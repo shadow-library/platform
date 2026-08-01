@@ -609,7 +609,7 @@ Every step is an API call over Postgres data — no grepping process logs to rec
 
 ## 10. Implementation Plan
 
-Prerequisites: migration-doc Phases 1–4 (scaffold, schema, domain CRUD, idempotent persistence). Each phase below ends green (`bun run type-check && bun run lint && bun test`); one commit per phase. Dependencies: A1 → A2/A3 (parallel-safe) → A4/A5/A6 → A7 → A8/A9 → A10 → A11.
+Prerequisites: migration-doc Phases 1–4 (scaffold, schema, domain CRUD, idempotent persistence). Each phase below ends green (`bun scripts/verify.ts apps/novel-forge-server` — format + lint + type-check + test); one commit per phase. Dependencies: A1 → A2/A3 (parallel-safe) → A4/A5/A6 → A7 → A8/A9 → A10 → A11.
 
 New dependencies (installed in A1–A5 as needed): `langchain`, `@langchain/core`, `@langchain/anthropic`, `@langchain/openai`, `@langchain/xai`, `@langchain/ollama`, `@langchain/langgraph`, `@langchain/langgraph-checkpoint-postgres`, `llamaindex`, `@llamaindex/postgres`, `zod`, `js-tiktoken`.
 

@@ -24,8 +24,8 @@ Backend dependency order: `common` → `class-schema`/`app` → `fastify` → `m
 
 - Internal dependencies are `workspace:*`. Nothing is published; there are no release workflows; `version` fields are frozen and carry no meaning.
 - A breaking change in `packages/*` must fix all its first-party consumers in the same change — affected-workspace CI and the e2e suite enforce this.
-- Per-workspace config files exist only where behavior genuinely differs from the root defaults. A new workspace needs only `package.json`, a `tsconfig.json` extending `tsconfig.base.json`, and source.
-- The server↔web API contract is **not** atomic: each web app's `api-types.gen.ts` is generated from a _running_ server (`generate:api-types` → `http://localhost:8080`). A server contract change requires regenerating consumer types and updating callers as coordinated work.
+- Per-workspace config files exist only where behavior genuinely differs from the defaults. A new workspace needs only `package.json`, a `tsconfig.json` extending its family file (`apps/tsconfig.server.json`, `apps/tsconfig.web.json`, or `packages/tsconfig.lib.json` — each in turn extending the root `tsconfig.base.json`), and source.
+- The server↔web API contract is **not** atomic: each web app's `api-types.gen.ts` is generated from a _running_ server (`generate:api-types` → `http://localhost:8080`). A server contract change requires regenerating consumer types and updating callers as coordinated work. Drift is CI-checked — `bun scripts/gen-api-types.ts <web-app>|--all --check` boots the paired server hermetically (no dev server needed) and fails if a fresh regeneration differs from the committed file.
 - Apps remain independently built, imaged, and deployed; the monorepo changes development, not runtime architecture.
 
 ## Working across workspaces
@@ -45,20 +45,22 @@ Every command runs **from the repo root** — workspaces carry no tooling script
 - The root tooling itself: `bun scripts/verify.ts scripts` — covers `scripts/` and the root-level configs.
 - Everything: `bun scripts/verify.ts --all`, or `bun run verify`.
 - Building: `bun scripts/build.ts <workspace>`, `--deps` for its dependency closure, `--all` for the whole repo in dependency order.
-- Whole platform: the `e2e` workspace runs cross-app flows against already-deployed service URLs supplied via environment variables (see `e2e/README` once it lands) — there is no local compose deployment in this plan.
+- Whole platform: the `e2e` workspace runs cross-app flows against already-deployed service URLs supplied via environment variables (see `e2e/.env.example`) — there is no local compose deployment in this plan.
 
 ## Tooling configuration
 
 Tooling is convention-driven; there is no bespoke config format. A workspace's type is inferred from its
-path and dependencies, its build `exports` from its `package.json` `exports` field. Lint rules live in
-ESLint's own `eslint.config.ts` (root, plus a per-workspace file only where a workspace genuinely deviates),
-formatting in the root `.prettierrc.json`, commit rules in the root `commitlint.config.ts`. The handful of
+path and dependencies, its build `exports` from its `package.json` `exports` field. Lint rules live in a
+single root ESLint flat config, `eslint.config.ts` — there is no per-workspace `eslint.config.ts`; every
+workspace deviation (rule overrides, extra globals, file-scoped exceptions) is a `files`-scoped block in
+that one file, grouped by concern. Formatting lives in the root `.prettierrc.json`, commit rules in the root
+`commitlint.config.ts`. The handful of
 build inputs that cannot be inferred — extra backend entrypoints, copied assets, a custom build command,
 the component build's alias/CSS options — go in a `"shadow"` key in that workspace's own `package.json`.
 
 ## Conventions
 
-- TypeScript strict everywhere; workspace `tsconfig.json` extends the root `tsconfig.base.json` (web apps extend `tsconfig.web.json`).
+- TypeScript strict everywhere; workspace `tsconfig.json` extends its family file — backends `apps/tsconfig.server.json`, web apps `apps/tsconfig.web.json`, `@lib/*`-style packages `packages/tsconfig.lib.json` — which in turn extends the root `tsconfig.base.json`.
 - Kebab-case filenames with role suffixes (`*.service.ts`, `*.controller.ts`, `*.dto.ts`, `*.spec.ts`); named exports with barrel `index.ts` files; section banner comments in source files; 2-space indent, semicolons, 180-column width.
 - Conventional Commits (`<type>(<scope>): <subject>`, imperative, lowercase).
 - Backends compose `@shadow-library/{common,app,class-schema,fastify,modules,auth}`; web apps compose `@shadow-library/{ui,web}`. Reach for the ecosystem packages before hand-rolling DI, config, logging, validation, HTTP, DB access, caching, UI, or transport.

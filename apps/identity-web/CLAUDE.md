@@ -79,20 +79,20 @@ Root tooling — always run from the **repo root**, by workspace path:
 
 This workspace's own scripts — run from **inside** `identity-web/`:
 
-| Purpose                                               | Command              |
-| ----------------------------------------------------- | -------------------- |
-| Install                                               | `bun install`        |
-| Dev (Vite + Start, port 3000)                         | `bun run dev`        |
-| Production start                                      | `bun run start`      |
-| Preview a build                                       | `bun run preview`    |
-| Type-check only                                       | `bun run type-check` |
-| E2E tests (Playwright — **needs the server running**) | `bun run test`       |
-| Install Playwright browser                            | `bun run test:setup` |
+| Purpose                       | Command           |
+| ----------------------------- | ----------------- |
+| Install                       | `bun install`     |
+| Dev (Vite + Start, port 3000) | `bun run dev`     |
+| Production start              | `bun run start`   |
+| Preview a build               | `bun run preview` |
 
-There is no `build`, `verify`, or `generate:api-types` script in this workspace's `package.json` — they are root
-tooling only. `bun scripts/verify.ts apps/identity-web` runs format + lint + type-check only (this workspace is a
-web app, so `verify` doesn't run tests by convention); Playwright is a separate step and requires a running
-`identity-server`. There is **no unit-test suite** — only e2e. Copy `.env.example` → `.env` before first run.
+There is no `build`, `verify`, `type-check`, `generate:api-types`, or `test` script in this workspace's
+`package.json` — they are root tooling only (or, for `test`, simply absent). `bun scripts/verify.ts
+apps/identity-web` runs format + lint + type-check only (type-check runs `tsc` directly against this
+workspace's tsconfig; this workspace is a web app, so `verify` doesn't run tests by convention). This
+workspace carries **no test suite** — browser e2e coverage was removed from the per-app Playwright setup
+and will be rebuilt in the root `e2e/` workspace; unit tests may be added here later if the app grows
+logic worth covering in isolation. Copy `.env.example` → `.env` before first run.
 
 ---
 
@@ -118,7 +118,8 @@ web app, so `verify` doesn't run tests by convention); Playwright is a separate 
 - **Hydration consistency.** `__root.tsx` owns the full document and sets `suppressHydrationWarning` where the
   theme runs a pre-paint boot script (`themeInitScript`, `data-theme`). Keep server and client render output
   deterministic and identical — no `Date.now()`/random/locale-dependent output during render; mount browser-only
-  widgets and devtools inside `ClientOnly`. `hydration.spec.ts` asserts zero mismatches.
+  widgets and devtools inside `ClientOnly`. (Hydration-mismatch coverage previously lived in a
+  `hydration.spec.ts` Playwright spec here; that suite was removed — see Commands above.)
 - **Error handling.** Narrow caught errors with `isApiError(cause)` (not `instanceof` — SSR and client bundles
   carry separate class identities); branch on `cause.status`/`cause.code`, read field errors from `cause.fields`
   (`[{ msg }]`), respect `cause.retryAfterSeconds` on 429. Statuses that resolve to a typed body instead of
@@ -133,9 +134,9 @@ web app, so `verify` doesn't run tests by convention); Playwright is a separate 
 - **UI** composes `@shadow-library/ui` components. Import `@shadow-library/ui/styles.css` once (via
   `src/styles.css`), theme with `data-theme` + `--sh-*`/`--si-*` tokens, style with co-located `*.module.css` CSS
   modules and the shipped utility classes. Do not add Tailwind or another styling system.
-- **Testing** with Playwright (`@playwright/test`), specs `*.spec.ts` in `tests/`, `test('should ...')`. Tests
-  drive the live backend through server functions and assert SSR HTML + auth redirects, so a running
-  `identity-server` is required.
+- **Testing.** This workspace has no test suite (see Commands above) — browser e2e coverage that used to
+  live here as `@playwright/test` specs under `tests/` was removed and will be rebuilt in the root `e2e/`
+  workspace against deployed services, not migrated in place.
 
 ---
 
@@ -164,7 +165,7 @@ shape, status code, error code, or auth requirement is a **both-repos** change:
 3. **Regenerate the API types** with `bun scripts/gen-api-types.ts apps/identity-web` against the running server
    (updates `api-types.gen.ts`; this file is excluded from format/lint).
 4. **Update every affected caller here** — the `*.api.ts` server function, its query/mutation hooks, callers,
-   `validateSearch`, fixtures, and Playwright specs.
+   `validateSearch`, and fixtures.
 5. **Verify BOTH workspaces** for a cross-repo change — `bun scripts/verify.ts apps/identity-web` and
    `bun scripts/verify.ts apps/identity-server` (and the relevant tests), from the repo root.
 
@@ -178,7 +179,7 @@ When you finish, report clearly:
 
 - **What changed** in `identity-web`.
 - **Which verification commands you actually ran** and their results (e.g. `bun scripts/verify.ts
-apps/identity-web`, `bun run type-check`, `bun run test`). For a cross-repo change, report `identity-web` and
+apps/identity-web`, `bun run test`). For a cross-repo change, report `identity-web` and
   `identity-server` **separately** and show verification for both.
 
 State plainly what passed, what failed (with output), and anything you skipped and why.

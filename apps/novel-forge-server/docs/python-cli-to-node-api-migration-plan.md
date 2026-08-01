@@ -783,18 +783,18 @@ The clone is independent (row-level isolation); running `extract`/`generate` on 
 ### Phase 1 — Project structure & dependencies
 
 - **Goal:** the app boots on the pulse architecture with Postgres wired.
-- **Files:** bump/add deps in `package.json` (match pulse `@shadow-library/*` versions; add `drizzle-orm`, `drizzle-kit`, AI stack §8.0); add scripts (`db:create-template`, `db:migrate`, `db:seed`); `tsconfig.json` path aliases (`@modules`, `@server`, `@scripts`, `@tests`); rewrite `bootstrap.ts` (drop `db.uri` mongo default; add `app.stage`, `database.postgres.url`, `ai.*` keys per §8.0, `storage.driver`+`storage.imageDir`); `constants.ts` (`APP_NAME='novel-forge'`); `drizzle.config.ts`; `common/` (enum.dto placeholder, data-transformers, index); a permissive `common/auth.guard.ts` (auth-ready seam, allows all now); update `classes/app-error-code.ts` groups; `database/database.module.ts` + `database.constants.ts` + `index.ts`; `modules/dynamic.modules.ts`; `app.module.ts` imports `[DatabaseModule, HttpRouteModule]`; `tests/test-environment.ts` + `scripts/create-template-db.ts`/`migrate-db.ts`/`seed.ts`.
-- **Tasks:** `bun install`; get `bun run dev` to boot against a local Postgres; `bun run type-check` clean.
-- **Acceptance:** app starts, `/api` responds, `bun run db:migrate` runs (empty schema).
-- **Commands:** `bun install && bun run type-check && bun run dev`.
+- **Files:** bump/add deps in `package.json` (match pulse `@shadow-library/*` versions; add `drizzle-orm`, `drizzle-kit`, AI stack §8.0); no per-workspace `db:*` scripts — DB commands run as `bun scripts/db.ts apps/novel-forge-server <generate|migrate|create-template|seed>` from the repo root; `tsconfig.json` path aliases (`@modules`, `@server`, `@scripts`, `@tests`); rewrite `bootstrap.ts` (drop `db.uri` mongo default; add `app.stage`, `database.postgres.url`, `ai.*` keys per §8.0, `storage.driver`+`storage.imageDir`); `constants.ts` (`APP_NAME='novel-forge'`); `drizzle.config.ts`; `common/` (enum.dto placeholder, data-transformers, index); a permissive `common/auth.guard.ts` (auth-ready seam, allows all now); update `classes/app-error-code.ts` groups; `database/database.module.ts` + `database.constants.ts` + `index.ts`; `modules/dynamic.modules.ts`; `app.module.ts` imports `[DatabaseModule, HttpRouteModule]`; `tests/test-environment.ts` + `scripts/create-template-db.ts`/`migrate-db.ts`/`seed.ts`.
+- **Tasks:** `bun install`; get `bun run dev` to boot against a local Postgres; `bunx tsc -p apps/novel-forge-server/tsconfig.json --noEmit` clean.
+- **Acceptance:** app starts, `/api` responds, `bun scripts/db.ts apps/novel-forge-server migrate` runs (empty schema).
+- **Commands:** `bun install && bunx tsc -p apps/novel-forge-server/tsconfig.json --noEmit && bun run dev`.
 
 ### Phase 2 — Database schema & migrations
 
 - **Goal:** full schema + pgvector.
 - **Files:** `database/schemas/{projects,chapters,knowledge,plan,story,bible,generation,jobs,vectors}.ts` + `index.ts` barrel; `common/enum.dto.ts` (EnumType from every pgEnum); pgvector extension SQL.
-- **Tasks:** author all tables/enums/relations/uniques/indexes (§6); `drizzle-kit generate`; add `CREATE EXTENSION vector`; `db:create-template`.
+- **Tasks:** author all tables/enums/relations/uniques/indexes (§6); `drizzle-kit generate`; add `CREATE EXTENSION vector`; `bun scripts/db.ts apps/novel-forge-server create-template`.
 - **Acceptance:** migrations apply cleanly; template DB builds; namespaced types infer.
-- **Commands:** `bunx drizzle-kit generate && bun run db:migrate && bun run db:create-template`.
+- **Commands:** `bunx drizzle-kit generate && bun scripts/db.ts apps/novel-forge-server migrate && bun scripts/db.ts apps/novel-forge-server create-template`.
 
 ### Phase 3 — Core domain modules (projects, chapters, entities, bible)
 
@@ -880,10 +880,10 @@ Use `bun:test` + `TestEnvironment` (template-DB clone per spec) + a **fake `Mode
 
 ## 12. Verification Checklist (run before final response)
 
-- [ ] `bun run type-check` — no errors (strict, `noUncheckedIndexedAccess`).
+- [ ] `bunx tsc -p apps/novel-forge-server/tsconfig.json --noEmit` — no errors (strict, `noUncheckedIndexedAccess`).
 - [ ] `bun run lint` — prettier + eslint clean (no `console`, import order, 180-col).
-- [ ] `bun test` — all specs pass (template DB required: `bun run db:create-template` first).
-- [ ] `bunx drizzle-kit generate` produces no pending diff (schema == migrations); `bun run db:migrate` applies cleanly incl. `CREATE EXTENSION vector`.
+- [ ] `bun test` — all specs pass (template DB required: `bun scripts/db.ts apps/novel-forge-server create-template` first).
+- [ ] `bunx drizzle-kit generate` produces no pending diff (schema == migrations); `bun scripts/db.ts apps/novel-forge-server migrate` applies cleanly incl. `CREATE EXTENSION vector`.
 - [ ] Every §4 command has a corresponding endpoint (§7) — including `consolidate`, `skeleton`, `outline`, `prompt`/`import`, `illustrate`, `backfill`, `reset`, `cost`, `resume`.
 - [ ] AI workflows verified with a mocked router: generation auto-fix loop, judge HARD/SOFT, finalize write-back, retrieval.
 - [ ] **No SQLite anywhere** — no `better-sqlite3`/`bun:sqlite` in the repo (no legacy migration; decision §1.1.1).

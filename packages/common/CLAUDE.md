@@ -21,7 +21,7 @@ always run from the **repo root** by path.
 | ------------------------------------------ | ------------------------------------------------------------------------------ |
 | Verify (format + lint + type-check + test) | `bun scripts/verify.ts packages/common` (autofix: `--fix`), from the repo root |
 | Run tests                                  | `bun test` (single file: `bun test tests/errors/app.error.spec.ts`)            |
-| Type-check                                 | `bun run type-check` (`tsc`)                                                   |
+| Type-check                                 | `bunx tsc -p packages/common/tsconfig.json --noEmit`, from the repo root       |
 | Build (ESM-only → `dist/`)                 | `bun scripts/build.ts packages/common`, from the repo root                     |
 
 There is no `build` or `verify` script in this package's own `package.json` — they are root tooling only. The

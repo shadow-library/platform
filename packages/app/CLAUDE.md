@@ -10,14 +10,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 bun install                  # Install dependencies
-bun run type-check           # TypeScript type checking (tsc)
 bun run test                 # Run all tests: unit (with coverage) + integration
 bun run test:unit            # Unit tests only (bun test + coverage)
 bun run test:integration     # Integration tests only
 
-# From the repo root, by workspace path — this package has no build/verify script:
+# From the repo root, by workspace path — this package has no build/verify/type-check script:
 bun scripts/verify.ts packages/app             # format (Prettier) + lint (ESLint) + type-check + test
 bun scripts/verify.ts packages/app --fix       # Auto-fix format + lint issues, then type-check + test
+bunx tsc -p packages/app/tsconfig.json --noEmit   # type-check only
 bun scripts/build.ts packages/app              # ESM-only, flat /dist with synthesized package.json
 ```
 

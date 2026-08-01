@@ -39,7 +39,7 @@ Backups: nightly logical dumps plus WAL archiving (platform tooling). To restore
 1. Provision a fresh Postgres, restore the latest base backup, replay WAL to the target time.
 2. Point a staging instance at it: set `DATABASE_POSTGRES_URL`, boot, and confirm
    `GET /health/ready` reports ready (checks Postgres, Redis, and an active signing key).
-3. Run `bun run db:migrate` — it must be a no-op for a healthy backup; a diff signals schema drift.
+3. Run `bun scripts/db.ts apps/identity-server migrate` (from the repo root) — it must be a no-op for a healthy backup; a diff signals schema drift.
 4. Integrity checks:
    - Audit chain: recompute `hash = SHA-256(prev_hash || canonical_row)` per organisation over
      `audit_events` and compare (chain fields: `previous_hash`, `hash`).

@@ -28,15 +28,17 @@ Read the doc section referenced by the current task before writing code; do not 
 
 ```bash
 bun run dev                 # watch-mode server (src/main.ts)
-bun run type-check          # tsc, no emit
 bun test                    # all tests (bunfig.toml enforces 90% coverage)
 bun test tests/foo.spec.ts  # single file
 bun test -t "pattern"       # single test by name
-bun run db:generate         # drizzle-kit generate → generated/drizzle/
-bun run db:migrate          # apply migrations (src/migrate.ts)
-bun run db:create-template  # build the template DB the test suite clones
-bun run db:seed             # seed local data
-bun run ai:smoke            # AI smoke check (scripts/ai-smoke.ts)
+
+# From the repo root — no workspace-local type-check/db scripts:
+bunx tsc -p apps/novel-forge-server/tsconfig.json --noEmit   # type-check only
+bun scripts/db.ts apps/novel-forge-server generate         # drizzle-kit generate → generated/drizzle/
+bun scripts/db.ts apps/novel-forge-server migrate           # apply migrations (src/migrate.ts)
+bun scripts/db.ts apps/novel-forge-server create-template    # build the template DB the test suite clones
+bun scripts/db.ts apps/novel-forge-server seed                # seed local data
+bun run ai:smoke            # AI smoke check (tests/ai/ai-smoke.ts)
 
 # from the repo root, by workspace path — this workspace has no build/verify script:
 bun scripts/verify.ts apps/novel-forge-server              # format + lint + type-check + test (add --fix to autofix)
@@ -51,7 +53,7 @@ bun scripts/build.ts apps/novel-forge-server                # bundle to dist/mai
 - **Layout:** `src/modules/<feature>/` for domain modules, `src/modules/ai/` per design-doc §1.4, `src/database/schemas/` for Drizzle schemas. HTTP wiring lives in `src/modules/dynamic.modules.ts` (`HttpCoreModule.forRoot` + `FastifyModule.forRoot` importing every feature module) — there is no `src/routes/` directory.
 - **Errors:** extend `AppErrorCode` (`src/classes/app-error-code.ts`, which extends `ServerErrorCode`) via its `notFound`/`badRequest`/`conflict`/`unauthenticated` factories and throw with `.create()`; error-code groups (`PRJ`, `SRC`, `CHP`, `AI`, …) per migration-doc §7.6.
 - **Responses & DB:** bind status + response schema with `@RespondFor(status, Dto)` / `@HttpStatus(n)` and return the plain object (the DTO serializes it — only declared fields leak, `bigint`→string, `Date`→ISO). Services get the Drizzle client via `this.databaseService.getPostgresClient() as PrimaryDatabase` and map constraint violations by chaining `.catch(err => this.databaseService.translateError(err))` on writes.
-- **Imports:** path aliases `@server/* → src/*`, `@modules/* → src/modules/*`, `@scripts/* → scripts/*`, `@tests/* → tests/*` are used across both source and tests (mixed with relative imports) — follow the neighbouring files.
+- **Imports:** path aliases `@server/* → src/*`, `@modules/* → src/modules/*`, `@tests/* → tests/*` are used across both source and tests (mixed with relative imports) — follow the neighbouring files.
 - **File style:** every source file uses the section banner comments (`Importing packages with side effects` / `Importing npm packages` / `Importing user defined packages` / `Defining types` / `Declaring the constants`) — match the existing files. Prettier: 180 print width, single quotes.
 - **Commits:** Conventional Commits enforced by commitlint (`<type>(<scope>): <subject>`, imperative, lowercase, ≤100-char lines). One commit per completed task.
 

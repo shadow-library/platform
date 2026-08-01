@@ -27,7 +27,7 @@
 | Styling             | **CSS Modules** + CSS custom-property design tokens                                                                                                                                                                                                                                                                                                                                                         |
 | Build               | `bun scripts/build.ts packages/ui` (root `scripts/` tooling, run from the repo root, `type: component`) — native Rollup (`rollup-plugin-esbuild`) + PostCSS (`rollup-plugin-postcss`, `postcss-import`) CSS-Modules pipeline with `'use client'` banners; the build synthesizes `dist/package.json`                                                                                                         |
 | Types               | `tsc` (declaration emit) + `tsc-alias`                                                                                                                                                                                                                                                                                                                                                                      |
-| Lint / format       | `bun scripts/verify.ts packages/ui` (root `scripts/` tooling, run from the repo root) — Prettier (root `.prettierrc.json`) + ESLint flat config: the root `eslint.config.ts` base (typescript-eslint + perfectionist + react/react-hooks/jsx-a11y) extended by this package's own `eslint.config.ts`                                                                                                        |
+| Lint / format       | `bun scripts/verify.ts packages/ui` (root `scripts/` tooling, run from the repo root) — Prettier (root `.prettierrc.json`) + ESLint flat config: the single root `eslint.config.ts` (typescript-eslint + perfectionist + react/react-hooks/jsx-a11y base, plus `packages/ui/**`-scoped blocks for this package's own deviations — there is no local `eslint.config.ts`)                                     |
 | Tests               | Vitest — `unit` project (happy-dom) + `storybook` project (Playwright/Chromium) + Testing Library                                                                                                                                                                                                                                                                                                           |
 | Docs / visual QA    | Storybook 10 (`@storybook/react-vite`)                                                                                                                                                                                                                                                                                                                                                                      |
 | Composition         | `@radix-ui/react-slot` (the sanctioned `asChild` Slot)                                                                                                                                                                                                                                                                                                                                                      |
@@ -48,7 +48,7 @@ ui/
 │   ├── main.ts               # Framework, addons, stories globs, Vite aliases
 │   ├── preview.tsx           # Imports global CSS, light/dark theme toolbar
 │   └── foundations/          # Token-gallery stories (design docs, not shipped)
-├── scripts/
+├── tests/
 │   └── ssr-smoke.mjs         # Standalone SSR import-safety smoke test for the built dist/ (driven by ssr.dist.test.ts)
 ├── src/
 │   ├── components/           # One folder per component (see Component Standards)
@@ -61,7 +61,6 @@ ui/
 │   │   └── index.css         # Aggregates tokens.css + reset.css + utilities.css (the global entry)
 │   ├── types.ts              # Shared public types
 │   └── index.ts              # Package entry: imports global CSS, re-exports public API
-├── eslint.config.ts          # This package's lint deviations, layered on the root eslint.config.ts
 ├── package.json              # Also carries the `"shadow"` key: the build's non-inferable css + alias options
 ├── tsconfig.json             # Base TS config (strict; @/* → src/*)
 ├── tsconfig.build.json       # Declaration-emit config for the build

@@ -65,7 +65,15 @@ Backend: `common` → `class-schema`/`app` → `fastify` → `modules` (+ `auth`
 - `.prettierrc.json` (plus `.prettierignore`) and `commitlint.config.ts` exist **only at the repo root**
   — no workspace has its own copy. `verify.ts` runs prettier from the repo root so the root config and
   ignore files always apply.
-- Most per-workspace `.gitignore` files were consolidated into the root `.gitignore`; `tsconfig.web.json`
-  at the root holds the compiler options the 4 web apps share.
+- Most per-workspace `.gitignore` files were consolidated into the root `.gitignore`. tsconfig now has a
+  three-tier hierarchy: root `tsconfig.base.json` ← family files (`apps/tsconfig.server.json` for the 4
+  backends, `apps/tsconfig.web.json` for the 4 web apps, `packages/tsconfig.lib.json` for the `@lib/*`-
+  style packages) ← per-workspace leaf, with real deltas layered where they exist. Family files use TS
+  5.5+'s `${configDir}` template variable for `include` only (safe — only `tsc` reads it); `paths` stays
+  declared per-leaf, plain `./`-relative, because Bun's runtime resolver does not implement `${configDir}`
+  correctly across a multi-level `extends` chain (it substitutes the declaring file's own directory, not
+  the leaf's — confirmed breaking `bun test`/`bun run` alias resolution when tried). Root
+  `tsconfig.web.json`/`tsconfig.build.base.json` were moved to `apps/tsconfig.web.json`/
+  `packages/tsconfig.build.json` respectively as part of that split.
 - Husky hooks (`.husky/pre-commit`, `.husky/commit-msg`) live once at the repo root and fan out per
   affected target (see `tooling-and-ci-wiring.md`).

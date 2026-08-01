@@ -133,6 +133,6 @@ Original/Converted toggle and per-row re-run, manuscript download. Sidebar entry
 
 ## 10. Verification
 
-Per task: `bun run type-check && bun run lint && bun test` (server) / type-check + build (web). Mocked-model suites cover the graph and executor end-to-end. Live
+Per task: `bun scripts/verify.ts apps/novel-forge-server` (server, format + lint + type-check + test) / type-check + build (web). Mocked-model suites cover the graph and executor end-to-end. Live
 smoke: small source project → `PUT config` with a directive → `POST rebrand` with `{limit: 3}` → watch `GET /rebrand` → inspect `chapter_conversions`,
 `rebrand_glossary`, `model_calls` → `GET /manuscript`.

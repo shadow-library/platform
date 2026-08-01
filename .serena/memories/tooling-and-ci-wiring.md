@@ -56,9 +56,11 @@ directly against `scripts/`, `.github/workflows/ci.yml`, and `.husky/*` in this 
   and `packages/{fastify,ui,web}`. Formatting: root `.prettierrc.json` + `.prettierignore`. Commits:
   root `commitlint.config.ts` + `@commitlint/cli`.
 - Root files that came with this: `eslint.config.ts`, `eslint-plugins.d.ts`, `commitlint.config.ts`,
-  `tsconfig.json` (the root tooling project), `tsconfig.web.json` (shared web-app compiler options, which
-  the 4 web apps extend), `.prettierignore`. Most per-workspace `.gitignore` files were consolidated into
-  the root one.
+  `tsconfig.json` (the root tooling project), `.prettierignore`. Most per-workspace `.gitignore` files
+  were consolidated into the root one. The web-app-shared tsconfig moved from root `tsconfig.web.json` to
+  `apps/tsconfig.web.json` (sibling family file `apps/tsconfig.server.json` for the 4 backends); the
+  build-only tsconfig moved from root `tsconfig.build.base.json` to `packages/tsconfig.build.json`, and a
+  new `packages/tsconfig.lib.json` covers the `@lib/*`-style packages — see `monorepo-workspace-map.md`.
 - Root `package.json` scripts: `prepare` (husky), `type-check`, `verify` (= `bun scripts/verify.ts
   --all`), `build` (= `bun scripts/build.ts --all`), `test` (= `bun run --filter '*' test`, the one
   remaining `--filter` use, since workspaces keep their own `test` scripts).
@@ -76,12 +78,16 @@ workspace wires its own husky hooks — don't add one when scaffolding a new wor
 ## CI (`.github/workflows/ci.yml`) — single workflow, no separate publish job
 
 1. A `changes` job diffs against the merge-base and expands the changed files into affected workspace
-   names: `apps/<x>/**` → that app only; `e2e/**` → `e2e` only; anything under `packages/**`,
-   `scripts/**`, or root config (`package.json`, `bun.lock`, `tsconfig.base.json`, `tsconfig.json`,
-   `tsconfig.web.json`, `.prettierrc.json`, `eslint.config.ts`, `eslint-plugins.d.ts`,
-   `commitlint.config.ts`, the workflow file itself) → **every** workspace. Workspaces are enumerated
-   from the filesystem at run time, not hardcoded — a new `apps/*`/`packages/*` needs no workflow edit —
-   plus the non-workspace `scripts` target.
+   names: `apps/<x>/**` → that app only; `e2e/**` → `e2e` only; anything under `packages/**` (also
+   matches the `packages/tsconfig.lib.json`/`packages/tsconfig.build.json` family files), `scripts/**`,
+   or root config (`package.json`, `bun.lock`, `tsconfig.base.json`, `tsconfig.json`,
+   `apps/tsconfig.server.json`, `apps/tsconfig.web.json`, `.prettierrc.json`, `eslint.config.ts`,
+   `eslint-plugins.d.ts`, `commitlint.config.ts`, the workflow file itself) → **every** workspace. The two
+   `apps/tsconfig.*.json` family-file paths are matched explicitly (checked before the generic `apps/*` →
+   single-app rule), since that generic rule would otherwise misroute a family-file change to one app
+   instead of every backend/web app. Workspaces are enumerated from the filesystem at run time, not
+   hardcoded — a new `apps/*`/`packages/*` needs no workflow edit — plus the non-workspace `scripts`
+   target.
 2. One `verify` matrix job per affected workspace (`fail-fast: false`, capped parallelism). Each job
    builds that workspace's `workspace:*` dependency closure first (`bun scripts/build.ts <ws> --deps` —
    the dependency-closure selector Bun's `--filter` never offered, so CI no longer has to build every

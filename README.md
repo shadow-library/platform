@@ -28,7 +28,7 @@ packages/
   web                     frontend wiring: transport, router/SSR, PWA, production server
 e2e/                      cross-app Playwright suite, run against deployed instances via E2E_* env vars
 scripts/                  the repo's own tooling — runnable Bun scripts (build, verify, API-type generation, migration drift)
-docker/                   one parameterized Dockerfile builds every app from the repo root
+docker/                   README documenting the per-app apps/*/Dockerfile build contract
 ```
 
 Everything internal resolves as `workspace:*` — nothing is published to npm; a breaking package change and every consumer fix land in the same commit, enforced by affected-workspace CI and the cross-app e2e suite.
@@ -41,7 +41,7 @@ bun run verify                         # format, lint, type-check, tests — eve
 bun run build                          # build every workspace, in dependency order
 bun scripts/verify.ts packages/common  # or scope either to one workspace
 bun scripts/build.ts apps/pulse-server --deps
-docker build -f docker/Dockerfile --build-arg APP=<app> --target runtime-<kind> .
+docker build -f apps/<app>/Dockerfile .        # each app owns its own hand-maintained Dockerfile — see its header comment for the exact invocation
 ```
 
 Tooling is convention-driven: a workspace's type and build inputs are inferred from its path, dependencies, and `package.json` `exports`. Lint, format, and commit rules live in the tools' own config files at the root.

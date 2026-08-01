@@ -1,20 +1,7 @@
 # Novel Forge Server
 
-Backend service for an AI-powered novel generation platform. Guides authors from a raw idea through story bible creation, volume planning, chapter generation, continuity validation, and final manuscript assembly — with human review at every stage.
-
-## Stack
-
-| Layer             | Technology                                                         |
-| ----------------- | ------------------------------------------------------------------ |
-| Runtime           | [Bun](https://bun.sh)                                              |
-| Language          | TypeScript (strict, ESM)                                           |
-| HTTP              | [Fastify](https://fastify.dev) via `@shadow-library/fastify`       |
-| DI                | `@shadow-library/app` (NestJS-style modules)                       |
-| Database          | PostgreSQL 16 + [Drizzle ORM](https://orm.drizzle.team) + pgvector |
-| AI orchestration  | LangGraph (multi-step workflows)                                   |
-| AI providers      | Anthropic Claude, xAI Grok, OpenAI GPT, Ollama (local)             |
-| Retrieval         | LlamaIndex.TS + pgvector (prose + lore indexes)                    |
-| Schema validation | Zod                                                                |
+Backend service for an AI-powered novel generation platform. See `CLAUDE.md` for architecture,
+conventions, and the source-of-truth design docs.
 
 ## Environment Variables
 
@@ -42,36 +29,18 @@ All keys are declared in `src/bootstrap.ts`. Keys marked **required in prod** mu
 | `STORAGE_DRIVER`        | `local`                  | Storage driver (`local` only currently)      |
 | `STORAGE_IMAGE_DIR`     | `./images`               | Directory for generated images               |
 
-## Commands
+## AI-specific commands
 
 ```bash
-# Development
-bun run dev               # Start with watch-mode (src/main.ts)
-bun run type-check        # Run tsc (no emit)
-
-# From the repo root, by workspace path — this workspace has no build/verify script:
-bun scripts/build.ts apps/novel-forge-server   # bundle to dist/main.js
-bun scripts/verify.ts apps/novel-forge-server  # format + lint + type-check + test (add --fix to auto-fix)
-
-# Database
-bun run db:migrate        # Run Drizzle migrations
-bun run db:create-template  # Create template DB for parallel tests
-bun run db:seed           # Seed the database with initial data
-
-# Tests
-bun test                  # All tests (90% coverage threshold enforced)
-bun test tests/foo.spec.ts            # Single file
-bun test -t "pattern"                 # By test name
-
-# AI test aliases
-bun run test:ai:unit      # Prompt, model-router, and context-assembler unit tests
-bun run test:ai:graph     # LangGraph workflow tests
-bun run test:ai:tools     # Tool registry tests
-bun run test:ai:local     # Ollama local integration tests (requires Ollama)
+# Test aliases (bun run <script>)
+test:ai:unit      # Prompt, model-router, and context-assembler unit tests
+test:ai:graph     # LangGraph workflow tests
+test:ai:tools     # Tool registry tests
+test:ai:local     # Ollama local integration tests (requires Ollama)
 
 # AI utilities
-bun run ai:smoke          # Smoke test against all configured providers
-bun run ai:pull-models    # Pull required Ollama models
+ai:smoke          # Smoke test against all configured providers
+ai:pull-models    # Pull required Ollama models
 ```
 
 ## API Overview
@@ -161,9 +130,9 @@ bun run dev
 Tests use a `_template` database to spin up isolated per-test databases without running migrations each time:
 
 ```bash
-# One-time setup:
-bun run db:migrate
-bun run db:create-template
+# One-time setup (from the repo root):
+bun scripts/db.ts apps/novel-forge-server migrate
+bun scripts/db.ts apps/novel-forge-server create-template
 
 # Then run tests normally:
 bun test

@@ -2,10 +2,10 @@
 
 Load this when writing or changing frontend code. First determine the rendering model — do NOT assume:
 
-| Signal | Model | Example workspace |
-| --- | --- | --- |
-| No `@tanstack/react-start` dep, `ReactDOM.createRoot` (inferred type `spa`) | Client-rendered SPA — no server render pass; no SSR-only code, no `hydrateRoot`, no server functions | `apps/pulse-web` |
-| `@tanstack/react-start` dep (inferred type `ssr`) | SSR (TanStack Start) — render must be deterministic server/client; browser APIs only in effects/handlers | `apps/identity-web`, `apps/novel-forge-web`, `apps/web-novel-web` |
+| Signal                                                                      | Model                                                                                                    | Example workspace                                                                   |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| No `@tanstack/react-start` dep, `ReactDOM.createRoot` (inferred type `spa`) | Client-rendered SPA — no server render pass; no SSR-only code, no `hydrateRoot`, no server functions     | none currently — all four web apps are `ssr` (`pulse-web` converted from `spa`)     |
+| `@tanstack/react-start` dep (inferred type `ssr`)                           | SSR (TanStack Start) — render must be deterministic server/client; browser APIs only in effects/handlers | `apps/identity-web`, `apps/novel-forge-web`, `apps/pulse-web`, `apps/web-novel-web` |
 
 (The type is inferred from the workspace's path and dependencies — there is no config file declaring it.)
 

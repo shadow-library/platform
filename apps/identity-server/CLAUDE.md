@@ -48,9 +48,10 @@ one client belongs **here**, not in the web app.
 ## Working rules
 
 1. **Check the current working directory before running any command.** `build`/`verify`/`gen-api-types`/
-   `check-migrations` are root tooling and always run from the **repo root** by path
-   (`bun scripts/verify.ts apps/identity-server`); this workspace's own scripts (`dev`, `test`, `db:*`, …) run from
-   **inside** `identity-server/` (confirm with `pwd`). Never mix the two up.
+   `check-migrations`/type-check (`bunx tsc -p apps/identity-server/tsconfig.json --noEmit`) are root
+   tooling and always run from the **repo root** by path (`bun scripts/verify.ts apps/identity-server`);
+   this workspace's own scripts (`dev`, `test`, …) run from **inside** `identity-server/` (confirm with
+   `pwd`). Never mix the two up.
 2. **Read the existing related code before editing.** Find the neighbouring controller/service/DTO/schema and
    follow its conventions. Don't add a second way to do something that already has one.
 3. **Prefer minimal, focused changes over broad refactors.** Touch only what the task requires; no opportunistic
@@ -78,20 +79,25 @@ Root tooling — always run from the **repo root**, by workspace path:
 
 This workspace's own scripts — run from **inside** `identity-server/`:
 
-| Purpose                 | Command                      |
-| ----------------------- | ---------------------------- |
-| Install                 | `bun install`                |
-| Dev server (watch)      | `bun run dev`                |
-| Dev worker (watch)      | `bun run dev:worker`         |
-| Type-check only         | `bun run type-check`         |
-| Test                    | `bun test`                   |
-| Generate a migration    | `bun run db:generate`        |
-| Apply migrations        | `bun run db:migrate`         |
-| Create test template DB | `bun run db:create-template` |
+| Purpose            | Command              |
+| ------------------ | -------------------- |
+| Install            | `bun install`        |
+| Dev server (watch) | `bun run dev`        |
+| Dev worker (watch) | `bun run dev:worker` |
+| Test               | `bun test`           |
 
-There is no `build`, `verify`, or `check-migrations` script in this workspace's `package.json` — they are root
-tooling only. Lint and format have **no standalone scripts** either — they run through `bun scripts/verify.ts`;
-use `--fix` to auto-apply. Copy `.env.example` → `.env` before first run.
+There is no `build`, `verify`, `type-check`, `check-migrations`, or `db:*` script in this workspace's
+`package.json` — they are root tooling only, run by path from the **repo root**:
+
+| Purpose                 | Command                                                   |
+| ----------------------- | --------------------------------------------------------- |
+| Type-check only         | `bunx tsc -p apps/identity-server/tsconfig.json --noEmit` |
+| Generate a migration    | `bun scripts/db.ts apps/identity-server generate`         |
+| Apply migrations        | `bun scripts/db.ts apps/identity-server migrate`          |
+| Create test template DB | `bun scripts/db.ts apps/identity-server create-template`  |
+
+Lint and format have **no standalone scripts** either — they run through `bun scripts/verify.ts`; use `--fix`
+to auto-apply. Copy `.env.example` → `.env` before first run.
 
 ---
 
@@ -100,7 +106,7 @@ use `--fix` to auto-apply. Copy `.env.example` → `.env` before first run.
 - **File section banners** open every source file (except barrels), in order, keeping empty ones:
   `Importing packages with side effects` → `Importing npm packages` → `Importing user defined packages` →
   `Defining types` → `Declaring the constants`. npm imports first, then internal (`@server/*`, `@modules/*`,
-  `@scripts/*` aliases or relative), separated by a blank line.
+  `@tests/*` aliases or relative), separated by a blank line.
 - **Feature modules** live in `src/modules/<domain>/<feature>/` as `*.module.ts` / `*.controller.ts` /
   `*.dto.ts` / `*.service.ts` / `*.constants.ts` / `*.types.ts`, each with a barrel `index.ts`.
 - **Controllers are thin adapters.** `@HttpController('/api/v1/...')` with **full explicit paths** (no global
@@ -135,11 +141,13 @@ use `--fix` to auto-apply. Copy `.env.example` → `.env` before first run.
   `db.query.*.findFirst`, `.transaction(...)`, `and/eq/inArray`). Wrap writes so constraint violations surface as
   domain errors: `.catch(error => this.databaseService.translateError(error))`, with the `constraintErrorMap`
   (`datastore.constants.ts`) mapping constraint names → prebuilt `AppError`s. No raw try/catch at call sites.
-  Schema changes go through `bun run db:generate` → committed SQL in `generated/drizzle` (also a build asset).
+  Schema changes go through `bun scripts/db.ts apps/identity-server generate` (from the repo root) → committed
+  SQL in `generated/drizzle` (also a build asset).
 - **Testing** with `bun test`. Specs are `*.spec.ts` under `tests/<domain>/`. Boot the real app via
   `TestEnvironment` / `ShadowFactory` (clones a per-suite DB from a migrated template); drive HTTP through the
   router (`getRouter()`), using the `csrfPair()` helper for cookie-auth mutations. `describe('UnitOrRoute')` →
-  `it('should ...')`. Coverage threshold is 0.9.
+  `it('should ...')`. Coverage threshold is ratcheted (see `bunfig.toml`) — Bun enforces it per file, and it
+  rises toward 0.9 as real gaps close, not as a number to relax.
 
 ---
 
@@ -186,7 +194,7 @@ When you finish, report clearly:
 
 - **What changed** in `identity-server`.
 - **Which verification commands you actually ran** and their results (e.g. `bun scripts/verify.ts
-apps/identity-server`, `bun test`, `bun run type-check`). For a cross-repo change, report `identity-server` and
+apps/identity-server`, `bun test`). For a cross-repo change, report `identity-server` and
   `identity-web` **separately** and
   show verification for both.
 

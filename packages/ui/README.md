@@ -1,38 +1,16 @@
 # @shadow-library/ui
 
-Shared UI components, layout primitives, and utilities for all Shadow Library apps.
-
-## Installation
-
-```sh
-# npm
-npm install @shadow-library/ui
-
-# bun
-bun add @shadow-library/ui
-```
-
-### Peer Dependencies
-
-```sh
-# npm
-npm install react react-dom
-
-# bun
-bun add react react-dom
-```
-
-`@tanstack/react-router` is an optional peer, required only for the `NavProgress` component — imported from the [`@shadow-library/ui/router`](#server-side-rendering-ssr) subpath, not the package root, so apps that don't use it never need the peer installed.
+Shared UI components, layout primitives, and utilities for all Shadow Library apps. Full component/export
+list: `.claude/skills/shadow-library-ecosystem/references/api-catalog.md`. Development conventions: this
+package's `CLAUDE.md`.
 
 ## Setup
 
-Shadow UI is styled with **CSS Modules and CSS-variable design tokens** — there is no provider to mount. Import the stylesheet once at your app root:
+Import the stylesheet once at your app root:
 
 ```ts
 import '@shadow-library/ui/styles.css';
 ```
-
-This ships the `--sh-*` design tokens, a minimal reset, the unprefixed utility classes, and every component's scoped styles.
 
 ### Theming
 
@@ -42,65 +20,17 @@ Switch theme by toggling `data-theme` (or the `dark` class) on `<html>`, and set
 <html data-theme="dark" data-density="compact"></html>
 ```
 
-Retheme by overriding any token at any scope — the tokens are the single source of truth:
-
-```css
-:root {
-  --sh-accent: #7c3aed;
-}
-```
-
 An `@layer`-wrapped variant (`@shadow-library/ui/styles.layer.css`) is also published for consumers who want to de-prioritize the library's styles in the cascade.
 
 ## Server-side rendering (SSR)
 
-The package is safe to import and render on the server (Node, Next.js, Remix, Astro, …). It ships one universal ESM build with no runtime style injection — styles are a static stylesheet, so there is nothing to collect or flush during SSR. Components server-render to stable markup and hydrate without mismatches, provided you observe the notes below.
+The package ships one universal ESM build with no runtime style injection, so there is nothing to collect or flush during SSR. Components server-render to stable markup and hydrate without mismatches, provided you observe these notes:
 
 - **Deterministic formatting.** Number/date components (`Statistic`, `Pagination`, `Calendar`, `DatePicker`, `DateRangePicker`, and `formatLongDate`) format with a pinned **`en-US`** default so the server and the browser always produce identical text. Pass a `locale` prop to localize — use the **same** locale on the server and the client.
 - **Time-dependent UI resolves after mount.** `Calendar` (the "today" marker) and `NotificationList` ("Today"/"Yesterday" headers) read the wall clock, which differs between server and client, so they render a clock-free result on the server and resolve the current day after hydration. Pass `today` / `now` to make them fully deterministic during SSR.
 - **Platform detection resolves after mount.** `Kbd` renders the non-Mac form (`Ctrl`) on the server and switches to `⌘` on macOS after hydration. Pass `mac` to pin it.
 - **Imperative overlays are client-only.** `toast`, `bannerStore`, and their outlets (`<Toaster />`, `<BannerOutlet />`) are client-side imperative APIs. Their state is never emitted into server HTML — render `<Toaster />` / `<BannerOutlet />` at your app root and drive them from client code. (They are module singletons; treat them as client-only and never call `toast()` during server render.)
-- **Router-bound UI lives on a subpath.** `NavProgress` is exported from `@shadow-library/ui/router` (it depends on the optional `@tanstack/react-router` peer); importing the package root never pulls that peer in. Router hooks and data utilities such as `useSearchParams` now live in [`@shadow-library/web`](https://github.com/shadow-library/web).
-
-## App foundation (providers & utilities)
-
-Shared, framework-level building blocks the Shadow apps all need — standardized here so they stay consistent and SSR-safe.
-
-- **`ThemeProvider` / `useTheme` / `themeInitScript`** — owns the light/dark choice. Styling flips on `data-theme` (and `.dark`) at the document root, so there's no visual chrome to mount. Inline `themeInitScript()` in the document `<head>` to apply the persisted (or OS-preferred) theme before first paint; the provider then reconciles React state after mount. SSR-safe: server and first client render use the deterministic `defaultTheme` (light), so hydration never mismatches. Configure with `defaultTheme` and `storageKey`.
-
-  ```tsx
-  // document head (server): <script dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
-  <ThemeProvider>
-    <App />
-  </ThemeProvider>
-  // anywhere: const { theme, toggleTheme } = useTheme();
-  ```
-
-- **`ClientOnly`** — renders its children only after the client mounts (via `useSyncExternalStore`), so a genuinely browser-only subtree can't corrupt hydration. Optional `fallback` renders on the server and until mount.
-- **`NavProgress`** (from `@shadow-library/ui/router`) — a thin, `aria-hidden` top progress bar reflecting the router's pending state.
-- **Utilities** (root export): `derivePaginationState(total, page, limit)` / `calculatePageUpdate(info, page)` (pure, SSR-safe pagination math), `toPositiveInt`, `copyText`, `downloadTextFile`, `getInitials`.
-
-## Components
-
-Every component is tree-shakeable, themeable via `--sh-*` tokens, and importable directly:
-
-```ts
-import { Button, Dialog, Select } from '@shadow-library/ui';
-```
-
-| Category               | Components                                                                                                                                                                                                        |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Actions**            | `Button`, `ButtonGroup`, `IconButton`                                                                                                                                                                             |
-| **Forms & Inputs**     | `Checkbox`, `ColorPicker`, `Combobox`, `FileUpload`, `FormField`, `Input`, `MultiSelect`, `NumberStepper`, `OtpInput`, `RadioGroup`, `Rating`, `RTEField`, `Select`, `Slider`, `Switch`, `Textarea`, `TokenInput` |
-| **Date & Time**        | `Calendar`, `DatePicker`, `DateRangePicker`, `TimePicker`                                                                                                                                                         |
-| **Overlays & Menus**   | `BottomSheet`, `CommandPalette`, `ContextMenu`, `Dialog`, `Drawer`, `DropdownMenu`, `HoverCard`, `Popover`, `Tooltip`                                                                                             |
-| **Feedback & Status**  | `Alert`, `Banner`, `EmptyState`, `NotificationCenter`, `Progress`, `Skeleton`, `Spinner`, `Toast`                                                                                                                 |
-| **Navigation**         | `Breadcrumbs`, `Pagination`, `Sidebar`, `Tabs`, `TopNavigation`                                                                                                                                                   |
-| **Data Display**       | `Avatar`, `Badge`, `Card`, `DataGrid`, `DescriptionList`, `Kbd`, `SegmentedControl`, `Statistic`, `Table`, `Tag`, `Timeline`, `TreeView`                                                                          |
-| **Disclosure**         | `Accordion`, `Stepper`                                                                                                                                                                                            |
-| **Layout & Structure** | `Shell`, `SplitPane`                                                                                                                                                                                              |
-
-Every component exposes props for `variant`/`size`/`intent` (where applicable), controlled and uncontrolled state, and `asChild` composition where the design calls for it. Full prop tables, usage examples, and visual previews are in Storybook (see _Full Documentation_ below).
+- **Router-bound UI lives on a subpath.** `NavProgress` is exported from `@shadow-library/ui/router` (it depends on the optional `@tanstack/react-router` peer); importing the package root never pulls that peer in.
 
 ### App Shell
 
@@ -144,7 +74,7 @@ A `Page` inside a shell contributes only its header — the shell already suppli
 
 Alongside components, Shadow UI ships a small, hand-authored set of utility classes for composing layout in your **own** markup around library components (e.g. spacing a `Card` and a `Button` apart, or laying out a form grid). Every value is drawn from the same `--sh-*` design tokens as the components themselves — no ad hoc pixel values.
 
-These are additive and optional: no component depends on them internally.
+These are additive and optional: no component depends on them internally. **This table is the authoritative list — `CLAUDE.md` requires any new utility to be added here.**
 
 ```tsx
 <div className="flex items-center justify-between gap-16 p-24">
@@ -226,18 +156,6 @@ Gap classes follow the same scale: `gap-*`, `gap-x-*`, `gap-y-*`.
 | `select-none`, `pointer-events-none`   | `user-select` / `pointer-events`                   |
 | `sr-only`                              | Visually hidden, still available to assistive tech |
 
-## Data, transport, and framework wiring
+## Relationship to `@shadow-library/web`
 
-The HTTP client (`APIRequest`), error model (`ApiError`), OpenAPI code generation (`generateApi`), and router hooks (`useSearchParams`) that used to live here now live in [`@shadow-library/web`](https://github.com/shadow-library/web) — Shadow UI is a component + design-token library only.
-
-## Full Documentation
-
-Component props, usage examples, and visual previews are available in Storybook.
-
-```sh
-npm run storybook
-```
-
-## License
-
-MIT
+The HTTP client (`APIRequest`), error model (`ApiError`), OpenAPI code generation (`generateApi`), and router hooks (`useSearchParams`) live in `@shadow-library/web` — Shadow UI is a component + design-token library only.

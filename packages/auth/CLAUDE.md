@@ -33,7 +33,7 @@ hand-rolling config, logging, errors, or validation.
 | Install                                    | `bun install`                                                                                                                 |
 | Verify — format + lint + type-check + test | `bun run verify`                                                                                                              |
 | Verify with autofix                        | `bun run verify --fix`                                                                                                        |
-| Type-check only                            | `bun run type-check`                                                                                                          |
+| Type-check only                            | `bunx tsc -p packages/auth/tsconfig.json --noEmit`, from the repo root                                                        |
 | Test                                       | `bun test`                                                                                                                    |
 | Build                                      | `bun run build`                                                                                                               |
 | Release                                    | Retired — this package is private and not published; `shadow commit-msg` + root Husky still enforce the commit-message format |

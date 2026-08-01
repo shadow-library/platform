@@ -10,26 +10,28 @@ Pulse Server is a multi-channel notification service (SMS, Email, Push, WhatsApp
 
 ```bash
 bun run dev              # Start dev server with watch mode
-bun run type-check       # TypeScript type checking (tsc, no emit)
 bun test                 # Run all tests
 bun test tests/notification/notification.spec.ts  # Run a single test file
 
-# Database
-bun run db:create-template  # Create template database (required before tests)
-bun run db:migrate          # Run migrations
-bun run db:seed             # Seed initial data
-
-# From the repo root, by workspace path — this workspace has no build/verify script:
-bun scripts/build.ts apps/pulse-server    # single-file dist/main.js + dist/migrate-db.js
+# From the repo root, by workspace path — this workspace has no build/verify/type-check/db:* script:
+bun scripts/build.ts apps/pulse-server    # single-file dist/main.js + dist/migrate.js
 bun scripts/verify.ts apps/pulse-server   # prettier + eslint + type-check + tests (add --fix to autofix)
+bunx tsc -p apps/pulse-server/tsconfig.json --noEmit   # type-check only
+
+# Database (also from the repo root)
+bun scripts/db.ts apps/pulse-server create-template  # Create template database (required before tests)
+bun scripts/db.ts apps/pulse-server migrate          # Run migrations
+bun scripts/db.ts apps/pulse-server seed             # Seed initial data
 ```
 
 All root-tooling scripting (build, lint, format, commit-msg linting) is convention-driven, invoked by path
-from `scripts/` — there is no `shadow` CLI and no `.shadowrc.json`; both were retired. This workspace **does**
-have its own `eslint.config.ts` layering deviations on top of the root ESLint config; there is no per-repo
-Prettier or commitlint config. Husky hooks live once at the repo root, not per-package.
+from `scripts/` — there is no `shadow` CLI and no `.shadowrc.json`; both were retired. Lint lives in a
+single root `eslint.config.ts` — this workspace has no `eslint.config.ts` of its own; its lint deviations
+(e.g. `@typescript-eslint/no-namespace` off for the Fastify request augmentations) are `apps/pulse-server/**`-scoped
+blocks in that root file. There is no per-repo Prettier or commitlint config either. Husky hooks live once
+at the repo root, not per-package.
 
-Tests require a running PostgreSQL instance. The template database must be created before running tests (`bun run db:create-template`). Each test file gets its own database cloned from the template via `createDatabaseFromTemplate`.
+Tests require a running PostgreSQL instance. The template database must be created before running tests (`bun scripts/db.ts apps/pulse-server create-template`, from the repo root). Each test file gets its own database cloned from the template via `createDatabaseFromTemplate`.
 
 ## Architecture
 
@@ -78,7 +80,6 @@ The audience (`api://pulse`), redirect URIs (`{origin}/api/auth/callback`), and 
 ```
 @modules/*  -> src/modules/*
 @server/*   -> src/*
-@scripts/*  -> scripts/*
 @tests/*    -> tests/*
 ```
 
@@ -102,5 +103,5 @@ Conventional Commits format: `<type>(<scope>): <subject>` (max 70 chars). Types:
 
 - Strict TypeScript (`strict: true`, `noUncheckedIndexedAccess: true`), TypeScript 6.x (no `baseUrl`; `./`-relative `paths`)
 - ESModules (`"type": "module"`); the whole @shadow-library 2.0 line is ESM-only
-- Lint/format rules ship with `bun scripts/verify.ts` (typescript-eslint strict + stylistic, perfectionist import sorting, prettier base rules); this workspace's `eslint.config.ts` layers its own deviations on top of the root config
+- Lint/format rules ship with `bun scripts/verify.ts` (typescript-eslint strict + stylistic, perfectionist import sorting, prettier base rules); this workspace's deviations live as `apps/pulse-server/**`-scoped blocks in the single root `eslint.config.ts`, not a local config file
 - Errors: throw `AppErrorCode.X.create()` (ErrorCode catalogs from `@shadow-library/common` 2.0); the `ServerError` class no longer exists

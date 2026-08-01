@@ -3,7 +3,8 @@
 The public webnovel reader backend: the authoritative **serving copy** of a projection owned by
 `novel-forge-server`. The forge pushes published novels and chapters one way over the internal
 publish API; readers browse and read them over the public API; reader identity comes from the
-Shadow identity service (OIDC) — this app keeps **no local user or session tables**.
+Shadow identity service (OIDC) — this app keeps **no local user or session tables**. See `CLAUDE.md`
+for conventions and commands.
 
 ## Surfaces
 
@@ -15,54 +16,26 @@ Shadow identity service (OIDC) — this app keeps **no local user or session tab
 | Reader                            | `GET /api/me/progress`, `GET`/`PUT /api/novels/:slug/progress`, `GET`/`POST /api/library`, `DELETE /api/library/:slug`                                                                                   | session cookie                                                                                  |
 | Health                            | `GET /health`, `GET /health/ready` on :8080; `/health/live` + `/health/ready` on :8081 (`HEALTH_ENABLED`)                                                                                                | none                                                                                            |
 
-Publish semantics (optimistic concurrency, revisions are forge-assigned and monotonic): incoming
-revision **below** stored → `409` (`WBN_003`, audited `stale_rejected`); **equal** revision with
-identical content → `204` no-op; anything else upserts and stores the incoming revision. Every
-internal mutation call — including every rejected attempt — writes exactly one `publish_audit_log`
-row. Unpublish is idempotent. `GET .../manifest` returns `[{ ordinal, contentHash, revision }]`
-for forge-side reconciliation and is not audited.
+## Publish semantics
+
+Optimistic concurrency, revisions are forge-assigned and monotonic: incoming revision **below** stored →
+`409` (`WBN_003`, audited `stale_rejected`); **equal** revision with identical content → `204` no-op;
+anything else upserts and stores the incoming revision. Every internal mutation call — including every
+rejected attempt — writes exactly one `publish_audit_log` row. Unpublish is idempotent. `GET
+.../manifest` returns `[{ ordinal, contentHash, revision }]` for forge-side reconciliation and is not
+audited.
 
 ## Running locally
 
-Prerequisites: [Bun](https://bun.sh) ≥ 1.3 and PostgreSQL (dev default
-`postgresql://postgres:postgres@localhost:5432/shadow_webnovel` — see `.env`).
-
-```bash
-bun install
-bun run db:migrate       # apply generated/drizzle to the configured database
-bun run dev              # start with reload on :8080
-```
-
-The committed `.env` carries dev-only defaults. `AUTH_ISSUER`/`AUTH_AUDIENCE` configure the trusted
-identity issuer; without `AUTH_CLIENT_ID` the app boots offline and every M2M caller is denied
-(fail closed). `SESSION_*` configures the OIDC relying-party client and the session-cookie secret.
-
-## Testing
-
-```bash
-bun test                 # live Postgres: builds a migrated template DB, clones it per test
-
-# from the repo root — this workspace has no verify script of its own:
-bun scripts/verify.ts apps/web-novel-server   # format + lint + type-check + test (pre-commit gate)
-```
-
-The suite is self-contained: a mock identity provider (`@shadow-library/auth/testing`) boots
-in-process and serves discovery/JWKS/token/service-access, so no identity deployment is needed.
+Without `AUTH_CLIENT_ID` the app boots offline and every M2M caller is denied (fail closed).
+`SESSION_*` configures the OIDC relying-party client and the session-cookie secret.
 
 ## Building and shipping
 
-```bash
-# from the repo root — this workspace has no build script of its own:
-bun scripts/build.ts apps/web-novel-server   # single-file dist/main.js (+ generated/drizzle assets)
-bun dist/main.js                              # run the production bundle
-```
-
-The image build is now shared and monorepo-root-context — see [`docker/README.md`](../../docker/README.md)
-for the exact command (`docker build -f docker/Dockerfile --target runtime-backend --build-arg
-APP=web-novel-server ...`, run from the repo root, not this directory).
-
-Ports: `8080` app (`/health`, `/health/ready`), `8081` HttpCoreModule health server
-(enable with `HEALTH_ENABLED=true`; on by default in production).
+The image build is monorepo-root-context — see this workspace's own
+[`Dockerfile`](./Dockerfile) header comment for the exact command
+(`docker build -f apps/web-novel-server/Dockerfile --build-arg APP_VERSION=$(git rev-parse --short HEAD) .`,
+run from the repo root, not this directory).
 
 ## Hard rules (from the reader-publish design)
 

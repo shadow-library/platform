@@ -8,9 +8,10 @@ workspace and is never installed as a dependency. It is a flat folder of directl
 **always invoked from the repository root by path**. There is no `shadow` CLI and no `.shadowrc.json`;
 both were retired. Workspaces carry **no** `build`, `verify`, `check-migrations`, or `generate:api-types`
 scripts — `cd <workspace> && bun run verify` does not work. MUST NOT hand-roll a workspace
-`scripts/build.ts`, `scripts/lint.ts`, `commitlint.config.*`, or husky hook bodies. Lint deviations DO
-belong in a per-workspace `eslint.config.ts` (see "Lint config" below) — that is real ESLint flat config,
-not bespoke tooling config. **`.prettierrc.json` and `commitlint.config.ts` live once, at the repo
+`scripts/build.ts`, `scripts/lint.ts`, `commitlint.config.*`, `eslint.config.ts`, or husky hook bodies.
+Lint deviations belong in the root `eslint.config.ts` as a `files`-scoped block (see "Lint config" below)
+— that is real ESLint flat config, not bespoke tooling config. **`.prettierrc.json` and
+`commitlint.config.ts` live once, at the repo
 root** — prettier resolves its config via its own upward directory search, and `verify.ts` runs the
 prettier CLI from the repo root so the root `.prettierrc.json`, `.gitignore`, and `.prettierignore` all
 apply. MUST NOT add a workspace-local `.prettierrc.json`; it would silently start shadowing the root one
@@ -20,51 +21,78 @@ don't pin any of it. Engines: node >= 23.
 
 ## Setup — scaffolding a new workspace
 
-A new workspace needs only `package.json`, a `tsconfig.json` extending the root `tsconfig.base.json`
-(web apps extend `tsconfig.web.json` instead), and source (AGENTS.md). Its `package.json` `scripts` carry
-only what is genuinely its own — `type-check`, `test`, `dev`, `db:*`:
+A new workspace needs only `package.json`, a `tsconfig.json`, and source (AGENTS.md). The `tsconfig.json`
+extends the nearest family file, not the root base directly: backends extend `../tsconfig.server.json`,
+web apps `../tsconfig.web.json` (both under `apps/`), `@lib/*`-style library packages
+`../tsconfig.lib.json` (under `packages/`) — each family file extends the root `tsconfig.base.json` in
+turn via TS 5.5+'s `${configDir}` template variable, which resolves an `include` entry declared in the
+family file against the *extending* workspace's own directory. `paths` is deliberately **not** hoisted
+into the family files, even though `tsc` itself resolves a `${configDir}`-based `paths` correctly through
+the two-level chain: Bun's runtime resolver (`bun test`, `bun run`) does not implement `${configDir}`
+correctly across `extends` — it substitutes the *declaring* file's own directory rather than the leaf's,
+silently breaking every alias (confirmed by hitting exactly this with `apps/tsconfig.server.json` — see
+its comment). Every workspace therefore still declares its own `paths` in its own `tsconfig.json`, plain
+`./`-relative, same as before this split. A workspace whose per-app deltas are otherwise fully covered by
+its family file needs only `{ "extends": "../tsconfig.server.json", "compilerOptions": { "paths": {...} } }`
+(or the `web.json`/`lib.json` equivalent); a genuine per-workspace `include`/`types` delta layers on top of
+that. `packages/ui` and `packages/web` diverge enough (DOM/storybook/vitest layer; the react layer) to
+extend `../tsconfig.base.json` directly instead of the lib family file. Its `package.json` `scripts` carry
+only what is genuinely its own — `dev`, and (for a backend/library with a real dev loop) similar
+run-mode entries. MUST NOT add a `type-check` script (`tsc`/`tsc -p tsconfig.json`/`tsc --noEmit` are all
+identical restatements of what `verify.ts` already runs directly against the workspace's own tsconfig — see
+"What each script does" below), a `db:*` pointer script (`scripts/db.ts <workspace> <cmd>` from the repo
+root replaces it), a `clean` script, or a `test` script that is a bare `"bun test"` pass-through (`verify.ts`
+falls back to running `bun test` directly when the workspace declares no `test` script — only add one if the
+workspace's tests genuinely need something other than plain `bun test`, e.g. Playwright, `vitest`, or a
+composed sequence):
 
 ```jsonc
-{ "scripts": { "type-check": "tsc", "test": "bun test" } }
+{ "scripts": { "dev": "bun run --watch src/main.ts" } }
 ```
 
 There is no scaffolding command — `shadow init` is gone. Wiring is by convention: put the workspace under
 `apps/*` or `packages/*` following the naming rules in the type table below, and `scripts/workspaces.ts`
 discovers it from the root `package.json` `workspaces` globs on the next run. Add a `"shadow"` key only
-for the build inputs that genuinely can't be inferred (next section), an `eslint.config.ts` only if it
-genuinely deviates from the root lint config, and no husky hooks at all — husky lives once, at the repo
+for the build inputs that genuinely can't be inferred (next section); no workspace-local `eslint.config.ts`
+(a lint deviation is a `files`-scoped block in the root config, see "Lint config" below) and no husky
+hooks at all — husky lives once, at the repo
 root (`"prepare": "husky"` in the root `package.json`; `.husky/pre-commit` and `.husky/commit-msg` are
 committed there and already fan out per-workspace, see below).
 
-**Prerequisites:** `tsconfig.build.json` extending both the workspace's own `tsconfig.json` and the root
-`tsconfig.build.base.json` (`noEmit: false`, `declaration: true`, `removeComments: true` — the shared boolean
-options; path-valued fields like `rootDir`/`include`/`exclude` stay in the workspace's own file, since TS
-resolves `extends`-inherited paths relative to the file that declares them, not the extender). A workspace
-whose emit shape is fully covered by the base needs only a one-liner `{ "extends": ["./tsconfig.json",
-"../../tsconfig.build.base.json"], "tsc-alias": { "resolveFullPaths": true } }`; a genuine delta (e.g.
-`packages/ui`'s declaration-only component build) still layers its own `compilerOptions`/`include`/`exclude`.
-The shared `bun:test` `Expect<T>` augmentation lives once at root `types/bun-test.d.ts`, wired into every
-workspace via `tsconfig.base.json`'s `files` — no per-workspace `tests/test.d.ts` copy needed. Base
-`tsconfig.json` on `module: ESNext` + `moduleResolution: bundler`. TypeScript itself is a root devDependency — workspaces don't pin
-their own copy.
+**Prerequisites:** `tsconfig.build.json` extending both the workspace's own `tsconfig.json` and
+`packages/tsconfig.build.json` (`noEmit: false`, `declaration: true`, `removeComments: true` — the shared
+boolean options; path-valued fields like `rootDir`/`include`/`exclude` stay in the workspace's own file,
+since TS resolves `extends`-inherited *relative* paths against the file that declares them, not the
+extender — this is exactly why the family file's `include` entries use the `${configDir}` template
+variable instead of a bare `./`; `paths` stays leaf-local for the Bun-compatibility reason above). A
+workspace whose emit shape is fully covered by the base needs only a one-liner `{ "extends":
+["./tsconfig.json", "../tsconfig.build.json"], "tsc-alias": { "resolveFullPaths": true } }`; a genuine
+delta (e.g. `packages/ui`'s declaration-only component build) still layers its own
+`compilerOptions`/`include`/`exclude`. GOTCHA: `paths` (and `include`) replace wholesale on `extends` —
+they do not merge key-by-key with the family file's — so a leaf that declares its own `paths` (e.g. a
+package's `@shadow-library/<name>` self-name mapping) must repeat any family-file alias it still uses
+(e.g. `@lib/*`) alongside it, or lose that alias silently. The shared `bun:test` `Expect<T>` augmentation
+lives once at root `types/bun-test.d.ts`, wired into every workspace via `tsconfig.base.json`'s `files` —
+no per-workspace `tests/test.d.ts` copy needed. Base `tsconfig.json` on `module: ESNext` +
+`moduleResolution: bundler`. TypeScript itself is a root devDependency — workspaces don't pin their own copy.
 
 ## Convention first, then the `"shadow"` package.json key
 
 There is no per-workspace tooling config file. `scripts/workspaces.ts` derives everything it can from the
 workspace's path, dependencies, and `package.json`:
 
-| Fact | Where it comes from |
-| --- | --- |
-| Type | `apps/*-server` → `backend`; `apps/*-web` → `ssr` when `@tanstack/react-start` is a dependency, else `spa`; a package that exports a stylesheet → `component`; any other `packages/*` → `library`; anything else (`e2e`) → `none` |
-| Build exports | the workspace `package.json` `exports` field, with the `./dist/` prefix and `.js`/`.d.ts` extension stripped — the published contract and the build can never drift |
-| Output directory | `dist/` |
-| Backend entrypoint | `src/main.ts` |
-| Migrations directory | `generated/drizzle` |
-| Generated API types | `src/lib/apis/api-types.gen.ts` |
-| Lint rules/ignores/overrides | the root `eslint.config.ts` plus the workspace's own `eslint.config.ts` where it has one |
-| Format rules and ignores | the root `.prettierrc.json`, `.gitignore`, `.prettierignore` |
-| Commit message rules | the root `commitlint.config.ts` |
-| Whether `verify` runs tests | false for web apps and `none`-type workspaces, true otherwise |
+| Fact                         | Where it comes from                                                                                                                                                                                                               |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Type                         | `apps/*-server` → `backend`; `apps/*-web` → `ssr` when `@tanstack/react-start` is a dependency, else `spa`; a package that exports a stylesheet → `component`; any other `packages/*` → `library`; anything else (`e2e`) → `none` |
+| Build exports                | the workspace `package.json` `exports` field, with the `./dist/` prefix and `.js`/`.d.ts` extension stripped — the published contract and the build can never drift                                                               |
+| Output directory             | `dist/`                                                                                                                                                                                                                           |
+| Backend entrypoint           | `src/main.ts`                                                                                                                                                                                                                     |
+| Migrations directory         | `generated/drizzle`                                                                                                                                                                                                               |
+| Generated API types          | `src/lib/apis/api-types.gen.ts`                                                                                                                                                                                                   |
+| Lint rules/ignores/overrides | the single root `eslint.config.ts` — every workspace deviation is a `files`-scoped block there                                                                                                                                   |
+| Format rules and ignores     | the root `.prettierrc.json`, `.gitignore`, `.prettierignore`                                                                                                                                                                      |
+| Commit message rules         | the root `commitlint.config.ts`                                                                                                                                                                                                   |
+| Whether `verify` runs tests  | false for web apps and `none`-type workspaces, true otherwise                                                                                                                                                                     |
 
 Only what genuinely cannot be inferred goes in a `"shadow"` key in the workspace's **own
 `package.json`**. A workspace with nothing non-derivable carries no `"shadow"` key at all — which is most
@@ -79,47 +107,52 @@ of them (`packages/{app,auth,class-schema,common,fastify,modules,web}`, `apps/{i
 }
 ```
 
-| Key | Applies to | Meaning |
-| --- | --- | --- |
-| `type` | any | Overrides the inferred type — for a workspace whose path breaks the naming convention |
-| `entries` | `backend` | Extra entrypoints bundled alongside `src/main.ts`, each emitted standalone |
-| `assets` | `backend` | Files/dirs copied verbatim into `dist/` (README and LICENSE are always copied) |
-| `command` | `library`, `component`, `spa`, `ssr` | A bundler invocation replacing the default compile step; must emit into `dist/` |
-| `alias` | `component` | Import prefix → workspace-relative dir for the Rollup bundle, mirroring the tsconfig `paths` |
-| `css` | `component` | CSS Modules options: `scopedName`, `extract`, `layer`, `minify`, `useClient` |
-| `bin` | `library` | Binary name → source-relative base; emitted into `dist/package.json` with a `bun` shebang |
-| `verifyTest` | any | Opts a workspace into or out of the `test` step during `verify` |
+| Key          | Applies to                           | Meaning                                                                                      |
+| ------------ | ------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `type`       | any                                  | Overrides the inferred type — for a workspace whose path breaks the naming convention        |
+| `entries`    | `backend`                            | Extra entrypoints bundled alongside `src/main.ts`, each emitted standalone                   |
+| `assets`     | `backend`                            | Files/dirs copied verbatim into `dist/` (README and LICENSE are always copied)               |
+| `command`    | `library`, `component`, `spa`, `ssr` | A bundler invocation replacing the default compile step; must emit into `dist/`              |
+| `alias`      | `component`                          | Import prefix → workspace-relative dir for the Rollup bundle, mirroring the tsconfig `paths` |
+| `css`        | `component`                          | CSS Modules options: `scopedName`, `extract`, `layer`, `minify`, `useClient`                 |
+| `bin`        | `library`                            | Binary name → source-relative base; emitted into `dist/package.json` with a `bun` shebang    |
+| `verifyTest` | any                                  | Opts a workspace into or out of the `test` step during `verify`                              |
 
 There is **no `release` key** — release/publish tooling was retired with the migration to this
 monorepo; nothing here is published to npm. There are no format options either — prettier options live
 in the repo-root `.prettierrc.json` only (see above).
 
-## Lint config — the rule that inverted
+## Lint config — one root file, no workspace-local configs
 
-Lint is now real ESLint flat config, not tooling config. The root `eslint.config.ts` exports a
-`createConfig` factory holding the base (`@eslint/js` recommended + typescript-eslint strict/stylistic +
-perfectionist import sorting + `eslint-plugin-n`, with the React/hooks/a11y layer and node globals and
-test-file overrides). A workspace that genuinely deviates gets its **own `eslint.config.ts`** importing
-that base and appending its rules/overrides/ignores. `verify.ts` runs ESLint with no explicit `--config`
-and the workspace as cwd, so flat config's upward resolution picks the workspace file when it exists and
-the root one otherwise.
+Lint is real ESLint flat config, not tooling config, but it lives in **one file**: the root
+`eslint.config.ts`. It exports a `createConfig` factory holding the base (`@eslint/js` recommended +
+typescript-eslint strict/stylistic + perfectionist import sorting + `eslint-plugin-n`, with the
+React/hooks/a11y layer, globals, and test-file overrides) and the default export layers every workspace's
+deviation on top as a `files`-scoped block, grouped by concern (e.g. one block covers `no-namespace: off`
+for every backend; one block covers the SSR web apps' extra Node globals). `verify.ts` runs ESLint with no
+explicit `--config` and the workspace as cwd; flat config's upward resolution walks up from there and
+finds this one file — there is no workspace-local `eslint.config.ts` to shadow it.
 
-This **inverts the old rule**: a per-workspace eslint config used to be forbidden (lint lived in
-`.shadowrc.json` `verify.lint`). It is now the correct and only place for a workspace lint deviation.
-Workspaces that currently have one: `apps/{identity-server,identity-web,novel-forge-server,novel-forge-web,pulse-server,pulse-web,web-novel-server,web-novel-web}`
-and `packages/{fastify,ui,web}`. Everything else inherits the root config — don't add a file that only
-re-exports the base.
+**MUST NOT add a workspace-local `eslint.config.ts`.** This repo tried the opposite convention (a
+per-workspace file importing the root `createConfig`) and inverted back: nearly every per-workspace file
+turned out to be either dead (an override for a glob that no longer existed) or a duplicate of what the
+root already provided via its own scoped blocks (e.g. the web apps' React/JSX layer). A workspace lint
+deviation is a `files`-scoped block appended to the root config's default export, not a new file. One
+subtlety if you add one: the root config's own file-scoped patterns (e.g. its test-file relaxations) must
+be written with a leading `**/` so they match at any workspace depth — a bare `tests/**/*.ts` only matches
+a `tests/` directory directly under the repo root now that there is a single config file resolving every
+workspace's files.
 
 ## Workspace `type` decision table
 
-| `type` | `build.ts` does | Lint globals default |
-| --- | --- | --- |
-| `library` (default for `packages/*`) | `tsc` + `tsc-alias` (or a `"shadow".command`) → flat `dist/` package with synthesized `dist/package.json` | node (`"both"` for hybrid client+server libs, `"browser"` for browser-only) |
-| `component` | Rollup + PostCSS → CSS-Modules React library (`.js` + one extracted `styles.css`, `.d.ts`, `'use client'`) | both |
-| `backend` | `Bun.build` → single-file tree-shaken `dist/main.js` | node |
-| `spa` | the workspace's `vite build` (client bundle) | browser |
-| `ssr` | the workspace's `vite build` (SSR server + client, e.g. TanStack Start) | both |
-| `none` | nothing to build (`e2e`) | — |
+| `type`                               | `build.ts` does                                                                                            | Lint globals default                                                        |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `library` (default for `packages/*`) | `tsc` + `tsc-alias` (or a `"shadow".command`) → flat `dist/` package with synthesized `dist/package.json`  | node (`"both"` for hybrid client+server libs, `"browser"` for browser-only) |
+| `component`                          | Rollup + PostCSS → CSS-Modules React library (`.js` + one extracted `styles.css`, `.d.ts`, `'use client'`) | both                                                                        |
+| `backend`                            | `Bun.build` → single-file tree-shaken `dist/main.js`                                                       | node                                                                        |
+| `spa`                                | the workspace's `vite build` (client bundle)                                                               | browser                                                                     |
+| `ssr`                                | the workspace's `vite build` (SSR server + client, e.g. TanStack Start)                                    | both                                                                        |
+| `none`                               | nothing to build (`e2e`)                                                                                   | —                                                                           |
 
 Every `apps/*` workspace here is `backend`, `spa`, or `ssr`; every `packages/*` workspace is `library`
 except `packages/ui`, which is `component`. `e2e` infers as `none` — it has nothing to build, and
@@ -141,17 +174,17 @@ type errors (`noEmitOnError` unset) will fail the build. Fix the types first.
 Everything runs **from the repository root**, by path. A `<workspace>` argument is either its
 repo-relative directory (`packages/common`) or its package name (`@shadow-library/common`).
 
-| Command | What it does |
-| --- | --- |
-| `bun scripts/build.ts <workspace>` | Builds per inferred workspace `type` (table above). |
-| `bun scripts/build.ts <workspace> --deps` | Builds only that workspace's transitive `workspace:*` dependency closure, in dependency order — what CI uses to prepare a single workspace without building the repo. |
-| `bun scripts/build.ts --all` | Sorts every workspace into dependency levels and builds each level in parallel (replacing the ordering `bun run --filter` used to provide). Root `bun run build`. |
-| `bun scripts/verify.ts <workspace> [--fix] [--fast]` | Prettier (run from the repo root, so the root `.prettierrc.json`/`.gitignore`/`.prettierignore` apply) → ESLint (no explicit config; flat config's upward lookup finds the workspace's `eslint.config.ts` or the root one) → the workspace's own `type-check` script → its own `test` script. Stops at first failure. `--fast` stops after lint — the pre-commit hook's speed budget. `--fix` applies format/lint fixes in place. |
-| `bun scripts/verify.ts scripts` | Verifies the root tooling itself (`scripts/` + the root-level configs) — the thing that verifies everything else isn't the one unverified thing. |
-| `bun scripts/verify.ts --all` | Verifies every workspace plus `scripts`, reporting a combined failure list instead of aborting on the first. Root `bun run verify`. |
-| `bun scripts/gen-api-types.ts <workspace> [url]` | OpenAPI doc → typed `src/lib/apis/api-types.gen.ts` (unique operationIds `<method>_<path>`, GET query-param widening, `<Name>QueryParams`/`PathParams` aliases; formatted via the root Prettier config). Defaults to a locally running server. |
-| `bun scripts/check-migrations.ts <workspace>` | Requires a `db:generate` script, runs it; fails on uncommitted migrations in `generated/drizzle` (tracked AND untracked). |
-| `bun scripts/db.ts <workspace> generate\|migrate\|create-template\|seed` | The 4 backends' Drizzle/Postgres CLI. No workspace carries its own `drizzle.config.ts` — `generate` shells `drizzle-kit generate` with `--schema`/`--out`/`--dialect` derived from convention (override the schema path via `shadow.db.schema`); `migrate` runs whichever `shadow.entries` item matches `/migrate/i`; `create-template`/`seed` run each backend's own `scripts/create-template-db.ts`/`scripts/seed.ts`, which stay backend-owned since their driver choice and seed strategy genuinely differ per backend. Each backend's `db:*` package.json scripts delegate here. |
+| Command                                                                  | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun scripts/build.ts <workspace>`                                       | Builds per inferred workspace `type` (table above).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `bun scripts/build.ts <workspace> --deps`                                | Builds only that workspace's transitive `workspace:*` dependency closure, in dependency order — what CI uses to prepare a single workspace without building the repo.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `bun scripts/build.ts --all`                                             | Sorts every workspace into dependency levels and builds each level in parallel (replacing the ordering `bun run --filter` used to provide). Root `bun run build`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `bun scripts/verify.ts <workspace> [--fix] [--fast]`                     | Prettier (run from the repo root, so the root `.prettierrc.json`/`.gitignore`/`.prettierignore` apply) → ESLint (no explicit config; flat config's upward lookup finds the single root `eslint.config.ts`) → `tsc` run directly against the workspace's own `tsconfig.json` → the workspace's own `test` script if it has one, else `bun test` directly (only for workspaces where `verifyTest` is true). Stops at first failure. `--fast` stops after lint — the pre-commit hook's speed budget. `--fix` applies format/lint fixes in place. No workspace needs a `type-check` package.json script, and only a workspace with a genuinely non-default test command needs a `test` one. |
+| `bun scripts/verify.ts scripts`                                          | Verifies the root tooling itself (`scripts/` + the root-level configs) — the thing that verifies everything else isn't the one unverified thing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `bun scripts/verify.ts --all`                                            | Verifies every workspace plus `scripts`, reporting a combined failure list instead of aborting on the first. Root `bun run verify`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `bun scripts/gen-api-types.ts <web-app>\|--all [url] [--check]`          | OpenAPI doc → typed `src/lib/apis/api-types.gen.ts` (unique operationIds `<method>_<path>`, GET query-param widening, `<Name>QueryParams`/`PathParams` aliases; formatted via the root Prettier config). Without `--check`, writes the file — a single target defaults to a locally running server (`url` overrides), `--all` boots each paired server hermetically in-process. With `--check`, nothing is written: it boots the paired server(s) in-process, diffs a fresh render against the committed file, and fails with a nonzero exit and an actionable message on drift — the server↔web contract drift gate CI runs.                                                                     |
+| `bun scripts/check-migrations.ts <workspace>`                            | Runs `scripts/db.ts <workspace> generate` directly (in-process, via `db.ts`'s exported `runDbCommand`); fails on uncommitted migrations in `generated/drizzle` (tracked AND untracked).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `bun scripts/db.ts <workspace> generate\|migrate\|create-template\|seed` | The 4 backends' Drizzle/Postgres CLI. No workspace carries its own `drizzle.config.ts` — `generate` shells `drizzle-kit generate` with `--schema`/`--out`/`--dialect` derived from convention (override the schema path via `shadow.db.schema`); `migrate` runs whichever `shadow.entries` item matches `/migrate/i`. `create-template` is a single generic driver here in `scripts/db.ts` — drop+create the template DB, run the migrate entry against it, run the optional template-seed hook (`shadow.db.templateSeed`, or the conventional `tests/fixtures/seed.ts` if present), mark it `IS_TEMPLATE` — no backend carries its own template-build script anymore. `seed` runs that same conventional `tests/fixtures/seed.ts` directly. Per-test-file DB cloning (`createDatabaseFromTemplate`/`dropDatabase`) lives in each backend's own `tests/fixtures/template-db.ts`, imported via `@tests/*`. No workspace carries its own `db:*` package.json scripts — this is the only entry point.                                                                                    |
 
 Commit messages are linted by `@commitlint/cli` against the root `commitlint.config.ts`, wired once at the
 repo root in `.husky/commit-msg` (`bunx --bun commitlint --edit "$1"`). There is no tooling command for it.
@@ -203,11 +236,11 @@ dev instances to generate SDK/web API types — the stamp is what makes every ge
 traceable to the exact server commit it was derived from. An image built without the argument serves
 `local` and breaks that audit trail. The app reads the value through `Config` (never `process.env`),
 and it MUST NOT be hand-set in `.env` files — it is build metadata, not configuration. (`BUN_IMAGE`
-is the existing convention for digest-pinning the base image in CI; pass both.) The per-app
-`apps/<name>/Dockerfile` files are gone: one parameterized `docker/Dockerfile` builds every app from the
-repo root, selected by `--build-arg APP=<app>` and `--target runtime-{backend,ssr,spa}` — see
-`docker/README.md` for the exact invocation per app. Apps remain independently built, imaged, and
-deployed even though development now happens in one repo.
+is the existing convention for digest-pinning the base image in CI; pass both.) Each app owns its own
+hand-maintained `apps/<name>/Dockerfile` (8 total, one per backend/ssr app; build context is always the
+repo root) — backends take `--build-arg APP_VERSION=$(git rev-parse --short HEAD)`, ssr web apps take no
+build-arg. See each Dockerfile's own header comment for its exact invocation. Apps remain independently
+built, imaged, and deployed even though development now happens in one repo.
 
 ## No release tooling
 
@@ -225,12 +258,18 @@ A single workflow (`.github/workflows/ci.yml`) replaces the old per-repo publish
 
 1. **Affected-workspace detection.** A `changes` job diffs against the merge-base and expands the
    changed-file list into affected workspace names: `apps/<x>/**` → that app only; `e2e/**` → `e2e` only;
-   anything under `packages/**`, `scripts/**`, or root config (`package.json`, `bun.lock`,
-   `tsconfig.base.json`, `tsconfig.json`, `tsconfig.web.json`, `.prettierrc.json`, `eslint.config.ts`,
+   anything under `packages/**` (which now includes the `packages/tsconfig.lib.json` /
+   `packages/tsconfig.build.json` family files — matched by the same `packages/*` case pattern), `scripts/**`,
+   or root config (`package.json`, `bun.lock`, `tsconfig.base.json`, `tsconfig.json`,
+   `apps/tsconfig.server.json`, `apps/tsconfig.web.json`, `.prettierrc.json`, `eslint.config.ts`,
    `eslint-plugins.d.ts`, `commitlint.config.ts`, the workflow file itself) → **every** workspace (a
-   shared package or the tooling itself can break any consumer). Workspaces are enumerated from the
-   filesystem, not a hardcoded list, so a new `apps/*`/`packages/*` needs no workflow edit. The list also
-   includes the non-workspace `scripts` target, so the root tooling is itself verified.
+   shared package or the tooling itself can break any consumer). The two `apps/tsconfig.*.json` family
+   files are listed explicitly rather than relying on the generic `apps/*` rule: that rule maps a changed
+   path to a single app (`cut -d/ -f1,2`), which would silently misroute a family-file change (it affects
+   every backend or every web app, not one) — an explicit case arm, checked before the generic `apps/*`
+   arm, is the simplest correct fix. Workspaces are enumerated from the filesystem, not a hardcoded list,
+   so a new `apps/*`/`packages/*` needs no workflow edit. The list also includes the non-workspace
+   `scripts` target, so the root tooling is itself verified.
 2. **One `verify` job per affected workspace** (matrix, `fail-fast: false`, capped parallelism), each:
    builds that workspace's dependency closure first (`bun scripts/build.ts <workspace> --deps`),
    optionally checks migrations / creates a template DB for backends that need Postgres, then runs
@@ -246,7 +285,7 @@ If you're wiring a new workspace into the matrix, its steps are just:
 
 ```yaml
 - run: bun scripts/build.ts ${{ matrix.workspace }} --deps # its workspace:* dependency closure
-- run: bun scripts/verify.ts ${{ matrix.workspace }}       # format + lint + type-check + test
+- run: bun scripts/verify.ts ${{ matrix.workspace }} # format + lint + type-check + test
 - run: bun scripts/build.ts ${{ matrix.workspace }}
 ```
 
