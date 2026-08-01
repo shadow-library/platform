@@ -1,7 +1,0 @@
-# Vite SSR build output / local overrides
-dist-ssr
-*.local
-
-# Bundle analysis (rollup-plugin-visualizer)
-stats.html
-count.txt
