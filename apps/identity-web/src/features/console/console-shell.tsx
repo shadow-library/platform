@@ -13,7 +13,6 @@ import { ArrowLeftIcon, BrandGlyph, GridIcon, LayersIcon, LinkIcon, ShieldCheckI
 import { ThemeToggle } from '@/components/si';
 import { useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
-import { PAGE_WIDTH } from '@/lib/layout';
 
 import styles from './console-shell.module.css';
 
@@ -92,7 +91,6 @@ export function ConsoleShell({ children }: { children: ReactNode }): React.JSX.E
         </span>
       }
       utility={<ThemeToggle />}
-      contentWidth={PAGE_WIDTH}
     >
       {children}
     </AppShell>

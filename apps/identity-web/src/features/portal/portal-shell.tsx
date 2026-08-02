@@ -13,7 +13,6 @@ import { BellIcon, BrandGlyph, BuildingIcon, GridIcon, MailIcon, MonitorIcon, Pl
 import { ThemeToggle } from '@/components/si';
 import { useAdminContextQuery, useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
-import { PAGE_WIDTH } from '@/lib/layout';
 
 import styles from './portal-shell.module.css';
 
@@ -95,7 +94,6 @@ export function PortalShell({ children }: { children: ReactNode }): React.JSX.El
       }
       actions={<IconButton variant="ghost" size="sm" aria-label="Notifications" icon={<BellIcon size={18} />} />}
       utility={<ThemeToggle />}
-      contentWidth={PAGE_WIDTH}
     >
       {children}
     </AppShell>
