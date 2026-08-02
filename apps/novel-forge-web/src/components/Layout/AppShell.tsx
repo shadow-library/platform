@@ -11,7 +11,7 @@ import { userDisplayName } from '@shadow-library/web';
  * Importing user defined modules
  */
 import { useListProjectsQuery, useListProposalsQuery, useLogoutMutation, useMeQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery } from '@/lib/apis';
-import { imageUrl, lifecyclePhase, projectDotColor, projectKindTag, projectTitle } from '@/lib/format';
+import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle } from '@/lib/format';
 
 import { BookIcon, GridIcon, MoonIcon, SearchIcon, SunIcon } from '../icons';
 import styles from './AppShell.module.css';
@@ -83,7 +83,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
     id: candidate.id,
     label: projectTitle(candidate),
     caption: `${projectKindTag(candidate.kind)} · #${candidate.id}`,
-    imageUrl: imageUrl(candidate.coverImagePath),
+    imageUrl: candidate.coverUrl ?? undefined,
     color: projectDotColor(candidate),
   }));
 

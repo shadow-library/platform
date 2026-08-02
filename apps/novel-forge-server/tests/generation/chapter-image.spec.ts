@@ -24,6 +24,10 @@ import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 const dbName = `${baseConnectionString.split('/').pop()}_chapter_image`;
 
+// Any absolute origin will do — the service under test only concatenates it, and asserting on it keeps
+// the ref → URL mapping visible in the expectations.
+const TEST_STORAGE_ORIGIN = 'https://storage.test';
+
 const pgAvailable = await (async () => {
   try {
     const sql = new SQL(baseConnectionString);
@@ -45,13 +49,15 @@ describe.if(pgAvailable)('ChapterImageService', () => {
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
-    // Stub the shared StorageService with a content-addressed save; the service no longer reads/deletes here.
+    // Stub the shared StorageService with a content-addressed save plus the public-URL resolution the
+    // service presents refs through; it no longer reads/deletes here.
     const storage = {
       save: async (bytes: Uint8Array) => {
         const ref = `${Buffer.from(bytes).toString('hex') || 'empty'}.png`;
         saved.push(ref);
         return ref;
       },
+      getPublicUrl: (ref?: string | null) => (ref ? `${TEST_STORAGE_ORIGIN}/${ref}` : undefined),
     };
     service = new ChapterImageService({ getPostgresClient: () => db } as never, storage as never);
   });
@@ -81,6 +87,18 @@ describe.if(pgAvailable)('ChapterImageService', () => {
 
     const rows = await service.list(projectId, 1);
     expect(rows.map(r => r.id)).toEqual([a.id, b.id]);
+  });
+
+  // The web app renders `imageUrl` verbatim. Presenting the bare ref instead once shipped an image
+  // pointing at the client bundle's baked-in dev origin, so both routes must resolve it server-side.
+  it('should present an absolute public URL rather than the stored ref', async () => {
+    const projectId = await seedProject();
+
+    const added = await service.add(projectId, 1, 'AAAA', 'image/png');
+    const [listed] = await service.list(projectId, 1);
+
+    expect(added.imageUrl).toBe(`${TEST_STORAGE_ORIGIN}/${added.imagePath}`);
+    expect(listed?.imageUrl).toBe(`${TEST_STORAGE_ORIGIN}/${added.imagePath}`);
   });
 
   it('removes an image row', async () => {

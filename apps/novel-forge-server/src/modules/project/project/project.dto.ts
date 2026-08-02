@@ -148,9 +148,11 @@ export class ProjectResponse {
   @Field({ optional: true, nullable: true })
   title?: string | null;
 
-  // Content-addressed storage ref (e.g. `a1b2…f0.png`); the client resolves it to its public object-storage URL for display.
+  // Absolute public object-storage URL for the cover, resolved from the server's runtime
+  // `storage.public-origin`. Sending the URL rather than the stored ref keeps the origin out of the
+  // client bundle, so one web build serves every deployment. Absent when the project has no cover.
   @Field({ optional: true, nullable: true })
-  coverImagePath?: string | null;
+  coverUrl?: string | null;
 
   @Field(() => ContentMode)
   contentMode: Project.ContentMode;

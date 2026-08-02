@@ -12,7 +12,7 @@ import { BookIcon, PlusIcon, UploadIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
 import { listProjectsQueryOptions, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
-import { imageUrl, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
+import { projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './index.module.css';
 
@@ -68,8 +68,8 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
         if (e.key === 'Enter' || e.key === ' ') open();
       }}
     >
-      {project.coverImagePath ? (
-        <img src={imageUrl(project.coverImagePath)} alt="" className={styles.cardCover} />
+      {project.coverUrl ? (
+        <img src={project.coverUrl} alt="" className={styles.cardCover} />
       ) : (
         <div className={styles.coverPlaceholder} data-kind={project.kind} aria-hidden="true">
           <BookIcon size={40} />

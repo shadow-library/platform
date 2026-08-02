@@ -64,7 +64,7 @@ export class ProjectService {
   // the writing instructions the AI will actually use.
   private present(project: Project.Row): Project.Presented {
     const instructions = project.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS;
-    return { ...project, config: project.config ?? undefined, instructions };
+    return { ...project, config: project.config ?? undefined, instructions, coverUrl: this.storage.getPublicUrl(project.coverImagePath) };
   }
 
   async create(body: CreateProjectBody): Promise<Project.Presented> {

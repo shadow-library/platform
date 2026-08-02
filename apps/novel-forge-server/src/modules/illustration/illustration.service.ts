@@ -124,7 +124,7 @@ export class IllustrationService {
     return { previewUrl: this.storage.getPublicUrl(ref) };
   }
 
-  async save(sessionId: string): Promise<{ saved: boolean; imagePath: string }> {
+  async save(sessionId: string): Promise<{ saved: boolean; imageUrl: string }> {
     const session = this.sessions.get(sessionId);
     if (!session || session.status !== 'active') throw AppError.internal(`Session ${sessionId} not found or inactive`);
     if (!session.previewBytes) throw AppError.internal('No preview to save');
@@ -135,7 +135,7 @@ export class IllustrationService {
 
     session.status = 'saved';
     this.logger.info('illustration saved', { sessionId, ref });
-    return { saved: true, imagePath: ref };
+    return { saved: true, imageUrl: this.storage.getPublicUrl(ref) };
   }
 
   async cancel(sessionId: string): Promise<{ cancelled: boolean }> {

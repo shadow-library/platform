@@ -55,8 +55,11 @@ export interface ProjectConfigData {
 export namespace Project {
   export type Row = InferSelectModel<typeof projects>;
   // The row as surfaced by `ProjectService.present`: the stored `config = null` is mapped to an omitted
-  // (`undefined`) field so it satisfies the non-nullable `ProjectConfig` response schema.
-  export type Presented = Omit<Row, 'config'> & { config?: ProjectConfigData };
+  // (`undefined`) field so it satisfies the non-nullable `ProjectConfig` response schema, and the stored
+  // `coverImagePath` ref gains its resolved `coverUrl`. The ref stays on the type for internal callers
+  // (the export packer reads bytes by ref); only `coverUrl` is declared on the response DTO, so the
+  // serialiser is what keeps the ref off the wire.
+  export type Presented = Omit<Row, 'config'> & { config?: ProjectConfigData; coverUrl?: string };
   export type Kind = InferEnum<typeof projectKind>;
   export type ContentMode = InferEnum<typeof contentMode>;
   export type ContentGenerator = InferEnum<typeof contentGenerator>;

@@ -23,6 +23,11 @@ import { type Generation, type PrimaryDatabase, schema } from '@server/database'
 
 type UploadMime = 'image/png' | 'image/jpeg' | 'image/webp';
 
+// A scene image as surfaced to the API: the stored `imagePath` ref gains its resolved public URL, built
+// from the server's runtime `storage.public-origin` so the origin is never baked into the client bundle.
+// The ref stays on the type for internal callers; only `imageUrl` is declared on the response DTO.
+export type PresentedChapterImage = Generation.ChapterImage & { imageUrl: string };
+
 /**
  * Declaring the constants
  */
@@ -39,14 +44,19 @@ export class ChapterImageService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  list(projectId: bigint, chapter: number): Promise<Generation.ChapterImage[]> {
-    return this.db.query.chapterImages.findMany({
+  private present(image: Generation.ChapterImage): PresentedChapterImage {
+    return { ...image, imageUrl: this.storage.getPublicUrl(image.imagePath) };
+  }
+
+  async list(projectId: bigint, chapter: number): Promise<PresentedChapterImage[]> {
+    const images = await this.db.query.chapterImages.findMany({
       where: and(eq(schema.chapterImages.projectId, projectId), eq(schema.chapterImages.chapter, chapter)),
       orderBy: [asc(schema.chapterImages.sortOrder), asc(schema.chapterImages.id)],
     });
+    return images.map(image => this.present(image));
   }
 
-  async add(projectId: bigint, chapter: number, image: string, mime: UploadMime, caption?: string): Promise<Generation.ChapterImage> {
+  async add(projectId: bigint, chapter: number, image: string, mime: UploadMime, caption?: string): Promise<PresentedChapterImage> {
     const existing = await this.list(projectId, chapter);
     const nextOrder = existing.reduce((max, img) => Math.max(max, img.sortOrder + 1), 0);
 
@@ -61,7 +71,7 @@ export class ChapterImageService {
 
     if (!created) throw AppErrorCode.DRF_001.create();
     this.logger.info('chapter image added', { projectId, chapter, imageId: created.id, ref });
-    return created;
+    return this.present(created);
   }
 
   async remove(projectId: bigint, chapter: number, imageId: bigint): Promise<void> {

@@ -25,6 +25,14 @@ import { type CreateEntityBody, type ListEntitiesQuery, type UpdateEntityBody } 
 
 export type EntityWithImages = Knowledge.Entity & { images: Knowledge.EntityImage[] };
 
+// An entity as surfaced to the API: every stored `imagePath` ref gains its resolved public URL, built from
+// the server's runtime `storage.public-origin` so the origin never has to be baked into the client bundle.
+// The refs stay on these types for internal callers; only the URLs are declared on the response DTOs, so
+// the serialiser is what keeps the refs off the wire.
+export type PresentedEntity = Knowledge.Entity & { imageUrl?: string };
+export type PresentedEntityImage = Knowledge.EntityImage & { imageUrl: string };
+export type PresentedEntityWithImages = PresentedEntity & { images: PresentedEntityImage[] };
+
 type UploadMime = 'image/png' | 'image/jpeg' | 'image/webp';
 
 /**
@@ -43,7 +51,16 @@ export class EntityService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  async create(projectId: bigint, body: CreateEntityBody): Promise<Knowledge.Entity> {
+  private present(entity: Knowledge.Entity): PresentedEntity {
+    return { ...entity, imageUrl: this.storage.getPublicUrl(entity.imagePath) };
+  }
+
+  private presentWithImages(entity: EntityWithImages): PresentedEntityWithImages {
+    const images = entity.images.map(image => ({ ...image, imageUrl: this.storage.getPublicUrl(image.imagePath) }));
+    return { ...this.present(entity), images };
+  }
+
+  async create(projectId: bigint, body: CreateEntityBody): Promise<PresentedEntity> {
     const [entity] = await this.db
       .insert(schema.entities)
       .values({
@@ -75,10 +92,10 @@ export class EntityService {
       .catch(err => this.databaseService.translateError(err));
 
     if (!entity) throw AppErrorCode.S001.create();
-    return entity;
+    return this.present(entity);
   }
 
-  async list(projectId: bigint, filter: ListEntitiesQuery): Promise<OffsetPaginationResult<Knowledge.Entity>> {
+  async list(projectId: bigint, filter: ListEntitiesQuery): Promise<OffsetPaginationResult<PresentedEntity>> {
     const query = utils.pagination.normalise(filter, {
       mode: 'offset',
       defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' },
@@ -97,19 +114,23 @@ export class EntityService {
       this.db.query.entities.findMany({ where, limit: query.limit, offset: query.offset, orderBy: order }),
     ]);
 
-    return utils.pagination.createResult(query, items, total);
+    return utils.pagination.createResult(
+      query,
+      items.map(item => this.present(item)),
+      total,
+    );
   }
 
-  get(projectId: bigint, entityKey: string): Promise<EntityWithImages | null> {
+  get(projectId: bigint, entityKey: string): Promise<PresentedEntityWithImages | null> {
     return this.db.query.entities
       .findFirst({
         where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)),
         with: { images: { orderBy: (img, { asc: ascOrder }) => [ascOrder(img.sortOrder), ascOrder(img.id)] } },
       })
-      .then(r => r ?? null);
+      .then(r => (r ? this.presentWithImages(r) : null));
   }
 
-  async update(projectId: bigint, entityKey: string, update: UpdateEntityBody): Promise<Knowledge.Entity> {
+  async update(projectId: bigint, entityKey: string, update: UpdateEntityBody): Promise<PresentedEntity> {
     const [result] = await this.db
       .update(schema.entities)
       .set({ ...update, updatedAt: new Date() })
@@ -118,10 +139,10 @@ export class EntityService {
       .catch(err => this.databaseService.translateError(err));
 
     if (!result) throw AppErrorCode.ENT_001.create();
-    return result;
+    return this.present(result);
   }
 
-  async setImage(projectId: bigint, entityKey: string, image: string, mime: 'image/png' | 'image/jpeg' | 'image/webp'): Promise<Knowledge.Entity> {
+  async setImage(projectId: bigint, entityKey: string, image: string, mime: 'image/png' | 'image/jpeg' | 'image/webp'): Promise<PresentedEntity> {
     const entity = await this.get(projectId, entityKey);
     if (!entity) throw AppErrorCode.ENT_001.create();
 
@@ -136,10 +157,10 @@ export class EntityService {
       .returning();
 
     if (!updated) throw AppErrorCode.ENT_001.create();
-    return updated;
+    return this.present(updated);
   }
 
-  async clearImage(projectId: bigint, entityKey: string): Promise<Knowledge.Entity> {
+  async clearImage(projectId: bigint, entityKey: string): Promise<PresentedEntity> {
     const entity = await this.get(projectId, entityKey);
     if (!entity) throw AppErrorCode.ENT_001.create();
 
@@ -150,10 +171,10 @@ export class EntityService {
       .returning();
 
     if (!updated) throw AppErrorCode.ENT_001.create();
-    return updated;
+    return this.present(updated);
   }
 
-  async addImage(projectId: bigint, entityKey: string, image: string, mime: UploadMime, caption?: string): Promise<EntityWithImages> {
+  async addImage(projectId: bigint, entityKey: string, image: string, mime: UploadMime, caption?: string): Promise<PresentedEntityWithImages> {
     const entity = await this.get(projectId, entityKey);
     if (!entity) throw AppErrorCode.ENT_001.create();
 
@@ -165,7 +186,7 @@ export class EntityService {
     return this.getOrThrow(projectId, entityKey);
   }
 
-  async deleteImageById(projectId: bigint, entityKey: string, imageId: bigint): Promise<EntityWithImages> {
+  async deleteImageById(projectId: bigint, entityKey: string, imageId: bigint): Promise<PresentedEntityWithImages> {
     const entity = await this.get(projectId, entityKey);
     if (!entity) throw AppErrorCode.ENT_001.create();
 
@@ -178,7 +199,7 @@ export class EntityService {
     return this.getOrThrow(projectId, entityKey);
   }
 
-  private async getOrThrow(projectId: bigint, entityKey: string): Promise<EntityWithImages> {
+  private async getOrThrow(projectId: bigint, entityKey: string): Promise<PresentedEntityWithImages> {
     const entity = await this.get(projectId, entityKey);
     if (!entity) throw AppErrorCode.ENT_001.create();
     return entity;

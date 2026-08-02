@@ -28,7 +28,7 @@ import {
   useUploadCoverMutation,
   type WorkflowRunDetailResponse,
 } from '@/lib/apis';
-import { imageUrl, LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
+import { LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './overview.module.css';
 
@@ -331,7 +331,7 @@ function OverviewScreen(): React.JSX.Element {
           <div className={styles.header}>
             <ImageUpload
               className={styles.headerCover}
-              src={imageUrl(project.coverImagePath)}
+              src={project.coverUrl ?? undefined}
               alt={`${projectTitle(project)} cover`}
               uploading={uploadCover.isPending || removeCover.isPending}
               onUpload={body => uploadCover.mutate(body, { onSuccess: () => toast.success('Cover updated'), onError: e => toast.danger(e.message) })}

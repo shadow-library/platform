@@ -2596,7 +2596,7 @@ export interface components {
       id: string;
       projectId: string;
       chapter: number;
-      imagePath: string;
+      imageUrl: string;
       caption?: null | string;
       sortOrder: number;
       /** Format: date-time */
@@ -2918,7 +2918,7 @@ export interface components {
       notes?: null | string;
       motivation?: null | string;
       body?: null | string;
-      imagePath?: null | string;
+      imageUrl?: null | string;
       images?: components['schemas']['EntityImageResponse'][];
       /** Format: date-time */
       createdAt: string;
@@ -2927,7 +2927,7 @@ export interface components {
     };
     EntityImageResponse: {
       id: string;
-      imagePath: string;
+      imageUrl: string;
       caption?: null | string;
       sortOrder: number;
     };
@@ -3152,7 +3152,7 @@ export interface components {
     };
     SaveIllustrationResponse: {
       saved: boolean;
-      imagePath: string;
+      imageUrl: string;
     };
     CancelIllustrationBody: {
       sessionId: string;
@@ -3653,7 +3653,7 @@ export interface components {
       name: string;
       kind: components['schemas']['ProjectKind'];
       title?: null | string;
-      coverImagePath?: null | string;
+      coverUrl?: null | string;
       contentMode: components['schemas']['ContentMode'];
       config?: components['schemas']['ProjectConfig'];
       brief?: null | string;

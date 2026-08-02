@@ -32,7 +32,7 @@ import {
   useUpdateEntityMutation,
   useUploadEntityImageMutation,
 } from '@/lib/apis';
-import { coverColor, imageUrl } from '@/lib/format';
+import { coverColor } from '@/lib/format';
 
 import styles from './story-bible.module.css';
 
@@ -363,7 +363,7 @@ function EntityDetail({ novelId, entityKey, onEdit }: EntityDetailProps): React.
           <div>
             <ImageUpload
               className={styles.cover}
-              src={imageUrl(entity.imagePath)}
+              src={entity.imageUrl ?? undefined}
               alt={entity.name}
               uploading={uploadImage.isPending || removeImage.isPending}
               placeholder={<div className={styles.coverPlaceholder} style={{ background: coverColor(entity.id) }} />}
@@ -399,7 +399,7 @@ function EntityDetail({ novelId, entityKey, onEdit }: EntityDetailProps): React.
             <div className={styles.gallerySection}>
               <div className={styles.sectionLabel}>Gallery</div>
               <ImageGallery
-                images={(entity.images ?? []).map(img => ({ id: img.id, url: imageUrl(img.imagePath), caption: img.caption }))}
+                images={(entity.images ?? []).map(img => ({ id: img.id, url: img.imageUrl, caption: img.caption }))}
                 busy={addGalleryImage.isPending || removeGalleryImage.isPending}
                 addLabel="Add image"
                 onAdd={body => addGalleryImage.mutate(body, { onSuccess: () => toast.success('Image added'), onError: e => toast.danger(e.message) })}
@@ -603,8 +603,8 @@ function StoryBibleScreen(): React.JSX.Element {
                 onClick={() => selectEntity(entity.entityKey)}
                 onKeyDown={e => e.key === 'Enter' && selectEntity(entity.entityKey)}
               >
-                {entity.imagePath ? (
-                  <img src={imageUrl(entity.imagePath)} alt="" className={styles.entityThumb} />
+                {entity.imageUrl ? (
+                  <img src={entity.imageUrl} alt="" className={styles.entityThumb} />
                 ) : (
                   <div className={styles.entityAvatar} style={{ '--nf-dot': coverColor(entity.id) } as React.CSSProperties} />
                 )}

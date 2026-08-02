@@ -19,7 +19,7 @@ export interface ChapterImage {
   id: string;
   projectId: string;
   chapter: number;
-  imagePath: string;
+  imageUrl: string;
   caption?: string | null;
   sortOrder: number;
   createdAt: string;

@@ -80,8 +80,9 @@ export class SaveIllustrationResponse {
   @Field()
   saved: boolean;
 
+  // Absolute public object-storage URL, resolved server-side from the runtime `storage.public-origin`.
   @Field()
-  imagePath: string;
+  imageUrl: string;
 }
 
 @Schema()

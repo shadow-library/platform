@@ -92,8 +92,9 @@ export class EntityImageResponse {
   @Field(() => String)
   id: bigint;
 
+  // Absolute public object-storage URL, resolved server-side from the runtime `storage.public-origin`.
   @Field()
-  imagePath: string;
+  imageUrl: string;
 
   @Field({ optional: true, nullable: true })
   caption?: string | null;
@@ -140,8 +141,10 @@ export class EntityResponse {
   @Field({ optional: true, nullable: true })
   body?: string | null;
 
+  // Absolute public object-storage URL for the portrait, resolved server-side from the runtime
+  // `storage.public-origin`; absent when the entity has no portrait.
   @Field({ optional: true, nullable: true })
-  imagePath?: string | null;
+  imageUrl?: string | null;
 
   // The entity's gallery of additional reference images, populated on the single-entity `get` route.
   @Field(() => [EntityImageResponse], { optional: true })

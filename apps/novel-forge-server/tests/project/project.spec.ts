@@ -106,4 +106,45 @@ describe.if(pgAvailable)('Projects API', () => {
       expect(cleared.json().instructions).toBe(DEFAULT_WRITING_INSTRUCTIONS);
     });
   });
+
+  // The wire contract, not just the mapper: the browser renders `coverUrl` verbatim and has no storage
+  // origin of its own to fall back on. Sending the bare ref instead once shipped covers pointing at the
+  // client bundle's baked-in dev origin, so the ref must not appear on the response at all.
+  describe('cover image URLs', () => {
+    async function createProject(name: string): Promise<string> {
+      const created = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name, kind: 'new_novel' });
+      return created.json().id;
+    }
+
+    const cover = { image: Buffer.from('cover-bytes').toString('base64'), mime: 'image/png' };
+
+    it('should respond with an absolute cover URL and never the stored ref', async () => {
+      const id = await createProject('cover-url');
+
+      const response = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${id}/cover`).body(cover);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().coverUrl).toMatch(/^http:\/\/storage\.test\/[0-9a-f]{64}\.png$/);
+      expect(response.json()).not.toHaveProperty('coverImagePath');
+    });
+
+    it('should carry the cover URL on a subsequent read', async () => {
+      const id = await createProject('cover-url-read');
+      await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${id}/cover`).body(cover);
+
+      const fetched = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${id}`);
+
+      expect(fetched.json().coverUrl).toMatch(/^http:\/\/storage\.test\/[0-9a-f]{64}\.png$/);
+    });
+
+    it('should omit the cover URL once the cover is removed', async () => {
+      const id = await createProject('cover-url-clear');
+      await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${id}/cover`).body(cover);
+
+      const cleared = await testEnv.getRouter().mockRequest().delete(`/api/v1/projects/${id}/cover`);
+
+      expect(cleared.statusCode).toBe(200);
+      expect(cleared.json().coverUrl).toBeUndefined();
+    });
+  });
 });

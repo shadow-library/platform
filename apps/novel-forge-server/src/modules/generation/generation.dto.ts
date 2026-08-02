@@ -926,8 +926,9 @@ export class ChapterImageResponse {
   @Field(() => Integer)
   chapter: number;
 
+  // Absolute public object-storage URL, resolved server-side from the runtime `storage.public-origin`.
   @Field()
-  imagePath: string;
+  imageUrl: string;
 
   @Field({ optional: true, nullable: true })
   caption?: string | null;

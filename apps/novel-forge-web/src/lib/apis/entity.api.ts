@@ -21,11 +21,11 @@ import { ApiError, APIRequest } from './transport';
  * Defining types
  */
 
-// The gallery of additional reference images an entity carries, alongside its single `imagePath`
+// The gallery of additional reference images an entity carries, alongside its single `imageUrl`
 // portrait. Hand-authored until the generated OpenAPI types pick up the new fields on redeploy.
 export interface EntityImage {
   id: string;
-  imagePath: string;
+  imageUrl: string;
   caption?: string | null;
   sortOrder: number;
 }
@@ -102,7 +102,7 @@ export function useDeleteEntityImageMutation(projectId: string, entityKey: strin
   });
 }
 
-/** Appends a reference image to the entity's gallery (distinct from the single portrait `imagePath`). */
+/** Appends a reference image to the entity's gallery (distinct from the single portrait `imageUrl`). */
 export function useAddEntityImageMutation(projectId: string, entityKey: string): UseMutationResult<EntityWithImages, ApiError, AddEntityImageBody> {
   const queryClient = useQueryClient();
   return useMutation<EntityWithImages, ApiError, AddEntityImageBody>({

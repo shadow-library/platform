@@ -35,7 +35,6 @@ import {
   useProjectStatusQuery,
   useUpdateDraftMutation,
 } from '@/lib/apis';
-import { imageUrl } from '@/lib/format';
 
 import styles from './chapters.module.css';
 
@@ -730,7 +729,7 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
               <section className={styles.sceneImages}>
                 <div className={styles.sceneImagesHead}>Scene images</div>
                 <ImageGallery
-                  images={(sceneImagesQuery.data?.items ?? []).map(img => ({ id: img.id, url: imageUrl(img.imagePath), caption: img.caption }))}
+                  images={(sceneImagesQuery.data?.items ?? []).map(img => ({ id: img.id, url: img.imageUrl, caption: img.caption }))}
                   busy={addSceneImage.isPending || removeSceneImage.isPending}
                   addLabel="Add scene image"
                   onAdd={body => addSceneImage.mutate(body, { onSuccess: () => toast.success('Scene image added'), onError: e => toast.danger(e.message) })}

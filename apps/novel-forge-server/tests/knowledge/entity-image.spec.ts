@@ -24,6 +24,10 @@ import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 const dbName = `${baseConnectionString.split('/').pop()}_entity_image`;
 
+// Any absolute origin will do — the service under test only concatenates it, and asserting on it keeps
+// the ref → URL mapping visible in the expectations.
+const TEST_STORAGE_ORIGIN = 'https://storage.test';
+
 const pgAvailable = await (async () => {
   try {
     const sql = new SQL(baseConnectionString);
@@ -44,9 +48,11 @@ describe.if(pgAvailable)('EntityService image gallery', () => {
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
-    // Stub the shared StorageService with a content-addressed save; the service no longer reads/deletes here.
+    // Stub the shared StorageService with a content-addressed save plus the public-URL resolution the
+    // service presents refs through; it no longer reads/deletes here.
     const storage = {
       save: async (bytes: Uint8Array) => `${Buffer.from(bytes).toString('hex') || 'empty'}.png`,
+      getPublicUrl: (ref?: string | null) => (ref ? `${TEST_STORAGE_ORIGIN}/${ref}` : undefined),
     };
     service = new EntityService({ getPostgresClient: () => db } as never, storage as never);
   });
@@ -71,6 +77,27 @@ describe.if(pgAvailable)('EntityService image gallery', () => {
     expect(withTwo.images).toHaveLength(2);
     expect(withTwo.images.map(i => i.sortOrder)).toEqual([0, 1]);
     expect(withTwo.images[0]?.caption).toBe('a portrait');
+  });
+
+  // The web app renders these URLs verbatim. Presenting bare refs instead once shipped images pointing at
+  // the client bundle's baked-in dev origin, so the portrait and every gallery entry resolve server-side.
+  it('should present absolute public URLs rather than the stored refs', async () => {
+    const { projectId, entityKey } = await seedEntity();
+
+    const portrait = await service.setImage(projectId, entityKey, 'AAAA', 'image/png');
+    const withGallery = await service.addImage(projectId, entityKey, 'BBBB', 'image/png');
+
+    expect(portrait.imageUrl).toBe(`${TEST_STORAGE_ORIGIN}/${portrait.imagePath}`);
+    expect(withGallery.imageUrl).toBe(`${TEST_STORAGE_ORIGIN}/${portrait.imagePath}`);
+    expect(withGallery.images[0]?.imageUrl).toBe(`${TEST_STORAGE_ORIGIN}/${withGallery.images[0]?.imagePath}`);
+  });
+
+  it('should present no portrait URL when the entity has no image', async () => {
+    const { projectId, entityKey } = await seedEntity();
+
+    const cleared = await service.clearImage(projectId, entityKey);
+
+    expect(cleared.imageUrl).toBeUndefined();
   });
 
   it('removes a gallery image by id', async () => {
