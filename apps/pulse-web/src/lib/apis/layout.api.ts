@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { type ApiError, APIRequest } from './api-request';
+import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Importing user defined packages
@@ -24,18 +24,26 @@ const layoutKeys = {
   detail: (layoutId: string) => [...layoutKeys.all, layoutId],
 } as const;
 
-export function useListLayoutsQuery(): UseQueryResult<ListLayoutResponse, ApiError> {
-  return useQuery<ListLayoutResponse, ApiError>({
+/** Shared by the layouts list route's loader prefetch and `useListLayoutsQuery` — identical key + fn, so SSR-dehydrated data hydrates without a second request. */
+export const listLayoutsQueryOptions = (): UseQueryOptions<ListLayoutResponse, ApiError> =>
+  queryOptions<ListLayoutResponse, ApiError>({
     queryKey: layoutKeys.list(),
     queryFn: () => APIRequest.get('/layouts').execute(),
   });
-}
 
-export function useLayoutQuery(layoutId: string): UseQueryResult<LayoutDetailResponse, ApiError> {
-  return useQuery<LayoutDetailResponse, ApiError>({
+/** Shared by the layout detail route's loader prefetch and `useLayoutQuery`. */
+export const layoutQueryOptions = (layoutId: string): UseQueryOptions<LayoutDetailResponse, ApiError> =>
+  queryOptions<LayoutDetailResponse, ApiError>({
     queryKey: layoutKeys.detail(layoutId),
     queryFn: () => APIRequest.get(`/layouts/${layoutId}`).execute(),
   });
+
+export function useListLayoutsQuery(): UseQueryResult<ListLayoutResponse, ApiError> {
+  return useQuery(listLayoutsQueryOptions());
+}
+
+export function useLayoutQuery(layoutId: string): UseQueryResult<LayoutDetailResponse, ApiError> {
+  return useQuery(layoutQueryOptions(layoutId));
 }
 
 export function useCreateLayoutMutation(): UseMutationResult<LayoutResponse, ApiError, CreateLayoutBody> {

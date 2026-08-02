@@ -6,7 +6,7 @@ import { createAuthApi } from '@shadow-library/web/auth';
 /**
  * Importing user defined packages
  */
-import { apiClient } from './api-request';
+import { apiClient } from './transport';
 
 /**
  * Defining types

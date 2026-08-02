@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { type ApiError, APIRequest } from './api-request';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Importing user defined packages/modules

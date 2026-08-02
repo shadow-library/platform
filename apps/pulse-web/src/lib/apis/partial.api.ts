@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { type ApiError, APIRequest } from './api-request';
+import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Importing user defined packages
@@ -31,18 +31,26 @@ const partialKeys = {
   detail: (partialId: string) => [...partialKeys.all, partialId],
 } as const;
 
-export function useListPartialsQuery(): UseQueryResult<ListPartialResponse, ApiError> {
-  return useQuery<ListPartialResponse, ApiError>({
+/** Shared by the partials list route's loader prefetch and `useListPartialsQuery` — identical key + fn, so SSR-dehydrated data hydrates without a second request. */
+export const listPartialsQueryOptions = (): UseQueryOptions<ListPartialResponse, ApiError> =>
+  queryOptions<ListPartialResponse, ApiError>({
     queryKey: partialKeys.list(),
     queryFn: () => APIRequest.get('/partials').execute(),
   });
-}
 
-export function usePartialQuery(partialId: string): UseQueryResult<PartialDetailResponse, ApiError> {
-  return useQuery<PartialDetailResponse, ApiError>({
+/** Shared by the partial detail route's loader prefetch and `usePartialQuery`. */
+export const partialQueryOptions = (partialId: string): UseQueryOptions<PartialDetailResponse, ApiError> =>
+  queryOptions<PartialDetailResponse, ApiError>({
     queryKey: partialKeys.detail(partialId),
     queryFn: () => APIRequest.get(`/partials/${partialId}`).execute(),
   });
+
+export function useListPartialsQuery(): UseQueryResult<ListPartialResponse, ApiError> {
+  return useQuery(listPartialsQueryOptions());
+}
+
+export function usePartialQuery(partialId: string): UseQueryResult<PartialDetailResponse, ApiError> {
+  return useQuery(partialQueryOptions(partialId));
 }
 
 export function useCreatePartialMutation(): UseMutationResult<PartialResponse, ApiError, CreatePartialBody> {

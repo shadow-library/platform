@@ -1,8 +1,17 @@
 /**
  * Importing npm packages
  */
-import { useMutation, type UseMutationOptions, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { type ApiError, APIRequest } from './api-request';
+import {
+  queryOptions,
+  useMutation,
+  type UseMutationOptions,
+  type UseMutationResult,
+  useQuery,
+  useQueryClient,
+  type UseQueryOptions,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Importing user defined packages
@@ -56,11 +65,15 @@ export function useListTemplatesQuery(params: ListTemplatesQueryParams = {}): Us
   });
 }
 
-export function useTemplateQuery(templateId: string): UseQueryResult<TemplateDetailResponse, ApiError> {
-  return useQuery<TemplateDetailResponse, ApiError>({
+/** Shared by the template detail route's loader prefetch and `useTemplateQuery`. */
+export const templateQueryOptions = (templateId: string): UseQueryOptions<TemplateDetailResponse, ApiError> =>
+  queryOptions<TemplateDetailResponse, ApiError>({
     queryKey: templateKeys.detail(templateId),
     queryFn: () => APIRequest.get(`/templates/${templateId}`).execute(),
   });
+
+export function useTemplateQuery(templateId: string): UseQueryResult<TemplateDetailResponse, ApiError> {
+  return useQuery(templateQueryOptions(templateId));
 }
 
 export function useCreateTemplateMutation(): UseMutationResult<TemplateResponse, ApiError, CreateTemplateBody> {

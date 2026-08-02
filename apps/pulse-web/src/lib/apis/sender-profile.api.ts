@@ -1,8 +1,17 @@
 /**
  * Importing npm packages
  */
-import { useMutation, type UseMutationOptions, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { type ApiError, APIRequest } from './api-request';
+import {
+  queryOptions,
+  useMutation,
+  type UseMutationOptions,
+  type UseMutationResult,
+  useQuery,
+  useQueryClient,
+  type UseQueryOptions,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Importing user defined packages/modules
@@ -45,11 +54,15 @@ export function useListSenderProfilesQuery(params: ListSenderProfilesQueryParams
   });
 }
 
-export function useSenderProfileQuery(profileId: string): UseQueryResult<SenderProfileResponse, ApiError> {
-  return useQuery<SenderProfileResponse, ApiError>({
+/** Shared by the sender profile detail route's loader prefetch and `useSenderProfileQuery`. */
+export const senderProfileQueryOptions = (profileId: string): UseQueryOptions<SenderProfileResponse, ApiError> =>
+  queryOptions<SenderProfileResponse, ApiError>({
     queryKey: senderProfileKeys.detail(profileId),
     queryFn: () => APIRequest.get(`/sender-profiles/${profileId}`).execute(),
   });
+
+export function useSenderProfileQuery(profileId: string): UseQueryResult<SenderProfileResponse, ApiError> {
+  return useQuery(senderProfileQueryOptions(profileId));
 }
 
 export function useCreateSenderProfileMutation(): UseMutationResult<SenderProfileResponse, ApiError, CreateSenderProfileBody> {
