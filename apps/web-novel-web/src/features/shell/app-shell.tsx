@@ -25,7 +25,7 @@ import {
   TagIcon,
 } from '@/components/icons';
 import { SearchOverlay } from '@/features/search';
-import { loginUrl, notificationsQueryOptions, purgeOnLogout, sessionQueryOptions, signOut } from '@/lib/apis';
+import { loginUrl, meQuery, notificationsQueryOptions, purgeOnLogout, sessionQueryOptions, signOut } from '@/lib/apis';
 
 import styles from './app-shell.module.css';
 
@@ -130,6 +130,9 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
   const [searchOpen, setSearchOpen] = useState(false);
 
   const user = session.data ?? undefined;
+  // The name lives on its own query, not the session: the session gates routes, and a profile that
+  // could not be fetched must never read as "signed out".
+  const me = useQuery({ ...meQuery, enabled: Boolean(user) });
   const notifications = useQuery(notificationsQueryOptions(user?.userId));
   const hasUnread = (notifications.data ?? []).some(notification => !notification.read);
   const activeNav = MAIN_NAV.filter(item => isActive(location.pathname, item.to)).at(-1);
@@ -148,7 +151,7 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
   }, []);
 
   const sidebar = (
-    <Sidebar aria-label="Primary" workspace={<Brand />} footer={<SidebarFooter userId={user?.userId} name={user?.name} email={user?.email} pathname={location.pathname} />}>
+    <Sidebar aria-label="Primary" workspace={<Brand />} footer={<SidebarFooter userId={user?.userId} name={me.data?.name} email={me.data?.email} pathname={location.pathname} />}>
       <Sidebar.Section>
         <NavItems items={MAIN_NAV} pathname={location.pathname} navigate={navigate} />
       </Sidebar.Section>
@@ -169,7 +172,7 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
           hasUnread={hasUnread}
           onNotifications={() => void navigate({ to: '/notifications' })}
           userId={user?.userId}
-          userName={user?.name}
+          userName={me.data?.name}
           pathname={location.pathname}
         />
       }

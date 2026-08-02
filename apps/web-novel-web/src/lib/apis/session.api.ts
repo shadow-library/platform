@@ -3,7 +3,7 @@
  */
 import { type QueryClient, queryOptions } from '@tanstack/react-query';
 import { createServerFn } from '@tanstack/react-start';
-import { type ApiResult, call } from '@shadow-library/web';
+import { type ApiResult, call, type UserInfo, userInfoQueryOptions } from '@shadow-library/web';
 import { requireAuth } from '@shadow-library/web/router';
 
 /**
@@ -55,6 +55,20 @@ const fetchSession = createServerFn({ method: 'GET' }).handler(async (): Promise
   if (!result.ok) return result.failure.status === 401 ? { ok: true, data: null } : result;
   return { ok: true, data: { userId: result.data.sub } };
 });
+
+/**
+ * The reader's own profile, from the SDK's userinfo route. Kept off {@link sessionQueryOptions} on
+ * purpose: that query gates the library route, and a name is not a reason to fail a gate. `name` and
+ * `email` used to exist on `SessionUser` but were only ever populated under fixtures — this is where
+ * they actually come from.
+ */
+const fetchUserInfo = createServerFn({ method: 'GET' }).handler(async (): Promise<ApiResult<UserInfo>> => {
+  if (useFixtures) return { ok: true, data: { sub: FIXTURE_SESSION.userId, name: FIXTURE_SESSION.name, email: FIXTURE_SESSION.email } };
+  const { serverFetch } = await import('./server-fetch');
+  return serverFetch<UserInfo>({ method: 'GET', path: '/auth/userinfo' });
+});
+
+export const meQuery = userInfoQueryOptions(() => call(fetchUserInfo()));
 
 export const sessionQueryOptions = () =>
   queryOptions<SessionUser | null, ApiError>({
