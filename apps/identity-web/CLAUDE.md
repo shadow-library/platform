@@ -110,15 +110,16 @@ logic worth covering in isolation. Copy `.env.example` → `.env` before first r
   with `use*Mutation()`. The router comes from `getRouter()` → `createAppRouter(...)` (`@shadow-library/web/router`),
   which owns the per-request `QueryClient` and SSR-query wiring.
 - **Server-only code vs browser-only APIs.** The backend is reached through the one client configured in
-  `src/lib/apis/api-request.ts` — `APIRequest.get('/me').execute<MeResponse>()`, paths relative to `/api/v1`.
+  `src/lib/apis/transport.ts` — `APIRequest.get('/me').execute<MeResponse>()`, paths relative to `/api/v1`.
   It is isomorphic: in the browser it calls the same-origin `/api/v1/...` (the reverse proxy routes that
   prefix to the identity server, so cookies and the CSRF double-submit work natively), and during SSR it goes
-  out through `src/lib/apis/ssr-transport.ts`, which reaches `SERVER_URL` directly and forwards the caller's
-  cookies and user agent. Do not hand-roll a `createServerFn` for a backend call. `SERVER_URL` and all server
-  env are read **server-side only** — the `import.meta.env.SSR` guard in `api-request.ts` keeps the SSR module
-  and its origin out of the client bundle. Never inline the backend URL into browser code, and never touch
-  browser-only APIs (`window`, `document`, `localStorage`) during render — gate them behind `ClientOnly`,
-  effects, or `import.meta.env.DEV`.
+  out through `@shadow-library/web/server`'s `createSsrTransport`, which resolves the backend origin —
+  `API_ORIGIN`, falling back to `SERVER_URL`, falling back to this app's own local-dev default — and forwards
+  the caller's cookies, user agent, accept-language and forwarded-for. Do not hand-roll a `createServerFn` for
+  a backend call. `SERVER_URL`/`API_ORIGIN` and all server env are read **server-side only** — the
+  `import.meta.env.SSR` guard in `transport.ts` keeps the SSR module and its origin out of the client bundle.
+  Never inline the backend URL into browser code, and never touch browser-only APIs (`window`, `document`,
+  `localStorage`) during render — gate them behind `ClientOnly`, effects, or `import.meta.env.DEV`.
 - **Hydration consistency.** `__root.tsx` owns the full document and sets `suppressHydrationWarning` where the
   theme runs a pre-paint boot script (`themeInitScript`, `data-theme`). Keep server and client render output
   deterministic and identical — no `Date.now()`/random/locale-dependent output during render; mount browser-only
@@ -147,16 +148,18 @@ logic worth covering in isolation. Copy `.env.example` → `.env` before first r
 
 ## Environment & secrets
 
-Read the authoritative key list and defaults from `.env.example`. `SERVER_URL`, `OPENAPI_SPEC_URL`, and
-`PUBLIC_ROOT_DOMAIN` are all **server-only** — read only in `src/lib/apis/ssr-transport.ts`, the remaining
-server functions, and `vite.config.ts`. The browser reaches the backend by relative path, so it never receives
-a backend URL; the only `VITE_`-prefixed var is `VITE_THEME_COOKIE_DOMAIN` — the public parent domain the
-shared light/dark theme cookie is written for, which has to reach the client because the theme is set there.
-Treat that as the bar for any future `VITE_` var.
+Read the authoritative key list and defaults from `.env.example`. `SERVER_URL`, `API_ORIGIN`,
+`OPENAPI_SPEC_URL`, and `PUBLIC_ROOT_DOMAIN` are all **server-only** — read only in `src/lib/apis/transport.ts`
+(via `createSsrTransport`), the remaining server functions, and `vite.config.ts`. `API_ORIGIN` is the
+canonical deploy-time backend origin (the identity server's in-cluster Service DNS name); `SERVER_URL` remains
+honored as a fallback and is what the dev/preview proxy keys off. The browser reaches the backend by relative
+path, so it never receives a backend URL; the only `VITE_`-prefixed var is `VITE_THEME_COOKIE_DOMAIN` — the
+public parent domain the shared light/dark theme cookie is written for, which has to reach the client because
+the theme is set there. Treat that as the bar for any future `VITE_` var.
 
 **Never expose secrets or server-only environment variables to the client.** Do not add a `VITE_`-prefixed var
 (or otherwise inline a value into the client bundle) that carries a secret, credential, backend URL, or any
-server-only config. Server-only env belongs behind the `import.meta.env.SSR` boundary in `api-request.ts` or
+server-only config. Server-only env belongs behind the `import.meta.env.SSR` boundary in `transport.ts` or
 inside a `createServerFn` handler — `runtime-config.api.ts` is the model for the latter.
 
 ---

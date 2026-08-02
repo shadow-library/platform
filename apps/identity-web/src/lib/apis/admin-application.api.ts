@@ -6,7 +6,6 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 /**
  * Importing user defined packages
  */
-import { type ApiError, APIRequest } from './api-request';
 import {
   type ApplicationDetailResponse,
   type ApplicationListResponse,
@@ -21,6 +20,7 @@ import {
   type ReleaseApplicationBody,
   type UpdateApplicationBody,
 } from './api-types.gen';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Defining types

@@ -1,4 +1,4 @@
-export * from './api-request';
+export * from './transport';
 export * from './runtime-config.api';
 export * from './auth.api';
 export * from './me.api';

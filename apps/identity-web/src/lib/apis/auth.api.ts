@@ -8,7 +8,6 @@ import { queryOptions, useMutation, type UseMutationResult, useQueryClient } fro
  */
 import { type JsonObject } from '@/types';
 
-import { type ApiError, APIRequest } from './api-request';
 import {
   type ChallengeMethod,
   type ChallengeMethodMetadata,
@@ -19,6 +18,7 @@ import {
   type ConsentScopeDto,
   type FederatedLoginOptionDto,
 } from './api-types.gen';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Defining types

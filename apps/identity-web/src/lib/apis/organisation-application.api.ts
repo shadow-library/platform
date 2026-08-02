@@ -6,9 +6,9 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 /**
  * Importing user defined packages
  */
-import { type ApiError, APIRequest } from './api-request';
 import { type OrganisationApplicationItem, type OrganisationApplicationsResponse, type UpdateOrganisationBody } from './api-types.gen';
 import { orgKeys } from './organisation.api';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Defining types

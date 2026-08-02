@@ -6,8 +6,8 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 /**
  * Importing user defined packages
  */
-import { type ApiError, APIRequest } from './api-request';
 import { type PolicyActionResponse, type PolicyItem, type PolicyListResponse, type SetPolicyBody } from './api-types.gen';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Defining types

@@ -6,7 +6,6 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 /**
  * Importing user defined packages
  */
-import { type ApiError, APIRequest } from './api-request';
 import {
   type CreatedWebhookResponse,
   type CreateWebhookBody,
@@ -16,6 +15,7 @@ import {
   type WebhookItem,
   type WebhookListResponse,
 } from './api-types.gen';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Defining types

@@ -8,7 +8,6 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
  */
 import { type JsonValue } from '@/types';
 
-import { type ApiError, APIRequest } from './api-request';
 import {
   type UserAuditEventItem,
   type UserAuditEventsResponse,
@@ -18,6 +17,7 @@ import {
   type UserSearchResponse,
   type UserSummaryItem,
 } from './api-types.gen';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Defining types

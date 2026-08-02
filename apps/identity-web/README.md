@@ -21,9 +21,10 @@ SERVER_PORT=9091 bun run src/main.ts
 
 ## Environment
 
-| Variable     | Default                 | Used by                                                    |
-| ------------ | ----------------------- | ---------------------------------------------------------- |
-| `SERVER_URL` | `http://localhost:9091` | The SSR transport (server-side backend origin) + dev proxy |
+| Variable     | Default                 | Used by                                                                             |
+| ------------ | ----------------------- | ----------------------------------------------------------------------------------- |
+| `API_ORIGIN` | _(unset)_               | The SSR transport (server-side backend origin) — takes precedence over `SERVER_URL` |
+| `SERVER_URL` | `http://localhost:9091` | The SSR transport fallback + dev proxy                                              |
 
 ## Deployment topology
 
@@ -32,6 +33,6 @@ that prefix to the identity server — along with `/oauth2` and `/saml2`, the fu
 identity server owns — and everything else to the Start server. The dev/preview server proxies the same
 three prefixes (see `vite.config.ts`) so local development matches.
 
-SSR takes none of that: `SERVER_URL` is read server-side only, and `src/lib/apis/ssr-transport.ts` reaches
-the identity server directly with it, forwarding the caller's cookies and user agent. The browser never
-receives a backend URL.
+SSR takes none of that: `API_ORIGIN`/`SERVER_URL` are read server-side only, and `src/lib/apis/transport.ts`
+reaches the identity server directly through `@shadow-library/web/server`'s `createSsrTransport`, forwarding
+the caller's cookies, user agent, accept-language and forwarded-for. The browser never receives a backend URL.

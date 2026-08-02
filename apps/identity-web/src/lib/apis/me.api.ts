@@ -6,9 +6,9 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 /**
  * Importing user defined packages
  */
-import { type ApiError, APIRequest } from './api-request';
 import { type ChangePasswordBody, type ChangePasswordResponse, type MeResponse, type UpdateProfileBody } from './api-types.gen';
 import { sessionKeys } from './session.api';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Defining types

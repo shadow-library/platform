@@ -6,8 +6,8 @@ import { queryOptions, useQuery, type UseQueryResult } from '@tanstack/react-que
 /**
  * Importing user defined packages
  */
-import { type ApiError, APIRequest } from './api-request';
 import { type AdminContextResponse } from './api-types.gen';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Defining types

@@ -8,7 +8,6 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
  */
 import { type JsonObject } from '@/types';
 
-import { type ApiError, APIRequest } from './api-request';
 import {
   type MfaEnrollmentItem,
   type MfaEnrollmentsResponse,
@@ -18,6 +17,7 @@ import {
   type TotpEnrollResponse,
 } from './api-types.gen';
 import { meKeys } from './me.api';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Defining types
