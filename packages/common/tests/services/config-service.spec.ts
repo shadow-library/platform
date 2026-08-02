@@ -150,6 +150,61 @@ describe('Config Service', () => {
     });
   });
 
+  /**
+   * `app.stage` is the deployment stage every app shares, and it fails safe: an operator who never sets
+   * `APP_STAGE` must land on `prod` and lose the dev-only surfaces, never gain them. These guard that
+   * default and the two-signal production check that reads it.
+   */
+  describe('app.stage', () => {
+    let previousStage: string | undefined;
+
+    beforeEach(() => (previousStage = process.env.APP_STAGE));
+    afterEach(() => (previousStage === undefined ? delete process.env.APP_STAGE : (process.env.APP_STAGE = previousStage)));
+
+    it('should default to the production stage when APP_STAGE is not set', () => {
+      delete process.env.APP_STAGE;
+      expect(new ConfigService().get('app.stage')).toBe('prod');
+    });
+
+    it('should read the stage from APP_STAGE when it is set', () => {
+      process.env.APP_STAGE = 'dev';
+      expect(new ConfigService().get('app.stage')).toBe('dev');
+    });
+
+    it('should reject a stage outside the allowed values', () => {
+      process.env.APP_STAGE = 'production';
+      expect(() => new ConfigService()).toThrow(AppError);
+    });
+  });
+
+  /**
+   * An operator sets `APP_STAGE` (`app.stage`) while `isProd()` reads `NODE_ENV` (`app.env`). Keying a
+   * security gate on `NODE_ENV` alone let an `APP_STAGE=prod` box with `NODE_ENV` unset fall back to
+   * insecure dev defaults, so EITHER signal has to count as production.
+   */
+  describe('isProductionDeployment', () => {
+    it('should treat an APP_STAGE=prod deployment as production even when NODE_ENV is not production', () => {
+      config['cache'].set('app.stage', 'prod');
+      config['cache'].set('app.env', 'development');
+
+      expect(config.isProductionDeployment()).toBe(true);
+    });
+
+    it('should treat a production NODE_ENV as production even when APP_STAGE is not prod', () => {
+      config['cache'].set('app.stage', 'dev');
+      config['cache'].set('app.env', 'production');
+
+      expect(config.isProductionDeployment()).toBe(true);
+    });
+
+    it('should not treat a genuine local dev deployment as production', () => {
+      config['cache'].set('app.stage', 'dev');
+      config['cache'].set('app.env', 'development');
+
+      expect(config.isProductionDeployment()).toBe(false);
+    });
+  });
+
   describe('invalid initialization', () => {
     beforeAll(() => ((process.env.NODE_ENV = 'production'), void 0));
     afterAll(() => ((process.env.NODE_ENV = 'test'), void 0));

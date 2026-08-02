@@ -5,11 +5,12 @@ conventions, and the source-of-truth design docs.
 
 ## Environment Variables
 
-All keys are declared in `src/bootstrap.ts`. Keys marked **required in prod** must be set when `APP_STAGE=prod`.
+All keys are declared in `src/bootstrap.ts`, except `APP_STAGE`, which `@shadow-library/common` declares for every app.
+Keys marked **required in prod** must be set when `APP_STAGE=prod`.
 
 | Env key                 | Default                  | Description                                  |
 | ----------------------- | ------------------------ | -------------------------------------------- |
-| `APP_STAGE`             | `dev`                    | Stage: `dev`, `staging`, or `prod`           |
+| `APP_STAGE`             | `prod`                   | Stage: `dev`, `staging`, or `prod`           |
 | `SERVER_PORT`           | `8080`                   | HTTP listen port                             |
 | `SERVER_HOST`           | `0.0.0.0`                | HTTP listen host                             |
 | `DATABASE_POSTGRES_URL` | —                        | PostgreSQL connection URL (required)         |

@@ -235,14 +235,11 @@ jobs:
         }}
       LOG_LEVEL: ${{ matrix.workspace == 'apps/pulse-server' && 'http' || '' }}
       # pulse-server's notification-messages route is gated `@EnableIf(() => Config.get('app.stage')
-      # === 'dev')`. The real bug (fixed in apps/pulse-server/bunfig.toml, see that commit) is that
-      # `Config.load()` skips re-resolving a key once it's *present* in the cache, even with value
-      # `undefined` -- and tests/common/stage.spec.ts, bun test's first-discovered file in CI's file
-      # order, saves/restores 'app.stage' through the raw `Config['cache']` before bootstrap.ts (which
-      # registers the 'dev' default) has ever been imported, poisoning the cache with an explicit
-      # `undefined` that then permanently blocks the default. Setting the "Pulse-owned env var" (per
-      # apps/pulse-server/CLAUDE.md) here didn't fix that by itself, but it's correct defense-in-depth
-      # now that bootstrap.ts preloads first -- an explicit value beats relying on the default.
+      # === 'dev')`, and `app.stage` is declared by @shadow-library/common with a deliberately
+      # fail-safe `prod` default -- so the suite has to opt in or the route is never registered and
+      # its specs 404. apps/pulse-server/tests/env.ts pins the same value for local runs; this is the
+      # CI-side half. Every other workspace resolves the safe default (an empty string is falsy, so
+      # `resolveConfigValue` falls through to it rather than failing the allowed-values check).
       APP_STAGE: ${{ matrix.workspace == 'apps/pulse-server' && 'dev' || '' }}
       # Capped to 1 for every backend, not just pulse-server (whose old mined workflow was the only
       # one that already had this). `DatabaseService` does not close its postgres pool on shutdown

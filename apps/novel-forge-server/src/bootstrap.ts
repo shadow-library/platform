@@ -17,9 +17,6 @@ import { Config } from '@shadow-library/common';
 
 declare module '@shadow-library/common' {
   export interface ConfigRecords {
-    /** App configs */
-    'app.stage': 'dev' | 'staging' | 'prod';
-
     /** Server configs */
     'server.port': number;
     'server.host': string;
@@ -74,7 +71,7 @@ declare module '@shadow-library/common' {
  * Declaring the constants
  */
 
-Config.load('app.stage', { defaultValue: 'dev', allowedValues: ['dev', 'staging', 'prod'], isProdRequired: true });
+/** `app.stage` is declared and loaded by `@shadow-library/common`'s ConfigService for every app; nothing about it is restated here. */
 
 Config.load('server.port', { defaultValue: '8080', validateType: 'number' });
 Config.load('server.host', { defaultValue: '0.0.0.0' });

@@ -36,6 +36,8 @@ export type ConfigChangeCallback<Configs> = (key: keyof Configs, newValue: any) 
 
 export type NodeEnv = 'development' | 'production' | 'test';
 
+export type AppStage = 'dev' | 'staging' | 'prod';
+
 export type LogLevel = 'silly' | 'debug' | 'http' | 'info' | 'warn' | 'error';
 
 export type Runtime = 'node' | 'edge' | 'deno' | 'browser' | 'bun' | 'unknown';
@@ -48,6 +50,7 @@ export interface ConfigRecords {
   /** Application configs */
   'app.env': NodeEnv;
   'app.name': string;
+  'app.stage': AppStage;
 
   /** Log configs */
   'log.level': LogLevel;
@@ -87,10 +90,19 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
 
     const defaultAppName = 'shadow-app';
     const appEnvs = ['development', 'production', 'test'];
+    const appStages = ['dev', 'staging', 'prod'];
     const logLevels = ['silly', 'debug', 'http', 'info', 'warn', 'error'];
 
     this.load('app.env', { envKey: 'NODE_ENV', allowedValues: appEnvs, defaultValue: 'development' });
     this.load('app.name', { defaultValue: defaultAppName });
+
+    /**
+     * Defaults to the most restrictive stage on purpose: this key gates surfaces that are safe on a
+     * laptop and unsafe in front of real users, so an operator who forgets to set it must lose a debug
+     * route, never gain one. That safe default is also why the key is deliberately not `isProdRequired` —
+     * requiring it in production would trade the fail-safe for a boot crash on the very deployment it protects.
+     */
+    this.load('app.stage', { allowedValues: appStages, defaultValue: 'prod' });
 
     this.load('log.level', { allowedValues: logLevels, defaultValue: this.isDev() ? 'debug' : 'info' });
     this.load('log.dir', { defaultValue: 'logs' });
@@ -309,6 +321,17 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
 
   isTest(): boolean {
     return this.cache.get('app.env') === 'test';
+  }
+
+  /**
+   * Whether this process is serving a real deployment, as opposed to `isProd()` which only reports what
+   * `NODE_ENV` claims. A deployment counts as production when EITHER signal says so: gating a security
+   * fail-fast or a Secure-cookie on `NODE_ENV` alone lets an `APP_STAGE=prod` box that never set
+   * `NODE_ENV` fall back to insecure development defaults. Prefer this over `isProd()` for anything whose
+   * failure mode is exposure; keep `isProd()` for what genuinely tracks the Node runtime, such as log transports.
+   */
+  isProductionDeployment(): boolean {
+    return this.cache.get('app.stage') === 'prod' || this.isProd();
   }
 
   get<T extends keyof Configs>(key: T): Configs[T] {

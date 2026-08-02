@@ -54,7 +54,7 @@ Each module follows the pattern: `*.module.ts`, `*.controller.ts`, `*.service.ts
 - Database constraint errors are mapped to custom app error codes in `database.constants.ts`
 - Type alias `PrimaryDatabase` exported from `database.module.ts`
 
-**Configuration:** Uses `@shadow-library/common` Config system. Pulse-owned env vars: `DATABASE_POSTGRES_URL`, `LOG_LEVEL`, `APP_STAGE` (dev/staging/prod).
+**Configuration:** Uses `@shadow-library/common` Config system. Pulse-owned env vars: `DATABASE_POSTGRES_URL`, `LOG_LEVEL`. `APP_STAGE` (dev/staging/prod, default `prod`) is declared by `@shadow-library/common` for every app, not by pulse.
 
 The entire auth surface is declared and loaded by `@shadow-library/auth/module` (the v1.1 "derived configuration" SDK), so pulse restates none of it. A steady-state deploy sets exactly three things plus one credential:
 
