@@ -66,6 +66,10 @@ export class AuthErrorCode extends ErrorCode {
   /** The token revocation request failed */
   static readonly REVOCATION_FAILED = AuthErrorCode.unavailable('REVOCATION_FAILED', 'Token revocation failed: {reason}');
 
+  static readonly USERINFO_FAILED = AuthErrorCode.unavailable('USERINFO_FAILED', 'User profile could not be resolved: {reason}');
+
+  static readonly DIRECTORY_FAILED = AuthErrorCode.unavailable('DIRECTORY_FAILED', 'Directory lookup failed: {reason}');
+
   /*!
    * First-Party App Session Errors
    */

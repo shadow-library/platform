@@ -52,7 +52,7 @@ describe('derived configuration', () => {
     const auth = client();
     const runtime = await sessions(auth).warmUp();
 
-    expect(runtime).toMatchObject({ clientId: APP_ID, audience: AUDIENCE, redirectUri: REDIRECT_URI, scopes: ['openid', 'reports:read'] });
+    expect(runtime).toMatchObject({ clientId: APP_ID, audience: AUDIENCE, redirectUri: REDIRECT_URI, scopes: ['openid', 'profile', 'reports:read'] });
     auth.stop();
   });
 
@@ -109,14 +109,14 @@ describe('derived configuration', () => {
   it('should pick up a scope an admin granted within one refresh interval', async () => {
     const auth = client(REFRESH_SECONDS);
     const service = sessions(auth);
-    expect((await service.warmUp()).scopes).toEqual(['openid', 'reports:read']);
+    expect((await service.warmUp()).scopes).toEqual(['openid', 'profile', 'reports:read']);
 
     idp.setAppRegistration({ scopes: ['openid', 'reports:read', 'reports:write'] });
     await sleep(REFRESH_SECONDS * 1000 * 2);
 
     /** No redeploy, no restart: the next login already asks for what the admin granted */
     const started = await service.beginLogin('/reports');
-    expect(new URL(started.url).searchParams.get('scope')).toBe('openid reports:read reports:write');
+    expect(new URL(started.url).searchParams.get('scope')).toBe('openid profile reports:read reports:write');
 
     idp.setAppRegistration({ scopes: ['openid', 'reports:read'] });
     auth.stop();

@@ -49,6 +49,8 @@ export interface AuthRoutePaths {
   logout: string | false;
   backchannelLogout: string | false;
   session: string | false;
+  /** The signed-in person's profile; the platform's answer to "who am I", so no app builds its own */
+  userinfo: string | false;
   stepUp: string | false;
   /** Lists the organisations this session may act in; one entry means there is nothing to switch to */
   organisations: string | false;
@@ -189,6 +191,7 @@ const DEFAULT_ROUTES: AuthRoutePaths = {
    */
   backchannelLogout: false,
   session: '/session',
+  userinfo: '/userinfo',
   stepUp: '/step-up',
   organisations: '/organisations',
   organisation: '/organisation',

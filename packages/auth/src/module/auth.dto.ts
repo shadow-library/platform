@@ -82,6 +82,45 @@ export class AuthSessionResponse {
   clientId?: string;
 }
 
+/**
+ * The signed-in person, mirroring OIDC's standard claims so an application never has to build a
+ * profile endpoint of its own. Claim names stay in the protocol's spelling rather than the
+ * repository's camelCase, because they are identity's answer passed through rather than a shape
+ * this package invented — a translation layer here would need an entry before any future standard
+ * claim could reach an application.
+ *
+ * Everything but `sub` is optional, and all of it can be missing at once: a profile nobody filled in
+ * is a normal account, and a session established before the `profile` scope was requested carries no
+ * name until its next login. Consumers must render a fallback rather than assume a name is present.
+ */
+@Schema()
+export class AuthUserInfoResponse {
+  @Field()
+  sub: string;
+
+  /** The one presentable string — a chosen display name, else the legal name parts joined. */
+  @Field({ optional: true })
+  name?: string;
+
+  @Field({ optional: true })
+  given_name?: string;
+
+  @Field({ optional: true })
+  family_name?: string;
+
+  @Field({ optional: true })
+  preferred_username?: string;
+
+  @Field({ optional: true })
+  picture?: string;
+
+  @Field({ optional: true })
+  email?: string;
+
+  @Field(() => Boolean, { optional: true })
+  email_verified?: boolean;
+}
+
 @Schema()
 export class AuthLogoutResponse {
   @Field()

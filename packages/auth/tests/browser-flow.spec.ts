@@ -122,7 +122,7 @@ describe('first-party browser flow', () => {
     const state = authorize.searchParams.get('state') as string;
     const stateCookie = readCookie(started, STATE_COOKIE) as string;
 
-    const code = idp.createAuthorizationCode({ sub, scopes: ['openid', 'reports:read'] });
+    const code = idp.createAuthorizationCode({ sub, scopes: ['openid', 'profile', 'reports:read'] });
     const callback = await get(`/auth/callback?code=${code}&state=${encodeURIComponent(state)}`, stateCookie);
     expect(callback.statusCode).toBe(302);
     expect(callback.headers.location).toBe('/reports');
@@ -137,7 +137,8 @@ describe('first-party browser flow', () => {
     expect(authorize.searchParams.get('response_type')).toBe('code');
     expect(authorize.searchParams.get('client_id')).toBe(CLIENT.id);
     expect(authorize.searchParams.get('redirect_uri')).toBe(REDIRECT_URI);
-    expect(authorize.searchParams.get('scope')).toBe('openid reports:read');
+    /** The protocol scopes lead every request: `profile` is what lets the app be told who signed in. */
+    expect(authorize.searchParams.get('scope')).toBe('openid profile reports:read');
     expect(authorize.searchParams.get('code_challenge_method')).toBe('S256');
     expect(authorize.searchParams.get('resource')).toBe(AUDIENCE);
     expect(authorize.searchParams.get('code_challenge')).toBeTruthy();
@@ -175,9 +176,59 @@ describe('first-party browser flow', () => {
   it('should report the current principal on the session route and 401 without a cookie', async () => {
     const authenticated = await get('/auth/session', sessionCookie);
     expect(authenticated.statusCode).toBe(200);
-    expect(body(authenticated)).toMatchObject({ sub: USER, scopes: ['openid', 'reports:read'] });
+    expect(body(authenticated)).toMatchObject({ sub: USER, scopes: ['openid', 'profile', 'reports:read'] });
 
     expect((await get('/auth/session')).statusCode).toBe(401);
+  });
+
+  describe('userinfo', () => {
+    it('should name the signed-in person without the application owning a profile endpoint', async () => {
+      idp.setUserProfile(USER, { name: 'Leander Paul', given_name: 'Leander', family_name: 'Paul', email: 'leander@example.test' });
+
+      const response = await get('/auth/userinfo', sessionCookie);
+
+      expect(response.statusCode).toBe(200);
+      expect(body(response)).toMatchObject({ sub: USER, name: 'Leander Paul', given_name: 'Leander', family_name: 'Paul' });
+    });
+
+    it('should reject a request with no session', async () => {
+      expect((await get('/auth/userinfo')).statusCode).toBe(401);
+    });
+
+    /** The whole point of caching it: a name is read on every screen and must not cost a round trip each time. */
+    it('should serve a repeat read from the session cache rather than asking identity again', async () => {
+      idp.setUserProfile(USER, { name: 'Leander Paul' });
+      await get('/auth/userinfo', sessionCookie);
+      const after = idp.getRequestCount('/oauth2/userinfo');
+
+      await get('/auth/userinfo', sessionCookie);
+
+      expect(idp.getRequestCount('/oauth2/userinfo')).toBe(after);
+    });
+
+    /** A name is decoration; an unreachable identity must degrade to the subject, not fail the screen. */
+    it('should fall back to the subject when identity cannot be reached', async () => {
+      const cookie = await login('degrading-user');
+      idp.setEndpointFailure('/oauth2/userinfo', true);
+
+      const response = await get('/auth/userinfo', cookie);
+
+      expect(response.statusCode).toBe(200);
+      expect(body(response)).toEqual({ sub: 'degrading-user' });
+      idp.setEndpointFailure('/oauth2/userinfo', false);
+    });
+
+    /** The failure must not be cached, or one blip would leave this person nameless for the whole window. */
+    it('should resolve the name on the next read after a failure', async () => {
+      const cookie = await login('recovering-user');
+      idp.setUserProfile('recovering-user', { name: 'Recovered Name' });
+      idp.setEndpointFailure('/oauth2/userinfo', true);
+      expect(body(await get('/auth/userinfo', cookie))).toEqual({ sub: 'recovering-user' });
+
+      idp.setEndpointFailure('/oauth2/userinfo', false);
+
+      expect(body(await get('/auth/userinfo', cookie))).toMatchObject({ name: 'Recovered Name' });
+    });
   });
 
   it('should reject a callback whose state does not match the state cookie', async () => {

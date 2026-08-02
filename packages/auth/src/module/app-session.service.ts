@@ -8,7 +8,7 @@ import { AppError, Logger } from '@shadow-library/common';
  */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
-import { AppRegistration, AppSessionOrganisation, AppSessionToken, AuthPrincipal } from '../interfaces';
+import { AppRegistration, AppSessionOrganisation, AppSessionToken, AuthPrincipal, UserInfo } from '../interfaces';
 import { AccessTokenCache, hashSessionHandle } from '../lib/access-token-cache';
 import { AuthClient } from '../lib/auth-client';
 import { buildAuthorizationUrl } from '../rp/authorization-url';
@@ -70,6 +70,19 @@ const WEB_PROTOCOLS = new Set(['http:', 'https:']);
 /** Used when identity answers with an expiry this SDK cannot read, so a session is never immortal by accident */
 const FALLBACK_SESSION_TTL_MS = 60 * 60 * 1000;
 
+/**
+ * How long a resolved profile is trusted. Short enough that someone who renames themselves sees it
+ * take effect without anyone invalidating anything, long enough that the common case — a person
+ * clicking around an application for a few minutes — costs identity one call rather than dozens.
+ */
+const PROFILE_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * The OIDC scopes every first-party session asks for. `openid` makes the request an OIDC one at all;
+ * `profile` is what releases the person's name back to the application that signed them in.
+ */
+const PROTOCOL_SCOPES = ['openid', 'profile'];
+
 /** An unreadable timestamp must fail towards "expires sooner", never towards "never expires" */
 const parseExpiry = (value: string, fallback: number): number => {
   const parsed = Date.parse(value);
@@ -90,6 +103,17 @@ export class AppSessionService {
 
   /** The last runtime derived from a registration, kept so an unchanged registration costs nothing */
   private derived: { registration: AppRegistration; runtime: BrowserAuthRuntime } | null = null;
+
+  /**
+   * Resolved profiles, keyed by session hash and expiring on their own.
+   *
+   * A name is read on nearly every screen and changes about never, so fetching one per request would
+   * put an identity round trip on the critical path of the whole application for a string that was
+   * already correct. Keyed by session rather than by subject because that is the key every eviction
+   * path already speaks — a logout, an organisation switch, or a back-channel notice drops the
+   * profile with the tokens instead of leaving the previous person's name behind it.
+   */
+  private readonly profiles = new Map<string, { profile: UserInfo; expiresAt: number }>();
 
   constructor(
     private readonly client: AuthClient,
@@ -163,6 +187,34 @@ export class AppSessionService {
   async resolvePrincipal(handle: string, request: TokenRequest = {}): Promise<AuthPrincipal> {
     const token = await this.getAccessToken(handle, request);
     return this.client.verify(token.accessToken);
+  }
+
+  /**
+   * The person behind this session, from identity's userinfo endpoint, cached for the session.
+   *
+   * Kept off `resolvePrincipal` deliberately. That call sits on the auth gate's critical path, and a
+   * gate that cannot answer "is this request authenticated" because a *name* could not be fetched
+   * would trade a working screen for a decorative one. Here the failure mode is the caller's to
+   * choose, and identity being unreachable degrades to what the token already proved: the subject.
+   */
+  async getUserInfo(handle: string): Promise<UserInfo> {
+    const handleHash = hashSessionHandle(handle);
+    const cached = this.profiles.get(handleHash);
+    if (cached && cached.expiresAt > Date.now()) return cached.profile;
+
+    const token = await this.getAccessToken(handle);
+    /** Offline and already-cached-key work, so it costs nothing and guarantees a subject to fall back to. */
+    const principal = await this.client.verify(token.accessToken);
+
+    try {
+      const profile = await this.client.getUserInfo(token.accessToken);
+      this.profiles.set(handleHash, { profile, expiresAt: Date.now() + PROFILE_TTL_MS });
+      return profile;
+    } catch (error) {
+      /** Not cached: one unreachable moment must not leave this person nameless for the whole window. */
+      this.logger.warn('userinfo lookup failed; falling back to the subject the token proved', { reason: (error as Error).message });
+      return { sub: principal.sub };
+    }
   }
 
   /** The cached-or-minted access token for this app's audience; elevation is part of the cache key, never a property of the entry */
@@ -373,7 +425,14 @@ export class AppSessionService {
       clientId: registration.appId,
       audience,
       redirectUri: this.config.redirectUri ?? this.callbackRedirectUri(registration.redirectUris),
-      scopes: this.config.scopes ?? registration.scopes,
+      /**
+       * The protocol scopes lead, always. An application's registration lists the API capabilities it
+       * owns and never the OIDC ones — those belong to the protocol, not to a resource server — so
+       * without this an app requests `scope=` empty, the session consents to nothing, and identity
+       * has no basis on which to release the signed-in person's own name back to it. Identity honours
+       * them for any client without a grant, so adding them costs no registration change anywhere.
+       */
+      scopes: [...new Set([...PROTOCOL_SCOPES, ...(this.config.scopes ?? registration.scopes)])],
       stepUpUrl: stepUpEndpoint,
     };
     this.derived = { registration, runtime };
@@ -436,6 +495,7 @@ export class AppSessionService {
   private evictTokens(handleHash: string): void {
     this.tokens.evictSession(handleHash);
     this.grants.delete(handleHash);
+    this.profiles.delete(handleHash);
   }
 
   /** Records the failure at warn level before it propagates; browser-flow rejections are expected traffic, not defects */

@@ -6,6 +6,7 @@
  * Importing user defined packages
  */
 import { AppRegistration, AssuranceLevel, FetchLike, Jwk, JwtPayload, PrincipalKind, ServiceAccessRule } from '../interfaces';
+import { decodeJwt } from '../lib/jwt';
 import { createTestSigner, TestSigner } from './signer';
 
 /**
@@ -165,6 +166,9 @@ export interface TestIdP {
   /** Returns the most recent token-endpoint request the mock received, if any */
   getLastTokenRequest(): CapturedTokenRequest | undefined;
 
+  /** Puts a profile on file for a subject; `userinfo` still releases it only to a `profile`-scoped token */
+  setUserProfile(sub: string, profile: Record<string, unknown>): void;
+
   /*!
    * First-party app sessions (D-18/D-19)
    */
@@ -255,6 +259,9 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   const authorizationCodes = new Map<string, TestTokenInput & { nonce?: string }>();
   const refreshTokens = new Map<string, TestTokenInput>();
   const grants = new Set<string>();
+
+  /** The profile `userinfo` releases per subject; a subject with no entry has nothing on file. */
+  const profiles = new Map<string, Record<string, unknown>>();
   const organisationsByUser = new Map<string, TestOrganisation[]>();
   const appSessions = new Map<string, AppSessionRecord>();
   const elevationGrants = new Map<string, number>();
@@ -514,6 +521,21 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     return json({ expiresAt: new Date(expiresAt).toISOString() });
   };
 
+  /**
+   * Mirrors identity's userinfo: claims are released against the token's own scope, so a spec that
+   * forgets to consent to `profile` sees exactly what production would show it — the subject alone.
+   */
+  const handleUserInfo = (request: Request): Response => {
+    const header = request.headers.get('authorization');
+    const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+    const claims = token ? decodeJwt(token).payload : null;
+    if (!claims?.sub) return json({ code: 'OAU_002', message: 'Token is not valid here' }, 401);
+
+    const scopes = new Set(typeof claims.scope === 'string' ? claims.scope.split(' ').filter(Boolean) : []);
+    const profile = scopes.has('profile') ? (profiles.get(claims.sub) ?? {}) : {};
+    return json({ sub: claims.sub, ...profile });
+  };
+
   const handleAuthzCheck = async (request: Request): Promise<Response> => {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const kind: PrincipalKind = body.principalType === 'SERVICE_ACCOUNT' ? 'service' : 'user';
@@ -580,6 +602,8 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
         return handleCatalog(request);
       case '/api/v1/authz/service-access':
         return json({ rules: serviceAccessRules });
+      case '/oauth2/userinfo':
+        return handleUserInfo(request);
       case '/api/v1/apps/me':
         return json(appRegistration);
       default:
@@ -637,6 +661,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     setServiceAccess: rules => void (serviceAccessRules = rules),
     getAppRegistration: () => appRegistration,
     setAppRegistration: registration => void (appRegistration = { ...appRegistration, ...registration }),
+    setUserProfile: (sub, profile) => void profiles.set(sub, profile),
     getLastTokenRequest: () => lastTokenRequest,
     setSteppedUp: (userId, intent) => void (intent === false ? steppedUp.delete(userId) : steppedUp.set(userId, intent === true ? {} : intent)),
     setOrganisations: (userId, organisations) => void organisationsByUser.set(userId, organisations),

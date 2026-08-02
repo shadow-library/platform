@@ -18,6 +18,7 @@ import {
   AuthOrganisationsResponse,
   AuthSessionResponse,
   AuthStepUpQuery,
+  AuthUserInfoResponse,
   BackchannelLogoutBody,
   BackchannelLogoutResponse,
   SwitchOrganisationBody,
@@ -52,6 +53,7 @@ const ROUTE_HANDLERS: [RouteName, string][] = [
   ['logout', 'logout'],
   ['backchannelLogout', 'backchannelLogout'],
   ['session', 'session'],
+  ['userinfo', 'userinfo'],
   ['stepUp', 'stepUp'],
   ['organisations', 'organisations'],
   ['organisation', 'switchOrganisation'],
@@ -142,6 +144,21 @@ export class AuthController {
 
     const principal = await this.sessions.resolvePrincipal(handle);
     return { sub: principal.sub, scopes: principal.scopes, org: principal.org, aal: principal.aal, clientId: principal.clientId };
+  }
+
+  /**
+   * Who the signed-in person is, by name — the reason an application needs no profile endpoint of
+   * its own. Separate from `/session` because that route gates rendering: a name is decoration, and
+   * putting an identity round trip behind the gate would let a profile outage read as a logout.
+   */
+  @Get('/userinfo')
+  @EnableIf(() => isEnabled('userinfo'))
+  @RespondFor(200, AuthUserInfoResponse)
+  async userinfo(): Promise<AuthUserInfoResponse> {
+    const handle = this.sessions.readHandle(this.cookies());
+    if (!handle) throw AuthGuardErrorCode.IAM_001.create();
+
+    return this.sessions.getUserInfo(handle);
   }
 
   /** The organisations this session may act in; a browser client renders a switcher only when there is more than one */

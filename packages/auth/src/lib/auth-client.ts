@@ -14,18 +14,21 @@ import {
   AuthPrincipal,
   CheckInput,
   CheckOptions,
+  DirectoryUser,
   DiscoveryDocument,
   ExchangedToken,
   FetchLike,
   IntrospectionResult,
   JwtPayload,
   LogoutTokenClaims,
+  ResolvedDirectoryUser,
   RoleCatalogManifest,
   RoleCatalogSyncOptions,
   RoleCatalogSyncResult,
   ServiceAccessRule,
   ServiceTokenOptions,
   TokenExchangeInput,
+  UserInfo,
 } from '../interfaces';
 import { AppRegistryClient } from './app-registry';
 import { AppSessionClient } from './app-session-client';
@@ -78,6 +81,12 @@ const ROLE_SYNC_SCOPE = 'authz:roles:sync';
 
 /** The app-session endpoints require a service token granted this scope */
 const APP_SESSION_SCOPE = 'app-session:manage';
+
+/** Reaches identity's directory seam, in either direction: naming a person by id, or by address. */
+const DIRECTORY_SCOPE = 'users:resolve';
+
+/** Identity caps a single directory request; batching above this would be silently truncated on the other side. */
+const DIRECTORY_BATCH_SIZE = 50;
 
 /** The `events` member that marks a JWT as a back-channel logout notice rather than an ID token */
 const BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
@@ -475,6 +484,66 @@ export class AuthClient {
     );
     if (!response.ok) throw this.logged(errorCode.create({ reason: `${description} endpoint returned http ${response.status}: ${await this.readFailureReason(response)}` }));
     return response;
+  }
+
+  /**
+   * The person behind a user access token, from identity's OIDC userinfo endpoint.
+   *
+   * Presented with the *user's* token rather than a service token, which is what makes this the
+   * generic answer to "who am I": the caller is the user, so no application needs a machine grant to
+   * learn its own signed-in person's name. Which claims come back is decided by the scopes that
+   * session consented to — a session established before `profile` was requested gets `sub` alone,
+   * and callers must treat every other field as optional rather than assume a name is there.
+   */
+  async getUserInfo(accessToken: string): Promise<UserInfo> {
+    const endpoint = await this.userInfoEndpoint();
+    const response = await this.transport(endpoint, { headers: { authorization: `Bearer ${accessToken}` } }).catch((error: Error) =>
+      throwError(this.logged(AuthErrorCode.USERINFO_FAILED.create({ reason: `userinfo request failed: ${error.message}` }))),
+    );
+    if (!response.ok)
+      throw this.logged(AuthErrorCode.USERINFO_FAILED.create({ reason: `userinfo endpoint returned http ${response.status}: ${await this.readFailureReason(response)}` }));
+    return (await response.json()) as UserInfo;
+  }
+
+  /**
+   * Names subjects the caller already holds ids for, through identity's directory.
+   *
+   * This is the *other* people question — a share list, an activity feed — and unlike userinfo it is
+   * a machine call, so it needs the `users:resolve` grant. Identity caps a single request, so the
+   * batching is done here once rather than in each application that needs a column of names.
+   */
+  async lookupUsers(userIds: string[]): Promise<DirectoryUser[]> {
+    return this.directory<DirectoryUser>('/api/v1/internal/users/lookup', 'userIds', userIds);
+  }
+
+  /** The address direction of the same seam: an address identity will not name is absent, never an error. */
+  async resolveUsersByEmail(emails: string[]): Promise<ResolvedDirectoryUser[]> {
+    return this.directory<ResolvedDirectoryUser>('/api/v1/internal/users/resolve', 'emails', emails);
+  }
+
+  private async directory<T>(path: string, field: 'userIds' | 'emails', values: string[]): Promise<T[]> {
+    const found: T[] = [];
+    for (let index = 0; index < values.length; index += DIRECTORY_BATCH_SIZE) {
+      const batch = values.slice(index, index + DIRECTORY_BATCH_SIZE);
+      const response = await this.fetch(
+        `${this.identityUrl}${path}`,
+        { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ [field]: batch }) },
+        this.identityTokenOptions(DIRECTORY_SCOPE),
+      );
+      if (!response.ok)
+        throw this.logged(AuthErrorCode.DIRECTORY_FAILED.create({ reason: `directory endpoint returned http ${response.status}: ${await this.readFailureReason(response)}` }));
+      found.push(...(((await response.json()) as { users?: T[] }).users ?? []));
+    }
+    return found;
+  }
+
+  /** Discovery is the source of truth; the issuer-relative path stays only as a last resort for older deployments */
+  private async userInfoEndpoint(): Promise<string> {
+    const advertised = (await this.discovery.get()).userinfo_endpoint;
+    if (advertised) return advertised;
+
+    this.logger.warn('discovery advertises no userinfo endpoint; falling back to the issuer-relative path');
+    return `${this.issuer}/oauth2/userinfo`;
   }
 
   private identityToken(scope: string): Promise<string> {

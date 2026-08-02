@@ -424,3 +424,36 @@ export interface IntrospectionResult {
   clientId?: string;
   tokenType?: string;
 }
+
+/**
+ * The person behind a token, as OIDC's userinfo endpoint describes them.
+ *
+ * Claim names are the protocol's, not the repository's: this is a wire shape identity fills in from
+ * the spec, and renaming it here would mean every future standard claim needs a translation entry
+ * before an application could see it. Every field is optional — which ones arrive depends on the
+ * scopes the session consented to, and a claim with no value is absent rather than empty.
+ */
+export interface UserInfo {
+  sub: string;
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  preferred_username?: string;
+  picture?: string;
+  email?: string;
+  email_verified?: boolean;
+}
+
+/** A person named by subject id through identity's directory — the batch answer to "who are these ids". */
+export interface DirectoryUser {
+  userId: string;
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+/** A subject resolved from an address; an address identity will not name is absent from the answer. */
+export interface ResolvedDirectoryUser {
+  email: string;
+  userId: string;
+}
