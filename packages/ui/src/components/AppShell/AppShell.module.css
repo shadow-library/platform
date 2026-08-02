@@ -1,0 +1,81 @@
+/*
+ * App Shell — the brand block in the sidebar header and the top bar's leading/utility clusters. The frame
+ * itself is Shell's; everything here is the chrome that sits inside its slots.
+ */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brandIcon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.brandName {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sh-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The tagline is where a privileged surface announces itself — warning tone, not decoration. */
+.brandTagline {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+.brandTagline[data-tone='warning'] {
+  color: var(--sh-warning-text);
+}
+
+/* ── Top bar ─────────────────────────────────────────────── */
+
+.breadcrumb {
+  min-width: 0;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 400;
+  color: var(--sh-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status chips are the first thing a narrow bar gives up: the account menu and the breadcrumb are what
+   the bar is for (breakpoint token --sh-breakpoint-sm 640). */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 639px) {
+  .status {
+    display: none;
+  }
+}
+
+.externalIcon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  margin-left: 4px;
+  color: var(--sh-text-tertiary);
+}
