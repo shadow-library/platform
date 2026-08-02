@@ -56,9 +56,10 @@ export async function runToolLoop(
 ): Promise<ToolLoopResult> {
   const maxRounds = opts?.maxRounds ?? 6;
 
-  // Subprocess providers (the Codex / Claude Code CLIs) can't do native tool-calling — they have no
-  // bindTools. Run them tool-free: they answer from the context already assembled in the prompt rather
-  // than looking canon up via tools. Degraded but functional, so these providers remain selectable.
+  // `bindTools` is optional on BaseChatModel and this loop accepts any of them, so a model without
+  // native tool-calling stays usable: it answers from the context already assembled in the prompt
+  // instead of looking canon up through tools. Degraded but functional — and this check is what
+  // narrows the model to ToolCapableModel below.
   if (typeof model.bindTools !== 'function') {
     logger.debug('runToolLoop: model has no bindTools — running tool-free', { node: ctx.node, runId: ctx.runId });
     const response = await model.invoke(messages);

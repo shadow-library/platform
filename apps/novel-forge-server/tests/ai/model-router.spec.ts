@@ -7,6 +7,11 @@
  */
 import { describe, expect, it, mock } from 'bun:test';
 
+import { ChatAnthropic } from '@langchain/anthropic';
+import { ChatOllama } from '@langchain/ollama';
+import { ChatOpenAI } from '@langchain/openai';
+import { ChatXAI } from '@langchain/xai';
+
 /**
  * Importing user defined packages
  */
@@ -14,7 +19,6 @@ import { LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, ROLE_GROUP } from '@modules/a
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { MODEL_REGISTRY } from '@modules/ai/models';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
-import { ChatGrokBuild } from '@modules/ai/subprocess-providers';
 import { Config } from '@shadow-library/common';
 
 /**
@@ -30,6 +34,12 @@ function stubDatabaseService(): never {
   const noopInsert = { values: () => ({ onConflictDoNothing: () => Promise.resolve() }) };
   const db = { query: { llmCache: { findFirst: async () => undefined } }, insert: () => noopInsert };
   return { getPostgresClient: () => db } as never;
+}
+
+// The router reads provider credentials and base URLs straight off the Config cache, which no test
+// bootstrap populates — seed it directly so a client can be constructed without a real environment.
+function setConfig(key: string, value: unknown): void {
+  (Config as unknown as { cache: Map<string, unknown> })['cache'].set(key, value);
 }
 
 describe('ModelRouterService.resolveModel', () => {
@@ -82,10 +92,45 @@ describe('ModelRouterService.resolveModel', () => {
   it('maps every fine-grained role to a model group', () => {
     for (const role of Object.keys(PRODUCTION_DEFAULTS)) expect(ROLE_GROUP[role as keyof typeof ROLE_GROUP]).toBeDefined();
   });
+});
 
-  it('builds the grok-build CLI client when its enabled flag is set', () => {
-    (Config as unknown as { cache: Map<string, unknown> })['cache'].set('ai.grok-build.enabled', true);
-    expect(router.buildClient({ provider: 'xai-grok-build', model: 'grok-build' })).toBeInstanceOf(ChatGrokBuild);
+describe('ModelRouterService.buildClient', () => {
+  const router = new ModelRouterService({} as never, stubDatabaseService());
+
+  setConfig('ai.anthropic.api.key', 'test-anthropic-key');
+  setConfig('ai.openai.api.key', 'test-openai-key');
+  setConfig('ai.xai.api.key', 'test-xai-key');
+
+  it('should let an explicitly resolved provider win over the registry entry for that model', () => {
+    expect(router.buildClient({ provider: 'ollama', model: 'grok-3' })).toBeInstanceOf(ChatOllama);
+  });
+
+  it('should fall back to the registry provider when the resolution names none', () => {
+    expect(router.buildClient({ provider: '', model: 'grok-3' })).toBeInstanceOf(ChatXAI);
+  });
+
+  it('should reject a model whose provider is neither resolved nor in the registry', () => {
+    expect(() => router.buildClient({ provider: '', model: 'not-a-real-model' })).toThrow();
+  });
+
+  it('should use the vendor default endpoint when no base url is configured', () => {
+    setConfig('ai.anthropic.api.url', undefined);
+    setConfig('ai.openai.api.url', undefined);
+    setConfig('ai.xai.api.url', undefined);
+
+    expect((router.buildClient({ provider: 'anthropic', model: 'claude-sonnet-4-6' }) as ChatAnthropic).apiUrl).toBeUndefined();
+    expect((router.buildClient({ provider: 'openai', model: 'gpt-4o' }) as ChatOpenAI).clientConfig.baseURL).toBeUndefined();
+    expect((router.buildClient({ provider: 'xai', model: 'grok-3' }) as ChatXAI).clientConfig.baseURL).toBe('https://api.x.ai/v1');
+  });
+
+  it('should point each vendor client at its configured base url', () => {
+    setConfig('ai.anthropic.api.url', 'http://gateway/anthropic');
+    setConfig('ai.openai.api.url', 'http://gateway/openai');
+    setConfig('ai.xai.api.url', 'http://gateway/xai');
+
+    expect((router.buildClient({ provider: 'anthropic', model: 'claude-sonnet-4-6' }) as ChatAnthropic).apiUrl).toBe('http://gateway/anthropic');
+    expect((router.buildClient({ provider: 'openai', model: 'gpt-4o' }) as ChatOpenAI).clientConfig.baseURL).toBe('http://gateway/openai');
+    expect((router.buildClient({ provider: 'xai', model: 'grok-3' }) as ChatXAI).clientConfig.baseURL).toBe('http://gateway/xai');
   });
 });
 

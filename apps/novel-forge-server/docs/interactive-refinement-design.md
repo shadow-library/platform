@@ -367,12 +367,11 @@ Convention for every module with `cacheStrategy` (enforced by render goldens):
 
 Injection lives entirely in `ModelRouterService.structured()` — nodes and services stay provider-agnostic. When `provider === 'anthropic'` and the module declares `cacheStrategy`, the router formats the template to messages, converts string contents to content-block arrays, and sets `cache_control: { type: 'ephemeral' }` at the three breakpoints above (≤ Anthropic's 4-breakpoint limit; blocks under ~1 024 tokens are left unmarked). Provider matrix:
 
-| Provider             | Behavior                                                                    |
-| -------------------- | --------------------------------------------------------------------------- |
-| anthropic            | explicit `cache_control` blocks                                             |
-| openai / xai         | no-op in code; automatic prefix caching benefits from stable-first ordering |
-| ollama               | no-op (KV-cache reuse still benefits from the stable prefix)                |
-| subprocess providers | no-op                                                                       |
+| Provider     | Behavior                                                                    |
+| ------------ | --------------------------------------------------------------------------- |
+| anthropic    | explicit `cache_control` blocks                                             |
+| openai / xai | no-op in code; automatic prefix caching benefits from stable-first ordering |
+| ollama       | no-op (KV-cache reuse still benefits from the stable prefix)                |
 
 Orthogonal to `llm_cache` (whole-response memo for deterministic roles), which is unchanged; `audit` and `compact` join `CACHEABLE_ROLES`; creative roles (chat, premise, arc, generation) stay out.
 

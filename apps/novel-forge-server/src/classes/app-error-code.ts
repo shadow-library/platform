@@ -72,7 +72,7 @@ export class AppErrorCode extends ServerErrorCode {
    * AI Errors
    */
   static readonly AI_001 = AppErrorCode.badRequest('AI_001', 'AI model returned unparseable response');
-  static readonly AI_002 = AppErrorCode.badRequest('AI_002', 'Role or model not in registry, or provider is disabled');
+  static readonly AI_002 = AppErrorCode.badRequest('AI_002', 'Role or model not in registry, or provider is not supported');
   static readonly AI_003 = AppErrorCode.badRequest('AI_003', 'Grok-only projects and grok interlude operations may only use xAI');
 
   /*!

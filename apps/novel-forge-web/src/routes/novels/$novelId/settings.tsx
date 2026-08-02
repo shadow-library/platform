@@ -92,14 +92,12 @@ const ROLE_GROUPS: RoleGroup[] = [
 
 const ALL_ROLES = ROLE_GROUPS.flatMap(g => g.roles);
 
-// Providers rendered as one visual group; the two CLI subprocess providers share a section since they
-// route on provider alone (the model id is ignored) and authenticate via the local CLI, not an API key.
+// Each provider is rendered as its own visual group, in the order authors most often reach for them.
 const PROVIDER_GROUPS: ProviderGroup[] = [
   { label: 'xAI · API key', providers: ['xai'] },
   { label: 'Anthropic · API key', providers: ['anthropic'] },
   { label: 'OpenAI · API key', providers: ['openai'] },
   { label: 'Ollama · local', providers: ['ollama'] },
-  { label: 'CLI · uses local auth', providers: ['anthropic-claude-code', 'openai-codex', 'xai-grok-build'] },
 ];
 
 interface ModelPickerProps {

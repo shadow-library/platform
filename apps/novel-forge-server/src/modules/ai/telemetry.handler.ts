@@ -73,8 +73,8 @@ export class TelemetryHandler extends BaseCallbackHandler {
   ): Promise<void> {
     if (this.pending.has(runId)) return;
 
-    // CLI-subprocess providers (claude-code, codex) report no token usage at all, so the prompt is
-    // measured up front and used as a fallback estimate when the provider stays silent.
+    // Not every provider reports token usage, so the prompt is measured up front and used as a
+    // fallback estimate when the provider stays silent.
     const promptTokensEstimate = countTokens(prompts.map(p => (typeof p === 'string' ? p : JSON.stringify(p))).join('\n'));
 
     const nf = metadata?.['nfTelemetry'] as (TelemetryContext & { projectId: string; provider: string; model: string; attempt: number }) | undefined;
@@ -121,8 +121,8 @@ export class TelemetryHandler extends BaseCallbackHandler {
     // on the generation info. Fall through all three so local runs report real token usage too.
     const meta = generation as
       { message?: { usage_metadata?: { input_tokens?: number; output_tokens?: number } }; generationInfo?: { prompt_eval_count?: number; eval_count?: number } } | undefined;
-    // When no layer reports usage (CLI subprocess models), fall back to tokenizer estimates so the
-    // run detail and usage dashboards never show blank counts.
+    // When no layer reports usage, fall back to tokenizer estimates so the run detail and usage
+    // dashboards never show blank counts.
     const inputTokens: number =
       usage?.input_tokens ?? usage?.prompt_tokens ?? meta?.message?.usage_metadata?.input_tokens ?? meta?.generationInfo?.prompt_eval_count ?? call.promptTokensEstimate;
     const outputTokens: number =

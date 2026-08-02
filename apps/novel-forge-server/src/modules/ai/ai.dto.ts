@@ -33,7 +33,7 @@ export class AiModelOption {
   @Field(() => String, { enum: ['llm', 'embedding', 'image'] })
   kind: string;
 
-  // false for subprocess providers whose server flag is off — the picker shows them disabled.
+  // Whether the server can currently route to this model; the picker renders the rest disabled.
   @Field()
   enabled: boolean;
 

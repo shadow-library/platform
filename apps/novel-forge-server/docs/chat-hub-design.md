@@ -252,9 +252,10 @@ ChatService.turn(sessionId, content)
   7. response: { userMessage, assistantMessage, proposal?, applied?, runId }
 ```
 
-The **declared-lookup protocol** (step 4) replaces native tool binding deliberately: the primary chat models
-are subprocess CLIs (Claude Code / Codex) with no `bindTools`, and the structured repair ladder must stay in
-the loop. Lookups reuse the six read-only tools by name; the hub playbook lists their names/args/purposes.
+The **declared-lookup protocol** (step 4) replaces native tool binding deliberately: the structured repair
+ladder must stay in the loop, and a declared lookup behaves identically on every provider regardless of how
+well it does native tool-calling. Lookups reuse the six read-only tools by name; the hub playbook lists
+their names/args/purposes.
 
 ### 6.1 Context: `forHubTurn` (purpose `chat_hub`)
 

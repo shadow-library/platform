@@ -16,16 +16,15 @@ Keys marked **required in prod** must be set when `APP_STAGE=prod`.
 | `DATABASE_POSTGRES_URL` | —                        | PostgreSQL connection URL (required)         |
 | `AI_PROFILE`            | `production`             | `production` or `local-test` (Ollama-only)   |
 | `AI_ANTHROPIC_API_KEY`  | —                        | Anthropic API key                            |
+| `AI_ANTHROPIC_API_URL`  | —                        | Anthropic base URL (unset = vendor endpoint) |
 | `AI_OPENAI_API_KEY`     | —                        | OpenAI API key                               |
+| `AI_OPENAI_API_URL`     | —                        | OpenAI base URL (unset = vendor endpoint)    |
 | `AI_XAI_API_KEY`        | —                        | xAI API key                                  |
+| `AI_XAI_API_URL`        | —                        | xAI base URL (unset = vendor endpoint)       |
 | `AI_GROK_LLM_MODEL`     | `grok-3`                 | Default xAI LLM model                        |
 | `AI_GROK_IMAGE_MODEL`   | `grok-2-image`           | xAI image model                              |
 | `AI_OLLAMA_HOST`        | `http://localhost:11434` | Ollama server URL                            |
 | `AI_EMBEDDING_MODEL`    | `qwen3-embedding:8b`     | Embedding model for vector indexes           |
-| `AI_ALLOW_CLAUDE_CODE`  | `false`                  | Enable Claude Code tool in agent loops       |
-| `AI_ALLOW_CODEX`        | `false`                  | Enable OpenAI Codex tool in agent loops      |
-| `AI_CLAUDE_CODE_BIN`    | `claude`                 | Path to the `claude` binary                  |
-| `AI_CODEX_BIN`          | `codex`                  | Path to the `codex` binary                   |
 | `AI_LANGSMITH_API_KEY`  | —                        | LangSmith API key (enables tracing when set) |
 | `STORAGE_DRIVER`        | `local`                  | Storage driver (`local` only currently)      |
 | `STORAGE_IMAGE_DIR`     | `./images`               | Directory for generated images               |
