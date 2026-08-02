@@ -204,13 +204,16 @@ export class OAuthClientService {
   }
 
   /** Idempotently provisions an API resource and one of its scopes, returning the scope id. */
-  async ensureScope(applicationId: number, resourceIdentifier: string, scopeName: string): Promise<string> {
+  async ensureScope(applicationId: number, resourceIdentifier: string, scopeName: string, principalType?: 'USER' | 'SERVICE' | 'BOTH'): Promise<string> {
     await this.db.insert(schema.apiResources).values({ applicationId, identifier: resourceIdentifier }).onConflictDoNothing();
     const resource =
       (await this.db.query.apiResources.findFirst({ where: eq(schema.apiResources.identifier, resourceIdentifier) })) ??
       throwError(AppError.internal(`API resource '${resourceIdentifier}' could not be provisioned`));
 
-    await this.db.insert(schema.scopes).values({ apiResourceId: resource.id, name: scopeName }).onConflictDoNothing();
+    await this.db
+      .insert(schema.scopes)
+      .values({ apiResourceId: resource.id, name: scopeName, principalType: principalType ?? 'BOTH' })
+      .onConflictDoNothing();
     const scope =
       (await this.db.query.scopes.findFirst({ where: and(eq(schema.scopes.apiResourceId, resource.id), eq(schema.scopes.name, scopeName)) })) ??
       throwError(AppError.internal(`Scope '${scopeName}' could not be provisioned`));

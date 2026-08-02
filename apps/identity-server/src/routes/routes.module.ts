@@ -20,6 +20,7 @@ import { SessionModule } from '@server/modules/auth/session';
 import { TokenModule } from '@server/modules/auth/token';
 import { AuthzModule } from '@server/modules/authz';
 import { ContactModule } from '@server/modules/identity/contact';
+import { DirectoryModule } from '@server/modules/identity/directory';
 import { OrganisationModule } from '@server/modules/identity/organisation';
 import { UserModule } from '@server/modules/identity/user';
 import { AuditModule } from '@server/modules/infrastructure/audit';
@@ -82,6 +83,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     MfaModule,
     ContactModule,
     OrganisationModule,
+    DirectoryModule,
     UserModule,
     AuditModule,
     NotificationModule,

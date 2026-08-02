@@ -121,6 +121,8 @@ const AUTHZ_CHECK = { resource: PLATFORM_RESOURCE, scope: 'authz:check' } as con
 const APP_SESSION = { resource: PLATFORM_RESOURCE, scope: 'app-session:manage' } as const;
 /** pulse alone: its RBAC catalogue is seeded identity-side rather than pushed by the SDK. */
 const AUTHZ_ROLES_SYNC = { resource: PLATFORM_RESOURCE, scope: 'authz:roles:sync' } as const;
+/** Reaches identity's directory seam: naming a person by email, and asking whether one is in an organisation. */
+const USERS_RESOLVE = { resource: PLATFORM_RESOURCE, scope: 'users:resolve' } as const;
 
 /**
  * The pulse RBAC catalogue, kept in lockstep with `pulse-server/src/modules/auth/rbac.constants.ts`.
@@ -182,8 +184,12 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       displayName: 'Novel Forge',
       description: 'Long-form fiction authoring platform for the Shadow ecosystem',
       resourceName: 'Novel Forge API',
-      /** Delegates onto web-novel: the publish grant is the ceiling `/apps/me` surfaces (D-22). */
-      grants: [AUTHZ_CHECK, APP_SESSION, { resource: 'api://web-novel', scope: 'web-novel:publish' }],
+      /**
+       * Delegates onto web-novel: the publish grant is the ceiling `/apps/me` surfaces (D-22). The
+       * directory grant is what turns "share with someone@example.com" into an identity subject —
+       * the forge resolves at share time, so only resolved subjects are ever pushed to the reader.
+       */
+      grants: [AUTHZ_CHECK, APP_SESSION, USERS_RESOLVE, { resource: 'api://web-novel', scope: 'web-novel:publish' }],
     },
     {
       name: 'web-novel',
@@ -198,7 +204,8 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
           principalType: 'SERVICE',
         },
       ],
-      grants: [AUTHZ_CHECK, APP_SESSION],
+      /** The directory grant answers one question only: is this reader a member of the organisation a novel was shared with? */
+      grants: [AUTHZ_CHECK, APP_SESSION, USERS_RESOLVE],
       serviceAccess: [{ callerClientId: 'novel-forge', method: '*', pathPattern: '/internal/*' }],
     },
   ],

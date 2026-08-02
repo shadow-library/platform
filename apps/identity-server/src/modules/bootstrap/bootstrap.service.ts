@@ -31,6 +31,8 @@ const PLATFORM_RESOURCE = 'shadow-identity';
 const AUTHZ_CHECK_SCOPE = 'authz:check';
 const AUTHZ_ROLES_SYNC_SCOPE = 'authz:roles:sync';
 const SCIM_PROVISION_SCOPE = 'scim:provision';
+/** Reaches the directory seam — naming a person by email, and asking whether one is in an organisation. */
+const USERS_RESOLVE_SCOPE = 'users:resolve';
 
 const ADMIN_PERMISSION_DESCRIPTIONS: Record<string, string> = {
   [ADMIN_PERMISSIONS.usersRead]: 'Read user accounts and their security posture',
@@ -92,6 +94,8 @@ export class BootstrapService implements OnModuleInit {
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, AUTHZ_ROLES_SYNC_SCOPE);
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, SCIM_PROVISION_SCOPE);
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, APP_SESSION_SCOPE);
+    /** Service-only: the directory answers questions about other people, which no user token may ever ask on its own behalf. */
+    await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, USERS_RESOLVE_SCOPE, 'SERVICE');
   }
 
   private async ensurePlatformApplication(): Promise<void> {
