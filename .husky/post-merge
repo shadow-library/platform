@@ -1,0 +1,3 @@
+# Keep the graphify knowledge graph in step with whatever the merge brought in. Runs detached; a root
+# rescan takes ~70s and nothing needs the graph until the next question is asked.
+"$(git rev-parse --show-toplevel)/.claude/hooks/graphify-refresh.sh"

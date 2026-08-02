@@ -28,7 +28,10 @@
       "Bash(cut:*)",
       "Bash(jq:*)"
     ],
-    "deny": ["Bash(sed -i:*)", "Bash(sed --in-place:*)"]
+    "deny": [
+      "Bash(sed -i:*)",
+      "Bash(sed --in-place:*)"
+    ]
   },
   "worktree": {
     "symlinkDirectories": [
@@ -47,6 +50,19 @@
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/enforce-worktree.sh\"",
             "timeout": 10,
             "statusMessage": "Enforcing worktree isolation"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/graphify-seed.sh\"",
+            "timeout": 30,
+            "statusMessage": "Seeding graphify graphs into worktree"
           }
         ]
       }
