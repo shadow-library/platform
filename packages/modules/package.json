@@ -22,6 +22,10 @@
     "./cache": {
       "types": "./dist/cache/index.d.ts",
       "default": "./dist/cache/index.js"
+    },
+    "./storage": {
+      "types": "./dist/storage/index.d.ts",
+      "default": "./dist/storage/index.js"
     }
   },
   "description": " A collection of shared modules for the Shadow Apps ecosystem, providing reusable components for configuration management, authentication, cloud access, email, notifications, and other essential services. Designed for seamless integration across all Node.js applications following the Shadow Library architecture.",
