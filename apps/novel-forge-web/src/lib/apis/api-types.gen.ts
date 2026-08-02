@@ -169,23 +169,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/images/{projectId}/{filename}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Serve Image */
-    get: operations['get_api_v1_images_projectId_filename'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/projects/{projectId}/seed-from-brief': {
     parameters: {
       query?: never;
@@ -3518,9 +3501,21 @@ export interface components {
       skipped: number[];
       failed: components['schemas']['ReconcileFailureItem'][];
       unknownOrdinals: number[];
+      wiki: components['schemas']['WikiReconcileResult'];
     };
     ReconcileFailureItem: {
       ordinal: number;
+      error: string;
+    };
+    WikiReconcileResult: {
+      pushed: string[];
+      deleted: string[];
+      skipped: string[];
+      failed: components['schemas']['WikiReconcileFailureItem'][];
+      unknownEntries: string[];
+    };
+    WikiReconcileFailureItem: {
+      entryKey: string;
       error: string;
     };
     ImportPlanBody: {
@@ -4088,38 +4083,6 @@ export interface operations {
       header?: never;
       path: {
         projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_images_projectId_filename: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        filename: string;
       };
       cookie?: never;
     };
@@ -10389,6 +10352,8 @@ export type AccessGrantInput = components['schemas']['AccessGrantInput'];
 export type PublicationsLedgerResponse = components['schemas']['PublicationsLedgerResponse'];
 export type ReconcileResponse = components['schemas']['ReconcileResponse'];
 export type ReconcileFailureItem = components['schemas']['ReconcileFailureItem'];
+export type WikiReconcileResult = components['schemas']['WikiReconcileResult'];
+export type WikiReconcileFailureItem = components['schemas']['WikiReconcileFailureItem'];
 export type ImportPlanBody = components['schemas']['ImportPlanBody'];
 export type PlanBundle = components['schemas']['PlanBundle'];
 export type PlanBundleBibleDoc = components['schemas']['PlanBundleBibleDoc'];
@@ -10423,7 +10388,6 @@ export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['paramete
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
 export type ExportNovelPathParams = Exclude<paths['/api/v1/projects/{projectId}/export/novel']['get']['parameters']['path'], undefined>;
-export type ServeImagePathParams = Exclude<paths['/api/v1/images/{projectId}/{filename}']['get']['parameters']['path'], undefined>;
 export type ListBriefsPathParams = Exclude<paths['/api/v1/projects/{projectId}/briefs']['get']['parameters']['path'], undefined>;
 export type GetBriefPathParams = Exclude<paths['/api/v1/projects/{projectId}/briefs/{n}']['get']['parameters']['path'], undefined>;
 export type ListJobsPathParams = Exclude<paths['/api/v1/projects/{projectId}/jobs']['get']['parameters']['path'], undefined>;

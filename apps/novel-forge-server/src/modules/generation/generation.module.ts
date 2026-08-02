@@ -6,7 +6,7 @@
  * Importing npm packages
  */
 import { Module } from '@shadow-library/app';
-import { DatabaseModule } from '@shadow-library/modules';
+import { DatabaseModule, StorageModule } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
@@ -14,7 +14,6 @@ import { DatabaseModule } from '@shadow-library/modules';
 import { AiModule } from '../ai/ai.module';
 import { JobsModule } from '../jobs/jobs.module';
 import { RefinementModule } from '../refinement/refinement.module';
-import { StorageModule } from '../storage/storage.module';
 import { ChapterImageController } from './chapter-image.controller';
 import { ChapterImageService } from './chapter-image.service';
 import { GenerationController } from './generation.controller';

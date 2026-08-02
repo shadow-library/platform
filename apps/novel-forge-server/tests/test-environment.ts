@@ -11,6 +11,9 @@ import './test-idp';
  * Importing npm packages
  */
 import { afterAll, beforeAll, beforeEach } from 'bun:test';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { type AbstractClass, type Class } from 'type-fest';
 import { Dispatcher, ShadowApplication } from '@shadow-library/app';
@@ -62,6 +65,12 @@ export class TestEnvironment {
     // leaks one for the rest of the run. Tests are sequential anyway; a small pool per app keeps the
     // whole suite far below Postgres's max_connections no matter how many suites boot an app.
     Config['cache'].set('database.postgres.max-connections', '3');
+
+    // The shared StorageModule defaults to the S3 driver, which the suite has no cluster to reach; pin it
+    // to the local-disk driver writing into a throwaway temp dir so image writes/reads stay hermetic.
+    Config['cache'].set('storage.driver', 'local');
+    Config['cache'].set('storage.local.dir', mkdtempSync(join(tmpdir(), 'nf-storage-')));
+    Config['cache'].set('storage.public-origin', 'http://storage.test');
 
     // beforeAll runs before any beforeEach, so the database must exist before the app boots —
     // otherwise a fresh machine (no leftover DB from a prior run) fails the boot-time SELECT 1.

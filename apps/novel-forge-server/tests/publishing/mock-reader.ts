@@ -24,6 +24,17 @@ export interface MockReaderChapter {
   publishedAt: string | null;
 }
 
+export interface MockReaderWikiEntry {
+  type: string;
+  name: string;
+  imageRef: string | null;
+  firstVisibleOrdinal: number;
+  contentHash: string;
+  revision: number;
+  facets: unknown[];
+  images: unknown[];
+}
+
 export interface MockReaderNovel {
   title: string;
   blurb: string | null;
@@ -37,6 +48,7 @@ export interface MockReaderNovel {
   subjectIds: string[];
   accessRevision: number;
   chapters: Map<number, MockReaderChapter>;
+  wiki: Map<string, MockReaderWikiEntry>;
 }
 
 interface RecordedRequest {
@@ -59,6 +71,8 @@ export class MockReaderService {
   readonly requests: RecordedRequest[] = [];
   /** Ordinals whose chapter PUT answers http 500 — simulates a reader-side failure for retry tests */
   readonly failOrdinals = new Set<number>();
+  /** Entry keys whose wiki PUT answers http 500 — simulates a reader-side failure for wiki retry tests */
+  readonly failWikiEntries = new Set<string>();
   private server: ReturnType<typeof Bun.serve> | null = null;
 
   start(): string {
@@ -80,7 +94,11 @@ export class MockReaderService {
     return Object.fromEntries(
       [...this.novels.entries()].map(([slug, novel]) => [
         slug,
-        { ...novel, chapters: Object.fromEntries([...novel.chapters.entries()].map(([ordinal, chapter]) => [ordinal, { ...chapter }])) },
+        {
+          ...novel,
+          chapters: Object.fromEntries([...novel.chapters.entries()].map(([ordinal, chapter]) => [ordinal, { ...chapter }])),
+          wiki: Object.fromEntries([...novel.wiki.entries()].map(([entryKey, entry]) => [entryKey, { ...entry }])),
+        },
       ]),
     );
   }
@@ -100,6 +118,14 @@ export class MockReaderService {
 
     const manifestMatch = /^\/internal\/novels\/([a-z0-9-]+)\/manifest$/.exec(url.pathname);
     if (manifestMatch && request.method === 'GET') return this.getManifest(manifestMatch[1] as string);
+
+    const wikiManifestMatch = /^\/internal\/novels\/([a-z0-9-]+)\/wiki\/manifest$/.exec(url.pathname);
+    if (wikiManifestMatch && request.method === 'GET') return this.getWikiManifest(wikiManifestMatch[1] as string);
+
+    const wikiEntryMatch = /^\/internal\/novels\/([a-z0-9-]+)\/wiki\/([A-Za-z0-9._-]+)$/.exec(url.pathname);
+    if (wikiEntryMatch && request.method === 'PUT')
+      return this.upsertWiki(wikiEntryMatch[1] as string, wikiEntryMatch[2] as string, (await request.json()) as Record<string, unknown>);
+    if (wikiEntryMatch && request.method === 'DELETE') return this.deleteWiki(wikiEntryMatch[1] as string, wikiEntryMatch[2] as string);
 
     const chapterMatch = /^\/internal\/novels\/([a-z0-9-]+)\/chapters\/(\d+)$/.exec(url.pathname);
     if (chapterMatch && request.method === 'PUT') return this.upsertChapter(chapterMatch[1] as string, Number(chapterMatch[2]), (await request.json()) as Record<string, unknown>);
@@ -139,6 +165,7 @@ export class MockReaderService {
       subjectIds: stored?.subjectIds ?? [],
       accessRevision: stored?.accessRevision ?? 1,
       chapters: stored?.chapters ?? new Map(),
+      wiki: stored?.wiki ?? new Map(),
     });
     return Response.json({ slug, outcome: 'applied', revision });
   }
@@ -208,6 +235,44 @@ export class MockReaderService {
     const novel = this.novels.get(slug);
     if (!novel) return Response.json({ code: 'WBN_001' }, { status: 404 });
     const items = [...novel.chapters.entries()].sort(([a], [b]) => a - b).map(([ordinal, chapter]) => ({ ordinal, contentHash: chapter.contentHash, revision: chapter.revision }));
+    return Response.json(items);
+  }
+
+  private upsertWiki(slug: string, entryKey: string, body: Record<string, unknown>): Response {
+    const novel = this.novels.get(slug);
+    if (!novel) return Response.json({ code: 'WBN_001' }, { status: 404 });
+    if (this.failWikiEntries.has(entryKey)) return Response.json({ code: 'WBN_500' }, { status: 500 });
+
+    const revision = body.revision as number;
+    const contentHash = body.contentHash as string;
+    const stored = novel.wiki.get(entryKey);
+    if (stored && revision < stored.revision) return Response.json({ code: 'WBN_003' }, { status: 409 });
+    if (stored && revision === stored.revision && contentHash === stored.contentHash) return new Response(null, { status: 204 });
+
+    novel.wiki.set(entryKey, {
+      type: body.type as string,
+      name: body.name as string,
+      imageRef: (body.imageRef as string | undefined) ?? null,
+      firstVisibleOrdinal: body.firstVisibleOrdinal as number,
+      contentHash,
+      revision,
+      facets: (body.facets as unknown[] | undefined) ?? [],
+      images: (body.images as unknown[] | undefined) ?? [],
+    });
+    return Response.json({ slug, outcome: 'applied', revision });
+  }
+
+  private deleteWiki(slug: string, entryKey: string): Response {
+    this.novels.get(slug)?.wiki.delete(entryKey);
+    return new Response(null, { status: 204 });
+  }
+
+  private getWikiManifest(slug: string): Response {
+    const novel = this.novels.get(slug);
+    if (!novel) return Response.json({ code: 'WBN_001' }, { status: 404 });
+    const items = [...novel.wiki.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([entryKey, entry]) => ({ entryKey, contentHash: entry.contentHash, revision: entry.revision }));
     return Response.json(items);
   }
 }

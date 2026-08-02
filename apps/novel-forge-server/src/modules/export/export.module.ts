@@ -6,12 +6,11 @@
  * Importing npm packages
  */
 import { Module } from '@shadow-library/app';
-import { DatabaseModule } from '@shadow-library/modules';
+import { DatabaseModule, StorageModule } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
  */
-import { StorageModule } from '../storage/storage.module';
 import { ExportController } from './export.controller';
 import { NovelPackageService } from './novel-package.service';
 

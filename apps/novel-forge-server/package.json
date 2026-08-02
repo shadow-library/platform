@@ -15,7 +15,8 @@
   },
   "shadow": {
     "entries": [
-      "src/migrate.ts"
+      "src/migrate.ts",
+      "src/scripts/backfill-storage.ts"
     ],
     "assets": [
       "generated/drizzle"

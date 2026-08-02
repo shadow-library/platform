@@ -66,7 +66,7 @@ export class PublicationJanitor {
 
   /** Enqueues (and dispatches) a `publish` job for every project with due ledger work; returns the projects touched */
   async sweep(): Promise<bigint[]> {
-    const due = await this.db
+    const chapterDue = await this.db
       .selectDistinct({ projectId: schema.chapterPublications.projectId })
       .from(schema.chapterPublications)
       .where(
@@ -76,11 +76,25 @@ export class PublicationJanitor {
         ),
       );
 
-    for (const row of due) {
-      const jobId = await this.jobService.enqueue(row.projectId, 'publish', `publish-${row.projectId}`);
+    // Wiki entries share the `publish` job and converge: a project with a pending or non-stale-failed wiki row
+    // has a push owed, exactly as a scheduled/failed chapter does. Tombstoned (`deleted`) rows are not swept —
+    // like a chapter's `unpublished`, their DELETE rides the next converge some other due work triggers.
+    const wikiDue = await this.db
+      .selectDistinct({ projectId: schema.wikiPublications.projectId })
+      .from(schema.wikiPublications)
+      .where(
+        or(
+          eq(schema.wikiPublications.state, 'pending'),
+          and(eq(schema.wikiPublications.state, 'failed'), or(isNull(schema.wikiPublications.error), notLike(schema.wikiPublications.error, `${STALE_ERROR_PREFIX}%`))),
+        ),
+      );
+
+    const projectIds = [...new Set([...chapterDue, ...wikiDue].map(row => row.projectId))];
+    for (const projectId of projectIds) {
+      const jobId = await this.jobService.enqueue(projectId, 'publish', `publish-${projectId}`);
       this.jobExecutor.dispatch(jobId).catch(err => this.logger.warn('publish dispatch failed from sweep', { err, jobId }));
     }
-    if (due.length > 0) this.logger.info(`publication sweep enqueued ${due.length} publish job(s)`, { projects: due.map(row => String(row.projectId)) });
-    return due.map(row => row.projectId);
+    if (projectIds.length > 0) this.logger.info(`publication sweep enqueued ${projectIds.length} publish job(s)`, { projects: projectIds.map(projectId => String(projectId)) });
+    return projectIds;
   }
 }

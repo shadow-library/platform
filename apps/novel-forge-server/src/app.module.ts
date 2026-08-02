@@ -7,6 +7,7 @@ import './bootstrap';
  * Importing npm packages
  */
 import { Module } from '@shadow-library/app';
+import { StorageModule } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
@@ -24,6 +25,6 @@ import { DatabaseModule } from './database';
  */
 
 @Module({
-  imports: [DatabaseModule, HttpRouteModule],
+  imports: [DatabaseModule, StorageModule.forRoot(), HttpRouteModule],
 })
 export class AppModule {}

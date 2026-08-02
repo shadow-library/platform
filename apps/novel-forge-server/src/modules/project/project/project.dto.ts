@@ -148,7 +148,7 @@ export class ProjectResponse {
   @Field({ optional: true, nullable: true })
   title?: string | null;
 
-  // Storage ref (e.g. `14/cover.png`); the client resolves it to `/api/v1/images/<ref>` for display.
+  // Content-addressed storage ref (e.g. `a1b2…f0.png`); the client resolves it to its public object-storage URL for display.
   @Field({ optional: true, nullable: true })
   coverImagePath?: string | null;
 

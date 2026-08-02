@@ -126,26 +126,8 @@ describe.if(pgAvailable)('Project ownership (BOLA)', () => {
     });
   });
 
-  describe('GET /api/v1/images/:projectId/:filename', () => {
-    it("should answer 404 for another user's project image and 200 for the owner", async () => {
-      const aliceId = await createProjectAs(aliceToken, 'alice-cover');
-      const upload = await asAlice()
-        .post(`/api/v1/projects/${aliceId}/cover`)
-        .body({ mime: 'image/jpeg', image: Buffer.from('alice-only-bytes').toString('base64') });
-      expect(upload.statusCode).toBe(200);
-
-      // `ProjectOwnershipGuard` matches any route whose path carries a `:projectId` segment — not just
-      // routes under `/api/v1/projects/*` — so this image route is covered by the same generic check
-      // as every other project-scoped route, with the same fail-closed 404 contract (PRJ_001).
-      const asBobView = await asBob().get(`/api/v1/images/${aliceId}/cover.jpg`);
-      expect(asBobView.statusCode).toBe(404);
-      expect(asBobView.json().code).toBe('PRJ_001');
-
-      const asAliceView = await asAlice().get(`/api/v1/images/${aliceId}/cover.jpg`);
-      expect(asAliceView.statusCode).toBe(200);
-      expect(Buffer.from(asAliceView.body as string).toString()).toBe('alice-only-bytes');
-    });
-  });
+  // The former GET /api/v1/images/:projectId/:filename BOLA case was removed with that route: images now
+  // resolve to anonymous public storage URLs, so there is no project-scoped image endpoint to guard.
 
   describe('owner positive control', () => {
     it('should let the owner read her own project and its nested routes', async () => {

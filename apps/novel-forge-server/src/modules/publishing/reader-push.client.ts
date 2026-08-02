@@ -63,6 +63,24 @@ export interface ManifestItem {
   revision: number;
 }
 
+/** The reader-clean wiki-entry push body (reader-publish design §5 wiki extension) — payload plus its concurrency keys. */
+export interface WikiPushBody {
+  type: 'character' | 'faction' | 'location' | 'item' | 'concept' | 'power_rule';
+  name: string;
+  imageRef?: string;
+  firstVisibleOrdinal: number;
+  contentHash: string;
+  revision: number;
+  facets: { facetKey: string; content: string; sortOrder: number; visibleFromOrdinal: number }[];
+  images: { imageRef: string; caption?: string; sortOrder: number; visibleFromOrdinal: number }[];
+}
+
+export interface WikiManifestItem {
+  entryKey: string;
+  revision: number;
+  contentHash: string;
+}
+
 /**
  * Declaring the constants
  */
@@ -146,6 +164,25 @@ export class ReaderPushClient {
     const response = await this.send<ManifestItem[]>('GET', `/internal/novels/${slug}/manifest`);
     if (response.statusCode === 404) return [];
     if (response.statusCode >= 400) throw new ReaderPushError(`reader manifest answered http ${response.statusCode}`, response.statusCode);
+    return response.data ?? [];
+  }
+
+  async upsertWiki(slug: string, entryKey: string, body: WikiPushBody): Promise<PushResult> {
+    const response = await this.send('PUT', `/internal/novels/${slug}/wiki/${entryKey}`, body);
+    return this.toUpsertResult(response, body.revision);
+  }
+
+  /** Idempotent on the reader — deleting an absent wiki entry still answers 204 */
+  async deleteWiki(slug: string, entryKey: string): Promise<void> {
+    const response = await this.send('DELETE', `/internal/novels/${slug}/wiki/${entryKey}`);
+    if (response.statusCode !== 204) throw new ReaderPushError(`reader wiki unpublish answered http ${response.statusCode}`, response.statusCode);
+  }
+
+  /** The wiki reconciliation primitive — an unknown novel reads as an empty wiki, since the next entry push creates it */
+  async getWikiManifest(slug: string): Promise<WikiManifestItem[]> {
+    const response = await this.send<WikiManifestItem[]>('GET', `/internal/novels/${slug}/wiki/manifest`);
+    if (response.statusCode === 404) return [];
+    if (response.statusCode >= 400) throw new ReaderPushError(`reader wiki manifest answered http ${response.statusCode}`, response.statusCode);
     return response.data ?? [];
   }
 

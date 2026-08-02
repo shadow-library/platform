@@ -50,11 +50,12 @@ describe.if(pgAvailable)('GenerationService.deleteDraft', () => {
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
     const noop = {} as never;
     // A real ChapterImageService (with an in-memory storage stub) so deleteDraft's scene-image purge and
-    // renumber-shift run against the DB; `deleted` records every ref the storage was asked to drop.
+    // renumber-shift run against the DB; `deleted` proves no storage object is dropped — refs are
+    // content-addressed and may be shared, so row removal must never delete the underlying object.
     const imageStorage = {
       save: async () => '',
-      read: async () => ({ bytes: new Uint8Array(), mime: 'image/png' }),
-      getUrl: () => '',
+      read: async () => ({ bytes: new Uint8Array(), contentType: 'image/png' }),
+      getPublicUrl: () => '',
       delete: async (ref: string) => void deleted.push(ref),
     };
     chapterImages = new ChapterImageService({ getPostgresClient: () => db } as never, imageStorage as never);
@@ -111,8 +112,9 @@ describe.if(pgAvailable)('GenerationService.deleteDraft', () => {
 
     await service.deleteDraft(projectId, 2);
 
-    // Chapter 2's image file is dropped; chapter 3's image follows its draft down to chapter 2.
-    expect(deleted).toEqual([`${projectId}/ch2.png`]);
+    // Storage objects are content-addressed and may be shared across rows, so no object delete happens;
+    // only the DB rows are purged, and chapter 3's image follows its draft down to chapter 2.
+    expect(deleted).toEqual([]);
     const rows = await chapterImages.list(projectId, 2);
     expect(rows.map(r => r.imagePath)).toEqual([`${projectId}/ch3.png`]);
     expect(await chapterImages.list(projectId, 3)).toHaveLength(0);

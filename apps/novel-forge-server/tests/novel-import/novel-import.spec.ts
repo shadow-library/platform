@@ -8,6 +8,7 @@
 import { SQL } from 'bun';
 import { describe, expect, it } from 'bun:test';
 import { asc, eq } from 'drizzle-orm';
+import { StorageService } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
@@ -148,7 +149,8 @@ describe.if(pgAvailable)('POST /api/v1/import', () => {
     const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, BigInt(projectId)) });
     expect(project).toMatchObject({ kind: 'new_novel', name: 'The Lantern Keeper (final)', brief: 'A retired lighthouse keeper strikes a bargain with the tide.' });
     expect(project?.themes).toEqual(['fantasy']);
-    expect(project?.coverImagePath).toBe(`${projectId}/cover.jpg`);
+    // The cover is stored content-addressed (`<sha256hex>.jpg`) rather than at a project-scoped path.
+    expect(project?.coverImagePath).toMatch(/^[0-9a-f]{64}\.jpg$/);
 
     // new_novel projects are seeded with contentless <section>/default placeholder bible docs, exactly
     // like a project created through POST /api/v1/projects.
@@ -164,9 +166,9 @@ describe.if(pgAvailable)('POST /api/v1/import', () => {
     ]);
 
     // Cover round-trips through the same storage path a normal cover upload uses.
-    const image = await testEnv.getRouter().mockRequest().get(`/api/v1/images/${projectId}/cover.jpg`);
-    expect(image.statusCode).toBe(200);
-    expect(Buffer.from(image.body as string).toString()).toBe('fake-cover-bytes');
+    const storage = testEnv.getService(StorageService);
+    const stored = await storage.read(project!.coverImagePath!);
+    expect(Buffer.from(stored.bytes).toString()).toBe('fake-cover-bytes');
 
     // Publishable from chapter 1: locked, non-empty content, contiguous numbering satisfy PUB_002/PUB_003.
     const publish = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/publish`).body({ title: 'The Lantern Keeper' });

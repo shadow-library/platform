@@ -5,12 +5,10 @@
 /**
  * Importing npm packages
  */
-import { randomUUID } from 'node:crypto';
-
 import { and, asc, eq, gt, sql } from 'drizzle-orm';
-import { Inject, Injectable } from '@shadow-library/app';
+import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { DatabaseService } from '@shadow-library/modules';
+import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
@@ -18,8 +16,6 @@ import { DatabaseService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Generation, type PrimaryDatabase, schema } from '@server/database';
-
-import { IMAGE_STORAGE, type ImageStorageProvider } from '../storage/image-storage.interface';
 
 /**
  * Defining types
@@ -38,7 +34,7 @@ export class ChapterImageService {
 
   constructor(
     private readonly databaseService: DatabaseService,
-    @Inject(IMAGE_STORAGE) private readonly imageStorage: ImageStorageProvider,
+    private readonly storage: StorageService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -54,11 +50,9 @@ export class ChapterImageService {
     const existing = await this.list(projectId, chapter);
     const nextOrder = existing.reduce((max, img) => Math.max(max, img.sortOrder + 1), 0);
 
-    // A random suffix keeps every scene image's storage key unique within the chapter.
-    const key = `ch${chapter}_s_${randomUUID().slice(0, 8)}`;
     const bytes = Buffer.from(image, 'base64');
-    this.logger.debug('chapter image add: saving', { projectId, chapter, key, mime, bytes: bytes.length, sortOrder: nextOrder });
-    const ref = await this.imageStorage.save(projectId, key, new Uint8Array(bytes), mime);
+    this.logger.debug('chapter image add: saving', { projectId, chapter, mime, bytes: bytes.length, sortOrder: nextOrder });
+    const ref = await this.storage.save(new Uint8Array(bytes), { contentType: mime });
 
     const [created] = await this.db
       .insert(schema.chapterImages)
@@ -76,8 +70,8 @@ export class ChapterImageService {
     });
     if (!image) throw AppErrorCode.DRF_006.create();
 
+    // The content-addressed object is retained (it may back another row); only the chapter-image row is removed.
     this.logger.info('chapter image removed', { projectId, chapter, imageId, ref: image.imagePath });
-    await this.imageStorage.delete(image.imagePath);
     await this.db.delete(schema.chapterImages).where(eq(schema.chapterImages.id, imageId));
   }
 
@@ -87,8 +81,7 @@ export class ChapterImageService {
    */
   async onChapterDeleted(projectId: bigint, deletedChapter: number): Promise<void> {
     const removed = await this.list(projectId, deletedChapter);
-    this.logger.debug('onChapterDeleted: purging scene images and shifting later chapters down', { projectId, deletedChapter, removed: removed.length });
-    await Promise.all(removed.map(img => this.imageStorage.delete(img.imagePath)));
+    this.logger.debug('onChapterDeleted: purging scene image rows and shifting later chapters down', { projectId, deletedChapter, removed: removed.length });
     await this.db.delete(schema.chapterImages).where(and(eq(schema.chapterImages.projectId, projectId), eq(schema.chapterImages.chapter, deletedChapter)));
 
     await this.db

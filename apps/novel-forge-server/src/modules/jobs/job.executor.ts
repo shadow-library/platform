@@ -6,9 +6,9 @@
  * Importing npm packages
  */
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
-import { Inject, Injectable } from '@shadow-library/app';
+import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
-import { DatabaseService } from '@shadow-library/modules';
+import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
@@ -21,7 +21,6 @@ import { IndexingService } from '../ai/retrieval/indexing.service';
 import { PublishRunner } from '../publishing/publish-runner';
 import { RebrandService } from '../rebrand/rebrand.service';
 import { RecombineService } from '../source/recombine.service';
-import { IMAGE_STORAGE, type ImageStorageProvider } from '../storage/image-storage.interface';
 import { ConcurrencyController } from './concurrency.controller';
 import { JobService } from './job.service';
 
@@ -85,7 +84,7 @@ export class JobExecutor {
     private readonly rebrandService: RebrandService,
     private readonly recombineService: RecombineService,
     private readonly publishRunner: PublishRunner,
-    @Inject(IMAGE_STORAGE) private readonly imageStorage: ImageStorageProvider,
+    private readonly storage: StorageService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -330,9 +329,18 @@ export class JobExecutor {
   private async runPublish(job: Job.Row): Promise<void> {
     await this.jobService.progress(job.id, { done: 0, total: 0, current: 'converging', phase: 'publish' });
     const result = await this.publishRunner.converge(job.projectId);
-    const total = result.pushed.length + result.deleted.length + result.skipped.length + result.failed.length;
-    await this.jobService.progress(job.id, { done: total - result.failed.length, total, current: 'done', phase: 'publish' });
-    if (result.failed.length > 0) throw AppError.internal(`publish convergence incomplete: ${result.failed.length} chapter push(es) failed — see the publication ledger`);
+    const total =
+      result.pushed.length +
+      result.deleted.length +
+      result.skipped.length +
+      result.failed.length +
+      result.wiki.pushed.length +
+      result.wiki.deleted.length +
+      result.wiki.skipped.length +
+      result.wiki.failed.length;
+    const failed = result.failed.length + result.wiki.failed.length;
+    await this.jobService.progress(job.id, { done: total - failed, total, current: 'done', phase: 'publish' });
+    if (failed > 0) throw AppError.internal(`publish convergence incomplete: ${failed} push(es) failed — see the publication ledger`);
   }
 
   // ─── Novel import (novel-import-format.md) ────────────────────────────────────
@@ -371,7 +379,7 @@ export class JobExecutor {
     if (cover) {
       this.logger.debug('runImport: storing cover asset', { jobId: job.id, projectId });
       const bytes = new Uint8Array(Buffer.from(cover.dataBase64, 'base64'));
-      const ref = await this.imageStorage.save(projectId, 'cover', bytes, cover.mimeType);
+      const ref = await this.storage.save(bytes, { contentType: cover.mimeType });
       await this.db.update(schema.projects).set({ coverImagePath: ref, updatedAt: new Date() }).where(eq(schema.projects.id, projectId));
     }
 

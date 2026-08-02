@@ -8,9 +8,9 @@
 import { randomUUID } from 'node:crypto';
 
 import { eq } from 'drizzle-orm';
-import { Inject, Injectable } from '@shadow-library/app';
+import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
-import { DatabaseService } from '@shadow-library/modules';
+import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
@@ -18,8 +18,6 @@ import { DatabaseService } from '@shadow-library/modules';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
-
-import { IMAGE_STORAGE, type ImageStorageProvider } from '../storage/image-storage.interface';
 
 /**
  * Defining types
@@ -49,7 +47,7 @@ export class IllustrationService {
 
   constructor(
     private readonly databaseService: DatabaseService,
-    @Inject(IMAGE_STORAGE) private readonly imageStorage: ImageStorageProvider,
+    private readonly storage: StorageService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -102,8 +100,8 @@ export class IllustrationService {
     const sessionId = randomUUID();
     this.sessions.set(sessionId, { sessionId, projectId, entityKey, instruction, previewBytes: bytes, status: 'active', createdAt: new Date() });
 
-    const ref = await this.imageStorage.save(projectId, `${entityKey}_preview_${sessionId.slice(0, 8)}`, bytes, 'image/png');
-    return { sessionId, previewUrl: this.imageStorage.getUrl(ref) };
+    const ref = await this.storage.save(bytes, { contentType: 'image/png' });
+    return { sessionId, previewUrl: this.storage.getPublicUrl(ref) };
   }
 
   async refine(sessionId: string, instruction: string): Promise<{ previewUrl: string }> {
@@ -116,8 +114,8 @@ export class IllustrationService {
     session.previewBytes = bytes;
     session.instruction = fullInstruction;
 
-    const ref = await this.imageStorage.save(session.projectId, `${session.entityKey}_preview_${sessionId.slice(0, 8)}`, bytes, 'image/png');
-    return { previewUrl: this.imageStorage.getUrl(ref) };
+    const ref = await this.storage.save(bytes, { contentType: 'image/png' });
+    return { previewUrl: this.storage.getPublicUrl(ref) };
   }
 
   async save(sessionId: string): Promise<{ saved: boolean; imagePath: string }> {
@@ -125,7 +123,7 @@ export class IllustrationService {
     if (!session || session.status !== 'active') throw AppError.internal(`Session ${sessionId} not found or inactive`);
     if (!session.previewBytes) throw AppError.internal('No preview to save');
 
-    const ref = await this.imageStorage.save(session.projectId, session.entityKey, session.previewBytes, 'image/png');
+    const ref = await this.storage.save(session.previewBytes, { contentType: 'image/png' });
 
     await this.db.update(schema.entities).set({ imagePath: ref, updatedAt: new Date() }).where(eq(schema.entities.entityKey, session.entityKey));
 

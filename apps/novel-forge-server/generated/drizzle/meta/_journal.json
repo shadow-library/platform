@@ -15,6 +15,13 @@
       "when": 1785654595771,
       "tag": "0001_new_cerebro",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785676905560,
+      "tag": "0002_new_magma",
+      "breakpoints": true
     }
   ]
 }

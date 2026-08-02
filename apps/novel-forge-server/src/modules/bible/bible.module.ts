@@ -6,12 +6,11 @@
  * Importing npm packages
  */
 import { Module } from '@shadow-library/app';
-import { DatabaseModule } from '@shadow-library/modules';
+import { DatabaseModule, StorageModule } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
  */
-import { StorageModule } from '../storage/storage.module';
 import { ArcController } from './arc/arc.controller';
 import { ArcService } from './arc/arc.service';
 import { BibleDocumentController } from './document/bible-document.controller';

@@ -39,29 +39,25 @@ describe.if(pgAvailable)('ChapterImageService', () => {
   let db: PrimaryDatabase;
   let service: ChapterImageService;
   const saved: string[] = [];
-  const deleted: string[] = [];
 
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
-    const imageStorage = {
-      save: async (projectId: bigint, key: string) => {
-        const ref = `${projectId}/${key}.png`;
+    // Stub the shared StorageService with a content-addressed save; the service no longer reads/deletes here.
+    const storage = {
+      save: async (bytes: Uint8Array) => {
+        const ref = `${Buffer.from(bytes).toString('hex') || 'empty'}.png`;
         saved.push(ref);
         return ref;
       },
-      read: async () => ({ bytes: new Uint8Array(), mime: 'image/png' }),
-      getUrl: (ref: string) => `/api/v1/images/${ref}`,
-      delete: async (ref: string) => void deleted.push(ref),
     };
-    service = new ChapterImageService({ getPostgresClient: () => db } as never, imageStorage as never);
+    service = new ChapterImageService({ getPostgresClient: () => db } as never, storage as never);
   });
 
   beforeEach(() => {
     saved.length = 0;
-    deleted.length = 0;
   });
 
   async function seedProject(): Promise<bigint> {
@@ -87,13 +83,12 @@ describe.if(pgAvailable)('ChapterImageService', () => {
     expect(rows.map(r => r.id)).toEqual([a.id, b.id]);
   });
 
-  it('removes an image and drops its stored file', async () => {
+  it('removes an image row', async () => {
     const projectId = await seedProject();
     const img = await service.add(projectId, 1, 'AAAA', 'image/png');
 
     await service.remove(projectId, 1, img.id);
 
-    expect(deleted).toEqual([img.imagePath]);
     expect(await service.list(projectId, 1)).toHaveLength(0);
   });
 
@@ -104,12 +99,11 @@ describe.if(pgAvailable)('ChapterImageService', () => {
 
   it('purges the deleted chapter and shifts later chapters down on onChapterDeleted', async () => {
     const projectId = await seedProject();
-    const gone = await service.add(projectId, 1, 'AAAA', 'image/png');
+    await service.add(projectId, 1, 'AAAA', 'image/png');
     const kept = await service.add(projectId, 2, 'BBBB', 'image/png');
 
     await service.onChapterDeleted(projectId, 1);
 
-    expect(deleted).toEqual([gone.imagePath]);
     expect(await service.list(projectId, 1)).toEqual([expect.objectContaining({ id: kept.id, chapter: 1 })]);
     expect(await service.list(projectId, 2)).toHaveLength(0);
   });

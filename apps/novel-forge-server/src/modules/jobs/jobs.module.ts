@@ -7,7 +7,7 @@
  */
 import { Module } from '@shadow-library/app';
 import { FastifyModule } from '@shadow-library/fastify';
-import { DatabaseModule } from '@shadow-library/modules';
+import { DatabaseModule, StorageModule } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
@@ -16,7 +16,6 @@ import { AiModule } from '../ai/ai.module';
 import { PublishingModule } from '../publishing/publishing.module';
 import { RebrandModule } from '../rebrand/rebrand.module';
 import { SourceModule } from '../source/source.module';
-import { StorageModule } from '../storage/storage.module';
 import { CheckpointJanitor } from './checkpoint.janitor';
 import { ConcurrencyController } from './concurrency.controller';
 import { JobExecutor } from './job.executor';

@@ -22,6 +22,7 @@ import { PublicationAccessService } from '@modules/publishing/publication-access
 import { PublishRunner } from '@modules/publishing/publish-runner';
 import { PublishingService } from '@modules/publishing/publishing.service';
 import { ReaderPushClient } from '@modules/publishing/reader-push.client';
+import { WikiPublishingService } from '@modules/publishing/wiki-publishing.service';
 import { TestEnvironment } from '@tests/test-environment';
 
 import { MockReaderService } from '../publishing/mock-reader';
@@ -113,7 +114,7 @@ describe.if(pgAvailable)('Novel import (final mode) → publish (mocked reader)'
     const authClient = new AuthClient({ issuer: testIdP.issuer, appId: APP_ID, client: { id: APP_ID, secret: CLIENT_SECRET } });
     const publishingService = new PublishingService(databaseService);
     const accessService = new PublicationAccessService(databaseService, publishingService, authClient);
-    const runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(authClient), accessService);
+    const runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(authClient), accessService, new WikiPublishingService(databaseService));
 
     const result = await runner.converge(BigInt(projectId));
     expect(result).toMatchObject({ novel: 'applied', pushed: [1, 2], failed: [] });

@@ -6,10 +6,10 @@
  * Importing npm packages
  */
 import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
-import { Inject, Injectable } from '@shadow-library/app';
+import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
-import { DatabaseService } from '@shadow-library/modules';
+import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
@@ -19,7 +19,6 @@ import { APP_NAME } from '@server/constants';
 import { type Bible, type Chapter, type Knowledge, type Plan, type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
-import { IMAGE_STORAGE, type ImageStorageProvider } from '../../storage/image-storage.interface';
 import {
   type CloneProjectBody,
   type CostResponse,
@@ -48,7 +47,7 @@ export class ProjectService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly context: ContextService,
-    @Inject(IMAGE_STORAGE) private readonly imageStorage: ImageStorageProvider,
+    private readonly storage: StorageService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -136,9 +135,9 @@ export class ProjectService {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) });
     if (!project) throw AppErrorCode.PRJ_001.create();
 
-    // Drop the previous cover first so a different extension (png → jpg) never leaves an orphan behind.
-    if (project.coverImagePath) await this.imageStorage.delete(project.coverImagePath);
-    const ref = await this.imageStorage.save(id, 'cover', new Uint8Array(Buffer.from(image, 'base64')), mime);
+    // Content-addressed refs are immutable and deduplicated, so the previous cover is left in place
+    // (it may still back another project); setting a new cover only repoints this project's ref.
+    const ref = await this.storage.save(new Uint8Array(Buffer.from(image, 'base64')), { contentType: mime });
 
     const [result] = await this.db.update(schema.projects).set({ coverImagePath: ref, updatedAt: new Date() }).where(eq(schema.projects.id, id)).returning();
     if (!result) throw AppErrorCode.PRJ_001.create();
@@ -148,7 +147,6 @@ export class ProjectService {
   async clearCover(id: bigint): Promise<Project.Presented> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    if (project.coverImagePath) await this.imageStorage.delete(project.coverImagePath);
 
     const [result] = await this.db.update(schema.projects).set({ coverImagePath: null, updatedAt: new Date() }).where(eq(schema.projects.id, id)).returning();
     if (!result) throw AppErrorCode.PRJ_001.create();

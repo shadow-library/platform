@@ -59,9 +59,21 @@ export function coverColor(id: string): string {
   return `hsl(${hue} 42% 32%)`;
 }
 
-/** Resolve a storage ref (e.g. `14/cover.png`) to the URL that serves its bytes; null passes through. */
+/**
+ * Origin that serves object-storage bytes anonymously (`<origin>/<ref>`), read from
+ * `VITE_STORAGE_PUBLIC_ORIGIN`. The server stores content-addressed refs (`<sha256hex>.<ext>`) and the
+ * bytes live in the platform's public bucket (Garage's website endpoint), not behind the forge API, so
+ * the browser builds the absolute URL itself. `import.meta.env` is read defensively — it is injected only
+ * by Vite-family bundlers, keeping this module import-safe under a plain Node/SSR runtime. The dev default
+ * mirrors the server module's `storage.public-origin` default.
+ */
+const STORAGE_PUBLIC_ORIGIN = (
+  (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_STORAGE_PUBLIC_ORIGIN || 'http://localhost:8080/local-storage'
+).replace(/\/+$/, '');
+
+/** Resolve a storage ref (e.g. `a1b2…f0.png`) to its anonymous public URL; null passes through. */
 export function imageUrl(ref?: string | null): string | undefined {
-  return ref ? `/api/v1/images/${ref}` : undefined;
+  return ref ? `${STORAGE_PUBLIC_ORIGIN}/${ref}` : undefined;
 }
 
 /** The best human title for a project — its explicit title, falling back to its name. */

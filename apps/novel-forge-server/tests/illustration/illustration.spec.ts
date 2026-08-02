@@ -12,9 +12,6 @@ import { describe, expect, it } from 'bun:test';
  */
 import { IllustrationModule } from '@modules/illustration/illustration.module';
 import { IllustrationService } from '@modules/illustration/illustration.service';
-import { IMAGE_STORAGE } from '@modules/storage/image-storage.interface';
-import { LocalImageStorageProvider } from '@modules/storage/local-image-storage.provider';
-import { StorageModule } from '@modules/storage/storage.module';
 
 /**
  * Defining types
@@ -24,36 +21,8 @@ import { StorageModule } from '@modules/storage/storage.module';
  * Declaring the constants
  */
 
-describe('LocalImageStorageProvider', () => {
-  it('getUrl returns correct API route format', () => {
-    const provider = new LocalImageStorageProvider();
-    const url = provider.getUrl('1/hero.png');
-    expect(url).toBe('/api/v1/images/1/hero.png');
-  });
-
-  it('getUrl with nested ref preserves full path', () => {
-    const provider = new LocalImageStorageProvider();
-    const url = provider.getUrl('42/protagonist.jpg');
-    expect(url).toContain('/api/v1/images/');
-    expect(url).toContain('42/protagonist.jpg');
-  });
-
-  it('class is constructable', () => {
-    expect(() => new LocalImageStorageProvider()).not.toThrow();
-  });
-});
-
-describe('StorageModule', () => {
-  it('exports IMAGE_STORAGE symbol', () => {
-    expect(IMAGE_STORAGE).toBeDefined();
-    expect(typeof IMAGE_STORAGE).toBe('symbol');
-  });
-
-  it('module class exists', () => {
-    expect(StorageModule).toBeDefined();
-  });
-});
-
+// Object storage itself (content-addressing, public URLs, the local/S3 providers) is exercised in
+// `@shadow-library/modules`' storage-module suite; here we only assert the illustration wiring survives.
 describe('IllustrationService', () => {
   it('class is defined', () => {
     expect(IllustrationService).toBeDefined();

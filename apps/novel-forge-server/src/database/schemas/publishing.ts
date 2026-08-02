@@ -21,9 +21,11 @@ import { projects } from './projects';
 export namespace Publishing {
   export type Publication = InferSelectModel<typeof publications>;
   export type ChapterPublication = InferSelectModel<typeof chapterPublications>;
+  export type WikiPublication = InferSelectModel<typeof wikiPublications>;
   export type Grant = InferSelectModel<typeof publicationGrants>;
   export type Status = InferEnum<typeof publicationStatus>;
   export type ChapterStatus = InferEnum<typeof chapterPublicationStatus>;
+  export type WikiState = InferEnum<typeof wikiPublicationState>;
   export type Visibility = InferEnum<typeof publicationVisibility>;
   export type GrantState = InferEnum<typeof publicationGrantState>;
 }
@@ -34,6 +36,14 @@ export namespace Publishing {
 
 export const publicationStatus = pgEnum('publication_status', ['draft', 'live', 'retired']);
 export const chapterPublicationStatus = pgEnum('chapter_publication_status', ['scheduled', 'published', 'failed', 'unpublished']);
+
+/**
+ * The wiki-entry push outbox states, mirroring `chapter_publication_status` (reader-publish design §5).
+ * `pending` — the projection changed and awaits a PUT; `pushed` — converged on the reader; `failed` —
+ * the last push errored and rides the retry loop; `deleted` — the entity is hidden or gone and must be
+ * DELETEd from the reader, then kept as a tombstone whose entry key a later un-hide reuses.
+ */
+export const wikiPublicationState = pgEnum('wiki_publication_state', ['pending', 'pushed', 'failed', 'deleted']);
 
 /** Who may read the published novel. Mirrors the reader's `novel_visibility`; this side is the system of record. */
 export const publicationVisibility = pgEnum('publication_visibility', ['PUBLIC', 'ORGANISATION', 'RESTRICTED']);
@@ -133,6 +143,32 @@ export const chapterPublications = pgTable(
   ],
 );
 
+// The wiki publication ledger, one row per pushed wiki entry (reader-publish design §5–6). Mirrors
+// `chapter_publications` as an outbox: `state` + `error` drive retries and the janitor sweep, and the
+// row IS the record of what the reader serves. `entryKey` is the entity key (the reader's stable wiki
+// URL segment); `contentHash` covers the full spoiler-gated projection so an unchanged entry re-hashes
+// identically and every no-op/republish decision is deterministic. `revision` is the forge-assigned
+// monotonic the reader uses for optimistic concurrency, bumped only when `contentHash` actually moves.
+export const wikiPublications = pgTable(
+  'wiki_publications',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    entryKey: varchar('entry_key', { length: 128 }).notNull(),
+    revision: integer('revision').notNull().default(1),
+    contentHash: varchar('content_hash', { length: 128 }).notNull(),
+    state: wikiPublicationState('state').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    error: text('error'),
+    pushedAt: timestamp('pushed_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  t => [unique('wiki_publications_project_id_entry_key_unique').on(t.projectId, t.entryKey), index('wiki_publications_project_id_state_idx').on(t.projectId, t.state)],
+);
+
 export const publicationsRelations = relations(publications, ({ one, many }) => ({
   project: one(projects, { fields: [publications.projectId], references: [projects.id] }),
   grants: many(publicationGrants),
@@ -144,4 +180,8 @@ export const publicationGrantsRelations = relations(publicationGrants, ({ one })
 
 export const chapterPublicationsRelations = relations(chapterPublications, ({ one }) => ({
   project: one(projects, { fields: [chapterPublications.projectId], references: [projects.id] }),
+}));
+
+export const wikiPublicationsRelations = relations(wikiPublications, ({ one }) => ({
+  project: one(projects, { fields: [wikiPublications.projectId], references: [projects.id] }),
 }));

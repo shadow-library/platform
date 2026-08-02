@@ -6,7 +6,7 @@
  * Importing npm packages
  */
 import { SQL } from 'bun';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 /**
@@ -38,24 +38,17 @@ const pgAvailable = await (async () => {
 describe.if(pgAvailable)('EntityService image gallery', () => {
   let db: PrimaryDatabase;
   let service: EntityService;
-  const deleted: string[] = [];
 
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
-    const imageStorage = {
-      save: async (projectId: bigint, key: string) => `${projectId}/${key}.png`,
-      read: async () => ({ bytes: new Uint8Array(), mime: 'image/png' }),
-      getUrl: (ref: string) => `/api/v1/images/${ref}`,
-      delete: async (ref: string) => void deleted.push(ref),
+    // Stub the shared StorageService with a content-addressed save; the service no longer reads/deletes here.
+    const storage = {
+      save: async (bytes: Uint8Array) => `${Buffer.from(bytes).toString('hex') || 'empty'}.png`,
     };
-    service = new EntityService({ getPostgresClient: () => db } as never, imageStorage as never);
-  });
-
-  beforeEach(() => {
-    deleted.length = 0;
+    service = new EntityService({ getPostgresClient: () => db } as never, storage as never);
   });
 
   async function seedEntity(): Promise<{ projectId: bigint; entityKey: string }> {
@@ -80,7 +73,7 @@ describe.if(pgAvailable)('EntityService image gallery', () => {
     expect(withTwo.images[0]?.caption).toBe('a portrait');
   });
 
-  it('removes a gallery image by id and deletes its stored file', async () => {
+  it('removes a gallery image by id', async () => {
     const { projectId, entityKey } = await seedEntity();
     const added = await service.addImage(projectId, entityKey, 'AAAA', 'image/png');
     const [image] = added.images;
@@ -89,7 +82,6 @@ describe.if(pgAvailable)('EntityService image gallery', () => {
     const after = await service.deleteImageById(projectId, entityKey, image.id);
 
     expect(after.images).toHaveLength(0);
-    expect(deleted).toEqual([image.imagePath]);
   });
 
   it('throws ENT_002 when removing a non-existent image', async () => {

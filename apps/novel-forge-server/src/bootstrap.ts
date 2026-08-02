@@ -49,9 +49,12 @@ declare module '@shadow-library/common' {
     /** Observability configs */
     'ai.langsmith.api.key': string | undefined;
 
-    /** Storage configs */
-    'storage.driver': 'local';
-    'storage.local.dir': string;
+    /**
+     * Storage configs (`storage.driver`, `storage.s3.*`, `storage.public-origin`, `storage.local.dir`) are
+     * owned by `@shadow-library/modules`' `StorageModule`: it augments `ConfigRecords`, declares the
+     * defaults, and resolves them lazily via `Config.register`. The app restates none of them here — the
+     * deploy sets `STORAGE_*` env vars and `StorageModule.forRoot()` in `app.module` wires the service.
+     */
 
     /** Publishing configs — whether a publish/unpublish immediately dispatches a reader push, or waits for the janitor sweep */
     'publishing.auto-push': boolean;
@@ -94,9 +97,6 @@ Config.load('ai.codex.bin', { defaultValue: 'codex' });
 Config.load('ai.grok-build.enabled', { defaultValue: 'false', validateType: 'boolean' });
 Config.load('ai.grok-build.bin', { defaultValue: 'grok' });
 Config.load('ai.langsmith.api.key');
-
-Config.load('storage.driver', { defaultValue: 'local', allowedValues: ['local'] });
-Config.load('storage.local.dir', { defaultValue: './images' });
 
 Config.load('publishing.auto-push', { validateType: 'boolean', defaultValue: 'true' });
 

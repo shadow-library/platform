@@ -17,6 +17,7 @@ import { PublicationAccessService } from './publication-access.service';
 import { PublishRunner } from './publish-runner';
 import { PublishingService } from './publishing.service';
 import { ReaderPushClient } from './reader-push.client';
+import { WikiPublishingService } from './wiki-publishing.service';
 
 /**
  * Defining types
@@ -35,7 +36,14 @@ import { ReaderPushClient } from './reader-push.client';
 // in PipelineModule (the HTTP-wiring seam), keeping the module graph acyclic.
 @Module({
   imports: [DatabaseModule],
-  providers: [PublishingService, { token: AuthClient, useFactory: () => new AuthClient(resolveAuthClientConfig()) }, ReaderPushClient, PublicationAccessService, PublishRunner],
-  exports: [PublishingService, PublishRunner, PublicationAccessService],
+  providers: [
+    PublishingService,
+    WikiPublishingService,
+    { token: AuthClient, useFactory: () => new AuthClient(resolveAuthClientConfig()) },
+    ReaderPushClient,
+    PublicationAccessService,
+    PublishRunner,
+  ],
+  exports: [PublishingService, WikiPublishingService, PublishRunner, PublicationAccessService],
 })
 export class PublishingModule {}

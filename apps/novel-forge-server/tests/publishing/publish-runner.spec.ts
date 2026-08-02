@@ -26,6 +26,7 @@ import { PublicationAccessService } from '@modules/publishing/publication-access
 import { PublishRunner } from '@modules/publishing/publish-runner';
 import { PublishingService } from '@modules/publishing/publishing.service';
 import { ReaderPushClient } from '@modules/publishing/reader-push.client';
+import { WikiPublishingService } from '@modules/publishing/wiki-publishing.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -62,6 +63,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
   let databaseService: never;
   let publishingService: PublishingService;
   let accessService: PublicationAccessService;
+  let wikiService: WikiPublishingService;
   let runner: PublishRunner;
 
   beforeAll(async () => {
@@ -73,7 +75,8 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     // directly against the mock issuer with the app's own credential.
     const authClient = new AuthClient({ issuer: testIdP.issuer, appId: APP_ID, client: { id: APP_ID, secret: CLIENT_SECRET } });
     accessService = new PublicationAccessService(databaseService, publishingService, authClient);
-    runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(authClient), accessService);
+    wikiService = new WikiPublishingService(databaseService);
+    runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(authClient), accessService, wikiService);
 
     process.env['SERVICE_URL_WEB_NOVEL_SERVER'] = reader.start();
   });
@@ -230,7 +233,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     // A credential-less client (an id, but no secret) is refused by the token endpoint, so every mint —
     // and therefore every push — fails; the runner ledgers it and answers PUB_004 rather than crashing.
     const credlessClient = new AuthClient({ issuer: testIdP.issuer, audience: AUTH_AUDIENCE, client: { id: APP_ID } });
-    const credlessRunner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(credlessClient), accessService);
+    const credlessRunner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(credlessClient), accessService, wikiService);
 
     await expect(credlessRunner.converge(projectId)).rejects.toThrow(/Reader service push failed/);
     expect(await ledgerRow(projectId, 1)).toMatchObject({ status: 'failed', error: expect.stringContaining('reader service') });

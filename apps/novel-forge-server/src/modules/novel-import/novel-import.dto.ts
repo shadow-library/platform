@@ -98,7 +98,7 @@ export class NovelImportMeta {
   @Field(() => [String], { optional: true })
   tags?: string[];
 
-  // The `name` of an entry in `assets` — stored through the same `ImageStorageProvider` path
+  // The `name` of an entry in `assets` — stored through the same `StorageService` path
   // `ProjectService.setCover` uses, so it resolves at `projects.coverImagePath`.
   @Field({ optional: true })
   cover?: string;

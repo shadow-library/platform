@@ -7,12 +7,11 @@
  */
 import { Module } from '@shadow-library/app';
 import { FastifyModule } from '@shadow-library/fastify';
-import { DatabaseModule } from '@shadow-library/modules';
+import { DatabaseModule, StorageModule } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
  */
-import { StorageModule } from '../storage/storage.module';
 import { ProjectOwnershipGuard } from './project-ownership.middleware';
 import { ProjectController } from './project/project.controller';
 import { ProjectService } from './project/project.service';

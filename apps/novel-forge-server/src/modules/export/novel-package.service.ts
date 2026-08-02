@@ -7,9 +7,9 @@
  */
 import { and, asc, eq } from 'drizzle-orm';
 import { zipSync } from 'fflate';
-import { Inject, Injectable } from '@shadow-library/app';
+import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { DatabaseService } from '@shadow-library/modules';
+import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
@@ -17,8 +17,6 @@ import { DatabaseService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
-
-import { IMAGE_STORAGE, type ImageStorageProvider } from '../storage/image-storage.interface';
 
 /**
  * Defining types
@@ -108,7 +106,7 @@ export class NovelPackageService {
 
   constructor(
     private readonly databaseService: DatabaseService,
-    @Inject(IMAGE_STORAGE) private readonly storage: ImageStorageProvider,
+    private readonly storage: StorageService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -240,8 +238,8 @@ export class NovelPackageService {
 
   private async readImage(ref: string): Promise<LoadedImage | null> {
     try {
-      const { bytes, mime } = await this.storage.read(ref);
-      return { bytes, ext: MIME_EXT[mime] ?? 'png' };
+      const { bytes, contentType } = await this.storage.read(ref);
+      return { bytes, ext: MIME_EXT[contentType] ?? 'png' };
     } catch (err) {
       this.logger.warn('export: skipping unreadable image', { ref, err });
       return null;

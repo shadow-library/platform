@@ -29,13 +29,14 @@ interface Harness {
   executor: JobExecutor;
   jobService: JobService;
   recombineCalls: bigint[];
-  coverSaves: { projectId: bigint; entityKey: string; mime: string; bytes: number }[];
+  coverSaves: { contentType: string; bytes: number }[];
 }
 
 /**
  * Declaring the constants
  */
 
+const COVER_REF = `${'a'.repeat(64)}.jpg`;
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 const dbName = `${baseConnectionString.split('/').pop()}_import_executor`;
 
@@ -74,7 +75,7 @@ describe.if(pgAvailable)('JobExecutor.runImport', () => {
   // their calls, exactly like rebrand-executor.spec.ts's harness for RebrandService/RecombineService.
   function buildExecutor(): Harness {
     const recombineCalls: bigint[] = [];
-    const coverSaves: { projectId: bigint; entityKey: string; mime: string; bytes: number }[] = [];
+    const coverSaves: { contentType: string; bytes: number }[] = [];
     const jobService = new JobService({ getPostgresClient: () => db } as never);
     const concurrency = new ConcurrencyController();
 
@@ -86,9 +87,9 @@ describe.if(pgAvailable)('JobExecutor.runImport', () => {
     } as never;
 
     const imageStorage = {
-      save: async (projectId: bigint, entityKey: string, bytes: Uint8Array, mime: string) => {
-        coverSaves.push({ projectId, entityKey, mime, bytes: bytes.length });
-        return `${projectId}/${entityKey}.jpg`;
+      save: async (bytes: Uint8Array, opts: { contentType?: string }) => {
+        coverSaves.push({ contentType: opts.contentType ?? '', bytes: bytes.length });
+        return COVER_REF;
       },
     } as never;
 
@@ -155,9 +156,9 @@ describe.if(pgAvailable)('JobExecutor.runImport', () => {
 
     await runImportJob(harness, projectId, { mode: 'final', chapters: chapters(1), cover: { mimeType: 'image/jpeg', dataBase64: Buffer.from('cover-bytes').toString('base64') } });
 
-    expect(harness.coverSaves).toEqual([{ projectId, entityKey: 'cover', mime: 'image/jpeg', bytes: Buffer.byteLength('cover-bytes') }]);
+    expect(harness.coverSaves).toEqual([{ contentType: 'image/jpeg', bytes: Buffer.byteLength('cover-bytes') }]);
     const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    expect(project?.coverImagePath).toBe(`${projectId}/cover.jpg`);
+    expect(project?.coverImagePath).toBe(COVER_REF);
   });
 
   it('should report progress across chapter batches', async () => {

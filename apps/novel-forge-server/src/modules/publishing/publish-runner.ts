@@ -20,7 +20,18 @@ import { type PrimaryDatabase, type Publishing, schema } from '@server/database'
 import { PublicationAccessService } from './publication-access.service';
 import { renderChapterPayload } from './publish-payload';
 import { PublishingService } from './publishing.service';
-import { type AccessPushBody, type AccessState, type ChapterPushBody, type ManifestItem, ReaderPushClient, ReaderPushError, StaleRevisionError } from './reader-push.client';
+import {
+  type AccessPushBody,
+  type AccessState,
+  type ChapterPushBody,
+  type ManifestItem,
+  ReaderPushClient,
+  ReaderPushError,
+  StaleRevisionError,
+  type WikiManifestItem,
+} from './reader-push.client';
+import { type WikiEntryProjection } from './wiki-projection';
+import { WikiPublishingService } from './wiki-publishing.service';
 
 /**
  * Defining types
@@ -36,6 +47,20 @@ export interface ConvergeFailure {
   error: string;
 }
 
+export interface WikiConvergeFailure {
+  entryKey: string;
+  error: string;
+}
+
+export interface WikiConvergeResult {
+  pushed: string[];
+  deleted: string[];
+  skipped: string[];
+  failed: WikiConvergeFailure[];
+  /** Manifest entry keys the ledger knows nothing about — reported, never deleted (one-way convergence, §6) */
+  unknownEntries: string[];
+}
+
 export interface ConvergeResult {
   novel: 'applied' | 'noop';
   access: 'applied' | 'noop';
@@ -45,6 +70,8 @@ export interface ConvergeResult {
   failed: ConvergeFailure[];
   /** Manifest ordinals the ledger knows nothing about — reported, never deleted (one-way convergence, §6) */
   unknownOrdinals: number[];
+  /** The wiki convergence outcome — derived projections pushed one-way alongside the chapters */
+  wiki: WikiConvergeResult;
 }
 
 /**
@@ -71,6 +98,7 @@ export class PublishRunner {
     private readonly publishingService: PublishingService,
     private readonly pushClient: ReaderPushClient,
     private readonly accessService: PublicationAccessService,
+    private readonly wikiService: WikiPublishingService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -78,7 +106,16 @@ export class PublishRunner {
   async converge(projectId: bigint, options: ConvergeOptions = {}): Promise<ConvergeResult> {
     const publication = await this.publishingService.getPublication(projectId);
     const ledger = await this.publishingService.loadLedger(projectId);
-    const result: ConvergeResult = { novel: 'noop', access: 'noop', pushed: [], deleted: [], skipped: [], failed: [], unknownOrdinals: [] };
+    const result: ConvergeResult = {
+      novel: 'noop',
+      access: 'noop',
+      pushed: [],
+      deleted: [],
+      skipped: [],
+      failed: [],
+      unknownOrdinals: [],
+      wiki: { pushed: [], deleted: [], skipped: [], failed: [], unknownEntries: [] },
+    };
 
     // Missing credentials fail soft: every due row gets an actionable ledger error and the caller a
     // clear PUB_004, while boot and every non-publishing feature stay untouched.
@@ -128,6 +165,11 @@ export class PublishRunner {
       else result.skipped.push(row.publishedOrdinal);
     }
 
+    // Wiki converges after the chapters so it reads their just-updated `published` ordinals in the same pass —
+    // a fact revealed in a chapter published this run becomes visible immediately. It never throws: the chapters
+    // already landed, so a reader hiccup here is ledgered soft and swept, exactly like a failed chapter push.
+    await this.convergeWiki(projectId, publication.novelSlug, options, result);
+
     this.logger.info('publish converge finished', {
       projectId,
       slug: publication.novelSlug,
@@ -137,6 +179,11 @@ export class PublishRunner {
       skipped: result.skipped.length,
       failed: result.failed.length,
       unknownOrdinals: result.unknownOrdinals,
+      wikiPushed: result.wiki.pushed.length,
+      wikiDeleted: result.wiki.deleted.length,
+      wikiSkipped: result.wiki.skipped.length,
+      wikiFailed: result.wiki.failed.length,
+      wikiUnknown: result.wiki.unknownEntries,
     });
     return result;
   }
@@ -175,6 +222,91 @@ export class PublishRunner {
       result.failed.push({ ordinal: row.publishedOrdinal, error: message });
       this.logger.warn('chapter unpublish push failed', { slug, ordinal: row.publishedOrdinal, message });
     }
+  }
+
+  /**
+   * One wiki convergence pass, mirroring the chapter loop. Recompute every entity's spoiler-gated projection,
+   * reconcile the outbox ledger against it, then walk the ledger: PUT every due or drifted entry, DELETE every
+   * tombstoned one the reader still serves, and record per-row results. Unlike chapters, the wiki payload is
+   * fully derived (no editorial decision), so the freshly recomputed projection is pushed as-is — there is no
+   * "prose drifted, republish" guard. Never throws: failures are ledgered soft and the job fails on their count.
+   */
+  private async convergeWiki(projectId: bigint, slug: string, options: ConvergeOptions, result: ConvergeResult): Promise<void> {
+    const projections = await this.wikiService.computeProjections(projectId);
+    const ledger = await this.wikiService.reconcileLedger(projectId, projections);
+    const byKey = new Map(projections.map(projection => [projection.entryKey, projection]));
+
+    let manifest: Map<string, WikiManifestItem>;
+    try {
+      const items = await this.pushClient.getWikiManifest(slug);
+      manifest = new Map(items.map(item => [item.entryKey, item]));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const due = ledger.filter(row => row.state !== 'deleted' && this.isWikiDue(row, options));
+      for (const row of due) await this.markWikiFailed(row, message);
+      result.wiki.failed.push(...due.map(row => ({ entryKey: row.entryKey, error: message })));
+      this.logger.warn('wiki converge could not read the reader manifest', { projectId, slug, message });
+      return;
+    }
+
+    const ledgerKeys = new Set(ledger.map(row => row.entryKey));
+    result.wiki.unknownEntries = [...manifest.keys()].filter(entryKey => !ledgerKeys.has(entryKey)).sort();
+
+    for (const row of ledger) {
+      const served = manifest.get(row.entryKey);
+      if (row.state === 'deleted') {
+        if (served) await this.deleteWiki(slug, row, result);
+        else result.wiki.skipped.push(row.entryKey);
+        continue;
+      }
+
+      const due = this.isWikiDue(row, options);
+      const drifted = row.state === 'pushed' && (!served || served.contentHash !== row.contentHash);
+      const projection = byKey.get(row.entryKey);
+      if ((due || drifted) && projection) await this.pushWiki(slug, row, projection, result);
+      else result.wiki.skipped.push(row.entryKey);
+    }
+  }
+
+  private async pushWiki(slug: string, row: Publishing.WikiPublication, projection: WikiEntryProjection, result: ConvergeResult): Promise<void> {
+    try {
+      await this.pushClient.upsertWiki(slug, row.entryKey, { ...projection.payload, contentHash: projection.contentHash, revision: row.revision });
+      await this.db
+        .update(schema.wikiPublications)
+        .set({ state: 'pushed', pushedAt: new Date(), error: null, attempts: 0, updatedAt: new Date() })
+        .where(eq(schema.wikiPublications.id, row.id));
+      result.wiki.pushed.push(row.entryKey);
+    } catch (err) {
+      const message = err instanceof StaleRevisionError || err instanceof ReaderPushError ? err.message : String(err instanceof Error ? err.message : err);
+      await this.markWikiFailed(row, message);
+      result.wiki.failed.push({ entryKey: row.entryKey, error: message });
+      this.logger.warn('wiki entry push failed', { slug, entryKey: row.entryKey, message });
+    }
+  }
+
+  private async deleteWiki(slug: string, row: Publishing.WikiPublication, result: ConvergeResult): Promise<void> {
+    try {
+      await this.pushClient.deleteWiki(slug, row.entryKey);
+      result.wiki.deleted.push(row.entryKey);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      result.wiki.failed.push({ entryKey: row.entryKey, error: message });
+      this.logger.warn('wiki entry delete push failed', { slug, entryKey: row.entryKey, message });
+    }
+  }
+
+  /** Due = a fresh/changed projection awaiting a push, or a non-stale failure retrying; reconcile widens it to every failure */
+  private isWikiDue(row: Publishing.WikiPublication, options: ConvergeOptions): boolean {
+    if (row.state === 'pending') return true;
+    if (row.state === 'failed') return options.reconcile ? true : !row.error?.startsWith(STALE_ERROR_PREFIX);
+    return false;
+  }
+
+  private async markWikiFailed(row: Publishing.WikiPublication, error: string): Promise<void> {
+    await this.db
+      .update(schema.wikiPublications)
+      .set({ state: 'failed', error: error.slice(0, 2000), attempts: row.attempts + 1, updatedAt: new Date() })
+      .where(eq(schema.wikiPublications.id, row.id));
   }
 
   /**

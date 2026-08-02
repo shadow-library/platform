@@ -149,6 +149,34 @@ export class ReconcileFailureItem {
 }
 
 @Schema()
+export class WikiReconcileFailureItem {
+  @Field()
+  entryKey: string;
+
+  @Field()
+  error: string;
+}
+
+@Schema()
+export class WikiReconcileResult {
+  @Field(() => [String])
+  pushed: string[];
+
+  @Field(() => [String])
+  deleted: string[];
+
+  @Field(() => [String])
+  skipped: string[];
+
+  @Field(() => [WikiReconcileFailureItem])
+  failed: WikiReconcileFailureItem[];
+
+  // Reader wiki entries the ledger cannot account for — reported for the author, never deleted (design §6).
+  @Field(() => [String])
+  unknownEntries: string[];
+}
+
+@Schema()
 export class ReconcileResponse {
   @Field(() => String, { enum: ['applied', 'noop'] })
   novel: 'applied' | 'noop';
@@ -171,6 +199,9 @@ export class ReconcileResponse {
   // Reader ordinals the ledger cannot account for — reported for the author, never deleted (design §6).
   @Field(() => [Integer])
   unknownOrdinals: number[];
+
+  @Field(() => WikiReconcileResult)
+  wiki: WikiReconcileResult;
 }
 
 /** A share list is a handful of people; an author who needs more than this wants organisation visibility. */

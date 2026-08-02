@@ -30,6 +30,7 @@ export namespace Knowledge {
   export type EntityType = InferEnum<typeof entityType>;
   export type EntitySignificance = InferEnum<typeof entitySignificance>;
   export type EntityOrigin = InferEnum<typeof entityOrigin>;
+  export type EntityWikiVisibility = InferEnum<typeof entityWikiVisibility>;
   export type FactSource = InferEnum<typeof factSource>;
 }
 
@@ -41,6 +42,11 @@ export const entityType = pgEnum('entity_type', ['character', 'faction', 'locati
 export const factSource = pgEnum('fact_source', ['brief', 'manual', 'import']);
 export const entitySignificance = pgEnum('entity_significance', ['major', 'minor']);
 export const entityOrigin = pgEnum('entity_origin', ['extracted', 'seeded', 'generated']);
+
+// Author opt-out for the reader wiki: `default` projects the entity to the published wiki (spoiler-gated
+// per fragment), `hidden` withholds it entirely — a flipped-to-hidden entity is deleted from the reader
+// on the next converge (wiki publish pipeline, reader-publish design §5–6).
+export const entityWikiVisibility = pgEnum('entity_wiki_visibility', ['default', 'hidden']);
 
 export const entities = pgTable(
   'entities',
@@ -61,6 +67,7 @@ export const entities = pgTable(
     motivation: text('motivation'),
     body: text('body'),
     imagePath: varchar('image_path'),
+    wikiVisibility: entityWikiVisibility('wiki_visibility').notNull().default('default'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

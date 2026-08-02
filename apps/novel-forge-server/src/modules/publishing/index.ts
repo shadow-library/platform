@@ -19,6 +19,8 @@
  */
 
 export * from './publish-payload';
+export * from './wiki-projection';
+export * from './wiki-publishing.service';
 export * from './publication-access.service';
 export * from './reader-push.client';
 export * from './publish-runner';
