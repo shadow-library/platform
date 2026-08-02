@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { type JsonObject, type JsonValue, type QueryParams, type QueryValue, type VoidFn } from '../types';
+import { type JsonObject, type JsonValue, type QueryValue, type VoidFn } from '../types';
 import { ApiError, type ErrorResponse } from './api-error';
 import { type ApiResult } from './api-result';
 import { type CsrfConfig, csrfSetCookie, ensureCsrfToken, resolveCsrfConfig } from './csrf';
@@ -133,14 +133,26 @@ export class ApiRequest {
   }
 
   query(key: string, value: QueryValue): this;
-  query(params: QueryParams): this;
-  query(keyOrParams: string | QueryParams, value?: QueryValue): this {
+  /**
+   * The params object is typed as a mapped type over its own keys rather than as `QueryParams`, because
+   * TypeScript withholds the implicit index signature from an `interface`: a declared `ListUsersParams`
+   * would not be assignable to `Record<string, QueryValue>`, and every caller holding a generated params
+   * interface would have to spread it (`.query({ ...params })`) to launder the type. This form accepts the
+   * interface directly and still checks each property's value type.
+   */
+  query<T extends object>(params: (T & { [K in keyof T]: QueryValue | undefined }) | undefined): this;
+  query(keyOrParams: string | object | undefined, value?: QueryValue): this {
+    // An absent params object is a no-op, so a caller holding optional filters can pass them straight
+    // through instead of guarding every call site with `?? {}`.
+    if (keyOrParams === undefined) return this;
+
     if (typeof keyOrParams === 'string') {
       if (value !== undefined) this.spec.query[keyOrParams] = String(value);
-    } else {
-      for (const [key, val] of Object.entries(keyOrParams)) {
-        if (val !== undefined) this.spec.query[key] = String(val);
-      }
+      return this;
+    }
+
+    for (const [key, val] of Object.entries(keyOrParams)) {
+      if (val !== undefined) this.spec.query[key] = String(val);
     }
     return this;
   }

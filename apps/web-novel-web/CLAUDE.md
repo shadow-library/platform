@@ -78,7 +78,7 @@ tooling and always run from the **repo root** by path. Prerequisite: **Bun**.
 | Purpose              | Command                                           | Notes                                                                                                                                                          |
 | -------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Install              | `bun install`                                     |                                                                                                                                                                |
-| Develop              | `bun run dev`                                     | `vite dev`, serves on **:3000**; proxies `/api` → `SERVER_URL` (default `http://localhost:8080`)                                                               |
+| Develop              | `bun run dev`                                     | `vite dev`, serves on **:3000**; proxies `/api` → `API_ORIGIN` (falling back to `SERVER_URL`, default `http://localhost:8080`)                                 |
 | Test                 | `bun run test`                                    | `vitest run` (jsdom; specs in `tests/**/*.spec.{ts,tsx}`)                                                                                                      |
 | Type-check           | _(folded into verify)_                            | `bunx tsc -p apps/web-novel-web/tsconfig.json --noEmit`, from the repo root                                                                                    |
 | Run prod build       | `bun run start`                                   | `bun main.ts` — the shared `@shadow-library/web` Bun server; ports from `PORT`/`HEALTH_PORT`                                                                   |
@@ -104,19 +104,25 @@ React 19 + TanStack Start/Router/Query on `@shadow-library/{ui,web}`. Routes are
   (e.g. `requireSession(context.queryClient, returnTo)`). Validate search params with `validateSearch` and
   guard open redirects (as `login.tsx` does). The router comes from `createAppRouter` in `src/router.tsx` — do
   not hand-roll `createRouter`.
-- **API consumption.** The browser calls the server on the **same origin at `/api/...`** (relative URLs):
-  - General/browser path → `APIRequest` (re-exported from `src/lib/apis/transport.ts`, from
-    `@shadow-library/web`); forward the query `signal` (`.signal(signal).timeout(ms)`) so Query can cancel;
-    narrow caught errors with `isApiError()`.
-  - SSR path that must forward the session cookie → `createServerFetch` in `src/lib/apis/server-fetch.ts`,
-    called from a `createServerFn` (dynamically imported so it is stripped from the client bundle).
+- **API consumption.** One isomorphic client, configured once in `src/lib/apis/transport.ts` via
+  `createApiClient`. The browser calls the server on the **same origin at `/api/...`**; SSR reaches
+  webnovel-server directly through `src/lib/apis/ssr-transport.ts`, forwarding the caller's cookie. Call
+  sites do not choose — `APIRequest.get('/novels')` does the right thing in both:
+  - Paths are **surface-relative**: `APIRequest` is rooted at `/api`, so write `/novels`, not `/api/novels`.
+    The `/api/auth` surface is `apiClient.auth`, wrapped by `createAuthApi` in `session.api.ts`.
+  - Forward the query `signal` (`.signal(signal).timeout(ms)`) so Query can cancel; narrow caught errors with
+    `isApiError()`. Use `.result<T>()` instead of `.execute<T>()` where a specific failure is a value rather
+    than an error (the signed-out 401 on the session read).
+  - The CSRF double-submit is handled by the shared transport on both paths — do not attach it by hand.
   - Each `*.api.ts` normalizes lean server DTOs → the internal client model at the boundary. Regenerate wire
     types with `bun scripts/gen-api-types.ts apps/web-novel-web` (from the repo root) after a contract change (§6).
 - **Browser-only APIs.** Anything touching `window`/`document`/`localStorage`/`navigator`/IndexedDB must be
   guarded — `if (typeof window === 'undefined') return …`, run it in `useEffect`, or wrap it in `ClientOnly`
   (`@shadow-library/ui`). Never touch the DOM during render or at module top-level; it runs on the server too.
-- **Server-only code.** Keep it out of the client bundle: server-only modules (e.g. `server-fetch.ts`) are
-  reached only via `createServerFn` with a dynamic `import()`. Never import server-only code into a component
+- **Server-only code.** Keep it out of the client bundle: `ssr-transport.ts` is reached only through the
+  `import.meta.env.SSR ? () => import('./ssr-transport') : undefined` thunk in `transport.ts`. That guard is
+  mandatory — a bare `() => import(...)` is never _called_ in the browser, but Rollup still bundles its
+  target for the client and the build fails on `node:stream`. Never import server-only code into a component
   that renders on the client, and never read `process.env` in browser code paths.
 - **Hydration consistency.** Server and first client render must match. Do not branch render output on
   `typeof window`, random values, or `Date` during render; put client-only differences behind
@@ -154,7 +160,7 @@ is a **contract change** shared with `web-novel-server`. Land it deliberately:
 
 - **Never expose secrets or server-only environment variables to the client.** Client vars are **`VITE_`-
   prefixed** (read via `import.meta.env`, e.g. `VITE_API_MODE`); server-only vars are unprefixed (read via
-  `process.env`, e.g. `SERVER_URL`, `PORT`, `HEALTH_PORT`) and used **only** in SSR/server code. The browser
+  `process.env`, e.g. `API_ORIGIN`, `PORT`, `HEALTH_PORT`) and used **only** in SSR/server code. The browser
   never needs the backend origin — it uses relative `/api`. Do not put server-only values into `VITE_` vars,
   `import.meta.env`, the client bundle, or any code path that reaches the browser.
 - **Verify before done:** run `bun scripts/verify.ts apps/web-novel-web` (format + lint + type-check + test)

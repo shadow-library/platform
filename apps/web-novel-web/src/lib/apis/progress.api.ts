@@ -75,7 +75,7 @@ export const progressQueryOptions = (userId?: string) =>
     queryFn: async () => {
       const local = readProgressMap(userId);
       if (useFixtures || !userId) return local;
-      const remote = await APIRequest.get('/api/me/progress').timeout(10_000).execute<ServerProgressList>();
+      const remote = await APIRequest.get('/me/progress').timeout(10_000).execute<ServerProgressList>();
       const merged: ProgressMap = { ...local };
       for (const item of remote.items) {
         const entry = toReadingProgress(item);
@@ -95,7 +95,7 @@ export function saveProgress(slug: string, ordinal: number, position: number, us
 
   if (!useFixtures && userId) {
     const pendingStorageKey = namespacedKey(PENDING_STORAGE_KEY, userId);
-    APIRequest.put(`/api/novels/${encodeURIComponent(slug)}/progress`)
+    APIRequest.put(`/novels/${encodeURIComponent(slug)}/progress`)
       .body({ ordinal: entry.ordinal, position: entry.position })
       .timeout(8_000)
       .execute()
@@ -118,7 +118,7 @@ export async function syncPendingProgress(userId?: string): Promise<void> {
     pending.map(slug => {
       const entry = map[slug];
       if (!entry) return Promise.resolve();
-      return APIRequest.put(`/api/novels/${encodeURIComponent(slug)}/progress`)
+      return APIRequest.put(`/novels/${encodeURIComponent(slug)}/progress`)
         .body({ ordinal: entry.ordinal, position: entry.position })
         .timeout(8_000)
         .execute();

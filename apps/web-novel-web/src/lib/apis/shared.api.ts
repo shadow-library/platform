@@ -46,7 +46,7 @@ export const sharedQueryOptions = (signedIn: boolean) =>
     queryKey: sharedKeys.all,
     enabled: signedIn,
     queryFn: async () => {
-      const response = await APIRequest.get('/api/shared').timeout(10_000).execute<ServerSharedList>();
+      const response = await APIRequest.get('/shared').timeout(10_000).execute<ServerSharedList>();
       return (response.items ?? []).map(item => ({ ...toLibraryEntry(item), visibility: item.visibility }));
     },
   });

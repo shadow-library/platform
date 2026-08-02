@@ -4,10 +4,10 @@
  * a backend-independent `/healthz` liveness probe on its own port (`HEALTH_PORT`, default 3001), and
  * graceful drain on shutdown.
  *
- * The old hand-rolled `/api` reverse proxy is gone — every backend call now travels through TanStack
- * Start server functions (`src/lib/apis/server-fetch.ts`, driven by `API_ORIGIN`), so the browser only
- * talks to this origin. The one exception is the interactive `/api/auth/*` redirect flow (login), which
- * the deployment's ingress must route to novel-forge-server.
+ * This server deliberately does not proxy `/api`. The deployment fronts it with an ingress that routes
+ * `/api/*` to novel-forge-server and everything else here, on one origin — which is what makes the
+ * browser's API calls same-origin, so its cookies and the CSRF double-submit work without a proxy hop
+ * through this process. SSR reaches novel-forge-server directly at `API_ORIGIN`, bypassing the ingress.
  */
 import { fileURLToPath } from 'node:url';
 

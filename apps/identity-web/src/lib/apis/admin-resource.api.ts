@@ -2,14 +2,12 @@
  * Importing npm packages
  */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { createServerFn } from '@tanstack/react-start';
 
 /**
  * Importing user defined packages
  */
-import { type ApiError, call } from './api-request';
+import { type ApiError, APIRequest } from './api-request';
 import { type CreateScopeBody, type ResourceItem, type ResourceListResponse, type ScopeItem } from './api-types.gen';
-import { serverFetch } from './server-fetch';
 
 /**
  * Defining types
@@ -24,12 +22,11 @@ export const adminResourceKeys = {
   all: ['admin', 'resources'] as const,
 };
 
-const fetchResources = createServerFn({ method: 'GET' }).handler(() => serverFetch<ResourceListResponse>({ method: 'GET', path: '/admin/resources' }));
-const createScope = createServerFn({ method: 'POST' })
-  .validator((input: { resourceId: string; body: CreateScopeBody }) => input)
-  .handler(({ data }) => serverFetch<{ id: string }>({ method: 'POST', path: `/admin/resources/${data.resourceId}/scopes`, body: data.body }));
-
-export const adminResourcesQueryOptions = () => queryOptions<ResourceListResponse, ApiError>({ queryKey: adminResourceKeys.all, queryFn: () => call(fetchResources()) });
+export const adminResourcesQueryOptions = () =>
+  queryOptions<ResourceListResponse, ApiError>({
+    queryKey: adminResourceKeys.all,
+    queryFn: ({ signal }) => APIRequest.get('/admin/resources').signal(signal).execute<ResourceListResponse>(),
+  });
 
 export function useResourcesQuery(): UseQueryResult<ResourceListResponse, ApiError> {
   return useQuery(adminResourcesQueryOptions());
@@ -38,7 +35,7 @@ export function useResourcesQuery(): UseQueryResult<ResourceListResponse, ApiErr
 export function useCreateScopeMutation(): UseMutationResult<{ id: string }, ApiError, { resourceId: string; body: CreateScopeBody }> {
   const queryClient = useQueryClient();
   return useMutation<{ id: string }, ApiError, { resourceId: string; body: CreateScopeBody }>({
-    mutationFn: input => call(createScope({ data: input })),
+    mutationFn: input => APIRequest.post(`/admin/resources/${input.resourceId}/scopes`).body(input.body).execute<{ id: string }>(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: adminResourceKeys.all }),
   });
 }

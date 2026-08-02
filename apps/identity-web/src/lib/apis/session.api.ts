@@ -2,14 +2,12 @@
  * Importing npm packages
  */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { createServerFn } from '@tanstack/react-start';
 
 /**
  * Importing user defined packages
  */
-import { type ApiError, call } from './api-request';
+import { type ApiError, APIRequest } from './api-request';
 import { type MeSessionItem, type MeSessionsResponse } from './api-types.gen';
-import { serverFetch } from './server-fetch';
 
 /**
  * Defining types
@@ -26,16 +24,10 @@ export const sessionKeys = {
   all: ['sessions'] as const,
 };
 
-const fetchSessions = createServerFn({ method: 'GET' }).handler(() => serverFetch<SessionsResponse>({ method: 'GET', path: '/me/sessions' }));
-const revokeSession = createServerFn({ method: 'POST' })
-  .validator((sessionId: string) => sessionId)
-  .handler(({ data }) => serverFetch<{ revoked: number }>({ method: 'DELETE', path: `/me/sessions/${encodeURIComponent(data)}` }));
-const revokeOtherSessions = createServerFn({ method: 'POST' }).handler(() => serverFetch<{ revoked: number }>({ method: 'DELETE', path: '/me/sessions' }));
-
 export const sessionsQueryOptions = () =>
   queryOptions<SessionsResponse, ApiError>({
     queryKey: sessionKeys.all,
-    queryFn: () => call(fetchSessions()),
+    queryFn: ({ signal }) => APIRequest.get('/me/sessions').signal(signal).execute<SessionsResponse>(),
   });
 
 export function useSessionsQuery(): UseQueryResult<SessionsResponse, ApiError> {
@@ -46,7 +38,7 @@ export function useSessionsQuery(): UseQueryResult<SessionsResponse, ApiError> {
 export function useRevokeSessionMutation(): UseMutationResult<{ revoked: number }, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<{ revoked: number }, ApiError, string>({
-    mutationFn: sessionId => call(revokeSession({ data: sessionId })),
+    mutationFn: sessionId => APIRequest.delete(`/me/sessions/${encodeURIComponent(sessionId)}`).execute<{ revoked: number }>(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.all }),
   });
 }
@@ -55,7 +47,7 @@ export function useRevokeSessionMutation(): UseMutationResult<{ revoked: number 
 export function useRevokeOtherSessionsMutation(): UseMutationResult<{ revoked: number }, ApiError, undefined> {
   const queryClient = useQueryClient();
   return useMutation<{ revoked: number }, ApiError, undefined>({
-    mutationFn: () => call(revokeOtherSessions()),
+    mutationFn: () => APIRequest.delete('/me/sessions').execute<{ revoked: number }>(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.all }),
   });
 }

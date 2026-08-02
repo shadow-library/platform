@@ -109,12 +109,16 @@ logic worth covering in isolation. Copy `.env.example` → `.env` before first r
   `Promise.all`) so data is in the SSR HTML; components read the warm cache with `use*Query()` hooks and mutate
   with `use*Mutation()`. The router comes from `getRouter()` → `createAppRouter(...)` (`@shadow-library/web/router`),
   which owns the per-request `QueryClient` and SSR-query wiring.
-- **Server-only code vs browser-only APIs.** The backend is reached **only** through TanStack Start server
-  functions (`createServerFn(...).validator(...).handler(...)`) that call `serverFetch` from
-  `src/lib/apis/server-fetch.ts` (→ `${SERVER_URL}/api/v1`, with cookie + CSRF + `Set-Cookie` relay). `SERVER_URL`
-  and all server env are read **server-side only** — the Start plugin strips them from the client bundle. Never
-  call the backend URL from the browser, and never touch browser-only APIs (`window`, `document`, `localStorage`)
-  during render — gate them behind `ClientOnly`, effects, or `import.meta.env.DEV`.
+- **Server-only code vs browser-only APIs.** The backend is reached through the one client configured in
+  `src/lib/apis/api-request.ts` — `APIRequest.get('/me').execute<MeResponse>()`, paths relative to `/api/v1`.
+  It is isomorphic: in the browser it calls the same-origin `/api/v1/...` (the reverse proxy routes that
+  prefix to the identity server, so cookies and the CSRF double-submit work natively), and during SSR it goes
+  out through `src/lib/apis/ssr-transport.ts`, which reaches `SERVER_URL` directly and forwards the caller's
+  cookies and user agent. Do not hand-roll a `createServerFn` for a backend call. `SERVER_URL` and all server
+  env are read **server-side only** — the `import.meta.env.SSR` guard in `api-request.ts` keeps the SSR module
+  and its origin out of the client bundle. Never inline the backend URL into browser code, and never touch
+  browser-only APIs (`window`, `document`, `localStorage`) during render — gate them behind `ClientOnly`,
+  effects, or `import.meta.env.DEV`.
 - **Hydration consistency.** `__root.tsx` owns the full document and sets `suppressHydrationWarning` where the
   theme runs a pre-paint boot script (`themeInitScript`, `data-theme`). Keep server and client render output
   deterministic and identical — no `Date.now()`/random/locale-dependent output during render; mount browser-only
@@ -123,8 +127,9 @@ logic worth covering in isolation. Copy `.env.example` → `.env` before first r
 - **Error handling.** Narrow caught errors with `isApiError(cause)` (not `instanceof` — SSR and client bundles
   carry separate class identities); branch on `cause.status`/`cause.code`, read field errors from `cause.fields`
   (`[{ msg }]`), respect `cause.retryAfterSeconds` on 429. Statuses that resolve to a typed body instead of
-  throwing are marked `modeled: [401, 429]` on the server function. Route-level failures surface through
-  `DefaultCatchBoundary`.
+  throwing are declared on the request with `.modeled(401)` / `.modeled(429)` — see `auth.api.ts`, where the
+  interactive flows answer 401/429 with a `FlowState` rather than an error envelope. Route-level failures
+  surface through `DefaultCatchBoundary`.
 - **Auth-protected routes** gate in `beforeLoad` with `requireSession(context.queryClient, location.href)`
   (`src/lib/session.ts`, built on `requireAuth`), which ensures the session query server-side and 302-redirects to
   `/login` preserving `returnTo`. Admin authorization is enforced by the **server** per endpoint (a 403 surfaces
@@ -143,14 +148,16 @@ logic worth covering in isolation. Copy `.env.example` → `.env` before first r
 ## Environment & secrets
 
 Read the authoritative key list and defaults from `.env.example`. `SERVER_URL`, `OPENAPI_SPEC_URL`, and
-`PUBLIC_ROOT_DOMAIN` are all **server-only** — read only in server functions / `src/lib/apis/server-fetch.ts` /
-`vite.config.ts`. The browser never receives a backend URL, so the only `VITE_`-prefixed var is
-`VITE_THEME_COOKIE_DOMAIN` — the public parent domain the shared light/dark theme cookie is written for, which
-has to reach the client because the theme is set there. Treat that as the bar for any future `VITE_` var.
+`PUBLIC_ROOT_DOMAIN` are all **server-only** — read only in `src/lib/apis/ssr-transport.ts`, the remaining
+server functions, and `vite.config.ts`. The browser reaches the backend by relative path, so it never receives
+a backend URL; the only `VITE_`-prefixed var is `VITE_THEME_COOKIE_DOMAIN` — the public parent domain the
+shared light/dark theme cookie is written for, which has to reach the client because the theme is set there.
+Treat that as the bar for any future `VITE_` var.
 
 **Never expose secrets or server-only environment variables to the client.** Do not add a `VITE_`-prefixed var
 (or otherwise inline a value into the client bundle) that carries a secret, credential, backend URL, or any
-server-only config. Keep every backend call inside a server function.
+server-only config. Server-only env belongs behind the `import.meta.env.SSR` boundary in `api-request.ts` or
+inside a `createServerFn` handler — `runtime-config.api.ts` is the model for the latter.
 
 ---
 

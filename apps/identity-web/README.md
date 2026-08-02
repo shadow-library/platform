@@ -21,14 +21,17 @@ SERVER_PORT=9091 bun run src/main.ts
 
 ## Environment
 
-| Variable     | Default                 | Used by                                                     |
-| ------------ | ----------------------- | ----------------------------------------------------------- |
-| `SERVER_URL` | `http://localhost:9091` | Server functions (server-side backend base URL) + dev proxy |
+| Variable     | Default                 | Used by                                                    |
+| ------------ | ----------------------- | ---------------------------------------------------------- |
+| `SERVER_URL` | `http://localhost:9091` | The SSR transport (server-side backend origin) + dev proxy |
 
 ## Deployment topology
 
-`SERVER_URL` is read server-side by the Start server. `/oauth2` and `/saml2` are full-page browser
-redirects the identity server owns; the dev/preview server proxies them (see `vite.config.ts`). In
-production, front the Start server and the identity server with a reverse proxy that routes `/api`,
-`/oauth2`, and `/saml2` to the identity server and everything else to Start, keeping the browser
-same-origin.
+One origin, split by path. The browser calls the same-origin `/api/*`, and the reverse proxy in front routes
+that prefix to the identity server — along with `/oauth2` and `/saml2`, the full-page browser redirects the
+identity server owns — and everything else to the Start server. The dev/preview server proxies the same
+three prefixes (see `vite.config.ts`) so local development matches.
+
+SSR takes none of that: `SERVER_URL` is read server-side only, and `src/lib/apis/ssr-transport.ts` reaches
+the identity server directly with it, forwarding the caller's cookies and user agent. The browser never
+receives a backend URL.

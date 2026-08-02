@@ -2,8 +2,8 @@
  * Importing npm packages
  */
 import { type QueryClient, queryOptions } from '@tanstack/react-query';
-import { createServerFn } from '@tanstack/react-start';
-import { type ApiResult, call, type UserInfo, userInfoQueryOptions } from '@shadow-library/web';
+import { type UserInfo, userInfoQueryOptions } from '@shadow-library/web';
+import { type AuthPrincipal, createAuthApi } from '@shadow-library/web/auth';
 import { requireAuth } from '@shadow-library/web/router';
 
 /**
@@ -14,47 +14,41 @@ import { queryPersister } from '@/lib/offline';
 import { FIXTURE_SESSION } from './fixtures';
 import { clearLibraryMirror } from './library.api';
 import { clearProgressMirror } from './progress.api';
-import { ApiError, APIRequest, isApiError, useFixtures } from './transport';
+import { apiClient, ApiError, isApiError, useFixtures } from './transport';
 import { type SessionUser } from './types';
 
 /**
  * Defining types
  */
 
-/** The `@shadow-library/auth` principal returned by `GET /api/auth/session`: the identity subject plus token metadata */
-interface SessionPrincipal {
-  sub: string;
-  scopes: string[];
-  org?: string;
-  aal?: string;
-  clientId?: string;
-}
-
 /**
  * Declaring the constants
  *
- * The reader login surface is now owned by webnovel-server's `@shadow-library/auth` module, mounted at
- * `/api/auth`: `GET /api/auth/session` answers 200 with the flat principal `{ sub, scopes, ... }` — or a
- * plain 401 when signed out — alongside `GET /api/auth/login?return_to=` (full-page redirect into the
- * identity IdP) and `POST /api/auth/logout`. The `sub` is the reader's identity subject; it maps onto the
- * device-namespacing `userId` the UI keys everything off. The signed-out 401 is folded into a `null`
- * session: a guest browsing the public catalog is a valid state for the reader, not a failure.
+ * `/api/auth/*` is `@shadow-library/auth`'s surface, not the reader's: webnovel-server mounts the SDK, so
+ * `GET /api/auth/session`, `GET /api/auth/login?return_to=` and `POST /api/auth/logout` are the SDK's
+ * contract. `createAuthApi` is the client half of it, so the principal shape and the login/logout routes come
+ * from there instead of being restated here.
  *
- * The session read goes through a TanStack Start server function (`serverFetch`) so the browser's session
- * cookie is forwarded during SSR — that is what lets `requireSession` gate the library route server-side
- * with a real 302 instead of a client-side flash.
+ * The session read is isomorphic now: in the browser it is a same-origin call, and during SSR the shared
+ * transport forwards the caller's cookie — which is what still lets `requireSession` gate the library route
+ * server-side with a real 302 rather than a client-side flash. The signed-out 401 is folded into a `null`
+ * session: a guest browsing the public catalog is a valid state for the reader, not a failure.
  */
+const authApi = createAuthApi(apiClient.auth);
+
 export const sessionKeys = {
   session: ['auth', 'session'] as const,
 };
 
-const fetchSession = createServerFn({ method: 'GET' }).handler(async (): Promise<ApiResult<SessionUser | null>> => {
-  if (useFixtures) return { ok: true, data: FIXTURE_SESSION };
-  const { serverFetch } = await import('./server-fetch');
-  const result = await serverFetch<SessionPrincipal>({ method: 'GET', path: '/auth/session' });
-  if (!result.ok) return result.failure.status === 401 ? { ok: true, data: null } : result;
-  return { ok: true, data: { userId: result.data.sub } };
-});
+/** The reader's `sub` is the identity subject; it maps onto the device-namespacing `userId` the UI keys everything off. */
+async function fetchSession(): Promise<SessionUser | null> {
+  if (useFixtures) return FIXTURE_SESSION;
+
+  const result = await apiClient.auth.get('/session').result<AuthPrincipal>();
+  if (result.ok) return { userId: result.data.sub };
+  if (result.failure.status === 401) return null;
+  throw new ApiError(result.failure.status, result.failure, result.failure.retryAfterSeconds);
+}
 
 /**
  * The reader's own profile, from the SDK's userinfo route. Kept off {@link sessionQueryOptions} on
@@ -62,19 +56,18 @@ const fetchSession = createServerFn({ method: 'GET' }).handler(async (): Promise
  * `email` used to exist on `SessionUser` but were only ever populated under fixtures — this is where
  * they actually come from.
  */
-const fetchUserInfo = createServerFn({ method: 'GET' }).handler(async (): Promise<ApiResult<UserInfo>> => {
-  if (useFixtures) return { ok: true, data: { sub: FIXTURE_SESSION.userId, name: FIXTURE_SESSION.name, email: FIXTURE_SESSION.email } };
-  const { serverFetch } = await import('./server-fetch');
-  return serverFetch<UserInfo>({ method: 'GET', path: '/auth/userinfo' });
-});
+async function fetchUserInfo(): Promise<UserInfo> {
+  if (useFixtures) return { sub: FIXTURE_SESSION.userId, name: FIXTURE_SESSION.name, email: FIXTURE_SESSION.email };
+  return apiClient.auth.get('/userinfo').execute<UserInfo>();
+}
 
-export const meQuery = userInfoQueryOptions(() => call(fetchUserInfo()));
+export const meQuery = userInfoQueryOptions(fetchUserInfo);
 
 export const sessionQueryOptions = () =>
   queryOptions<SessionUser | null, ApiError>({
     queryKey: sessionKeys.session,
     staleTime: 5 * 60_000,
-    queryFn: () => call(fetchSession()),
+    queryFn: fetchSession,
   });
 
 const requiredSessionQueryOptions = () =>
@@ -82,7 +75,7 @@ const requiredSessionQueryOptions = () =>
     queryKey: [...sessionKeys.session, 'required'],
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const session = await call(fetchSession());
+      const session = await fetchSession();
       if (!session) throw new ApiError(401, { code: 'UNAUTHENTICATED', type: 'UnauthorizedError', message: 'Sign in to continue' });
       return session;
     },
@@ -98,19 +91,19 @@ export function requireSession(queryClient: QueryClient, returnTo: string): Prom
 
 /** The SDK's login route reads the RFC-spelled `return_to`; the web's own `/login` route keeps `returnTo`. */
 export function loginUrl(returnTo: string): string {
-  return `/api/auth/login?return_to=${encodeURIComponent(returnTo)}`;
+  return authApi.loginUrl(returnTo);
 }
 
 /**
  * Ends the server-side app session. The SDK's logout is a `POST` behind webnovel-server's CSRF
- * double-submit, so it goes through the shared `APIRequest` — whose pre-request hook attaches the
- * `x-csrf-token` header — rather than a navigation. An already-invalid session still signs the reader
- * out locally, so an expected `ApiError` is swallowed; anything else propagates. No-ops under fixtures.
+ * double-submit, which the shared transport satisfies on the browser path. An already-invalid session still
+ * signs the reader out locally, so an expected `ApiError` is swallowed; anything else propagates. No-ops
+ * under fixtures.
  */
 export async function signOut(): Promise<void> {
   if (useFixtures) return;
   try {
-    await APIRequest.post('/api/auth/logout').execute();
+    await authApi.logout();
   } catch (error) {
     if (!isApiError(error)) throw error;
   }

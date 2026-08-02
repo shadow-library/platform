@@ -2,14 +2,12 @@
  * Importing npm packages
  */
 import { queryOptions, useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { createServerFn } from '@tanstack/react-start';
 
 /**
  * Importing user defined packages
  */
-import { type ApiError, call } from './api-request';
+import { type ApiError, APIRequest } from './api-request';
 import { type MyApplicationItem, type MyApplicationsResponse } from './api-types.gen';
-import { serverFetch } from './server-fetch';
 
 /**
  * Defining types
@@ -26,12 +24,10 @@ export const myApplicationKeys = {
   all: ['me', 'applications'] as const,
 };
 
-const fetchMyApplications = createServerFn({ method: 'GET' }).handler(() => serverFetch<MyApplicationsResponse>({ method: 'GET', path: '/me/applications' }));
-
 export const myApplicationsQueryOptions = () =>
   queryOptions<MyApplicationsResponse, ApiError>({
     queryKey: myApplicationKeys.all,
-    queryFn: () => call(fetchMyApplications()),
+    queryFn: ({ signal }) => APIRequest.get('/me/applications').signal(signal).execute<MyApplicationsResponse>(),
   });
 
 export function useMyApplicationsQuery(): UseQueryResult<MyApplicationsResponse, ApiError> {

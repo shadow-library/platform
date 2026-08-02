@@ -37,7 +37,17 @@ export interface AuthApi {
   };
   /** The signed-in principal. A 401 throws, which is what a route gate reads to bounce to login. */
   sessionQueryOptions(): UseQueryOptions<AuthPrincipal, ApiError>;
-  /** The signed-in principal, or `null` when signed out — for apps where browsing as a guest is a valid state, not a failure. */
+  /**
+   * The signed-in principal, or `null` when signed out — for apps where browsing as a guest is a valid
+   * state, not a failure.
+   *
+   * Usable as-is only by an app whose own session type *is* `AuthPrincipal`. An app that reshapes it
+   * (mapping `sub` onto its own user model, say) cannot do so with `select`, because `requireAuth` resolves
+   * the query through `ensureQueryData`, which returns the unselected data and would hand the gate the
+   * wrong shape. Those apps should build their own `queryOptions` around
+   * `surface.get('/session').result<AuthPrincipal>()` — the one line this wraps — and map inside the
+   * `queryFn`, where the result is the query's own data.
+   */
   optionalSessionQueryOptions(): UseQueryOptions<AuthPrincipal | null, ApiError>;
   /** The organisations this session may act in; one entry means there is nothing to switch to. */
   organisationsQueryOptions(): UseQueryOptions<AuthOrganisation[], ApiError>;

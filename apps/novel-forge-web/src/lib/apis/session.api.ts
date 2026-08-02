@@ -1,80 +1,56 @@
 /**
  * Importing npm packages
  */
-import { queryOptions, useMutation, type UseMutationResult, useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { createServerFn } from '@tanstack/react-start';
-import { call, type UserInfo, userInfoQueryOptions } from '@shadow-library/web';
+import { useMutation, type UseMutationResult, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { type UserInfo, userInfoQueryOptions } from '@shadow-library/web';
+import { type AuthLogoutResult, type AuthPrincipal, createAuthApi } from '@shadow-library/web/auth';
 
 /**
  * Importing user defined packages
  */
-import { type ApiError } from './api-request';
-import { serverAuthFetch } from './server-fetch';
+import { apiClient, type ApiError } from './api-request';
 
 /**
  * Defining types
+ *
+ * `/api/auth/*` is `@shadow-library/auth`'s surface, not Novel Forge's: the SDK owns `session`, `logout`,
+ * `organisations` and `organisation` on every service that mounts it. `createAuthApi` is the client half of
+ * that contract, so this module binds it to the app's auth surface and re-exports it under the names the
+ * app already uses, rather than restating endpoints and response shapes a backend change could invalidate.
+ *
+ * `SessionResponse` is the SDK's principal: `sub` is the stable user id, and the cookie carries an opaque
+ * handle rather than a token, so the browser is told only what the guard exposes.
  */
-
-/**
- * The principal shape the `@shadow-library/auth` SDK's session surface answers with:
- * `GET /api/auth/session` returns 200 with this for an established session and 401 otherwise — never a
- * 200 null. `sub` is the stable user id; the SDK no longer returns `email`/`name` (the cookie carries an
- * opaque handle, not a token, so the browser is told only what the guard exposes).
- */
-export interface SessionResponse {
-  sub: string;
-  scopes: string[];
-  org?: string;
-  aal?: string;
-  clientId?: string;
-}
-
-/** `POST /api/auth/logout` ends the app session and clears the cookie; identity's own session is untouched. */
-export interface LogoutResponse {
-  success: boolean;
-}
+export type { AuthLogoutResult as LogoutResponse, AuthPrincipal as SessionResponse } from '@shadow-library/web/auth';
 
 /**
  * Declaring the constants
  */
-const sessionKeys = {
-  current: ['auth', 'session'] as const,
-};
-
-const fetchSession = createServerFn({ method: 'GET' }).handler(() => serverAuthFetch<SessionResponse>({ method: 'GET', path: '/session' }));
-
-const fetchUserInfo = createServerFn({ method: 'GET' }).handler(() => serverAuthFetch<UserInfo>({ method: 'GET', path: '/userinfo' }));
-
-const requestLogout = createServerFn({ method: 'POST' }).handler(() => serverAuthFetch<LogoutResponse>({ method: 'POST', path: '/logout' }));
+const authApi = createAuthApi(apiClient.auth, { staleTime: 60_000 });
 
 /**
  * Route-critical: the signed-in identity. A 401 here means "no session" — the route gates read that to
  * bounce to the backend's login redirect — so this query never retries (a retry would just re-confirm the
  * 401). `beforeLoad` gates ensure it; components read the warm cache.
  */
-export const sessionQuery = queryOptions<SessionResponse, ApiError>({
-  queryKey: sessionKeys.current,
-  queryFn: () => call(fetchSession()),
-  retry: false,
-  staleTime: 60_000,
-});
+export const sessionQuery = authApi.sessionQueryOptions();
 
-export function useSessionQuery(): UseQueryResult<SessionResponse, ApiError> {
+export function useSessionQuery(): UseQueryResult<AuthPrincipal, ApiError> {
   return useQuery(sessionQuery);
 }
 
 /**
- * The signed-in author, by name. The route is the SDK's, the key and caching policy are
- * `@shadow-library/web`'s, and the only thing this app supplies is the transport — which has to live
- * here because `/api/auth/*` travels through a TanStack Start server function.
+ * The signed-in author, by name. The route is the SDK's and the key and caching policy are
+ * `@shadow-library/web`'s; this app supplies only the transport. That transport is a plain surface call
+ * now the client is isomorphic — the server function it used to need is gone.
  */
-export const meQuery = userInfoQueryOptions(() => call(fetchUserInfo()));
+export const meQuery = userInfoQueryOptions(() => apiClient.auth.get('/userinfo').execute<UserInfo>());
 
 export function useMeQuery(): UseQueryResult<UserInfo, ApiError> {
   return useQuery(meQuery);
 }
 
 /** Ends the first-party app session. The caller navigates to `/login` on success — the SDK ends only this app's session, so identity may re-establish it. */
-export function useLogoutMutation(): UseMutationResult<LogoutResponse, ApiError, undefined> {
-  return useMutation<LogoutResponse, ApiError, undefined>({ mutationFn: () => call(requestLogout()) });
+export function useLogoutMutation(): UseMutationResult<AuthLogoutResult, ApiError, undefined> {
+  return useMutation<AuthLogoutResult, ApiError, undefined>({ mutationFn: () => authApi.logout() });
 }

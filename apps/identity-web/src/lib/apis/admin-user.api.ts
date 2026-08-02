@@ -2,14 +2,13 @@
  * Importing npm packages
  */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { createServerFn } from '@tanstack/react-start';
 
 /**
  * Importing user defined packages
  */
 import { type JsonValue } from '@/types';
 
-import { type ApiError, call } from './api-request';
+import { type ApiError, APIRequest } from './api-request';
 import {
   type UserAuditEventItem,
   type UserAuditEventsResponse,
@@ -19,7 +18,6 @@ import {
   type UserSearchResponse,
   type UserSummaryItem,
 } from './api-types.gen';
-import { serverFetch } from './server-fetch';
 
 /**
  * Defining types
@@ -66,52 +64,12 @@ export const adminUserKeys = {
   audit: (userId: string) => [...adminUserKeys.all, userId, 'audit'] as const,
 };
 
-/** ---------- server functions ---------- */
-
-const fetchUsers = createServerFn({ method: 'GET' })
-  .validator((params: UserSearchParams) => params)
-  .handler(({ data }) => serverFetch<UserSearchResponse>({ method: 'GET', path: '/admin/users', query: data }));
-const fetchUser = createServerFn({ method: 'GET' })
-  .validator((userId: string) => userId)
-  .handler(({ data }) => serverFetch<UserDetailResponse>({ method: 'GET', path: `/admin/users/${data}` }));
-const fetchUserAudit = createServerFn({ method: 'GET' })
-  .validator((userId: string) => userId)
-  .handler(({ data }) => serverFetch<UserAuditEventsResponse>({ method: 'GET', path: `/admin/users/${data}/audit` }));
-
-const lockUser = createServerFn({ method: 'POST' })
-  .validator((input: LockUserInput) => input)
-  .handler(({ data }) => serverFetch<JsonValue>({ method: 'POST', path: `/admin/users/${data.userId}/lock`, body: { mode: data.mode, until: data.until } }));
-const unlockUser = createServerFn({ method: 'POST' })
-  .validator((userId: string) => userId)
-  .handler(({ data }) => serverFetch<JsonValue>({ method: 'POST', path: `/admin/users/${data}/unlock`, body: {} }));
-const forcePasswordReset = createServerFn({ method: 'POST' })
-  .validator((userId: string) => userId)
-  .handler(({ data }) => serverFetch<JsonValue>({ method: 'POST', path: `/admin/users/${data}/force-password-reset`, body: {} }));
-const terminateSessions = createServerFn({ method: 'POST' })
-  .validator((userId: string) => userId)
-  .handler(({ data }) => serverFetch<JsonValue>({ method: 'POST', path: `/admin/users/${data}/sessions/terminate`, body: {} }));
-const deactivateUser = createServerFn({ method: 'POST' })
-  .validator((userId: string) => userId)
-  .handler(({ data }) => serverFetch<JsonValue>({ method: 'POST', path: `/admin/users/${data}/deactivate`, body: {} }));
-const suspendUser = createServerFn({ method: 'POST' })
-  .validator((input: SuspendUserInput) => input)
-  .handler(({ data }) => serverFetch<JsonValue>({ method: 'POST', path: `/admin/users/${data.userId}/suspend`, body: { reason: data.reason, until: data.until } }));
-const blockUser = createServerFn({ method: 'POST' })
-  .validator((input: BlockUserInput) => input)
-  .handler(({ data }) => serverFetch<JsonValue>({ method: 'POST', path: `/admin/users/${data.userId}/block`, body: { reason: data.reason } }));
-const reactivateUser = createServerFn({ method: 'POST' })
-  .validator((userId: string) => userId)
-  .handler(({ data }) => serverFetch<JsonValue>({ method: 'POST', path: `/admin/users/${data}/reactivate`, body: {} }));
-const deleteUser = createServerFn({ method: 'POST' })
-  .validator((userId: string) => userId)
-  .handler(({ data }) => serverFetch<JsonValue>({ method: 'DELETE', path: `/admin/users/${data}` }));
-
 /** ---------- queries ---------- */
 
 export const adminUsersQueryOptions = (params?: UserSearchParams) =>
   queryOptions<UserSearchResponse, ApiError>({
     queryKey: adminUserKeys.list(params),
-    queryFn: () => call(fetchUsers({ data: params ?? {} })),
+    queryFn: ({ signal }) => APIRequest.get('/admin/users').query(params).signal(signal).execute<UserSearchResponse>(),
   });
 
 export function useUsersQuery(params?: UserSearchParams): UseQueryResult<UserSearchResponse, ApiError> {
@@ -121,7 +79,7 @@ export function useUsersQuery(params?: UserSearchParams): UseQueryResult<UserSea
 export const adminUserQueryOptions = (userId: string, enabled = true) =>
   queryOptions<UserDetailResponse, ApiError>({
     queryKey: adminUserKeys.detail(userId),
-    queryFn: () => call(fetchUser({ data: userId })),
+    queryFn: ({ signal }) => APIRequest.get(`/admin/users/${userId}`).signal(signal).execute<UserDetailResponse>(),
     enabled: enabled && Boolean(userId),
   });
 
@@ -132,7 +90,7 @@ export function useUserQuery(userId: string, enabled = true): UseQueryResult<Use
 export const adminUserAuditQueryOptions = (userId: string, enabled = true) =>
   queryOptions<UserAuditEventsResponse, ApiError>({
     queryKey: adminUserKeys.audit(userId),
-    queryFn: () => call(fetchUserAudit({ data: userId })),
+    queryFn: ({ signal }) => APIRequest.get(`/admin/users/${userId}/audit`).signal(signal).execute<UserAuditEventsResponse>(),
     enabled: enabled && Boolean(userId),
   });
 
@@ -155,38 +113,38 @@ function useUserActionMutation<V extends { userId: string }>(action: (vars: V) =
 }
 
 export function useLockUserMutation(): UseMutationResult<unknown, ApiError, LockUserInput> {
-  return useUserActionMutation<LockUserInput>(input => call(lockUser({ data: input })));
+  return useUserActionMutation<LockUserInput>(input => APIRequest.post(`/admin/users/${input.userId}/lock`).body({ mode: input.mode, until: input.until }).execute<JsonValue>());
 }
 
 export function useUnlockUserMutation(): UseMutationResult<unknown, ApiError, { userId: string }> {
-  return useUserActionMutation(({ userId }) => call(unlockUser({ data: userId })));
+  return useUserActionMutation(({ userId }) => APIRequest.post(`/admin/users/${userId}/unlock`).body({}).execute<JsonValue>());
 }
 
 export function useForcePasswordResetMutation(): UseMutationResult<unknown, ApiError, { userId: string }> {
-  return useUserActionMutation(({ userId }) => call(forcePasswordReset({ data: userId })));
+  return useUserActionMutation(({ userId }) => APIRequest.post(`/admin/users/${userId}/force-password-reset`).body({}).execute<JsonValue>());
 }
 
 export function useTerminateUserSessionsMutation(): UseMutationResult<unknown, ApiError, { userId: string }> {
-  return useUserActionMutation(({ userId }) => call(terminateSessions({ data: userId })));
+  return useUserActionMutation(({ userId }) => APIRequest.post(`/admin/users/${userId}/sessions/terminate`).body({}).execute<JsonValue>());
 }
 
 export function useDeactivateUserMutation(): UseMutationResult<unknown, ApiError, { userId: string }> {
-  return useUserActionMutation(({ userId }) => call(deactivateUser({ data: userId })));
+  return useUserActionMutation(({ userId }) => APIRequest.post(`/admin/users/${userId}/deactivate`).body({}).execute<JsonValue>());
 }
 
 export function useSuspendUserMutation(): UseMutationResult<unknown, ApiError, SuspendUserInput> {
-  return useUserActionMutation(input => call(suspendUser({ data: input })));
+  return useUserActionMutation(input => APIRequest.post(`/admin/users/${input.userId}/suspend`).body({ reason: input.reason, until: input.until }).execute<JsonValue>());
 }
 
 export function useBlockUserMutation(): UseMutationResult<unknown, ApiError, BlockUserInput> {
-  return useUserActionMutation(input => call(blockUser({ data: input })));
+  return useUserActionMutation(input => APIRequest.post(`/admin/users/${input.userId}/block`).body({ reason: input.reason }).execute<JsonValue>());
 }
 
 export function useReactivateUserMutation(): UseMutationResult<unknown, ApiError, { userId: string }> {
-  return useUserActionMutation(({ userId }) => call(reactivateUser({ data: userId })));
+  return useUserActionMutation(({ userId }) => APIRequest.post(`/admin/users/${userId}/reactivate`).body({}).execute<JsonValue>());
 }
 
 /** Right-to-erasure — scrubs PII/credentials, keeps the audit skeleton. */
 export function useDeleteUserMutation(): UseMutationResult<unknown, ApiError, { userId: string }> {
-  return useUserActionMutation(({ userId }) => call(deleteUser({ data: userId })));
+  return useUserActionMutation(({ userId }) => APIRequest.delete(`/admin/users/${userId}`).execute<JsonValue>());
 }

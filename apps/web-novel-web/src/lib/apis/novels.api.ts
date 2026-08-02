@@ -168,7 +168,7 @@ export const catalogQueryOptions = (query: CatalogQuery = {}) =>
       const page = query.page ?? 1;
       const limit = query.limit ?? 20;
       const sort = SORT_TO_SERVER[query.sort ?? 'trending'];
-      const response = await APIRequest.get('/api/novels')
+      const response = await APIRequest.get('/novels')
         .query({
           search: query.q,
           genre: query.genre,
@@ -197,7 +197,7 @@ export const novelQueryOptions = (slug: string) =>
         if (!novel) throw notFound(`No novel named "${slug}"`);
         return fixtureDelay(novel);
       }
-      return APIRequest.get(`/api/novels/${encodeURIComponent(slug)}`)
+      return APIRequest.get(`/novels/${encodeURIComponent(slug)}`)
         .signal(signal)
         .timeout(10_000)
         .execute<ServerNovelDetail>()
@@ -216,7 +216,7 @@ export const chapterListQueryOptions = (slug: string, page = 1, limit = 100) =>
         return fixtureDelay(list);
       }
       // The live list endpoint returns every published chapter in one page; paging stays a fixture affordance.
-      return APIRequest.get(`/api/novels/${encodeURIComponent(slug)}/chapters`)
+      return APIRequest.get(`/novels/${encodeURIComponent(slug)}/chapters`)
         .signal(signal)
         .timeout(10_000)
         .execute<{ items: ServerChapterMeta[] }>()
@@ -257,7 +257,7 @@ export const chapterQueryOptions = (slug: string, ordinal: number) =>
 
 /** The chapter body carries no nav or novel context of its own, so the list and detail ride along in parallel */
 async function fetchLiveChapter(slug: string, ordinal: number, signal?: AbortSignal): Promise<ChapterContent> {
-  const base = `/api/novels/${encodeURIComponent(slug)}`;
+  const base = `/novels/${encodeURIComponent(slug)}`;
   const chapterRequest = APIRequest.get(`${base}/chapters/${ordinal}`).timeout(15_000);
   if (signal) chapterRequest.signal(signal);
   const [chapter, list, novel] = await Promise.all([

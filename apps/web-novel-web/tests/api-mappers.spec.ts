@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * Importing user defined packages
  */
-import { ensureCsrfToken, type LibraryEntry, type ReadingProgress, toLibraryEntry, toReadingProgress } from '@/lib/apis';
+import { type LibraryEntry, type ReadingProgress, toLibraryEntry, toReadingProgress } from '@/lib/apis';
 
 /**
  * Defining types
@@ -93,33 +93,5 @@ describe('toReadingProgress', () => {
   it('should drop unknown server fields so they never reach the localStorage mirror', () => {
     const item = { ...PROGRESS_RESPONSE.items[0]!, id: 'prg_01' };
     expect(Object.keys(toReadingProgress(item)).sort()).toEqual(['novelSlug', 'ordinal', 'position', 'updatedAt']);
-  });
-});
-
-describe('ensureCsrfToken', () => {
-  const future = (Date.now() + 60_000).toString(36);
-
-  it('should echo the token part of a valid csrf cookie', () => {
-    const csrf = ensureCsrfToken(`session=abc; csrf-token=${future}%3Adeadbeef42; theme=dark`);
-    expect(csrf.token).toBe('deadbeef42');
-    expect(csrf.setCookie).toBeUndefined();
-  });
-
-  it('should accept an unencoded expiry:token cookie value', () => {
-    expect(ensureCsrfToken(`csrf-token=${future}:cafebabe`).token).toBe('cafebabe');
-  });
-
-  it('should mint a fresh expiry:token pair when the cookie is missing', () => {
-    const csrf = ensureCsrfToken('session=abc');
-    expect(csrf.token).toMatch(/^[0-9a-f]{32}$/);
-    expect(csrf.setCookie).toMatch(/^csrf-token=.+; Path=\/; Max-Age=3600; SameSite=Lax$/);
-    expect(decodeURIComponent(csrf.setCookie ?? '')).toContain(`:${csrf.token}`);
-  });
-
-  it('should mint a replacement when the cookie token has expired', () => {
-    const expired = (Date.now() - 1_000).toString(36);
-    const csrf = ensureCsrfToken(`csrf-token=${expired}%3Astaletoken`);
-    expect(csrf.token).not.toBe('staletoken');
-    expect(csrf.setCookie).toBeDefined();
   });
 });

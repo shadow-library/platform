@@ -91,12 +91,12 @@ export const libraryQueryOptions = (userId?: string) =>
       if (useFixtures || !userId) return local;
       // Merge server truth over this user's mirror; only entries added under this same namespace (e.g. offline
       // additions) are promoted — guest entries live in a separate namespace and are never pushed to the account.
-      const response = await APIRequest.get('/api/library').timeout(10_000).execute<ServerLibraryList>();
+      const response = await APIRequest.get('/library').timeout(10_000).execute<ServerLibraryList>();
       const localBySlug = new Map(local.map(entry => [entry.novelSlug, entry]));
       const remote = response.items.map(item => toLibraryEntry(item, localBySlug.get(item.slug)));
       const remoteSlugs = new Set(remote.map(entry => entry.novelSlug));
       const localOnly = local.filter(entry => !remoteSlugs.has(entry.novelSlug));
-      await Promise.allSettled(localOnly.map(entry => APIRequest.post('/api/library').body({ slug: entry.novelSlug }).execute()));
+      await Promise.allSettled(localOnly.map(entry => APIRequest.post('/library').body({ slug: entry.novelSlug }).execute()));
       const merged = [...remote, ...localOnly];
       writeLibrary(merged, userId);
       return merged;
@@ -112,7 +112,7 @@ export function useToggleLibraryMutation(userId?: string): UseMutationResult<Lib
       const next = existing ? entries.filter(entry => entry.novelSlug !== novel.slug) : [{ novelSlug: novel.slug, addedAt: new Date().toISOString(), novel }, ...entries];
       writeLibrary(next, userId);
       if (!useFixtures && userId) {
-        const request = existing ? APIRequest.delete(`/api/library/${encodeURIComponent(novel.slug)}`) : APIRequest.post('/api/library').body({ slug: novel.slug });
+        const request = existing ? APIRequest.delete(`/library/${encodeURIComponent(novel.slug)}`) : APIRequest.post('/library').body({ slug: novel.slug });
         await request
           .timeout(10_000)
           .execute()

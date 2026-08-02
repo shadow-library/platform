@@ -26,7 +26,7 @@ import { buildManifest } from '@shadow-library/web/pwa';
  * proxy is a fallback for `VITE_API_MODE=server` runs. Production fronts this Start server and the API with
  * a reverse proxy that routes `/api` to webnovel-server and everything else here.
  */
-const proxyTarget = process.env.SERVER_URL || 'http://localhost:8080';
+const proxyTarget = process.env.API_ORIGIN || process.env.SERVER_URL || 'http://localhost:8080';
 const proxy = { '/api': { target: proxyTarget, changeOrigin: true, secure: false } };
 
 /**
