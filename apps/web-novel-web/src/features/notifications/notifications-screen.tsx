@@ -9,7 +9,7 @@ import { Button, EmptyState } from '@shadow-library/ui';
  * Importing user defined packages
  */
 import { BookIcon, DownloadIcon } from '@/components/icons';
-import { notificationsQueryOptions, sessionQueryOptions, useMarkAllReadMutation, useMarkReadMutation } from '@/lib/apis';
+import { sessionQueryOptions, useNotifications } from '@/lib/apis';
 import { type Notification, type NotificationType } from '@/lib/apis/notifications.api';
 
 import styles from './notifications-screen.module.css';
@@ -27,16 +27,10 @@ interface TypeMeta {
 /**
  * Declaring the constants
  *
- * The "Updates" surface from the mockups: a vertical feed of device-local notifications. Each row is an
- * action button that marks the update read and, when it carries a novel, opens that novel. `icons.tsx` has
- * no chat or bell glyph, so the two missing per-type icons are defined here rather than in the shared set.
+ * The "Updates" surface: a vertical feed derived from the reader's own shelf, progress and downloads (see
+ * `notifications.api.ts` — there is no server feed). Each row is an action button that marks the update read
+ * and opens its novel. `icons.tsx` has no bell glyph, so that one is defined here rather than in the shared set.
  */
-const ReplyIcon: NotifIcon = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
-);
-
 const BellIcon: NotifIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
@@ -46,9 +40,7 @@ const BellIcon: NotifIcon = ({ size = 18 }) => (
 
 const TYPE_META: Record<NotificationType, TypeMeta> = {
   chapter: { Icon: BookIcon, tone: styles.toneChapter },
-  reply: { Icon: ReplyIcon, tone: styles.toneReply },
   download: { Icon: DownloadIcon, tone: styles.toneDownload },
-  system: { Icon: BellIcon, tone: styles.toneSystem },
 };
 
 /** Compact relative label ("18m ago", "3h ago", "2d ago"). Runs client-side only — the feed is empty during SSR. */
@@ -67,16 +59,11 @@ export function NotificationsScreen(): React.JSX.Element {
   const navigate = useNavigate();
   const session = useQuery(sessionQueryOptions());
   const userId = session.data?.userId;
-  const notifications = useQuery(notificationsQueryOptions(userId));
-  const markAllRead = useMarkAllReadMutation(userId);
-  const markRead = useMarkReadMutation(userId);
-
-  const items = notifications.data ?? [];
-  const unreadCount = items.reduce((count, item) => count + (item.read ? 0 : 1), 0);
+  const { items, unreadCount, markRead, markAllRead } = useNotifications(userId);
 
   const onOpen = (notification: Notification): void => {
-    if (!notification.read) markRead.mutate(notification.id);
-    if (notification.novelSlug) void navigate({ to: '/novels/$slug', params: { slug: notification.novelSlug } });
+    if (!notification.read) markRead(notification.id);
+    void navigate({ to: '/novels/$slug', params: { slug: notification.novelSlug } });
   };
 
   return (
@@ -84,15 +71,20 @@ export function NotificationsScreen(): React.JSX.Element {
       <div className={styles.head}>
         <div>
           <h1 className={styles.title}>Updates</h1>
-          <p className={styles.subtitle}>Chapter releases, downloads and replies</p>
+          <p className={styles.subtitle}>New chapters on your shelf and finished downloads</p>
         </div>
-        <Button variant="secondary" size="sm" onClick={() => markAllRead.mutate()} disabled={unreadCount === 0}>
+        <Button variant="secondary" size="sm" onClick={markAllRead} disabled={unreadCount === 0}>
           Mark all read
         </Button>
       </div>
 
       {items.length === 0 ? (
-        <EmptyState illustration={<BellIcon size={26} />} title="You’re all caught up" description="Chapter releases, replies and downloads you follow will show up here." />
+        <EmptyState
+          illustration={<BellIcon size={26} />}
+          title="No updates yet"
+          description="When a novel on your shelf publishes chapters past where you left off, or a download finishes, it shows up here."
+          action={{ label: 'Browse novels', onClick: () => void navigate({ to: '/browse' }) }}
+        />
       ) : (
         <div className={styles.list}>
           {items.map(notification => (

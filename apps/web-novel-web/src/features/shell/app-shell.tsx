@@ -12,7 +12,7 @@ import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-librar
  */
 import { BookIcon, BookmarkIcon, CompassIcon, DownloadIcon, HistoryIcon, HomeIcon, MoonIcon, SearchIcon, SettingsSlidersIcon, SunIcon, TagIcon } from '@/components/icons';
 import { SearchOverlay } from '@/features/search';
-import { loginUrl, meQuery, notificationsQueryOptions, purgeOnLogout, sessionQueryOptions, signOut } from '@/lib/apis';
+import { loginUrl, meQuery, purgeOnLogout, sessionQueryOptions, signOut, useNotifications } from '@/lib/apis';
 
 import styles from './app-shell.module.css';
 
@@ -111,8 +111,7 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
   // The name lives on its own query, not the session: the session gates routes, and a profile that
   // could not be fetched must never read as "signed out".
   const me = useQuery({ ...meQuery, enabled: Boolean(user) });
-  const notifications = useQuery(notificationsQueryOptions(user?.userId));
-  const hasUnread = (notifications.data ?? []).some(notification => !notification.read);
+  const { unreadCount } = useNotifications(user?.userId);
 
   // A global "/" opens search from anywhere — but stay out of the way while the reader is typing.
   useEffect(() => {
@@ -161,7 +160,7 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
           <Tooltip content="Notifications">
             <IconButton variant="ghost" aria-label="Notifications" icon={<BellIcon size={18} />} onClick={() => void navigate({ to: '/notifications' })} />
           </Tooltip>
-          {hasUnread && <span className={styles.bellDot} aria-hidden />}
+          {unreadCount > 0 && <span className={styles.bellDot} aria-hidden />}
         </span>
       }
       utility={

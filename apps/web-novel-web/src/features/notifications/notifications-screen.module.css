@@ -68,19 +68,9 @@
   color: var(--sh-accent);
 }
 
-.toneReply {
-  background: var(--sh-info-bg-subtle);
-  color: var(--sh-info-text-on-subtle);
-}
-
 .toneDownload {
   background: var(--sh-success-bg-subtle);
   color: var(--sh-success-text-on-subtle);
-}
-
-.toneSystem {
-  background: var(--sh-warning-bg-subtle);
-  color: var(--sh-warning-text-on-subtle);
 }
 
 .rowBody {

@@ -12,6 +12,7 @@ import { requireAuth } from '@shadow-library/web/router';
 import { queryPersister } from '@/lib/offline';
 
 import { clearLibraryMirror } from './library.api';
+import { clearNotificationsMirror } from './notifications.api';
 import { clearProgressMirror } from './progress.api';
 import { apiClient, ApiError, isApiError } from './transport';
 import { type SessionUser } from './types';
@@ -114,12 +115,13 @@ export async function signOut(): Promise<string | undefined> {
 
 /**
  * Wipe every on-device trace of the session on sign-out: the in-memory query cache, the IndexedDB query
- * persister, and this user's namespaced library/progress mirrors. Without this, the next person on the
- * device would inherit the previous account's cached shelf and reading history.
+ * persister, and this user's namespaced library/progress/updates mirrors. Without this, the next person on
+ * the device would inherit the previous account's cached shelf and reading history.
  */
 export async function purgeOnLogout(queryClient: QueryClient, userId?: string): Promise<void> {
   clearLibraryMirror(userId);
   clearProgressMirror(userId);
+  clearNotificationsMirror(userId);
   queryClient.clear();
   await queryPersister.removeClient();
 }
