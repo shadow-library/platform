@@ -1,4 +1,5 @@
 export * from './AccessDenied';
+export * from './AccountMenu';
 export * from './Accordion';
 export * from './ActionSheet';
 export * from './Alert';

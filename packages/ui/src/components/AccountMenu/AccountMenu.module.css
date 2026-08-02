@@ -1,0 +1,55 @@
+/*
+ * Account Menu — the top bar's identity affordance. The trigger is the avatar itself with no chrome of
+ * its own, so the utility cluster reads as one row of glyphs rather than a button among icons.
+ */
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.trigger {
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: var(--sh-radius-full);
+  cursor: pointer;
+}
+
+.trigger:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+
+/* ── Menu ────────────────────────────────────────────────── */
+
+.menu {
+  min-width: 220px;
+}
+
+/* The header stacks name over email, so it opts out of the label's single-line default. */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.headerName {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerEmail {
+  font-size: var(--sh-text-caption);
+  font-weight: 400;
+  color: var(--sh-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
