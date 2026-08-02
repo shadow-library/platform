@@ -22,7 +22,9 @@ export const Route = createFileRoute('/novels/$novelId/import-plan')({
  */
 
 const BUNDLE_FORMAT = 'novel-forge-plan';
-const BUNDLE_VERSION = 1;
+// Mirrors the server's accepted set (`plan-import.service.ts`): v2 added the optional `facts` collection
+// and the brief `knowledgeContract`, and is a pure superset — v1 bundles packed earlier stay importable.
+const BUNDLE_VERSIONS = [1, 2];
 
 interface CollectionRow {
   key: keyof ImportPlanResponse['results'];
@@ -32,6 +34,7 @@ interface CollectionRow {
 const COLLECTIONS: CollectionRow[] = [
   { key: 'bible', label: 'Bible documents' },
   { key: 'entities', label: 'Entities' },
+  { key: 'facts', label: 'Canon facts' },
   { key: 'volumes', label: 'Volumes' },
   { key: 'arcs', label: 'Arcs' },
   { key: 'briefs', label: 'Chapter briefs' },
@@ -74,9 +77,9 @@ function ImportPlanScreen(): React.JSX.Element {
     importPlan.reset();
     try {
       const parsed = JSON.parse(await file.text()) as PlanBundle;
-      if (parsed.format !== BUNDLE_FORMAT || parsed.version !== BUNDLE_VERSION) {
+      if (parsed.format !== BUNDLE_FORMAT || !BUNDLE_VERSIONS.includes(parsed.version)) {
         setBundle(null);
-        setParseError(`Not a supported plan bundle — expected format "${BUNDLE_FORMAT}" version ${BUNDLE_VERSION}.`);
+        setParseError(`Not a supported plan bundle — expected format "${BUNDLE_FORMAT}" version ${BUNDLE_VERSIONS.join(' or ')}.`);
         return;
       }
       setBundle(parsed);
