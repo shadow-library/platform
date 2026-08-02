@@ -33,6 +33,16 @@ declare module '@shadow-library/common' {
     'ai.xai.api.key': string | undefined;
     'ai.xai.api.url': string | undefined;
 
+    /**
+     * Image generation posts to the vendors' REST endpoints directly and cannot be pointed at the
+     * gateway — no CLI backend generates images. It therefore needs its own credentials: whenever a
+     * `*.api.url` above aims a provider at the gateway, the matching `*.api.key` holds the gateway's
+     * bearer token, and reusing it here would send a host credential to api.openai.com. Left unset,
+     * image generation fails closed rather than leaking that token to a third party.
+     */
+    'ai.openai.image.api.key': string | undefined;
+    'ai.xai.image.api.key': string | undefined;
+
     /** AI model configs */
     'ai.grok.llm.model': string;
     'ai.grok.image.model': string;
@@ -84,6 +94,8 @@ Config.load('ai.openai.api.key');
 Config.load('ai.openai.api.url');
 Config.load('ai.xai.api.key');
 Config.load('ai.xai.api.url');
+Config.load('ai.openai.image.api.key');
+Config.load('ai.xai.image.api.key');
 Config.load('ai.grok.llm.model', { defaultValue: 'grok-3' });
 Config.load('ai.grok.image.model', { defaultValue: 'grok-2-image' });
 Config.load('ai.ollama.host', { defaultValue: 'http://localhost:11434' });
