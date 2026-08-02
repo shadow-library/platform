@@ -34,7 +34,8 @@
   "scripts": {
     "prepare": "husky",
     "verify": "bun scripts/verify.ts --all",
-    "build": "bun scripts/build.ts --all"
+    "build": "bun scripts/build.ts --all",
+    "db": "bun scripts/db.ts"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.0",

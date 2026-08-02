@@ -44,8 +44,14 @@ blob-report/
 playwright/.cache/
 playwright/.auth/
 
-# Serena cache (project.yml itself is committed)
-.serena/cache/
+# Serena (do not commit)
+.serena/
+
+# graphify (do not commit — generated knowledge graphs, root and per-workspace)
+graphify-out/
+
+# Claude local overrides (do not commit)
+CLAUDE.local.md
 
 # Workspace-scoped ignores (hoisted from the deleted per-workspace .gitignore files)
 apps/identity-server/public/
