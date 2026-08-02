@@ -31,7 +31,7 @@ const LIBRARY_RESPONSE = {
     {
       slug: 'starfall-requiem',
       title: 'Starfall Requiem',
-      coverPath: '/covers/starfall.webp',
+      coverUrl: 'http://localhost:9000/wiki-assets/starfall.webp',
       genres: ['Sci-Fi'],
       status: 'retired' as const,
       visibility: 'PUBLIC' as const,
@@ -42,8 +42,8 @@ const LIBRARY_RESPONSE = {
 
 const PROGRESS_RESPONSE = {
   items: [
-    { novelSlug: 'omniscient-sovereigns', ordinal: 42, position: 63, updatedAt: '2026-07-10T21:14:03.000Z' },
-    { novelSlug: 'starfall-requiem', ordinal: 3, position: 0, updatedAt: '2026-07-02T09:00:00.000Z' },
+    { novelSlug: 'omniscient-sovereigns', ordinal: 42, position: 63, furthestOrdinal: 47, updatedAt: '2026-07-10T21:14:03.000Z' },
+    { novelSlug: 'starfall-requiem', ordinal: 3, position: 0, furthestOrdinal: 3, updatedAt: '2026-07-02T09:00:00.000Z' },
   ],
 };
 
@@ -64,6 +64,14 @@ describe('toLibraryEntry', () => {
 
   it('should map the server retired status to the internal completed status', () => {
     expect(toLibraryEntry(LIBRARY_RESPONSE.items[1]!).novel.status).toBe('completed');
+  });
+
+  it('should carry the resolved coverUrl onto the cover as imageUrl', () => {
+    expect(toLibraryEntry(LIBRARY_RESPONSE.items[1]!).novel.cover.imageUrl).toBe('http://localhost:9000/wiki-assets/starfall.webp');
+  });
+
+  it('should leave imageUrl unset when the server has no cover for the novel', () => {
+    expect(toLibraryEntry(LIBRARY_RESPONSE.items[0]!).novel.cover.imageUrl).toBeUndefined();
   });
 
   it('should keep the richer local catalog snapshot while taking the server addedAt', () => {

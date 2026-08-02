@@ -8,6 +8,7 @@ export * from './shared.api';
 export * from './taxonomy';
 export * from './transport';
 export * from './types';
+export * from './wiki.api';
 
 /**
  * `types.ts` holds the internal client view-model — the presentation shapes the mappers in each `*.api.ts`

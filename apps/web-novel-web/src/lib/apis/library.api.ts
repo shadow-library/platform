@@ -67,7 +67,7 @@ export function toLibraryEntry(item: LibraryItem, local?: LibraryEntry): Library
     synopsis: '',
     updatedAt: item.addedAt,
     views: 0,
-    cover: coverFor(item.slug),
+    cover: coverFor(item.slug, item.coverUrl),
   };
   return { novelSlug: item.slug, addedAt: item.addedAt, novel };
 }

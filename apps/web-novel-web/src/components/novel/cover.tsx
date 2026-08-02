@@ -25,13 +25,20 @@ export interface CoverProps {
 /**
  * Declaring the constants
  *
- * Cover artwork is a deterministic gradient + title glyph until the server hosts real art — the same
- * device-independent trick the design prototype uses, so covers render offline and with zero requests.
+ * Cover artwork: the real image when `cover.imageUrl` was resolved server-side, else the deterministic
+ * gradient + title glyph placeholder — the same device-independent trick the design prototype uses, so a
+ * cover-less novel still renders offline and with zero requests.
  */
 export function Cover({ cover, title, showTitle = true, className, children }: CoverProps): React.JSX.Element {
   return (
-    <div className={cn(styles.cover, className)} style={{ background: `linear-gradient(158deg, ${cover.from} 0%, ${cover.to} 100%)` }} aria-hidden="true">
-      <span className={styles.coverGlyph}>{title.charAt(0)}</span>
+    <div className={cn(styles.cover, className)} style={cover.imageUrl ? undefined : { background: `linear-gradient(158deg, ${cover.from} 0%, ${cover.to} 100%)` }}>
+      {cover.imageUrl ? (
+        <img src={cover.imageUrl} alt={title} className={styles.coverImg} />
+      ) : (
+        <span className={styles.coverGlyph} aria-hidden="true">
+          {title.charAt(0)}
+        </span>
+      )}
       {showTitle && <span className={styles.coverTitle}>{title}</span>}
       {children}
     </div>

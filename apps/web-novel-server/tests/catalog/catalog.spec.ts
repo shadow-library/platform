@@ -29,6 +29,7 @@ const seedCatalog = async () => {
         slug: 'aurora-blade',
         title: 'Aurora Blade',
         blurb: 'Steel under polar light',
+        coverPath: 'aurora-blade-cover.jpg',
         genres: ['fantasy', 'action'],
         status: 'live',
         revision: 1,
@@ -63,7 +64,14 @@ describe('Public catalog API', () => {
       const body = response.json() as { total: number; limit: number; offset: number; items: { slug: string; chapterCount: number }[] };
       expect(body.total).toBe(3);
       expect(body.items.map(item => item.slug)).toEqual(['aurora-blade', 'silent-harbor', 'old-embers']);
-      expect(body.items[0]).toMatchObject({ slug: 'aurora-blade', title: 'Aurora Blade', genres: ['fantasy', 'action'], status: 'live', chapterCount: 2 });
+      expect(body.items[0]).toMatchObject({
+        slug: 'aurora-blade',
+        title: 'Aurora Blade',
+        genres: ['fantasy', 'action'],
+        status: 'live',
+        chapterCount: 2,
+        coverUrl: 'http://localhost:9000/wiki-assets/aurora-blade-cover.jpg',
+      });
     });
 
     it('should search titles case-insensitively', async () => {
@@ -107,7 +115,14 @@ describe('Public catalog API', () => {
     it('should return the novel detail', async () => {
       const response = await env.getRouter().mockRequest().get('/api/novels/aurora-blade');
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toMatchObject({ slug: 'aurora-blade', title: 'Aurora Blade', blurb: 'Steel under polar light', chapterCount: 2, status: 'live' });
+      expect(response.json()).toMatchObject({
+        slug: 'aurora-blade',
+        title: 'Aurora Blade',
+        blurb: 'Steel under polar light',
+        chapterCount: 2,
+        status: 'live',
+        coverUrl: 'http://localhost:9000/wiki-assets/aurora-blade-cover.jpg',
+      });
     });
 
     it('should answer 404 for an unknown novel', async () => {

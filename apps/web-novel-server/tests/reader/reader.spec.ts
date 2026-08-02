@@ -30,7 +30,7 @@ const seedNovel = async (slug = 'moonfall') => {
   const db = env.getPostgresClient();
   const [novel] = await db
     .insert(schema.novels)
-    .values({ slug, title: 'Moonfall', coverPath: '/covers/moonfall.jpg', genres: ['fantasy'], revision: 1 })
+    .values({ slug, title: 'Moonfall', coverPath: 'moonfall-cover.jpg', genres: ['fantasy'], revision: 1 })
     .returning();
   return novel as { id: bigint };
 };
@@ -77,6 +77,26 @@ describe('Reader progress and library', () => {
       expect((list.json() as { items: unknown[] }).items).toEqual([expect.objectContaining({ novelSlug: 'moonfall', ordinal: 4, position: 0 })]);
     });
 
+    it('should initialize furthestOrdinal to the ordinal on the first save', async () => {
+      await seedNovel('furthest-init');
+      const saved = await request('put', '/api/novels/furthest-init/progress').body({ ordinal: 5, position: 0.1 });
+      expect(saved.statusCode).toBe(200);
+      expect(saved.json()).toMatchObject({ ordinal: 5, furthestOrdinal: 5 });
+    });
+
+    it('should keep furthestOrdinal at the furthest chapter reached when rereading an earlier one', async () => {
+      await seedNovel('furthest-reread');
+      const advanced = await request('put', '/api/novels/furthest-reread/progress').body({ ordinal: 40, position: 0 });
+      expect(advanced.json()).toMatchObject({ ordinal: 40, furthestOrdinal: 40 });
+
+      const reread = await request('put', '/api/novels/furthest-reread/progress').body({ ordinal: 3, position: 0 });
+      expect(reread.statusCode).toBe(200);
+      expect(reread.json()).toMatchObject({ ordinal: 3, furthestOrdinal: 40 });
+
+      const fetched = await request('get', '/api/novels/furthest-reread/progress');
+      expect(fetched.json()).toMatchObject({ ordinal: 3, furthestOrdinal: 40 });
+    });
+
     it('should answer 404 when no progress is recorded yet', async () => {
       await seedNovel();
       const response = await request('get', '/api/novels/moonfall/progress');
@@ -110,7 +130,13 @@ describe('Reader progress and library', () => {
       expect(list.statusCode).toBe(200);
       const items = (list.json() as { items: { slug: string; addedAt: string }[] }).items;
       expect(items).toHaveLength(1);
-      expect(items[0]).toMatchObject({ slug: 'moonfall', title: 'Moonfall', coverPath: '/covers/moonfall.jpg', genres: ['fantasy'], status: 'live' });
+      expect(items[0]).toMatchObject({
+        slug: 'moonfall',
+        title: 'Moonfall',
+        coverUrl: 'http://localhost:9000/wiki-assets/moonfall-cover.jpg',
+        genres: ['fantasy'],
+        status: 'live',
+      });
 
       const removed = await request('delete', '/api/library/moonfall');
       expect(removed.statusCode).toBe(204);

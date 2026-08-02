@@ -7,3 +7,6 @@ export * from './publish.dto';
 export * from './publish.module';
 export * from './publish.service';
 export * from './publish.types';
+export * from './wiki-ingest.controller';
+export * from './wiki-ingest.dto';
+export * from './wiki-ingest.service';

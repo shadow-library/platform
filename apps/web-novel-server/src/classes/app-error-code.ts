@@ -63,4 +63,15 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly WBN_007 = AppErrorCode.badRequest('WBN_007', 'Organisation visibility requires an organisation');
   /** A `PUBLIC` or `RESTRICTED` access push carried an organisation, which would be silently ignored */
   static readonly WBN_008 = AppErrorCode.badRequest('WBN_008', 'Only organisation visibility may name an organisation');
+
+  /*!
+   * Wiki Error Codes
+   */
+
+  /**
+   * The wiki entry does not exist, or lies beyond the reader's furthest ordinal. The two are answered
+   * identically and on purpose: an entry that appears only after a later chapter must not be confirmable
+   * to exist by a reader who has not reached it, or its very presence spoils the reveal.
+   */
+  static readonly WBN_009 = AppErrorCode.notFound('WBN_009', 'Wiki entry not found');
 }

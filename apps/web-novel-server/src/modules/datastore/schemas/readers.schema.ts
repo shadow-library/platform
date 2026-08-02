@@ -38,6 +38,8 @@ export const readingProgress = pgTable(
     ordinal: integer('ordinal').notNull(),
     /** Scroll offset within the chapter, as reported by the reader client */
     position: doublePrecision('position').notNull().default(0),
+    /** Furthest chapter ever reached — monotonic, never decreases even when `ordinal` moves back on a reread. Gates spoilers. */
+    furthestOrdinal: integer('furthest_ordinal').notNull().default(0),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   table => [primaryKey({ name: 'reading_progress_user_id_novel_id_pk', columns: [table.userId, table.novelId] })],

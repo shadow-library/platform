@@ -17,6 +17,7 @@ import { CatalogModule } from '@server/modules/catalog';
 import { HealthModule } from '@server/modules/health';
 import { PublishModule } from '@server/modules/publish';
 import { ReaderModule } from '@server/modules/reader';
+import { WikiModule } from '@server/modules/wiki';
 
 /**
  * Defining types
@@ -38,7 +39,7 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({
 });
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, WebNovelAuthModule, HealthModule, PublishModule, CatalogModule, ReaderModule],
+  imports: [AppHttpCoreModule, WebNovelAuthModule, HealthModule, PublishModule, CatalogModule, ReaderModule, WikiModule],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),

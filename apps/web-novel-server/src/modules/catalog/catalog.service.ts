@@ -8,7 +8,7 @@
 import { and, asc, count, desc, eq, ilike, sql, type SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { type AuthPrincipal } from '@shadow-library/auth';
-import { Logger, LRUCache } from '@shadow-library/common';
+import { AppError, Config, Logger, LRUCache } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 /**
@@ -49,12 +49,23 @@ export class CatalogService {
   private readonly logger = Logger.getLogger(APP_NAME, CatalogService.name);
   private readonly chapterCache = new LRUCache(CHAPTER_CACHE_CAPACITY);
   private readonly db: PrimaryDatabase;
+  /**
+   * Trailing slashes stripped once, so a stored ref can be joined with a single separator. Shared with
+   * `WikiService` and `ReaderService` — every module already depends on this one. The key's type is
+   * optional (owned by `@shadow-library/modules`'s storage `ConfigRecords` augmentation), but this app
+   * always loads a default for it in `bootstrap.ts`, so a missing value here means the app failed to boot
+   * correctly rather than a legitimate absence.
+   */
+  private readonly publicOrigin: string;
 
   constructor(
     databaseService: DatabaseService,
     private readonly accessService: NovelAccessService,
   ) {
     this.db = databaseService.getPostgresClient();
+    const origin = Config.get('storage.public-origin');
+    if (!origin) throw AppError.internal("config key 'storage.public-origin' is not set");
+    this.publicOrigin = origin.replace(/\/+$/, '');
   }
 
   async listNovels(query: NovelCatalogQuery): Promise<NovelCatalogResponse> {
@@ -180,12 +191,18 @@ export class CatalogService {
     return query.sortOrder === 'asc' ? asc(column) : desc(column);
   }
 
+  /** Resolves a stored content-addressed ref to the absolute URL clients fetch it from; `undefined` covers both a missing ref and no cover at all. */
+  imageUrl(ref: string | null | undefined): string | undefined {
+    if (!ref) return undefined;
+    return `${this.publicOrigin}/${ref}`;
+  }
+
   private toSummary(novel: Novel, chapterCount: number): NovelSummary {
     return {
       slug: novel.slug,
       title: novel.title,
       blurb: novel.blurb ?? undefined,
-      coverPath: novel.coverPath ?? undefined,
+      coverUrl: this.imageUrl(novel.coverPath),
       genres: novel.genres,
       status: novel.status,
       visibility: novel.visibility,

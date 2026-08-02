@@ -48,8 +48,9 @@ export class NovelSummary {
   @Field(() => String, { optional: true })
   blurb?: string;
 
+  /** Absolute public URL, resolved server-side from the storage origin; absent when the novel has no cover. */
   @Field(() => String, { optional: true })
-  coverPath?: string;
+  coverUrl?: string;
 
   @Field(() => [String])
   genres: string[];

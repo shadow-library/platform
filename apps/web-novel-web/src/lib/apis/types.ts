@@ -20,10 +20,11 @@ export type NovelStatus = 'ongoing' | 'completed' | 'hiatus';
 
 export type CatalogSort = 'trending' | 'popular' | 'rating' | 'updated' | 'chapters' | 'title';
 
-/** Cover artwork is a deterministic gradient until real cover assets exist server-side. */
+/** Cover artwork: the real image when the server resolved one from `coverUrl`, else a deterministic gradient. */
 export interface NovelCover {
   from: string;
   to: string;
+  imageUrl?: string;
 }
 
 export interface NovelSummary {
@@ -167,6 +168,45 @@ export interface SessionUser {
   userId: string;
   email?: string;
   name?: string;
+}
+
+/**
+ * The reader-facing lore wiki. Spoiler gating (which entries/facets are visible) is decided entirely
+ * server-side from the reader's progress — the client only renders what it is given plus the two
+ * "more unlock as you read" counters (`lockedCount`, `hiddenFacetCount`).
+ */
+export type WikiEntryType = 'character' | 'faction' | 'location' | 'item' | 'concept' | 'power_rule';
+
+export interface WikiEntrySummary {
+  entryKey: string;
+  type: WikiEntryType;
+  name: string;
+  imageUrl?: string;
+}
+
+export interface WikiIndex {
+  items: WikiEntrySummary[];
+  /** Entries that exist but are still spoiler-locked for this reader. */
+  lockedCount: number;
+}
+
+export interface WikiFacet {
+  facetKey: string;
+  content: string;
+  sortOrder: number;
+}
+
+export interface WikiImage {
+  imageUrl: string;
+  caption?: string;
+  sortOrder: number;
+}
+
+export interface WikiEntryDetail extends WikiEntrySummary {
+  facets: WikiFacet[];
+  images: WikiImage[];
+  /** Facets that exist on this entry but are still spoiler-locked for this reader. */
+  hiddenFacetCount: number;
 }
 
 /**

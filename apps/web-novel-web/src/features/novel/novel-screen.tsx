@@ -26,6 +26,7 @@ import {
 } from '@/components/icons';
 import { Cover, NovelCard } from '@/components/novel';
 import { DownloadDialog } from '@/features/downloads/download-dialog';
+import { WikiPreview } from '@/features/wiki';
 import { chapterListQueryOptions, getProgress, isInLibrary, libraryQueryOptions, novelQueryOptions, sessionQueryOptions, useToggleLibraryMutation } from '@/lib/apis';
 import {
   type ChapterMeta,
@@ -244,6 +245,7 @@ export function NovelScreen(): React.JSX.Element {
             <div className={styles.tabsInner}>
               <Tabs.List aria-label="Novel sections">
                 <Tabs.Tab value="overview">Overview</Tabs.Tab>
+                <Tabs.Tab value="wiki">Wiki</Tabs.Tab>
                 <Tabs.Tab value="chapters">Chapters</Tabs.Tab>
                 <Tabs.Tab value="reviews">Reviews</Tabs.Tab>
                 <Tabs.Tab value="comments">Comments</Tabs.Tab>
@@ -253,6 +255,9 @@ export function NovelScreen(): React.JSX.Element {
           <div className={styles.content}>
             <Tabs.Panel value="overview">
               <OverviewPanel novel={data} />
+            </Tabs.Panel>
+            <Tabs.Panel value="wiki">
+              <WikiPreview slug={slug} />
             </Tabs.Panel>
             <Tabs.Panel value="chapters">
               <ChaptersPanel novel={data} currentOrdinal={progress?.ordinal} />

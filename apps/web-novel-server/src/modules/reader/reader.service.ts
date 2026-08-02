@@ -5,10 +5,10 @@
 /**
  * Importing npm packages
  */
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { type AuthPrincipal } from '@shadow-library/auth';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 /**
@@ -56,6 +56,7 @@ export class ReaderService {
         novelSlug: schema.novels.slug,
         ordinal: schema.readingProgress.ordinal,
         position: schema.readingProgress.position,
+        furthestOrdinal: schema.readingProgress.furthestOrdinal,
         updatedAt: schema.readingProgress.updatedAt,
       })
       .from(schema.readingProgress)
@@ -69,7 +70,7 @@ export class ReaderService {
     );
     return rows
       .filter(row => readable.has(row.novel.id))
-      .map(row => ({ novelSlug: row.novelSlug, ordinal: row.ordinal, position: row.position, updatedAt: row.updatedAt.toISOString() }));
+      .map(row => ({ novelSlug: row.novelSlug, ordinal: row.ordinal, position: row.position, furthestOrdinal: row.furthestOrdinal, updatedAt: row.updatedAt.toISOString() }));
   }
 
   async getProgress(principal: AuthPrincipal, slug: string): Promise<ProgressResponse> {
@@ -80,19 +81,28 @@ export class ReaderService {
       .from(schema.readingProgress)
       .where(and(eq(schema.readingProgress.userId, userId), eq(schema.readingProgress.novelId, novel.id)));
     if (!progress) throw AppErrorCode.WBN_006.create();
-    return { ordinal: progress.ordinal, position: progress.position, updatedAt: progress.updatedAt.toISOString() };
+    return { ordinal: progress.ordinal, position: progress.position, furthestOrdinal: progress.furthestOrdinal, updatedAt: progress.updatedAt.toISOString() };
   }
 
+  /**
+   * `furthestOrdinal` is monotonic: a fresh row initializes it to the saved ordinal, and an upsert takes
+   * `GREATEST` of the stored value and the new ordinal so rereading an earlier chapter never lowers it.
+   */
   async saveProgress(principal: AuthPrincipal, slug: string, body: ProgressBody): Promise<ProgressResponse> {
     const novel = await this.catalogService.getReadableNovel(slug, principal);
     const userId = principal.sub;
     const updatedAt = new Date();
-    await this.db
+    const [progress] = await this.db
       .insert(schema.readingProgress)
-      .values({ userId, novelId: novel.id, ordinal: body.ordinal, position: body.position, updatedAt })
-      .onConflictDoUpdate({ target: [schema.readingProgress.userId, schema.readingProgress.novelId], set: { ordinal: body.ordinal, position: body.position, updatedAt } });
-    this.logger.debug('reading progress saved', { userId, slug, ordinal: body.ordinal });
-    return { ordinal: body.ordinal, position: body.position, updatedAt: updatedAt.toISOString() };
+      .values({ userId, novelId: novel.id, ordinal: body.ordinal, position: body.position, furthestOrdinal: body.ordinal, updatedAt })
+      .onConflictDoUpdate({
+        target: [schema.readingProgress.userId, schema.readingProgress.novelId],
+        set: { ordinal: body.ordinal, position: body.position, furthestOrdinal: sql`greatest(${schema.readingProgress.furthestOrdinal}, ${body.ordinal})`, updatedAt },
+      })
+      .returning();
+    if (!progress) throw AppError.internal(`upsert of reading progress returned no row for user ${userId}, novel ${novel.id}`);
+    this.logger.debug('reading progress saved', { userId, slug, ordinal: body.ordinal, furthestOrdinal: progress.furthestOrdinal });
+    return { ordinal: progress.ordinal, position: progress.position, furthestOrdinal: progress.furthestOrdinal, updatedAt: updatedAt.toISOString() };
   }
 
   /*!
@@ -141,7 +151,7 @@ export class ReaderService {
     return {
       slug: novel.slug,
       title: novel.title,
-      coverPath: novel.coverPath ?? undefined,
+      coverUrl: this.catalogService.imageUrl(novel.coverPath),
       genres: novel.genres,
       status: novel.status,
       visibility: novel.visibility,

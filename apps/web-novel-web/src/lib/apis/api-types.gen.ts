@@ -239,6 +239,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/internal/novels/{slug}/wiki/{entryKey}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Upsert Entry */
+    put: operations['put_internal_novels_slug_wiki_entryKey'];
+    post?: never;
+    /** Delete Entry */
+    delete: operations['delete_internal_novels_slug_wiki_entryKey'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/internal/novels/{slug}/wiki/manifest': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Manifest */
+    get: operations['get_internal_novels_slug_wiki_manifest'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/novels': {
     parameters: {
       query?: never;
@@ -394,6 +429,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/novels/{slug}/wiki': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Entries */
+    get: operations['get_api_novels_slug_wiki'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/novels/{slug}/wiki/{entryKey}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Entry */
+    get: operations['get_api_novels_slug_wiki_entryKey'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -505,6 +574,42 @@ export interface components {
       contentHash: string;
       revision: number;
     };
+    WikiEntryUpsertBody: {
+      /** @enum {string} */
+      type: 'character' | 'faction' | 'location' | 'item' | 'concept' | 'power_rule';
+      name: string;
+      imageRef?: string;
+      firstVisibleOrdinal: number;
+      contentHash: string;
+      revision: number;
+      facets: components['schemas']['WikiFacetInput'][];
+      images: components['schemas']['WikiImageInput'][];
+    };
+    WikiFacetInput: {
+      facetKey: string;
+      content: string;
+      sortOrder: number;
+      visibleFromOrdinal: number;
+    };
+    WikiImageInput: {
+      imageRef: string;
+      caption?: string;
+      sortOrder: number;
+      visibleFromOrdinal: number;
+    };
+    WikiPublishResultResponse: {
+      slug: string;
+      entryKey: string;
+      /** @enum {string} */
+      outcome: 'applied';
+      revision: number;
+    };
+    WikiManifestItem: components['schemas']['WikiManifestItem1'][];
+    WikiManifestItem1: {
+      entryKey: string;
+      revision: number;
+      contentHash: string;
+    };
     /** @enum {string} */
     SortOrder: 'asc' | 'desc';
     /** @enum {string} */
@@ -519,7 +624,7 @@ export interface components {
       slug: string;
       title: string;
       blurb?: string;
-      coverPath?: string;
+      coverUrl?: string;
       genres: string[];
       /** @enum {string} */
       status: 'live' | 'retired';
@@ -532,7 +637,7 @@ export interface components {
       slug: string;
       title: string;
       blurb?: string;
-      coverPath?: string;
+      coverUrl?: string;
       genres: string[];
       /** @enum {string} */
       status: 'live' | 'retired';
@@ -567,12 +672,14 @@ export interface components {
     ProgressListItem: {
       ordinal: number;
       position: number;
+      furthestOrdinal: number;
       updatedAt: string;
       novelSlug: string;
     };
     ProgressResponse: {
       ordinal: number;
       position: number;
+      furthestOrdinal: number;
       updatedAt: string;
     };
     ProgressBody: {
@@ -585,7 +692,7 @@ export interface components {
     LibraryItem: {
       slug: string;
       title: string;
-      coverPath?: string;
+      coverUrl?: string;
       genres: string[];
       /** @enum {string} */
       status: 'live' | 'retired';
@@ -595,6 +702,37 @@ export interface components {
     };
     LibraryAddBody: {
       slug: string;
+    };
+    WikiListResponse: {
+      items: components['schemas']['WikiListItem'][];
+      lockedCount: number;
+    };
+    WikiListItem: {
+      entryKey: string;
+      /** @enum {string} */
+      type: 'character' | 'faction' | 'location' | 'item' | 'concept' | 'power_rule';
+      name: string;
+      imageUrl?: string;
+    };
+    WikiEntryDetailResponse: {
+      entryKey: string;
+      /** @enum {string} */
+      type: 'character' | 'faction' | 'location' | 'item' | 'concept' | 'power_rule';
+      name: string;
+      imageUrl?: string;
+      facets: components['schemas']['WikiFacetItem'][];
+      images: components['schemas']['WikiImageItem'][];
+      hiddenFacetCount: number;
+    };
+    WikiFacetItem: {
+      facetKey: string;
+      content: string;
+      sortOrder: number;
+    };
+    WikiImageItem: {
+      imageUrl: string;
+      caption?: string;
+      sortOrder: number;
     };
   };
   responses: never;
@@ -1218,6 +1356,123 @@ export interface operations {
       };
     };
   };
+  put_internal_novels_slug_wiki_entryKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+        entryKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WikiEntryUpsertBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WikiPublishResultResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_internal_novels_slug_wiki_entryKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+        entryKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_internal_novels_slug_wiki_manifest: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WikiManifestItem'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_novels: {
     parameters: {
       query?: {
@@ -1647,6 +1902,87 @@ export interface operations {
       };
     };
   };
+  get_api_novels_slug_wiki: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WikiListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_novels_slug_wiki_entryKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+        entryKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WikiEntryDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
 }
 export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
 export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
@@ -1667,6 +2003,12 @@ export type NovelAccessResponse = components['schemas']['NovelAccessResponse'];
 export type ChapterUpsertBody = components['schemas']['ChapterUpsertBody'];
 export type ManifestItem = components['schemas']['ManifestItem'];
 export type ManifestItem1 = components['schemas']['ManifestItem1'];
+export type WikiEntryUpsertBody = components['schemas']['WikiEntryUpsertBody'];
+export type WikiFacetInput = components['schemas']['WikiFacetInput'];
+export type WikiImageInput = components['schemas']['WikiImageInput'];
+export type WikiPublishResultResponse = components['schemas']['WikiPublishResultResponse'];
+export type WikiManifestItem = components['schemas']['WikiManifestItem'];
+export type WikiManifestItem1 = components['schemas']['WikiManifestItem1'];
 export type SortOrder = components['schemas']['SortOrder'];
 export type NovelSortBy = components['schemas']['NovelSortBy'];
 export type NovelCatalogResponse = components['schemas']['NovelCatalogResponse'];
@@ -1682,13 +2024,21 @@ export type ProgressBody = components['schemas']['ProgressBody'];
 export type LibraryListResponse = components['schemas']['LibraryListResponse'];
 export type LibraryItem = components['schemas']['LibraryItem'];
 export type LibraryAddBody = components['schemas']['LibraryAddBody'];
+export type WikiListResponse = components['schemas']['WikiListResponse'];
+export type WikiListItem = components['schemas']['WikiListItem'];
+export type WikiEntryDetailResponse = components['schemas']['WikiEntryDetailResponse'];
+export type WikiFacetItem = components['schemas']['WikiFacetItem'];
+export type WikiImageItem = components['schemas']['WikiImageItem'];
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
 export type GetAccessPathParams = Exclude<paths['/internal/novels/{slug}/access']['get']['parameters']['path'], undefined>;
-export type GetManifestPathParams = Exclude<paths['/internal/novels/{slug}/manifest']['get']['parameters']['path'], undefined>;
+export type InternalNovelsSlugManifestPathParams = Exclude<paths['/internal/novels/{slug}/manifest']['get']['parameters']['path'], undefined>;
+export type InternalNovelsSlugWikiManifestPathParams = Exclude<paths['/internal/novels/{slug}/wiki/manifest']['get']['parameters']['path'], undefined>;
 export type ListNovelsQueryParams = Exclude<paths['/api/novels']['get']['parameters']['query'], undefined>;
 export type GetNovelPathParams = Exclude<paths['/api/novels/{slug}']['get']['parameters']['path'], undefined>;
 export type ListChaptersPathParams = Exclude<paths['/api/novels/{slug}/chapters']['get']['parameters']['path'], undefined>;
 export type GetChapterPathParams = Exclude<paths['/api/novels/{slug}/chapters/{ordinal}']['get']['parameters']['path'], undefined>;
 export type GetProgressPathParams = Exclude<paths['/api/novels/{slug}/progress']['get']['parameters']['path'], undefined>;
+export type ListEntriesPathParams = Exclude<paths['/api/novels/{slug}/wiki']['get']['parameters']['path'], undefined>;
+export type GetEntryPathParams = Exclude<paths['/api/novels/{slug}/wiki/{entryKey}']['get']['parameters']['path'], undefined>;

@@ -38,6 +38,10 @@ export class ProgressResponse {
   @Field()
   position: number;
 
+  /** Furthest chapter ever reached — monotonic, unaffected by rereading an earlier chapter. */
+  @Field(() => Integer)
+  furthestOrdinal: number;
+
   @Field()
   updatedAt: string;
 }
@@ -68,8 +72,9 @@ export class LibraryItem {
   @Field()
   title: string;
 
+  /** Absolute public URL, resolved server-side from the storage origin; absent when the novel has no cover. */
   @Field(() => String, { optional: true })
-  coverPath?: string;
+  coverUrl?: string;
 
   @Field(() => [String])
   genres: string[];

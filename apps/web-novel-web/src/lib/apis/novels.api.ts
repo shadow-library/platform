@@ -54,7 +54,7 @@ export const novelKeys = {
   chapter: (slug: string, ordinal: number) => ['novels', 'chapter', slug, ordinal] as const,
 };
 
-/** Cover artwork stays a deterministic slug-keyed gradient until the server serves real cover assets */
+/** Fallback gradient palette for a novel with no `coverUrl` yet — deterministic, keyed on the slug. */
 const COVER_PALETTE: NovelCover[] = [
   { from: '#6366f1', to: '#312e81' },
   { from: '#0ea5e9', to: '#0c4a6e' },
@@ -78,10 +78,11 @@ const SORT_TO_SERVER: Record<CatalogSort, { sortBy: 'updatedAt' | 'createdAt' | 
   title: { sortBy: 'title', sortOrder: 'asc' },
 };
 
-export function coverFor(slug: string): NovelCover {
+export function coverFor(slug: string, coverUrl?: string): NovelCover {
   let hash = 0;
   for (const char of slug) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return COVER_PALETTE[hash % COVER_PALETTE.length] as NovelCover;
+  const gradient = COVER_PALETTE[hash % COVER_PALETTE.length] as NovelCover;
+  return coverUrl ? { ...gradient, imageUrl: coverUrl } : gradient;
 }
 
 function toSummary(item: ServerNovelSummary): NovelSummary {
@@ -97,7 +98,7 @@ function toSummary(item: ServerNovelSummary): NovelSummary {
     synopsis: item.blurb ?? '',
     updatedAt: item.updatedAt,
     views: 0,
-    cover: coverFor(item.slug),
+    cover: coverFor(item.slug, item.coverUrl),
   };
 }
 

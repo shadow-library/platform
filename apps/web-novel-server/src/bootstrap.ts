@@ -55,3 +55,13 @@ Config.load('catalog.cache-max-age', { defaultValue: '300', validateType: 'numbe
  * read from Postgres on every request and revoke immediately.
  */
 Config.load('access.membership-ttl', { defaultValue: '60', validateType: 'number' });
+
+/**
+ * Where this service's content-addressed images (novel covers, wiki entries) are publicly served from.
+ * Rows store only a storage ref (e.g. `<sha256>.webp`); the read surface resolves each to an absolute URL
+ * under this origin, so the store's location can move without rewriting a single row. A trailing slash is
+ * tolerated — the resolver strips it. The key itself is typed by `@shadow-library/modules`'s storage
+ * `ConfigRecords` augmentation (declared optional there); this app loads its own default rather than
+ * depending on that package's `StorageModule`, so it must not redeclare the key here too.
+ */
+Config.load('storage.public-origin', { defaultValue: 'http://localhost:9000/wiki-assets' });

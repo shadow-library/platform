@@ -14,7 +14,7 @@
  * Defining types
  */
 
-export type PublishAction = 'novel.upsert' | 'novel.access' | 'chapter.upsert' | 'chapter.unpublish';
+export type PublishAction = 'novel.upsert' | 'novel.access' | 'chapter.upsert' | 'chapter.unpublish' | 'wiki.upsert' | 'wiki.delete';
 
 export type PublishOutcome = 'applied' | 'noop' | 'stale_rejected' | 'unauthorized' | 'error';
 
