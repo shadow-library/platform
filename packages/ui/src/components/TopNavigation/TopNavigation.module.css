@@ -1,19 +1,19 @@
 /*
- * Top Navigation — surface-card bar with a border-default bottom edge (App Shell's header recipe).
- * Full-height links; the active one draws a 2px accent underline over the bottom border. No background
- * wash on links — the underline zone stays clean.
+ * Top Navigation — surface-card bar with a border-subtle bottom edge, matched to the Sidebar's right
+ * edge so the two pieces of chrome meet as one frame. Full-height links; the active one draws a 2px
+ * accent underline over the bottom border. No background wash on links — the underline zone stays clean.
  */
 
 .bar {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 16px;
   /* The bar extends under the status bar / notch in standalone PWAs: safe-area padding
-     grows the box while the 56px content row stays centered (insets are 0 on desktop). */
-  height: calc(56px + var(--sh-safe-top));
-  padding: var(--sh-safe-top) calc(24px + var(--sh-safe-right)) 0 calc(24px + var(--sh-safe-left));
+     grows the box while the 60px content row stays centered (insets are 0 on desktop). */
+  height: calc(60px + var(--sh-safe-top));
+  padding: var(--sh-safe-top) calc(clamp(14px, 3vw, 26px) + var(--sh-safe-right)) 0 calc(clamp(14px, 3vw, 26px) + var(--sh-safe-left));
   background: var(--sh-surface-card);
-  border-bottom: var(--sh-border-width) solid var(--sh-border-default);
+  border-bottom: var(--sh-border-width) solid var(--sh-border-subtle);
 }
 [data-density='compact'] .bar {
   height: calc(48px + var(--sh-safe-top));
