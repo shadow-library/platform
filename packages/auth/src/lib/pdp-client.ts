@@ -51,6 +51,8 @@ export class PdpClient {
   private readonly logger = Logger.getLogger(NAMESPACE, PdpClient.name);
   private readonly cache = new Map<string, CachedDecision>();
   private readonly versions = new Map<string, number>();
+  /** In-flight checks, keyed as the cache is — see {@link PdpClient.dedupe}. */
+  private readonly inflight = new Map<string, Promise<boolean>>();
 
   constructor(private readonly options: PdpClientOptions) {}
 
@@ -69,7 +71,7 @@ export class PdpClient {
     }
 
     try {
-      return await this.request(principalKey, key, organisationId, input, options);
+      return await this.dedupe(key, options, () => this.request(principalKey, key, organisationId, input, options));
     } catch (error) {
       this.logger.warn('pdp check failed; applying fallback decision', { action: input.action, failOpen: options.failOpen ?? false, reason: (error as Error).message });
       return options.failOpen ?? false;
@@ -78,6 +80,25 @@ export class PdpClient {
 
   checkAll(inputs: CheckInput[], options: CheckOptions = {}): Promise<boolean[]> {
     return Promise.all(inputs.map(input => this.check(input, options)));
+  }
+
+  /**
+   * Collapses concurrent identical checks onto a single request. The cache is only written once a
+   * response returns, so without this the exact case the cache exists for — a cold page load asking
+   * the same question N times at once — issues N identical POSTs and warms the entry N times.
+   *
+   * `highRisk` joins the key because it shortens the cached TTL: sharing across it would let a
+   * high-risk check ride on a long-TTL result, quietly widening the window it was asked to narrow.
+   * Rejections propagate to every waiter, so each caller still applies its own `failOpen`.
+   */
+  private dedupe(key: string, options: CheckOptions, run: () => Promise<boolean>): Promise<boolean> {
+    const flightKey = options.highRisk ? `${key}:high-risk` : key;
+    const existing = this.inflight.get(flightKey);
+    if (existing) return existing;
+
+    const flight = run().finally(() => this.inflight.delete(flightKey));
+    this.inflight.set(flightKey, flight);
+    return flight;
   }
 
   private async request(principalKey: string, key: string, organisationId: string, input: CheckInput, options: CheckOptions): Promise<boolean> {

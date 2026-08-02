@@ -94,6 +94,9 @@ export class AppSessionService {
   private readonly tokens = new AccessTokenCache();
   private readonly registry = new SessionRegistry();
 
+  /** In-flight mints, keyed exactly as {@link AccessTokenCache} keys its entries — see {@link AppSessionService.getAccessToken} */
+  private readonly mints = new Map<string, Promise<AppSessionToken>>();
+
   /**
    * Elevation grant windows in epoch milliseconds, keyed by session hash. The D-19 isolation boundary
    * is (app session, audience), but a service only ever mints for its own audience, so the audience is
@@ -228,16 +231,31 @@ export class AppSessionService {
     const cached = this.tokens.get(key);
     if (cached) return cached;
 
-    const minted = await this.mint(runtime, handle, handleHash, elevated);
-
     /**
-     * An elevated token is only cached for as long as the grant it came from is known to last. When
-     * that window is unknown — identity still held a grant this process never saw it claim — the
-     * expiry passed here is already in the past, so the token is used once and never stored. Guessing
-     * a window would be the one way an `AAL2` token could outlive its elevation.
+     * The entry is only written once identity answers, so N concurrent calls that all miss would each
+     * mint — which is precisely what a cold page load does when its session query and every API call
+     * start together. Sharing one mint is safe because the key already names everything the token
+     * depends on; elevation is in it, so an `AAL2` mint can never be handed to an `AAL1` caller.
      */
-    this.tokens.set(key, minted, elevated ? (this.grants.get(handleHash) ?? 0) : undefined);
-    return minted;
+    const flightKey = `${handleHash}|${elevated ? 'AAL2' : 'AAL1'}|${key.audience}|${key.scope ?? ''}`;
+    const inflight = this.mints.get(flightKey);
+    if (inflight) return inflight;
+
+    const flight = this.mint(runtime, handle, handleHash, elevated)
+      .then(minted => {
+        /**
+         * An elevated token is only cached for as long as the grant it came from is known to last. When
+         * that window is unknown — identity still held a grant this process never saw it claim — the
+         * expiry passed here is already in the past, so the token is used once and never stored. Guessing
+         * a window would be the one way an `AAL2` token could outlive its elevation.
+         */
+        this.tokens.set(key, minted, elevated ? (this.grants.get(handleHash) ?? 0) : undefined);
+        return minted;
+      })
+      .finally(() => this.mints.delete(flightKey));
+
+    this.mints.set(flightKey, flight);
+    return flight;
   }
 
   /**
