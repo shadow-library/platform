@@ -13,6 +13,8 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { DirectoryClient } from './directory.client';
+import { PublicationAccessService } from './publication-access.service';
 import { PublishRunner } from './publish-runner';
 import { PublishingService } from './publishing.service';
 import { ReaderPushClient } from './reader-push.client';
@@ -34,7 +36,15 @@ import { ReaderPushClient } from './reader-push.client';
 // in PipelineModule (the HTTP-wiring seam), keeping the module graph acyclic.
 @Module({
   imports: [DatabaseModule],
-  providers: [PublishingService, { token: AuthClient, useFactory: () => new AuthClient(resolveAuthClientConfig()) }, ReaderPushClient, PublishRunner],
-  exports: [PublishingService, PublishRunner],
+  providers: [
+    PublishingService,
+    { token: AuthClient, useFactory: () => new AuthClient(resolveAuthClientConfig()) },
+    ReaderPushClient,
+    /** Shares the module-owned AuthClient, so the directory lookup authenticates as the same client the reader push does. */
+    DirectoryClient,
+    PublicationAccessService,
+    PublishRunner,
+  ],
+  exports: [PublishingService, PublishRunner, PublicationAccessService],
 })
 export class PublishingModule {}

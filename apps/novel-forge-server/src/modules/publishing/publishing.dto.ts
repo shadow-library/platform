@@ -11,7 +11,7 @@ import { Transform } from '@shadow-library/fastify';
 /**
  * Importing user defined packages
  */
-import { ChapterPublicationStatus, PublicationStatus } from '@server/common';
+import { ChapterPublicationStatus, PublicationGrantState, PublicationStatus, PublicationVisibility } from '@server/common';
 
 /**
  * Defining types
@@ -153,6 +153,9 @@ export class ReconcileResponse {
   @Field(() => String, { enum: ['applied', 'noop'] })
   novel: 'applied' | 'noop';
 
+  @Field(() => String, { enum: ['applied', 'noop'] })
+  access: 'applied' | 'noop';
+
   @Field(() => [Integer])
   pushed: number[];
 
@@ -168,6 +171,57 @@ export class ReconcileResponse {
   // Reader ordinals the ledger cannot account for — reported for the author, never deleted (design §6).
   @Field(() => [Integer])
   unknownOrdinals: number[];
+}
+
+/** A share list is a handful of people; an author who needs more than this wants organisation visibility. */
+export const MAX_GRANT_EMAILS = 200;
+
+@Schema()
+export class AccessGrantInput {
+  @Field({ maxLength: 255, pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$' })
+  email: string;
+}
+
+/**
+ * A full replacement of the access record. `organisationId` is deliberately absent: it comes from
+ * the session's active organisation, never from the client, so a caller cannot share a novel into
+ * an organisation they are not acting in.
+ */
+@Schema()
+export class PublicationAccessBody {
+  @Field(() => PublicationVisibility)
+  visibility: string;
+
+  @Field(() => [AccessGrantInput], { optional: true, maxItems: MAX_GRANT_EMAILS })
+  grants?: AccessGrantInput[];
+}
+
+@Schema()
+export class AccessGrantItem {
+  @Field()
+  email: string;
+
+  /** Absent while the address names no verified account; such a grant conveys no access and is never pushed. */
+  @Field(() => String, { optional: true, nullable: true })
+  subjectId?: string | null;
+
+  @Field(() => PublicationGrantState)
+  state: string;
+}
+
+@Schema()
+export class PublicationAccessResponse {
+  @Field(() => PublicationVisibility)
+  visibility: string;
+
+  @Field(() => String, { optional: true, nullable: true })
+  organisationId?: string | null;
+
+  @Field(() => Integer)
+  accessRevision: number;
+
+  @Field(() => [AccessGrantItem])
+  grants: AccessGrantItem[];
 }
 
 @Schema()

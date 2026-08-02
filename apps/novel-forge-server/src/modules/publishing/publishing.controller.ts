@@ -7,16 +7,19 @@
  */
 import { Authenticated } from '@shadow-library/auth/module';
 import { Config } from '@shadow-library/common';
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, RespondFor } from '@shadow-library/fastify';
+import { Body, ContextService, Delete, Get, HttpController, HttpStatus, Params, Post, Put, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
+import { PublicationAccessService } from './publication-access.service';
 import { PublishRunner } from './publish-runner';
 import {
   ChapterPublicationResponse,
+  PublicationAccessBody,
+  PublicationAccessResponse,
   PublicationResponse,
   PublicationsLedgerResponse,
   PublishChapterBody,
@@ -43,6 +46,8 @@ export class PublishingController {
     private readonly publishRunner: PublishRunner,
     private readonly jobService: JobService,
     private readonly jobExecutor: JobExecutor,
+    private readonly accessService: PublicationAccessService,
+    private readonly context: ContextService,
   ) {}
 
   @Post('/publish')
@@ -71,6 +76,29 @@ export class PublishingController {
     const row = await this.publishingService.unpublishChapter(params.projectId, params.chapter);
     await this.enqueuePublish(params.projectId);
     return row;
+  }
+
+  /*!
+   * Access
+   */
+
+  @Get('/publications/access')
+  @RespondFor(200, PublicationAccessResponse)
+  getAccess(@Params() params: PublishingProjectParams): Promise<PublicationAccessResponse> {
+    return this.accessService.getAccess(params.projectId);
+  }
+
+  /**
+   * The organisation comes from the session, never the body: a caller may only share into the
+   * organisation they are currently acting in, and letting the client name one would make this an
+   * endpoint for sharing a novel into an organisation you merely know the id of.
+   */
+  @Put('/publications/access')
+  @RespondFor(200, PublicationAccessResponse)
+  async setAccess(@Params() params: PublishingProjectParams, @Body() body: PublicationAccessBody): Promise<PublicationAccessResponse> {
+    const access = await this.accessService.setAccess(params.projectId, body, this.context.getAuthPrincipal().org);
+    await this.enqueuePublish(params.projectId);
+    return access;
   }
 
   @Get('/publications')

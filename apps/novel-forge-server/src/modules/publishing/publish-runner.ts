@@ -17,9 +17,10 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Publishing, schema } from '@server/database';
 
+import { PublicationAccessService } from './publication-access.service';
 import { renderChapterPayload } from './publish-payload';
 import { PublishingService } from './publishing.service';
-import { type ChapterPushBody, type ManifestItem, ReaderPushClient, ReaderPushError, StaleRevisionError } from './reader-push.client';
+import { type AccessPushBody, type AccessState, type ChapterPushBody, type ManifestItem, ReaderPushClient, ReaderPushError, StaleRevisionError } from './reader-push.client';
 
 /**
  * Defining types
@@ -37,6 +38,7 @@ export interface ConvergeFailure {
 
 export interface ConvergeResult {
   novel: 'applied' | 'noop';
+  access: 'applied' | 'noop';
   pushed: number[];
   deleted: number[];
   skipped: number[];
@@ -68,6 +70,7 @@ export class PublishRunner {
     databaseService: DatabaseService,
     private readonly publishingService: PublishingService,
     private readonly pushClient: ReaderPushClient,
+    private readonly accessService: PublicationAccessService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -75,7 +78,7 @@ export class PublishRunner {
   async converge(projectId: bigint, options: ConvergeOptions = {}): Promise<ConvergeResult> {
     const publication = await this.publishingService.getPublication(projectId);
     const ledger = await this.publishingService.loadLedger(projectId);
-    const result: ConvergeResult = { novel: 'noop', pushed: [], deleted: [], skipped: [], failed: [], unknownOrdinals: [] };
+    const result: ConvergeResult = { novel: 'noop', access: 'noop', pushed: [], deleted: [], skipped: [], failed: [], unknownOrdinals: [] };
 
     // Missing credentials fail soft: every due row gets an actionable ledger error and the caller a
     // clear PUB_004, while boot and every non-publishing feature stay untouched.
@@ -87,9 +90,18 @@ export class PublishRunner {
         coverPath: publication.coverPath ?? undefined,
         genres: (publication.genres as string[] | null) ?? undefined,
         status: publication.status === 'retired' ? 'retired' : 'live',
+        visibility: publication.visibility,
         revision: publication.revision,
       });
       result.novel = novelResult.outcome;
+
+      /**
+       * Access goes second, and always before any chapter. The metadata push carries the tier, so a
+       * novel is created already restricted; the window between the two pushes is one in which
+       * nobody can read it. The reverse order would open a window in which everybody could.
+       */
+      result.access = await this.convergeAccess(publication, options);
+
       const items = await this.pushClient.getManifest(publication.novelSlug);
       manifest = new Map(items.map(item => [item.ordinal, item]));
     } catch (err) {
@@ -194,6 +206,37 @@ export class PublishRunner {
       .update(schema.chapterPublications)
       .set({ status: 'failed', error: error.slice(0, 2000), updatedAt: new Date() })
       .where(eq(schema.chapterPublications.id, row.id));
+  }
+
+  /**
+   * Pushes the share list when it has moved. Reconcile mode reads the reader's copy first and
+   * pushes whenever the two disagree — the access counterpart of the chapter manifest diff, so a
+   * reader rebuilt from empty regains its ACL rather than serving a novel with no grants at all.
+   */
+  private async convergeAccess(publication: Publishing.Publication, options: ConvergeOptions): Promise<'applied' | 'noop'> {
+    const subjectIds = await this.accessService.getPushPayload(publication.id);
+    const body = {
+      visibility: publication.visibility,
+      organisationId: publication.organisationId ?? undefined,
+      subjectIds,
+      revision: publication.accessRevision,
+    };
+
+    if (options.reconcile) {
+      const served = await this.pushClient.getAccess(publication.novelSlug);
+      if (served && !this.accessDrifted(served, body)) return 'noop';
+    }
+
+    const result = await this.pushClient.upsertAccess(publication.novelSlug, body);
+    return result.outcome;
+  }
+
+  private accessDrifted(served: AccessState, wanted: AccessPushBody): boolean {
+    if (served.visibility !== wanted.visibility) return true;
+    if ((served.organisationId ?? undefined) !== wanted.organisationId) return true;
+    if (served.revision !== wanted.revision) return true;
+    const held = new Set(served.subjectIds);
+    return held.size !== (wanted.subjectIds?.length ?? 0) || !(wanted.subjectIds ?? []).every(subjectId => held.has(subjectId));
   }
 
   private async recordFailure(rows: Publishing.ChapterPublication[], error: string): Promise<void> {

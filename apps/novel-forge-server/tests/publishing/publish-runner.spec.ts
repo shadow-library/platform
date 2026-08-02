@@ -22,6 +22,8 @@ import { ConcurrencyController } from '@modules/jobs/concurrency.controller';
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { JobService } from '@modules/jobs/job.service';
 import { PublicationJanitor } from '@modules/jobs/publication.janitor';
+import { DirectoryClient } from '@modules/publishing/directory.client';
+import { PublicationAccessService } from '@modules/publishing/publication-access.service';
 import { PublishRunner } from '@modules/publishing/publish-runner';
 import { PublishingService } from '@modules/publishing/publishing.service';
 import { ReaderPushClient } from '@modules/publishing/reader-push.client';
@@ -60,6 +62,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
   let db: PrimaryDatabase;
   let databaseService: never;
   let publishingService: PublishingService;
+  let accessService: PublicationAccessService;
   let runner: PublishRunner;
 
   beforeAll(async () => {
@@ -70,7 +73,8 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     // The shared, discovery-backed client the AuthModule would inject in a real boot — here built
     // directly against the mock issuer with the app's own credential.
     const authClient = new AuthClient({ issuer: testIdP.issuer, appId: APP_ID, client: { id: APP_ID, secret: CLIENT_SECRET } });
-    runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(authClient));
+    accessService = new PublicationAccessService(databaseService, publishingService, new DirectoryClient(authClient));
+    runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(authClient), accessService);
 
     process.env['SERVICE_URL_WEB_NOVEL_SERVER'] = reader.start();
   });
@@ -227,7 +231,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     // A credential-less client (an id, but no secret) is refused by the token endpoint, so every mint —
     // and therefore every push — fails; the runner ledgers it and answers PUB_004 rather than crashing.
     const credlessClient = new AuthClient({ issuer: testIdP.issuer, audience: AUTH_AUDIENCE, client: { id: APP_ID } });
-    const credlessRunner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(credlessClient));
+    const credlessRunner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(credlessClient), accessService);
 
     await expect(credlessRunner.converge(projectId)).rejects.toThrow(/Reader service push failed/);
     expect(await ledgerRow(projectId, 1)).toMatchObject({ status: 'failed', error: expect.stringContaining('reader service') });

@@ -179,4 +179,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PUB_003 = AppErrorCode.badRequest('PUB_003', 'Chapters must be published contiguously — publish or restore every earlier chapter first');
   // A user-facing 500: the push failure detail must reach the client, so it stays out of the internal() mask
   static readonly PUB_004 = new AppErrorCode('PUB_004', 'Reader service push failed — see the publication ledger error', 500);
+  // Same reasoning as PUB_004: the author needs to know sharing failed because identity was unreachable,
+  // not that "something went wrong", since the fix is to retry rather than to change the share list.
+  static readonly PUB_005 = new AppErrorCode('PUB_005', 'Could not resolve the people to share with — the identity service is unavailable', 503);
+  static readonly PUB_006 = AppErrorCode.badRequest('PUB_006', 'Organisation visibility requires the session to be acting in an organisation');
 }

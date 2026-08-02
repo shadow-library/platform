@@ -24,6 +24,22 @@ export interface NovelPushBody {
   coverPath?: string;
   genres?: string[];
   status?: 'live' | 'retired';
+  /** Required by the reader, not optional: a default would let a dropped field publish a private novel publicly. */
+  visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
+  revision: number;
+}
+
+export interface AccessPushBody {
+  visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
+  organisationId?: string;
+  subjectIds?: string[];
+  revision: number;
+}
+
+export interface AccessState {
+  visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
+  organisationId?: string;
+  subjectIds: string[];
   revision: number;
 }
 
@@ -99,6 +115,19 @@ export class ReaderPushClient {
   async upsertNovel(slug: string, body: NovelPushBody): Promise<PushResult> {
     const response = await this.send('PUT', `/internal/novels/${slug}`, body);
     return this.toUpsertResult(response, body.revision);
+  }
+
+  async upsertAccess(slug: string, body: AccessPushBody): Promise<PushResult> {
+    const response = await this.send('PUT', `/internal/novels/${slug}/access`, body);
+    return this.toUpsertResult(response, body.revision);
+  }
+
+  /** The access counterpart of `getManifest`; an unknown novel reads as nothing shared, since the next push creates it. */
+  async getAccess(slug: string): Promise<AccessState | undefined> {
+    const response = await this.send<AccessState>('GET', `/internal/novels/${slug}/access`);
+    if (response.statusCode === 404) return undefined;
+    if (response.statusCode >= 400) throw new ReaderPushError(`reader access read answered http ${response.statusCode}`, response.statusCode);
+    return response.data ?? undefined;
   }
 
   async upsertChapter(slug: string, ordinal: number, body: ChapterPushBody): Promise<PushResult> {

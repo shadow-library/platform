@@ -30,7 +30,12 @@ export interface MockReaderNovel {
   coverPath: string | null;
   genres: string[];
   status: string;
+  visibility: string;
   revision: number;
+  /** The access record, carried so `snapshot()` still proves a wiped reader converges to identical state. */
+  organisationId: string | null;
+  subjectIds: string[];
+  accessRevision: number;
   chapters: Map<number, MockReaderChapter>;
 }
 
@@ -89,6 +94,10 @@ export class MockReaderService {
     const novelMatch = /^\/internal\/novels\/([a-z0-9-]+)$/.exec(url.pathname);
     if (novelMatch && request.method === 'PUT') return this.upsertNovel(novelMatch[1] as string, (await request.json()) as Record<string, unknown>);
 
+    const accessMatch = /^\/internal\/novels\/([a-z0-9-]+)\/access$/.exec(url.pathname);
+    if (accessMatch && request.method === 'PUT') return this.upsertAccess(accessMatch[1] as string, (await request.json()) as Record<string, unknown>);
+    if (accessMatch && request.method === 'GET') return this.getAccess(accessMatch[1] as string);
+
     const manifestMatch = /^\/internal\/novels\/([a-z0-9-]+)\/manifest$/.exec(url.pathname);
     if (manifestMatch && request.method === 'GET') return this.getManifest(manifestMatch[1] as string);
 
@@ -110,6 +119,7 @@ export class MockReaderService {
       coverPath: (body.coverPath as string | undefined) ?? null,
       genres: (body.genres as string[] | undefined) ?? [],
       status: (body.status as string | undefined) ?? 'live',
+      visibility: body.visibility as string,
       revision,
     };
     const unchanged =
@@ -119,11 +129,51 @@ export class MockReaderService {
       next.blurb === stored.blurb &&
       next.coverPath === stored.coverPath &&
       next.status === stored.status &&
+      next.visibility === stored.visibility &&
       JSON.stringify(next.genres) === JSON.stringify(stored.genres);
     if (unchanged) return new Response(null, { status: 204 });
 
-    this.novels.set(slug, { ...next, chapters: stored?.chapters ?? new Map() });
+    this.novels.set(slug, {
+      ...next,
+      organisationId: stored?.organisationId ?? null,
+      subjectIds: stored?.subjectIds ?? [],
+      accessRevision: stored?.accessRevision ?? 1,
+      chapters: stored?.chapters ?? new Map(),
+    });
     return Response.json({ slug, outcome: 'applied', revision });
+  }
+
+  /** Mirrors the reader's access sub-resource, including its own revision ladder. */
+  private upsertAccess(slug: string, body: Record<string, unknown>): Response {
+    const stored = this.novels.get(slug);
+    if (!stored) return Response.json({ code: 'WBN_001' }, { status: 404 });
+
+    const revision = body.revision as number;
+    if (revision < stored.accessRevision) return Response.json({ code: 'WBN_003' }, { status: 409 });
+
+    const visibility = body.visibility as string;
+    const organisationId = (body.organisationId as string | undefined) ?? null;
+    const subjectIds = [...new Set((body.subjectIds as string[] | undefined) ?? [])].sort();
+    const unchanged =
+      revision === stored.accessRevision &&
+      visibility === stored.visibility &&
+      organisationId === stored.organisationId &&
+      JSON.stringify(subjectIds) === JSON.stringify([...stored.subjectIds].sort());
+    if (unchanged) return new Response(null, { status: 204 });
+
+    this.novels.set(slug, { ...stored, visibility, organisationId, subjectIds, accessRevision: revision });
+    return Response.json({ slug, outcome: 'applied', revision });
+  }
+
+  private getAccess(slug: string): Response {
+    const novel = this.novels.get(slug);
+    if (!novel) return Response.json({ code: 'WBN_001' }, { status: 404 });
+    return Response.json({
+      visibility: novel.visibility,
+      organisationId: novel.organisationId ?? undefined,
+      subjectIds: [...novel.subjectIds].sort(),
+      revision: novel.accessRevision,
+    });
   }
 
   private upsertChapter(slug: string, ordinal: number, body: Record<string, unknown>): Response {

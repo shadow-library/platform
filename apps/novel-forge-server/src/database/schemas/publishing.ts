@@ -21,8 +21,11 @@ import { projects } from './projects';
 export namespace Publishing {
   export type Publication = InferSelectModel<typeof publications>;
   export type ChapterPublication = InferSelectModel<typeof chapterPublications>;
+  export type Grant = InferSelectModel<typeof publicationGrants>;
   export type Status = InferEnum<typeof publicationStatus>;
   export type ChapterStatus = InferEnum<typeof chapterPublicationStatus>;
+  export type Visibility = InferEnum<typeof publicationVisibility>;
+  export type GrantState = InferEnum<typeof publicationGrantState>;
 }
 
 /**
@@ -31,6 +34,17 @@ export namespace Publishing {
 
 export const publicationStatus = pgEnum('publication_status', ['draft', 'live', 'retired']);
 export const chapterPublicationStatus = pgEnum('chapter_publication_status', ['scheduled', 'published', 'failed', 'unpublished']);
+
+/** Who may read the published novel. Mirrors the reader's `novel_visibility`; this side is the system of record. */
+export const publicationVisibility = pgEnum('publication_visibility', ['PUBLIC', 'ORGANISATION', 'RESTRICTED']);
+
+/**
+ * Whether a grant names an account yet. An author may share with an address that has no verified
+ * platform account, and that must not be an error — the row is kept as `pending` so the intent
+ * survives, is retried on every converge, and shows in the UI as awaiting an account. A `pending`
+ * grant conveys no access and is never pushed to the reader.
+ */
+export const publicationGrantState = pgEnum('publication_grant_state', ['resolved', 'pending']);
 
 // One per published novel — the forge-side system of record for the release decision (reader-publish
 // design §3). `novelSlug` anchors reader URLs and never changes; `revision` is the forge-assigned
@@ -49,10 +63,42 @@ export const publications = pgTable('publications', {
   // other string-list column in this schema.
   genres: jsonb('genres').$type<string[]>(),
   status: publicationStatus('status').notNull().default('draft'),
+  visibility: publicationVisibility('visibility').notNull().default('PUBLIC'),
+  /**
+   * The identity organisation an `ORGANISATION` publication is shared with, captured from the
+   * author's active organisation when they chose the tier. Stored rather than resolved at push time
+   * because the author may later act in a different organisation, and that must not silently
+   * re-target an existing share.
+   */
+  organisationId: varchar('organisation_id', { length: 64 }),
+  /** Separate from `revision` so changing the share list never rewrites the metadata row, and vice versa. */
+  accessRevision: integer('access_revision').notNull().default(1),
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
+
+/**
+ * One row per person the author named. The address is kept alongside the resolved subject because
+ * the author thinks in addresses — it is what the UI shows, what a re-resolution keys on, and the
+ * only durable record of intent when no account exists yet. Only `subject_id` is ever pushed to the
+ * reader, so an address never leaves this service.
+ */
+export const publicationGrants = pgTable(
+  'publication_grants',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    publicationId: bigint('publication_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => publications.id, { onDelete: 'cascade' }),
+    email: varchar('email', { length: 255 }).notNull(),
+    subjectId: varchar('subject_id', { length: 128 }),
+    state: publicationGrantState('state').notNull().default('pending'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  t => [unique('publication_grants_publication_id_email_unique').on(t.publicationId, t.email), index('publication_grants_publication_id_state_idx').on(t.publicationId, t.state)],
+);
 
 // The publication ledger, one row per pushed chapter (reader-publish design §3). `publishedOrdinal`
 // is the reader-facing sequence: assigned once at first publish, never re-derived from forge chapter
@@ -87,8 +133,13 @@ export const chapterPublications = pgTable(
   ],
 );
 
-export const publicationsRelations = relations(publications, ({ one }) => ({
+export const publicationsRelations = relations(publications, ({ one, many }) => ({
   project: one(projects, { fields: [publications.projectId], references: [projects.id] }),
+  grants: many(publicationGrants),
+}));
+
+export const publicationGrantsRelations = relations(publicationGrants, ({ one }) => ({
+  publication: one(publications, { fields: [publicationGrants.publicationId], references: [publications.id] }),
 }));
 
 export const chapterPublicationsRelations = relations(chapterPublications, ({ one }) => ({

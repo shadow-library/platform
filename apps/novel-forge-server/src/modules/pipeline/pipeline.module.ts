@@ -6,6 +6,7 @@
  * Importing npm packages
  */
 import { Module } from '@shadow-library/app';
+import { FastifyModule } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -39,7 +40,8 @@ import { PipelineController } from './pipeline.controller';
  * RebrandService in the rebrand job) — so their controllers live here.
  */
 @Module({
-  imports: [SourceModule, ExtractionModule, PlanningModule, JobsModule, RebrandModule, ReforgeModule, PublishingModule],
+  /** `FastifyModule` for `ContextService`: the publishing controller reads the session's active organisation off the principal. */
+  imports: [SourceModule, ExtractionModule, PlanningModule, JobsModule, RebrandModule, ReforgeModule, PublishingModule, FastifyModule],
   controllers: [PipelineController, RebrandController, ReforgeController, PublishingController],
 })
 export class PipelineModule {}

@@ -58,4 +58,6 @@ export const ReforgeFidelity = EnumType.create('ReforgeFidelity', schema.reforge
 export const RefinementKind = EnumType.create('RefinementKind', schema.refinementKind.enumValues);
 export const PublicationStatus = EnumType.create('PublicationStatus', schema.publicationStatus.enumValues);
 export const ChapterPublicationStatus = EnumType.create('ChapterPublicationStatus', schema.chapterPublicationStatus.enumValues);
+export const PublicationVisibility = EnumType.create('PublicationVisibility', schema.publicationVisibility.enumValues);
+export const PublicationGrantState = EnumType.create('PublicationGrantState', schema.publicationGrantState.enumValues);
 export const RefinementProposalStatus = EnumType.create('RefinementProposalStatus', schema.refinementProposalStatus.enumValues);
