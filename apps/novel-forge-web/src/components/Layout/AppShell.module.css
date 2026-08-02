@@ -11,9 +11,16 @@
 
 /* Fills the shell's content region and anchors `.nf-splitpane`'s `position: absolute; inset: 0`, so the
    editor, chat, and bible reach every edge. */
+/*
+ * The document screens re-create the gutters the shell would have given them, from the shell's own scale.
+ * Declared here rather than in `:root`: a `var()` inside a custom property is substituted where that
+ * property is *declared*, and `--sh-shell-gutter-*` live on the shell's content region — at the root they
+ * would resolve against nothing and the padding would silently collapse to zero.
+ */
 .content {
   position: relative;
   min-height: 100%;
+  --nf-page-pad-inline: max(var(--sh-shell-gutter-inline), var(--sh-safe-left)) max(var(--sh-shell-gutter-inline), var(--sh-safe-right));
 }
 
 /* ── Command bar ─────────────────────────────────────────── */

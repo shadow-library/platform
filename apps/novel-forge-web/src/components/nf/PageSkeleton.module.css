@@ -1,6 +1,7 @@
 .wrap {
-  padding: clamp(1rem, 3vw, 2.5rem);
-  max-width: var(--nf-page-max, 1120px);
+  padding-block: clamp(1rem, 3vw, 2.5rem);
+  padding-inline: var(--nf-page-pad-inline);
+  max-width: var(--sh-page-max);
   margin: 0 auto;
   width: 100%;
 }

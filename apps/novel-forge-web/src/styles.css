@@ -7,9 +7,12 @@
 :root {
   --sh-z-dropdown: 1300;
 
-  /* Shared Novel Forge layout dimensions — the centered content column, the split-pane list rail,
-     and the detail-pane min width. Screens draw from these so navigation never shifts the layout. */
-  --nf-page-max: 1120px;
+  /* Shared Novel Forge layout dimensions — the split-pane list rail and the detail-pane min width.
+     Screens draw from these so navigation never shifts the layout. The document column itself is not one
+     of them: it is the platform's `--sh-page-max`, so a project here measures what a novel does in the
+     reader and a page does in Pulse. The gutters likewise mirror the shell's own scale — this app takes
+     the content region whole (`contentPadding="none"`) so the editor, chat and bible can reach every
+     edge, which means the document screens have to re-create the gutters the shell would have given them. */
   --nf-rail-width: 380px;
   --nf-detail-min: 480px;
 }
@@ -187,10 +190,12 @@ a:hover {
   background: var(--nf-dot);
 }
 
-/* Centered content column shared by the non-split-pane screens (each screen sets its own padding). */
+/* Centered content column shared by the non-split-pane screens. It owns the horizontal gutters so every
+   document screen agrees on them; each screen still sets its own vertical rhythm. */
 .nf-page {
-  max-width: var(--nf-page-max);
+  max-width: var(--sh-page-max);
   margin: 0 auto;
+  padding-inline: var(--nf-page-pad-inline);
 }
 
 /* Split-pane screens (review, chat, proposals, runs, bible): a fixed list rail beside a fluid detail pane. */

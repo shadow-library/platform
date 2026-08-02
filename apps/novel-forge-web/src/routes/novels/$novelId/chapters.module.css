@@ -17,7 +17,7 @@
 .progressInner {
   max-width: 640px;
   margin: 0 auto;
-  padding: 60px 32px 90px;
+  padding-block: 60px 90px;
 }
 
 .progressHead {
@@ -107,7 +107,7 @@
 }
 
 .listInner {
-  padding: 44px 32px 90px;
+  padding-block: 44px 90px;
 }
 
 .listHead {
@@ -425,7 +425,7 @@
 }
 
 .editorInner {
-  padding: 16px 32px 120px;
+  padding-block: 16px 120px;
 }
 
 .tabs {
@@ -478,7 +478,7 @@
 }
 
 .reader {
-  padding: 64px 32px 120px;
+  padding-block: 64px 120px;
   font-size: 19px;
   line-height: 1.85;
   font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
