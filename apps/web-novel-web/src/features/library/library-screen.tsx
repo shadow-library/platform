@@ -11,7 +11,7 @@ import { cn, EmptyState, Input, SegmentedControl } from '@shadow-library/ui';
  */
 import { BookmarkIcon, CloseIcon, PlayIcon, ShieldIcon } from '@/components/icons';
 import { Cover } from '@/components/novel';
-import { libraryQueryOptions, progressQueryOptions, sessionQueryOptions, useToggleLibraryMutation } from '@/lib/apis';
+import { libraryQueryOptions, progressQueryOptions, sessionQueryOptions, sharedQueryOptions, useToggleLibraryMutation } from '@/lib/apis';
 import { type LibraryEntry, type ReadingProgress } from '@/lib/apis/types';
 
 import styles from './library-screen.module.css';
@@ -91,6 +91,7 @@ export function LibraryScreen(): React.JSX.Element {
   const library = useQuery(libraryQueryOptions(session.data?.userId));
   const progress = useQuery(progressQueryOptions(session.data?.userId));
   const toggleLibrary = useToggleLibraryMutation(session.data?.userId);
+  const shared = useQuery(sharedQueryOptions(Boolean(session.data)));
 
   const view = search.view ?? 'grid';
   const signedOut = session.data === null;
@@ -141,6 +142,25 @@ export function LibraryScreen(): React.JSX.Element {
             Saved on this device. <Link to="/login">Sign in</Link> to sync across devices.
           </span>
         </div>
+      )}
+
+      {/* Above the shelf, not inside it: these are novels someone gave you access to, not ones you saved. */}
+      {(shared.data?.length ?? 0) > 0 && (
+        <section className={styles.sharedSection} aria-labelledby="shared-heading">
+          <h2 id="shared-heading" className={styles.sharedTitle}>
+            Shared with me
+            <span className={styles.tabCount}>{shared.data?.length}</span>
+          </h2>
+          <div className={styles.sharedRow}>
+            {shared.data?.map(entry => (
+              <Link key={entry.novelSlug} to="/novels/$slug" params={{ slug: entry.novelSlug }} className={styles.sharedCard}>
+                <Cover cover={entry.novel.cover} title={entry.novel.title} showTitle={false} />
+                <span className={styles.sharedName}>{entry.novel.title}</span>
+                <span className={styles.sharedBadge}>{entry.visibility === 'ORGANISATION' ? 'Organisation' : 'Private'}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       {entries.length > 0 && (

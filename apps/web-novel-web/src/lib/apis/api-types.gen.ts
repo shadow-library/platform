@@ -169,6 +169,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/internal/novels/{slug}/access': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Access */
+    get: operations['get_internal_novels_slug_access'];
+    /** Upsert Access */
+    put: operations['put_internal_novels_slug_access'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/internal/novels/{slug}/chapters/{ordinal}': {
     parameters: {
       query?: never;
@@ -325,6 +343,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/shared': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Shared */
+    get: operations['get_api_shared'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/library/{slug}': {
     parameters: {
       query?: never;
@@ -404,12 +439,28 @@ export interface components {
       genres?: string[];
       /** @enum {string} */
       status?: 'live' | 'retired';
+      /** @enum {string} */
+      visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
       revision: number;
     };
     PublishResultResponse: {
       slug: string;
       /** @enum {string} */
       outcome: 'applied';
+      revision: number;
+    };
+    NovelAccessBody: {
+      /** @enum {string} */
+      visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
+      organisationId?: string;
+      subjectIds?: string[];
+      revision: number;
+    };
+    NovelAccessResponse: {
+      /** @enum {string} */
+      visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
+      organisationId?: string;
+      subjectIds: string[];
       revision: number;
     };
     ChapterUpsertBody: {
@@ -445,6 +496,8 @@ export interface components {
       genres: string[];
       /** @enum {string} */
       status: 'live' | 'retired';
+      /** @enum {string} */
+      visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
       chapterCount: number;
       updatedAt: string;
     };
@@ -456,6 +509,8 @@ export interface components {
       genres: string[];
       /** @enum {string} */
       status: 'live' | 'retired';
+      /** @enum {string} */
+      visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
       chapterCount: number;
       updatedAt: string;
       createdAt: string;
@@ -507,6 +562,8 @@ export interface components {
       genres: string[];
       /** @enum {string} */
       status: 'live' | 'retired';
+      /** @enum {string} */
+      visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
       addedAt: string;
     };
     LibraryAddBody: {
@@ -863,6 +920,90 @@ export interface operations {
     requestBody: {
       content: {
         'application/json': components['schemas']['NovelUpsertBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PublishResultResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_internal_novels_slug_access: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NovelAccessResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_internal_novels_slug_access: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['NovelAccessBody'];
       };
     };
     responses: {
@@ -1372,6 +1513,44 @@ export interface operations {
       };
     };
   };
+  get_api_shared: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LibraryListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   delete_api_library_slug: {
     parameters: {
       query?: never;
@@ -1417,6 +1596,8 @@ export type ReadyResponse = components['schemas']['ReadyResponse'];
 export type HealthDependencies = components['schemas']['HealthDependencies'];
 export type NovelUpsertBody = components['schemas']['NovelUpsertBody'];
 export type PublishResultResponse = components['schemas']['PublishResultResponse'];
+export type NovelAccessBody = components['schemas']['NovelAccessBody'];
+export type NovelAccessResponse = components['schemas']['NovelAccessResponse'];
 export type ChapterUpsertBody = components['schemas']['ChapterUpsertBody'];
 export type ManifestItem = components['schemas']['ManifestItem'];
 export type ManifestItem1 = components['schemas']['ManifestItem1'];
@@ -1438,6 +1619,7 @@ export type LibraryAddBody = components['schemas']['LibraryAddBody'];
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
+export type GetAccessPathParams = Exclude<paths['/internal/novels/{slug}/access']['get']['parameters']['path'], undefined>;
 export type GetManifestPathParams = Exclude<paths['/internal/novels/{slug}/manifest']['get']['parameters']['path'], undefined>;
 export type ListNovelsQueryParams = Exclude<paths['/api/novels']['get']['parameters']['query'], undefined>;
 export type GetNovelPathParams = Exclude<paths['/api/novels/{slug}']['get']['parameters']['path'], undefined>;

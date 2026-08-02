@@ -264,3 +264,56 @@
   align-items: center;
   justify-content: center;
 }
+
+/* Shared-with-me strip — a horizontally scrolling row so it stays a band above the shelf
+   rather than competing with it for vertical space, however many novels land in it. */
+.sharedSection {
+  margin-bottom: 20px;
+}
+
+.sharedTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.sharedRow {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.sharedCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 108px;
+  flex: 0 0 auto;
+  text-decoration: none;
+  color: inherit;
+}
+
+.sharedName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sh-text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sharedBadge {
+  align-self: flex-start;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--sh-surface-raised);
+  border: 1px solid var(--sh-border-default);
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
