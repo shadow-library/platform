@@ -23,8 +23,8 @@
  * environments set the var; development leaves it unset, where a host-only cookie is already shared because
  * cookie scope ignores the port that distinguishes the local dev origins.
  *
- * `import.meta.env` is injected only by Vite-family bundlers, so it is read defensively — the same reason
- * `resolveEnvBaseUrl` does, keeping this module import-safe in a plain Node/SSR runtime.
+ * `import.meta.env` is injected only by Vite-family bundlers, so it is read defensively — keeping this module
+ * import-safe in a plain Node/SSR runtime where `import.meta.env` is absent.
  */
 export function themeCookieDomain(): string | undefined {
   const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;

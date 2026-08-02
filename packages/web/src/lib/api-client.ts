@@ -49,6 +49,9 @@ export interface ApiClientConfig<TSurfaces extends Record<string, string>> {
    * resolves and bundles the target for the client environment, which pulls `node:stream` and
    * `node:async_hooks` in and fails the build. The guard has to live in app code, because that is what
    * Vite transforms — this package ships prebuilt, so a guard written here would never be substituted.
+   *
+   * `@shadow-library/web/server` ships `createSsrTransport` so the target can be the shared factory rather
+   * than a per-app module — `() => import('@shadow-library/web/server').then(m => m.createSsrTransport({ fallback: '...' }))`.
    */
   ssr?: SsrTransportLoader;
   /** CSRF cookie/header/TTL overrides; the defaults match every Shadow backend. */

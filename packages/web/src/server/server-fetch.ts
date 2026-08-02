@@ -31,10 +31,15 @@ export interface ServerFetchConfig {
   /** CSRF cookie/header/TTL overrides; the defaults match every Shadow backend. */
   csrf?: CsrfConfig;
   /**
-   * Inbound request headers relayed to the backend. `user-agent` is forwarded by default because the
-   * backend records it as the session's device — without it every session the backend mints records this
-   * SSR runtime as the device instead of the real browser.
-   * @default ['user-agent']
+   * Inbound request headers relayed to the backend. Three are forwarded by default, each carrying request
+   * context the backend would otherwise attribute to this SSR runtime rather than to the real client:
+   * - `user-agent` — the backend records it as the session's device; without it every session it mints names
+   *   this SSR runtime as the device instead of the browser.
+   * - `accept-language` — the caller's locale context, so a backend that localises its answers speaks the
+   *   reader's language on the SSR pass, not this process's default.
+   * - `x-forwarded-for` — the ingress-appended client-IP chain, so a backend behind `trustProxy` resolves the
+   *   real client address rather than this web tier's, for rate-limiting and audit.
+   * @default ['user-agent', 'accept-language', 'x-forwarded-for']
    */
   forwardHeaders?: string[];
 }
@@ -45,7 +50,28 @@ export type { ServerFetch, ServerFetchSpec };
 /**
  * Declaring the constants
  */
-const DEFAULT_FORWARD_HEADERS = ['user-agent'];
+const DEFAULT_FORWARD_HEADERS = ['user-agent', 'accept-language', 'x-forwarded-for'];
+
+/** The correlation header both this web tier and every Shadow backend propagate, so an SSR call stitches to the backend's logs for that request. */
+const CORRELATION_HEADER = 'x-correlation-id';
+
+/**
+ * One correlation id per inbound request, not per backend call. A multi-query SSR loader fans out several
+ * `serverFetch` calls against the same inbound `Request`; keying the id off that request object — weakly, so
+ * it is collected with the request — lets every call in the pass share one id. An inbound `x-correlation-id`
+ * (set by an upstream proxy that already opened the trace) always wins, so the whole chain agrees on one id.
+ */
+const correlationIds = new WeakMap<Request, string>();
+
+function correlationId(request: Request): string {
+  const inbound = request.headers.get(CORRELATION_HEADER);
+  if (inbound) return inbound;
+  const existing = correlationIds.get(request);
+  if (existing) return existing;
+  const minted = crypto.randomUUID();
+  correlationIds.set(request, minted);
+  return minted;
+}
 
 /** The cookie name portion of a raw `Set-Cookie` string, lowercased for case-insensitive de-duping. */
 function cookieName(raw: string): string {
@@ -112,6 +138,7 @@ export function createServerFetch(config: ServerFetchConfig): ServerFetch {
       const value = request.headers.get(name);
       if (value) headers[name] = value;
     }
+    headers[CORRELATION_HEADER] = correlationId(request);
     Object.assign(headers, spec.headers);
 
     const init: RequestInit = { method: spec.method, headers, redirect: 'manual' };
