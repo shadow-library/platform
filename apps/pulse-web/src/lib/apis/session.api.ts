@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { type UserInfo, userInfoQueryOptions } from '@shadow-library/web';
 import { createAuthApi } from '@shadow-library/web/auth';
 
 /**
@@ -41,3 +42,14 @@ export const { organisationsQueryOptions, sessionQueryOptions, switchOrganisatio
  * deployment configures RP-initiated logout, in which case the reply carries `redirectTo`.
  */
 export const logout = authApi.logout;
+
+/**
+ * The operator's own profile, from the SDK's userinfo route. Deliberately separate from the session
+ * query: that one gates every route, and a missing display name is not a reason to fail a gate. The
+ * session principal carries only `sub`, so the name and email the account menu shows come from here.
+ */
+async function fetchUserInfo(): Promise<UserInfo> {
+  return apiClient.auth.get('/userinfo').execute<UserInfo>();
+}
+
+export const meQuery = userInfoQueryOptions(fetchUserInfo);
