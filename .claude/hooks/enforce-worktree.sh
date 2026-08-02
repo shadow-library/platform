@@ -30,6 +30,14 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 # source files are never exempted by their position under the parent checkout's .claude/worktrees/.
 case "${target#"$root"/}" in .claude/*) exit 0 ;; esac
 
+# A file that git ignores and does not track cannot reach a commit, so a worktree protects nothing about it:
+# the policy exists to keep *committed* work isolated. Gating these only made local-only state — CLAUDE.local.md,
+# .env, generated graphify-out/ — editable exclusively from a worktree that is about to be deleted with them.
+# Both conditions are required: an ignored path that was force-added is tracked, and its edits do commit.
+if git check-ignore -q "$target" 2>/dev/null && ! git ls-files --error-unmatch "$target" >/dev/null 2>&1; then
+  exit 0
+fi
+
 read -r git_dir git_common_dir <<<"$(git rev-parse --path-format=absolute --git-dir --git-common-dir 2>/dev/null | tr '\n' ' ')"
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 
