@@ -15,3 +15,69 @@
   position: relative;
   min-height: 100%;
 }
+
+/* ── Command bar ─────────────────────────────────────────── */
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px 0 12px;
+  border-radius: var(--sh-radius-md);
+  border: 1px solid var(--sh-border-default);
+  background: var(--sh-surface-app);
+  color: var(--sh-text-tertiary);
+  font-size: var(--sh-text-body-sm);
+  cursor: pointer;
+  min-width: 220px;
+}
+
+.searchLabel {
+  flex: 1;
+  text-align: left;
+}
+
+/* ── Lifecycle ───────────────────────────────────────────── */
+
+/* Where a project sits in the pipeline, pinned under the nav. This is the sidebar footer's whole job now
+   — the author's identity moved to the top bar's account menu, where there is exactly one of it. */
+.lifecycle {
+  padding: 2px 0;
+}
+
+.lifecycleHeading {
+  padding-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.lifecycleBar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.lifecycleSeg {
+  flex: 1;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--sh-bg-pressed);
+}
+
+.lifecycleSeg[data-state='done'] {
+  background: var(--sh-success-solid);
+}
+
+.lifecycleSeg[data-state='current'] {
+  background: var(--sh-accent);
+}
+
+.lifecycleLabel {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}

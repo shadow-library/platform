@@ -76,6 +76,9 @@ a:hover {
 /* ========================================
    Novel Forge helpers (from the design comps)
    ======================================== */
+
+/* An in-page nav row. The sidebar no longer uses it — that rail comes from the design system's AppShell
+   now — but the chapters screen still styles its chapter-list trigger this way. */
 .nf-nav {
   display: flex;
   align-items: center;
