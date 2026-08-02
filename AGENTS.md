@@ -37,6 +37,22 @@ Backend dependency order: `common` → `class-schema`/`app` → `fastify` → `m
   app's `api-types.gen.ts` from a _running_ server and updating its callers as part of the same
   coordinated change (see Hard rules above).
 
+## Code discovery
+
+Serena (configured in `.mcp.json`) indexes this repository symbolically, and it is activated once per session
+before other work begins. For anything symbol-shaped it is not a stylistic preference over shell search — it is
+the tool that answers the question correctly, because it resolves declarations rather than matching text:
+
+| Question                             | Reach for                               | Not             |
+| ------------------------------------ | --------------------------------------- | --------------- |
+| Where is `X` defined?                | `find_symbol`                           | `grep -rn "X"`  |
+| What calls `X`?                      | `find_referencing_symbols`              | `grep -rn "X("` |
+| What does this file contain?         | `get_symbols_overview`                  | `cat` / `head`  |
+| Rename a symbol, or replace its body | `rename_symbol` / `replace_symbol_body` | `sed`           |
+
+Shell search remains the right tool where there are no symbols to resolve: the generated SQL under
+`apps/*/generated/drizzle`, `.env.example` files, JSON, and markdown. Use `rg` there without hesitation.
+
 ## Validation
 
 Every command runs **from the repo root** — workspaces carry no tooling scripts of their own.
