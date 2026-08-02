@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
@@ -146,12 +146,18 @@ export class ApplicationMemberService {
    * enriched with when they first and last used it. Keying on the accessible set — not on membership —
    * is deliberate: it surfaces apps the user can open but has never launched, and drops apps they once
    * used but can no longer reach (D-A4), so the launcher never advertises access the sign-in gate denies.
+   *
+   * Identity itself is excluded: the launcher answers "where else can I go", and the user is already
+   * inside the app it would link back to. The exclusion lives here rather than in the access resolver
+   * because that set also backs `assertUserAccess` — dropping identity there would deny its own sign-in.
    */
   async listAccessibleApplications(userId: bigint): Promise<AccessibleApplicationRow[]> {
     const accessibleIds = [...(await this.accessService.resolveAccessibleApplicationIds(userId))];
     if (accessibleIds.length === 0) return [];
 
-    const applications = await this.db.query.applications.findMany({ where: inArray(schema.applications.id, accessibleIds) });
+    const applications = await this.db.query.applications.findMany({
+      where: and(inArray(schema.applications.id, accessibleIds), ne(schema.applications.name, APP_NAME)),
+    });
     const usageRows = await this.db
       .select({ applicationId: schema.applicationMembers.applicationId, firstUsedAt: schema.applicationMembers.firstUsedAt, lastUsedAt: schema.applicationMembers.lastUsedAt })
       .from(schema.applicationMembers)

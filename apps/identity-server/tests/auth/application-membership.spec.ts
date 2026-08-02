@@ -68,9 +68,12 @@ describe('Application membership provisioning', () => {
     expect(second?.lastUsedAt.getTime()).toBeGreaterThanOrEqual(first?.lastUsedAt.getTime() ?? 0);
   });
 
+  /** The launcher points elsewhere, so it is fixtured on a real product app — identity excludes itself by design. */
   it("lists the user's applications through the self-service endpoint", async () => {
     const user = await newUser('me');
-    await env.getService(ApplicationMemberService).ensureMembership(platformAppId, user.id);
+    const name = `membership-app-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const product = await env.getService(ApplicationService).createApplication({ name, subDomain: name, visibility: 'PUBLIC' });
+    await env.getService(ApplicationMemberService).ensureMembership(product.id, user.id);
     const { secret } = await env.getService(SessionService).create({ userId: user.id, aal: 'AAL1' });
 
     const csrf = csrfPair();
@@ -83,7 +86,8 @@ describe('Application membership provisioning', () => {
 
     expect(response.statusCode).toBe(200);
     const apps = (response.json() as { applications: { id: number; name: string }[] }).applications;
-    expect(apps.map(app => app.name)).toContain(APP_NAME);
+    expect(apps.map(app => app.name)).toContain(name);
+    expect(apps.map(app => app.name)).not.toContain(APP_NAME);
   });
 
   it('requires authentication for the self-service endpoint', async () => {

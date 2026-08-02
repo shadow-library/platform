@@ -7,6 +7,7 @@ import { and, eq } from 'drizzle-orm';
 /**
  * Importing user defined packages
  */
+import { APP_NAME } from '@server/constants';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
@@ -87,6 +88,27 @@ describe('My applications launcher', () => {
     const restricted = await createApp('RESTRICTED');
     const items = await launcher();
     expect(items.some(item => item.id === restricted)).toBe(false);
+  });
+
+  it('should never surface the identity application itself', async () => {
+    const identity = env.getService(ApplicationService).getApplicationOrThrow(APP_NAME);
+    const items = await launcher();
+    expect(items.some(item => item.id === identity.id)).toBe(false);
+    expect(items.some(item => item.name === APP_NAME)).toBe(false);
+  });
+
+  /** Guards the exclusion against being pushed down into the access resolver, which also gates sign-in. */
+  it('should still resolve the identity application as accessible even though the launcher hides it', async () => {
+    const identity = env.getService(ApplicationService).getApplicationOrThrow(APP_NAME);
+    const grants = await env.getService(ApplicationAccessService).resolveAccessibleApplicationIds(userId);
+    expect(grants.has(identity.id)).toBe(true);
+    await expect(env.getService(ApplicationAccessService).assertUserAccess(userId, identity.id)).resolves.toBeUndefined();
+  });
+
+  it('should keep listing other applications once identity is filtered out', async () => {
+    const publicApp = await createApp('PUBLIC');
+    const items = await launcher();
+    expect(items.some(item => item.id === publicApp)).toBe(true);
   });
 
   it('should drop an app the user used but can no longer reach', async () => {
