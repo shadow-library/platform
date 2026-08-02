@@ -36,9 +36,12 @@ export interface ThemeProviderProps extends ThemeInitScriptOptions {
   /** Fallback theme when nothing is persisted and the OS preference can't be read. @default 'light' */
   defaultTheme?: Theme;
   /**
-   * Domain to write the cookie for. Set it to the registrable parent domain (`.example.com`) so every app on a
-   * subdomain of it shares one theme; leave it unset for a host-only cookie — the right choice on `localhost`,
-   * where apps already share the host because a cookie's scope ignores the port.
+   * Domain to write the cookie for. Leave it unset: the provider derives the registrable parent
+   * (`identity.example.com` → `.example.com`) so every app on a sibling subdomain shares one theme, and
+   * falls back to a host-only cookie wherever there is no parent to widen to (`localhost`, an IP, a bare
+   * registrable domain) or the browser refuses the one derived.
+   *
+   * Pass it only to override that — a deployment whose apps do not sit on sibling subdomains.
    */
   cookieDomain?: string;
 }

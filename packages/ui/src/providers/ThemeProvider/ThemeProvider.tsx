@@ -60,13 +60,47 @@ function readCookie(name: string): Theme | null {
   return value === 'light' || value === 'dark' ? value : null;
 }
 
-/** Persist an explicit choice, or erase it (`system`) by expiring the cookie in the same scope it was written. */
-function writeCookie(name: string, mode: ThemeMode, domain: string | undefined): void {
+function setCookie(name: string, mode: ThemeMode, domain: string | undefined): void {
   const value = mode === 'system' ? '' : mode;
   const attributes = [`${name}=${value}`, 'path=/', `max-age=${mode === 'system' ? 0 : COOKIE_MAX_AGE}`, 'samesite=lax'];
   if (domain) attributes.push(`domain=${domain}`);
   if (window.location.protocol === 'https:') attributes.push('secure');
   document.cookie = attributes.join('; ');
+}
+
+/**
+ * The domain that spans every app on this host's parent — `identity.shadow-apps.test` → `.shadow-apps.test`.
+ *
+ * Derived rather than configured because the alternative is a build-time variable, which bakes one
+ * environment's domain into the image and does nothing when omitted: the preference then silently stops
+ * crossing apps, which is exactly how this last broke.
+ *
+ * Returns nothing where there is no parent worth widening to — an IP literal, `localhost`, or a bare
+ * registrable domain, whose parent would be a public suffix.
+ */
+function sharedDomain(hostname: string): string | undefined {
+  if (hostname.includes(':') || /^\d+(\.\d+)*$/.test(hostname)) return undefined;
+  const labels = hostname.split('.');
+  if (labels.length < 3) return undefined;
+  return `.${labels.slice(1).join('.')}`;
+}
+
+/**
+ * Persist an explicit choice, or erase it (`system`), in the widest scope the browser will accept.
+ *
+ * Two failure modes are handled here rather than left to the caller. A host-only cookie written by an
+ * earlier build shares this one's name but has a narrower scope, and `document.cookie` exposes no way to
+ * tell the two apart — so it is cleared before the shared one is written, or it would shadow it forever.
+ * And a domain the browser refuses (a public suffix such as `.co.uk`) is dropped with no error at all, so
+ * the write is read back and retried host-only rather than losing the preference outright.
+ */
+function writeCookie(name: string, mode: ThemeMode, domain: string | undefined): void {
+  const scope = domain ?? sharedDomain(window.location.hostname);
+  if (scope == null) return setCookie(name, mode, undefined);
+
+  setCookie(name, 'system', undefined);
+  setCookie(name, mode, scope);
+  if (mode !== 'system' && readCookie(name) == null) setCookie(name, mode, undefined);
 }
 
 function systemTheme(fallback: Theme): Theme {

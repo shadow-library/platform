@@ -15,13 +15,16 @@
  */
 
 /**
- * The domain every Shadow app writes its theme cookie for, read from `VITE_THEME_COOKIE_DOMAIN`.
+ * An explicit override for the theme cookie's domain, read from `VITE_THEME_COOKIE_DOMAIN`.
  *
- * The platform's apps are separate origins, so `localStorage` cannot carry a shared preference between them.
- * A cookie scoped to the registrable parent domain (`.shadow-apps.com`) can: it is visible to every app on a
- * subdomain of it, which is what makes a theme picked in one app the theme the next one opens with. Deploy
- * environments set the var; development leaves it unset, where a host-only cookie is already shared because
- * cookie scope ignores the port that distinguishes the local dev origins.
+ * **Optional, and normally unset.** `ThemeProvider` derives the registrable parent of the current host on its
+ * own (`identity.shadow-apps.com` → `.shadow-apps.com`), which is what lets a theme picked in one app be the
+ * theme the next one opens with. Pass this only where that derivation is wrong — apps that do not sit on
+ * sibling subdomains of one parent.
+ *
+ * Reach for it reluctantly: `VITE_*` is inlined at **build time**, so a value here bakes one environment's
+ * domain into the image and needs a separate build per environment. Omitting it once already shipped four
+ * images that each wrote a host-only cookie, silently confining the theme to one app.
  *
  * `import.meta.env` is injected only by Vite-family bundlers, so it is read defensively — keeping this module
  * import-safe in a plain Node/SSR runtime where `import.meta.env` is absent.

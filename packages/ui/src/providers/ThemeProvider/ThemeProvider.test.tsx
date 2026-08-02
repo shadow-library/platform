@@ -215,3 +215,144 @@ describe('themeInitScript', () => {
     expect(() => themeInitScript({ legacyStorageKey: "x');alert(1);//" })).toThrow(/Invalid theme storage key/);
   });
 });
+
+/**
+ * `document.cookie` never reads back the attributes a write carried, so the scope a cookie was written
+ * for is only observable by intercepting the write itself.
+ */
+function cookieDescriptor(): PropertyDescriptor {
+  for (let target: object | null = document; target; target = Object.getPrototypeOf(target)) {
+    const descriptor = Object.getOwnPropertyDescriptor(target, 'cookie');
+    if (descriptor?.get && descriptor.set) return descriptor;
+  }
+  throw new Error('no `document.cookie` accessor to wrap');
+}
+
+function captureCookieWrites(): string[] {
+  const writes: string[] = [];
+  const descriptor = cookieDescriptor();
+  Object.defineProperty(document, 'cookie', {
+    configurable: true,
+    get: () => descriptor.get?.call(document),
+    set: (value: string) => {
+      writes.push(value);
+      descriptor.set?.call(document, value);
+    },
+  });
+  return writes;
+}
+
+function atHost(hostname: string): void {
+  vi.spyOn(window.location, 'hostname', 'get').mockReturnValue(hostname);
+}
+
+describe('ThemeProvider cookie scope', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(document, 'cookie');
+    vi.restoreAllMocks();
+  });
+
+  it('should widen the cookie to the registrable parent so sibling apps share it', async () => {
+    atHost('identity.shadow-apps.test');
+    const writes = captureCookieWrites();
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+
+    await userEvent.click(screen.getByText('toggle'));
+
+    expect(writes.some(write => write.includes('shadow-theme=dark') && write.includes('domain=.shadow-apps.test'))).toBe(true);
+  });
+
+  it('should clear the host-only twin an earlier build left behind, which would otherwise shadow the shared cookie', async () => {
+    atHost('identity.shadow-apps.test');
+    const writes = captureCookieWrites();
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+
+    await userEvent.click(screen.getByText('toggle'));
+
+    const erase = writes.findIndex(write => write.includes('shadow-theme=;') && !write.includes('domain='));
+    const widen = writes.findIndex(write => write.includes('domain=.shadow-apps.test'));
+    expect(erase).toBeGreaterThanOrEqual(0);
+    expect(erase).toBeLessThan(widen);
+  });
+
+  it('should stay host-only on a single-label host, where there is no parent to widen to', async () => {
+    atHost('localhost');
+    const writes = captureCookieWrites();
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+
+    await userEvent.click(screen.getByText('toggle'));
+
+    expect(writes.every(write => !write.includes('domain='))).toBe(true);
+  });
+
+  it('should stay host-only on a bare registrable domain, whose parent is a public suffix', async () => {
+    atHost('shadow-apps.test');
+    const writes = captureCookieWrites();
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+
+    await userEvent.click(screen.getByText('toggle'));
+
+    expect(writes.every(write => !write.includes('domain='))).toBe(true);
+  });
+
+  it('should stay host-only on an IP literal', async () => {
+    atHost('127.0.0.1');
+    const writes = captureCookieWrites();
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+
+    await userEvent.click(screen.getByText('toggle'));
+
+    expect(writes.every(write => !write.includes('domain='))).toBe(true);
+  });
+
+  it('should honour an explicit cookieDomain over the derived one', async () => {
+    atHost('identity.shadow-apps.test');
+    const writes = captureCookieWrites();
+    render(
+      <ThemeProvider cookieDomain=".override.test">
+        <Probe />
+      </ThemeProvider>,
+    );
+
+    await userEvent.click(screen.getByText('toggle'));
+
+    expect(writes.some(write => write.includes('domain=.override.test'))).toBe(true);
+    expect(writes.every(write => !write.includes('domain=.shadow-apps.test'))).toBe(true);
+  });
+
+  it('should erase both scopes when the mode goes back to system, so no stale twin survives', async () => {
+    atHost('identity.shadow-apps.test');
+    const writes = captureCookieWrites();
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'system' }));
+
+    const erases = writes.filter(write => write.includes('shadow-theme=;') || write.includes('max-age=0'));
+    expect(erases.some(write => write.includes('domain=.shadow-apps.test'))).toBe(true);
+    expect(erases.some(write => !write.includes('domain='))).toBe(true);
+  });
+});
