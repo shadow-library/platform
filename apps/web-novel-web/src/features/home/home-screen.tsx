@@ -9,7 +9,7 @@ import { usePwaInstall } from '@shadow-library/web/pwa';
 /**
  * Importing user defined packages
  */
-import { ChevronRightIcon, DownloadIcon, ExternalIcon, PlayIcon, ShieldIcon, StarIcon } from '@/components/icons';
+import { ChevronRightIcon, DownloadIcon, ExternalIcon, PlayIcon, StarIcon } from '@/components/icons';
 import { Cover, formatCount, NovelCard } from '@/components/novel';
 import styles from '@/features/home/home-screen.module.css';
 import { catalogQueryOptions, progressQueryOptions, sessionQueryOptions } from '@/lib/apis';
@@ -58,7 +58,6 @@ export function HomeScreen(): React.JSX.Element {
 
   const featured = continueItems[0]?.novel ?? novels[0];
   const featuredProgress = featured ? progressMap[featured.slug] : undefined;
-  const signedOut = session.data === null;
 
   return (
     <div className={`${styles.page} wn-fade`}>
@@ -96,18 +95,6 @@ export function HomeScreen(): React.JSX.Element {
               </div>
             </div>
           </div>
-        </section>
-      )}
-
-      {signedOut && (
-        <section className={styles.guestNotice}>
-          <ShieldIcon size={18} />
-          <span>
-            You’re reading as a guest. Your library, history and downloads are saved <strong>on this device</strong>. Sign in to sync them everywhere.
-          </span>
-          <Button variant="secondary" size="sm" asChild>
-            <Link to="/login">Sign in</Link>
-          </Button>
         </section>
       )}
 

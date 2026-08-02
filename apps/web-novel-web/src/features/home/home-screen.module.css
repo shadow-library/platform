@@ -115,24 +115,6 @@
   align-items: center;
 }
 
-.guestNotice {
-  margin: 6px 20px 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: var(--sh-radius-lg);
-  background: var(--sh-accent-soft);
-  border: 1px solid var(--sh-border-subtle);
-  font-size: 13px;
-  color: var(--sh-text-secondary);
-  line-height: 1.45;
-}
-
-.guestNotice strong {
-  color: var(--sh-text-primary);
-}
-
 .section {
   padding: 22px 0 4px;
 }
