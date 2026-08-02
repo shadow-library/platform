@@ -88,6 +88,16 @@ export function validateOpenApiDocument(value: unknown, sourceUrl: string): Open
 }
 
 /**
+ * Collapses every run of non-alphanumeric characters (`/`, `{`, `}`, `-`, …) in a path to a single `_` and
+ * trims leading/trailing ones — e.g. `/internal/novels/{slug}/manifest` → `internal_novels_slug_manifest`.
+ * Collapsing runs (not just replacing each character) matters: a raw path has adjacent separators
+ * (`/{slug}` is `/` then `{`), and replacing them one-for-one would leave stray `_` behind.
+ */
+function normalizePath(pathKey: string): string {
+  return pathKey.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+/**
  * Rewrites every operationId to `${method}_${normalizedPath}`. The framework this ecosystem's servers
  * are built on (`@shadow-library/fastify`) derives operationIds from controller method names
  * (list/create/remove/…), which collide across controllers; deriving instead from method + path is
@@ -98,7 +108,7 @@ function rewriteOperationIds(document: OpenApiDocument): void {
     for (const method of HTTP_METHODS) {
       const operation = pathItem[method];
       if (!operation) continue;
-      operation.operationId = `${method}_${pathKey.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')}`;
+      operation.operationId = `${method}_${normalizePath(pathKey)}`;
     }
   }
 }
@@ -133,27 +143,77 @@ export function transformOpenApiDocument(document: OpenApiDocument): OpenApiDocu
   return clone;
 }
 
+/** One GET operation's alias inputs, ahead of the collision check `buildTypeAliases` runs before naming anything. */
+interface AliasCandidate {
+  pathKey: string;
+  baseName: string;
+  hasQueryParams: boolean;
+  hasPathParams: boolean;
+}
+
 /**
  * Builds the hand-written type aliases appended after the `openapi-typescript` output:
  *  - every named schema surfaced as a top-level alias (`MeResponse` instead of `components['schemas']['MeResponse']`)
  *  - a `<Name>QueryParams`/`<Name>PathParams` alias per GET operation that has query/path params, named
  *    from the operation's `summary` when present (falling back to its operationId so generation never
  *    breaks on a spec that omits summaries).
+ *
+ * `summary` comes from `@shadow-library/fastify`'s `@HttpRoute` decorator, which derives it from the
+ * *controller method name* alone (`http-route.decorator.ts`) — not the path. Two controllers with same-named
+ * handlers (`getManifest` on both the chapter-publish and wiki-publish controllers, say) produce identical
+ * summaries and therefore identical `<Name>PathParams`/`<Name>QueryParams` aliases, even though their paths
+ * differ. Since an OpenAPI document's path keys are themselves unique by construction, any alias name whose
+ * summary-derived form collides with another route's is deterministically replaced — for every route sharing
+ * that name, not just the newcomer, so the rule never depends on object-iteration order — with one derived
+ * from the *full path* instead, which can't collide. Non-colliding routes keep their existing, already-committed
+ * names untouched, so this never churns a web app's `api-types.gen.ts` beyond the routes that actually collide.
  */
 export function buildTypeAliases(document: OpenApiDocument): string {
   let output = '';
 
   for (const key of Object.keys(document.components?.schemas ?? {})) output += `export type ${key} = components['schemas']['${key}'];\n`;
 
+  const candidates: AliasCandidate[] = [];
   for (const [pathKey, pathItem] of Object.entries(document.paths ?? {})) {
     const operation = pathItem.get;
     if (!operation?.parameters?.length) continue;
 
     const baseName = operation.summary ? operation.summary.replace(/[^a-zA-Z0-9]/g, '') : toIdentifier(operation.operationId ?? pathKey);
-    const hasQueryParams = operation.parameters.some(param => param.in === 'query');
-    const hasPathParams = operation.parameters.some(param => param.in === 'path');
-    if (hasQueryParams) output += `export type ${baseName}QueryParams = Exclude<paths['${pathKey}']['get']['parameters']['query'], undefined>;\n`;
-    if (hasPathParams) output += `export type ${baseName}PathParams = Exclude<paths['${pathKey}']['get']['parameters']['path'], undefined>;\n`;
+    candidates.push({
+      pathKey,
+      baseName,
+      hasQueryParams: operation.parameters.some(param => param.in === 'query'),
+      hasPathParams: operation.parameters.some(param => param.in === 'path'),
+    });
+  }
+
+  // Tally how many routes would land on the same summary-derived name for each suffix, independently —
+  // a route can share its `QueryParams` name with one route and its `PathParams` name with a different one.
+  const occurrences = new Map<string, number>();
+  const tally = (name: string) => occurrences.set(name, (occurrences.get(name) ?? 0) + 1);
+  for (const candidate of candidates) {
+    if (candidate.hasQueryParams) tally(`${candidate.baseName}QueryParams`);
+    if (candidate.hasPathParams) tally(`${candidate.baseName}PathParams`);
+  }
+
+  const usedNames = new Set<string>();
+  const resolveName = (candidate: AliasCandidate, suffix: 'QueryParams' | 'PathParams'): string => {
+    const preferred = `${candidate.baseName}${suffix}`;
+    const name = (occurrences.get(preferred) ?? 0) > 1 ? `${toIdentifier(normalizePath(candidate.pathKey))}${suffix}` : preferred;
+    // Path keys are unique OpenAPI document keys, so a path-derived name can only collide with another
+    // path-derived name if two candidates were generated from identical paths, which cannot happen — this
+    // check exists to fail loudly instead of silently emitting a duplicate identifier if that ever changes.
+    if (usedNames.has(name))
+      throw new ShadowError(`buildTypeAliases produced a duplicate alias "${name}" for ${candidate.pathKey} — this is a bug in the disambiguation rule itself.`);
+    usedNames.add(name);
+    return name;
+  };
+
+  for (const candidate of candidates) {
+    if (candidate.hasQueryParams)
+      output += `export type ${resolveName(candidate, 'QueryParams')} = Exclude<paths['${candidate.pathKey}']['get']['parameters']['query'], undefined>;\n`;
+    if (candidate.hasPathParams)
+      output += `export type ${resolveName(candidate, 'PathParams')} = Exclude<paths['${candidate.pathKey}']['get']['parameters']['path'], undefined>;\n`;
   }
 
   return output;
