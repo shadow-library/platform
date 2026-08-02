@@ -6,7 +6,6 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest } from './api-request';
 import {
   type AddEntityImageBody,
   type CreateEntityBody,
@@ -16,6 +15,7 @@ import {
   type UpdateEntityBody,
   type UploadImageBody,
 } from './api-types.gen';
+import { ApiError, APIRequest } from './transport';
 
 /**
  * Defining types

@@ -6,8 +6,8 @@ import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } fro
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest, type PollingOptions } from './api-request';
 import { type AiUsageResponse, type AssetsResponse, type CostResponse, type ListGenerationJobResponse } from './api-types.gen';
+import { ApiError, APIRequest, type PollingOptions } from './transport';
 
 /**
  * Cross-cutting project insights: AI spend, background jobs, and rendered output.

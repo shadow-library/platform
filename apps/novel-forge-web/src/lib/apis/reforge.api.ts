@@ -6,8 +6,8 @@ import { useMutation, type UseMutationResult, useQuery, useQueryClient, type Use
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest } from './api-request';
 import { type JobEnqueueResponse, type JobResponse } from './api-types.gen';
+import { ApiError, APIRequest } from './transport';
 
 /**
  * The reforge pipeline re-authors a source novel from scratch: it reuses the rebrand rename bible, then

@@ -6,8 +6,8 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest } from './api-request';
 import { type BriefResponse, type ListBriefSummaryResponse, type UpdateBriefBody } from './api-types.gen';
+import { ApiError, APIRequest } from './transport';
 
 /**
  * Per-chapter briefs — the structured plan the writing step turns into prose.

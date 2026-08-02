@@ -6,8 +6,8 @@ import { useMutation, type UseMutationResult, useQueryClient } from '@tanstack/r
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest } from './api-request';
 import { type ConsolidateResponse, type ExtractBody, type JobEnqueueResponse, type SkeletonResponse } from './api-types.gen';
+import { ApiError, APIRequest } from './transport';
 
 /**
  * Source-pipeline actions for imported source projects: extract a bible from the chapters the

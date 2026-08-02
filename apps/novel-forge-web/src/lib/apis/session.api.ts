@@ -8,7 +8,7 @@ import { type AuthLogoutResult, type AuthPrincipal, createAuthApi } from '@shado
 /**
  * Importing user defined packages
  */
-import { apiClient, type ApiError } from './api-request';
+import { apiClient, type ApiError } from './transport';
 
 /**
  * Defining types

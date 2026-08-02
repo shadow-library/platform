@@ -6,8 +6,8 @@ import { useMutation, type UseMutationResult, useQueryClient } from '@tanstack/r
 /**
  * Importing user defined packages
  */
-import { type ApiError, APIRequest } from './api-request';
 import { type ImportPlanBody, type ImportPlanResponse } from './api-types.gen';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Declaring the constants

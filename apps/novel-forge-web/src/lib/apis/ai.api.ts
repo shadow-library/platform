@@ -6,8 +6,8 @@ import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } fro
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest } from './api-request';
 import { type AiModelsResponse } from './api-types.gen';
+import { ApiError, APIRequest } from './transport';
 
 /**
  * The AI model registry: every routable model (with its provider) plus the subprocess CLI providers,

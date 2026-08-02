@@ -6,8 +6,8 @@ import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } fro
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest } from './api-request';
 import { type ChapterResponse, type ListChapterResponse, type ListChaptersQueryParams } from './api-types.gen';
+import { ApiError, APIRequest } from './transport';
 
 /**
  * Source chapters are a project's chapters supplied via a novel-import bundle (distinct from

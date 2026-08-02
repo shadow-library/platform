@@ -6,8 +6,8 @@ import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 /**
  * Importing user defined packages
  */
-import { type ApiError, APIRequest } from './api-request';
 import { type ImportNovelResponse, type NovelBundle } from './api-types.gen';
+import { type ApiError, APIRequest } from './transport';
 
 /**
  * Declaring the constants

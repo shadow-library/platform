@@ -6,8 +6,8 @@ import { useMutation, type UseMutationResult, useQuery, useQueryClient, type Use
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest } from './api-request';
 import { type AccessGrantItem, type PublicationAccessBody, type PublicationAccessResponse } from './api-types.gen';
+import { ApiError, APIRequest } from './transport';
 
 /**
  * The reader-publish surface (reader-publish design §7): the forge-side publication ledger and the

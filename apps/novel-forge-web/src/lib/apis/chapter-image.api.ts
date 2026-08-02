@@ -6,8 +6,8 @@ import { useMutation, type UseMutationResult, useQuery, useQueryClient, type Use
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest } from './api-request';
 import { type AddChapterImageBody } from './api-types.gen';
+import { ApiError, APIRequest } from './transport';
 
 /**
  * Defining types

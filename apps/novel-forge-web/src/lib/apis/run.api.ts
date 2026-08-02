@@ -6,8 +6,8 @@ import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } fro
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest, type PollingOptions } from './api-request';
 import { type ListWorkflowRunResponse, type RunContextResponse, type RunModelCallDetailResponse, type WorkflowRunDetailResponse } from './api-types.gen';
+import { ApiError, APIRequest, type PollingOptions } from './transport';
 
 /**
  * Workflow runs are the orchestrator's execution records — every generate, judge,

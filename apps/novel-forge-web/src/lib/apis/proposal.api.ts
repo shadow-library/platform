@@ -6,8 +6,8 @@ import { useMutation, type UseMutationResult, useQueryClient } from '@tanstack/r
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest } from './api-request';
 import { type ContinuityProposalResponse } from './api-types.gen';
+import { ApiError, APIRequest } from './transport';
 
 /**
  * Continuity proposals are the AI's suggested canon edits for a single chapter, surfaced in the

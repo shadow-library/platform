@@ -6,7 +6,6 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest } from './api-request';
 import {
   type DraftResponse,
   type FeedbackBody,
@@ -26,6 +25,7 @@ import {
   type UserFeedbackResponse,
   type WorkflowRunResponse,
 } from './api-types.gen';
+import { ApiError, APIRequest } from './transport';
 
 /**
  * Drafts are the generated chapters of a project (distinct from imported source

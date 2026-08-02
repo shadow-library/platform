@@ -6,8 +6,8 @@ import { useMutation, type UseMutationResult, useQuery, useQueryClient, type Use
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest } from './api-request';
 import { type JobEnqueueResponse, type JobResponse, type RebrandConfigBody, type RebrandStartBody } from './api-types.gen';
+import { ApiError, APIRequest } from './transport';
 
 /**
  * The rebrand pipeline converts a source novel into an alternate-world version

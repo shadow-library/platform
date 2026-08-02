@@ -6,8 +6,8 @@ import { useMutation, type UseMutationResult, useQuery, useQueryClient, type Use
 /**
  * Importing user defined packages
  */
-import { ApiError, APIRequest } from './api-request';
 import { type BibleDocResponse, type BibleSection, type ListBibleDocResponse, type UpsertBibleDocBody } from './api-types.gen';
+import { ApiError, APIRequest } from './transport';
 
 /**
  * Story Bible documents, addressed by section + slug. A missing document is a
