@@ -1,2 +1,0 @@
-ALTER TABLE "saml_service_providers" ADD COLUMN "application_id" integer;--> statement-breakpoint
-ALTER TABLE "saml_service_providers" ADD CONSTRAINT "saml_service_providers_application_id_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."applications"("id") ON DELETE set null ON UPDATE no action;

@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1784972556204,
-      "tag": "0000_outgoing_kat_farrell",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1785071931843,
-      "tag": "0001_amazing_revanche",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1785093527930,
-      "tag": "0002_slim_iron_fist",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1785125047865,
-      "tag": "0003_great_penance",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1785157079989,
-      "tag": "0004_last_whiplash",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1785347533893,
-      "tag": "0005_pulse_internal_visibility",
+      "when": 1785616505077,
+      "tag": "0000_mighty_prodigy",
       "breakpoints": true
     }
   ]

@@ -1,5 +1,5 @@
 {
-  "id": "882e5fab-4513-402f-97ba-7ebfd3af7478",
+  "id": "2ba3d7f5-cd4b-4a5a-8a76-1dfff2aed0d6",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -3100,6 +3100,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "application_id": {
+          "name": "application_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "name_id_format": {
           "name": "name_id_format",
           "type": "saml_name_id_format",
@@ -3143,7 +3149,21 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "saml_service_providers_application_id_applications_id_fk": {
+          "name": "saml_service_providers_application_id_applications_id_fk",
+          "tableFrom": "saml_service_providers",
+          "tableTo": "applications",
+          "columnsFrom": [
+            "application_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "saml_service_providers_entity_id_unique": {
@@ -3377,6 +3397,87 @@
         }
       },
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.scim_group_role_mappings": {
+      "name": "scim_group_role_mappings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "group_id": {
+          "name": "group_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role_id": {
+          "name": "role_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "scim_group_role_mappings_group_id_scim_groups_id_fk": {
+          "name": "scim_group_role_mappings_group_id_scim_groups_id_fk",
+          "tableFrom": "scim_group_role_mappings",
+          "tableTo": "scim_groups",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "scim_group_role_mappings_role_id_application_roles_id_fk": {
+          "name": "scim_group_role_mappings_role_id_application_roles_id_fk",
+          "tableFrom": "scim_group_role_mappings",
+          "tableTo": "application_roles",
+          "columnsFrom": [
+            "role_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "scim_group_role_mappings_group_role_unique": {
+          "name": "scim_group_role_mappings_group_role_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "group_id",
+            "role_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -3783,6 +3884,32 @@
           "notNull": true,
           "default": "'MEMBER'"
         },
+        "status": {
+          "name": "status",
+          "type": "organisation_member_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ACTIVE'"
+        },
+        "status_reason": {
+          "name": "status_reason",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_changed_at": {
+          "name": "status_changed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_until": {
+          "name": "status_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "joined_at": {
           "name": "joined_at",
           "type": "timestamp with time zone",
@@ -3871,6 +3998,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'ACTIVE'"
+        },
+        "app_access_mode": {
+          "name": "app_access_mode",
+          "type": "organisation_app_access_mode",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ALL_APPS'"
         },
         "deleted_at": {
           "name": "deleted_at",
@@ -4094,6 +4229,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "is_default": {
+          "name": "is_default",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -4191,6 +4333,14 @@
           "notNull": true,
           "default": true
         },
+        "visibility": {
+          "name": "visibility",
+          "type": "application_visibility",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PUBLIC'"
+        },
         "sub_domain": {
           "name": "sub_domain",
           "type": "varchar(255)",
@@ -4243,6 +4393,103 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.organisation_applications": {
+      "name": "organisation_applications",
+      "schema": "",
+      "columns": {
+        "organisation_id": {
+          "name": "organisation_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "application_id": {
+          "name": "application_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "organisation_application_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assigned_by": {
+          "name": "assigned_by",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assigned_at": {
+          "name": "assigned_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "organisation_applications_application_id_idx": {
+          "name": "organisation_applications_application_id_idx",
+          "columns": [
+            {
+              "expression": "application_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "organisation_applications_organisation_id_organisations_id_fk": {
+          "name": "organisation_applications_organisation_id_organisations_id_fk",
+          "tableFrom": "organisation_applications",
+          "tableTo": "organisations",
+          "columnsFrom": [
+            "organisation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "organisation_applications_application_id_applications_id_fk": {
+          "name": "organisation_applications_application_id_applications_id_fk",
+          "tableFrom": "organisation_applications",
+          "tableTo": "applications",
+          "columnsFrom": [
+            "application_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "organisation_applications_organisation_id_application_id_source_pk": {
+          "name": "organisation_applications_organisation_id_application_id_source_pk",
+          "columns": [
+            "organisation_id",
+            "application_id",
+            "source"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -4759,6 +5006,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "status_reason": {
+          "name": "status_reason",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_changed_at": {
+          "name": "status_changed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_until": {
+          "name": "status_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "lock_mode": {
           "name": "lock_mode",
           "type": "user_lock_mode",
@@ -5104,7 +5369,8 @@
       "schema": "public",
       "values": [
         "USER",
-        "SERVICE_ACCOUNT"
+        "SERVICE_ACCOUNT",
+        "ORGANISATION"
       ]
     },
     "public.challenge_type": {
@@ -5245,6 +5511,14 @@
         "PERSISTENT"
       ]
     },
+    "public.organisation_app_access_mode": {
+      "name": "organisation_app_access_mode",
+      "schema": "public",
+      "values": [
+        "ALL_APPS",
+        "ASSIGNED_ONLY"
+      ]
+    },
     "public.organisation_domain_status": {
       "name": "organisation_domain_status",
       "schema": "public",
@@ -5263,6 +5537,15 @@
         "MEMBER"
       ]
     },
+    "public.organisation_member_status": {
+      "name": "organisation_member_status",
+      "schema": "public",
+      "values": [
+        "ACTIVE",
+        "SUSPENDED",
+        "BLOCKED"
+      ]
+    },
     "public.organisation_status": {
       "name": "organisation_status",
       "schema": "public",
@@ -5278,6 +5561,23 @@
       "values": [
         "PERSONAL",
         "TEAM"
+      ]
+    },
+    "public.application_visibility": {
+      "name": "application_visibility",
+      "schema": "public",
+      "values": [
+        "PUBLIC",
+        "RESTRICTED",
+        "INTERNAL"
+      ]
+    },
+    "public.organisation_application_source": {
+      "name": "organisation_application_source",
+      "schema": "public",
+      "values": [
+        "PLATFORM_RELEASE",
+        "ORG_ASSIGNMENT"
       ]
     },
     "public.gender": {

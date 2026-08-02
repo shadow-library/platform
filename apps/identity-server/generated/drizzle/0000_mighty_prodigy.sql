@@ -4,7 +4,7 @@ CREATE TYPE "public"."audit_outcome" AS ENUM('SUCCESS', 'DENIED', 'FAILURE');-->
 CREATE TYPE "public"."session_aal" AS ENUM('AAL1', 'AAL2');--> statement-breakpoint
 CREATE TYPE "public"."session_status" AS ENUM('ACTIVE', 'REVOKED', 'TERMINATED', 'EXPIRED');--> statement-breakpoint
 CREATE TYPE "public"."sign_in_status" AS ENUM('SUCCESS', 'INVALID_CREDENTIALS', 'MFA_FAILED', 'ACCOUNT_LOCKED', 'FAILED');--> statement-breakpoint
-CREATE TYPE "public"."principal_type" AS ENUM('USER', 'SERVICE_ACCOUNT');--> statement-breakpoint
+CREATE TYPE "public"."principal_type" AS ENUM('USER', 'SERVICE_ACCOUNT', 'ORGANISATION');--> statement-breakpoint
 CREATE TYPE "public"."challenge_type" AS ENUM('EMAIL_OTP', 'SMS_OTP', 'EMAIL_LINK');--> statement-breakpoint
 CREATE TYPE "public"."consent_source" AS ENUM('USER', 'FIRST_PARTY_POLICY', 'ADMIN');--> statement-breakpoint
 CREATE TYPE "public"."mfa_method" AS ENUM('TOTP', 'WEBAUTHN', 'EMAIL_OTP');--> statement-breakpoint
@@ -20,10 +20,14 @@ CREATE TYPE "public"."refresh_family_status" AS ENUM('ACTIVE', 'REVOKED');--> st
 CREATE TYPE "public"."refresh_revoke_reason" AS ENUM('ROTATION_REUSE', 'LOGOUT', 'ADMIN', 'EXPIRY');--> statement-breakpoint
 CREATE TYPE "public"."refresh_token_status" AS ENUM('ACTIVE', 'ROTATED', 'REVOKED');--> statement-breakpoint
 CREATE TYPE "public"."saml_name_id_format" AS ENUM('EMAIL', 'PERSISTENT');--> statement-breakpoint
+CREATE TYPE "public"."organisation_app_access_mode" AS ENUM('ALL_APPS', 'ASSIGNED_ONLY');--> statement-breakpoint
 CREATE TYPE "public"."organisation_domain_status" AS ENUM('PENDING', 'VERIFIED', 'FAILED');--> statement-breakpoint
 CREATE TYPE "public"."organisation_member_role" AS ENUM('OWNER', 'ADMIN', 'MEMBER');--> statement-breakpoint
+CREATE TYPE "public"."organisation_member_status" AS ENUM('ACTIVE', 'SUSPENDED', 'BLOCKED');--> statement-breakpoint
 CREATE TYPE "public"."organisation_status" AS ENUM('ACTIVE', 'SUSPENDED', 'DELETED');--> statement-breakpoint
 CREATE TYPE "public"."organisation_type" AS ENUM('PERSONAL', 'TEAM');--> statement-breakpoint
+CREATE TYPE "public"."application_visibility" AS ENUM('PUBLIC', 'RESTRICTED', 'INTERNAL');--> statement-breakpoint
+CREATE TYPE "public"."organisation_application_source" AS ENUM('PLATFORM_RELEASE', 'ORG_ASSIGNMENT');--> statement-breakpoint
 CREATE TYPE "public"."gender" AS ENUM('MALE', 'FEMALE', 'OTHER', 'UNSPECIFIED');--> statement-breakpoint
 CREATE TYPE "public"."password_algorithm" AS ENUM('BCRYPT', 'ARGON2ID');--> statement-breakpoint
 CREATE TYPE "public"."user_auth_provider" AS ENUM('PASSWORD', 'OTP', 'TOTP', 'WEBAUTHN', 'RECOVERY_CODE', 'FEDERATED', 'GOOGLE', 'MICROSOFT');--> statement-breakpoint
@@ -396,6 +400,7 @@ CREATE TABLE "saml_service_providers" (
 	"entity_id" text NOT NULL,
 	"name" varchar(255) NOT NULL,
 	"acs_url" text NOT NULL,
+	"application_id" integer,
 	"name_id_format" "saml_name_id_format" DEFAULT 'EMAIL' NOT NULL,
 	"released_attributes" text[] NOT NULL,
 	"sp_certificate_pem" text,
@@ -421,6 +426,15 @@ CREATE TABLE "scim_group_members" (
 	"group_id" uuid NOT NULL,
 	"directory_id" uuid NOT NULL,
 	CONSTRAINT "scim_group_members_group_id_directory_id_pk" PRIMARY KEY("group_id","directory_id")
+);
+--> statement-breakpoint
+CREATE TABLE "scim_group_role_mappings" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"group_id" uuid NOT NULL,
+	"role_id" integer NOT NULL,
+	"created_by" varchar(64),
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "scim_group_role_mappings_group_role_unique" UNIQUE("group_id","role_id")
 );
 --> statement-breakpoint
 CREATE TABLE "scim_groups" (
@@ -465,6 +479,10 @@ CREATE TABLE "organisation_members" (
 	"user_id" bigint NOT NULL,
 	"is_default" boolean DEFAULT false NOT NULL,
 	"role" "organisation_member_role" DEFAULT 'MEMBER' NOT NULL,
+	"status" "organisation_member_status" DEFAULT 'ACTIVE' NOT NULL,
+	"status_reason" varchar(256),
+	"status_changed_at" timestamp with time zone,
+	"status_until" timestamp with time zone,
 	"joined_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "organisation_members_organisation_id_user_id_pk" PRIMARY KEY("organisation_id","user_id")
 );
@@ -475,6 +493,7 @@ CREATE TABLE "organisations" (
 	"name" varchar(255) NOT NULL,
 	"type" "organisation_type" DEFAULT 'TEAM' NOT NULL,
 	"status" "organisation_status" DEFAULT 'ACTIVE' NOT NULL,
+	"app_access_mode" "organisation_app_access_mode" DEFAULT 'ALL_APPS' NOT NULL,
 	"deleted_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -503,6 +522,7 @@ CREATE TABLE "application_roles" (
 	"application_id" integer NOT NULL,
 	"role_name" varchar(255) NOT NULL,
 	"description" text,
+	"is_default" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "application_roles_application_role_unique" UNIQUE("application_id","role_name")
@@ -514,6 +534,7 @@ CREATE TABLE "applications" (
 	"display_name" varchar(255),
 	"description" text,
 	"is_active" boolean DEFAULT true NOT NULL,
+	"visibility" "application_visibility" DEFAULT 'PUBLIC' NOT NULL,
 	"sub_domain" varchar(255) NOT NULL,
 	"public_urls" text[] DEFAULT '{}' NOT NULL,
 	"home_page_url" text,
@@ -521,6 +542,15 @@ CREATE TABLE "applications" (
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "applications_name_unique" UNIQUE("name")
+);
+--> statement-breakpoint
+CREATE TABLE "organisation_applications" (
+	"organisation_id" bigint NOT NULL,
+	"application_id" integer NOT NULL,
+	"source" "organisation_application_source" NOT NULL,
+	"assigned_by" varchar(64),
+	"assigned_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "organisation_applications_organisation_id_application_id_source_pk" PRIMARY KEY("organisation_id","application_id","source")
 );
 --> statement-breakpoint
 CREATE TABLE "password_history" (
@@ -581,6 +611,9 @@ CREATE TABLE "users" (
 	"username" varchar(32),
 	"status" "user_status" DEFAULT 'INACTIVE' NOT NULL,
 	"personal_organisation_id" bigint,
+	"status_reason" varchar(256),
+	"status_changed_at" timestamp with time zone,
+	"status_until" timestamp with time zone,
 	"lock_mode" "user_lock_mode" DEFAULT 'NONE' NOT NULL,
 	"locked_until" timestamp with time zone,
 	"password_reset_required" boolean DEFAULT false NOT NULL,
@@ -651,10 +684,13 @@ ALTER TABLE "organisation_policies" ADD CONSTRAINT "organisation_policies_organi
 ALTER TABLE "refresh_token_families" ADD CONSTRAINT "refresh_token_families_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refresh_token_families" ADD CONSTRAINT "refresh_token_families_session_id_user_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."user_sessions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_family_id_refresh_token_families_id_fk" FOREIGN KEY ("family_id") REFERENCES "public"."refresh_token_families"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "saml_service_providers" ADD CONSTRAINT "saml_service_providers_application_id_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."applications"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "scim_directory" ADD CONSTRAINT "scim_directory_organisation_id_organisations_id_fk" FOREIGN KEY ("organisation_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "scim_directory" ADD CONSTRAINT "scim_directory_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "scim_group_members" ADD CONSTRAINT "scim_group_members_group_id_scim_groups_id_fk" FOREIGN KEY ("group_id") REFERENCES "public"."scim_groups"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "scim_group_members" ADD CONSTRAINT "scim_group_members_directory_id_scim_directory_id_fk" FOREIGN KEY ("directory_id") REFERENCES "public"."scim_directory"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "scim_group_role_mappings" ADD CONSTRAINT "scim_group_role_mappings_group_id_scim_groups_id_fk" FOREIGN KEY ("group_id") REFERENCES "public"."scim_groups"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "scim_group_role_mappings" ADD CONSTRAINT "scim_group_role_mappings_role_id_application_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."application_roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "scim_groups" ADD CONSTRAINT "scim_groups_organisation_id_organisations_id_fk" FOREIGN KEY ("organisation_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "organisation_domains" ADD CONSTRAINT "organisation_domains_organisation_id_organisations_id_fk" FOREIGN KEY ("organisation_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "organisation_invitations" ADD CONSTRAINT "organisation_invitations_organisation_id_organisations_id_fk" FOREIGN KEY ("organisation_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -665,6 +701,8 @@ ALTER TABLE "application_configurations" ADD CONSTRAINT "application_configurati
 ALTER TABLE "application_members" ADD CONSTRAINT "application_members_application_id_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."applications"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "application_members" ADD CONSTRAINT "application_members_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "application_roles" ADD CONSTRAINT "application_roles_application_id_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."applications"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "organisation_applications" ADD CONSTRAINT "organisation_applications_organisation_id_organisations_id_fk" FOREIGN KEY ("organisation_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "organisation_applications" ADD CONSTRAINT "organisation_applications_application_id_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."applications"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "password_history" ADD CONSTRAINT "password_history_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_auth_identities" ADD CONSTRAINT "user_auth_identities_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_emails" ADD CONSTRAINT "user_emails_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -705,6 +743,7 @@ CREATE UNIQUE INDEX "organisation_invitations_pending_unique" ON "organisation_i
 CREATE INDEX "organisation_invitations_email_idx" ON "organisation_invitations" USING btree ("email");--> statement-breakpoint
 CREATE INDEX "application_members_user_id_idx" ON "application_members" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "application_roles_application_id_idx" ON "application_roles" USING btree ("application_id");--> statement-breakpoint
+CREATE INDEX "organisation_applications_application_id_idx" ON "organisation_applications" USING btree ("application_id");--> statement-breakpoint
 CREATE INDEX "password_history_user_id_created_at_idx" ON "password_history" USING btree ("user_id","created_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "user_emails_verified_email_unique" ON "user_emails" USING btree (lower("email_id")) WHERE "user_emails"."verified_at" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "user_emails_primary_unique" ON "user_emails" USING btree ("user_id") WHERE "user_emails"."is_primary";--> statement-breakpoint
