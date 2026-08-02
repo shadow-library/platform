@@ -21,9 +21,6 @@ import OrgSwitcher from './OrgSwitcher';
  * Declaring the constants
  */
 
-/** The reading column every screen sits in; the shell centres it and supplies the gutters. */
-const PAGE_WIDTH = 1200;
-
 const NAV: NavConfig = {
   variant: 'sections',
   sections: [
@@ -107,7 +104,6 @@ export default function Layout({ children }: PropsWithChildren): ReactElement {
         </>
       }
       utility={<ThemeToggle />}
-      contentWidth={PAGE_WIDTH}
     >
       {children}
     </AppShell>
