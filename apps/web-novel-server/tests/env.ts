@@ -7,5 +7,5 @@
  * redirect URIs and scopes are derived from the mock IdP's `GET /api/v1/apps/me` (see `test-idp.ts`,
  * which also points `AUTH_ISSUER` at the mock once its ephemeral port is known).
  */
-process.env.AUTH_APP_ID = 'webnovel';
-process.env.AUTH_CLIENT_SECRET = 'webnovel-test-secret';
+process.env.AUTH_APP_ID = 'web-novel';
+process.env.AUTH_CLIENT_SECRET = 'web-novel-test-secret';

@@ -43,7 +43,7 @@ interface RecordedRequest {
 /**
  * Declaring the constants
  *
- * An in-process reader service speaking webnovel-server's exact `/internal/*` contract: PUT novel /
+ * An in-process reader service speaking web-novel-server's exact `/internal/*` contract: PUT novel /
  * chapter answering 200 applied, 204 no-op (same revision + same content), 409 `WBN_003` on a stale
  * incoming revision; idempotent DELETE 204; bare-array manifest. State is inspectable and wipeable
  * so specs can drive retry, stale-conflict, and wipe-and-rebuild scenarios.

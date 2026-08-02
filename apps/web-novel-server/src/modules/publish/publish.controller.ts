@@ -25,7 +25,7 @@ import { PublishService } from './publish.service';
  * Declaring the constants
  *
  * The one-way push surface novel-forge-server drives; it is never exposed publicly. Every route
- * requires an identity-issued M2M token carrying `webnovel:publish` — a scope end-user tokens
+ * requires an identity-issued M2M token carrying `web-novel:publish` — a scope end-user tokens
  * never receive — and the guard additionally checks the admin-configured service-access rules
  * for the calling client. Mutations answer 200 applied / 204 no-op / 409 stale.
  */

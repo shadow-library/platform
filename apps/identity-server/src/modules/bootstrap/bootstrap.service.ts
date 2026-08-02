@@ -29,6 +29,7 @@ import { EcosystemSeedService } from './ecosystem-seed.service';
  */
 const PLATFORM_RESOURCE = 'shadow-identity';
 const AUTHZ_CHECK_SCOPE = 'authz:check';
+const AUTHZ_ROLES_SYNC_SCOPE = 'authz:roles:sync';
 const SCIM_PROVISION_SCOPE = 'scim:provision';
 
 const ADMIN_PERMISSION_DESCRIPTIONS: Record<string, string> = {
@@ -50,10 +51,10 @@ const ADMIN_PERMISSION_DESCRIPTIONS: Record<string, string> = {
  * administrative role assignments, and a bootstrap administrator account. Runs on every boot and
  * is a no-op once the records exist, so it is safe under horizontal scaling and repeated restarts.
  *
- * First-party ecosystem applications (pulse, novel-forge, webnovel) are provisioned by
- * {@link EcosystemSeedService}, invoked as the final bootstrap step so it can rely on the platform
- * application already existing; any other consumer application is registered by an administrator
- * through the console.
+ * First-party ecosystem applications are declared as data in `ecosystem-seed.constants.ts` and
+ * provisioned by {@link EcosystemSeedService}, invoked as the final bootstrap step so it can rely on
+ * the platform application and its scopes already existing; any other consumer application is
+ * registered by an administrator through the console.
  */
 @Injectable()
 export class BootstrapService implements OnModuleInit {
@@ -82,11 +83,13 @@ export class BootstrapService implements OnModuleInit {
   /**
    * The PDP endpoint demands a service token carrying `authz:check`; the scope must therefore
    * exist before any client can be granted it. Runs unconditionally so existing deployments pick
-   * it up on upgrade.
+   * it up on upgrade — and so {@link EcosystemSeedService}, which only ever resolves platform
+   * scopes and never creates them, finds every scope its seeded grants reference.
    */
   private async ensurePlatformScopes(): Promise<void> {
     const application = this.applicationService.getApplicationOrThrow(APP_NAME);
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, AUTHZ_CHECK_SCOPE);
+    await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, AUTHZ_ROLES_SYNC_SCOPE);
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, SCIM_PROVISION_SCOPE);
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, APP_SESSION_SCOPE);
   }

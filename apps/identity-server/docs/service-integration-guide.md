@@ -63,7 +63,7 @@ An application holds **one** client and exposes **one** API resource, both deriv
 | :--------------------------- | :------------------------------------------------ | :---------------------- |
 | `pulse`                      | `pulse`                                           | `api://pulse`           |
 | `novel-forge`                | `novel-forge`                                     | `api://novel-forge`     |
-| `webnovel`                   | `webnovel`                                        | `api://webnovel`        |
+| `web-novel`                  | `web-novel`                                       | `api://web-novel`       |
 | `shadow-identity` (platform) | `identity-server` (identity's own outbound calls) | `shadow-identity`       |
 
 Identity's own platform API keeps its bare identifier: it is the platform rather than an application onboarding onto it, and every service token and guard already names it.
@@ -71,8 +71,8 @@ Identity's own platform API keeps its bare identifier: it is the platform rather
 Also seeded:
 
 - Each application's client is granted `authz:check`, `authz:roles:sync` and `app-session:manage` (so the SDK can load service-access rules, call the PDP, push a role catalog, and open app sessions).
-- `novel-forge` is granted the `webnovel:publish` scope (on the `api://webnovel` resource).
-- Service-access rules: `identity-server` → pulse `POST /api/v1/notifications`; `novel-forge` → webnovel `* /internal/*`.
+- `novel-forge` is granted the `web-novel:publish` scope (on the `api://web-novel` resource).
+- Service-access rules: `identity-server` → pulse `POST /api/v1/notifications`; `novel-forge` → web-novel `* /internal/*`.
 - RP redirect URIs: `{origin}/api/auth/callback` for every public origin on the application. Origins are stored on the application (`applications.public_urls`) — seeded with defaults (`http://<app>.shadow-apps.test` plus a localhost dev variant) the first time the app is created, then managed through the admin console's application page. Editing an app's public URLs regenerates its relying-party clients' redirect URIs; the seed no longer overwrites them on boot.
 
 **Client ids and secrets.** By default client ids are database-generated UUIDs, so they differ per environment. On the boot that first creates a client, its id and secret are logged once (`Registered service client '<name>' …` — same convention as the bootstrap-admin password); afterwards look ids up via `GET /api/v1/admin/clients` and mint a fresh secret with `POST /api/v1/admin/clients/:clientId/rotate-secret` (dual-secret overlap, so running consumers keep working while you re-configure). Secrets are stored hashed; they cannot be read back.
@@ -85,8 +85,8 @@ Also seeded:
 | `pulse-server`       | `ECOSYSTEM_PULSE_SERVER_CLIENT_ID`       | `ECOSYSTEM_PULSE_SERVER_CLIENT_SECRET`       |
 | `novel-forge` (RP)   | `ECOSYSTEM_NOVEL_FORGE_RP_CLIENT_ID`     | `ECOSYSTEM_NOVEL_FORGE_RP_CLIENT_SECRET`     |
 | `novel-forge-server` | `ECOSYSTEM_NOVEL_FORGE_SERVER_CLIENT_ID` | `ECOSYSTEM_NOVEL_FORGE_SERVER_CLIENT_SECRET` |
-| `webnovel` (RP)      | `ECOSYSTEM_WEBNOVEL_RP_CLIENT_ID`        | `ECOSYSTEM_WEBNOVEL_RP_CLIENT_SECRET`        |
-| `webnovel-server`    | `ECOSYSTEM_WEBNOVEL_SERVER_CLIENT_ID`    | `ECOSYSTEM_WEBNOVEL_SERVER_CLIENT_SECRET`    |
+| `web-novel` (RP)     | `ECOSYSTEM_WEB_NOVEL_RP_CLIENT_ID`       | `ECOSYSTEM_WEB_NOVEL_RP_CLIENT_SECRET`       |
+| `web-novel-server`   | `ECOSYSTEM_WEB_NOVEL_SERVER_CLIENT_ID`   | `ECOSYSTEM_WEB_NOVEL_SERVER_CLIENT_SECRET`   |
 | `identity-server`    | `ECOSYSTEM_IDENTITY_SERVER_CLIENT_ID`    | `ECOSYSTEM_IDENTITY_SERVER_CLIENT_SECRET`    |
 
 Every variable is optional and each pair's halves are independent; whatever is unset keeps the random behaviour above. Semantics:

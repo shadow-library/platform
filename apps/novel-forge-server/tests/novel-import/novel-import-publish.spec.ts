@@ -2,7 +2,7 @@
  * Importing packages with side effects
  *
  * The test IdP must be evaluated first: it stands up the mock issuer the push client's AuthClient mints
- * its `webnovel:publish` tokens against — same ordering requirement as publish-runner.spec.ts.
+ * its `web-novel:publish` tokens against — same ordering requirement as publish-runner.spec.ts.
  */
 import { APP_ID, CLIENT_SECRET, testIdP } from '@tests/test-idp';
 
@@ -69,13 +69,13 @@ describe.if(pgAvailable)('Novel import (final mode) → publish (mocked reader)'
   const reader = new MockReaderService();
 
   beforeAll(() => {
-    process.env['SERVICE_URL_WEBNOVEL_SERVER'] = reader.start();
+    process.env['SERVICE_URL_WEB_NOVEL_SERVER'] = reader.start();
   });
 
   // The reader URL env is process-global; leaving it set would point a dead reader at every later spec file.
   afterAll(() => {
     reader.stop();
-    delete process.env['SERVICE_URL_WEBNOVEL_SERVER'];
+    delete process.env['SERVICE_URL_WEB_NOVEL_SERVER'];
   });
 
   it('should carry an imported chapter through the real publishing gate and a real reader push', async () => {
@@ -120,6 +120,6 @@ describe.if(pgAvailable)('Novel import (final mode) → publish (mocked reader)'
     expect(novel?.chapters.get(1)).toMatchObject({ title: 'Opening', content: 'The story begins here, in full.' });
 
     const tokenRequest = testIdP.getLastTokenRequest();
-    expect(tokenRequest?.body).toMatchObject({ grant_type: 'client_credentials', scope: 'webnovel:publish', resource: 'api://webnovel' });
+    expect(tokenRequest?.body).toMatchObject({ grant_type: 'client_credentials', scope: 'web-novel:publish', resource: 'api://web-novel' });
   });
 });

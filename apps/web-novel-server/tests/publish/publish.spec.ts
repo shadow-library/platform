@@ -282,7 +282,7 @@ describe('Internal publish API', () => {
     });
 
     it('should reject a scoped service token whose client has no service-access rule', async () => {
-      const token = await idp.issueToken({ sub: 'rogue-service', kind: 'service', clientId: 'rogue-service', audience: AUDIENCE, scopes: ['webnovel:publish'] });
+      const token = await idp.issueToken({ sub: 'rogue-service', kind: 'service', clientId: 'rogue-service', audience: AUDIENCE, scopes: ['web-novel:publish'] });
       const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1), token });
       expect(response.statusCode).toBe(403);
 
@@ -299,7 +299,7 @@ describe('Internal publish API', () => {
     });
 
     it('should reject a user-kind token that carries the publish scope with 403 and audit it as unauthorized', async () => {
-      const token = await userToken('reader-1', { scopes: ['webnovel:publish'] });
+      const token = await userToken('reader-1', { scopes: ['web-novel:publish'] });
       const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1), token });
       expect(response.statusCode).toBe(403);
       expect(await novelRows()).toHaveLength(0);

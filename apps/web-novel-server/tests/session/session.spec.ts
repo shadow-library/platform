@@ -7,7 +7,7 @@ import { describe, expect, it } from 'bun:test';
  * Importing user defined packages
  */
 import { csrfPair, TestEnvironment } from '../test-environment';
-import { AUDIENCE, idp, LOGIN_COOKIE_NAME, LOGIN_SCOPES, SESSION_COOKIE_NAME, WEBNOVEL_CLIENT_ID } from '../test-idp';
+import { AUDIENCE, idp, LOGIN_COOKIE_NAME, LOGIN_SCOPES, SESSION_COOKIE_NAME, WEB_NOVEL_CLIENT_ID } from '../test-idp';
 
 /**
  * Defining types
@@ -64,7 +64,7 @@ describe('Reader session surface', () => {
       const location = new URL(response.headers.location as string);
       expect(location.origin).toBe(idp.issuer);
       expect(location.pathname).toBe('/oauth2/authorize');
-      expect(location.searchParams.get('client_id')).toBe(WEBNOVEL_CLIENT_ID);
+      expect(location.searchParams.get('client_id')).toBe(WEB_NOVEL_CLIENT_ID);
       expect(location.searchParams.get('response_type')).toBe('code');
       expect(location.searchParams.get('code_challenge_method')).toBe('S256');
       expect(location.searchParams.get('resource')).toBe(AUDIENCE);

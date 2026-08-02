@@ -51,14 +51,14 @@ export interface ManifestItem {
  * Declaring the constants
  */
 
-/** Identity service name of the reader — resolves via `SERVICE_URL_WEBNOVEL_SERVER` or in-cluster svc DNS */
-export const READER_SERVICE = 'webnovel-server';
+/** Identity service name of the reader — resolves via `SERVICE_URL_WEB_NOVEL_SERVER` or in-cluster svc DNS */
+export const READER_SERVICE = 'web-novel-server';
 
 /** RFC 8707 resource the M2M token is addressed to; the reader accepts exactly this `aud`, not the service name */
-export const READER_RESOURCE = 'api://webnovel';
+export const READER_RESOURCE = 'api://web-novel';
 
 /** The M2M scope the reader's `/internal/*` guard requires; end-user tokens never carry it */
-export const READER_PUBLISH_SCOPE = 'webnovel:publish';
+export const READER_PUBLISH_SCOPE = 'web-novel:publish';
 
 /** Any reader push failure that is not a revision conflict — transport errors, 5xx, unmintable token */
 export class ReaderPushError extends Error {
@@ -84,8 +84,8 @@ export class StaleRevisionError extends Error {
 
 /**
  * The one-way HTTP client for the reader's `/internal/*` surface (reader-publish design §5). Every
- * call rides an identity-issued M2M token addressed to `api://webnovel` and carrying the
- * cross-application scope `webnovel:publish`, minted by the DI-injected `AuthClient` — built from the
+ * call rides an identity-issued M2M token addressed to `api://web-novel` and carrying the
+ * cross-application scope `web-novel:publish`, minted by the DI-injected `AuthClient` — built from the
  * forge's own `AUTH_*` registration, no separate credential to configure. A mint or transport failure
  * (reader unreachable, a revoked cross-application grant) fails the push soft, ledgered as an error,
  * while every non-publishing feature stays untouched. The request-timeout budget is `AUTH_TIMEOUT`.

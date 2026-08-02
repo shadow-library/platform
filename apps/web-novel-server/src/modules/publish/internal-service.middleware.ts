@@ -22,7 +22,7 @@ import { APP_NAME } from '@server/constants';
 /**
  * Declaring the constants
  *
- * Defence-in-depth over the scope guard for the `/internal/*` surface: `webnovel:publish` must only
+ * Defence-in-depth over the scope guard for the `/internal/*` surface: `web-novel:publish` must only
  * ever ride an identity-issued M2M token, but the auth guard runs its service-access allowlist only
  * for service principals — a user-kind token that somehow carried the scope would pass on scope
  * alone. This preHandler runs just after the auth guard (lower weight, same phase, once the
@@ -36,7 +36,7 @@ export class InternalServiceGuard {
   constructor(private readonly context: ContextService) {}
 
   cacheKey(metadata: HandlerMetadata): string {
-    return `webnovel-internal-service:${String(metadata.method)}:${String(metadata.path)}`;
+    return `web-novel-internal-service:${String(metadata.method)}:${String(metadata.path)}`;
   }
 
   generate(metadata: HandlerMetadata): RouteHandler | undefined {

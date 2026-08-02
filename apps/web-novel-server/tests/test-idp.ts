@@ -22,9 +22,9 @@ import { createTestIdP, type TestTokenInput } from '@shadow-library/auth/testing
  * (D-21) — there is no `AUTH_AUDIENCE` any more.
  */
 
-export const AUDIENCE = 'api://webnovel';
-export const WEBNOVEL_CLIENT_ID = 'webnovel';
-export const WEBNOVEL_CLIENT_SECRET = 'webnovel-test-secret';
+export const AUDIENCE = 'api://web-novel';
+export const WEB_NOVEL_CLIENT_ID = 'web-novel';
+export const WEB_NOVEL_CLIENT_SECRET = 'web-novel-test-secret';
 export const FORGE_CLIENT_ID = 'novel-forge';
 export const REDIRECT_URI = 'http://localhost:8080/api/auth/callback';
 export const LOGIN_SCOPES = ['openid', 'profile', 'email'];
@@ -34,18 +34,18 @@ export const SESSION_COOKIE_NAME = '__Host-shadow-session';
 export const LOGIN_COOKIE_NAME = '__Host-shadow-session-login';
 
 export const idp = await createTestIdP({
-  clientId: WEBNOVEL_CLIENT_ID,
-  clientSecret: WEBNOVEL_CLIENT_SECRET,
-  app: { appId: WEBNOVEL_CLIENT_ID, audience: AUDIENCE, redirectUris: [REDIRECT_URI], scopes: LOGIN_SCOPES },
+  clientId: WEB_NOVEL_CLIENT_ID,
+  clientSecret: WEB_NOVEL_CLIENT_SECRET,
+  app: { appId: WEB_NOVEL_CLIENT_ID, audience: AUDIENCE, redirectUris: [REDIRECT_URI], scopes: LOGIN_SCOPES },
 });
 
 /** novel-forge is the only M2M caller identity allowlists on this service's internal surface */
 idp.setServiceAccess([{ callerClientId: FORGE_CLIENT_ID, method: '*', path: '/internal/*' }]);
 process.env.AUTH_ISSUER = idp.issuer;
 
-/** An identity-issued M2M token as novel-forge would acquire it (scope `webnovel:publish`, aud `api://webnovel`) */
+/** An identity-issued M2M token as novel-forge would acquire it (scope `web-novel:publish`, aud `api://web-novel`) */
 export function forgeToken(overrides: Partial<TestTokenInput> = {}): Promise<string> {
-  return idp.issueToken({ sub: FORGE_CLIENT_ID, kind: 'service', clientId: FORGE_CLIENT_ID, audience: AUDIENCE, scopes: ['webnovel:publish'], ...overrides });
+  return idp.issueToken({ sub: FORGE_CLIENT_ID, kind: 'service', clientId: FORGE_CLIENT_ID, audience: AUDIENCE, scopes: ['web-novel:publish'], ...overrides });
 }
 
 /** An end-user access token; end-user tokens never carry the publish scope */

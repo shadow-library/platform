@@ -51,4 +51,4 @@ declare module 'fastify' {
  */
 
 /** Handler-metadata key carrying the `PublishAuditRouteMetadata` for audited internal routes */
-export const PUBLISH_AUDIT_METADATA = 'webnovelPublishAudit';
+export const PUBLISH_AUDIT_METADATA = 'webNovelPublishAudit';

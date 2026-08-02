@@ -2,7 +2,7 @@
  * Importing packages with side effects
  *
  * The test IdP must be evaluated first: it stands up the mock issuer the push client's AuthClient
- * mints its `webnovel:publish` tokens against.
+ * mints its `web-novel:publish` tokens against.
  */
 import { APP_ID, AUTH_AUDIENCE, CLIENT_SECRET, testIdP } from '@tests/test-idp';
 
@@ -72,14 +72,14 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     const authClient = new AuthClient({ issuer: testIdP.issuer, appId: APP_ID, client: { id: APP_ID, secret: CLIENT_SECRET } });
     runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(authClient));
 
-    process.env['SERVICE_URL_WEBNOVEL_SERVER'] = reader.start();
+    process.env['SERVICE_URL_WEB_NOVEL_SERVER'] = reader.start();
   });
 
   // The reader URL env is process-global; leaving it set would point a dead reader at every later
   // spec file. Closing the pool keeps later suites from starving.
   afterAll(() => {
     reader.stop();
-    delete process.env['SERVICE_URL_WEBNOVEL_SERVER'];
+    delete process.env['SERVICE_URL_WEB_NOVEL_SERVER'];
     (db as unknown as { $client: SQL }).$client.close();
   });
 
@@ -123,7 +123,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
 
     // The push rode an identity-issued client-credentials token scoped to the reader's audience.
     const tokenRequest = testIdP.getLastTokenRequest();
-    expect(tokenRequest?.body).toMatchObject({ grant_type: 'client_credentials', scope: 'webnovel:publish', resource: 'api://webnovel' });
+    expect(tokenRequest?.body).toMatchObject({ grant_type: 'client_credentials', scope: 'web-novel:publish', resource: 'api://web-novel' });
     expect(reader.requests.every(request => request.hasBearer)).toBe(true);
   });
 

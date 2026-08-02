@@ -44,7 +44,7 @@ export class PublishAuditTrailer {
   constructor(private readonly auditService: PublishAuditService) {}
 
   cacheKey(metadata: HandlerMetadata): string {
-    return `webnovel-publish-audit:${String(metadata.method)}:${String(metadata.path)}`;
+    return `web-novel-publish-audit:${String(metadata.method)}:${String(metadata.path)}`;
   }
 
   generate(metadata: HandlerMetadata): RouteHandler | undefined {

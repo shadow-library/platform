@@ -77,10 +77,13 @@ skill unless it touches workspace conventions directly.
 | `e2e/`                                                                                                                                             | `e2e`                                | Whole-platform Playwright suite — cross-app flows against deployed service URLs (`E2E_*` vars; defaults to the local `gitops` dev cluster at `https://<service>.shadow-apps.test`) |
 | `scripts/`                                                                                                                                         | _(not a workspace)_                  | Root tooling — directly-runnable Bun scripts (`build.ts`, `verify.ts`, `gen-api-types.ts`, `check-migrations.ts`), always invoked from the repo root by path |
 
-**Web Novel naming note:** the workspace/package names use the hyphenated `web-novel-*` form, but the
-_runtime_ identifiers — the OIDC app id, the `webnovel:publish` scope, storage/cache key prefixes —
-still use the older unhyphenated `webnovel` form internally. That naming is owned by devops; don't
-"fix" it to match the workspace name.
+**Web Novel naming note:** the server-side identifiers now match the workspace name — the OIDC app
+id is `web-novel`, its audience `api://web-novel`, the delegation scope `web-novel:publish`, and the
+in-cluster service/subject `web-novel-server`. The **browser-side** identifiers in `web-novel-web`
+are deliberately unchanged: the `webnovel:*` localStorage prefix, the `webnovel-offline` /
+`webnovel-query-cache` IndexedDB names, the `webnovel` service-worker cache prefix and the "Shadow
+Webnovel" product copy. Renaming those silently orphans on-device reader data (progress, library,
+settings), so leave them alone unless a migration ships with the change.
 
 **apps/\* vs packages/\* — the rule that matters:** `apps/*` are deployable products (a backend or a
 web app), each independently built, imaged, and deployed. `packages/*` are shared libraries consumed

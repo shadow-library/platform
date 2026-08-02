@@ -18,7 +18,7 @@
  * Declaring the constants
  */
 
-export const APP_NAME = 'webnovel-server';
+export const APP_NAME = 'web-novel-server';
 
 /** Scope an identity-issued M2M token must carry to reach the internal publish surface */
-export const PUBLISH_SCOPE = 'webnovel:publish';
+export const PUBLISH_SCOPE = 'web-novel:publish';

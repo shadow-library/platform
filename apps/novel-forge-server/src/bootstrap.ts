@@ -64,8 +64,8 @@ declare module '@shadow-library/common' {
      * `@shadow-library/auth/module`: it declares them, augments `ConfigRecords`, and reads them in
      * `AuthModule.forRoot()`. The app never restates them — audience, redirect URIs and granted scopes
      * are discovered from identity's `GET /api/v1/apps/me` (D-21). The reader-push client mints its
-     * `webnovel:publish` tokens through an `AuthClient` built from the same registration; the reader's
-     * base URL resolves via service discovery (`SERVICE_URL_WEBNOVEL_SERVER`, or `http://webnovel-server`).
+     * `web-novel:publish` tokens through an `AuthClient` built from the same registration; the reader's
+     * base URL resolves via service discovery (`SERVICE_URL_WEB_NOVEL_SERVER`, or `http://web-novel-server`).
      */
   }
 }

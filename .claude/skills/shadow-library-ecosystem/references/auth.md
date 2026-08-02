@@ -269,7 +269,7 @@ Integration specs boot a real graph (`ShadowFactory.create`) and drive the route
     env var doesn't exist (see §4). If you see the old sealed/store-backed design (`LoginStateStore`,
     `InMemoryLoginStateStore`, `SealedLoginStateStore`, or a caveat about needing a shared secret in a
     multi-replica deploy) referenced anywhere, that's stale.
-15. **Stale identity docs — do not propagate:** `service-integration-guide.md` (seeded novel-forge/webnovel
+15. **Stale identity docs — do not propagate:** `service-integration-guide.md` (seeded novel-forge/web-novel
     clients as a `<app>`/`<app>-server` pair — see §3 for the current one-client model; UUID client ids,
     `ECOSYSTEM_*` env vars, lowercase `aal1`/`aal2`, `checkAll` batch PDP — note its `app-session:manage`
     grant description at line 73 is otherwise consistent with current source); `auth/api-contract.md`

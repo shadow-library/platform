@@ -360,7 +360,7 @@ A refund-on-success design was rejected: the refund lags the consume by an argon
 
 ### C-1 — Re-seed the ecosystem per D-21 — **done**
 
-Pulse holds one client (`pulse`, `authorization_code` + `client_credentials` + token-exchange, granted `authz:check`, `authz:roles:sync` and `app-session:manage`) instead of the `pulse` / `pulse-server` pair, and its audience is `api://pulse`. `novel-forge-server` / `webnovel-server` became `api://novel-forge` / `api://webnovel`; `notification.audience` now defaults to `api://pulse`.
+Pulse holds one client (`pulse`, `authorization_code` + `client_credentials` + token-exchange, granted `authz:check`, `authz:roles:sync` and `app-session:manage`) instead of the `pulse` / `pulse-server` pair, and its audience is `api://pulse`. `novel-forge-server` / `web-novel-server` became `api://novel-forge` / `api://web-novel`; `notification.audience` now defaults to `api://pulse`.
 
 **Decision:** identity's own platform API keeps the bare `shadow-identity` identifier rather than becoming `api://shadow-identity`. It is not an application onboarding onto the platform but the platform itself, and the name is load-bearing in the access guard, SCIM auth, app-sessions and every service token already issued — renaming it buys symmetry at the cost of reconfiguring every consumer. C-1 targets the `<app>-server`-style identifiers, which are gone.
 
