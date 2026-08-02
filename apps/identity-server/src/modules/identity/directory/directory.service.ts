@@ -21,6 +21,13 @@ export interface ResolvedUser {
   userId: string;
 }
 
+export interface DirectoryUser {
+  userId: string;
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
 /**
  * Declaring the constants
  *
@@ -38,6 +45,9 @@ export interface ResolvedUser {
 
 /** A closed account must never resolve: it names a person who is gone, and a grant against it would outlive them. */
 const RESOLVABLE_STATUSES = ['ACTIVE', 'INACTIVE', 'DISABLED', 'BLOCKED', 'SUSPENDED'] as const;
+
+/** Digits in the largest `bigint`; a longer string is not an overlong id, it is not an id at all. */
+const MAX_ID_DIGITS = 19;
 
 @Injectable()
 export class DirectoryService {
@@ -85,6 +95,55 @@ export class DirectoryService {
 
     this.logger.debug('directory resolve handled', { callerClientId, requested: normalised.length, resolved: resolved.length });
     return resolved;
+  }
+
+  /**
+   * Names the accounts the caller already holds ids for — the seam a service reaches through to put a
+   * person's name on screen instead of the subject id it got from a token.
+   *
+   * The safety story is the mirror of {@link resolveByEmail}: there, the caller proves it already knows
+   * the address; here, it proves it already knows the id. What it cannot do is turn one into the other,
+   * which is why the answer carries no address. Ids are sequential, so an id-to-address route would let
+   * a caller read the user table off a counter; an id-to-name route only tells it what a name is for
+   * subjects it could already name in its own data. Unknown, unshapely and closed ids are all simply
+   * absent, so the caller learns nothing about which of the three it hit (D-A3).
+   */
+  async lookupByUserId(userIds: string[], callerClientId: string): Promise<DirectoryUser[]> {
+    /** `bigint` is 8 bytes, so anything longer cannot be an id and must not reach `BigInt()` or the comparison. */
+    const shapely = userIds.filter(userId => REGEX.ID.test(userId) && userId.length <= MAX_ID_DIGITS);
+
+    const rows =
+      shapely.length === 0
+        ? []
+        : await this.db
+            .select({
+              userId: schema.users.id,
+              displayName: schema.userProfiles.displayName,
+              firstName: schema.userProfiles.firstName,
+              lastName: schema.userProfiles.lastName,
+            })
+            .from(schema.users)
+            /** Left-joined: an account with no profile row still resolves, just without a name to show. */
+            .leftJoin(schema.userProfiles, eq(schema.userProfiles.userId, schema.users.id))
+            .where(and(inArray(schema.users.id, shapely.map(BigInt)), inArray(schema.users.status, [...RESOLVABLE_STATUSES])));
+
+    const users = rows.map(row => ({
+      userId: row.userId.toString(),
+      displayName: row.displayName ?? undefined,
+      firstName: row.firstName ?? undefined,
+      lastName: row.lastName ?? undefined,
+    }));
+    await this.auditService.record({
+      action: 'directory.users.lookup',
+      outcome: 'SUCCESS',
+      actorType: 'SERVICE_ACCOUNT',
+      actorId: callerClientId,
+      /** Counts only, matching the resolve trail — the ids are the caller's business and names never belong in an audit row. */
+      detail: { requested: shapely.length, resolved: users.length },
+    });
+
+    this.logger.debug('directory lookup handled', { callerClientId, requested: shapely.length, resolved: users.length });
+    return users;
   }
 
   /**

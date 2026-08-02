@@ -47,6 +47,47 @@ export class ResolveUsersResponse {
   users: ResolvedUserItem[];
 }
 
+/** Same ceiling as the email direction, and for the same reason: one request must not walk the directory. */
+export const MAX_LOOKUP_USERS = 50;
+
+/**
+ * The id direction of the seam. Item shape is unenforceable here for the same reason as
+ * {@link ResolveUsersBody}, so {@link DirectoryService.lookupByUserId} drops anything that is not a
+ * plausible id — an unshapely id is simply absent from the answer, exactly like an unknown one.
+ */
+@Schema()
+export class LookupUsersBody {
+  @Field(() => [String], { minItems: 1, maxItems: MAX_LOOKUP_USERS, uniqueItems: true })
+  userIds: string[];
+}
+
+/**
+ * Deliberately name-only. The caller already holds the id, so nothing here helps it enumerate; an
+ * address would, because ids are sequential and the answer would turn a counter into a contact list.
+ * A service that needs an address still has to go the other way round, through `users/resolve`.
+ */
+@Schema()
+export class DirectoryUserItem {
+  @Field()
+  userId: string;
+
+  /** The name the person chose to be shown as; absent when they have not set one. */
+  @Field({ optional: true })
+  displayName?: string;
+
+  @Field({ optional: true })
+  firstName?: string;
+
+  @Field({ optional: true })
+  lastName?: string;
+}
+
+@Schema()
+export class LookupUsersResponse {
+  @Field(() => [DirectoryUserItem])
+  users: DirectoryUserItem[];
+}
+
 @Schema()
 export class OrganisationMemberParams {
   @Field(() => String, { ...PATTERN.ID })

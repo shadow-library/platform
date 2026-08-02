@@ -121,7 +121,7 @@ const AUTHZ_CHECK = { resource: PLATFORM_RESOURCE, scope: 'authz:check' } as con
 const APP_SESSION = { resource: PLATFORM_RESOURCE, scope: 'app-session:manage' } as const;
 /** pulse alone: its RBAC catalogue is seeded identity-side rather than pushed by the SDK. */
 const AUTHZ_ROLES_SYNC = { resource: PLATFORM_RESOURCE, scope: 'authz:roles:sync' } as const;
-/** Reaches identity's directory seam: naming a person by email, and asking whether one is in an organisation. */
+/** Reaches identity's directory seam: naming a person by email or by id, and asking whether one is in an organisation. */
 const USERS_RESOLVE = { resource: PLATFORM_RESOURCE, scope: 'users:resolve' } as const;
 
 /**
