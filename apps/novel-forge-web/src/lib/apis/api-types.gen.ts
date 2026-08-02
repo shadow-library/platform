@@ -67,6 +67,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/auth/userinfo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Userinfo */
+    get: operations['get_api_auth_userinfo'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/auth/organisations': {
     parameters: {
       query?: never;
@@ -2097,6 +2114,16 @@ export interface components {
       aal?: string;
       clientId?: string;
     };
+    AuthUserInfoResponse: {
+      sub: string;
+      name?: string;
+      given_name?: string;
+      family_name?: string;
+      preferred_username?: string;
+      picture?: string;
+      email?: string;
+      email_verified?: boolean;
+    };
     AuthOrganisationsResponse: {
       organisations: components['schemas']['AuthOrganisationItem'][];
     };
@@ -3844,6 +3871,44 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AuthSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_auth_userinfo: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuthUserInfoResponse'];
         };
       };
       /** @description Default Response */
@@ -10107,6 +10172,7 @@ export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
 export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
 export type AuthLogoutResponse = components['schemas']['AuthLogoutResponse'];
 export type AuthSessionResponse = components['schemas']['AuthSessionResponse'];
+export type AuthUserInfoResponse = components['schemas']['AuthUserInfoResponse'];
 export type AuthOrganisationsResponse = components['schemas']['AuthOrganisationsResponse'];
 export type AuthOrganisationItem = components['schemas']['AuthOrganisationItem'];
 export type SwitchOrganisationBody = components['schemas']['SwitchOrganisationBody'];

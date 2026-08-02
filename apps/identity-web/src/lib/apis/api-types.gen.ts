@@ -1477,6 +1477,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/internal/users/lookup': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Lookup Users */
+    post: operations['post_api_v1_internal_users_lookup'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/internal/organisations/{organisationId}/members/{userId}': {
     parameters: {
       query?: never;
@@ -2416,6 +2433,11 @@ export interface components {
       sub: string;
       email?: string;
       email_verified?: boolean;
+      name?: string;
+      given_name?: string;
+      family_name?: string;
+      preferred_username?: string;
+      picture?: string;
     };
     TokenActionBody: {
       token: string;
@@ -3070,6 +3092,18 @@ export interface components {
     ResolvedUserItem: {
       email: string;
       userId: string;
+    };
+    LookupUsersBody: {
+      userIds: string[];
+    };
+    LookupUsersResponse: {
+      users: components['schemas']['DirectoryUserItem'][];
+    };
+    DirectoryUserItem: {
+      userId: string;
+      displayName?: string;
+      firstName?: string;
+      lastName?: string;
     };
     OrganisationMemberResponse: {
       member: boolean;
@@ -7635,6 +7669,48 @@ export interface operations {
       };
     };
   };
+  post_api_v1_internal_users_lookup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LookupUsersBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LookupUsersResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_internal_organisations_organisationId_members_userId: {
     parameters: {
       query?: never;
@@ -10619,6 +10695,9 @@ export type RemovePhoneBody = components['schemas']['RemovePhoneBody'];
 export type ResolveUsersBody = components['schemas']['ResolveUsersBody'];
 export type ResolveUsersResponse = components['schemas']['ResolveUsersResponse'];
 export type ResolvedUserItem = components['schemas']['ResolvedUserItem'];
+export type LookupUsersBody = components['schemas']['LookupUsersBody'];
+export type LookupUsersResponse = components['schemas']['LookupUsersResponse'];
+export type DirectoryUserItem = components['schemas']['DirectoryUserItem'];
 export type OrganisationMemberResponse = components['schemas']['OrganisationMemberResponse'];
 export type AdminContextResponse = components['schemas']['AdminContextResponse'];
 export type SortOrder = components['schemas']['SortOrder'];
