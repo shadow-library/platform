@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { forwardRef, type Import, Module } from '@shadow-library/app';
+import { Config } from '@shadow-library/common';
 import { FastifyModule } from '@shadow-library/fastify';
 import { HttpCoreModule } from '@shadow-library/modules';
 
@@ -62,6 +63,9 @@ const DeferredSessionModule = forwardRef(() => SessionModule.forRoot()) as unkno
 class PlatformModule {}
 
 export const HttpRouteModule = FastifyModule.forRoot({
+  host: Config.get('server.host'),
+  port: Config.get('server.port'),
+
   imports: [PlatformModule, ConfigurationModule, NotificationModule, TemplateModule, MetricsModule],
 
   transformers: CUSTOM_DATA_TRANSFORMERS,

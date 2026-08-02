@@ -1,4 +1,9 @@
 /**
+ * Importing packages with side effects
+ */
+import './bootstrap';
+
+/**
  * Importing npm packages
  */
 import { Module } from '@shadow-library/app';
