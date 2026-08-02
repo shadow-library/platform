@@ -7,7 +7,8 @@
  */
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { AuthClient } from '@shadow-library/auth';
+import { Logger, throwError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 /**
@@ -16,8 +17,6 @@ import { DatabaseService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Publishing, schema } from '@server/database';
-
-import { DirectoryClient } from './directory.client';
 import { type PublicationAccessBody, type PublicationAccessResponse } from './publishing.dto';
 import { PublishingService } from './publishing.service';
 
@@ -45,7 +44,7 @@ export class PublicationAccessService {
   constructor(
     databaseService: DatabaseService,
     private readonly publishingService: PublishingService,
-    private readonly directoryClient: DirectoryClient,
+    private readonly authClient: AuthClient,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -70,7 +69,7 @@ export class PublicationAccessService {
     const emails = [...new Set((body.grants ?? []).map(grant => grant.email.trim().toLowerCase()))].filter(Boolean);
     /** Only `RESTRICTED` carries a share list; keeping stale rows on another tier would silently re-grant on a switch back. */
     const wanted = body.visibility === 'RESTRICTED' ? emails : [];
-    const resolved = wanted.length > 0 ? await this.directoryClient.resolveEmails(wanted) : new Map<string, string>();
+    const resolved = await this.resolveEmails(wanted);
     const nextOrganisationId = body.visibility === 'ORGANISATION' ? (organisationId as string) : null;
 
     const existing = await this.loadGrants(publication.id);
@@ -110,6 +109,18 @@ export class PublicationAccessService {
   async getPushPayload(publicationId: bigint): Promise<string[]> {
     const grants = await this.loadGrants(publicationId);
     return grants.filter(grant => grant.state === 'resolved' && grant.subjectId).map(grant => grant.subjectId as string);
+  }
+
+  /**
+   * The addresses identity could name, keyed by the caller's own lowercased spelling. The SDK owns
+   * the batching and the `users:resolve` grant, so the forge no longer keeps a directory client of
+   * its own — an address that resolves to nothing is simply missing, which the caller records as a
+   * pending grant rather than an error.
+   */
+  private async resolveEmails(emails: string[]): Promise<Map<string, string>> {
+    if (emails.length === 0) return new Map();
+    const resolved = await this.authClient.resolveUsersByEmail(emails).catch(error => throwError(AppErrorCode.PUB_005.create({ reason: (error as Error).message })));
+    return new Map(resolved.map(user => [user.email.toLowerCase(), user.userId]));
   }
 
   private loadGrants(publicationId: bigint): Promise<Publishing.Grant[]> {

@@ -22,7 +22,6 @@ import { ConcurrencyController } from '@modules/jobs/concurrency.controller';
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { JobService } from '@modules/jobs/job.service';
 import { PublicationJanitor } from '@modules/jobs/publication.janitor';
-import { DirectoryClient } from '@modules/publishing/directory.client';
 import { PublicationAccessService } from '@modules/publishing/publication-access.service';
 import { PublishRunner } from '@modules/publishing/publish-runner';
 import { PublishingService } from '@modules/publishing/publishing.service';
@@ -73,7 +72,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     // The shared, discovery-backed client the AuthModule would inject in a real boot — here built
     // directly against the mock issuer with the app's own credential.
     const authClient = new AuthClient({ issuer: testIdP.issuer, appId: APP_ID, client: { id: APP_ID, secret: CLIENT_SECRET } });
-    accessService = new PublicationAccessService(databaseService, publishingService, new DirectoryClient(authClient));
+    accessService = new PublicationAccessService(databaseService, publishingService, authClient);
     runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(authClient), accessService);
 
     process.env['SERVICE_URL_WEB_NOVEL_SERVER'] = reader.start();

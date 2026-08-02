@@ -7,7 +7,7 @@ import { createFileRoute, notFound, Outlet } from '@tanstack/react-router';
  * Importing user defined modules
  */
 import { AppShell } from '@/components/Layout';
-import { isApiError, projectQueryOptions } from '@/lib/apis';
+import { isApiError, meQuery, projectQueryOptions } from '@/lib/apis';
 import { projectTitle } from '@/lib/format';
 import { requireSession } from '@/lib/session';
 
@@ -18,8 +18,12 @@ import { requireSession } from '@/lib/session';
 export const Route = createFileRoute('/novels/$novelId')({
   beforeLoad: ({ context, location }) => requireSession(context.queryClient, location.href),
   loader: async ({ context, params }) => {
+    // Same shell, same reason as `_app`: warm the author's name for SSR, and never let it fail the screen.
+    const me = context.queryClient.ensureQueryData(meQuery).catch(() => undefined);
     try {
-      return await context.queryClient.ensureQueryData(projectQueryOptions(params.novelId));
+      const project = await context.queryClient.ensureQueryData(projectQueryOptions(params.novelId));
+      await me;
+      return project;
     } catch (err) {
       if (isApiError(err) && err.status === 404) throw notFound();
       throw err;

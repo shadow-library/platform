@@ -3,7 +3,7 @@
  */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { createServerFn } from '@tanstack/react-start';
-import { call } from '@shadow-library/web';
+import { call, type UserInfo, userInfoQueryOptions } from '@shadow-library/web';
 
 /**
  * Importing user defined packages
@@ -43,6 +43,8 @@ const sessionKeys = {
 
 const fetchSession = createServerFn({ method: 'GET' }).handler(() => serverAuthFetch<SessionResponse>({ method: 'GET', path: '/session' }));
 
+const fetchUserInfo = createServerFn({ method: 'GET' }).handler(() => serverAuthFetch<UserInfo>({ method: 'GET', path: '/userinfo' }));
+
 const requestLogout = createServerFn({ method: 'POST' }).handler(() => serverAuthFetch<LogoutResponse>({ method: 'POST', path: '/logout' }));
 
 /**
@@ -59,6 +61,17 @@ export const sessionQuery = queryOptions<SessionResponse, ApiError>({
 
 export function useSessionQuery(): UseQueryResult<SessionResponse, ApiError> {
   return useQuery(sessionQuery);
+}
+
+/**
+ * The signed-in author, by name. The route is the SDK's, the key and caching policy are
+ * `@shadow-library/web`'s, and the only thing this app supplies is the transport — which has to live
+ * here because `/api/auth/*` travels through a TanStack Start server function.
+ */
+export const meQuery = userInfoQueryOptions(() => call(fetchUserInfo()));
+
+export function useMeQuery(): UseQueryResult<UserInfo, ApiError> {
+  return useQuery(meQuery);
 }
 
 /** Ends the first-party app session. The caller navigates to `/login` on success — the SDK ends only this app's session, so identity may re-establish it. */

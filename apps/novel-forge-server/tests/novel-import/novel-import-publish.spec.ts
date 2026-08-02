@@ -18,7 +18,6 @@ import { AuthClient } from '@shadow-library/auth';
  */
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { type NovelBundle } from '@modules/novel-import/novel-import.dto';
-import { DirectoryClient } from '@modules/publishing/directory.client';
 import { PublicationAccessService } from '@modules/publishing/publication-access.service';
 import { PublishRunner } from '@modules/publishing/publish-runner';
 import { PublishingService } from '@modules/publishing/publishing.service';
@@ -113,7 +112,7 @@ describe.if(pgAvailable)('Novel import (final mode) → publish (mocked reader)'
     const databaseService = { getPostgresClient: () => testEnv.getPostgresClient() } as never;
     const authClient = new AuthClient({ issuer: testIdP.issuer, appId: APP_ID, client: { id: APP_ID, secret: CLIENT_SECRET } });
     const publishingService = new PublishingService(databaseService);
-    const accessService = new PublicationAccessService(databaseService, publishingService, new DirectoryClient(authClient));
+    const accessService = new PublicationAccessService(databaseService, publishingService, authClient);
     const runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(authClient), accessService);
 
     const result = await runner.converge(BigInt(projectId));

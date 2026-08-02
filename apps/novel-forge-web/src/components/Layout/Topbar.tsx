@@ -4,12 +4,13 @@
 import { useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import { type ReactNode, useMemo, useState } from 'react';
 import { Avatar, type CommandItem, CommandPalette, DropdownMenu, Kbd, Popover, Spinner, toast, useShellNav } from '@shadow-library/ui';
+import { userDisplayName } from '@shadow-library/web';
 
 /**
  * Importing user defined modules
  */
-import { useListJobsQuery, useListProjectsQuery, useLogoutMutation, useProjectQuery, useSessionQuery } from '@/lib/apis';
-import { projectTitle, userDisplayName } from '@/lib/format';
+import { useListJobsQuery, useListProjectsQuery, useLogoutMutation, useMeQuery, useProjectQuery } from '@/lib/apis';
+import { projectTitle } from '@/lib/format';
 import {
   BellIcon,
   BookIcon,
@@ -110,7 +111,7 @@ export default function Topbar(): React.JSX.Element {
   const inProject = Boolean(novelId);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
-  const sessionQuery = useSessionQuery();
+  const meQuery = useMeQuery();
   const logout = useLogoutMutation();
   const projectQuery = useProjectQuery(novelId ?? '', inProject);
   const projectsQuery = useListProjectsQuery({ limit: 50 });
@@ -198,11 +199,11 @@ export default function Topbar(): React.JSX.Element {
       <DropdownMenu>
         <DropdownMenu.Trigger asChild>
           <button className={styles.avatarBtn} aria-label="Account menu">
-            <Avatar name={userDisplayName(sessionQuery.data)} size="sm" />
+            <Avatar name={userDisplayName(meQuery.data)} size="sm" />
           </button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="end" sideOffset={8}>
-          <DropdownMenu.Label>{userDisplayName(sessionQuery.data)}</DropdownMenu.Label>
+          <DropdownMenu.Label>{userDisplayName(meQuery.data)}</DropdownMenu.Label>
           <DropdownMenu.Separator />
           <DropdownMenu.Item icon={<GridIcon />} onSelect={() => void navigate({ to: '/' })}>
             All projects
