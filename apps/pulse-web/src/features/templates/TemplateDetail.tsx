@@ -86,23 +86,25 @@ export default function TemplateDetail({ templateId }: { templateId: string }): 
       />
 
       <Card padding="md" className={controls.detailCard}>
-        <DescriptionList layout="grid" columns={4}>
-          <DescriptionList.Item term="Name">{template.name}</DescriptionList.Item>
-          <DescriptionList.Item term="Message type">
-            <OutlineBadge>{template.messageType}</OutlineBadge>
-          </DescriptionList.Item>
-          <DescriptionList.Item term="Priority">
-            <PriorityBadge priority={template.priority} />
-          </DescriptionList.Item>
-          <DescriptionList.Item term="Category">
-            <TextOrDash value={template.category} />
-          </DescriptionList.Item>
-          <DescriptionList.Item term="Status">
-            <StatusBadge active={template.isActive} />
-          </DescriptionList.Item>
-          <DescriptionList.Item term="Created">{formatDateTime(template.createdAt)}</DescriptionList.Item>
-          <DescriptionList.Item term="Updated">{formatDateTime(template.updatedAt)}</DescriptionList.Item>
-        </DescriptionList>
+        <Card.Body>
+          <DescriptionList layout="grid" columns={4}>
+            <DescriptionList.Item term="Name">{template.name}</DescriptionList.Item>
+            <DescriptionList.Item term="Message type">
+              <OutlineBadge>{template.messageType}</OutlineBadge>
+            </DescriptionList.Item>
+            <DescriptionList.Item term="Priority">
+              <PriorityBadge priority={template.priority} />
+            </DescriptionList.Item>
+            <DescriptionList.Item term="Category">
+              <TextOrDash value={template.category} />
+            </DescriptionList.Item>
+            <DescriptionList.Item term="Status">
+              <StatusBadge active={template.isActive} />
+            </DescriptionList.Item>
+            <DescriptionList.Item term="Created">{formatDateTime(template.createdAt)}</DescriptionList.Item>
+            <DescriptionList.Item term="Updated">{formatDateTime(template.updatedAt)}</DescriptionList.Item>
+          </DescriptionList>
+        </Card.Body>
       </Card>
 
       <ChannelSettings templateId={templateId} channels={template.channels} />

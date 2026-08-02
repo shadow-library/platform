@@ -18,19 +18,21 @@ export default function ChannelCard({ label, stats }: { label: string; stats: No
 
   return (
     <Card padding="md">
-      <div className={styles.channelHead}>
-        <span className={styles.channelName}>{label}</span>
-        <span className={styles.channelRate}>{successRate(stats.total, stats.succeeded)} success</span>
-      </div>
-      <div className={styles.bar}>
-        <div className={styles.barFill} style={{ width: `${ratePercent}%` }} />
-      </div>
-      <div className={styles.metricGrid}>
-        <Metric label="Total" value={stats.total} />
-        <Metric label="Succeeded" value={stats.succeeded} tone={styles.success} />
-        <Metric label="Failed" value={stats.failed} tone={styles.danger} />
-        <Metric label="Pending" value={stats.pending} tone={styles.warning} />
-      </div>
+      <Card.Body>
+        <div className={styles.channelHead}>
+          <span className={styles.channelName}>{label}</span>
+          <span className={styles.channelRate}>{successRate(stats.total, stats.succeeded)} success</span>
+        </div>
+        <div className={styles.bar}>
+          <div className={styles.barFill} style={{ width: `${ratePercent}%` }} />
+        </div>
+        <div className={styles.metricGrid}>
+          <Metric label="Total" value={stats.total} />
+          <Metric label="Succeeded" value={stats.succeeded} tone={styles.success} />
+          <Metric label="Failed" value={stats.failed} tone={styles.danger} />
+          <Metric label="Pending" value={stats.pending} tone={styles.warning} />
+        </div>
+      </Card.Body>
     </Card>
   );
 }

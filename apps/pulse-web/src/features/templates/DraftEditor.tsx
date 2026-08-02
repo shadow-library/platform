@@ -114,10 +114,12 @@ export default function DraftEditor({ templateId, versions, channels }: { templa
 
       {!draft ? (
         <Card padding="lg" className={styles.draftEmpty}>
-          <p className={styles.draftEmptyText}>No open draft. Opening one clones the current published content into an editable draft.</p>
-          <Button variant="primary" onClick={() => openDraft.mutate()} loading={openDraft.isPending}>
-            Open draft
-          </Button>
+          <Card.Body className={styles.draftEmptyBody}>
+            <p className={styles.draftEmptyText}>No open draft. Opening one clones the current published content into an editable draft.</p>
+            <Button variant="primary" onClick={() => openDraft.mutate()} loading={openDraft.isPending}>
+              Open draft
+            </Button>
+          </Card.Body>
         </Card>
       ) : (
         <>
@@ -138,73 +140,77 @@ export default function DraftEditor({ templateId, versions, channels }: { templa
           </div>
 
           <Card padding="md" className={controls.detailCard}>
-            <div className={styles.editorGrid}>
-              <FormField label="Channel" required>
-                <Select
-                  value={editor.channel}
-                  onValueChange={value => setEditor(prev => ({ ...prev, channel: value as NotificationChannel }))}
-                  disabled={editingExisting}
-                  aria-label="Content channel"
-                >
-                  {channelOptions.map(option => (
-                    <Select.Item key={option.value} value={option.value}>
-                      {option.label}
-                    </Select.Item>
-                  ))}
-                </Select>
-              </FormField>
-              <FormField label="Locale" required>
-                <Input value={editor.locale} onValueChange={value => setEditor(prev => ({ ...prev, locale: value }))} disabled={editingExisting} placeholder={DEFAULT_LOCALE} />
-              </FormField>
-              {editor.channel === 'EMAIL' ? (
-                <FormField label="Subject" required>
-                  <Input value={editor.subject} onValueChange={value => setEditor(prev => ({ ...prev, subject: value }))} placeholder="Your order {{ orderId }} is confirmed" />
+            <Card.Body>
+              <div className={styles.editorGrid}>
+                <FormField label="Channel" required>
+                  <Select
+                    value={editor.channel}
+                    onValueChange={value => setEditor(prev => ({ ...prev, channel: value as NotificationChannel }))}
+                    disabled={editingExisting}
+                    aria-label="Content channel"
+                  >
+                    {channelOptions.map(option => (
+                      <Select.Item key={option.value} value={option.value}>
+                        {option.label}
+                      </Select.Item>
+                    ))}
+                  </Select>
                 </FormField>
+                <FormField label="Locale" required>
+                  <Input value={editor.locale} onValueChange={value => setEditor(prev => ({ ...prev, locale: value }))} disabled={editingExisting} placeholder={DEFAULT_LOCALE} />
+                </FormField>
+                {editor.channel === 'EMAIL' ? (
+                  <FormField label="Subject" required>
+                    <Input value={editor.subject} onValueChange={value => setEditor(prev => ({ ...prev, subject: value }))} placeholder="Your order {{ orderId }} is confirmed" />
+                  </FormField>
+                ) : null}
+                <FormField label="Layout" optional helper="Design-system shell wrapping the body.">
+                  <Combobox
+                    options={layoutOptions}
+                    value={editor.layoutKey || null}
+                    onValueChange={value => setEditor(prev => ({ ...prev, layoutKey: value ?? '' }))}
+                    placeholder="No layout"
+                    clearable
+                  />
+                </FormField>
+                <FormField label="Body" required helper="Liquid template rendered per recipient.">
+                  <Textarea value={editor.body} onValueChange={value => setEditor(prev => ({ ...prev, body: value }))} minRows={10} placeholder="Hi {{ firstName }}, …" />
+                </FormField>
+              </div>
+
+              {saveError ? (
+                <Alert intent="danger" title="Couldn't save content" className={styles.editorAlert}>
+                  {saveError}
+                </Alert>
               ) : null}
-              <FormField label="Layout" optional helper="Design-system shell wrapping the body.">
-                <Combobox
-                  options={layoutOptions}
-                  value={editor.layoutKey || null}
-                  onValueChange={value => setEditor(prev => ({ ...prev, layoutKey: value ?? '' }))}
-                  placeholder="No layout"
-                  clearable
-                />
-              </FormField>
-              <FormField label="Body" required helper="Liquid template rendered per recipient.">
-                <Textarea value={editor.body} onValueChange={value => setEditor(prev => ({ ...prev, body: value }))} minRows={10} placeholder="Hi {{ firstName }}, …" />
-              </FormField>
-            </div>
 
-            {saveError ? (
-              <Alert intent="danger" title="Couldn't save content" className={styles.editorAlert}>
-                {saveError}
-              </Alert>
-            ) : null}
-
-            <div className={styles.editorActions}>
-              <Button variant="primary" onClick={save} loading={upsert.isPending}>
-                {editingExisting ? 'Save content' : 'Add content'}
-              </Button>
-              {editingExisting ? (
-                <Button variant="ghost" className={controls.danger} onClick={() => void deleteContent()} loading={remove.isPending}>
-                  Delete content
+              <div className={styles.editorActions}>
+                <Button variant="primary" onClick={save} loading={upsert.isPending}>
+                  {editingExisting ? 'Save content' : 'Add content'}
                 </Button>
-              ) : null}
-            </div>
+                {editingExisting ? (
+                  <Button variant="ghost" className={controls.danger} onClick={() => void deleteContent()} loading={remove.isPending}>
+                    Delete content
+                  </Button>
+                ) : null}
+              </div>
+            </Card.Body>
           </Card>
 
           <Card padding="md" className={styles.publishBar}>
-            <FormField label="Publish notes" optional>
-              <Input value={notes} onValueChange={setNotes} placeholder="Reworded the CTA copy" />
-            </FormField>
-            {publishError ? (
-              <Alert intent="danger" title="Couldn't publish">
-                {publishError}
-              </Alert>
-            ) : null}
-            <Button variant="primary" onClick={runPublish} loading={publish.isPending}>
-              Publish draft
-            </Button>
+            <Card.Body className={styles.publishBarBody}>
+              <FormField label="Publish notes" optional>
+                <Input value={notes} onValueChange={setNotes} placeholder="Reworded the CTA copy" />
+              </FormField>
+              {publishError ? (
+                <Alert intent="danger" title="Couldn't publish">
+                  {publishError}
+                </Alert>
+              ) : null}
+              <Button variant="primary" onClick={runPublish} loading={publish.isPending}>
+                Publish draft
+              </Button>
+            </Card.Body>
           </Card>
         </>
       )}

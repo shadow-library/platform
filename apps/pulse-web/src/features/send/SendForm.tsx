@@ -70,7 +70,7 @@ export default function SendForm(): ReactElement {
     <div className={styles.page}>
       <PageHeader title="Send Notification" subtitle="Manually trigger a send to test templates and routing end-to-end." />
       <Card padding="lg">
-        <div className={styles.formCol}>
+        <Card.Body className={styles.formCol}>
           <FormField label="Template key" required helper="References an existing template.">
             <Combobox
               options={templateOptions}
@@ -124,7 +124,7 @@ export default function SendForm(): ReactElement {
               Reset
             </Button>
           </div>
-        </div>
+        </Card.Body>
       </Card>
 
       {result ? <SendResult result={result} /> : null}
@@ -145,7 +145,7 @@ function SendResult({ result }: { result: CreateNotificationResponse }): ReactEl
       <div className={styles.resultCards}>
         {result.channelResults.map((channel, index) => (
           <Card key={index} padding="sm">
-            <div className={styles.channelRow}>
+            <Card.Body className={styles.channelRow}>
               <OutlineBadge>{channel.channel}</OutlineBadge>
               {channel.status === 'FAILED' ? (
                 <Badge intent="danger" variant="soft" dot>
@@ -171,7 +171,7 @@ function SendResult({ result }: { result: CreateNotificationResponse }): ReactEl
                   jobId <Mono>{channel.jobId}</Mono>
                 </span>
               ) : null}
-            </div>
+            </Card.Body>
           </Card>
         ))}
       </div>

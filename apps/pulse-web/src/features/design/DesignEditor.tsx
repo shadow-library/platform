@@ -47,32 +47,34 @@ export default function DesignEditor(props: DesignEditorProps): ReactElement {
     <>
       <SectionHeader title="Draft" subtitle="Edit the working draft body, then publish it as the next version." />
       <Card padding="md">
-        <div className={styles.editor}>
-          <FormField label="Body" required helper="Liquid template for the shell/block.">
-            <Textarea value={body} onValueChange={setBody} minRows={12} placeholder="<html>… {{ content }} …</html>" />
-          </FormField>
-          <FormField label="Notes" optional>
-            <Input value={notes} onValueChange={setNotes} placeholder="What changed" />
-          </FormField>
-          {saveError ? (
-            <Alert intent="danger" title="Couldn't save draft">
-              {saveError}
-            </Alert>
-          ) : null}
-          {publishError ? (
-            <Alert intent="danger" title="Couldn't publish">
-              {publishError}
-            </Alert>
-          ) : null}
-          <div className={styles.actions}>
-            <Button variant="secondary" onClick={() => onSaveDraft(body, notes.trim() || undefined)} loading={saving}>
-              Save draft
-            </Button>
-            <Button variant="primary" onClick={() => onPublish(notes.trim() || undefined)} loading={publishing}>
-              Publish
-            </Button>
+        <Card.Body>
+          <div className={styles.editor}>
+            <FormField label="Body" required helper="Liquid template for the shell/block.">
+              <Textarea value={body} onValueChange={setBody} minRows={12} placeholder="<html>… {{ content }} …</html>" />
+            </FormField>
+            <FormField label="Notes" optional>
+              <Input value={notes} onValueChange={setNotes} placeholder="What changed" />
+            </FormField>
+            {saveError ? (
+              <Alert intent="danger" title="Couldn't save draft">
+                {saveError}
+              </Alert>
+            ) : null}
+            {publishError ? (
+              <Alert intent="danger" title="Couldn't publish">
+                {publishError}
+              </Alert>
+            ) : null}
+            <div className={styles.actions}>
+              <Button variant="secondary" onClick={() => onSaveDraft(body, notes.trim() || undefined)} loading={saving}>
+                Save draft
+              </Button>
+              <Button variant="primary" onClick={() => onPublish(notes.trim() || undefined)} loading={publishing}>
+                Publish
+              </Button>
+            </div>
           </div>
-        </div>
+        </Card.Body>
       </Card>
 
       <div className={styles.versions}>

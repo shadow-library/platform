@@ -51,16 +51,24 @@ export default function Dashboard(): ReactElement {
       </div>
       <div className={styles.kpiGrid}>
         <Card padding="md">
-          <Statistic label="Total sent" value={today.overall.total} size="lg" />
+          <Card.Body>
+            <Statistic label="Total sent" value={today.overall.total} size="lg" />
+          </Card.Body>
         </Card>
         <Card padding="md">
-          <Statistic label="Succeeded" value={today.overall.succeeded} size="lg" />
+          <Card.Body>
+            <Statistic label="Succeeded" value={today.overall.succeeded} size="lg" />
+          </Card.Body>
         </Card>
         <Card padding="md">
-          <Statistic label="Failed" value={today.overall.failed} size="lg" />
+          <Card.Body>
+            <Statistic label="Failed" value={today.overall.failed} size="lg" />
+          </Card.Body>
         </Card>
         <Card padding="md">
-          <Statistic label="Pending" value={today.overall.pending} size="lg" />
+          <Card.Body>
+            <Statistic label="Pending" value={today.overall.pending} size="lg" />
+          </Card.Body>
         </Card>
       </div>
 
@@ -72,16 +80,18 @@ export default function Dashboard(): ReactElement {
       </div>
 
       <Card padding="lg">
-        <div className={styles.trendHead}>
-          <h2 className={styles.h3}>Daily volume trend</h2>
-          <span className={styles.muted}>{rangeLabel}</span>
-        </div>
-        <div className={styles.legend}>
-          <LegendItem dotClass={styles.dotSuccess} label="Succeeded" />
-          <LegendItem dotClass={styles.dotWarning} label="Pending" />
-          <LegendItem dotClass={styles.dotDanger} label="Failed" />
-        </div>
-        <VolumeChart stats={trend.stats} />
+        <Card.Body>
+          <div className={styles.trendHead}>
+            <h2 className={styles.h3}>Daily volume trend</h2>
+            <span className={styles.muted}>{rangeLabel}</span>
+          </div>
+          <div className={styles.legend}>
+            <LegendItem dotClass={styles.dotSuccess} label="Succeeded" />
+            <LegendItem dotClass={styles.dotWarning} label="Pending" />
+            <LegendItem dotClass={styles.dotDanger} label="Failed" />
+          </div>
+          <VolumeChart stats={trend.stats} />
+        </Card.Body>
       </Card>
     </div>
   );

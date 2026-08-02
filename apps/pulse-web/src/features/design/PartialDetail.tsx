@@ -86,16 +86,18 @@ export default function PartialDetail({ partialId }: { partialId: string }): Rea
       />
 
       <Card padding="md" className={controls.detailCard}>
-        <DescriptionList layout="grid" columns={4}>
-          <DescriptionList.Item term="Name">{partial.name}</DescriptionList.Item>
-          <DescriptionList.Item term="Description">
-            <TextOrDash value={partial.description} />
-          </DescriptionList.Item>
-          <DescriptionList.Item term="Status">
-            <StatusBadge active={partial.isActive} />
-          </DescriptionList.Item>
-          <DescriptionList.Item term="Updated">{formatDateTime(partial.updatedAt)}</DescriptionList.Item>
-        </DescriptionList>
+        <Card.Body>
+          <DescriptionList layout="grid" columns={4}>
+            <DescriptionList.Item term="Name">{partial.name}</DescriptionList.Item>
+            <DescriptionList.Item term="Description">
+              <TextOrDash value={partial.description} />
+            </DescriptionList.Item>
+            <DescriptionList.Item term="Status">
+              <StatusBadge active={partial.isActive} />
+            </DescriptionList.Item>
+            <DescriptionList.Item term="Updated">{formatDateTime(partial.updatedAt)}</DescriptionList.Item>
+          </DescriptionList>
+        </Card.Body>
       </Card>
 
       <DesignEditor

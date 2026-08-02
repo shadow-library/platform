@@ -38,18 +38,20 @@ export default function ChannelSettings({ templateId, channels }: { templateId: 
         </Alert>
       ) : null}
       <Card padding="md" className={controls.detailCard}>
-        <div className={styles.switchList}>
-          {CHANNEL_OPTIONS.map(option => (
-            <Switch
-              key={option.value}
-              label={option.label}
-              description={CHANNEL_HINTS[option.value]}
-              checked={enabledFor(option.value)}
-              onCheckedChange={next => toggle(option.value, next)}
-              pending={mutation.isPending && mutation.variables?.channel === option.value}
-            />
-          ))}
-        </div>
+        <Card.Body>
+          <div className={styles.switchList}>
+            {CHANNEL_OPTIONS.map(option => (
+              <Switch
+                key={option.value}
+                label={option.label}
+                description={CHANNEL_HINTS[option.value]}
+                checked={enabledFor(option.value)}
+                onCheckedChange={next => toggle(option.value, next)}
+                pending={mutation.isPending && mutation.variables?.channel === option.value}
+              />
+            ))}
+          </div>
+        </Card.Body>
       </Card>
     </>
   );

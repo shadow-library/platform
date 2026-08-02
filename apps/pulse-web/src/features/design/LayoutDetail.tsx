@@ -86,16 +86,18 @@ export default function LayoutDetail({ layoutId }: { layoutId: string }): ReactE
       />
 
       <Card padding="md" className={controls.detailCard}>
-        <DescriptionList layout="grid" columns={4}>
-          <DescriptionList.Item term="Name">{layout.name}</DescriptionList.Item>
-          <DescriptionList.Item term="Description">
-            <TextOrDash value={layout.description} />
-          </DescriptionList.Item>
-          <DescriptionList.Item term="Status">
-            <StatusBadge active={layout.isActive} />
-          </DescriptionList.Item>
-          <DescriptionList.Item term="Updated">{formatDateTime(layout.updatedAt)}</DescriptionList.Item>
-        </DescriptionList>
+        <Card.Body>
+          <DescriptionList layout="grid" columns={4}>
+            <DescriptionList.Item term="Name">{layout.name}</DescriptionList.Item>
+            <DescriptionList.Item term="Description">
+              <TextOrDash value={layout.description} />
+            </DescriptionList.Item>
+            <DescriptionList.Item term="Status">
+              <StatusBadge active={layout.isActive} />
+            </DescriptionList.Item>
+            <DescriptionList.Item term="Updated">{formatDateTime(layout.updatedAt)}</DescriptionList.Item>
+          </DescriptionList>
+        </Card.Body>
       </Card>
 
       <DesignEditor

@@ -173,14 +173,16 @@ export default function ProfileDetail({ profileId }: { profileId: string }): Rea
       />
 
       <Card padding="md" className={controls.detailCard}>
-        <DescriptionList layout="grid" columns={4}>
-          <DescriptionList.Item term="Status">
-            <StatusBadge active={profile.isActive} />
-          </DescriptionList.Item>
-          <DescriptionList.Item term="Display name">{profile.displayName || '—'}</DescriptionList.Item>
-          <DescriptionList.Item term="Created">{formatDateTime(profile.createdAt)}</DescriptionList.Item>
-          <DescriptionList.Item term="Updated">{formatDateTime(profile.updatedAt)}</DescriptionList.Item>
-        </DescriptionList>
+        <Card.Body>
+          <DescriptionList layout="grid" columns={4}>
+            <DescriptionList.Item term="Status">
+              <StatusBadge active={profile.isActive} />
+            </DescriptionList.Item>
+            <DescriptionList.Item term="Display name">{profile.displayName || '—'}</DescriptionList.Item>
+            <DescriptionList.Item term="Created">{formatDateTime(profile.createdAt)}</DescriptionList.Item>
+            <DescriptionList.Item term="Updated">{formatDateTime(profile.updatedAt)}</DescriptionList.Item>
+          </DescriptionList>
+        </Card.Body>
       </Card>
 
       <SectionHeader
