@@ -7,6 +7,7 @@
  */
 import { and, desc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
+import { type AuthPrincipal } from '@shadow-library/auth';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
@@ -15,8 +16,8 @@ import { DatabaseService } from '@shadow-library/modules';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { CatalogService } from '@server/modules/catalog';
-import { type PrimaryDatabase, schema } from '@server/modules/datastore';
+import { CatalogService, NovelAccessService } from '@server/modules/catalog';
+import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
 
 import { type LibraryItem, type ProgressBody, type ProgressListItem, type ProgressResponse } from './reader.dto';
 
@@ -39,6 +40,7 @@ export class ReaderService {
   constructor(
     databaseService: DatabaseService,
     private readonly catalogService: CatalogService,
+    private readonly accessService: NovelAccessService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -47,18 +49,32 @@ export class ReaderService {
    * Reading progress
    */
 
-  async listProgress(userId: string): Promise<ProgressListItem[]> {
+  async listProgress(principal: AuthPrincipal): Promise<ProgressListItem[]> {
     const rows = await this.db
-      .select({ novelSlug: schema.novels.slug, ordinal: schema.readingProgress.ordinal, position: schema.readingProgress.position, updatedAt: schema.readingProgress.updatedAt })
+      .select({
+        novel: { id: schema.novels.id, visibility: schema.novels.visibility, organisationId: schema.novels.organisationId },
+        novelSlug: schema.novels.slug,
+        ordinal: schema.readingProgress.ordinal,
+        position: schema.readingProgress.position,
+        updatedAt: schema.readingProgress.updatedAt,
+      })
       .from(schema.readingProgress)
       .innerJoin(schema.novels, eq(schema.readingProgress.novelId, schema.novels.id))
-      .where(eq(schema.readingProgress.userId, userId))
+      .where(eq(schema.readingProgress.userId, principal.sub))
       .orderBy(desc(schema.readingProgress.updatedAt));
-    return rows.map(row => ({ novelSlug: row.novelSlug, ordinal: row.ordinal, position: row.position, updatedAt: row.updatedAt.toISOString() }));
+
+    const readable = await this.accessService.readableIds(
+      rows.map(row => row.novel),
+      principal,
+    );
+    return rows
+      .filter(row => readable.has(row.novel.id))
+      .map(row => ({ novelSlug: row.novelSlug, ordinal: row.ordinal, position: row.position, updatedAt: row.updatedAt.toISOString() }));
   }
 
-  async getProgress(userId: string, slug: string): Promise<ProgressResponse> {
-    const novel = await this.catalogService.getNovelBySlug(slug);
+  async getProgress(principal: AuthPrincipal, slug: string): Promise<ProgressResponse> {
+    const novel = await this.catalogService.getReadableNovel(slug, principal);
+    const userId = principal.sub;
     const [progress] = await this.db
       .select()
       .from(schema.readingProgress)
@@ -67,8 +83,9 @@ export class ReaderService {
     return { ordinal: progress.ordinal, position: progress.position, updatedAt: progress.updatedAt.toISOString() };
   }
 
-  async saveProgress(userId: string, slug: string, body: ProgressBody): Promise<ProgressResponse> {
-    const novel = await this.catalogService.getNovelBySlug(slug);
+  async saveProgress(principal: AuthPrincipal, slug: string, body: ProgressBody): Promise<ProgressResponse> {
+    const novel = await this.catalogService.getReadableNovel(slug, principal);
+    const userId = principal.sub;
     const updatedAt = new Date();
     await this.db
       .insert(schema.readingProgress)
@@ -82,28 +99,61 @@ export class ReaderService {
    * Library
    */
 
-  async listLibrary(userId: string): Promise<LibraryItem[]> {
+  async listLibrary(principal: AuthPrincipal): Promise<LibraryItem[]> {
     const rows = await this.db
       .select({ novel: schema.novels, addedAt: schema.library.addedAt })
       .from(schema.library)
       .innerJoin(schema.novels, eq(schema.library.novelId, schema.novels.id))
-      .where(eq(schema.library.userId, userId))
+      .where(eq(schema.library.userId, principal.sub))
       .orderBy(desc(schema.library.addedAt));
-    return rows.map(row => ({
-      slug: row.novel.slug,
-      title: row.novel.title,
-      coverPath: row.novel.coverPath ?? undefined,
-      genres: row.novel.genres,
-      status: row.novel.status,
-      addedAt: row.addedAt.toISOString(),
-    }));
+
+    const readable = await this.accessService.readableIds(
+      rows.map(row => row.novel),
+      principal,
+    );
+    return rows.filter(row => readable.has(row.novel.id)).map(row => this.toLibraryItem(row.novel, row.addedAt));
+  }
+
+  /**
+   * The shelf of novels shared *with* this reader — the only place a non-public novel is ever
+   * listed. Two queries rather than one because the two tiers are answered by different authorities:
+   * a restricted grant is a row in this database, whereas organisation membership is identity's to
+   * say, and no join can express it.
+   */
+  async listShared(principal: AuthPrincipal): Promise<LibraryItem[]> {
+    const granted = await this.db
+      .select({ novel: schema.novels })
+      .from(schema.novelGrants)
+      .innerJoin(schema.novels, eq(schema.novelGrants.novelId, schema.novels.id))
+      .where(and(eq(schema.novelGrants.subjectId, principal.sub), eq(schema.novels.visibility, 'RESTRICTED')));
+
+    const orgShared = await this.db.select({ novel: schema.novels }).from(schema.novels).where(eq(schema.novels.visibility, 'ORGANISATION'));
+
+    const candidates = [...granted, ...orgShared].map(row => row.novel);
+    const readable = await this.accessService.readableIds(candidates, principal);
+    return candidates
+      .filter(novel => readable.has(novel.id))
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+      .map(novel => this.toLibraryItem(novel, novel.updatedAt));
+  }
+
+  private toLibraryItem(novel: Novel, addedAt: Date): LibraryItem {
+    return {
+      slug: novel.slug,
+      title: novel.title,
+      coverPath: novel.coverPath ?? undefined,
+      genres: novel.genres,
+      status: novel.status,
+      visibility: novel.visibility,
+      addedAt: addedAt.toISOString(),
+    };
   }
 
   /** Idempotent: re-adding an existing entry keeps the original addedAt */
-  async addToLibrary(userId: string, slug: string): Promise<void> {
-    const novel = await this.catalogService.getNovelBySlug(slug);
-    await this.db.insert(schema.library).values({ userId, novelId: novel.id }).onConflictDoNothing();
-    this.logger.debug('novel added to library', { userId, slug });
+  async addToLibrary(principal: AuthPrincipal, slug: string): Promise<void> {
+    const novel = await this.catalogService.getReadableNovel(slug, principal);
+    await this.db.insert(schema.library).values({ userId: principal.sub, novelId: novel.id }).onConflictDoNothing();
+    this.logger.debug('novel added to library', { userId: principal.sub, slug });
   }
 
   /** Idempotent: removing an absent entry (or an unknown slug) succeeds silently */

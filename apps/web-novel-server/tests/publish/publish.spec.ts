@@ -33,6 +33,7 @@ const novelBody = (revision: number, overrides: object = {}) => ({
   blurb: 'A city under a falling moon',
   genres: ['fantasy'],
   status: 'live',
+  visibility: 'PUBLIC',
   revision,
   ...overrides,
 });

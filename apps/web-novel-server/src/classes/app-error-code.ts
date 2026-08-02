@@ -51,4 +51,16 @@ export class AppErrorCode extends ServerErrorCode {
 
   /** The reader has no recorded progress for this novel */
   static readonly WBN_006 = AppErrorCode.notFound('WBN_006', 'No reading progress recorded for this novel');
+
+  /*!
+   * Access Error Codes
+   *
+   * Both are contract violations by the forge, never by a reader — a reader who may not see a novel
+   * is answered with WBN_001, indistinguishable from one that does not exist.
+   */
+
+  /** An `ORGANISATION` access push named no organisation to share with */
+  static readonly WBN_007 = AppErrorCode.badRequest('WBN_007', 'Organisation visibility requires an organisation');
+  /** A `PUBLIC` or `RESTRICTED` access push carried an organisation, which would be silently ignored */
+  static readonly WBN_008 = AppErrorCode.badRequest('WBN_008', 'Only organisation visibility may name an organisation');
 }

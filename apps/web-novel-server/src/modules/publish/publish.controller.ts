@@ -14,7 +14,16 @@ import { Body, Delete, Get, HttpController, type HttpResponse, HttpStatus, Param
 import { PUBLISH_SCOPE } from '@server/constants';
 
 import { PublishAudited } from './publish.decorators';
-import { ChapterOrdinalParams, ChapterUpsertBody, ManifestItem, NovelSlugParams, NovelUpsertBody, PublishResultResponse } from './publish.dto';
+import {
+  ChapterOrdinalParams,
+  ChapterUpsertBody,
+  ManifestItem,
+  NovelAccessBody,
+  NovelAccessResponse,
+  NovelSlugParams,
+  NovelUpsertBody,
+  PublishResultResponse,
+} from './publish.dto';
 import { PublishService } from './publish.service';
 
 /**
@@ -42,6 +51,21 @@ export class PublishController {
     const result = await this.publishService.upsertNovel(params.slug, body);
     if (result.outcome === 'noop') return void response.status(204).send();
     return { slug: params.slug, outcome: 'applied', revision: result.revision };
+  }
+
+  @Put('/:slug/access')
+  @PublishAudited('novel.access')
+  @RespondFor(200, PublishResultResponse)
+  async upsertAccess(@Params() params: NovelSlugParams, @Body() body: NovelAccessBody, @Res() response: HttpResponse): Promise<PublishResultResponse | undefined> {
+    const result = await this.publishService.upsertAccess(params.slug, body);
+    if (result.outcome === 'noop') return void response.status(204).send();
+    return { slug: params.slug, outcome: 'applied', revision: result.revision };
+  }
+
+  @Get('/:slug/access')
+  @RespondFor(200, NovelAccessResponse)
+  getAccess(@Params() params: NovelSlugParams): Promise<NovelAccessResponse> {
+    return this.publishService.getAccess(params.slug);
   }
 
   @Put('/:slug/chapters/:ordinal')

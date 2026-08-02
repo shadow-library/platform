@@ -19,7 +19,7 @@ import { APP_NAME } from '@server/constants';
 import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
 
 import { PublishAuditService } from './publish-audit.service';
-import { type ChapterUpsertBody, type ManifestItem, type NovelUpsertBody } from './publish.dto';
+import { type ChapterUpsertBody, type ManifestItem, type NovelAccessBody, type NovelAccessResponse, type NovelUpsertBody } from './publish.dto';
 import { type PublishAuditEntry } from './publish.types';
 
 /**
@@ -83,6 +83,7 @@ export class PublishService {
         coverPath: body.coverPath ?? null,
         genres: body.genres ?? [],
         status: body.status ?? ('live' as const),
+        visibility: body.visibility,
         revision: body.revision,
         updatedAt: new Date(),
       };
@@ -169,6 +170,75 @@ export class PublishService {
     return result;
   }
 
+  /**
+   * Replaces a novel's whole access record — tier, organisation and grant set — under the same
+   * revision ladder the metadata push uses, against `accessRevision` rather than `revision`.
+   *
+   * The replacement is wholesale and transactional: a partial apply would leave a novel restricted
+   * to a stale set, which is either a leak or a lockout depending on which half landed. Grants are
+   * deleted and re-inserted rather than diffed because the set is small and a diff has more ways to
+   * be subtly wrong than the whole-set write it would replace.
+   */
+  async upsertAccess(slug: string, body: NovelAccessBody): Promise<UpsertResult> {
+    const caller = this.caller();
+    if (body.visibility === 'ORGANISATION' && !body.organisationId) throw AppErrorCode.WBN_007.create();
+    if (body.visibility !== 'ORGANISATION' && body.organisationId) throw AppErrorCode.WBN_008.create();
+
+    const subjectIds = [...new Set(body.subjectIds ?? [])];
+    const result = await this.db.transaction(async tx => {
+      const [stored] = await tx.select().from(schema.novels).where(eq(schema.novels.slug, slug)).for('update');
+      if (!stored) throw AppErrorCode.WBN_001.create();
+      const base: Omit<PublishAuditEntry, 'outcome'> = {
+        action: 'novel.access',
+        novelSlug: slug,
+        incomingRevision: body.revision,
+        storedRevision: stored.accessRevision,
+        ...caller,
+      };
+
+      if (body.revision < stored.accessRevision) {
+        await this.auditService.record({ ...base, outcome: 'stale_rejected' }, tx);
+        return { outcome: 'stale', stored: stored.accessRevision } satisfies StaleMarker;
+      }
+
+      const current = await tx.select({ subjectId: schema.novelGrants.subjectId }).from(schema.novelGrants).where(eq(schema.novelGrants.novelId, stored.id));
+      if (body.revision === stored.accessRevision && this.isAccessUnchanged(stored, body, subjectIds, current)) {
+        await this.auditService.record({ ...base, outcome: 'noop' }, tx);
+        return { outcome: 'noop', revision: stored.accessRevision } satisfies UpsertResult;
+      }
+
+      await tx
+        .update(schema.novels)
+        .set({ visibility: body.visibility, organisationId: body.organisationId ?? null, accessRevision: body.revision, updatedAt: new Date() })
+        .where(eq(schema.novels.id, stored.id));
+      await tx.delete(schema.novelGrants).where(eq(schema.novelGrants.novelId, stored.id));
+      if (subjectIds.length > 0) await tx.insert(schema.novelGrants).values(subjectIds.map(subjectId => ({ novelId: stored.id, subjectId })));
+      await this.auditService.record({ ...base, outcome: 'applied' }, tx);
+      return { outcome: 'applied', revision: body.revision } satisfies UpsertResult;
+    });
+
+    this.auditService.markRecorded();
+    if (result.outcome === 'stale') throw AppErrorCode.WBN_003.create({ incoming: body.revision, stored: result.stored });
+    this.logger.info('novel access push handled', { slug, outcome: result.outcome, visibility: body.visibility, grants: subjectIds.length, revision: body.revision });
+    return result;
+  }
+
+  /** The access counterpart of the manifest: the forge diffs this to heal drift. Reads are not audited */
+  async getAccess(slug: string): Promise<NovelAccessResponse> {
+    const novel = await this.getNovelBySlug(slug);
+    const grants = await this.db
+      .select({ subjectId: schema.novelGrants.subjectId })
+      .from(schema.novelGrants)
+      .where(eq(schema.novelGrants.novelId, novel.id))
+      .orderBy(asc(schema.novelGrants.subjectId));
+    return {
+      visibility: novel.visibility,
+      organisationId: novel.organisationId ?? undefined,
+      subjectIds: grants.map(grant => grant.subjectId),
+      revision: novel.accessRevision,
+    };
+  }
+
   /** The reconciliation primitive: the forge diffs this against its publication ledger. Reads are not audited */
   async getManifest(slug: string): Promise<ManifestItem[]> {
     const novel = await this.getNovelBySlug(slug);
@@ -196,9 +266,19 @@ export class PublishService {
       stored.blurb === (body.blurb ?? null) &&
       stored.coverPath === (body.coverPath ?? null) &&
       stored.status === (body.status ?? 'live') &&
+      stored.visibility === body.visibility &&
       stored.genres.length === (body.genres ?? []).length &&
       stored.genres.every((genre, index) => genre === (body.genres ?? [])[index])
     );
+  }
+
+  /** Order-insensitive on the grant set: the forge sends a share list, and the order it happened to build it in is not a change. */
+  private isAccessUnchanged(stored: Novel, body: NovelAccessBody, subjectIds: string[], current: { subjectId: string }[]): boolean {
+    if (stored.visibility !== body.visibility) return false;
+    if (stored.organisationId !== (body.organisationId ?? null)) return false;
+    if (current.length !== subjectIds.length) return false;
+    const held = new Set(current.map(grant => grant.subjectId));
+    return subjectIds.every(subjectId => held.has(subjectId));
   }
 
   private countWords(content: string): number {

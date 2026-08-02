@@ -143,7 +143,7 @@ describe('Public catalog API', () => {
     };
 
     const publishChapter = async (revision: number, contentHash: string, content: string) => {
-      await publish('/internal/novels/etag-novel', { title: 'ETag Novel', genres: [], revision: 1 });
+      await publish('/internal/novels/etag-novel', { title: 'ETag Novel', genres: [], visibility: 'PUBLIC', revision: 1 });
       await publish('/internal/novels/etag-novel/chapters/1', { title: 'One', content, contentHash, revision });
     };
 
@@ -188,7 +188,7 @@ describe('Public catalog API', () => {
     });
 
     it('should answer 404 for an unknown chapter', async () => {
-      await publish('/internal/novels/etag-novel', { title: 'ETag Novel', genres: [], revision: 1 });
+      await publish('/internal/novels/etag-novel', { title: 'ETag Novel', genres: [], visibility: 'PUBLIC', revision: 1 });
       const response = await env.getRouter().mockRequest().get('/api/novels/etag-novel/chapters/99');
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'WBN_002' });

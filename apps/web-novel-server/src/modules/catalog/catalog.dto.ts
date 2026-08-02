@@ -11,6 +11,7 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { NOVEL_VISIBILITIES } from '@server/modules/publish';
 
 /**
  * Defining types
@@ -55,6 +56,10 @@ export class NovelSummary {
 
   @Field(() => String, { enum: ['live', 'retired'] })
   status: 'live' | 'retired';
+
+  /** Safe to surface: only a caller already cleared to see the novel ever receives this. */
+  @Field(() => String, { enum: [...NOVEL_VISIBILITIES] })
+  visibility: (typeof NOVEL_VISIBILITIES)[number];
 
   @Field(() => Integer)
   chapterCount: number;

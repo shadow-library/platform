@@ -7,6 +7,7 @@
  */
 import { and, asc, count, desc, eq, ilike, sql, type SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
+import { type AuthPrincipal } from '@shadow-library/auth';
 import { Logger, LRUCache } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
@@ -18,6 +19,7 @@ import { APP_NAME } from '@server/constants';
 import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
 
 import { type ChapterContentResponse, type ChapterMetaItem, type NovelCatalogQuery, type NovelCatalogResponse, type NovelDetailResponse, type NovelSummary } from './catalog.dto';
+import { NovelAccessService } from './novel-access.service';
 
 /**
  * Defining types
@@ -29,6 +31,8 @@ export interface ChapterRef {
   ordinal: number;
   contentHash: string;
   revision: number;
+  /** Carried so the controller can decide the caching story without a second lookup */
+  visibility: Novel['visibility'];
 }
 
 /**
@@ -46,7 +50,10 @@ export class CatalogService {
   private readonly chapterCache = new LRUCache(CHAPTER_CACHE_CAPACITY);
   private readonly db: PrimaryDatabase;
 
-  constructor(databaseService: DatabaseService) {
+  constructor(
+    databaseService: DatabaseService,
+    private readonly accessService: NovelAccessService,
+  ) {
     this.db = databaseService.getPostgresClient();
   }
 
@@ -68,14 +75,15 @@ export class CatalogService {
     return { total: total?.value ?? 0, limit: query.limit, offset: query.offset, items };
   }
 
-  async getNovel(slug: string): Promise<NovelDetailResponse> {
-    const novel = await this.getNovelBySlug(slug);
+  async getNovel(slug: string, principal: AuthPrincipal | null): Promise<NovelDetailResponse> {
+    const novel = await this.getReadableNovel(slug, principal);
     const [chapters] = await this.db.select({ value: count() }).from(schema.publishedChapters).where(eq(schema.publishedChapters.novelId, novel.id));
     return { ...this.toSummary(novel, chapters?.value ?? 0), createdAt: novel.createdAt.toISOString() };
   }
 
-  async listChapters(slug: string): Promise<ChapterMetaItem[]> {
-    const novel = await this.getNovelBySlug(slug);
+  /** Returns the tier alongside the list so the controller can pick a caching story without a second lookup. */
+  async listChapters(slug: string, principal: AuthPrincipal | null): Promise<{ items: ChapterMetaItem[]; visibility: Novel['visibility'] }> {
+    const novel = await this.getReadableNovel(slug, principal);
     const chapters = await this.db
       .select({
         ordinal: schema.publishedChapters.ordinal,
@@ -87,23 +95,37 @@ export class CatalogService {
       .where(eq(schema.publishedChapters.novelId, novel.id))
       .orderBy(asc(schema.publishedChapters.ordinal));
 
-    return chapters.map(chapter => ({
+    const items = chapters.map(chapter => ({
       ordinal: chapter.ordinal,
       title: chapter.title,
       wordCount: chapter.wordCount ?? undefined,
       publishedAt: chapter.publishedAt?.toISOString(),
     }));
+    return { items, visibility: novel.visibility };
   }
 
   /** Cheap lookup (no content column) that carries everything ETag handling needs */
-  async getChapterRef(slug: string, ordinal: number): Promise<ChapterRef> {
-    const novel = await this.getNovelBySlug(slug);
+  async getChapterRef(slug: string, ordinal: number, principal: AuthPrincipal | null): Promise<ChapterRef> {
+    const novel = await this.getReadableNovel(slug, principal);
     const [chapter] = await this.db
       .select({ id: schema.publishedChapters.id, contentHash: schema.publishedChapters.contentHash, revision: schema.publishedChapters.revision })
       .from(schema.publishedChapters)
       .where(and(eq(schema.publishedChapters.novelId, novel.id), eq(schema.publishedChapters.ordinal, ordinal)));
     if (!chapter) throw AppErrorCode.WBN_002.create();
-    return { novelSlug: slug, chapterId: chapter.id, ordinal, contentHash: chapter.contentHash, revision: chapter.revision };
+    return { novelSlug: slug, chapterId: chapter.id, ordinal, contentHash: chapter.contentHash, revision: chapter.revision, visibility: novel.visibility };
+  }
+
+  /**
+   * Resolve-then-authorize, and the single door every by-slug read goes through. A caller who may
+   * not read the novel gets `WBN_001` — the same 404 an unknown slug gets, byte for byte — so the
+   * response cannot be used to confirm that a private novel exists at a guessed slug. That is why
+   * this returns rather than branches: there is deliberately no "forbidden" answer to leak.
+   */
+  async getReadableNovel(slug: string, principal: AuthPrincipal | null): Promise<Novel> {
+    const novel = await this.getNovelBySlug(slug);
+    if (await this.accessService.canRead(novel, principal)) return novel;
+    this.accessService.logDenial(slug, principal, novel.visibility);
+    throw AppErrorCode.WBN_001.create();
   }
 
   /**
@@ -139,12 +161,18 @@ export class CatalogService {
     return novel ?? AppErrorCode.WBN_001.throw();
   }
 
-  private buildFilters(query: NovelCatalogQuery): SQL | undefined {
-    const filters: SQL[] = [];
+  /**
+   * The public filter is unconditional and not a caller's to influence: browse, search and sort
+   * only ever see `PUBLIC`. Making it depend on who is asking would mean a shared novel could
+   * surface in a listing — and a listing is exactly what the author asked us to keep it out of.
+   * Readers reach their shared novels through `/api/shared` and direct slug lookups instead.
+   */
+  private buildFilters(query: NovelCatalogQuery): SQL {
+    const filters: SQL[] = [eq(schema.novels.visibility, 'PUBLIC')];
     if (query.search) filters.push(ilike(schema.novels.title, `%${query.search}%`));
     if (query.genre) filters.push(sql`${query.genre} = ANY(${schema.novels.genres})`);
     if (query.status) filters.push(eq(schema.novels.status, query.status));
-    return filters.length > 0 ? and(...filters) : undefined;
+    return and(...filters) as SQL;
   }
 
   private buildOrder(query: NovelCatalogQuery): SQL {
@@ -160,6 +188,7 @@ export class CatalogService {
       coverPath: novel.coverPath ?? undefined,
       genres: novel.genres,
       status: novel.status,
+      visibility: novel.visibility,
       chapterCount,
       updatedAt: novel.updatedAt.toISOString(),
     };

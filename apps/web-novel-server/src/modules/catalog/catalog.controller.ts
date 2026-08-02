@@ -6,13 +6,14 @@
  * Importing npm packages
  */
 import { type FastifyRequest } from 'fastify';
+import { type AuthPrincipal } from '@shadow-library/auth';
 import { Config } from '@shadow-library/common';
-import { Get, HttpController, type HttpResponse, Params, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
+import { ContextService, Get, HttpController, type HttpResponse, Params, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
-import { ChapterOrdinalParams, NovelSlugParams } from '@server/modules/publish';
+import { ChapterOrdinalParams, NOVEL_VISIBILITIES, NovelSlugParams } from '@server/modules/publish';
 
 import { ChapterContentResponse, ChapterListResponse, NovelCatalogQuery, NovelCatalogResponse, NovelDetailResponse } from './catalog.dto';
 import { CatalogService } from './catalog.service';
@@ -31,7 +32,10 @@ import { CatalogService } from './catalog.service';
 
 @HttpController('/api/novels')
 export class CatalogController {
-  constructor(private readonly catalogService: CatalogService) {}
+  constructor(
+    private readonly catalogService: CatalogService,
+    private readonly context: ContextService,
+  ) {}
 
   @Get()
   @RespondFor(200, NovelCatalogResponse)
@@ -41,24 +45,46 @@ export class CatalogController {
 
   @Get('/:slug')
   @RespondFor(200, NovelDetailResponse)
-  getNovel(@Params() params: NovelSlugParams): Promise<NovelDetailResponse> {
-    return this.catalogService.getNovel(params.slug);
+  async getNovel(@Params() params: NovelSlugParams, @Res() response: HttpResponse): Promise<NovelDetailResponse> {
+    const novel = await this.catalogService.getNovel(params.slug, this.principal());
+    this.applyCachePolicy(response, novel.visibility);
+    return novel;
   }
 
   @Get('/:slug/chapters')
   @RespondFor(200, ChapterListResponse)
-  async listChapters(@Params() params: NovelSlugParams): Promise<ChapterListResponse> {
-    return { items: await this.catalogService.listChapters(params.slug) };
+  async listChapters(@Params() params: NovelSlugParams, @Res() response: HttpResponse): Promise<ChapterListResponse> {
+    const chapters = await this.catalogService.listChapters(params.slug, this.principal());
+    this.applyCachePolicy(response, chapters.visibility);
+    return { items: chapters.items };
   }
 
   @Get('/:slug/chapters/:ordinal')
   @RespondFor(200, ChapterContentResponse)
   async getChapter(@Params() params: ChapterOrdinalParams, @Req() request: FastifyRequest, @Res() response: HttpResponse): Promise<ChapterContentResponse | undefined> {
-    const ref = await this.catalogService.getChapterRef(params.slug, params.ordinal);
+    const ref = await this.catalogService.getChapterRef(params.slug, params.ordinal, this.principal());
     response.header('etag', `"${ref.contentHash}"`);
-    response.header('cache-control', `public, max-age=${Config.get('catalog.cache-max-age')}`);
+    this.applyCachePolicy(response, ref.visibility);
     if (this.matchesETag(request.headers['if-none-match'], ref.contentHash)) return void response.status(304).send();
     return this.catalogService.getChapterContent(ref);
+  }
+
+  /** Present only when the caller carried a credential; `OptionalAuthResolver` never demands one. */
+  private principal(): AuthPrincipal | null {
+    return this.context.getAuthPrincipalOrNull();
+  }
+
+  /**
+   * A public novel keeps the shared-cache story it has always had. Anything else must never be held
+   * by a CDN or proxy, because the response is a function of who asked — `no-store` rather than
+   * `private` so that even a browser's back/forward cache does not retain it after a share is
+   * revoked, and `Vary` so any intermediary that ignores the first directive still cannot serve one
+   * reader's copy to another.
+   */
+  private applyCachePolicy(response: HttpResponse, visibility: (typeof NOVEL_VISIBILITIES)[number]): void {
+    if (visibility === 'PUBLIC') return void response.header('cache-control', `public, max-age=${Config.get('catalog.cache-max-age')}`);
+    response.header('cache-control', 'private, no-store');
+    response.header('vary', 'Cookie, Authorization');
   }
 
   /** RFC 9110 §13.1.2: any listed entity-tag may match; weak-prefixed and unquoted forms are tolerated */

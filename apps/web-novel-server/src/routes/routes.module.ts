@@ -5,8 +5,6 @@
 /**
  * Importing npm packages
  */
-import { type DynamicModule, forwardRef, type Import } from '@shadow-library/app';
-import { AuthModule } from '@shadow-library/auth/module';
 import { Config } from '@shadow-library/common';
 import { FastifyModule } from '@shadow-library/fastify';
 import { HttpCoreModule } from '@shadow-library/modules';
@@ -14,6 +12,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { WebNovelAuthModule } from '@server/modules/auth';
 import { CatalogModule } from '@server/modules/catalog';
 import { HealthModule } from '@server/modules/health';
 import { PublishModule } from '@server/modules/publish';
@@ -38,17 +37,8 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({
   openapi: { normalizeSchemaIds: true },
 });
 
-/**
- * The auth SDK's dynamic module carries a live `AuthClient` in a value provider, and `@Module`
- * deep-freezes everything reachable from its metadata. The forwardRef defers construction to
- * module resolution — after the freeze — so the client stays mutable; memoized so repeated
- * resolution never mints a second client.
- */
-let authModule: DynamicModule | undefined;
-const DeferredAuthModule = forwardRef(() => (authModule ??= AuthModule.forRoot({ routes: { basePath: '/api/auth' } }))) as unknown as Import;
-
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, DeferredAuthModule, HealthModule, PublishModule, CatalogModule, ReaderModule],
+  imports: [AppHttpCoreModule, WebNovelAuthModule, HealthModule, PublishModule, CatalogModule, ReaderModule],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),

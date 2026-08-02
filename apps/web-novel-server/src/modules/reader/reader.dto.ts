@@ -10,6 +10,7 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
 /**
  * Importing user defined packages
  */
+import { NOVEL_VISIBILITIES } from '@server/modules/publish';
 
 /**
  * Defining types
@@ -76,6 +77,11 @@ export class LibraryItem {
   @Field(() => String, { enum: ['live', 'retired'] })
   status: 'live' | 'retired';
 
+  /** Lets the shelf mark a shared novel as such; only a caller already cleared to see it receives this. */
+  @Field(() => String, { enum: [...NOVEL_VISIBILITIES] })
+  visibility: (typeof NOVEL_VISIBILITIES)[number];
+
+  /** On `/shared` this is the novel's last update rather than an add date — nothing was added to a shelf. */
   @Field()
   addedAt: string;
 }

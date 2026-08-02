@@ -19,6 +19,7 @@ import { bigint, bigserial, integer, pgEnum, pgTable, text, timestamp, unique, v
 export type Novel = InferSelectModel<typeof novels>;
 export namespace Novel {
   export type Status = InferEnum<typeof novelStatus>;
+  export type Visibility = InferEnum<typeof novelVisibility>;
   export type Chapter = InferSelectModel<typeof publishedChapters>;
 }
 
@@ -33,6 +34,19 @@ export namespace Novel {
 
 export const novelStatus = pgEnum('novel_status', ['live', 'retired']);
 
+/**
+ * How widely a novel may be read. A ceiling on reachability, not a publication state — `status`
+ * still says whether it is live at all, and a `retired` PUBLIC novel is retired-but-public rather
+ * than private. Deliberately not a flag pair: "hidden" and "who may see it" are one question with
+ * three answers, and modelling them separately invites a row that is both.
+ *
+ * `PUBLIC` is the only value the catalog will list, search or sort. `ORGANISATION` is readable by
+ * the members of `organisation_id`. `RESTRICTED` is readable only by the subjects in `novel_grants`.
+ * Both non-public tiers are owned by novel-forge and arrive over the internal publish surface; this
+ * service never writes them.
+ */
+export const novelVisibility = pgEnum('novel_visibility', ['PUBLIC', 'ORGANISATION', 'RESTRICTED']);
+
 export const novels = pgTable('novels', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   slug: varchar('slug', { length: 128 }).notNull().unique(),
@@ -42,6 +56,12 @@ export const novels = pgTable('novels', {
   /** Free-form genre strings drive the public catalog filters; carried in the metadata PUT payload */
   genres: varchar('genres', { length: 64 }).array().notNull().default([]),
   status: novelStatus('status').notNull().default('live'),
+  /** Defaulted for the migration's benefit only — every push carries it explicitly, so a row never relies on the default. */
+  visibility: novelVisibility('visibility').notNull().default('PUBLIC'),
+  /** The identity organisation an `ORGANISATION` novel is shared with; null on every other tier. */
+  organisationId: varchar('organisation_id', { length: 64 }),
+  /** Forge-assigned, and independent of `revision`: adding a viewer must not churn the metadata row. */
+  accessRevision: integer('access_revision').notNull().default(1),
   revision: integer('revision').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

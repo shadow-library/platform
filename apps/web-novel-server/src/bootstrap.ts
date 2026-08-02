@@ -23,6 +23,9 @@ declare module '@shadow-library/common' {
 
     /** Public chapter delivery */
     'catalog.cache-max-age': number;
+
+    /** Non-public novel access */
+    'access.membership-ttl': number;
   }
 }
 
@@ -44,3 +47,11 @@ Config.load('server.host', { defaultValue: '0.0.0.0' });
 
 /** Public chapter responses advertise this max-age; ETag revalidation covers the rest */
 Config.load('catalog.cache-max-age', { defaultValue: '300', validateType: 'number' });
+
+/**
+ * How long an organisation-membership answer from identity is trusted, in seconds. This is the
+ * upper bound on how long a removed member keeps reading an `ORGANISATION` novel, so shortening it
+ * trades identity round trips for revocation latency. Per-user grants are unaffected — those are
+ * read from Postgres on every request and revoke immediately.
+ */
+Config.load('access.membership-ttl', { defaultValue: '60', validateType: 'number' });
