@@ -8,9 +8,9 @@
 import { type ApiError } from '@/lib/apis';
 import { type ReactElement, type ReactNode } from 'react';
 
-import { Alert, Badge, type BadgeIntent, copyText, EmptyState, IconButton, Spinner, toast, useShellNav, useTheme } from '@shadow-library/ui';
+import { Alert, Badge, type BadgeIntent, copyText, EmptyState, IconButton, Spinner, toast, useTheme } from '@shadow-library/ui';
 
-import { CopyIcon, MenuIcon, MoonIcon, SunIcon } from '../icons';
+import { CopyIcon, MoonIcon, SunIcon } from '../icons';
 import styles from './si.module.css';
 
 export type ChipIntent = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent';
@@ -141,29 +141,6 @@ export function ThemeToggle(): ReactElement {
       icon={dark ? <SunIcon size={18} /> : <MoonIcon size={18} />}
       onClick={toggleTheme}
     />
-  );
-}
-
-/**
- * Opens the shell's nav drawer. Both shells draw their own top bar rather than `TopNavigation`, so the
- * hamburger it would have supplied is wired here instead; CSS shows it only where the shell has swapped
- * the persistent sidebar for the drawer.
- */
-export function NavMenuButton(): ReactElement | null {
-  const nav = useShellNav();
-  if (!nav.hasSidebar) return null;
-  return (
-    <span className={styles.navMenu}>
-      <IconButton
-        variant="ghost"
-        size="sm"
-        aria-label="Open navigation"
-        aria-haspopup="dialog"
-        aria-expanded={nav.open}
-        icon={<MenuIcon size={18} />}
-        onClick={() => nav.setOpen(true)}
-      />
-    </span>
   );
 }
 

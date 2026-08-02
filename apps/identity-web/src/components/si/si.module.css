@@ -98,18 +98,3 @@
   font-family: var(--sh-font-mono);
   font-size: 0.92em;
 }
-
-/* The nav-drawer trigger only exists below the shell's md breakpoint (--sh-breakpoint-md 768), where
-   the persistent sidebar has been swapped for the drawer. */
-.navMenu {
-  display: none;
-  align-items: center;
-  flex-shrink: 0;
-  margin-left: -4px;
-}
-
-@media (max-width: 767px) {
-  .navMenu {
-    display: inline-flex;
-  }
-}

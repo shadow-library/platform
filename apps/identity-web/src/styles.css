@@ -129,40 +129,6 @@ a:hover {
   background: var(--si-dot);
 }
 
-/* A nav link inside a sidebar rail. */
-.si-nav {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--sh-radius-md);
-  color: var(--sh-text-secondary);
-  font-size: var(--sh-text-body-sm);
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  background: transparent;
-  width: 100%;
-  text-align: left;
-  transition:
-    background 0.12s,
-    color 0.12s;
-}
-
-.si-nav:hover {
-  background: var(--sh-bg-hover);
-  color: var(--sh-text-primary);
-}
-
-.si-nav[data-active='true'] {
-  background: var(--sh-accent-soft);
-  color: var(--sh-accent);
-}
-
-.si-nav[data-active='true'] svg {
-  color: var(--sh-accent);
-}
-
 /* A quiet icon button matching the design chrome (topbar actions, row triggers). */
 .si-ib {
   display: inline-flex;

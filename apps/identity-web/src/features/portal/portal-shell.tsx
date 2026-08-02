@@ -1,87 +1,65 @@
 /**
  * Importing npm packages
  */
-import { Link, useLocation, useNavigate } from '@tanstack/react-router';
+import { useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
-import { Avatar, DropdownMenu, IconButton, Shell, Spinner } from '@shadow-library/ui';
+import { IconButton, Spinner } from '@shadow-library/ui';
+import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 
 /**
  * Importing user defined packages
  */
-import { BellIcon, BuildingIcon, GridIcon, LogOutIcon, MailIcon, MonitorIcon, PlugIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
-import { NavMenuButton, ThemeToggle } from '@/components/si';
-import { type MeResponse, useAdminContextQuery, useMeQuery, useSignoutMutation } from '@/lib/apis';
+import { BellIcon, BrandGlyph, BuildingIcon, GridIcon, MailIcon, MonitorIcon, PlugIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
+import { ThemeToggle } from '@/components/si';
+import { useAdminContextQuery, useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 import { PAGE_WIDTH } from '@/lib/layout';
 
 import styles from './portal-shell.module.css';
 
 /**
- * Defining types
- */
-interface NavItem {
-  to: string;
-  label: string;
-  icon: ReactNode;
-  exact?: boolean;
-}
-
-/**
  * Declaring the constants
  */
-const ACCOUNT_NAV: NavItem[] = [
-  { to: '/account', label: 'Overview', icon: <GridIcon size={18} />, exact: true },
-  { to: '/account/security', label: 'Security', icon: <ShieldCheckIcon size={18} /> },
-  { to: '/account/sessions', label: 'Sessions & devices', icon: <MonitorIcon size={18} /> },
-  { to: '/account/contacts', label: 'Emails & phones', icon: <MailIcon size={18} /> },
-  { to: '/account/profile', label: 'Profile', icon: <UserIcon size={18} /> },
-  { to: '/applications', label: 'My applications', icon: <GridIcon size={18} /> },
-  { to: '/account/connected', label: 'Connected apps', icon: <PlugIcon size={18} /> },
-];
-
-const ORG_NAV: NavItem[] = [{ to: '/organizations', label: 'My organizations', icon: <BuildingIcon size={18} /> }];
-
-/** Revealed only to platform staff (an admin whose /admin/context grants any permission). */
-const PLATFORM_NAV: NavItem[] = [{ to: '/console', label: 'Admin console', icon: <TerminalIcon size={18} /> }];
-
-/** The account/portal brand glyph. */
-function BrandGlyph(): React.JSX.Element {
-  return (
-    <svg width={24} height={24} viewBox="0 0 28 28" fill="none" aria-hidden="true">
-      <rect x="7" y="7" width="17" height="17" rx="5" fill="var(--sh-accent-soft)" />
-      <rect x="3" y="3" width="17" height="17" rx="5" fill="var(--sh-accent)" />
-      <circle cx="11.5" cy="10.2" r="2.5" fill="var(--sh-on-accent)" />
-      <path d="M10.4 11.8 12.6 11.8 13.4 16 9.6 16 Z" fill="var(--sh-on-accent)" />
-    </svg>
-  );
+/** `isStaff` gates the platform section — an admin whose /admin/context grants any permission. */
+function navConfig(isStaff: boolean): NavConfig {
+  return {
+    variant: 'sections',
+    sections: [
+      {
+        label: 'Account',
+        items: [
+          { to: '/account', label: 'Overview', icon: <GridIcon size={18} />, exact: true },
+          { to: '/account/security', label: 'Security', icon: <ShieldCheckIcon size={18} /> },
+          { to: '/account/sessions', label: 'Sessions & devices', icon: <MonitorIcon size={18} /> },
+          { to: '/account/contacts', label: 'Emails & phones', icon: <MailIcon size={18} /> },
+          { to: '/account/profile', label: 'Profile', icon: <UserIcon size={18} /> },
+          { to: '/applications', label: 'My applications', icon: <GridIcon size={18} /> },
+          { to: '/account/connected', label: 'Connected apps', icon: <PlugIcon size={18} /> },
+        ],
+      },
+      { label: 'Organizations', items: [{ to: '/organizations', label: 'My organizations', icon: <BuildingIcon size={18} /> }] },
+      { label: 'Platform', hidden: !isStaff, items: [{ to: '/console', label: 'Admin console', icon: <TerminalIcon size={18} /> }] },
+    ],
+  };
 }
 
-function UserMenu({ me, children }: { me: MeResponse; children: ReactNode }): React.JSX.Element {
-  const navigate = useNavigate();
-  const signout = useSignoutMutation();
-  return (
-    <DropdownMenu>
-      <DropdownMenu.Trigger asChild>{children}</DropdownMenu.Trigger>
-      <DropdownMenu.Content align="end" sideOffset={6} className={styles.userMenu}>
-        <DropdownMenu.Label>{me.email ?? displayName(me)}</DropdownMenu.Label>
-        <DropdownMenu.Separator />
-        <DropdownMenu.Item icon={<LogOutIcon size={16} />} destructive onSelect={() => signout.mutate(undefined, { onSuccess: () => navigate({ to: '/login' }) })}>
-          Sign out
-        </DropdownMenu.Item>
-      </DropdownMenu.Content>
-    </DropdownMenu>
-  );
+/** The breadcrumb's leaf, read off the same config the sidebar renders so the two can't disagree. */
+function activeLabel(nav: NavConfig, pathname: string): string {
+  const leaves = nav.sections.filter(section => section.hidden !== true).flatMap(section => section.items);
+  const match = leaves.find(item => 'to' in item && (item.exact === true ? pathname === item.to : pathname.startsWith(item.to)));
+  return match != null && 'label' in match ? match.label : 'Account';
 }
 
 /**
- * The account-portal chrome: a fixed nav rail (account + organizations), a slim top bar carrying the
- * session-assurance badge and the user menu, and a scrolling content region. Handles the auth gate —
- * an unauthenticated visitor is bounced to the hosted sign-in.
+ * The account-portal chrome. `AppShell` owns the rail, the top bar, the account menu, and the sub-md nav
+ * drawer; the portal supplies its destinations and the session-assurance badge, plus the auth gate — an
+ * unauthenticated visitor is bounced to the hosted sign-in.
  */
 export function PortalShell({ children }: { children: ReactNode }): React.JSX.Element {
   const me = useMeQuery();
   const adminContext = useAdminContextQuery();
   const navigate = useNavigate();
+  const signout = useSignoutMutation();
   const { pathname } = useLocation();
 
   useEffect(() => {
@@ -96,65 +74,30 @@ export function PortalShell({ children }: { children: ReactNode }): React.JSX.El
     );
 
   const user = me.data;
-  const isStaff = (adminContext.data?.permissions.length ?? 0) > 0;
+  const nav = navConfig((adminContext.data?.permissions.length ?? 0) > 0);
   const elevated = user.aal === 'AAL2' || user.elevated;
-  const activeLabel = [...ACCOUNT_NAV, ...ORG_NAV].find(item => (item.exact ? pathname === item.to : pathname.startsWith(item.to)))?.label ?? 'Account';
 
-  const renderNav = (item: NavItem): React.JSX.Element => (
-    <Link key={item.to} to={item.to} className="si-nav" activeOptions={{ exact: item.exact }} activeProps={{ 'data-active': 'true' }}>
-      {item.icon}
-      <span>{item.label}</span>
-    </Link>
-  );
-
-  const sidebar = (
-    <aside className={styles.sidebar}>
-      <div className={styles.brand}>
-        <BrandGlyph />
-        <span className={styles.brandName}>
-          Shadow <span className={styles.brandSub}>Identity</span>
-        </span>
-      </div>
-      <nav className={styles.nav} aria-label="Account">
-        <div className={styles.navLabel}>Account</div>
-        {ACCOUNT_NAV.map(renderNav)}
-        <div className={styles.navLabel}>Organizations</div>
-        {ORG_NAV.map(renderNav)}
-        {isStaff && (
-          <>
-            <div className={styles.navLabel}>Platform</div>
-            {PLATFORM_NAV.map(renderNav)}
-          </>
-        )}
-      </nav>
-    </aside>
-  );
-
-  const topbar = (
-    <header className={styles.header}>
-      <NavMenuButton />
-      <div className={styles.crumb}>Account / {activeLabel}</div>
-      <div className={styles.headerRight}>
+  return (
+    <AppShell
+      brand={{ icon: <BrandGlyph />, name: 'Shadow Identity', to: '/account' }}
+      nav={nav}
+      account={{
+        name: displayName(user),
+        email: user.email ?? undefined,
+        onSignOut: () => signout.mutate(undefined, { onSuccess: () => navigate({ to: '/login' }) }),
+      }}
+      breadcrumb={`Account / ${activeLabel(nav, pathname)}`}
+      status={
         <span className={styles.aalBadge} data-elevated={elevated || undefined}>
           <ShieldCheckIcon size={12} />
           {elevated ? 'AAL2 · MFA' : 'AAL1'}
         </span>
-        <IconButton variant="ghost" size="sm" aria-label="Notifications" icon={<BellIcon size={18} />} />
-        <ThemeToggle />
-        <UserMenu me={user}>
-          <button type="button" className={styles.headerAvatar} aria-label="Account menu">
-            <Avatar name={displayName(user)} size="sm" />
-          </button>
-        </UserMenu>
-      </div>
-    </header>
-  );
-
-  // The shell owns the gutters, the centred column, and the sub-md nav drawer — the portal only supplies
-  // the chrome. `contentWidth` is the one column the portal and the console share.
-  return (
-    <Shell sidebar={sidebar} topbar={topbar} contentWidth={PAGE_WIDTH}>
+      }
+      actions={<IconButton variant="ghost" size="sm" aria-label="Notifications" icon={<BellIcon size={18} />} />}
+      utility={<ThemeToggle />}
+      contentWidth={PAGE_WIDTH}
+    >
       {children}
-    </Shell>
+    </AppShell>
   );
 }

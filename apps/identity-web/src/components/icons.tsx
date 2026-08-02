@@ -438,3 +438,16 @@ export const SparkIcon = (p: IconProps): React.JSX.Element => (
     <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
   </SvgIcon>
 );
+
+/**
+ * The Shadow Identity mark — two offset rounded squares behind a person glyph. Shared by both shells so
+ * the portal and the console cannot drift apart on the one thing that says which product this is.
+ */
+export const BrandGlyph = ({ size = 24 }: { size?: number }): React.JSX.Element => (
+  <svg width={size} height={size} viewBox="0 0 28 28" fill="none" aria-hidden="true">
+    <rect x="7" y="7" width="17" height="17" rx="5" fill="var(--sh-accent-soft)" />
+    <rect x="3" y="3" width="17" height="17" rx="5" fill="var(--sh-accent)" />
+    <circle cx="11.5" cy="10.2" r="2.5" fill="var(--sh-on-accent)" />
+    <path d="M10.4 11.8 12.6 11.8 13.4 16 9.6 16 Z" fill="var(--sh-on-accent)" />
+  </svg>
+);
