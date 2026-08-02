@@ -1054,6 +1054,7 @@ export interface components {
       trend: components['schemas']['NotificationStatsTrend'];
     };
     NotificationStats: {
+      /** Format: date */
       date: string;
       overall: components['schemas']['NotificationDeliveryStats'];
       channels: components['schemas']['NotificationChannelStats'];
@@ -1070,7 +1071,9 @@ export interface components {
       push: components['schemas']['NotificationDeliveryStats'];
     };
     NotificationStatsTrend: {
+      /** Format: date */
       fromDate: string;
+      /** Format: date */
       toDate: string;
       stats: components['schemas']['NotificationStatsWithDate'][];
     };
@@ -1079,6 +1082,7 @@ export interface components {
       succeeded: number;
       failed: number;
       pending: number;
+      /** Format: date */
       date: string;
     };
     AuthLogoutResponse: {

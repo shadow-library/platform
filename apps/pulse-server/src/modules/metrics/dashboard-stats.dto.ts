@@ -33,8 +33,8 @@ export class NotificationDeliveryStats {
 
 @Schema()
 export class NotificationStatsWithDate extends NotificationDeliveryStats {
-  @Field(() => String)
-  @Transform({ output: 'date:dmy' })
+  @Field(() => String, { format: 'date' })
+  @Transform({ output: 'date:iso' })
   date: number;
 }
 
@@ -52,8 +52,8 @@ export class NotificationChannelStats {
 
 @Schema()
 export class NotificationStats {
-  @Field(() => String)
-  @Transform({ output: 'date:dmy' })
+  @Field(() => String, { format: 'date' })
+  @Transform({ output: 'date:iso' })
   date: number;
 
   @Field()
@@ -65,12 +65,12 @@ export class NotificationStats {
 
 @Schema()
 export class NotificationStatsTrend {
-  @Field(() => String)
-  @Transform({ output: 'date:dmy' })
+  @Field(() => String, { format: 'date' })
+  @Transform({ output: 'date:iso' })
   fromDate: number;
 
-  @Field(() => String)
-  @Transform({ output: 'date:dmy' })
+  @Field(() => String, { format: 'date' })
+  @Transform({ output: 'date:iso' })
   toDate: number;
 
   @Field(() => [NotificationStatsWithDate])
