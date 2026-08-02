@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { ThemeProvider, Toaster, TooltipProvider } from '@shadow-library/ui';
+import { themeCookieDomain } from '@shadow-library/web';
 
 /**
  * Declaring types
@@ -21,7 +22,7 @@ export interface AppProviderProps {
  */
 export default function AppProvider(props: AppProviderProps): React.JSX.Element {
   return (
-    <ThemeProvider storageKey="shadow-identity-theme">
+    <ThemeProvider cookieDomain={themeCookieDomain()} legacyStorageKey="shadow-identity-theme">
       <TooltipProvider>{props.children}</TooltipProvider>
       <Toaster placement="top-end" />
     </ThemeProvider>

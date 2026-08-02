@@ -3,13 +3,13 @@
  */
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Card, ConfirmDialog, SegmentedControl, Select, Switch, type Theme, toast, useTheme } from '@shadow-library/ui';
+import { Button, Card, ConfirmDialog, SegmentedControl, Select, Switch, type ThemeMode, toast, useTheme } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
 import { BookIcon, ChevronRightIcon, SettingsSlidersIcon } from '@/components/icons';
-import { APP_LANGUAGES, clearAllLocalData, DEFAULT_SETTINGS, loadSettings, saveSettings, type ThemeMode, type ToggleKey, type WebnovelSettings } from '@/lib/settings-store';
+import { APP_LANGUAGES, clearAllLocalData, DEFAULT_SETTINGS, loadSettings, saveSettings, type ToggleKey, type WebnovelSettings } from '@/lib/settings-store';
 
 import styles from './settings-screen.module.css';
 
@@ -37,9 +37,9 @@ interface ThemeOption {
  * Declaring the constants
  *
  * The account-agnostic preferences screen from the mockups: a sticky left rail of sections and a right pane
- * of controls. Every toggle and select is device-local (persisted through `settings-store`), and the theme
- * picker drives the real app theme through the design-system `useTheme`. `system` is resolved to the OS
- * preference here since the app theme itself is only ever light or dark.
+ * of controls. Every toggle and select is device-local (persisted through `settings-store`), except the theme
+ * picker: theme is a platform-wide preference shared with the other Shadow apps, so it reads and writes the
+ * design-system `useTheme` directly rather than keeping a second copy here that could disagree with it.
  */
 export const SETTINGS_SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
@@ -84,11 +84,6 @@ const CONTENT_TOGGLES: ToggleMeta[] = [
 
 const route = getRouteApi('/_shell/settings');
 
-function systemTheme(): Theme {
-  if (typeof window === 'undefined' || !window.matchMedia) return 'light';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
 function ToggleList({ toggles, settings, onToggle }: { toggles: ToggleMeta[]; settings: WebnovelSettings; onToggle: (key: ToggleKey, value: boolean) => void }): React.JSX.Element {
   return (
     <div className={styles.rows}>
@@ -109,30 +104,14 @@ function ToggleList({ toggles, settings, onToggle }: { toggles: ToggleMeta[]; se
 export function SettingsScreen(): React.JSX.Element {
   const { section } = route.useSearch();
   const navigate = route.useNavigate();
-  const { setTheme } = useTheme();
+  const { mode: themeMode, setMode: setThemeMode } = useTheme();
 
   // Deterministic defaults render on the server and through the hydration pass; the persisted preferences load
   // in an effect afterwards, so the first client render always matches the server HTML.
   const [settings, setSettings] = useState<WebnovelSettings>(DEFAULT_SETTINGS);
-  const [loaded, setLoaded] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  useEffect(() => {
-    setSettings(loadSettings());
-    setLoaded(true);
-  }, []);
-
-  // Reflect the stored theme mode onto the real app theme once preferences are known, and keep `system` live
-  // as the OS preference flips. Gating on `loaded` avoids briefly overriding the theme with the default.
-  useEffect(() => {
-    if (!loaded || typeof window === 'undefined') return;
-    const apply = (): void => setTheme(settings.themeMode === 'system' ? systemTheme() : settings.themeMode);
-    apply();
-    if (settings.themeMode !== 'system' || !window.matchMedia) return;
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    media.addEventListener('change', apply);
-    return () => media.removeEventListener('change', apply);
-  }, [loaded, settings.themeMode, setTheme]);
+  useEffect(() => setSettings(loadSettings()), []);
 
   const patch = useCallback(<K extends keyof WebnovelSettings>(key: K, value: WebnovelSettings[K]): void => {
     setSettings(current => {
@@ -147,7 +126,7 @@ export function SettingsScreen(): React.JSX.Element {
   const onClearData = (): void => {
     clearAllLocalData();
     setSettings(DEFAULT_SETTINGS);
-    setTheme(systemTheme());
+    setThemeMode('system');
     setConfirmOpen(false);
     toast.success('Cleared all local data from this device');
   };
@@ -177,13 +156,7 @@ export function SettingsScreen(): React.JSX.Element {
               <h2 className={styles.sectionTitle}>Appearance</h2>
               <p className={styles.sectionDesc}>How the app looks. Reading-page typography lives under Reader defaults.</p>
               <div className={styles.fieldLabel}>Theme</div>
-              <SegmentedControl
-                className={styles.segmented}
-                fullWidth
-                aria-label="Theme"
-                value={settings.themeMode}
-                onValueChange={value => patch('themeMode', value as ThemeMode)}
-              >
+              <SegmentedControl className={styles.segmented} fullWidth aria-label="Theme" value={themeMode} onValueChange={value => setThemeMode(value as ThemeMode)}>
                 {THEME_OPTIONS.map(option => (
                   <SegmentedControl.Item key={option.value} value={option.value}>
                     {option.label}

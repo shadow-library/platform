@@ -71,7 +71,7 @@ function RootDocument({ children }: { children: React.ReactNode }): React.JSX.El
       <head>
         <HeadContent />
         {/* Applies the persisted theme before paint so there is no flash and no `data-theme` hydration mismatch. */}
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript('shadow-identity-theme') }} />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript({ legacyStorageKey: 'shadow-identity-theme' }) }} />
       </head>
       <body>
         <NavProgress />

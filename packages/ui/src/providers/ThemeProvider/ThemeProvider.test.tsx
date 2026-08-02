@@ -28,13 +28,25 @@ function makeStorage(): Storage {
   };
 }
 
+function setCookie(name: string, value: string): void {
+  document.cookie = `${name}=${value}; path=/`;
+}
+
+function readCookie(name: string): string | null {
+  return document.cookie.match(`(?:^|; )${name}=([^;]*)`)?.[1] ?? null;
+}
+
 function Probe() {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, mode, setMode, toggleTheme } = useTheme();
   return (
     <div>
       <span data-testid="theme">{theme}</span>
+      <span data-testid="mode">{mode}</span>
       <button type="button" onClick={toggleTheme}>
         toggle
+      </button>
+      <button type="button" onClick={() => setMode('system')}>
+        system
       </button>
     </div>
   );
@@ -44,12 +56,13 @@ beforeEach(() => vi.stubGlobal('localStorage', makeStorage()));
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  for (const entry of document.cookie.split('; ')) document.cookie = `${entry.split('=')[0]}=; path=/; max-age=0`;
   document.documentElement.removeAttribute('data-theme');
   document.documentElement.classList.remove('dark');
 });
 
 describe('ThemeProvider', () => {
-  it('server-renders the deterministic default theme without touching the DOM', () => {
+  it('should server-render the deterministic default theme without touching the DOM', () => {
     const html = renderToStaticMarkup(
       <ThemeProvider>
         <Probe />
@@ -58,8 +71,8 @@ describe('ThemeProvider', () => {
     expect(html).toContain('>light<');
   });
 
-  it('adopts the persisted theme after mount and applies it to <html>', async () => {
-    localStorage.setItem('shadow-theme', 'dark');
+  it('should adopt the theme persisted in the shared cookie and apply it to <html>', async () => {
+    setCookie('shadow-theme', 'dark');
     render(
       <ThemeProvider>
         <Probe />
@@ -70,24 +83,135 @@ describe('ThemeProvider', () => {
     expect(document.documentElement.classList.contains('dark')).toBe(true);
   });
 
-  it('toggles the theme and persists the choice', async () => {
-    localStorage.setItem('shadow-theme', 'light');
+  it('should fall back to the legacy localStorage key when no cookie is set', async () => {
+    localStorage.setItem('webnovel-theme', 'dark');
+    render(
+      <ThemeProvider legacyStorageKey="webnovel-theme">
+        <Probe />
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('theme')).toHaveTextContent('dark'));
+  });
+
+  it('should promote a legacy theme into the shared cookie so the other apps pick it up', async () => {
+    localStorage.setItem('webnovel-theme', 'dark');
+    render(
+      <ThemeProvider legacyStorageKey="webnovel-theme">
+        <Probe />
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(readCookie('shadow-theme')).toBe('dark'));
+  });
+
+  it('should not promote an OS-derived theme, so it keeps tracking the OS', async () => {
+    render(
+      <ThemeProvider legacyStorageKey="webnovel-theme">
+        <Probe />
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('theme')).toHaveTextContent(/light|dark/));
+    expect(readCookie('shadow-theme')).toBeNull();
+  });
+
+  it('should prefer the cookie over the legacy localStorage key', async () => {
+    setCookie('shadow-theme', 'light');
+    localStorage.setItem('webnovel-theme', 'dark');
+    render(
+      <ThemeProvider legacyStorageKey="webnovel-theme">
+        <Probe />
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('theme')).toHaveTextContent('light'));
+  });
+
+  it('should persist a toggled theme to the cookie and leave the legacy key alone', async () => {
+    setCookie('shadow-theme', 'light');
     const user = userEvent.setup();
     render(
-      <ThemeProvider>
+      <ThemeProvider legacyStorageKey="webnovel-theme">
         <Probe />
       </ThemeProvider>,
     );
     await waitFor(() => expect(screen.getByTestId('theme')).toHaveTextContent('light'));
     await user.click(screen.getByText('toggle'));
     expect(screen.getByTestId('theme')).toHaveTextContent('dark');
-    expect(localStorage.getItem('shadow-theme')).toBe('dark');
+    expect(readCookie('shadow-theme')).toBe('dark');
+    expect(localStorage.getItem('webnovel-theme')).toBeNull();
   });
 
-  it('emits a self-contained init script keyed to the storage key', () => {
-    const script = themeInitScript('custom-key');
-    expect(script).toContain('custom-key');
+  it('should report mode `system` when nothing is persisted, and the explicit choice once one is', async () => {
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('mode')).toHaveTextContent('system'));
+
+    await userEvent.setup().click(screen.getByText('toggle'));
+    expect(screen.getByTestId('mode')).toHaveTextContent(/light|dark/);
+    expect(readCookie('shadow-theme')).toBe(screen.getByTestId('theme').textContent);
+  });
+
+  it('should clear the shared cookie when the mode goes back to `system`', async () => {
+    setCookie('shadow-theme', 'dark');
+    const user = userEvent.setup();
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('mode')).toHaveTextContent('dark'));
+
+    await user.click(screen.getByText('system'));
+    expect(screen.getByTestId('mode')).toHaveTextContent('system');
+    expect(readCookie('shadow-theme')).toBeNull();
+  });
+
+  it('should re-read the cookie when the page becomes visible, so a switch in a sibling app lands', async () => {
+    setCookie('shadow-theme', 'light');
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('theme')).toHaveTextContent('light'));
+
+    setCookie('shadow-theme', 'dark');
+    document.dispatchEvent(new Event('visibilitychange'));
+    await waitFor(() => expect(screen.getByTestId('theme')).toHaveTextContent('dark'));
+  });
+});
+
+describe('themeInitScript', () => {
+  it('should read the shared cookie and fall back to the OS preference', () => {
+    const script = themeInitScript();
+    expect(script).toContain('shadow-theme');
+    expect(script).toContain('document.cookie');
     expect(script).toContain('prefers-color-scheme: dark');
     expect(script).toContain('data-theme');
+  });
+
+  it('should read the legacy storage key only when one is given', () => {
+    expect(themeInitScript()).not.toContain('localStorage');
+    expect(themeInitScript({ legacyStorageKey: 'custom-key' })).toContain("localStorage.getItem('custom-key')");
+  });
+
+  /** The script is what runs pre-paint, so asserting on its text is not enough — execute it and read the DOM. */
+  it('should apply the cookie theme to <html> when executed', () => {
+    setCookie('shadow-theme', 'dark');
+    new Function(themeInitScript())();
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+  });
+
+  it('should apply the legacy storage theme when executed with no cookie present', () => {
+    localStorage.setItem('webnovel-theme', 'dark');
+    new Function(themeInitScript({ legacyStorageKey: 'webnovel-theme' }))();
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+  });
+
+  it('should reject a key that could break out of the generated script', () => {
+    expect(() => themeInitScript({ cookieName: "x');alert(1);//" })).toThrow(/Invalid theme storage key/);
+    expect(() => themeInitScript({ legacyStorageKey: "x');alert(1);//" })).toThrow(/Invalid theme storage key/);
   });
 });

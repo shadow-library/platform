@@ -3,6 +3,7 @@
  */
 import { type ReactElement } from 'react';
 import { ThemeProvider } from '@shadow-library/ui';
+import { themeCookieDomain } from '@shadow-library/web';
 
 /**
  *  Importing user defined modules
@@ -26,7 +27,7 @@ export interface AppProviderProps {
 
 export default function AppProvider(props: AppProviderProps): ReactElement {
   return (
-    <ThemeProvider storageKey="theme">
+    <ThemeProvider cookieDomain={themeCookieDomain()} legacyStorageKey="theme">
       <ConfirmProvider>{props.children}</ConfirmProvider>
     </ThemeProvider>
   );

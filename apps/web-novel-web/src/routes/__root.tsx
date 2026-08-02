@@ -70,7 +70,7 @@ function RootDocument({ children }: { children: React.ReactNode }): React.JSX.El
       <head>
         <HeadContent />
         {/* Applies the persisted theme before paint so there is no flash and no `data-theme` mismatch. */}
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript('webnovel-theme') }} />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript({ legacyStorageKey: 'webnovel-theme' }) }} />
       </head>
       <body>
         <NavProgress />

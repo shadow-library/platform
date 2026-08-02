@@ -10,10 +10,7 @@ import { readLocal, removeLocal, writeLocal } from '@/lib/local-store';
 /**
  * Defining types
  */
-export type ThemeMode = 'light' | 'dark' | 'system';
-
 export interface WebnovelSettings {
-  themeMode: ThemeMode;
   appLanguage: string;
   wifiOnlyDownloads: boolean;
   autoDownloadNewChapters: boolean;
@@ -54,7 +51,6 @@ const APP_STORAGE_PREFIX = 'webnovel';
 export const APP_LANGUAGES = ['English', '한국어', '日本語', '中文'] as const;
 
 export const DEFAULT_SETTINGS: WebnovelSettings = {
-  themeMode: 'system',
   appLanguage: 'English',
   wifiOnlyDownloads: true,
   autoDownloadNewChapters: false,
@@ -87,7 +83,11 @@ export function grantMatureConsent(): void {
   writeLocal<boolean>(MATURE_CONSENT_STORAGE_KEY, true);
 }
 
-/** Wipe every device-local key this app owns — settings, library, reading progress, reader prefs and theme. */
+/**
+ * Wipe every device-local key this app owns — settings, library, reading progress and reader prefs. The app
+ * theme is deliberately not among them: it is a platform-wide preference shared with the other Shadow apps
+ * via a cookie, so clearing this device's data resets it separately (see `SettingsScreen.onClearData`).
+ */
 export function clearAllLocalData(): void {
   if (typeof window === 'undefined') return;
   const owned = Object.keys(window.localStorage).filter(key => key.startsWith(APP_STORAGE_PREFIX));

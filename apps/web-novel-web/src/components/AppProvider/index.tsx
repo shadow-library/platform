@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { ThemeProvider, Toaster, TooltipProvider } from '@shadow-library/ui';
+import { themeCookieDomain } from '@shadow-library/web';
 
 /**
  * Importing user defined packages
@@ -24,7 +25,7 @@ export interface AppProviderProps {
  */
 export default function AppProvider(props: AppProviderProps): React.JSX.Element {
   return (
-    <ThemeProvider storageKey="webnovel-theme">
+    <ThemeProvider cookieDomain={themeCookieDomain()} legacyStorageKey="webnovel-theme">
       <TooltipProvider>
         <PwaLifecycle />
         {props.children}

@@ -125,8 +125,12 @@ React 19 + TanStack Start/Router/Query on `@shadow-library/{ui,web}`. Routes are
 - **Error handling.** Use the router's error/not-found boundaries (`DefaultCatchBoundary`, `NotFound`); surface
   API failures via `isApiError()` and inline field errors, not raw throws in components.
 - **Styling / UI.** Use `@shadow-library/ui` components and `--sh-*` tokens; the design-system CSS is imported
-  once (`src/styles.css` → `__root.tsx`). Theme via `data-theme` (`ThemeProvider`, `storageKey="webnovel-theme"`),
-  `data-density="touch"` on `<html>`. Do not add Tailwind or another styling system.
+  once (`src/styles.css` → `__root.tsx`). Theme via `data-theme` (`ThemeProvider`), `data-density="touch"` on
+  `<html>`. Do not add Tailwind or another styling system.
+  - **Theme is platform-wide, not app-local.** It lives in a cookie shared with the other Shadow apps, so a
+    switch here changes them too; `legacyStorageKey="webnovel-theme"` exists only to migrate the pre-cookie
+    `localStorage` value. Read and write it through `useTheme()` (`mode`/`setMode`, where `mode: 'system'`
+    means no stored choice). Never keep a second copy in `settings-store` — it would silently fight the cookie.
 - **PWA/offline** uses `@shadow-library/web`'s `buildManifest`, `createServiceWorker` (`src/sw.ts`),
   `useServiceWorker`/`useOnlineStatus`, and the `OfflineStore`/query-persister layer — extend those, don't
   hand-roll service-worker registration or caching.

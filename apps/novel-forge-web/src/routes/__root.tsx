@@ -73,7 +73,7 @@ function RootDocument({ children }: { children: ReactNode }): React.JSX.Element 
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
-        <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeInitScript('theme') }} />
+        <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeInitScript({ legacyStorageKey: 'theme' }) }} />
       </head>
       <body>
         <AppProviders>

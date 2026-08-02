@@ -144,7 +144,9 @@ logic worth covering in isolation. Copy `.env.example` → `.env` before first r
 
 Read the authoritative key list and defaults from `.env.example`. `SERVER_URL`, `OPENAPI_SPEC_URL`, and
 `PUBLIC_ROOT_DOMAIN` are all **server-only** — read only in server functions / `src/lib/apis/server-fetch.ts` /
-`vite.config.ts`. There are deliberately **no `VITE_`-prefixed vars**: the browser never receives a backend URL.
+`vite.config.ts`. The browser never receives a backend URL, so the only `VITE_`-prefixed var is
+`VITE_THEME_COOKIE_DOMAIN` — the public parent domain the shared light/dark theme cookie is written for, which
+has to reach the client because the theme is set there. Treat that as the bar for any future `VITE_` var.
 
 **Never expose secrets or server-only environment variables to the client.** Do not add a `VITE_`-prefixed var
 (or otherwise inline a value into the client bundle) that carries a secret, credential, backend URL, or any
