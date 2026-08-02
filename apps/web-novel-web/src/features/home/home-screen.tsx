@@ -14,6 +14,7 @@ import { Cover, formatCount, NovelCard } from '@/components/novel';
 import styles from '@/features/home/home-screen.module.css';
 import { catalogQueryOptions, progressQueryOptions, sessionQueryOptions } from '@/lib/apis';
 import { type NovelSummary, type ReadingProgress } from '@/lib/apis/types';
+import { NOVEL_FORGE_URL } from '@/lib/constants';
 
 /**
  * Defining types
@@ -29,8 +30,6 @@ interface ContinueItem {
  * The dashboard from the mockups: continue-reading hero, resume cards, trending poster row, recently
  * updated list, genre chips, and the Novel Forge / install-app promo pair.
  */
-const NOVEL_FORGE_URL = 'https://forge.shadow.app';
-
 function timeAgo(iso: string): string {
   const hours = Math.max(1, Math.round((Date.now() - Date.parse(iso)) / 3_600_000));
   if (hours < 24) return `${hours}h ago`;

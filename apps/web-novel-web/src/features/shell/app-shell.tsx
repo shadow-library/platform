@@ -13,6 +13,7 @@ import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-librar
 import { BookIcon, BookmarkIcon, CompassIcon, DownloadIcon, HistoryIcon, HomeIcon, MoonIcon, SearchIcon, SettingsSlidersIcon, SunIcon, TagIcon } from '@/components/icons';
 import { SearchOverlay } from '@/features/search';
 import { loginUrl, meQuery, purgeOnLogout, sessionQueryOptions, signOut, useNotifications } from '@/lib/apis';
+import { NOVEL_FORGE_URL } from '@/lib/constants';
 
 import styles from './app-shell.module.css';
 
@@ -57,9 +58,6 @@ const HelpIcon = glyph(
     <path d="M12 17h.01" />
   </>,
 );
-
-/** The same external writing studio the home PromoSection links to (`NOVEL_FORGE_URL` in `home-screen.tsx`). */
-const NOVEL_FORGE_URL = 'https://forge.shadow.app';
 
 /** The primary destinations, which also drive the phone bottom bar. */
 const MAIN_NAV: NavLeaf[] = [
