@@ -72,6 +72,11 @@ describe('Create Fastify Instance', () => {
     expect(fastifyFactory).toHaveBeenCalled();
   });
 
+  it('should forward trustProxy to the fastify instance', async () => {
+    await createFastifyInstance({ host: '', port: 3000, errorHandler, trustProxy: true });
+    expect(fastify).toHaveBeenCalledWith(expect.objectContaining({ trustProxy: true }));
+  });
+
   it('should create the object and fastify instance without fastifyFactory', async () => {
     instance = (await createFastifyInstance({ host: '', port: 3000, errorHandler })) as unknown as FastifyInstance;
     expect(instance).toBeDefined();

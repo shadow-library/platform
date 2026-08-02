@@ -35,6 +35,9 @@ export class FastifyModule {
     return {
       host: Config.get('app.host'),
       port: Config.get('app.port'),
+      // Governs whether Fastify derives request.ip from x-forwarded-for; every consumer inherits it
+      // so a trusted-ingress deploy keys rate limits and logs on the real client, not the proxy hop.
+      trustProxy: Config.get('app.trust-proxy'),
       responseSchema: { '4xx': errorResponseSchema, '5xx': errorResponseSchema },
       errorHandler: new DefaultErrorHandler(),
       maskSensitiveData: Config.isProd(),
