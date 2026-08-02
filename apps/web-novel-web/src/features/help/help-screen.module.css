@@ -1,8 +1,9 @@
 .page {
-  max-width: 760px;
+  max-width: var(--sh-page-max);
   margin: 0 auto;
   width: 100%;
-  padding: 22px 20px 40px;
+  padding-block: var(--wn-page-pad-block);
+  padding-inline: var(--wn-page-pad-inline);
 }
 
 .back {
@@ -74,10 +75,12 @@
   color: var(--sh-text-tertiary);
 }
 
+/* The page is as wide as every other screen; the running text keeps its own readable measure. */
 .faqList {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-width: var(--wn-prose-max);
 }
 
 .faqCard {
@@ -100,6 +103,7 @@
 }
 
 .feedbackCard {
+  max-width: var(--wn-prose-max);
   padding: 20px;
   border-radius: 14px;
   border: 1px solid var(--sh-border-subtle);
@@ -117,6 +121,7 @@
 }
 
 .prose {
+  max-width: var(--wn-prose-max);
   font-size: 14.5px;
   line-height: 1.65;
   color: var(--sh-text-secondary);
@@ -141,6 +146,7 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
+  max-width: var(--wn-prose-max);
 }
 
 .legalHeading {

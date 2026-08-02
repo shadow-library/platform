@@ -89,8 +89,14 @@ const NAV: NavConfig = { variant: 'sections', sections: [{ items: MAIN_NAV }, { 
  * Reading is public, so the account menu has a signed-out face: a "Sign in" call to action rather than an
  * avatar with nothing behind it.
  *
- * A reading app draws its own measure per screen — a full-bleed novel hero, a 1280px browse grid, a 760px
- * help page — so the shell supplies the chrome and hands the content region over whole.
+ * The content region is handed over whole (`fluid` + no gutters) because the novel screen is banded — its
+ * hero and sticky tab bar span the region edge to edge with a centred column inside, which shell gutters
+ * would turn into floating cards. The screens therefore re-create the column and gutters from the shell's
+ * own `--sh-page-max` / `--sh-shell-gutter-*` values, so this app measures exactly what Pulse and Identity
+ * measure. A screen needing a narrower line (help's running text) narrows inside that constant page.
+ *
+ * The bottom-nav reservation is the shell's: it restates it for `contentPadding="none"`, so this must not
+ * add its own or phones get it twice.
  */
 export function AppShell({ children }: AppShellProps): React.JSX.Element {
   const location = useLocation();
@@ -170,7 +176,7 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
       contentPadding="none"
       className={styles.shellRoot}
     >
-      <div className={`${styles.content} ${isPhone ? styles.contentWithBottomNav : ''}`}>{children}</div>
+      <div className={styles.content}>{children}</div>
       <SearchOverlay open={searchOpen} onOpenChange={setSearchOpen} />
     </Chrome>
   );

@@ -1,7 +1,9 @@
 .content {
-  max-width: 1080px;
+  max-width: var(--sh-page-max);
   margin: 0 auto;
-  padding: 20px;
+  width: 100%;
+  padding-block: var(--wn-page-pad-block);
+  padding-inline: var(--wn-page-pad-inline);
 }
 
 .backLink {

@@ -12,9 +12,10 @@
 
 .heroInner {
   position: relative;
-  max-width: 1080px;
+  max-width: var(--sh-page-max);
   margin: 0 auto;
-  padding: 22px 20px 16px;
+  padding-block: var(--wn-page-pad-block) 16px;
+  padding-inline: var(--wn-page-pad-inline);
 }
 
 .backBtn {
@@ -204,9 +205,9 @@
 }
 
 .statsStrip {
-  max-width: 1080px;
+  max-width: var(--sh-page-max);
   margin: 0 auto;
-  padding: 0 20px;
+  padding-inline: var(--wn-page-pad-inline);
 }
 
 .statsInner {
@@ -245,15 +246,16 @@
 }
 
 .tabsInner {
-  max-width: 1080px;
+  max-width: var(--sh-page-max);
   margin: 0 auto;
-  padding: 0 20px;
+  padding-inline: var(--wn-page-pad-inline);
 }
 
 .content {
-  max-width: 1080px;
+  max-width: var(--sh-page-max);
   margin: 0 auto;
-  padding: 20px;
+  padding-block: 20px;
+  padding-inline: var(--wn-page-pad-inline);
 }
 
 .matureWarn {

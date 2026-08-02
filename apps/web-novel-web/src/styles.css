@@ -2,9 +2,9 @@
 @import '@shadow-library/ui/styles.css';
 
 :root {
-  /* Shared layout dimensions the screens draw from so navigation never shifts the layout. */
-  --wn-page-max: 1200px;
-  --wn-page-wide: 1280px;
+  /* A readable line length is a property of the paragraph, not of the page: running text narrows inside
+     the constant column rather than shrinking the page around it. */
+  --wn-prose-max: 760px;
 }
 
 /* ========================================

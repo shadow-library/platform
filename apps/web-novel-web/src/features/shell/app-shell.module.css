@@ -184,16 +184,31 @@
 /* Shadow UI's top-bar children slot is content-width and `align-items: stretch`, which pins the search box to
    the left and, because the 38px button won't stretch, floats it to the top of the 56px bar. Let the slot grow
    and center its child both ways so the search field sits centered between the menu and utility clusters. */
+/* Touch density makes this app's bottom bar taller than the shell's 56px default, and the shell reserves
+   room for it off this value — left unset the last few pixels of every page sit under the bar. */
+.shellRoot {
+  --sh-shell-bottom-nav-height: 60px;
+}
+
 .shellRoot :global([class*='sh-links']) {
   flex: 1;
   align-items: center;
   justify-content: center;
 }
 
+/*
+ * This app hands the shell's content region over whole (`contentPadding="none"`) because the novel screen
+ * is banded: its hero and sticky tab bar span the region edge to edge with a centred column inside, which
+ * shell gutters would turn into floating cards. So the screens re-create what the shell would otherwise
+ * have given them, from the shell's own values rather than numbers of their own — which is what keeps this
+ * app's measure identical to Pulse's and Identity's, where the shell does own the region.
+ *
+ * These have to be declared here rather than in `:root`: a `var()` inside a custom property is substituted
+ * where that property is *declared*, and `--sh-shell-gutter-*` live on the shell's content region. Declared
+ * at the root they would resolve against nothing and the padding would silently collapse to zero.
+ */
 .content {
   min-height: 100%;
-}
-
-.contentWithBottomNav {
-  padding-bottom: calc(64px + var(--sh-safe-bottom, 0px));
+  --wn-page-pad-block: var(--sh-shell-gutter-block);
+  --wn-page-pad-inline: max(var(--sh-shell-gutter-inline), var(--sh-safe-left)) max(var(--sh-shell-gutter-inline), var(--sh-safe-right));
 }

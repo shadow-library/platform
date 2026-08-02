@@ -1,11 +1,12 @@
 .page {
-  max-width: var(--wn-page-max);
+  max-width: var(--sh-page-max);
   margin: 0 auto;
   width: 100%;
 }
 
 .heroWrap {
-  padding: 22px 20px 8px;
+  padding-block: var(--wn-page-pad-block) 8px;
+  padding-inline: var(--wn-page-pad-inline);
 }
 
 .hero {
@@ -141,7 +142,7 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 20px;
+  padding-inline: var(--wn-page-pad-inline);
   margin-bottom: 13px;
 }
 
@@ -171,7 +172,8 @@
   display: flex;
   gap: 14px;
   overflow-x: auto;
-  padding: 2px 20px 12px;
+  padding-block: 2px 12px;
+  padding-inline: var(--wn-page-pad-inline);
 }
 
 .continueCard {
@@ -249,7 +251,7 @@
 }
 
 .updatedList {
-  padding: 0 20px;
+  padding-inline: var(--wn-page-pad-inline);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -313,7 +315,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 0 20px;
+  padding-inline: var(--wn-page-pad-inline);
 }
 
 .genreChip {
@@ -332,7 +334,8 @@
 }
 
 .promos {
-  padding: 20px 20px 30px;
+  padding-block: 20px var(--wn-page-pad-block);
+  padding-inline: var(--wn-page-pad-inline);
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 14px;

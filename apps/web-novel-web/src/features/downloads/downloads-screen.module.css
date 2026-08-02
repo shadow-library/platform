@@ -1,8 +1,9 @@
 .page {
-  max-width: 900px;
+  max-width: var(--sh-page-max);
   margin: 0 auto;
   width: 100%;
-  padding: 22px 20px 30px;
+  padding-block: var(--wn-page-pad-block);
+  padding-inline: var(--wn-page-pad-inline);
 }
 
 .title {
