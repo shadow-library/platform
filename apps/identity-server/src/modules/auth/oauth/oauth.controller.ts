@@ -9,10 +9,11 @@ import { Body, Get, Header, HttpController, HttpStatus, Post, Query, Req, Res, R
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { OIDC_PROFILE_SCOPE } from '@server/constants';
 import { Auth } from '@server/modules/access';
 import { KeyService } from '@server/modules/auth/keys';
 import { SESSION_COOKIE_NAME } from '@server/modules/auth/session';
-import { UserEmailService } from '@server/modules/identity/user';
+import { UserEmailService, UserService } from '@server/modules/identity/user';
 import { M2MBudget } from '@server/modules/infrastructure/security';
 
 import { AccessTokenService } from './access-token.service';
@@ -51,6 +52,7 @@ export class OAuthController {
     private readonly clientService: OAuthClientService,
     private readonly keyService: KeyService,
     private readonly userEmailService: UserEmailService,
+    private readonly userService: UserService,
   ) {}
 
   @Get('/.well-known/openid-configuration')
@@ -151,6 +153,14 @@ export class OAuthController {
     };
   }
 
+  /**
+   * The OIDC userinfo endpoint: the standard, client-agnostic way to turn a token into the person
+   * behind it, and the reason no application needs an endpoint of its own for "who am I".
+   *
+   * Profile claims are released only to a token carrying the `profile` scope, per OIDC Core §5.4.
+   * A service token never gets them whatever its scope: its `sub` names a client, not a person, so
+   * resolving it as a user id would either miss or — worse — hit an unrelated account.
+   */
   @Get('/oauth2/userinfo')
   @Auth({ public: true })
   @RespondFor(200, UserInfoResponse)
@@ -159,9 +169,13 @@ export class OAuthController {
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
     const claims = token ? this.keyService.verify(token) : null;
     if (!claims || typeof claims.sub !== 'string' || typeof claims.exp !== 'number' || claims.exp * 1000 <= Date.now()) throw AppErrorCode.OAU_002.create();
+    if (claims.token_type === 'service') throw AppErrorCode.OAU_002.create();
 
-    const email = await this.userEmailService.getPrimaryEmail(BigInt(claims.sub));
-    return { sub: claims.sub, email: email ?? undefined, email_verified: email ? true : undefined };
+    const userId = BigInt(claims.sub);
+    const scopes = new Set(typeof claims.scope === 'string' ? claims.scope.split(' ').filter(Boolean) : []);
+    const email = await this.userEmailService.getPrimaryEmail(userId);
+    const profile = scopes.has(OIDC_PROFILE_SCOPE) ? await this.userService.getProfileClaims(userId) : {};
+    return { sub: claims.sub, email: email ?? undefined, email_verified: email ? true : undefined, ...profile };
   }
 
   @Post('/oauth2/revoke')

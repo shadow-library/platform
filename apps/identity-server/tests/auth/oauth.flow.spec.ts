@@ -64,12 +64,12 @@ describe('OAuth authorization-code flow', () => {
     sessionSecret = (await env.getService(SessionService).create({ userId })).secret;
   });
 
-  const authorize = (challenge: string, cookie = true) => {
+  const authorize = (challenge: string, cookie = true, scope = 'openid') => {
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: REDIRECT_URI,
       response_type: 'code',
-      scope: 'openid',
+      scope,
       state: 'xyz',
       nonce: 'n1',
       code_challenge: challenge,
@@ -118,6 +118,37 @@ describe('OAuth authorization-code flow', () => {
       .get('/oauth2/userinfo')
       .headers({ authorization: `Bearer ${body.access_token}` });
     expect(userinfo.json()).toMatchObject({ sub: userId.toString(), email: 'oauth@example.com' });
+    /** No `profile` scope was consented to, so the name is withheld even though one is on file. */
+    expect(userinfo.json()).not.toHaveProperty('name');
+  });
+
+  /**
+   * The claims that let an application put a person's name on screen without building an endpoint of
+   * its own — released against the token's own scope, per OIDC Core §5.4.
+   */
+  it('should release the profile claims to a token that consented to the profile scope', async () => {
+    await env.getService(UserService).updateProfile(userId, { firstName: 'Leander', lastName: 'Paul' });
+
+    const { verifier, challenge } = pkce();
+    const redirect = await authorize(challenge, true, 'openid profile');
+    const code = new URL(redirect.headers.location ?? '').searchParams.get('code') ?? '';
+
+    const token = await env
+      .getRouter()
+      .mockRequest()
+      .post('/oauth2/token')
+      .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+      .body(form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier }));
+    const { access_token: accessToken } = token.json() as { access_token: string };
+
+    const userinfo = await env
+      .getRouter()
+      .mockRequest()
+      .get('/oauth2/userinfo')
+      .headers({ authorization: `Bearer ${accessToken}` });
+
+    expect(userinfo.statusCode).toBe(200);
+    expect(userinfo.json()).toMatchObject({ sub: userId.toString(), name: 'Leander Paul', given_name: 'Leander', family_name: 'Paul' });
   });
 
   it('should reject a reused authorization code', async () => {

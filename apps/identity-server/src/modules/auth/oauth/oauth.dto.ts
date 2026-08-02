@@ -161,6 +161,15 @@ export class RevocationResponse {
   revoked: boolean;
 }
 
+/**
+ * OIDC Core §5.1 standard claims, in their wire spelling. Which of them appear is decided by the
+ * token's scope, and an unavailable claim is absent rather than null.
+ *
+ * `email` is released without requiring the `email` scope, which the spec would ask for. That is
+ * deliberate and it is backwards compatibility, not an oversight: this endpoint has always answered
+ * with the address for any valid token, and retroactively gating it would silently break every
+ * client already relying on it. New claims are gated properly; the old one keeps its contract.
+ */
 @Schema()
 export class UserInfoResponse {
   @Field()
@@ -171,6 +180,22 @@ export class UserInfoResponse {
 
   @Field(() => Boolean, { optional: true })
   email_verified?: boolean;
+
+  /** The one presentable string, composed from the chosen display name or the legal name parts. */
+  @Field({ optional: true })
+  name?: string;
+
+  @Field({ optional: true })
+  given_name?: string;
+
+  @Field({ optional: true })
+  family_name?: string;
+
+  @Field({ optional: true })
+  preferred_username?: string;
+
+  @Field({ optional: true })
+  picture?: string;
 }
 
 @Schema()

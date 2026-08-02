@@ -42,6 +42,19 @@ export interface CurrentUserSummary {
   elevatedUntil?: Date;
 }
 
+/**
+ * The OIDC Core §5.1 standard claims the `profile` scope releases, in their wire spelling. Kept in
+ * protocol shape rather than the repository's camelCase because it is copied verbatim onto a
+ * `userinfo` response — a renaming layer here would only be undone at the boundary.
+ */
+export interface ProfileClaims {
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  preferred_username?: string;
+  picture?: string;
+}
+
 export interface StatusHold {
   /** Administrator-supplied justification, surfaced in the console and the audit trail. */
   reason?: string;
@@ -288,6 +301,31 @@ export class UserService {
       aal: session.aal,
       elevated,
       elevatedUntil: session.elevatedUntil ? new Date(session.elevatedUntil) : undefined,
+    };
+  }
+
+  /**
+   * The `profile` claims for a subject, or an empty object when nothing is on file.
+   *
+   * `name` is composed rather than stored: the profile keeps a chosen display name and the two legal
+   * name parts separately, while OIDC asks for one presentable string. Preferring `displayName` means
+   * a person who set one is shown as they asked to be, and everyone else still gets a name rather than
+   * a blank. Every claim is omitted rather than sent empty — a consumer must be able to tell "not set"
+   * from "set to nothing", and OIDC says an unavailable claim is simply absent.
+   */
+  async getProfileClaims(userId: bigint): Promise<ProfileClaims> {
+    const [profile, user] = await Promise.all([
+      this.databaseService.getPostgresClient().query.userProfiles.findFirst({ where: eq(schema.userProfiles.userId, userId) }),
+      this.databaseService.getPostgresClient().query.users.findFirst({ where: eq(schema.users.id, userId), columns: { username: true } }),
+    ]);
+
+    const fullName = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ');
+    return {
+      name: profile?.displayName?.trim() || fullName.trim() || undefined,
+      given_name: profile?.firstName ?? undefined,
+      family_name: profile?.lastName ?? undefined,
+      preferred_username: user?.username ?? undefined,
+      picture: profile?.avatarUrl ?? undefined,
     };
   }
 
