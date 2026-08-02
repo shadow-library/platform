@@ -43,6 +43,8 @@ playwright-report/
 blob-report/
 playwright/.cache/
 playwright/.auth/
+# Scratch output (screenshots, snapshots) from the Playwright MCP server, not from the e2e suite
+.playwright-mcp/
 
 # Serena (do not commit)
 .serena/
