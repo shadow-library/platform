@@ -11,7 +11,7 @@ import { AppError, Logger, throwError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, OIDC_PROTOCOL_SCOPES } from '@server/constants';
 import { type ElevationIntent } from '@server/modules/auth/session';
 import { ApiResource, DatabaseService, OAuthClient, PrimaryDatabase, schema, Scope } from '@server/modules/infrastructure/datastore';
 
@@ -401,14 +401,22 @@ export class OAuthClientService {
     return granted.map(scope => scope.name);
   }
 
-  /** Distinct scope names across all active API resources, advertised as `scopes_supported` in discovery. */
+  /**
+   * Distinct scope names across all active API resources, advertised as `scopes_supported` in discovery.
+   *
+   * The protocol scopes are unioned in because they are genuinely supported and hold no `scopes` row —
+   * a row belongs to an API resource, and these belong to OIDC. Omitting them made discovery say
+   * `openid` was unsupported while every authorize call honoured it, which is both wrong per OIDC Core
+   * (`openid` is required to appear here) and the reason a client validating its scopes against this
+   * list could not ask for the very scopes that release a user's profile.
+   */
   async listActiveScopeNames(): Promise<string[]> {
     const rows = await this.db
       .selectDistinct({ name: schema.scopes.name })
       .from(schema.scopes)
       .innerJoin(schema.apiResources, eq(schema.scopes.apiResourceId, schema.apiResources.id))
       .where(eq(schema.apiResources.isActive, true));
-    return rows.map(row => row.name).sort();
+    return [...new Set([...OIDC_PROTOCOL_SCOPES, ...rows.map(row => row.name)])].sort();
   }
 
   async rotateSecret(clientId: string): Promise<string> {

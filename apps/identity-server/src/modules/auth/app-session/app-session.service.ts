@@ -11,7 +11,7 @@ import { AppError, Logger, throwError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, OIDC_PROTOCOL_SCOPES } from '@server/constants';
 import { AccessTokenService, AuthorizationCodeService, DEFAULT_AUDIENCE, OAuthClientService, verifyPkce } from '@server/modules/auth/oauth';
 import { SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
@@ -71,8 +71,6 @@ export interface SwitchedOrganisation {
 /**
  * Declaring the constants
  */
-const OIDC_PROTOCOL_SCOPES = new Set(['openid', 'profile', 'email', 'offline_access', 'address', 'phone']);
-
 @Injectable()
 export class AppSessionService {
   private readonly logger = Logger.getLogger(APP_NAME, AppSessionService.name);

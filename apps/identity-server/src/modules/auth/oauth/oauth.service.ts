@@ -8,7 +8,7 @@ import { AppError, Config, Logger } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, OIDC_PROTOCOL_SCOPES } from '@server/constants';
 import { KeyService } from '@server/modules/auth/keys';
 import { SessionService } from '@server/modules/auth/session';
 import { RefreshTokenClientMismatchError, RefreshTokenReuseError, RefreshTokenService } from '@server/modules/auth/token';
@@ -100,13 +100,6 @@ interface ResolvedGrant {
 /**
  * Declaring the constants
  */
-
-/**
- * OIDC protocol scopes are never resource-server capabilities: they are always honoured for any
- * client without an explicit grant. Every other requested scope must be registered AND granted to
- * the client, so a client can never mint a token carrying a scope it was not authorised for.
- */
-const STANDARD_OIDC_SCOPES = new Set(['openid', 'profile', 'email', 'offline_access', 'address', 'phone']);
 
 @Injectable()
 export class OAuthService {
@@ -334,7 +327,7 @@ export class OAuthService {
 
     const requested = requestedScope.split(' ').filter(Boolean);
     const principalScoped = await this.clientService.filterScopesForPrincipal(requested, principal);
-    const isAllowed = (name: string): boolean => grantedHere.has(name) || (principal === 'user' && STANDARD_OIDC_SCOPES.has(name));
+    const isAllowed = (name: string): boolean => grantedHere.has(name) || (principal === 'user' && OIDC_PROTOCOL_SCOPES.has(name));
     return { audience, scopes: principalScoped.filter(isAllowed), rejected: principalScoped.filter(name => !isAllowed(name)) };
   }
 
