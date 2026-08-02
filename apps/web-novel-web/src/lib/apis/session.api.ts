@@ -11,10 +11,9 @@ import { requireAuth } from '@shadow-library/web/router';
  */
 import { queryPersister } from '@/lib/offline';
 
-import { FIXTURE_SESSION } from './fixtures';
 import { clearLibraryMirror } from './library.api';
 import { clearProgressMirror } from './progress.api';
-import { apiClient, ApiError, isApiError, useFixtures } from './transport';
+import { apiClient, ApiError, isApiError } from './transport';
 import { type SessionUser } from './types';
 
 /**
@@ -42,8 +41,6 @@ export const sessionKeys = {
 
 /** The reader's `sub` is the identity subject; it maps onto the device-namespacing `userId` the UI keys everything off. */
 async function fetchSession(): Promise<SessionUser | null> {
-  if (useFixtures) return FIXTURE_SESSION;
-
   const result = await apiClient.auth.get('/session').result<AuthPrincipal>();
   if (result.ok) return { userId: result.data.sub };
   if (result.failure.status === 401) return null;
@@ -52,12 +49,10 @@ async function fetchSession(): Promise<SessionUser | null> {
 
 /**
  * The reader's own profile, from the SDK's userinfo route. Kept off {@link sessionQueryOptions} on
- * purpose: that query gates the library route, and a name is not a reason to fail a gate. `name` and
- * `email` used to exist on `SessionUser` but were only ever populated under fixtures — this is where
- * they actually come from.
+ * purpose: that query gates the library route, and a name is not a reason to fail a gate. The display
+ * `name`/`email` the shell shows come from here, not from the session principal (which carries only `sub`).
  */
 async function fetchUserInfo(): Promise<UserInfo> {
-  if (useFixtures) return { sub: FIXTURE_SESSION.userId, name: FIXTURE_SESSION.name, email: FIXTURE_SESSION.email };
   return apiClient.auth.get('/userinfo').execute<UserInfo>();
 }
 
@@ -66,14 +61,19 @@ export const meQuery = userInfoQueryOptions(fetchUserInfo);
 export const sessionQueryOptions = () =>
   queryOptions<SessionUser | null, ApiError>({
     queryKey: sessionKeys.session,
-    staleTime: 5 * 60_000,
+    // Public reader app: a hydrated session must not refetch the instant a screen mounts. 30s matches the
+    // router's query default so post-hydration navigations reuse the cached principal. The signed-out 401 is
+    // folded into a `null` value rather than thrown, so a retry buys nothing — keep it off.
+    staleTime: 30_000,
+    retry: false,
     queryFn: fetchSession,
   });
 
 const requiredSessionQueryOptions = () =>
   queryOptions<SessionUser, ApiError>({
     queryKey: [...sessionKeys.session, 'required'],
-    staleTime: 5 * 60_000,
+    staleTime: 30_000,
+    retry: false,
     queryFn: async () => {
       const session = await fetchSession();
       if (!session) throw new ApiError(401, { code: 'UNAUTHENTICATED', type: 'UnauthorizedError', message: 'Sign in to continue' });
@@ -97,15 +97,13 @@ export function loginUrl(returnTo: string): string {
 /**
  * Ends the server-side app session. The SDK's logout is a `POST` behind webnovel-server's CSRF
  * double-submit, which the shared transport satisfies on the browser path. An already-invalid session still
- * signs the reader out locally, so an expected `ApiError` is swallowed; anything else propagates. No-ops
- * under fixtures.
+ * signs the reader out locally, so an expected `ApiError` is swallowed; anything else propagates.
  *
  * Returns identity's end-session URL where the deployment configures RP-initiated logout. The caller
  * navigates there instead of to the catalog root: it ends the central identity session too and bounces
  * back on its own, so skipping it would leave the reader signed in at identity.
  */
 export async function signOut(): Promise<string | undefined> {
-  if (useFixtures) return undefined;
   try {
     return (await authApi.logout()).redirectTo;
   } catch (error) {

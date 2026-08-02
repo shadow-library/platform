@@ -277,7 +277,7 @@ function AccountSlot(props: { userId?: string; name?: string; email?: string; pa
   const queryClient = useQueryClient();
 
   // Signed-in state hinges on the identity subject, not a display name: the SDK's session gives `sub` but
-  // no profile, so `name`/`email` only appear under fixtures and cannot gate the account slot.
+  // no profile, so `name`/`email` come from the separate userinfo query and cannot gate the account slot.
   if (!props.userId) {
     return (
       <div className={styles.account}>

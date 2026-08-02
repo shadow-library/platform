@@ -21,10 +21,9 @@ import { buildManifest } from '@shadow-library/web/pwa';
 /**
  * Declaring the constants
  *
- * The browser talks to the webnovel server on the same origin (`/api/...`), so dev proxies `/api` to the
- * backend once it exists. Until then the API layer serves typed fixtures in dev (see src/lib/apis), so the
- * proxy is a fallback for `VITE_API_MODE=server` runs. Production fronts this Start server and the API with
- * a reverse proxy that routes `/api` to webnovel-server and everything else here.
+ * The browser talks to webnovel-server on the same origin (`/api/...`), so dev proxies `/api` to the backend
+ * at `API_ORIGIN` (falling back to `SERVER_URL`, then localhost). Production fronts this Start server and the
+ * API with a reverse proxy that routes `/api` to webnovel-server and everything else here.
  */
 const proxyTarget = process.env.API_ORIGIN || process.env.SERVER_URL || 'http://localhost:8080';
 const proxy = { '/api': { target: proxyTarget, changeOrigin: true, secure: false } };

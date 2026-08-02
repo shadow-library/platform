@@ -8,29 +8,18 @@ import { queryOptions, useMutation, type UseMutationResult, useQueryClient } fro
  */
 import { namespacedKey, readLocal, removeLocal, writeLocal } from '@/lib/local-store';
 
-import { coverFor, type ServerNovelStatus, STATUS_FROM_SERVER } from './novels.api';
-import { type ApiError, APIRequest, useFixtures } from './transport';
+import { type LibraryItem, type LibraryListResponse } from './api-types.gen';
+import { coverFor, STATUS_FROM_SERVER } from './novels.api';
+import { type ApiError, APIRequest } from './transport';
 import { type LibraryEntry, type NovelSummary } from './types';
 
 /**
  * Defining types
  *
- * The live `GET /api/library` wire shape (verified against the reader DTOs): a wrapped `{ items }` list of
- * lean shelf items — no author/rating/chapter count, `live`/`retired` status — keyed by `slug`, not the
- * client's `novelSlug`. `toLibraryEntry` normalizes each item into the internal model at this boundary.
+ * The live `GET /api/library` wire shape comes from the generated contract: a wrapped `{ items }` list of lean
+ * `LibraryItem` shelf entries — no author/rating/chapter count, `live`/`retired` status — keyed by `slug`, not
+ * the client's `novelSlug`. `toLibraryEntry` normalizes each item into the internal model at this boundary.
  */
-export interface ServerLibraryItem {
-  slug: string;
-  title: string;
-  coverPath?: string;
-  genres: string[];
-  status: ServerNovelStatus;
-  addedAt: string;
-}
-
-interface ServerLibraryList {
-  items: ServerLibraryItem[];
-}
 
 /**
  * Declaring the constants
@@ -65,7 +54,7 @@ export function isInLibrary(entries: LibraryEntry[] | undefined, slug: string): 
 }
 
 /** The local mirror's richer catalog snapshot wins when present; a lean server item synthesizes catalog-style defaults. */
-export function toLibraryEntry(item: ServerLibraryItem, local?: LibraryEntry): LibraryEntry {
+export function toLibraryEntry(item: LibraryItem, local?: LibraryEntry): LibraryEntry {
   const novel: NovelSummary = local?.novel ?? {
     slug: item.slug,
     title: item.title,
@@ -88,10 +77,10 @@ export const libraryQueryOptions = (userId?: string) =>
     queryKey: libraryKeys.all,
     queryFn: async () => {
       const local = readLibrary(userId);
-      if (useFixtures || !userId) return local;
+      if (!userId) return local;
       // Merge server truth over this user's mirror; only entries added under this same namespace (e.g. offline
       // additions) are promoted — guest entries live in a separate namespace and are never pushed to the account.
-      const response = await APIRequest.get('/library').timeout(10_000).execute<ServerLibraryList>();
+      const response = await APIRequest.get('/library').timeout(10_000).execute<LibraryListResponse>();
       const localBySlug = new Map(local.map(entry => [entry.novelSlug, entry]));
       const remote = response.items.map(item => toLibraryEntry(item, localBySlug.get(item.slug)));
       const remoteSlugs = new Set(remote.map(entry => entry.novelSlug));
@@ -111,7 +100,7 @@ export function useToggleLibraryMutation(userId?: string): UseMutationResult<Lib
       const existing = entries.find(entry => entry.novelSlug === novel.slug);
       const next = existing ? entries.filter(entry => entry.novelSlug !== novel.slug) : [{ novelSlug: novel.slug, addedAt: new Date().toISOString(), novel }, ...entries];
       writeLibrary(next, userId);
-      if (!useFixtures && userId) {
+      if (userId) {
         const request = existing ? APIRequest.delete(`/library/${encodeURIComponent(novel.slug)}`) : APIRequest.post('/library').body({ slug: novel.slug });
         await request
           .timeout(10_000)

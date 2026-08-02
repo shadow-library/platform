@@ -8,28 +8,18 @@ import { queryOptions } from '@tanstack/react-query';
  */
 import { namespacedKey, readLocal, removeLocal, writeLocal } from '@/lib/local-store';
 
-import { type ApiError, APIRequest, useFixtures } from './transport';
+import { type ProgressListItem, type ProgressListResponse } from './api-types.gen';
+import { type ApiError, APIRequest } from './transport';
 import { type ReadingProgress } from './types';
 
 /**
  * Defining types
  *
- * The live `GET /api/me/progress` wire shape (verified against the reader DTOs): a wrapped `{ items }` list
- * whose entries carry `novelSlug`/`ordinal`/`position`/`updatedAt`. `toReadingProgress` picks the fields
- * explicitly so future server additions never leak into the localStorage mirror.
+ * The live `GET /api/me/progress` wire shape comes from the generated contract: a wrapped `{ items }` list of
+ * `ProgressListItem`s carrying `novelSlug`/`ordinal`/`position`/`updatedAt`. `toReadingProgress` picks the
+ * fields explicitly so future server additions never leak into the localStorage mirror.
  */
 export type ProgressMap = Record<string, ReadingProgress>;
-
-export interface ServerProgressItem {
-  novelSlug: string;
-  ordinal: number;
-  position: number;
-  updatedAt: string;
-}
-
-interface ServerProgressList {
-  items: ServerProgressItem[];
-}
 
 /**
  * Declaring the constants
@@ -65,7 +55,7 @@ export function clearProgressMirror(userId?: string): void {
   removeLocal(namespacedKey(PENDING_STORAGE_KEY, userId));
 }
 
-export function toReadingProgress(item: ServerProgressItem): ReadingProgress {
+export function toReadingProgress(item: ProgressListItem): ReadingProgress {
   return { novelSlug: item.novelSlug, ordinal: item.ordinal, position: item.position, updatedAt: item.updatedAt };
 }
 
@@ -74,8 +64,8 @@ export const progressQueryOptions = (userId?: string) =>
     queryKey: progressKeys.all,
     queryFn: async () => {
       const local = readProgressMap(userId);
-      if (useFixtures || !userId) return local;
-      const remote = await APIRequest.get('/me/progress').timeout(10_000).execute<ServerProgressList>();
+      if (!userId) return local;
+      const remote = await APIRequest.get('/me/progress').timeout(10_000).execute<ProgressListResponse>();
       const merged: ProgressMap = { ...local };
       for (const item of remote.items) {
         const entry = toReadingProgress(item);
@@ -93,7 +83,7 @@ export function saveProgress(slug: string, ordinal: number, position: number, us
   map[slug] = entry;
   writeProgressMap(map, userId);
 
-  if (!useFixtures && userId) {
+  if (userId) {
     const pendingStorageKey = namespacedKey(PENDING_STORAGE_KEY, userId);
     APIRequest.put(`/novels/${encodeURIComponent(slug)}/progress`)
       .body({ ordinal: entry.ordinal, position: entry.position })
@@ -109,7 +99,7 @@ export function saveProgress(slug: string, ordinal: number, position: number, us
 
 /** Re-push the signed-in user's progress writes that failed while offline — called from the reconnect handler. */
 export async function syncPendingProgress(userId?: string): Promise<void> {
-  if (useFixtures || !userId) return;
+  if (!userId) return;
   const pendingStorageKey = namespacedKey(PENDING_STORAGE_KEY, userId);
   const pending = readLocal<string[]>(pendingStorageKey, []);
   if (pending.length === 0) return;

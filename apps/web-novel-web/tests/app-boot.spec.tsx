@@ -17,8 +17,9 @@ import { getRouter } from '@/router';
 /**
  * Declaring the constants
  *
- * The boot smoke test: the real route tree, router, and query wiring render against jsdom with the
- * fixture API active. This is the "app starts and screens draw" gate that runs in `shadow verify`.
+ * The boot smoke test: the real route tree, router, and query wiring render against jsdom. No API server
+ * answers here, so the catalog queries stay empty and the assertions target each screen's static chrome —
+ * this is the "app starts and screens draw" gate that runs in `shadow verify`.
  */
 function renderAt(path: string) {
   const router = getRouter();
@@ -27,7 +28,7 @@ function renderAt(path: string) {
 }
 
 describe('app boot', () => {
-  it('should render the home dashboard with fixture rows', async () => {
+  it('should render the home dashboard sections', async () => {
     renderAt('/');
     expect(await screen.findByText('Trending now', undefined, { timeout: 10_000 })).toBeDefined();
     expect(await screen.findByText('Recently updated')).toBeDefined();
@@ -39,9 +40,8 @@ describe('app boot', () => {
     expect(await screen.findByText('Continue to sign in →')).toBeDefined();
   });
 
-  it('should render the browse catalog from fixtures', async () => {
+  it('should render the browse catalog screen', async () => {
     renderAt('/browse');
     expect(await screen.findByText('Browse novels', undefined, { timeout: 10_000 })).toBeDefined();
-    expect(await screen.findByText('Shadow Novelist', undefined, { timeout: 10_000 })).toBeDefined();
   });
 });

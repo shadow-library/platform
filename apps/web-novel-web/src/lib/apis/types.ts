@@ -9,8 +9,11 @@
 /**
  * Defining types
  *
- * The webnovel-server API contract, hand-typed until the server ships an OpenAPI doc (then regenerate via
- * `bun run generate:api-types` and re-point these aliases). All endpoints live under `/api`.
+ * The reader's internal client view-model — the presentation shapes every screen is built on. It is
+ * deliberately distinct from the generated wire contract (`api-types.gen.ts`): it carries derived, client-only
+ * fields (gradient covers, humanized labels, the `ongoing`/`completed`/`hiatus` status the UI speaks) that the
+ * lean server DTOs do not, and each `*.api.ts` maps the wire response into these shapes at its boundary. When a
+ * shape here is a 1:1 mirror of a server DTO, consume the generated type instead of restating it.
  */
 
 export type NovelStatus = 'ongoing' | 'completed' | 'hiatus';
@@ -158,7 +161,7 @@ export interface LibraryEntry {
 /**
  * The reader the UI keys everything off. `userId` is mapped from the auth SDK principal's `sub`
  * (`GET /api/auth/session`, 200; signed-out is a plain 401). `email`/`name` are not carried by the SDK
- * session — they are populated only by fixtures — so treat them as optional presentation extras.
+ * session — they come from the separate userinfo query — so treat them as optional presentation extras.
  */
 export interface SessionUser {
   userId: string;

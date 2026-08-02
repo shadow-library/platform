@@ -10,7 +10,7 @@ import { Avatar, Input } from '@shadow-library/ui';
  * Importing user defined packages
  */
 import { ChevronRightIcon, HistoryIcon, SearchIcon } from '@/components/icons';
-import { catalogQueryOptions, FIXTURE_GENRES, FIXTURE_TAGS, type NovelSummary } from '@/lib/apis';
+import { CATALOG_GENRES, CATALOG_TAGS, catalogQueryOptions, type NovelSummary } from '@/lib/apis';
 import { readLocal, writeLocal } from '@/lib/local-store';
 
 import styles from './search-overlay.module.css';
@@ -36,7 +36,7 @@ const RECENTS_STORAGE_KEY = 'webnovel:search-recents';
 const RECENTS_LIMIT = 6;
 const RESULTS_LIMIT = 6;
 const DEBOUNCE_MS = 180;
-const TRENDING = FIXTURE_TAGS.slice(0, 8);
+const TRENDING = CATALOG_TAGS.slice(0, 8);
 
 /** Trending-up glyph — not part of the shared icon set, kept local to this overlay. */
 function TrendingIcon({ size = 18 }: { size?: number }): React.JSX.Element {
@@ -120,8 +120,8 @@ export function SearchOverlay({ open, onOpenChange }: SearchOverlayProps): React
 
   const lower = term.toLowerCase();
   const novels = catalog.data?.items ?? [];
-  const genres = term ? FIXTURE_GENRES.filter(genre => genre.toLowerCase().includes(lower)).slice(0, 6) : [];
-  const tags = term ? FIXTURE_TAGS.filter(tag => tag.toLowerCase().includes(lower)).slice(0, 6) : [];
+  const genres = term ? CATALOG_GENRES.filter(genre => genre.toLowerCase().includes(lower)).slice(0, 6) : [];
+  const tags = term ? CATALOG_TAGS.filter(tag => tag.toLowerCase().includes(lower)).slice(0, 6) : [];
   const authors = [...new Set(novels.map(novel => novel.author))].filter(author => author && author !== 'Unknown author').slice(0, 3);
   const noMatch = term.length > 0 && !catalog.isLoading && novels.length === 0 && genres.length === 0 && tags.length === 0;
 

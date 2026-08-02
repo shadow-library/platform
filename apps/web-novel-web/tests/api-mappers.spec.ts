@@ -20,13 +20,21 @@ import { type LibraryEntry, type ReadingProgress, toLibraryEntry, toReadingProgr
  */
 const LIBRARY_RESPONSE = {
   items: [
-    { slug: 'omniscient-sovereigns', title: 'Omniscient Sovereigns', genres: ['Fantasy', 'System'], status: 'live' as const, addedAt: '2026-07-01T10:00:00.000Z' },
+    {
+      slug: 'omniscient-sovereigns',
+      title: 'Omniscient Sovereigns',
+      genres: ['Fantasy', 'System'],
+      status: 'live' as const,
+      visibility: 'PUBLIC' as const,
+      addedAt: '2026-07-01T10:00:00.000Z',
+    },
     {
       slug: 'starfall-requiem',
       title: 'Starfall Requiem',
       coverPath: '/covers/starfall.webp',
       genres: ['Sci-Fi'],
       status: 'retired' as const,
+      visibility: 'PUBLIC' as const,
       addedAt: '2026-06-20T08:30:00.000Z',
     },
   ],

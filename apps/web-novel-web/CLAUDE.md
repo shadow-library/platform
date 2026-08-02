@@ -106,8 +106,9 @@ React 19 + TanStack Start/Router/Query on `@shadow-library/{ui,web}`. Routes are
   not hand-roll `createRouter`.
 - **API consumption.** One isomorphic client, configured once in `src/lib/apis/transport.ts` via
   `createApiClient`. The browser calls the server on the **same origin at `/api/...`**; SSR reaches
-  webnovel-server directly through `src/lib/apis/ssr-transport.ts`, forwarding the caller's cookie. Call
-  sites do not choose — `APIRequest.get('/novels')` does the right thing in both:
+  webnovel-server directly through `@shadow-library/web/server`'s `createSsrTransport`, wired inline in
+  `transport.ts` behind the `import.meta.env.SSR` guard, forwarding the caller's cookie. Call sites do not
+  choose — `APIRequest.get('/novels')` does the right thing in both:
   - Paths are **surface-relative**: `APIRequest` is rooted at `/api`, so write `/novels`, not `/api/novels`.
     The `/api/auth` surface is `apiClient.auth`, wrapped by `createAuthApi` in `session.api.ts`.
   - Forward the query `signal` (`.signal(signal).timeout(ms)`) so Query can cancel; narrow caught errors with
@@ -119,11 +120,13 @@ React 19 + TanStack Start/Router/Query on `@shadow-library/{ui,web}`. Routes are
 - **Browser-only APIs.** Anything touching `window`/`document`/`localStorage`/`navigator`/IndexedDB must be
   guarded — `if (typeof window === 'undefined') return …`, run it in `useEffect`, or wrap it in `ClientOnly`
   (`@shadow-library/ui`). Never touch the DOM during render or at module top-level; it runs on the server too.
-- **Server-only code.** Keep it out of the client bundle: `ssr-transport.ts` is reached only through the
-  `import.meta.env.SSR ? () => import('./ssr-transport') : undefined` thunk in `transport.ts`. That guard is
-  mandatory — a bare `() => import(...)` is never _called_ in the browser, but Rollup still bundles its
-  target for the client and the build fails on `node:stream`. Never import server-only code into a component
-  that renders on the client, and never read `process.env` in browser code paths.
+- **Server-only code.** Keep it out of the client bundle: the SSR transport is reached only through the
+  `import.meta.env.SSR ? () => import('@shadow-library/web/server').then(…) : undefined` thunk in
+  `transport.ts`. That guard is mandatory — a bare `() => import(...)` is never _called_ in the browser, but
+  Rollup still bundles its target for the client and the build fails on `node:stream`. The origin
+  (`API_ORIGIN`/`SERVER_URL`) is resolved inside that thunk so the `process.env` reads never reach the client.
+  Never import server-only code into a component that renders on the client, and never read `process.env` in
+  browser code paths.
 - **Hydration consistency.** Server and first client render must match. Do not branch render output on
   `typeof window`, random values, or `Date` during render; put client-only differences behind
   `useEffect`/`ClientOnly`. Theme is set pre-hydration by `themeInitScript` on `<html>` (with
@@ -152,14 +155,14 @@ is a **contract change** shared with `web-novel-server`. Land it deliberately:
 2. **Then here:** regenerate types with `bun scripts/gen-api-types.ts apps/web-novel-web` (server running, run
    from the repo root), then update the affected
    `src/lib/apis/*.api.ts` callers, `queryOptions`, route loaders, components, the internal client-model
-   mapping, **fixtures**, and frontend validation.
-3. **Update everything the change touches** here: routes, callers, types, query options, tests, fixtures, and
+   mapping, and frontend validation.
+3. **Update everything the change touches** here: routes, callers, types, query options, tests, and
    any docs affected. Do not leave the contract half-changed.
 
 ## 7. Secrets, verification & reporting
 
 - **Never expose secrets or server-only environment variables to the client.** Client vars are **`VITE_`-
-  prefixed** (read via `import.meta.env`, e.g. `VITE_API_MODE`); server-only vars are unprefixed (read via
+  prefixed** (read via `import.meta.env`, e.g. `VITE_THEME_COOKIE_DOMAIN`); server-only vars are unprefixed (read via
   `process.env`, e.g. `API_ORIGIN`, `PORT`, `HEALTH_PORT`) and used **only** in SSR/server code. The browser
   never needs the backend origin — it uses relative `/api`. Do not put server-only values into `VITE_` vars,
   `import.meta.env`, the client bundle, or any code path that reaches the browser.

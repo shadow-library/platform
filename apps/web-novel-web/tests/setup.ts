@@ -16,9 +16,9 @@ import { afterEach } from 'vitest';
 /**
  * Declaring the constants
  *
- * Flush React Query notifications synchronously. Fixture responses resolve on a timer, so a query can
- * settle after a test has torn jsdom down; the default batch scheduler would then run its callback with
- * no `window` and crash the run. A synchronous scheduler notifies inline while the tree is still mounted.
+ * Flush React Query notifications synchronously. Queries settle asynchronously, so one can resolve after a
+ * test has torn jsdom down; the default batch scheduler would then run its callback with no `window` and
+ * crash the run. A synchronous scheduler notifies inline while the tree is still mounted.
  */
 notifyManager.setScheduler(run => run());
 

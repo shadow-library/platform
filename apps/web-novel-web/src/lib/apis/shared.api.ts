@@ -6,26 +6,20 @@ import { queryOptions } from '@tanstack/react-query';
 /**
  * Importing user defined packages
  */
-import { type ServerLibraryItem, toLibraryEntry } from './library.api';
+import { type LibraryItem, type LibraryListResponse } from './api-types.gen';
+import { toLibraryEntry } from './library.api';
 import { type ApiError, APIRequest } from './transport';
 import { type LibraryEntry } from './types';
 
 /**
  * Defining types
  *
- * `GET /api/shared` answers the same lean shelf shape as `GET /api/library`, plus the novel's
- * visibility, so the two render through one component.
+ * `GET /api/shared` answers the same `LibraryListResponse` shape as `GET /api/library`; each `LibraryItem`
+ * already carries the novel's `visibility`, so the two render through one component and the shared listing just
+ * surfaces the field the library screen ignores.
  */
-export interface ServerSharedItem extends ServerLibraryItem {
-  visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
-}
-
-interface ServerSharedList {
-  items: ServerSharedItem[];
-}
-
 export interface SharedEntry extends LibraryEntry {
-  visibility: ServerSharedItem['visibility'];
+  visibility: LibraryItem['visibility'];
 }
 
 /**
@@ -46,7 +40,7 @@ export const sharedQueryOptions = (signedIn: boolean) =>
     queryKey: sharedKeys.all,
     enabled: signedIn,
     queryFn: async () => {
-      const response = await APIRequest.get('/shared').timeout(10_000).execute<ServerSharedList>();
+      const response = await APIRequest.get('/shared').timeout(10_000).execute<LibraryListResponse>();
       return (response.items ?? []).map(item => ({ ...toLibraryEntry(item), visibility: item.visibility }));
     },
   });

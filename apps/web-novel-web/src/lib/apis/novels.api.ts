@@ -8,8 +8,15 @@ import { queryOptions } from '@tanstack/react-query';
  */
 import { chapterKey, offlineStore } from '@/lib/offline';
 
-import { fixtureCatalog, fixtureChapter, fixtureChapterList, fixtureNovel } from './fixtures';
-import { ApiError, APIRequest, fixtureDelay, useFixtures } from './transport';
+import {
+  type ChapterContentResponse,
+  type ChapterMetaItem,
+  type NovelCatalogResponse,
+  type NovelDetailResponse,
+  type ChapterListResponse as ServerChapterListResponse,
+  type NovelSummary as ServerNovelSummary,
+} from './api-types.gen';
+import { type ApiError, APIRequest } from './transport';
 import {
   type CatalogQuery,
   type CatalogResponse,
@@ -25,59 +32,20 @@ import {
 /**
  * Defining types
  *
- * The live webnovel-server wire shapes (verified against its catalog DTOs). The server publishes a leaner
- * model than the fixture-era client one — no author/rating/views, `blurb` for `synopsis`, `live`/`retired`
- * for status, raw `content` text, and `limit`/`offset` paging — so the mappers below normalize every
- * response into the client model at this boundary and the rest of the app stays shape-agnostic.
+ * The live webnovel-server wire shapes come straight from the generated contract (`api-types.gen`), aliased to
+ * `Server*` names at the import. The server publishes a leaner model than the client one — no author/rating/
+ * views, `blurb` for `synopsis`, `live`/`retired` for status, raw `content` text, and `limit`/`offset` paging —
+ * so the mappers below normalize every response into the client model at this boundary and the rest of the app
+ * stays shape-agnostic.
  */
 
-export type ServerNovelStatus = 'live' | 'retired';
-
-interface ServerNovelSummary {
-  slug: string;
-  title: string;
-  blurb?: string;
-  coverPath?: string;
-  genres: string[];
-  status: ServerNovelStatus;
-  chapterCount: number;
-  updatedAt: string;
-}
-
-interface ServerNovelDetail extends ServerNovelSummary {
-  createdAt: string;
-}
-
-interface ServerCatalogResponse {
-  total: number;
-  limit: number;
-  offset: number;
-  items: ServerNovelSummary[];
-}
-
-interface ServerChapterMeta {
-  ordinal: number;
-  title: string;
-  wordCount?: number;
-  publishedAt?: string;
-}
-
-interface ServerChapterContent {
-  novelSlug: string;
-  ordinal: number;
-  title: string;
-  content: string;
-  authorNote?: string;
-  wordCount?: number;
-  revision: number;
-  publishedAt?: string;
-}
+export type ServerNovelStatus = ServerNovelSummary['status'];
 
 /**
  * Declaring the constants
  *
  * The canonical webnovel-server read surface. Every query forwards TanStack Query's abort `signal` into
- * `APIRequest.signal(...)` so navigation cancels in-flight requests; fixture mode answers locally in dev.
+ * `APIRequest.signal(...)` so navigation cancels in-flight requests.
  */
 export const novelKeys = {
   catalog: (query: CatalogQuery) => ['novels', 'catalog', query] as const,
@@ -110,10 +78,6 @@ const SORT_TO_SERVER: Record<CatalogSort, { sortBy: 'updatedAt' | 'createdAt' | 
   title: { sortBy: 'title', sortOrder: 'asc' },
 };
 
-function notFound(message: string): ApiError {
-  return new ApiError(404, { code: 'NOT_FOUND', type: 'NotFoundError', message });
-}
-
 export function coverFor(slug: string): NovelCover {
   let hash = 0;
   for (const char of slug) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
@@ -137,12 +101,12 @@ function toSummary(item: ServerNovelSummary): NovelSummary {
   };
 }
 
-function toDetail(item: ServerNovelDetail): NovelDetail {
+function toDetail(item: NovelDetailResponse): NovelDetail {
   return { ...toSummary(item), alternativeTitles: [], tags: item.genres, language: 'English', mature: false };
 }
 
 /** Nav derives from the published chapter list — ordinals may hold gaps after an unpublish */
-function toChapterContent(chapter: ServerChapterContent, chapters: ServerChapterMeta[], novelTitle: string): ChapterContent {
+function toChapterContent(chapter: ChapterContentResponse, chapters: ChapterMetaItem[], novelTitle: string): ChapterContent {
   const ordinals = chapters.map(meta => meta.ordinal).sort((a, b) => a - b);
   return {
     novelSlug: chapter.novelSlug,
@@ -164,7 +128,6 @@ export const catalogQueryOptions = (query: CatalogQuery = {}) =>
   queryOptions<CatalogResponse, ApiError>({
     queryKey: novelKeys.catalog(query),
     queryFn: async ({ signal }) => {
-      if (useFixtures) return fixtureDelay(fixtureCatalog(query));
       const page = query.page ?? 1;
       const limit = query.limit ?? 20;
       const sort = SORT_TO_SERVER[query.sort ?? 'trending'];
@@ -180,7 +143,7 @@ export const catalogQueryOptions = (query: CatalogQuery = {}) =>
         })
         .signal(signal)
         .timeout(10_000)
-        .execute<ServerCatalogResponse>();
+        .execute<NovelCatalogResponse>();
       const items = response.items.map(toSummary);
       const genres = [...new Set(items.flatMap(item => item.genres))].sort();
       return { items, total: response.total, page, pageSize: limit, genres };
@@ -191,37 +154,26 @@ export const novelQueryOptions = (slug: string) =>
   queryOptions<NovelDetail, ApiError>({
     queryKey: novelKeys.detail(slug),
     staleTime: 5 * 60_000,
-    queryFn: ({ signal }) => {
-      if (useFixtures) {
-        const novel = fixtureNovel(slug);
-        if (!novel) throw notFound(`No novel named "${slug}"`);
-        return fixtureDelay(novel);
-      }
-      return APIRequest.get(`/novels/${encodeURIComponent(slug)}`)
+    queryFn: ({ signal }) =>
+      APIRequest.get(`/novels/${encodeURIComponent(slug)}`)
         .signal(signal)
         .timeout(10_000)
-        .execute<ServerNovelDetail>()
-        .then(toDetail);
-    },
+        .execute<NovelDetailResponse>()
+        .then(toDetail),
   });
 
 export const chapterListQueryOptions = (slug: string, page = 1, limit = 100) =>
   queryOptions<ChapterListResponse, ApiError>({
     queryKey: novelKeys.chapters(slug, page, limit),
     staleTime: 5 * 60_000,
-    queryFn: ({ signal }) => {
-      if (useFixtures) {
-        const list = fixtureChapterList(slug, page, limit);
-        if (!list) throw notFound(`No novel named "${slug}"`);
-        return fixtureDelay(list);
-      }
-      // The live list endpoint returns every published chapter in one page; paging stays a fixture affordance.
-      return APIRequest.get(`/novels/${encodeURIComponent(slug)}/chapters`)
+    // The live list endpoint returns every published chapter in one page; the `page`/`limit` params stay part
+    // of the query key so callers can page client-side without a contract that does not yet support it.
+    queryFn: ({ signal }) =>
+      APIRequest.get(`/novels/${encodeURIComponent(slug)}/chapters`)
         .signal(signal)
         .timeout(10_000)
-        .execute<{ items: ServerChapterMeta[] }>()
-        .then(({ items }) => ({ items: items.map(meta => ({ ordinal: meta.ordinal, title: meta.title, releasedAt: meta.publishedAt ?? '' })), total: items.length }));
-    },
+        .execute<ServerChapterListResponse>()
+        .then(({ items }) => ({ items: items.map(meta => ({ ordinal: meta.ordinal, title: meta.title, releasedAt: meta.publishedAt ?? '' })), total: items.length })),
   });
 
 /**
@@ -235,16 +187,6 @@ export const chapterQueryOptions = (slug: string, ordinal: number) =>
     staleTime: 60 * 60_000,
     queryFn: async ({ signal }) => {
       const downloaded = () => offlineStore.get<ChapterContent>(chapterKey(slug, ordinal));
-      if (useFixtures) {
-        if (typeof navigator !== 'undefined' && !navigator.onLine) {
-          const stored = await downloaded();
-          if (stored) return stored;
-          throw new ApiError(-1, { code: 'OFFLINE', type: 'NetworkError', message: 'This chapter is not downloaded' });
-        }
-        const chapter = fixtureChapter(slug, ordinal);
-        if (!chapter) throw notFound(`Chapter ${ordinal} does not exist`);
-        return fixtureDelay(chapter);
-      }
       try {
         return await fetchLiveChapter(slug, ordinal, signal);
       } catch (error) {
@@ -261,19 +203,14 @@ async function fetchLiveChapter(slug: string, ordinal: number, signal?: AbortSig
   const chapterRequest = APIRequest.get(`${base}/chapters/${ordinal}`).timeout(15_000);
   if (signal) chapterRequest.signal(signal);
   const [chapter, list, novel] = await Promise.all([
-    chapterRequest.execute<ServerChapterContent>(),
-    APIRequest.get(`${base}/chapters`).timeout(15_000).execute<{ items: ServerChapterMeta[] }>(),
-    APIRequest.get(base).timeout(15_000).execute<ServerNovelDetail>(),
+    chapterRequest.execute<ChapterContentResponse>(),
+    APIRequest.get(`${base}/chapters`).timeout(15_000).execute<ServerChapterListResponse>(),
+    APIRequest.get(base).timeout(15_000).execute<NovelDetailResponse>(),
   ]);
   return toChapterContent(chapter, list.items, novel.title);
 }
 
 /** The loader used when explicitly downloading chapters for offline reading. */
 export function fetchChapter(slug: string, ordinal: number): Promise<ChapterContent> {
-  if (useFixtures) {
-    const chapter = fixtureChapter(slug, ordinal);
-    if (!chapter) throw notFound(`Chapter ${ordinal} does not exist`);
-    return fixtureDelay(chapter, 40);
-  }
   return fetchLiveChapter(slug, ordinal);
 }
