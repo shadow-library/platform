@@ -4,10 +4,10 @@
  * a backend-independent `/healthz` liveness probe on its own port (`HEALTH_PORT`, default 3001), and
  * graceful drain on shutdown.
  *
- * The old hand-rolled SPA static server (index.html fallback for every unknown path) is gone — every
- * backend call now travels through TanStack Start server functions (`src/lib/apis/server-fetch.ts`,
- * driven by `API_ORIGIN`), so the browser only talks to this origin. The one exception is the interactive
- * `/api/auth/*` redirect flow (login/logout), which the deployment's ingress must route to pulse-server.
+ * This server deliberately does not proxy `/api`. The deployment fronts it with an ingress that routes
+ * `/api/*` to pulse-server and everything else here, on one origin — which is what makes the browser's API
+ * calls same-origin, so its cookies and the CSRF double-submit work without a proxy hop through this
+ * process. SSR reaches pulse-server directly at `API_ORIGIN`, bypassing the ingress entirely.
  */
 import { fileURLToPath } from 'node:url';
 

@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { type JsonObject, type JsonValue, type VoidFn } from '../types';
+import { type JsonObject, type JsonValue, type QueryParams, type VoidFn } from '../types';
 import { ApiError, type ErrorResponse } from './api-error';
 
 /**
@@ -36,8 +36,6 @@ export type PreRequestHook = (context: PreRequestContext) => void | Promise<void
 
 export type PostResponseHook = (context: PostResponseContext) => void | Promise<void>;
 
-export type QueryParams = Record<string, string | number | boolean | undefined>;
-
 /**
  * Declaring the constants
  */
@@ -56,6 +54,10 @@ function resolveEnvBaseUrl(): string {
 /**
  * A chainable, thenable HTTP client for browser-origin calls (SPA apps, or any code that talks to the API
  * directly rather than through a server function). Non-2xx responses reject with an `ApiError`.
+ *
+ * @deprecated Superseded by `createApiClient`, which covers the browser and SSR runtimes with one builder
+ * and shares the CSRF rule with the server transport instead of leaving each app to attach it by hook.
+ * Kept while the remaining apps migrate; delete once nothing imports it.
  */
 export class APIRequest {
   private static baseUrl = resolveEnvBaseUrl();
