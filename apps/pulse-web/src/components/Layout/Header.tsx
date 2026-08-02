@@ -30,15 +30,20 @@ export default function Header(): ReactElement {
   const stage = import.meta.env.DEV ? 'dev' : 'production';
 
   /**
-   * Ends the app session server-side, then hands the browser to `/login` — which bounces to SSO. The
-   * session cookie is cleared regardless of the request outcome, so a failed call still signs out.
+   * Ends the app session server-side, then hands the browser on. Where the deployment configures
+   * RP-initiated logout, the reply carries identity's end-session URL — a full-page navigation to another
+   * origin that must *replace* the local `/login` bounce, not follow it: routing to `/login` would leave
+   * the central identity session live and sign the operator straight back in. The session cookie is
+   * cleared regardless of the request outcome, so a failed call still signs out locally.
    */
   const handleSignOut = async (): Promise<void> => {
     try {
-      await logout();
-    } finally {
-      await navigate({ to: '/login', search: { returnTo: '/' } });
+      const { redirectTo } = await logout();
+      if (redirectTo) return window.location.assign(redirectTo);
+    } catch {
+      /* the cookie is gone either way, so fall through to the local bounce */
     }
+    await navigate({ to: '/login', search: { returnTo: '/' } });
   };
 
   return (

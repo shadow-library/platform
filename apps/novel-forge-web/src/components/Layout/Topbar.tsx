@@ -152,9 +152,15 @@ export default function Topbar(): React.JSX.Element {
 
   // Ends the app session, then hands the browser back to the login shim. The SDK ends only this app's
   // session (identity's own persists), so the shim may re-establish it — that is the SDK's logout semantics.
+  // Unless the deployment configures RP-initiated logout: then the reply carries identity's end-session URL,
+  // which ends the central session too and bounces back on its own, so the browser is handed there instead
+  // of to the shim — which would otherwise sign the author straight back in.
   const signOut = (): void => {
     logout.mutate(undefined, {
-      onSuccess: () => void navigate({ to: '/login', search: { returnTo: '/' } }),
+      onSuccess: result => {
+        if (result.redirectTo) return window.location.assign(result.redirectTo);
+        void navigate({ to: '/login', search: { returnTo: '/' } });
+      },
       onError: err => toast.danger(err.message),
     });
   };

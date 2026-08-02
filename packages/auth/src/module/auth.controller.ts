@@ -107,18 +107,25 @@ export class AuthController {
   }
 
   /**
-   * Ends this application's session. The central identity session survives it, unless a post-logout
-   * redirect is configured and the browser is handed on to identity's RP-initiated logout.
+   * Ends this application's session. The central identity session survives it unless a post-logout
+   * redirect is configured, in which case the reply carries identity's RP-initiated logout URL and the
+   * caller hands the browser to it.
+   *
+   * That URL is *returned* rather than issued as a 302, which is what `AuthLogoutResponse` has always
+   * declared. Unlike `/login` and `/callback`, this route is a `POST` a browser client makes with
+   * `fetch` — never a top-level navigation, by the same rule `auth-guard` applies — and `fetch` cannot
+   * hand a user to a cross-origin redirect: following it makes a background request the browser never
+   * navigates to, and `redirect: 'manual'` yields an opaque response with no readable `Location`. A 302
+   * here ended the local session and then stranded the caller, leaving the identity session live.
    */
   @Post('/logout')
   @EnableIf(() => isEnabled('logout'))
   @RespondFor(200, AuthLogoutResponse)
-  async logout(): Promise<AuthLogoutResponse | undefined> {
-    const response = this.context.getResponse();
+  async logout(): Promise<AuthLogoutResponse> {
     const cleared = await this.sessions.logout(this.sessions.readHandle(this.cookies()));
     const redirectTo = await this.sessions.endSessionUrl();
-    this.send(response, cleared, redirectTo);
-    return redirectTo ? undefined : { success: true };
+    this.send(this.context.getResponse(), cleared);
+    return redirectTo ? { success: true, redirectTo } : { success: true };
   }
 
   /**

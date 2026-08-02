@@ -99,13 +99,18 @@ export function loginUrl(returnTo: string): string {
  * double-submit, which the shared transport satisfies on the browser path. An already-invalid session still
  * signs the reader out locally, so an expected `ApiError` is swallowed; anything else propagates. No-ops
  * under fixtures.
+ *
+ * Returns identity's end-session URL where the deployment configures RP-initiated logout. The caller
+ * navigates there instead of to the catalog root: it ends the central identity session too and bounces
+ * back on its own, so skipping it would leave the reader signed in at identity.
  */
-export async function signOut(): Promise<void> {
-  if (useFixtures) return;
+export async function signOut(): Promise<string | undefined> {
+  if (useFixtures) return undefined;
   try {
-    await authApi.logout();
+    return (await authApi.logout()).redirectTo;
   } catch (error) {
     if (!isApiError(error)) throw error;
+    return undefined;
   }
 }
 

@@ -492,3 +492,105 @@ describe('first-party browser flow', () => {
     });
   });
 });
+
+/**
+ * RP-initiated logout needs its own application, because configuring `postLogoutRedirect` changes what
+ * every logout answers with — the suite above asserts the bare `{ success: true }` of a deployment that
+ * ends logout locally.
+ */
+describe('RP-initiated logout', () => {
+  const POST_LOGOUT = 'https://reports.test/signed-out';
+
+  let idp: TestIdP;
+  let app: ShadowApplication;
+  let router: MockRouter;
+
+  beforeAll(async () => {
+    idp = await createTestIdP({ clientId: CLIENT.id, clientSecret: CLIENT.secret });
+
+    @Module({
+      imports: [
+        FastifyModule.forRoot({
+          imports: [
+            AuthModule.forRoot({
+              issuer: idp.issuer,
+              audience: AUDIENCE,
+              client: CLIENT,
+              browser: { redirectUri: REDIRECT_URI, scopes: ['openid', 'reports:read'], allowedRedirects: ['https://reports.test'], postLogoutRedirect: POST_LOGOUT },
+            }),
+            ReportModule,
+          ],
+        }),
+      ],
+    })
+    class LogoutAppModule {}
+
+    app = await ShadowFactory.create(LogoutAppModule);
+    await app.init();
+    router = app.get(Dispatcher) as unknown as MockRouter;
+  });
+  afterAll(async () => {
+    await app?.stop();
+    idp.stop();
+  });
+
+  const readCookie = (response: MockResponse, name: string): string | undefined => {
+    const headers = response.headers['set-cookie'];
+    const all = Array.isArray(headers) ? headers : [headers];
+    const match = all.find(entry => typeof entry === 'string' && entry.startsWith(`${name}=`));
+    return typeof match === 'string' ? (match.split(';')[0] as string) : undefined;
+  };
+
+  const login = async (): Promise<string> => {
+    const started = await router.mockRequest({ method: 'GET', url: '/auth/login?return_to=/reports' });
+    const authorize = new URL(started.headers.location as string);
+    const state = authorize.searchParams.get('state') as string;
+    const stateCookie = readCookie(started, STATE_COOKIE) as string;
+
+    const code = idp.createAuthorizationCode({ sub: USER, scopes: ['openid', 'reports:read'] });
+    const callback = await router.mockRequest({
+      method: 'GET',
+      url: `/auth/callback?code=${code}&state=${encodeURIComponent(state)}`,
+      headers: { cookie: stateCookie },
+    });
+    return readCookie(callback, SESSION_COOKIE) as string;
+  };
+
+  const logout = (cookie: string) => router.mockRequest({ method: 'POST', url: '/auth/logout', headers: { cookie } });
+
+  it('should return identity end-session URL in the body so the caller can navigate to it', async () => {
+    const response = await logout(await login());
+
+    expect(response.statusCode).toBe(200);
+    const payload = JSON.parse(response.payload) as { success: boolean; redirectTo?: string };
+    expect(payload.success).toBe(true);
+
+    const url = new URL(payload.redirectTo as string);
+    expect(url.origin + url.pathname).toBe(`${idp.issuer}/oauth2/logout`);
+    expect(url.searchParams.get('client_id')).toBe(CLIENT.id);
+    expect(url.searchParams.get('post_logout_redirect_uri')).toBe(POST_LOGOUT);
+  });
+
+  /**
+   * The regression guard. This route answers a `fetch`, which cannot hand a user to a cross-origin
+   * redirect — it would either fail CORS or follow it as a background request the browser never lands on,
+   * ending the local session while leaving the identity session live.
+   */
+  it('should answer with a status the caller can read, never a redirect', async () => {
+    const response = await logout(await login());
+
+    expect(response.statusCode).not.toBe(302);
+    expect(response.headers.location).toBeUndefined();
+  });
+
+  it('should still clear the session cookie and revoke the handle', async () => {
+    const cookie = await login();
+    const before = idp.getAppSessionCount();
+
+    const response = await logout(cookie);
+
+    expect(readCookie(response, SESSION_COOKIE)).toBe(`${SESSION_COOKIE}=`);
+    expect(idp.getAppSessionCount()).toBe(before - 1);
+    expect((await router.mockRequest({ method: 'GET', url: '/reports', headers: { cookie } })).statusCode).toBe(401);
+  });
+});

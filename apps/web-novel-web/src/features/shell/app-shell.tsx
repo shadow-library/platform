@@ -297,9 +297,12 @@ function AccountSlot(props: { userId?: string; name?: string; email?: string; pa
   // End the server session, then purge this account's on-device caches so the next person on the device
   // never inherits the previous user's cached library or reading history, and finally reset the app.
   const onSignOut = async (): Promise<void> => {
-    await signOut();
+    const redirectTo = await signOut();
     await purgeOnLogout(queryClient, props.userId);
-    window.location.href = '/';
+    // On-device traces are purged first either way; where RP-initiated logout is configured the reader is
+    // then handed to identity to end the central session, rather than dropped back on the catalog still
+    // signed in there.
+    window.location.href = redirectTo ?? '/';
   };
 
   return (
