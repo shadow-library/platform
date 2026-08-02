@@ -113,11 +113,18 @@ const CLIENT_ID_PATTERN = /^[a-z0-9]([a-z0-9-]{1,62}[a-z0-9])?$/;
 /** Reserved ids that would collide with system identifiers such as the default access-token audience. */
 const RESERVED_CLIENT_IDS = new Set(['shadow-identity']);
 const DUMMY_SECRET_HASH = '$argon2id$v=19$m=65536,t=3,p=1$NCJqmYBSCaQHCbd96KVjeycfea/Op9Qf6OqrtzsUMkw$YNaWD8v4qxMkTfyuv7T0n+3PYqGqYo+6ixhN31TqX6E';
+/** Matches the `cache-control: max-age=300` the discovery document already advertises, so the copy a client caches and the copy this process serves expire together. */
+const SCOPE_NAMES_TTL_SECONDS = 300;
 
 @Injectable()
 export class OAuthClientService {
   private readonly logger = Logger.getLogger(APP_NAME, OAuthClientService.name);
   private readonly db: PrimaryDatabase;
+
+  /** Memoised `scopes_supported` — see {@link OAuthClientService.listActiveScopeNames}. */
+  private activeScopeNames: string[] | null = null;
+  private activeScopeNamesAt = 0;
+  private activeScopeNamesInflight: Promise<string[]> | null = null;
 
   constructor(databaseService: DatabaseService) {
     this.db = databaseService.getPostgresClient();
@@ -409,14 +416,33 @@ export class OAuthClientService {
    * `openid` was unsupported while every authorize call honoured it, which is both wrong per OIDC Core
    * (`openid` is required to appear here) and the reason a client validating its scopes against this
    * list could not ask for the very scopes that release a user's profile.
+   *
+   * Memoised for {@link SCOPE_NAMES_TTL_SECONDS}, because this is the only query behind an otherwise
+   * static document that every service reads at boot — uncached it made discovery the slowest public
+   * endpoint on the server, and it is the first call the auth SDK makes. Scopes change only when an
+   * API resource is registered or deactivated, so a stale window bounded by the document's own
+   * `max-age` costs nothing. Concurrent cold callers share one query rather than each issuing their
+   * own, which matters precisely when it hurts: every service dialling a cold identity at once.
    */
   async listActiveScopeNames(): Promise<string[]> {
+    const cached = this.activeScopeNames;
+    if (cached && Date.now() - this.activeScopeNamesAt < SCOPE_NAMES_TTL_SECONDS * 1000) return cached;
+
+    this.activeScopeNamesInflight ??= this.queryActiveScopeNames().finally(() => (this.activeScopeNamesInflight = null));
+    return this.activeScopeNamesInflight;
+  }
+
+  private async queryActiveScopeNames(): Promise<string[]> {
     const rows = await this.db
       .selectDistinct({ name: schema.scopes.name })
       .from(schema.scopes)
       .innerJoin(schema.apiResources, eq(schema.scopes.apiResourceId, schema.apiResources.id))
       .where(eq(schema.apiResources.isActive, true));
-    return [...new Set([...OIDC_PROTOCOL_SCOPES, ...rows.map(row => row.name)])].sort();
+    const names = [...new Set([...OIDC_PROTOCOL_SCOPES, ...rows.map(row => row.name)])].sort();
+
+    this.activeScopeNames = names;
+    this.activeScopeNamesAt = Date.now();
+    return names;
   }
 
   async rotateSecret(clientId: string): Promise<string> {
