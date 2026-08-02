@@ -235,3 +235,99 @@ describe('Sidebar', () => {
     expect(onClick).toHaveBeenCalled();
   });
 });
+
+describe('Sidebar.Switcher', () => {
+  const OPTIONS = [
+    { id: 'a', label: 'Alpha', caption: 'source · #a' },
+    { id: 'b', label: 'Beta', caption: 'new · #b' },
+  ];
+
+  it('should label the trigger with the current option', () => {
+    render(
+      <Sidebar>
+        <Sidebar.Switcher current={OPTIONS[0]} options={OPTIONS} onSelect={vi.fn()} />
+      </Sidebar>,
+    );
+    expect(screen.getByRole('button', { name: 'Alpha — switch' })).toBeInTheDocument();
+  });
+
+  it('should fall back to the empty label when nothing is selected', () => {
+    render(
+      <Sidebar>
+        <Sidebar.Switcher options={OPTIONS} emptyLabel="All projects" onSelect={vi.fn()} />
+      </Sidebar>,
+    );
+    expect(screen.getByRole('button', { name: 'All projects — switch' })).toBeInTheDocument();
+  });
+
+  it('should report the chosen option id and close the menu', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(
+      <Sidebar>
+        <Sidebar.Switcher current={OPTIONS[0]} options={OPTIONS} onSelect={onSelect} />
+      </Sidebar>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Alpha — switch' }));
+    await user.click(await screen.findByRole('button', { name: /Beta/ }));
+
+    expect(onSelect).toHaveBeenCalledWith('b');
+    expect(screen.queryByRole('button', { name: /Beta/ })).not.toBeInTheDocument();
+  });
+
+  it('should mark the current option with aria-current', async () => {
+    const user = userEvent.setup();
+    render(
+      <Sidebar>
+        <Sidebar.Switcher current={OPTIONS[0]} options={OPTIONS} onSelect={vi.fn()} />
+      </Sidebar>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Alpha — switch' }));
+
+    expect(await screen.findByRole('button', { name: /Alpha/, current: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Beta/ })).not.toHaveAttribute('aria-current');
+  });
+
+  it('should run the footer action and close', async () => {
+    const user = userEvent.setup();
+    const onFooter = vi.fn();
+    render(
+      <Sidebar>
+        <Sidebar.Switcher options={OPTIONS} onSelect={vi.fn()} footerAction={{ label: 'View all projects', onSelect: onFooter }} />
+      </Sidebar>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /switch/ }));
+    await user.click(await screen.findByRole('button', { name: 'View all projects' }));
+
+    expect(onFooter).toHaveBeenCalledOnce();
+  });
+
+  it('should say so when there is nothing to switch to', async () => {
+    const user = userEvent.setup();
+    render(
+      <Sidebar>
+        <Sidebar.Switcher options={[]} onSelect={vi.fn()} />
+      </Sidebar>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /switch/ }));
+
+    expect(await screen.findByText('Nothing to switch to.')).toBeInTheDocument();
+  });
+
+  it('should keep the full option list reachable in rail mode', async () => {
+    const user = userEvent.setup();
+    render(
+      <Sidebar collapsed>
+        <Sidebar.Switcher current={OPTIONS[0]} options={OPTIONS} onSelect={vi.fn()} />
+      </Sidebar>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Alpha — switch' }));
+
+    expect(await screen.findByRole('button', { name: /Beta/ })).toBeInTheDocument();
+  });
+});

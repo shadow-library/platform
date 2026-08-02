@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Slot, Slottable } from '@radix-ui/react-slot';
-import { Children, forwardRef, type MouseEvent, type ReactNode, useContext, useEffect, useId, useRef } from 'react';
+import { Children, forwardRef, type MouseEvent, type ReactNode, useContext, useEffect, useId, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -15,7 +15,7 @@ import { ShellMobileNavAreaContext } from '../Shell/Shell.context';
 import { Tooltip, TooltipProvider } from '../Tooltip';
 import { SidebarContext } from './Sidebar.context';
 import styles from './Sidebar.module.css';
-import { type SidebarGroupProps, type SidebarItemProps, type SidebarProps, type SidebarSectionProps } from './Sidebar.types';
+import { type SidebarGroupProps, type SidebarItemProps, type SidebarProps, type SidebarSectionProps, type SidebarSwitcherOption, type SidebarSwitcherProps } from './Sidebar.types';
 
 /**
  * Declaring the constants
@@ -51,6 +51,29 @@ function ChevronDown() {
   );
 }
 
+/** The switcher's affordance: up/down carets that read as "change this", not "expand a list". */
+function ChevronsUpDown() {
+  return (
+    <svg className={styles.switcherChevron} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 6.5 8 3.5l3 3M11 9.5 8 12.5l-3-3" />
+    </svg>
+  );
+}
+
+function CheckMark() {
+  return (
+    <svg className={styles.switcherCheck} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 8.5 6.5 11.5l6-7" />
+    </svg>
+  );
+}
+
+/** A project's thumbnail, or a colored dot standing in for one. Decorative — the label carries the name. */
+function SwitcherMark({ option }: { option?: SidebarSwitcherOption }) {
+  if (option?.imageUrl != null) return <img className={styles.switcherThumb} src={option.imageUrl} alt="" />;
+  return <span className={styles.switcherDot} style={option?.color != null ? { background: option.color } : undefined} aria-hidden="true" />;
+}
+
 /** Chevron for the collapse toggle — points left to collapse, right to expand back out. */
 function CollapseChevron({ collapsed }: { collapsed: boolean }) {
   return (
@@ -64,7 +87,8 @@ function CollapseChevron({ collapsed }: { collapsed: boolean }) {
  * The navigation region's behavior: a single managed active state, collapsible groups, an expanded↔rail
  * transition that keeps every destination reachable, and the accessibility contract (a nav landmark of
  * links, aria-current on the active item, group buttons with aria-expanded). Items, badges, and tooltips
- * are the existing components — the Sidebar contributes the state machine. Chrome is surface-app.
+ * are the existing components — the Sidebar contributes the state machine. Chrome is surface-card, one
+ * step up from the content region so the rail reads as chrome rather than as part of the page.
  */
 const SidebarRoot = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
   { workspace, footer, collapsed: collapsedProp, defaultCollapsed, storageKey, onCollapsedChange, className, children, 'aria-label': ariaLabel = 'Main', ...props },
@@ -242,8 +266,84 @@ const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(function Side
   );
 });
 
+/**
+ * The workspace switcher that sits directly under the brand: what a console is *currently scoped to*,
+ * and the shortest path to another scope. It is deliberately not a nav item — the thing being switched
+ * is the context every destination below it resolves against, so it reads as a header, not a link.
+ *
+ * In rail mode it shrinks to its avatar alone; the flyout still carries the full list, because
+ * collapsing the sidebar must never strand the only way to change scope.
+ */
+const SidebarSwitcher = forwardRef<HTMLDivElement, SidebarSwitcherProps>(function SidebarSwitcher(
+  { current, options, emptyLabel = 'All projects', menuLabel = 'Switch project', onSelect, footerAction, loading = false, className, ...props },
+  ref,
+) {
+  const { collapsed } = useContext(SidebarContext);
+  // Owned rather than left to the Popover, so choosing an option can close the menu before navigating —
+  // otherwise the overlay outlives the route change and lands on top of the new screen.
+  const [open, setOpen] = useState(false);
+  const label = current?.label ?? emptyLabel;
+
+  function choose(run: () => void): void {
+    setOpen(false);
+    run();
+  }
+
+  return (
+    <div ref={ref} className={cn(styles.switcher, className)} {...props}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <Popover.Trigger asChild>
+          <button type="button" className={styles.switcherTrigger} aria-label={`${label} — switch`}>
+            <SwitcherMark option={current} />
+            {collapsed ? null : (
+              <>
+                <span className={styles.switcherMeta}>
+                  <span className={styles.switcherName}>{label}</span>
+                  {current?.caption != null ? <span className={styles.switcherCaption}>{current.caption}</span> : null}
+                </span>
+                <ChevronsUpDown />
+              </>
+            )}
+          </button>
+        </Popover.Trigger>
+        <Popover.Content className={styles.switcherMenu} side={collapsed ? 'right' : 'bottom'} align="start" sideOffset={6} aria-label={menuLabel}>
+          <div className={styles.sectionLabel}>{menuLabel}</div>
+          {loading ? <div className={styles.switcherEmpty}>Loading…</div> : null}
+          {!loading && options.length === 0 ? <div className={styles.switcherEmpty}>Nothing to switch to.</div> : null}
+          {options.map(option => (
+            <button
+              key={option.id}
+              type="button"
+              className={styles.switcherRow}
+              aria-current={option.id === current?.id ? 'true' : undefined}
+              onClick={() => choose(() => onSelect(option.id))}
+            >
+              <SwitcherMark option={option} />
+              <span className={styles.switcherMeta}>
+                <span className={styles.switcherName}>{option.label}</span>
+                {option.caption != null ? <span className={styles.switcherCaption}>{option.caption}</span> : null}
+              </span>
+              {option.id === current?.id ? <CheckMark /> : null}
+            </button>
+          ))}
+          {footerAction != null ? (
+            <>
+              <div className={styles.switcherDivider} />
+              <button type="button" className={styles.switcherRow} onClick={() => choose(footerAction.onSelect)}>
+                {footerAction.icon != null ? <span className={styles.icon}>{footerAction.icon}</span> : null}
+                <span className={styles.switcherName}>{footerAction.label}</span>
+              </button>
+            </>
+          ) : null}
+        </Popover.Content>
+      </Popover>
+    </div>
+  );
+});
+
 export const Sidebar = Object.assign(SidebarRoot, {
   Section: SidebarSection,
   Item: SidebarItem,
   Group: SidebarGroup,
+  Switcher: SidebarSwitcher,
 });

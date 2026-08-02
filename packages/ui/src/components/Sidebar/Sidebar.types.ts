@@ -48,6 +48,34 @@ export interface SidebarItemProps extends ComponentPropsWithoutRef<'a'> {
   label?: string;
 }
 
+export interface SidebarSwitcherOption {
+  /** Stable identity — passed back to `onSelect` and used as the React key. */
+  id: string;
+  label: string;
+  /** Secondary line (kind, id, plan tier) — the disambiguator when two projects share a name. */
+  caption?: string;
+  /** Thumbnail; falls back to a `color` dot, then to a neutral dot. */
+  imageUrl?: string;
+  /** CSS color for the fallback dot, so a project stays recognisable before its image loads. */
+  color?: string;
+}
+
+export interface SidebarSwitcherProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onSelect'> {
+  /** The option in scope. Omit for the "no project selected" state, which shows `emptyLabel`. */
+  current?: SidebarSwitcherOption;
+  options: SidebarSwitcherOption[];
+  /** Trigger label when nothing is selected. @default 'All projects' */
+  emptyLabel?: string;
+  /** Heading above the option list. @default 'Switch project' */
+  menuLabel?: string;
+  /** Fires with the chosen option's id; the menu closes first so navigation isn't racing the overlay. */
+  onSelect: (id: string) => void;
+  /** A pinned row below the options — "View all projects", "New project". */
+  footerAction?: { label: string; icon?: ReactNode; onSelect: () => void };
+  /** Shows a placeholder row while the options are still arriving. */
+  loading?: boolean;
+}
+
 export interface SidebarGroupProps extends ComponentPropsWithoutRef<'div'> {
   /** Group trigger label. */
   label: ReactNode;

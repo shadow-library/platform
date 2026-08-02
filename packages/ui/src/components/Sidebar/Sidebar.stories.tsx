@@ -126,3 +126,42 @@ export const RouterLinks: Story = {
     </div>
   ),
 };
+
+/**
+ * The project-scoped shape: a switcher directly under the brand, naming what every destination below it
+ * resolves against. Firebase's model — change the scope, keep the navigation.
+ */
+export const ProjectSwitcher: Story = {
+  render: function ProjectSwitcherStory() {
+    const projects = [
+      { id: 'a', label: 'The Sunless Court', caption: 'source · #a', color: 'var(--sh-accent)' },
+      { id: 'b', label: 'Ashes of Meridian', caption: 'new novel · #b', color: '#e0803a' },
+      { id: 'c', label: 'Winterlight', caption: 'source · #c', color: '#3aa3e0' },
+    ];
+    const [current, setCurrent] = useState(projects[0]);
+    return (
+      <div style={{ display: 'flex', height: 380 }}>
+        <Sidebar workspace={<WorkspaceMark />}>
+          <Sidebar.Switcher
+            current={current}
+            options={projects}
+            onSelect={id => setCurrent(projects.find(project => project.id === id))}
+            footerAction={{ label: 'View all projects', onSelect: () => setCurrent(undefined) }}
+          />
+          <Sidebar.Section>
+            <Sidebar.Item icon={<Dot />} href="#overview" active>
+              Overview
+            </Sidebar.Item>
+            <Sidebar.Item icon={<Dot />} href="#chapters" badge={<Badge variant="count">12</Badge>}>
+              Chapters
+            </Sidebar.Item>
+            <Sidebar.Item icon={<Dot />} href="#publish">
+              Publish
+            </Sidebar.Item>
+          </Sidebar.Section>
+        </Sidebar>
+        <div style={{ flex: 1, padding: 24, color: 'var(--sh-text-tertiary)' }}>Content region</div>
+      </div>
+    );
+  },
+};

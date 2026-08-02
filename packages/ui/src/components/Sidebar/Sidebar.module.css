@@ -1,17 +1,18 @@
 /*
- * Sidebar — surface-app chrome with a border-default right edge (App Shell's recipe). Item states map
- * to bg-hover / accent-soft / accent; the active edge bar is a 3px accent bleed. No sidebar-specific
- * colors. Expanded 248px, rail 56px.
+ * Sidebar — surface-card chrome with a border-subtle right edge. The rail sits on a lighter surface than
+ * the content region so it reads as chrome rather than as part of the page; a surface-app rail would
+ * dissolve into the content it navigates. Item states map to bg-hover / accent-soft / accent — the active
+ * pill carries the state on its own, with no edge bleed. Expanded 254px, rail 56px.
  */
 
 .root {
   display: flex;
   flex-direction: column;
-  width: 248px;
+  width: 254px;
   height: 100%;
   flex-shrink: 0;
-  background: var(--sh-surface-app);
-  border-right: var(--sh-border-width) solid var(--sh-border-default);
+  background: var(--sh-surface-card);
+  border-right: var(--sh-border-width) solid var(--sh-border-subtle);
   transition: width var(--sh-duration-normal) var(--sh-ease-standard);
 }
 .root[data-collapsed] {
@@ -23,8 +24,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  height: 56px;
-  padding: 0 12px 0 16px;
+  height: 60px;
+  padding: 0 12px 0 18px;
   flex-shrink: 0;
 }
 .workspace {
@@ -84,12 +85,155 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  padding: 8px 14px 14px;
+}
+.root[data-collapsed] .scroll {
   padding: 8px;
 }
 .footer {
   flex-shrink: 0;
-  padding: 8px;
+  padding: 8px 14px;
   border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+
+/* ── Switcher ────────────────────────────────────────────── */
+.switcher {
+  flex-shrink: 0;
+  padding: 0 14px 8px;
+}
+.root[data-collapsed] .switcher {
+  padding: 0 8px 8px;
+}
+
+.switcherTrigger {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border: var(--sh-border-width) solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-well);
+  font: inherit;
+  color: var(--sh-text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    border-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.root[data-collapsed] .switcherTrigger {
+  justify-content: center;
+  gap: 0;
+  padding: 7px 0;
+}
+.switcherTrigger:hover {
+  background: var(--sh-bg-hover);
+  border-color: var(--sh-border-default);
+}
+.switcherTrigger:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+
+.switcherMeta {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.switcherName {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.switcherCaption {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.switcherChevron {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--sh-text-tertiary);
+}
+
+.switcherCheck {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--sh-accent);
+}
+
+.switcherThumb {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: var(--sh-radius-sm);
+  object-fit: cover;
+}
+
+.switcherDot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  margin: 6px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-text-tertiary);
+}
+
+/* ── Switcher menu (inside a Popover surface) ── */
+.switcherMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 240px;
+  max-height: 60vh;
+  padding: 4px;
+  overflow-y: auto;
+}
+
+.switcherRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--sh-radius-sm);
+  background: transparent;
+  font: inherit;
+  color: var(--sh-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.switcherRow:hover {
+  background: var(--sh-bg-hover);
+}
+.switcherRow:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+}
+
+.switcherDivider {
+  height: var(--sh-border-width);
+  margin: 4px 0;
+  background: var(--sh-border-subtle);
+}
+
+.switcherEmpty {
+  padding: 8px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
 }
 
 /* ── Section ─────────────────────────────────────────────── */
@@ -112,8 +256,8 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  height: 32px;
-  padding: 0 8px;
+  height: 34px;
+  padding: 0 10px;
   border: none;
   background: transparent;
   border-radius: var(--sh-radius-md);
@@ -162,17 +306,6 @@
   background: var(--sh-accent-soft);
   color: var(--sh-accent);
   font-weight: 500;
-}
-.item[data-active]::before,
-.item[data-status='active']::before {
-  content: '';
-  position: absolute;
-  left: -8px;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
-  border-radius: 0 var(--sh-radius-sm) var(--sh-radius-sm) 0;
-  background: var(--sh-accent);
 }
 
 .icon {
