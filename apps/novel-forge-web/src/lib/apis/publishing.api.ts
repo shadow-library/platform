@@ -7,6 +7,7 @@ import { useMutation, type UseMutationResult, useQuery, useQueryClient, type Use
  * Importing user defined packages
  */
 import { ApiError, APIRequest } from './api-request';
+import { type AccessGrantItem, type PublicationAccessBody, type PublicationAccessResponse } from './api-types.gen';
 
 /**
  * The reader-publish surface (reader-publish design §7): the forge-side publication ledger and the
@@ -16,6 +17,15 @@ import { ApiError, APIRequest } from './api-request';
 
 export type PublicationStatus = 'live' | 'retired';
 export type ChapterPublicationStatus = 'scheduled' | 'published' | 'failed' | 'unpublished';
+/**
+ * The access shapes come from the generated OpenAPI mirror rather than being hand-authored like the
+ * ledger types above — the server surfaces them, so there is no reason to restate them here and let
+ * the two drift. Only the alias below is local, because the generated response name reads oddly at
+ * the call sites.
+ */
+export type PublicationAccess = PublicationAccessResponse;
+export type AccessGrant = AccessGrantItem;
+export type GrantState = AccessGrantItem['state'];
 
 export interface Publication {
   id: string;
@@ -104,6 +114,26 @@ export function usePublicationsQuery(projectId: string, enabled = true): UseQuer
     // Publishing is asynchronous (202 + push job): while any row is still scheduled, keep the ledger
     // fresh so scheduled → published/failed transitions surface without a manual reload.
     refetchInterval: query => (query.state.data?.chapters.some(chapter => chapter.status === 'scheduled') ? 5000 : false),
+  });
+}
+
+export function usePublicationAccessQuery(projectId: string, enabled = true): UseQueryResult<PublicationAccess, ApiError> {
+  return useQuery<PublicationAccess, ApiError>({
+    queryKey: [...publishingKeys.all(projectId), 'access'],
+    queryFn: () => APIRequest.get(`/projects/${projectId}/publications/access`).execute(),
+    enabled: enabled && Boolean(projectId),
+  });
+}
+
+/**
+ * Replaces the whole access record. The response echoes each grant's resolved state, so the panel can
+ * show immediately which addresses named an account and which are still waiting for one.
+ */
+export function useSetPublicationAccessMutation(projectId: string): UseMutationResult<PublicationAccess, ApiError, PublicationAccessBody> {
+  const invalidate = usePublishingInvalidation(projectId);
+  return useMutation<PublicationAccess, ApiError, PublicationAccessBody>({
+    mutationFn: body => APIRequest.put(`/projects/${projectId}/publications/access`).body(body).execute(),
+    onSuccess: invalidate,
   });
 }
 

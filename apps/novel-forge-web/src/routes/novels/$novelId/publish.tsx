@@ -13,16 +13,20 @@ import {
   type ChapterPublication,
   type ChapterPublicationStatus,
   type DraftResponse,
+  type GrantState,
   type Publication,
   type PublicationStatus,
+  type PublicationVisibility,
   type PublishNovelBody,
   type ReconcileResult,
   useListDraftsQuery,
   useProjectQuery,
+  usePublicationAccessQuery,
   usePublicationsQuery,
   usePublishChapterMutation,
   usePublishNovelMutation,
   useReconcileMutation,
+  useSetPublicationAccessMutation,
   useUnpublishChapterMutation,
 } from '@/lib/apis';
 import { messageTime, projectTitle, relativeTime } from '@/lib/format';
@@ -173,6 +177,145 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
   );
 }
 
+// ─── Visibility & access card ────────────────────────────────────────────────
+
+const VISIBILITY_HELP: Record<PublicationVisibility, string> = {
+  PUBLIC: 'Anyone can find and read it. Listed in browse, search and sort.',
+  ORGANISATION: 'Every member of your current organisation can read it. Hidden from browse, search and sort.',
+  RESTRICTED: 'Only the people you name can read it. Hidden from browse, search and sort.',
+};
+
+interface AccessCardProps {
+  novelId: string;
+  published: boolean;
+}
+
+/**
+ * Editing access here rather than on the reader is deliberate: the forge is the system of record for
+ * who may read a published novel, and the reader holds a projection it never writes.
+ */
+function AccessCard({ novelId, published }: AccessCardProps): React.JSX.Element {
+  const access = usePublicationAccessQuery(novelId, published);
+  const setAccess = useSetPublicationAccessMutation(novelId);
+  const [visibility, setVisibility] = useState<PublicationVisibility>('PUBLIC');
+  const [emails, setEmails] = useState<string[]>([]);
+  const [draft, setDraft] = useState('');
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (hydrated || !access.data) return;
+    setVisibility(access.data.visibility);
+    setEmails(access.data.grants.map(grant => grant.email));
+    setHydrated(true);
+  }, [access.data, hydrated]);
+
+  /** Accepts a comma- or space-separated paste, so an author can bring a list from anywhere. */
+  const addDraft = (): void => {
+    const added = draft
+      .split(/[\s,;]+/)
+      .map(value => value.trim().toLowerCase())
+      .filter(Boolean);
+    if (added.length === 0) return;
+    setEmails(current => [...new Set([...current, ...added])]);
+    setDraft('');
+  };
+
+  const save = (): void => {
+    setAccess.mutate(
+      { visibility, grants: visibility === 'RESTRICTED' ? emails.map(email => ({ email })) : [] },
+      {
+        onSuccess: result => {
+          setEmails(result.grants.map(grant => grant.email));
+          const pending = result.grants.filter(grant => grant.state === 'pending').length;
+          if (pending > 0) toast.warning(`Saved — ${pending} address${pending === 1 ? '' : 'es'} have no account yet and cannot read it until they sign up`);
+          else toast.success('Access updated');
+        },
+        onError: error => toast.danger(error.message),
+      },
+    );
+  };
+
+  const stateOf = (email: string): GrantState | undefined => access.data?.grants.find(grant => grant.email === email)?.state;
+
+  if (!published) {
+    return (
+      <SectionCard title="Visibility & access">
+        <Alert intent="info" title="Publish the novel first">
+          Visibility is part of the published listing, so there is nothing to share until this novel has been published once.
+        </Alert>
+      </SectionCard>
+    );
+  }
+
+  return (
+    <SectionCard
+      title="Visibility & access"
+      action={
+        access.data && (
+          <span className={styles.metaRow}>
+            <StatusChip intent={access.data.visibility === 'PUBLIC' ? 'neutral' : 'warning'} dot>
+              {access.data.visibility.toLowerCase()}
+            </StatusChip>
+            <span className={styles.metaText}>rev {access.data.accessRevision}</span>
+          </span>
+        )
+      }
+    >
+      <QueryState isLoading={access.isLoading} error={access.error}>
+        <div className={styles.form}>
+          <FormField label="Who can read this" helper={VISIBILITY_HELP[visibility]}>
+            <SegmentedControl value={visibility} onValueChange={value => setVisibility(value as PublicationVisibility)} size="sm">
+              <SegmentedControl.Item value="PUBLIC">Public</SegmentedControl.Item>
+              <SegmentedControl.Item value="ORGANISATION">My organisation</SegmentedControl.Item>
+              <SegmentedControl.Item value="RESTRICTED">Specific people</SegmentedControl.Item>
+            </SegmentedControl>
+          </FormField>
+
+          {visibility === 'RESTRICTED' && (
+            <FormField label="Shared with" helper="Enter an email address. Paste a list to add several at once.">
+              <div className={styles.chipRow}>
+                {emails.map(email => (
+                  <StatusChip key={email} intent={stateOf(email) === 'pending' ? 'warning' : 'info'}>
+                    {email}
+                    {stateOf(email) === 'pending' ? ' · no account yet' : ''}
+                    <Button variant="ghost" size="sm" onClick={() => setEmails(current => current.filter(value => value !== email))} aria-label={`Remove ${email}`}>
+                      ×
+                    </Button>
+                  </StatusChip>
+                ))}
+                {emails.length === 0 && <span className={styles.metaText}>Nobody yet — this novel is readable only by you.</span>}
+              </div>
+              <div className={styles.formGrid}>
+                <Input
+                  value={draft}
+                  onValueChange={setDraft}
+                  placeholder="reader@example.com"
+                  onKeyDown={event => {
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+                    addDraft();
+                  }}
+                />
+                <Button variant="secondary" onClick={addDraft} disabled={!draft.trim()}>
+                  Add
+                </Button>
+              </div>
+            </FormField>
+          )}
+
+          {visibility === 'ORGANISATION' && access.data?.organisationId && <span className={styles.metaText}>Shared with organisation {access.data.organisationId}.</span>}
+
+          <div className={styles.formActions}>
+            <Button variant="primary" loading={setAccess.isPending} onClick={save}>
+              Save access
+            </Button>
+          </div>
+        </div>
+      </QueryState>
+    </SectionCard>
+  );
+}
+
 // ─── Reconcile summary ───────────────────────────────────────────────────────
 
 interface ReconcileSummaryProps {
@@ -319,6 +462,8 @@ function PublishScreen(): React.JSX.Element {
             ready={!ledgerQuery.isLoading && Boolean(projectQuery.data)}
             defaultTitle={projectQuery.data ? projectTitle(projectQuery.data) : ''}
           />
+
+          <AccessCard novelId={novelId} published={Boolean(publication)} />
 
           {reconcileResult && <ReconcileSummary result={reconcileResult} />}
 

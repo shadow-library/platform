@@ -1880,6 +1880,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/publications/access': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Access */
+    get: operations['get_api_v1_projects_projectId_publications_access'];
+    /** Set Access */
+    put: operations['put_api_v1_projects_projectId_publications_access'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/publications': {
     parameters: {
       query?: never;
@@ -3437,6 +3455,28 @@ export interface components {
     };
     /** @enum {string} */
     ChapterPublicationStatus: 'scheduled' | 'published' | 'failed' | 'unpublished';
+    PublicationAccessResponse: {
+      visibility: components['schemas']['PublicationVisibility'];
+      organisationId?: null | string;
+      accessRevision: number;
+      grants: components['schemas']['AccessGrantItem'][];
+    };
+    /** @enum {string} */
+    PublicationVisibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
+    AccessGrantItem: {
+      email: string;
+      subjectId?: null | string;
+      state: components['schemas']['PublicationGrantState'];
+    };
+    /** @enum {string} */
+    PublicationGrantState: 'resolved' | 'pending';
+    PublicationAccessBody: {
+      visibility: components['schemas']['PublicationVisibility'];
+      grants?: components['schemas']['AccessGrantInput'][];
+    };
+    AccessGrantInput: {
+      email: string;
+    };
     PublicationsLedgerResponse: {
       publication?: components['schemas']['PublicationResponse'];
       chapters: components['schemas']['ChapterPublicationResponse'][];
@@ -3444,6 +3484,8 @@ export interface components {
     ReconcileResponse: {
       /** @enum {string} */
       novel: 'applied' | 'noop';
+      /** @enum {string} */
+      access: 'applied' | 'noop';
       pushed: number[];
       deleted: number[];
       skipped: number[];
@@ -9399,6 +9441,90 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_publications_access: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PublicationAccessResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_publications_access: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PublicationAccessBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PublicationAccessResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects_projectId_publications: {
     parameters: {
       query?: never;
@@ -10188,6 +10314,12 @@ export type PublicationStatus = components['schemas']['PublicationStatus'];
 export type PublishChapterBody = components['schemas']['PublishChapterBody'];
 export type ChapterPublicationResponse = components['schemas']['ChapterPublicationResponse'];
 export type ChapterPublicationStatus = components['schemas']['ChapterPublicationStatus'];
+export type PublicationAccessResponse = components['schemas']['PublicationAccessResponse'];
+export type PublicationVisibility = components['schemas']['PublicationVisibility'];
+export type AccessGrantItem = components['schemas']['AccessGrantItem'];
+export type PublicationGrantState = components['schemas']['PublicationGrantState'];
+export type PublicationAccessBody = components['schemas']['PublicationAccessBody'];
+export type AccessGrantInput = components['schemas']['AccessGrantInput'];
 export type PublicationsLedgerResponse = components['schemas']['PublicationsLedgerResponse'];
 export type ReconcileResponse = components['schemas']['ReconcileResponse'];
 export type ReconcileFailureItem = components['schemas']['ReconcileFailureItem'];
@@ -10284,6 +10416,7 @@ export type GetReforgeStatusPathParams = Exclude<paths['/api/v1/projects/{projec
 export type ListReforgesPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/chapters']['get']['parameters']['path'], undefined>;
 export type GetReforgePathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/chapters/{chapter}']['get']['parameters']['path'], undefined>;
 export type GetReforgeManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/manuscript']['get']['parameters']['path'], undefined>;
+export type GetAccessPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications/access']['get']['parameters']['path'], undefined>;
 export type ListPublicationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications']['get']['parameters']['path'], undefined>;
 export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
 export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
