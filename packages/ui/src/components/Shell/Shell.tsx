@@ -20,6 +20,14 @@ import { type PageProps, type ShellNav, type ShellProps } from './Shell.types';
 const NO_SHELL_NAV: ShellNav = { hasSidebar: false, open: false, setOpen: () => undefined };
 
 /**
+ * The platform's reading column, in pixels — the width every Shadow app's content settles on unless it
+ * asks for something else. Mirrored as the `--sh-page-max` token for full-bleed apps that take the content
+ * region whole (`contentPadding="none"`) and therefore have to centre their own column in CSS; change both
+ * together.
+ */
+export const PAGE_WIDTH = 1200;
+
+/**
  * The application scaffold: a sidebar landmark, a top bar, and the `main` content region, with the
  * mandatory skip-to-content link rendered as the first tab stop so products can't forget it. The shell
  * is also where theme and density mount — one place, app-wide. Chrome reads surface-app (the
@@ -37,7 +45,7 @@ const NO_SHELL_NAV: ShellNav = { hasSidebar: false, open: false, setOpen: () => 
  * scrolls so mobile browsers keep their URL-bar auto-hide.
  */
 export const Shell = forwardRef<HTMLDivElement, ShellProps>(function Shell(
-  { sidebar, topbar, bottomNav, theme = 'light', density = 'comfortable', contentWidth = 1200, contentPadding = 'md', className, children, ...props },
+  { sidebar, topbar, bottomNav, theme = 'light', density = 'comfortable', contentWidth = PAGE_WIDTH, contentPadding = 'md', className, children, ...props },
   ref,
 ) {
   const [navOpen, setNavOpen] = useState(false);
@@ -108,7 +116,7 @@ export const Shell = forwardRef<HTMLDivElement, ShellProps>(function Shell(
 export const Page = forwardRef<HTMLDivElement, PageProps>(function Page({ title, description, breadcrumbs, actions, maxWidth, className, children, ...props }, ref) {
   const framed = useContext(ShellContentContext);
   const hasHeader = title != null || description != null || breadcrumbs != null || actions != null;
-  const resolved = maxWidth ?? (framed ? 'fluid' : 1200);
+  const resolved = maxWidth ?? (framed ? 'fluid' : PAGE_WIDTH);
   const width = resolved === 'fluid' ? undefined : resolved;
   return (
     <div ref={ref} className={cn(styles.page, className)} data-framed={framed || undefined} {...props}>

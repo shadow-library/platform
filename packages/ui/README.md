@@ -42,11 +42,11 @@ The package ships one universal ESM build with no runtime style injection, so th
 </Shell>
 ```
 
-| Prop             | Effect                                                                                    |
-| ---------------- | ----------------------------------------------------------------------------------------- |
-| `contentWidth`   | Reading-column cap, centered once the region outgrows it. `'fluid'` fills. Default `1200` |
-| `contentPadding` | Gutter scale: `'none' \| 'sm' \| 'md' \| 'lg'`. Each step is responsive. Default `'md'`   |
-| `bottomNav`      | Phone-only bar (e.g. `BottomNavigation`), pinned bottom and hidden from `768px` up        |
+| Prop             | Effect                                                                                          |
+| ---------------- | ----------------------------------------------------------------------------------------------- |
+| `contentWidth`   | Reading-column cap, centered once the region outgrows it. `'fluid'` fills. Default `PAGE_WIDTH` |
+| `contentPadding` | Gutter scale: `'none' \| 'sm' \| 'md' \| 'lg'`. Each step is responsive. Default `'md'`         |
+| `bottomNav`      | Phone-only bar (e.g. `BottomNavigation`), pinned bottom and hidden from `768px` up              |
 
 Below `768px` the persistent sidebar becomes a modal nav drawer. `TopNavigation` surfaces the hamburger automatically; a bespoke top bar wires its own trigger with the `useShellNav()` hook. From `768px` up the chrome is pinned and only the content region scrolls; below it the document scrolls so mobile browsers keep their URL-bar auto-hide.
 
@@ -69,6 +69,20 @@ No `active` prop is needed when the router marks its own links — the active tr
 `Sidebar` can own its rail state: pass `defaultCollapsed` and/or `storageKey` to get a working collapse toggle that survives reloads. The stored value is adopted after mount, so server-rendered apps hydrate against `defaultCollapsed`.
 
 A `Page` inside a shell contributes only its header — the shell already supplied the gutters and column. Pass `Page`'s `maxWidth` to narrow a single page (a settings form inside a wide shell); standalone, a `Page` still frames itself.
+
+### The page measure
+
+`PAGE_WIDTH` (1200) is the platform's reading column, exported for reference and used as `Shell`'s `contentWidth` default and `Page`'s standalone default. **An app that lets the shell own the content region should pass no `contentWidth` at all** — naming the default is how the four apps drifted apart in the first place.
+
+An app that genuinely cannot use the shell's region — one passing `contentPadding="none"` because it has banded screens that bleed to the chrome edges, or panes positioned `absolute; inset: 0` — still has to land on the same measure. Build its column from the same values rather than new numbers:
+
+| Property                                               | Use for                                                                                                                                         |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--sh-page-max`                                        | The column cap — the CSS mirror of `PAGE_WIDTH`                                                                                                 |
+| `--sh-shell-gutter-inline` / `--sh-shell-gutter-block` | The gutters. Declared on the content region and inherited, so they still read under `contentPadding="none"` — and still respond to the viewport |
+| `--sh-safe-left` / `--sh-safe-right`                   | Pair with the inline gutter as `max(gutter, safe-inset)` so a display cutout never clips the column                                             |
+
+`--sh-shell-gutter-*` are also writable: set them on the shell to retune a product's gutters without forking the component.
 
 ## Utility Classes
 

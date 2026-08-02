@@ -253,6 +253,13 @@
   --sh-safe-bottom: env(safe-area-inset-bottom, 0px);
   --sh-safe-left: env(safe-area-inset-left, 0px);
 
+  /* ── Page layout ──────────────────────────────────────────── */
+  /* The platform's reading column. `Shell` caps its content region here by default, so an app that lets
+     the shell own the column never names a width at all. It is a token as well as a default because a
+     full-bleed app (one passing `contentPadding="none"` so banded or absolutely-positioned screens can
+     reach the chrome edges) still has to centre its own column on the same measure. */
+  --sh-page-max: 1200px;
+
   /*
    * Breakpoints (reference) — matching the Foundations grid (xs–2xl).
    * CSS custom properties cannot be used inside media queries, so these document the
