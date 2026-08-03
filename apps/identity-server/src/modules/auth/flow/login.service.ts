@@ -127,6 +127,7 @@ export class LoginService {
     const user = await this.userService.getUser(input.identifier);
     if (!user) throw AppErrorCode.AUTH_008.create();
     this.userService.assertLoginAllowed(await this.userService.resolveEffectiveStatus(user));
+    if (this.isFullyLocked(user)) throw AppErrorCode.AUTH_012.create();
     const provider = input.identifier.includes('@') ? await this.identityProviderService.routeForEmail(input.identifier.toLowerCase()) : null;
 
     let federated: FederatedFlowState | undefined;
@@ -360,6 +361,16 @@ export class LoginService {
   }
 
   /**
+   * Tier-4 FULL lock: every interactive method — password, OTP, MFA, recovery and federated
+   * completion — is refused until the lock lifts (§13.2), unlike an OTP_ONLY lock which still
+   * accepts OTP. A FULL lock with no `lockedUntil` is an indefinite administrative lock that only
+   * an operator can clear.
+   */
+  private isFullyLocked(user: User): boolean {
+    return user.lockMode === 'FULL' && (user.lockedUntil === null || user.lockedUntil.getTime() > Date.now());
+  }
+
+  /**
    * Completes the MFA step of a login flow with a TOTP code or a single-use recovery code;
    * sessions born here carry AAL2.
    */
@@ -442,6 +453,14 @@ export class LoginService {
   }
 
   private async complete(flow: AuthFlowContext, userId: bigint, options: CompletionOptions): Promise<FlowStepResult> {
+    /**
+     * The single session-minting chokepoint, so a FULL lock is re-checked here as the backstop for
+     * paths that never pass through `init` — usernameless passkey login and a federated subject that
+     * resolves to a different account — guaranteeing no interactive method can mint a session for a
+     * fully locked account.
+     */
+    const user = await this.userService.getUser(userId);
+    if (user && this.isFullyLocked(user)) throw AppErrorCode.AUTH_012.create();
     /** Assessed before the success is recorded so "previously seen" excludes this very login. */
     await this.suspiciousLoginService.assessLogin(userId, flow.device);
     await this.signInEventService.record({

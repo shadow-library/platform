@@ -3,11 +3,14 @@
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
+import { eq } from 'drizzle-orm';
+
 /**
  * Importing user defined packages
  */
 import { SESSION_COOKIE_NAME } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
+import { schema } from '@server/modules/infrastructure/datastore';
 
 import { TestEnvironment } from '../test-environment';
 
@@ -24,6 +27,20 @@ const login = (identifier: string) => env.getRouter().mockRequest().post('/api/v
 const verify = (flowId: string, password: string) => env.getRouter().mockRequest().post('/api/v1/auth/challenge/verify').body({ flowId, password });
 const resetPassword = (flowId: string, currentPassword: string, newPassword: string) =>
   env.getRouter().mockRequest().post('/api/v1/auth/login/reset-password').body({ flowId, currentPassword, newPassword });
+const changeMethod = (flowId: string, method: string) => env.getRouter().mockRequest().post('/api/v1/auth/challenge/change').body({ flowId, method });
+const verifyOtp = (flowId: string, code: string) => env.getRouter().mockRequest().post('/api/v1/auth/challenge/verify').body({ flowId, code });
+
+const lockAccount = async (email: string, lockMode: 'FULL' | 'OTP_ONLY', lockedUntil: Date | null): Promise<void> => {
+  const user = await env.getService(UserService).getUser(email);
+  if (!user) throw new Error(`account ${email} missing`);
+  await env.getPostgresClient().update(schema.users).set({ lockMode, lockedUntil }).where(eq(schema.users.id, user.id));
+};
+
+const otpFor = async (email: string): Promise<string> => {
+  const rows = await env.getPostgresClient().select().from(schema.notificationOutbox);
+  const row = rows.filter(entry => entry.recipients.email === email).pop();
+  return String((row?.payload as { code: string }).code);
+};
 
 describe('Login flow', () => {
   beforeEach(async () => {
@@ -144,5 +161,56 @@ describe('Login flow', () => {
     const reset = await resetPassword(flowId, 'WrongPassword@1', 'NewPassword@456');
     expect(reset.statusCode).toBe(401);
     expect(reset.json()).toMatchObject({ status: 'AWAITING_PASSWORD_RESET', attemptsLeft: 2 });
+  });
+
+  describe('full lock', () => {
+    it('should refuse a password login at the identifier step while fully locked', async () => {
+      await lockAccount('login@example.com', 'FULL', new Date(Date.now() + 60_000));
+
+      const response = await login('login@example.com');
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({ code: 'AUTH_012' });
+      expect(response.json()).not.toHaveProperty('flowId');
+    });
+
+    /** A lock that lands mid-flow must still deny the session, proving the completion backstop enforces every method. */
+    it('should refuse an otp login caught by a lock mid-flow and mint no session', async () => {
+      const { flowId } = (await login('login@example.com')).json() as { flowId: string };
+      expect((await changeMethod(flowId, 'EMAIL_OTP')).statusCode).toBe(200);
+      const code = await otpFor('login@example.com');
+
+      await lockAccount('login@example.com', 'FULL', new Date(Date.now() + 60_000));
+      const response = await verifyOtp(flowId, code);
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({ code: 'AUTH_012' });
+      const setCookie = ([] as string[]).concat(response.headers['set-cookie'] ?? []);
+      expect(setCookie.some(cookie => cookie.startsWith(`${SESSION_COOKIE_NAME}=`))).toBe(false);
+    });
+
+    it('should let a fully locked account sign in once the lock has expired', async () => {
+      await lockAccount('login@example.com', 'FULL', new Date(Date.now() - 60_000));
+
+      const init = await login('login@example.com');
+      expect(init.statusCode).toBe(200);
+      const { flowId } = init.json() as { flowId: string };
+      expect((await verify(flowId, 'Password@123')).json()).toMatchObject({ status: 'COMPLETED' });
+    });
+
+    it('should leave an otp_only lock unchanged — password refused, otp still completes', async () => {
+      await lockAccount('login@example.com', 'OTP_ONLY', new Date(Date.now() + 60_000));
+
+      const init = await login('login@example.com');
+      expect(init.statusCode).toBe(200);
+      expect(init.json()).not.toMatchObject({ code: 'AUTH_012' });
+
+      const { flowId } = init.json() as { flowId: string };
+      expect((await verify(flowId, 'Password@123')).statusCode).toBe(401);
+
+      const { flowId: otpFlow } = (await login('login@example.com')).json() as { flowId: string };
+      await changeMethod(otpFlow, 'EMAIL_OTP');
+      const done = await verifyOtp(otpFlow, await otpFor('login@example.com'));
+      expect(done.statusCode).toBe(200);
+      expect(done.json()).toMatchObject({ status: 'COMPLETED' });
+    });
   });
 });

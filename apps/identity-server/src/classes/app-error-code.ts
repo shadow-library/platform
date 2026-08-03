@@ -81,6 +81,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AUTH_010 = AppErrorCode.forbidden('AUTH_010', 'Account is suspended');
   /** The account was deactivated as part of its lifecycle (offboarding, SCIM deprovisioning) */
   static readonly AUTH_011 = AppErrorCode.forbidden('AUTH_011', 'Account is deactivated');
+  /** The account is under a FULL security lock and refuses every interactive method until the lock lifts (§13.2) */
+  static readonly AUTH_012 = AppErrorCode.forbidden('AUTH_012', 'Account is locked');
 
   /*!
    * MFA Error Codes
