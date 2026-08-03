@@ -165,6 +165,18 @@ describe('Template', () => {
       expect(previewAfter.json().subject).toBe('Hi Bob');
     });
 
+    it('should return 409 when opening a draft while one is already open', async () => {
+      const create = await router().post('/api/v1/templates').body({ templateKey: 'demo.doubledraft', name: 'Double draft', messageType: 'TRANSACTIONAL' });
+      const templateId = create.json().id;
+
+      const first = await router().post(`/api/v1/templates/${templateId}/versions/draft`);
+      expect(first.statusCode).toBe(201);
+
+      const second = await router().post(`/api/v1/templates/${templateId}/versions/draft`);
+      expect(second.statusCode).toBe(409);
+      expect(second.json()).toMatchObject({ code: 'TPL_PUB_004' });
+    });
+
     it('should return 409 when publishing with no draft', async () => {
       const response = await router().post('/api/v1/templates/1/versions/draft/publish').body({});
 

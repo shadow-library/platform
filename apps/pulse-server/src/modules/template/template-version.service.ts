@@ -97,8 +97,16 @@ export class TemplateVersionService {
     });
   }
 
-  /** Opens the single editable draft, cloning the published version's content so an edit starts from what is live. Idempotent. */
+  /** Opens the single editable draft, cloning the published version's content so an edit starts from what is live. Rejects if one is already open. */
   async openDraft(templateId: bigint, editedBy?: string): Promise<Template.Version> {
+    await this.templateService.getTemplateOrThrow(templateId);
+    const existing = await this.getDraft(templateId);
+    if (existing) throw AppErrorCode.TPL_PUB_004.create();
+    return this.ensureDraft(templateId, editedBy);
+  }
+
+  /** Returns the open draft, opening one (cloned from the published version) when none exists. The idempotent get-or-open used when writing content. */
+  private async ensureDraft(templateId: bigint, editedBy?: string): Promise<Template.Version> {
     await this.templateService.getTemplateOrThrow(templateId);
     const existing = await this.getDraft(templateId);
     if (existing) return existing;
@@ -129,7 +137,7 @@ export class TemplateVersionService {
   async upsertContent(templateId: bigint, data: UpsertContentData, editedBy?: string): Promise<Template.Content> {
     if (data.channel === 'EMAIL' && !data.subject) throw new ValidationError('subject', 'must be provided when the channel is EMAIL');
     const locale = data.locale ?? DEFAULT_LOCALE;
-    const draft = await this.openDraft(templateId, editedBy);
+    const draft = await this.ensureDraft(templateId, editedBy);
     const [content] = await this.db
       .insert(schema.templateContents)
       .values({ templateVersionId: draft.id, channel: data.channel, locale, subject: data.subject, body: data.body, layoutKey: data.layoutKey })
