@@ -9,6 +9,7 @@ import { Logger } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
+import { seedBaseline } from '@server/database/seed';
 
 /**
  * Defining types
@@ -27,6 +28,8 @@ try {
   const db = drizzle(url);
   await migrate(db, { migrationsFolder });
   logger.info('Database migration completed successfully');
+  await seedBaseline();
+  logger.info('Database baseline seeding completed successfully');
 } catch (error: any) {
   logger.error('Database migration failed', { error });
   if ('cause' in error) logger.error('Cause', { cause: error.cause });
