@@ -13,6 +13,7 @@
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@types/bun": "catalog:",
+    "postgres": "^3.4.5",
     "typescript": "catalog:"
   }
 }

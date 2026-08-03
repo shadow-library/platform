@@ -8,3 +8,7 @@ stats.html
 # Not code, and prettier's HTML/markdown opinions fight the tools that own these.
 **/storybook-static/
 bun.lock
+
+# Playwright storage states + the e2e seed manifest: generated per-machine by the e2e seed/setup, gitignored,
+# and not prettier's to reformat (Playwright owns the storageState JSON shape).
+**/.auth/

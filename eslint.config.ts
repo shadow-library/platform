@@ -247,6 +247,9 @@ export default defineConfig([
    */
   { files: ['packages/ui/tests/ssr-smoke.mjs'], languageOptions: { globals: globals.node }, rules: { '@typescript-eslint/no-empty-function': 'off' } },
 
+  /** e2e seed: a directly-invoked Bun CLI script whose job includes printing a run summary to stdout. */
+  { files: ['e2e/seed/**/*.ts'], rules: { 'no-console': 'off' } },
+
   /** packages/web: hooks live in plain `.ts` files, and the offline/PWA/service-worker code needs both global sets. */
   ...reactLayer(DEFAULT_REACT_VERSION, 'packages/web/**'),
   { files: ['packages/web/**/*.{ts,tsx}'], languageOptions: { globals: resolveGlobals('both') } },

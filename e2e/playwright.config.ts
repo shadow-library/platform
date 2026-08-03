@@ -31,6 +31,11 @@ const isCI = !!process.env.CI;
 
 export default defineConfig({
   testDir: './tests',
+  // Seed the dev cluster's Postgres before anything runs, and drain DB clients after. `globalSetup` spawns the
+  // seed as a Bun subprocess (specs run under the node runner, which lacks Bun's argon2id hashing); it completes
+  // synchronously so the seed manifest exists before the auth-setup project logs anyone in.
+  globalSetup: './seed/global-setup.ts',
+  globalTeardown: './seed/global-teardown.ts',
   fullyParallel: true,
   forbidOnly: isCI,
   // Unconditional retries would hide real local flake; CI still gets one to absorb network jitter.
@@ -53,5 +58,12 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
   },
 
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // The `setup` project produces the per-persona storage states (`tests/auth.setup.ts`); `chromium` depends on it
+  // so those files exist before an authenticated spec reads one. `chromium` carries no `storageState` of its own —
+  // the existing specs assert the unauthenticated experience, and authenticated specs opt in per-test (via
+  // `test.use({ storageState })` or `apiContext(product, persona)`).
+  projects: [
+    { name: 'setup', testMatch: /.*\.setup\.ts/ },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testIgnore: /.*\.setup\.ts/ },
+  ],
 });
