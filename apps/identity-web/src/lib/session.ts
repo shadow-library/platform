@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { type QueryClient } from '@tanstack/react-query';
-import { requireAuth } from '@shadow-library/web/router';
+import { requireAuth, type SessionGuardStatus, useSessionGuard as useSharedSessionGuard } from '@shadow-library/web/router';
 
 /**
  * Importing user defined packages
@@ -28,4 +28,17 @@ export function requireSession(queryClient: QueryClient, returnTo: string): Prom
    * and `MeResponse` is inferred — no widening cast needed anymore.
    */
   return requireAuth(queryClient, meQueryOptions(), { loginTo: '/login', returnTo });
+}
+
+/**
+ * `requireSession` only runs when the browser first enters a protected route group: TanStack reuses the
+ * layout match, so its `beforeLoad` never re-runs while navigating between pages inside the portal or console
+ * shell. This binds `@shadow-library/web/router`'s shared `useSessionGuard` (the same gap-closer Novel Forge
+ * and Pulse already use) to identity's `me` query and `/login` route, keeping the session live for as long as
+ * an authenticated shell is mounted — re-validating on every in-app navigation and whenever the tab regains
+ * focus, and bouncing to `/login` the moment the server reports the session is gone, so a session that ends
+ * mid-use never keeps rendering the portal.
+ */
+export function useSessionGuard(): SessionGuardStatus {
+  return useSharedSessionGuard({ query: meQueryOptions(), loginTo: '/login' });
 }

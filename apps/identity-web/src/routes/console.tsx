@@ -2,19 +2,38 @@
  * Importing npm packages
  */
 import { createFileRoute, Outlet } from '@tanstack/react-router';
+import { Spinner } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
 import { ConsoleShell } from '@/features/console';
-import { requireSession } from '@/lib/session';
+import { requireSession, useSessionGuard } from '@/lib/session';
 
 /** The privileged operator console (`/console/*`). Session is gated here; the identity server enforces admin authorization per endpoint. */
 export const Route = createFileRoute('/console')({
   beforeLoad: ({ context, location }) => requireSession(context.queryClient, location.href),
-  component: () => (
+  component: ConsoleGroup,
+});
+
+/**
+ * As with the portal, the entry gate does not re-run while navigating inside the console. `useSessionGuard`
+ * keeps the session live for as long as the console shell is mounted and bounces to `/login` the moment it
+ * ends, withholding the console chrome behind a spinner until the redirect completes.
+ */
+function ConsoleGroup(): React.JSX.Element {
+  const status = useSessionGuard();
+
+  if (status === 'redirecting')
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh' }}>
+        <Spinner aria-label="Redirecting to sign-in" />
+      </div>
+    );
+
+  return (
     <ConsoleShell>
       <Outlet />
     </ConsoleShell>
-  ),
-});
+  );
+}
