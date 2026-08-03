@@ -35,6 +35,9 @@ export class CreateRoutingRuleBody {
 
 @Schema()
 export class SenderRoutingRuleResponse extends PickType(CreateRoutingRuleBody, ['senderProfileId'] as const) {
+  @Field(() => String)
+  id: bigint;
+
   @Field(() => MessageType, { optional: true })
   @Transform('strip:null')
   messageType: Template.MessageType | null;

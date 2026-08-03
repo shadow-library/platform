@@ -714,6 +714,7 @@ export interface components {
     MessageType: 'OTP' | 'TRANSACTIONAL' | 'PROMOTIONAL';
     SenderRoutingRuleResponse: {
       senderProfileId: string;
+      id: string;
       messageType?: components['schemas']['MessageType'];
       region?: string;
       service?: string;
@@ -730,6 +731,7 @@ export interface components {
     };
     SenderRoutingRuleDetailResponse: {
       senderProfileId: string;
+      id: string;
       messageType?: components['schemas']['MessageType'];
       region?: string;
       service?: string;

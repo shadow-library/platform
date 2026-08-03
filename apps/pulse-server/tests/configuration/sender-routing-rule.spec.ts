@@ -33,6 +33,7 @@ describe('Sender Routing Rule', () => {
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
+        id: expect.stringMatching(TEST_REGEX.id),
         senderProfileId: body.senderProfileId,
         service: body.service,
         region: body.region,
@@ -40,6 +41,23 @@ describe('Sender Routing Rule', () => {
         createdAt: expect.stringMatching(TEST_REGEX.dateISO),
         updatedAt: expect.stringMatching(TEST_REGEX.dateISO),
       });
+    });
+
+    it('should return an id that addresses the newly created rule', async () => {
+      const create = await testEnv
+        .getRouter()
+        .mockRequest()
+        .headers(testEnv.authHeaders())
+        .post('/api/v1/sender-routing-rules')
+        .body({ senderProfileId: '1', service: 'addressable' });
+
+      expect(create.statusCode).toBe(201);
+      const { id } = create.json();
+      expect(id).toMatch(TEST_REGEX.id);
+
+      const get = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get(`/api/v1/sender-routing-rules/${id}`);
+      expect(get.statusCode).toBe(200);
+      expect(get.json()).toMatchObject({ id, service: 'addressable' });
     });
 
     it('should create a routing rule with only required senderProfileId', async () => {
@@ -52,6 +70,7 @@ describe('Sender Routing Rule', () => {
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
+        id: expect.stringMatching(TEST_REGEX.id),
         senderProfileId: body.senderProfileId,
         createdAt: expect.stringMatching(TEST_REGEX.dateISO),
         updatedAt: expect.stringMatching(TEST_REGEX.dateISO),
@@ -212,6 +231,7 @@ describe('Sender Routing Rule', () => {
         offset: 0,
         items: expect.arrayContaining([
           expect.objectContaining({
+            id: expect.stringMatching(TEST_REGEX.id),
             senderProfileId: expect.stringMatching(TEST_REGEX.id),
             createdAt: expect.stringMatching(TEST_REGEX.dateISO),
             updatedAt: expect.stringMatching(TEST_REGEX.dateISO),
@@ -323,6 +343,7 @@ describe('Sender Routing Rule', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
+        id: '1',
         senderProfileId: '2',
         service: 'auth',
         region: 'US',
