@@ -34,7 +34,7 @@ const PROGRESS_STORAGE_KEY = 'webnovel:progress';
 const PENDING_STORAGE_KEY = 'webnovel:progress-pending';
 
 export const progressKeys = {
-  all: ['progress'] as const,
+  all: (userId?: string) => ['progress', userId ?? 'guest'] as const,
 };
 
 export function readProgressMap(userId?: string): ProgressMap {
@@ -61,7 +61,7 @@ export function toReadingProgress(item: ProgressListItem): ReadingProgress {
 
 export const progressQueryOptions = (userId?: string) =>
   queryOptions<ProgressMap, ApiError>({
-    queryKey: progressKeys.all,
+    queryKey: progressKeys.all(userId),
     queryFn: async () => {
       const local = readProgressMap(userId);
       if (!userId) return local;

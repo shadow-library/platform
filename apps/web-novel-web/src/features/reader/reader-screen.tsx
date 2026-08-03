@@ -133,7 +133,7 @@ export function ReaderScreen(): React.JSX.Element {
       clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
         saveProgress(slug, ordinal, pct, userId);
-        queryClient.setQueryData(progressKeys.all, readProgressMap(userId));
+        queryClient.setQueryData(progressKeys.all(userId), readProgressMap(userId));
       }, 800);
     };
     window.addEventListener('scroll', onScroll, { passive: true });

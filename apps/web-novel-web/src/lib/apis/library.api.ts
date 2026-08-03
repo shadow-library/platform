@@ -33,7 +33,10 @@ import { type LibraryEntry, type NovelSummary } from './types';
 const LIBRARY_STORAGE_KEY = 'webnovel:library';
 
 export const libraryKeys = {
-  all: ['library'] as const,
+  // Keyed by user (namespaced like the storage mirror) rather than a static tuple: the loader fires before
+  // `session.data` resolves, so a static key would cache the guest-empty result under the same key a signed-in
+  // fetch reuses and never refetch once the session lands. Mirrors `notificationsKeys.read`.
+  all: (userId?: string) => ['library', userId ?? 'guest'] as const,
 };
 
 function readLibrary(userId?: string): LibraryEntry[] {
@@ -74,7 +77,7 @@ export function toLibraryEntry(item: LibraryItem, local?: LibraryEntry): Library
 
 export const libraryQueryOptions = (userId?: string) =>
   queryOptions<LibraryEntry[], ApiError>({
-    queryKey: libraryKeys.all,
+    queryKey: libraryKeys.all(userId),
     queryFn: async () => {
       const local = readLibrary(userId);
       if (!userId) return local;
@@ -109,6 +112,6 @@ export function useToggleLibraryMutation(userId?: string): UseMutationResult<Lib
       }
       return next;
     },
-    onSuccess: next => queryClient.setQueryData(libraryKeys.all, next),
+    onSuccess: next => queryClient.setQueryData(libraryKeys.all(userId), next),
   });
 }

@@ -136,7 +136,7 @@ export function HistoryScreen(): React.JSX.Element {
 
   const clearAll = (): void => {
     clearProgressMirror(session.data?.userId);
-    queryClient.setQueryData<ProgressMap>(progressKeys.all, {});
+    queryClient.setQueryData<ProgressMap>(progressKeys.all(session.data?.userId), {});
   };
 
   return (
