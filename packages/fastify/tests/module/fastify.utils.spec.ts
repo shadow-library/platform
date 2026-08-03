@@ -296,16 +296,48 @@ describe('Create Fastify Instance', () => {
     });
   });
 
-  it('should validate query schema and transform it to valid data without throwing errors for invalid data', () => {
-    const validate = compileValidator({ schema, method: 'get', url: '/test', httpPart: 'querystring' }, validators);
-    const result = validate({ orderBy: 'rand', active: 'false', limit: '-10', offset: '20', order: 'asc' });
-    expect(result).toStrictEqual({ value: { active: false, limit: 20, offset: 20, order: 'asc' } });
-  });
+  describe('querystring validation', () => {
+    const querySchema = {
+      $id: 'QuerySchema',
+      type: 'object',
+      properties: {
+        limit: { type: 'number', default: 20, minimum: 1, maximum: 100 },
+        offset: { type: 'number', default: 0, minimum: 0 },
+        sortBy: { type: 'string', default: 'title', enum: ['title', 'createdAt'] },
+      },
+    };
+    const compile = (): ReturnType<typeof compileValidator> => compileValidator({ schema: querySchema, method: 'get', url: '/test', httpPart: 'querystring' }, validators);
 
-  it('should validate query schema and return same data for valid data', () => {
-    const validate = compileValidator({ schema, method: 'get', url: '/test', httpPart: 'querystring' }, validators);
-    const result = validate({ orderBy: 'name', active: true, limit: 10, offset: 20, order: 'asc' });
-    expect(result).toStrictEqual({ value: { orderBy: 'name', active: true, limit: 10, offset: 20, order: 'asc' } });
+    it('should coerce the string query params of a valid query and accept it', () => {
+      const data: Record<string, unknown> = { limit: '20', offset: '5', sortBy: 'title' };
+      expect(compile()(data)).toStrictEqual({});
+      /** Ajv coerces the URL strings in place, so the coerced values reach the handler even though no `value` is returned */
+      expect(data).toStrictEqual({ limit: 20, offset: 5, sortBy: 'title' });
+    });
+
+    it('should reject a numeric query param below its minimum', () => {
+      const result = compile()({ limit: '0' }) as { error: ValidationError };
+      expect(result.error).toBeInstanceOf(ValidationError);
+      expect(result.error.getErrors().map(error => error.field)).toStrictEqual(['querystring.limit']);
+    });
+
+    it('should reject a numeric query param above its maximum', () => {
+      const result = compile()({ limit: '101' }) as { error: ValidationError };
+      expect(result.error).toBeInstanceOf(ValidationError);
+      expect(result.error.getErrors().map(error => error.field)).toStrictEqual(['querystring.limit']);
+    });
+
+    it('should reject a non-numeric value for a numeric query param', () => {
+      const result = compile()({ limit: 'abc' }) as { error: ValidationError };
+      expect(result.error).toBeInstanceOf(ValidationError);
+      expect(result.error.getErrors().map(error => error.field)).toStrictEqual(['querystring.limit']);
+    });
+
+    it('should reject a query param outside its enum', () => {
+      const result = compile()({ sortBy: 'bogus' }) as { error: ValidationError };
+      expect(result.error).toBeInstanceOf(ValidationError);
+      expect(result.error.getErrors().map(error => error.field)).toStrictEqual(['querystring.sortBy']);
+    });
   });
 
   it('should return a validation error for body schema validation', () => {

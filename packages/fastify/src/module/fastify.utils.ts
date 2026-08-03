@@ -49,34 +49,23 @@ function compileSchema(ajv: Ajv, schema: JSONSchema): ValidateFunction<unknown> 
 export function compileValidator(routeSchema: FastifyRouteSchemaDef<SchemaObject>, validators: AjvValidators): FastifyValidationResult {
   assert(allowedHttpParts.includes(routeSchema.httpPart as string), `Invalid httpPart: ${routeSchema.httpPart}`);
 
-  if (routeSchema.httpPart !== 'querystring') {
-    const ajv = routeSchema.httpPart === 'body' ? validators.strictValidator : validators.lenientValidator;
-    const validate = compileSchema(ajv, routeSchema.schema);
-    const dataVar = routeSchema.httpPart as SchemaErrorDataVar;
+  /**
+   * The body is validated as-is by the strict validator; querystring and params arrive as strings and so are
+   * coerced by the lenient validator. All three reject constraint violations identically — a query param outside
+   * its declared `minimum`/`maximum`/`enum` fails the same way a body or params field would, rather than being
+   * silently defaulted.
+   */
+  const ajv = routeSchema.httpPart === 'body' ? validators.strictValidator : validators.lenientValidator;
+  const validate = compileSchema(ajv, routeSchema.schema);
+  const dataVar = routeSchema.httpPart as SchemaErrorDataVar;
 
-    /**
-     * The errors are formatted here rather than by the schema error formatter because resolving a field's
-     * `errorMessage` needs the route schema, and because it keeps the raw Ajv errors from leaving this handler.
-     */
-    return data => {
-      if (validate(data)) return {};
-      return { error: formatSchemaErrors(validate.errors ?? [], dataVar, routeSchema.schema) };
-    };
-  }
-
-  const validate = compileSchema(validators.lenientValidator, routeSchema.schema);
-  return (data: Record<string, unknown>) => {
-    validate(data);
-
-    for (const error of validate.errors ?? []) {
-      /** Since this schema is for querystring there won't be any nested objects so we are directly accessing the path */
-      const path = error.instancePath.substring(1);
-      const defaultValue = routeSchema.schema.properties?.[path]?.default;
-      if (defaultValue !== undefined) data[path] = defaultValue;
-      else delete data[path];
-    }
-
-    return { value: data };
+  /**
+   * The errors are formatted here rather than by the schema error formatter because resolving a field's
+   * `errorMessage` needs the route schema, and because it keeps the raw Ajv errors from leaving this handler.
+   */
+  return data => {
+    if (validate(data)) return {};
+    return { error: formatSchemaErrors(validate.errors ?? [], dataVar, routeSchema.schema) };
   };
 }
 
