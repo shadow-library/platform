@@ -3,6 +3,8 @@
  */
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
+import { sql } from 'drizzle-orm';
+
 /**
  * Importing user defined packages
  */
@@ -50,6 +52,18 @@ describe('NotificationService', () => {
     expect(row?.status).toBe('PENDING');
     expect(row?.templateKey).toBe('email.verification');
     expect(sentCalls).toHaveLength(0);
+  });
+
+  it('should store recipients and payload as genuine jsonb objects readable by field', async () => {
+    await service.enqueue({ templateKey: 'email.verification', recipients: { email: 'jane@example.com' }, payload: { code: '123456' } });
+
+    const [row] = (await env
+      .getPostgresClient()
+      .execute(
+        sql`select jsonb_typeof(recipients) as recipients_type, jsonb_typeof(payload) as payload_type, recipients->>'email' as email, payload->>'code' as code from notification_outbox`,
+      )) as unknown as { recipients_type: string; payload_type: string; email: string | null; code: string | null }[];
+
+    expect(row).toMatchObject({ recipients_type: 'object', payload_type: 'object', email: 'jane@example.com', code: '123456' });
   });
 
   it('should dispatch pending notifications and mark them sent', async () => {
