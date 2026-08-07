@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { Field, OmitType, PartialType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-/**
- * Importing user defined packages
- */
 import { SortByTime } from '@server/common';
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class CreateSenderProfileBody {

@@ -1,15 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export interface RenderBrand {
   /** Product wordmark shown in the header and footer. */
   name: string;
@@ -20,10 +8,6 @@ export interface RenderBrand {
   /** Accent colour used on dark backgrounds, kept legible against the dark surface. */
   accentDark: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /** The default first-party brand; mirrors the `@shadow-library/ui` indigo palette. A send may override any field via payload. */
 export const DEFAULT_BRAND: RenderBrand = { name: 'Shadow', tagline: 'Security', accent: '#4f46e5', accentDark: '#818cf8' };

@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Field, OmitType, PartialType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-/**
- * Importing user defined packages
- */
 import { MessageType, NotificationChannel, Priority, SortByTime } from '@server/common';
 import { type Notification, type Template } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class CreateTemplateBody {
@@ -41,8 +27,11 @@ export class CreateTemplateBody {
   @Transform({ output: 'strip:null' })
   category?: string | null;
 
-  /** The producer↔template variable contract; loosely typed since it is authored by trusted operators and stored as-is. */
-  @Field(() => Object, { optional: true, additionalProperties: true })
+  @Field(() => Object, {
+    optional: true,
+    additionalProperties: true,
+    description: 'Producer-to-template variable contract. Trusted operators author this object and it is stored without structural coercion.',
+  })
   variableSchema?: Template.VariableSchema;
 
   @Field({ optional: true })

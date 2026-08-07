@@ -1,6 +1,4 @@
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import assert from 'node:assert';
 
 import { InferInsertModel } from 'drizzle-orm';
@@ -8,9 +6,6 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { PrimaryDatabase, schema } from '@server/database';
 
@@ -24,15 +19,7 @@ import {
   SMSProvider,
 } from './base-notification.provider';
 
-/**
- * Defining types
- */
-
 type MessageRecord = InferInsertModel<typeof schema.notificationMessages>;
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class DevNotificationProvider implements SMSProvider, EmailProvider, PushNotificationProvider {

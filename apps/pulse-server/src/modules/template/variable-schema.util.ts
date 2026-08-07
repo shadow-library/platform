@@ -1,27 +1,11 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { type Template } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /** Representative values used to exercise a template at publish time — proves the content renders before it goes live. */
 const TYPE_SAMPLE: Record<Template.VariableDefinition['type'], unknown> = { string: 'sample', number: 42, boolean: true };
 /** Neutral defaults injected for declared-but-absent optionals so a live strict render never fails on a legitimately-omitted variable. */
 const TYPE_FALLBACK: Record<Template.VariableDefinition['type'], unknown> = { string: '', number: 0, boolean: false };
 
-/** Builds a fully-populated dataset from the declared schema, preferring each variable's documented example. */
 export function buildSampleData(schema: Template.VariableSchema): Record<string, unknown> {
   const data: Record<string, unknown> = {};
   for (const [name, definition] of Object.entries(schema.variables)) data[name] = definition.example ?? TYPE_SAMPLE[definition.type];

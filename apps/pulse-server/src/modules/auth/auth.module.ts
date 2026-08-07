@@ -1,22 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type DynamicModule, Module } from '@shadow-library/app';
 import { AuthModule } from '@shadow-library/auth/module';
 
-/**
- * Importing user defined packages
- */
 import { AUTH_ROUTES_BASE_PATH } from './auth.constants';
 import { RouteGuardSentinel } from './route-guard.sentinel';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * Pulse standardises on `@shadow-library/auth/module` for the entire auth stack: bearer verification,
  * scope checks, PDP permission checks, M2M service-access enforcement, and — since the v1.1 SDK — the
  * complete first-party browser login flow (`GET /api/auth/login|callback|session|step-up`,

@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { forwardRef, type Import, Module } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
 import { FastifyModule } from '@shadow-library/fastify';
 import { HttpCoreModule } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { SessionModule } from '@modules/auth';
 import { ConfigurationModule } from '@modules/configuration';
 import { MetricsModule } from '@modules/metrics';
@@ -17,12 +11,6 @@ import { TemplateModule } from '@modules/template';
 import { CUSTOM_DATA_TRANSFORMERS } from '@server/common';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * Controllers carry explicit, full paths (`/api/v1/*`, `/api/auth/*`) instead of a global
  * `routePrefix` + `prefixVersioning`: the first-party session surface is bound to the unversioned
  * `/api/auth/*` contract pulse-web is coded against, which a module-wide version prefix cannot

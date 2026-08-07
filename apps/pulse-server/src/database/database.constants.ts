@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { type AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export const constraintErrorMap: Record<string, AppError> = {
   templates_template_key_unique: AppErrorCode.TPL_002.create(),

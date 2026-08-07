@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { TEST_AUDIENCE, TEST_GRANTED_SCOPES, TestEnvironment } from '@tests/test-environment';
-
-/**
- * Defining types
- */
 
 interface LoginRedirect {
   authorizeUrl: URL;
@@ -18,8 +8,6 @@ interface LoginRedirect {
 }
 
 /**
- * Declaring the constants
- *
  * Exercises the first-party session contract pulse-web is coded against, now owned end-to-end by
  * `@shadow-library/auth`'s browser flow (mounted under `/api/auth`): `GET /login` -> OIDC redirect,
  * `GET /callback` -> opaque app-session cookie, `GET /session` -> `{ sub, scopes, ... }` | 401,
@@ -28,7 +16,6 @@ interface LoginRedirect {
  */
 const testEnv = new TestEnvironment('auth_session_test');
 
-/** The SDK's default cookie names: the app-session handle and the transient login-state cookie */
 const SESSION_COOKIE = '__Host-shadow-session';
 const STATE_COOKIE = '__Host-shadow-session-login';
 
@@ -47,13 +34,11 @@ describe('Session', () => {
     return { authorizeUrl: new URL(response.headers.location as string), stateCookie: `${STATE_COOKIE}=${(stateCookie as { value: string }).value}` };
   };
 
-  /** Runs the full login round-trip and returns the session cookie header */
   const establishSession = async (returnTo = '/'): Promise<string> => {
     const { authorizeUrl, stateCookie } = await startLogin(returnTo);
     const state = authorizeUrl.searchParams.get('state') as string;
     const nonce = authorizeUrl.searchParams.get('nonce') as string;
 
-    /** Identity's role in the flow: it hands back a single-use code the SDK redeems for an app session */
     const code = testEnv.getIdP().createAuthorizationCode({ sub: USER.sub, scopes: [...TEST_GRANTED_SCOPES], nonce });
     const callback = await testEnv.getRouter().mockRequest().headers({ cookie: stateCookie }).get(`/api/auth/callback?code=${code}&state=${state}`);
 
@@ -74,7 +59,6 @@ describe('Session', () => {
       expect(authorizeUrl.searchParams.get('code_challenge_method')).toBe('S256');
       expect(authorizeUrl.searchParams.get('code_challenge')).toBeTruthy();
       expect(authorizeUrl.searchParams.get('state')).toBeTruthy();
-      /** Both derived from `apps/me`, never restated in a pulse env var */
       expect(authorizeUrl.searchParams.get('client_id')).toBe('pulse');
       expect(authorizeUrl.searchParams.get('resource')).toBe(TEST_AUDIENCE);
     });

@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const testEnv = new TestEnvironment('notification_test');
 
-/** Sort channel results so assertions are independent of fan-out ordering. */
 const byChannel = (results: { channel: string }[]): { channel: string }[] => [...results].sort((a, b) => a.channel.localeCompare(b.channel));
 
 describe('Notification', () => {

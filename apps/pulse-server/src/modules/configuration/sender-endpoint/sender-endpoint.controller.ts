@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { RequirePermission } from '@shadow-library/auth/module';
 import { ApiOperation, Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { PULSE_PERMISSIONS } from '@modules/auth';
 import { AppErrorCode } from '@server/classes';
 
@@ -20,10 +14,6 @@ import {
   UpdateSenderEndpointBody,
 } from './sender-endpoint.dto';
 import { SenderEndpointService } from './sender-endpoint.service';
-
-/**
- * Declaring the constants
- */
 
 @ApiOperation({ tags: ['Sender Endpoints'] })
 @HttpController('/api/v1/sender-profiles/:profileId/endpoints')

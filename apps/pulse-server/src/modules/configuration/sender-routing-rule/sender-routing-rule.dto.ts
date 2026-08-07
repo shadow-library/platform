@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { Field, PickType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-/**
- * Importing user defined packages
- */
 import { MessageType, SortByTime } from '@server/common';
 import { type Template } from '@server/database';
 
 import { SenderProfileResponse } from '../sender-profile/sender-profile.dto';
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class CreateRoutingRuleBody {

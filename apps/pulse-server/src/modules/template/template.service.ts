@@ -1,6 +1,4 @@
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import assert from 'node:assert';
 
 import { and, asc, desc, eq, InferInsertModel, like } from 'drizzle-orm';
@@ -8,16 +6,9 @@ import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { Notification, PrimaryDatabase, schema, Template } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface ListTemplateQuery extends Partial<OffsetPagination> {
   key?: string;
@@ -28,15 +19,6 @@ export type CreateTemplate = Omit<InferInsertModel<typeof schema.templates>, 'id
 
 export type UpdateTemplate = Partial<Pick<CreateTemplate, 'name' | 'description' | 'messageType' | 'priority' | 'category' | 'variableSchema' | 'isActive'>>;
 
-/**
- * Declaring the constants
- */
-
-/**
- * The template aggregate root — the stable identity addressed by `templateKey`. Owns template metadata, the variable
- * contract, and per-channel enablement. Renderable content lives in immutable versions ({@link TemplateVersionService});
- * live-send resolution lives in {@link TemplateResolverService}.
- */
 @Injectable()
 export class TemplateService {
   private readonly logger = Logger.getLogger(APP_NAME, TemplateService.name);
@@ -101,7 +83,6 @@ export class TemplateService {
     return this.db.query.templateChannelSettings.findMany({ where: eq(schema.templateChannelSettings.templateId, templateId) });
   }
 
-  /** Upserts a channel's enablement; creating a setting for the first time enables the channel in the send fan-out. */
   async setChannelSetting(templateId: bigint, channel: Notification.Channel, isEnabled: boolean): Promise<Template.ChannelSetting> {
     await this.getTemplateOrThrow(templateId);
     const [setting] = await this.db

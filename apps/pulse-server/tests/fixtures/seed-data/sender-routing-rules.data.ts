@@ -1,21 +1,9 @@
-/**
- * Importing npm packages
- */
 import { InferInsertModel } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import * as schema from '@server/database/schemas';
 
-/**
- * Defining types
- */
 type SenderRoutingRuleInsertModel = InferInsertModel<typeof schema.senderRoutingRules>;
 
-/**
- * Declaring the constants
- */
 export const senderRoutingRules: SenderRoutingRuleInsertModel[] = [
   {
     id: 1n,

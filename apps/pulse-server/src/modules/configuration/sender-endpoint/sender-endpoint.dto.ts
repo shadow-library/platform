@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Field, OmitType, PartialType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-/**
- * Importing user defined packages
- */
 import { NotificationChannel, NotificationServiceProvider, SortByTime } from '@server/common';
 import { type Configuration, type Notification } from '@server/database';
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class CreateSenderEndpointBody {

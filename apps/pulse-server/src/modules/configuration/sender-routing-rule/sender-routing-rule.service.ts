@@ -1,6 +1,4 @@
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import assert from 'node:assert';
 
 import { and, asc, desc, eq, InferInsertModel, isNull, or, sql } from 'drizzle-orm';
@@ -8,16 +6,9 @@ import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { Configuration, PrimaryDatabase, schema, Template } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface SenderRoutingRuleDetails extends Configuration.SenderRoutingRule {
   profile: Configuration.SenderProfile;
@@ -32,10 +23,6 @@ export interface ListSenderRoutingRulesQuery extends Partial<OffsetPagination> {
 export type CreateRoutingRule = Omit<InferInsertModel<typeof schema.senderRoutingRules>, 'createdAt' | 'updatedAt'>;
 
 export type UpdateRoutingRule = Partial<Pick<CreateRoutingRule, 'senderProfileId'>>;
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class SenderRoutingRuleService {

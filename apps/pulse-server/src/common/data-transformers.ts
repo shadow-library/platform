@@ -1,25 +1,10 @@
-/**
- * Importing npm packages
- */
 import { CustomTransformers } from '@shadow-library/fastify';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 declare module '@shadow-library/fastify' {
   interface CustomTransformers {
     'date:iso': (value: number) => string;
   }
 }
-
-/**
- * Declaring the constants
- */
 
 export const CUSTOM_DATA_TRANSFORMERS: CustomTransformers = {
   /**

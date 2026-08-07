@@ -1,6 +1,4 @@
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import assert from 'node:assert';
 
 import { and, desc, eq, InferInsertModel, max } from 'drizzle-orm';
@@ -8,18 +6,11 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { PrimaryDatabase, schema, Template } from '@server/database';
 
 import { TemplateResolverService } from './template-resolver.service';
-
-/**
- * Defining types
- */
 
 export type CreatePartial = Omit<InferInsertModel<typeof schema.partials>, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdatePartial = Partial<Pick<CreatePartial, 'name' | 'description' | 'isActive'>>;
@@ -34,10 +25,6 @@ export interface PartialPublishOptions {
   notes?: string;
   editedBy?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Manages the reusable content blocks (buttons, OTP panels, footers) that templates and layouts pull in via Liquid

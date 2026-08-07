@@ -1,24 +1,11 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import juice from 'juice';
 import { Liquid } from 'liquidjs';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { Notification } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface RenderInput {
   channel: Notification.Channel;
@@ -39,9 +26,6 @@ export interface RenderOutput {
   body: string;
 }
 
-/**
- * Declaring the constants
- */
 const LOGGER_NAMESPACE = `${APP_NAME}/rendering`;
 /** Hard ceiling so a pathological template can never hang a worker; Liquid aborts a render past this. */
 const RENDER_LIMIT_MS = 1000;
@@ -88,7 +72,6 @@ export class TemplateEngineService {
     return this.createEngine(partials, false);
   }
 
-  /** Builds a fresh sandboxed engine scoped to this render's partials. `isHtml` toggles auto-escaping. */
   private createEngine(partials: Record<string, string>, isHtml: boolean): Liquid {
     const read = (file: string): string => {
       const value = partials[file];

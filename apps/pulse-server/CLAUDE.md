@@ -105,3 +105,5 @@ Conventional Commits format: `<type>(<scope>): <subject>` (max 70 chars). Types:
 - ESModules (`"type": "module"`); the whole @shadow-library 2.0 line is ESM-only
 - Lint/format rules ship with `bun scripts/verify.ts` (typescript-eslint strict + stylistic, perfectionist import sorting, prettier base rules); this workspace's deviations live as `apps/pulse-server/**`-scoped blocks in the single root `eslint.config.ts`, not a local config file
 - Errors: throw `AppErrorCode.X.create()` (ErrorCode catalogs from `@shadow-library/common` 2.0); the `ServerError` class no longer exists
+- Implementation comments explain only non-obvious constraints, compatibility, ordering, or security rationale; do not add section banners or restate names and control flow. Keep caller-facing JSDoc where reusable option fields need semantic guidance, and put DTO field guidance in `@Field` descriptions.
+- Preserve established import order. Treat `@shadow-library/*` as external npm packages, not repository aliases.

@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import { BunSQLDatabase, drizzle } from 'drizzle-orm/bun-sql';
 import { DatabaseModule as CoreDatabaseModule } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { constraintErrorMap } from './database.constants';
 import * as schema from './schemas';
-
-/**
- * Defining types
- */
 
 export type PrimaryDatabase = BunSQLDatabase<typeof schema>;
 
@@ -21,10 +12,6 @@ declare module '@shadow-library/modules' {
     postgres: PrimaryDatabase;
   }
 }
-
-/**
- * Declaring the constants
- */
 
 export const DatabaseModule = CoreDatabaseModule.forRoot({
   postgres: {

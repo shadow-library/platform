@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 import { type AppErrorObject } from '@shadow-library/common';
 import { ErrorResponseDto } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { ChannelNotificationStatus, NotificationStatus } from '@modules/notification';
 import { MessageType, NotificationChannel, SortByCreatedAt } from '@server/common';
 import { type Notification, type Template } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema({ minProperties: 1 })
 export class NotificationRecipients {

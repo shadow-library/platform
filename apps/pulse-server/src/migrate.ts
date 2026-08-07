@@ -1,23 +1,11 @@
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { seedBaseline } from '@server/database/seed';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const url = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost/shadow_pulse';
 const migrationsFolder = process.env.MIGRATIONS_FOLDER || 'generated/drizzle';
 const logger = Logger.getLogger(APP_NAME, 'migrate-db');

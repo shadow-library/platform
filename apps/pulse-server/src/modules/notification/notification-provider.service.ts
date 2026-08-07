@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { buildRenderGlobals, type RenderBundle, TemplateEngineService } from '@modules/template';
 import { APP_NAME } from '@server/constants';
 import { Configuration, Notification } from '@server/database';
 
 import { DevNotificationProvider, EmailAddress, NotificationOpResult, SendEmailConfig, SendPushNotificationConfig, SendSMSConfig } from './providers';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class NotificationProviderService {
@@ -42,7 +28,6 @@ export class NotificationProviderService {
     return { email };
   }
 
-  /** The render dataset: ambient globals (brand, year, support) beneath the job's schema-validated payload. */
   private buildData(notificationJob: Notification.Job): Record<string, unknown> {
     return { ...buildRenderGlobals(), ...((notificationJob.payload as Record<string, unknown> | null) ?? {}) };
   }

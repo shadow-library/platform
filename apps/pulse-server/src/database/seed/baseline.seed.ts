@@ -1,25 +1,13 @@
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { BASELINE_LAYOUTS, BASELINE_PARTIALS, BASELINE_TEMPLATES } from './baseline.data';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const logger = Logger.getLogger(APP_NAME, 'BaselineSeed');
 const SEQUENCE_RESET = `
   DO $$
@@ -39,7 +27,6 @@ const SEQUENCE_RESET = `
   END $$;
 `;
 
-/** Publishes the baseline design-system layouts, if a layout with the same key is not already present. */
 async function bootstrapLayouts(db: PrimaryDatabase): Promise<void> {
   for (const fixture of BASELINE_LAYOUTS) {
     const [inserted] = await db
@@ -55,7 +42,6 @@ async function bootstrapLayouts(db: PrimaryDatabase): Promise<void> {
   }
 }
 
-/** Publishes the baseline reusable partials, if a partial with the same key is not already present. */
 async function bootstrapPartials(db: PrimaryDatabase): Promise<void> {
   for (const fixture of BASELINE_PARTIALS) {
     const [inserted] = await db

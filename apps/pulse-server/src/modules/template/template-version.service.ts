@@ -1,6 +1,4 @@
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import assert from 'node:assert';
 
 import { and, desc, eq, max } from 'drizzle-orm';
@@ -8,9 +6,6 @@ import { Injectable } from '@shadow-library/app';
 import { Logger, ValidationError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { Notification, PrimaryDatabase, schema, Template } from '@server/database';
@@ -20,10 +15,6 @@ import { type RenderOutput, TemplateEngineService } from './rendering/template-e
 import { DEFAULT_LOCALE, TemplateResolverService } from './template-resolver.service';
 import { TemplateService } from './template.service';
 import { buildSampleData, parseUndefinedVariable } from './variable-schema.util';
-
-/**
- * Defining types
- */
 
 export type VersionWithContents = Template.Version & { contents: Template.Content[] };
 
@@ -45,10 +36,6 @@ export interface PreviewInput {
   locale?: string;
   data?: Record<string, unknown>;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Owns a template's publishing lifecycle: an editable DRAFT is opened (cloned from the current PUBLISHED version),
@@ -97,7 +84,6 @@ export class TemplateVersionService {
     });
   }
 
-  /** Opens the single editable draft, cloning the published version's content so an edit starts from what is live. Rejects if one is already open. */
   async openDraft(templateId: bigint, editedBy?: string): Promise<Template.Version> {
     await this.templateService.getTemplateOrThrow(templateId);
     const existing = await this.getDraft(templateId);
@@ -105,7 +91,6 @@ export class TemplateVersionService {
     return this.ensureDraft(templateId, editedBy);
   }
 
-  /** Returns the open draft, opening one (cloned from the published version) when none exists. The idempotent get-or-open used when writing content. */
   private async ensureDraft(templateId: bigint, editedBy?: string): Promise<Template.Version> {
     await this.templateService.getTemplateOrThrow(templateId);
     const existing = await this.getDraft(templateId);
@@ -133,7 +118,6 @@ export class TemplateVersionService {
     return draft;
   }
 
-  /** Writes a per-channel/locale content block onto the draft (auto-opening one), replacing any existing block for that key. */
   async upsertContent(templateId: bigint, data: UpsertContentData, editedBy?: string): Promise<Template.Content> {
     if (data.channel === 'EMAIL' && !data.subject) throw new ValidationError('subject', 'must be provided when the channel is EMAIL');
     const locale = data.locale ?? DEFAULT_LOCALE;
@@ -162,7 +146,6 @@ export class TemplateVersionService {
     if (deleted.length === 0) throw AppErrorCode.TPL_CNT_001.create();
   }
 
-  /** Publishes the draft after a full render gate: draft → PUBLISHED, previous PUBLISHED → ARCHIVED, atomically. */
   async publishDraft(templateId: bigint, options: PublishOptions = {}): Promise<Template.Version> {
     const template = await this.templateService.getTemplateOrThrow(templateId);
     const draft = await this.getDraft(templateId);
@@ -188,7 +171,6 @@ export class TemplateVersionService {
     return published;
   }
 
-  /** Re-publishes a copy of a historical version as a new version — the audit-friendly, immutable form of rollback. */
   async rollback(templateId: bigint, targetVersion: number, options: PublishOptions = {}): Promise<Template.Version> {
     const template = await this.templateService.getTemplateOrThrow(templateId);
     const target = await this.getVersion(templateId, targetVersion);
@@ -228,7 +210,6 @@ export class TemplateVersionService {
     return published;
   }
 
-  /** Renders a single channel/locale of the draft (else the published version) with sample + supplied data — powers the studio preview. */
   async preview(templateId: bigint, input: PreviewInput): Promise<RenderOutput> {
     const template = await this.templateService.getTemplateOrThrow(templateId);
     const version = (await this.getDraft(templateId)) ?? (await this.getPublished(templateId));
@@ -242,7 +223,6 @@ export class TemplateVersionService {
     return this.engine.render({ channel: input.channel, subject: content.subject, body: content.body, layout, partials, data });
   }
 
-  /** Proves every content block renders under strict, sandboxed Liquid before it goes live; undeclared refs become a publish rejection. */
   private async assertContentsRender(template: Template.Template, contents: Template.Content[]): Promise<void> {
     const data = { ...buildRenderGlobals(), ...buildSampleData(template.variableSchema) };
     const partials = await this.resolver.publishedPartials();

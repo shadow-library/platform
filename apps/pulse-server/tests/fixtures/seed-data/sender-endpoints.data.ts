@@ -1,21 +1,9 @@
-/**
- * Importing npm packages
- */
 import { InferInsertModel } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import * as schema from '@server/database/schemas';
 
-/**
- * Defining types
- */
 type SenderEndpointInsertModel = InferInsertModel<typeof schema.senderEndpoints>;
 
-/**
- * Declaring the constants
- */
 export const senderEndpoints: SenderEndpointInsertModel[] = [
   {
     id: 1n,

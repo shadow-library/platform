@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, boolean, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { notificationChannel, priority as priorityEnum } from './notification-jobs';
-
-/**
- * Defining types
- */
 
 export namespace Template {
   export type Template = InferSelectModel<typeof templates>;
@@ -38,9 +28,6 @@ export namespace Template {
   }
 }
 
-/**
- * Declaring the constants
- */
 export const messageTypes = pgEnum('message_types', ['OTP', 'TRANSACTIONAL', 'PROMOTIONAL']);
 
 /** The CMS publishing lifecycle. Exactly one PUBLISHED version per entity is used for live sends. */
@@ -193,10 +180,6 @@ export const partialVersions = pgTable(
   },
   t => [unique('partial_versions_partial_id_version_unique').on(t.partialId, t.version)],
 );
-
-/**
- * Declaring the relations
- */
 
 export const templateRelations = relations(templates, ({ many }) => ({
   versions: many(templateVersions),

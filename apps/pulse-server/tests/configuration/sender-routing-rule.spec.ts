@@ -1,20 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const testEnv = new TestEnvironment('sender_routing_rule_test');
 
 describe('Sender Routing Rule', () => {
@@ -490,11 +477,9 @@ describe('Sender Routing Rule', () => {
     });
 
     it('should allow re-creation of deleted routing rule combination', async () => {
-      // First, delete an existing routing rule
       const deleteResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-routing-rules/1');
       expect(deleteResponse.statusCode).toBe(204);
 
-      // Now create a new routing rule with the same combination
       const body = {
         senderProfileId: '1',
         service: 'auth',

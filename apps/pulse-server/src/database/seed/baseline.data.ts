@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type Notification, type Template } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface PartialFixture {
   partialKey: string;
@@ -46,8 +35,6 @@ export interface TemplateFixture {
 }
 
 /**
- * Declaring the constants
- *
  * The baseline design system + notification catalogue that pulse bootstraps into an empty datastore. It is authored
  * here purely as data — no message content lives in application code. The bootstrap seeds each item only when absent,
  * so an operator can fully customise (or replace) any template through the CMS and a later boot will not clobber it.
@@ -60,7 +47,6 @@ function variable(type: Template.VariableDefinition['type'], required: boolean, 
   return example === undefined ? { type, required } : { type, required, example };
 }
 
-/** One-time-code email: heading, a line of context, the shared OTP block, and an expiry note. */
 function otpEmail(heading: string, intro: string): string {
   return `<h1 class="email-h1">${heading}</h1>
 <p class="email-text">${intro}</p>
@@ -68,7 +54,6 @@ function otpEmail(heading: string, intro: string): string {
 <p class="email-muted">This code expires in 10 minutes. If you didn't request it, you can safely ignore this email.</p>`;
 }
 
-/** Security-alert email: heading, the alert body, and a warning panel prompting action if unexpected. */
 function securityEmail(heading: string, body: string, action = 'If this wasn’t you, secure your account and change your password right away.'): string {
   return `<h1 class="email-h1">${heading}</h1>
 <p class="email-text">${body}</p>
@@ -250,7 +235,6 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
     ],
   },
 
-  /** Identity-server notification catalogue: every key identity sends resolves to an en-ZZ published version on a fresh boot. */
   {
     templateKey: 'auth.register.otp',
     name: 'Registration OTP',

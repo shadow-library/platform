@@ -1,20 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const testEnv = new TestEnvironment('template_test');
 const router = () => testEnv.getRouter().mockRequest().headers(testEnv.authHeaders());
 
@@ -120,7 +107,6 @@ describe('Template', () => {
       const templateId = create.json().id;
       await router().put(`/api/v1/templates/${templateId}/channels/EMAIL`).body({ isEnabled: true });
 
-      /** Open the first draft (v1) and write email content. */
       const draft = await router().post(`/api/v1/templates/${templateId}/versions/draft`);
       expect(draft.statusCode).toBe(201);
       expect(draft.json()).toMatchObject({ version: 1, status: 'DRAFT' });
@@ -135,7 +121,6 @@ describe('Template', () => {
       expect(publish.statusCode).toBe(200);
       expect(publish.json()).toMatchObject({ version: 1, status: 'PUBLISHED' });
 
-      /** Preview renders the published version through the engine + layout. */
       const preview = await router()
         .post(`/api/v1/templates/${templateId}/versions/preview`)
         .body({ channel: 'EMAIL', data: { name: 'Bob' } });
@@ -143,7 +128,6 @@ describe('Template', () => {
       expect(preview.json().subject).toBe('Hi Bob');
       expect(preview.json().body).toContain('Hi Bob');
 
-      /** Re-edit: a new draft clones v1, edits, and publishing archives v1. */
       const draft2 = await router().post(`/api/v1/templates/${templateId}/versions/draft`);
       expect(draft2.json()).toMatchObject({ version: 2, status: 'DRAFT' });
       await router()
@@ -156,7 +140,6 @@ describe('Template', () => {
       const statuses = Object.fromEntries(versions.json().items.map((v: { version: number; status: string }) => [v.version, v.status]));
       expect(statuses).toEqual({ 1: 'ARCHIVED', 2: 'PUBLISHED' });
 
-      /** Rollback re-publishes a copy of v1 as v3 and archives v2. */
       const rollback = await router().post(`/api/v1/templates/${templateId}/versions/1/rollback`).body({});
       expect(rollback.json()).toMatchObject({ version: 3, status: 'PUBLISHED' });
       const previewAfter = await router()

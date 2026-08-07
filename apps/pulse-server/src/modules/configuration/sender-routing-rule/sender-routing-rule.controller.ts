@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { RequirePermission } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { PULSE_PERMISSIONS } from '@modules/auth';
 import { AppErrorCode } from '@server/classes';
 
@@ -20,10 +14,6 @@ import {
   UpdateSenderRoutingRuleBody,
 } from './sender-routing-rule.dto';
 import { SenderRoutingRuleService } from './sender-routing-rule.service';
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/sender-routing-rules')
 export class SenderRoutingRuleController {

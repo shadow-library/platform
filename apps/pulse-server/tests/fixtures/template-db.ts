@@ -1,20 +1,7 @@
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { Logger } from '@shadow-library/common';
 
 /**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * Per-test-file DB cloning: `scripts/db.ts create-template` provisions and migrates the template
  * database once; every test file then clones its own isolated copy from it via
  * `CREATE DATABASE ... TEMPLATE`, through `TestEnvironment`.

@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { RequirePermission } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Patch, Post, Put, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { PULSE_PERMISSIONS } from '@modules/auth';
 import { AppErrorCode } from '@server/classes';
 
@@ -22,14 +16,6 @@ import {
   UpdateLayoutBody,
 } from './layout.dto';
 import { LayoutService } from './layout.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/layouts')
 export class LayoutController {

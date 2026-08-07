@@ -1,30 +1,18 @@
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import { eq } from 'drizzle-orm';
 import { BunSQLDatabase, drizzle } from 'drizzle-orm/bun-sql';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import * as schema from '@server/database/schemas';
 import { resetSequences, seedBaseline } from '@server/database/seed';
 
 import { senderEndpoints, senderProfiles, senderRoutingRules } from './seed-data';
 import { DEMO_MESSAGES } from './seed-data/baseline.data';
 
-/**
- * Defining types
- */
 type Database = BunSQLDatabase<typeof schema>;
 
-/**
- * Declaring the constants
- */
 const logger = Logger.getLogger('Scripts', 'Seeder');
 
-/** Seeds the sender profiles / endpoints / routing rules that back message delivery. Idempotent on their unique keys. */
 async function bootstrapSenders(db: Database): Promise<void> {
   await db.insert(schema.senderProfiles).values(senderProfiles).onConflictDoNothing();
   await db.insert(schema.senderEndpoints).values(senderEndpoints).onConflictDoNothing();

@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { Field, OmitType, PartialType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { VersionStatus } from '@server/common';
 import { type Template } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class CreatePartialBody {

@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, boolean, pgEnum, pgTable, smallint, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { notificationChannel } from './notification-jobs';
 import { messageTypes } from './templates';
 
-/**
- * Defining types
- */
 export namespace Configuration {
   export type SenderProfile = InferSelectModel<typeof senderProfiles>;
   export type SenderEndpoint = InferSelectModel<typeof senderEndpoints>;
@@ -20,10 +11,6 @@ export namespace Configuration {
 
   export type ServiceProvider = InferEnum<typeof notificationServiceProviders>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const notificationServiceProviders = pgEnum('notification_service_providers', ['DEV', 'SENDGRID', 'TWILIO', 'FIREBASE', 'AWS_SES']);
 
@@ -74,10 +61,6 @@ export const senderRoutingRules = pgTable(
   },
   t => [unique('sender_routing_rules_service_region_message_type_unique').on(t.service, t.region, t.messageType)],
 );
-
-/**
- * Declaring the relations
- */
 
 export const senderProfileRelations = relations(senderProfiles, ({ many }) => ({
   endpoints: many(senderEndpoints),

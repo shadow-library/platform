@@ -1,22 +1,11 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { PULSE_PERMISSIONS, PULSE_SCOPES } from '@modules/auth';
 import { IDENTITY_CLIENT_ID, TEST_AUDIENCE, TEST_ORG, TestEnvironment } from '@tests/test-environment';
 
-/**
- * Declaring the constants
- */
 const testEnv = new TestEnvironment('auth_guard_test');
 
-/** A management route gated by a PDP permission (`pulse:templates:read`) */
 const MANAGEMENT_ROUTE = '/api/v1/templates';
-/** The machine-to-machine send route gated by the `notifications:send` scope */
 const SEND_ROUTE = '/api/v1/notifications';
 const SEND_BODY = { templateKey: 'sign-up', recipients: { email: 'user@example.com', phone: '+919876543210' }, locale: 'en-US', service: 'default' };
 

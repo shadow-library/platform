@@ -1,21 +1,12 @@
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { InMemoryStore, Logger, LRUCache } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { Notification, PrimaryDatabase, schema, Template } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface ResolvedTemplate {
   template: Template.Template;
@@ -34,16 +25,12 @@ export interface RenderBundle {
   partials: Record<string, string>;
 }
 
-/**
- * Declaring the constants
- */
 /** The neutral, language-agnostic base locale; every template must have en-ZZ content, so it is the universal fallback. */
 export const DEFAULT_LOCALE = 'en-ZZ';
 
 /** Bounds on the immutable per-version content and per-key layout caches, so a long-lived worker can never grow unboundedly. */
 const CONTENT_CACHE_CAPACITY = 2000;
 const LAYOUT_CACHE_CAPACITY = 200;
-/** Single-entry key under which the full published-partial set is memoised. */
 const PARTIALS_STORE_KEY = 'published-partials';
 
 /**
@@ -87,7 +74,6 @@ export class TemplateResolverService {
     return { template, publishedVersion, enabledChannels };
   }
 
-  /** Resolves the content row for a pinned version + channel, honouring the en-ZZ locale fallback. Cached (immutable). */
   async findContent(versionId: bigint, channel: Notification.Channel, locale: string): Promise<Template.Content | null> {
     const cacheKey = `${versionId}:${channel}:${locale}`;
     if (this.contentCache.has(cacheKey)) return this.contentCache.get<Template.Content | null>(cacheKey) ?? null;
@@ -99,7 +85,6 @@ export class TemplateResolverService {
     return content ?? null;
   }
 
-  /** Assembles the full render bundle for a pinned version: immutable content + the currently published design system. */
   async loadRenderBundle(versionId: bigint, channel: Notification.Channel, locale: string): Promise<RenderBundle | null> {
     const content = await this.findContent(versionId, channel, locale);
     if (!content) return null;
@@ -109,7 +94,6 @@ export class TemplateResolverService {
     return { subject: content.subject, body: content.body, layout, partials };
   }
 
-  /** The published body of a layout, or null if the layout is unknown or has no published version. Cached until a layout publish. */
   async publishedLayoutBody(layoutKey: string): Promise<string | null> {
     if (this.layoutCache.has(layoutKey)) return this.layoutCache.get<string | null>(layoutKey) ?? null;
 
@@ -122,7 +106,6 @@ export class TemplateResolverService {
     return body;
   }
 
-  /** Every published partial keyed by partialKey. Cached as a set until a partial publish. */
   async publishedPartials(): Promise<Record<string, string>> {
     const cached = this.partialStore.get<Record<string, string>>(PARTIALS_STORE_KEY);
     if (cached) return cached;
@@ -139,12 +122,10 @@ export class TemplateResolverService {
     return map;
   }
 
-  /** Called by the layout service after a publish — the next render picks up the new design-system shell. */
   invalidateLayouts(): void {
     this.layoutCache.clear();
   }
 
-  /** Called by the partial service after a publish — the next render picks up the new partial set. */
   invalidatePartials(): void {
     this.partialStore.del(PARTIALS_STORE_KEY);
   }

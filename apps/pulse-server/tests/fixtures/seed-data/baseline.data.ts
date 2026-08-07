@@ -1,10 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type Notification } from '@server/database';
 
 /**
@@ -13,10 +6,6 @@ import { type Notification } from '@server/database';
  * from the same place. Only the test-only fixtures below (demo messages) still live here.
  */
 export * from '@server/database/seed';
-
-/**
- * Defining types
- */
 
 export interface MessageFixture {
   templateKey: string;
@@ -28,11 +17,6 @@ export interface MessageFixture {
   payload: Record<string, unknown>;
 }
 
-/**
- * Declaring the constants
- */
-
-/** A small set of pre-rendered messages so the dev `GET /notifications/messages` view has data on a fresh install. */
 export const DEMO_MESSAGES: MessageFixture[] = [
   {
     templateKey: 'sign-up',

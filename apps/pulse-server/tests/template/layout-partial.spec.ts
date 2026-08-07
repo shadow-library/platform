@@ -1,20 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const testEnv = new TestEnvironment('layout_partial_test');
 const router = () => testEnv.getRouter().mockRequest().headers(testEnv.authHeaders());
 

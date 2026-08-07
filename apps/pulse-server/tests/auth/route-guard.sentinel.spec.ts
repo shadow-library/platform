@@ -1,21 +1,13 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
 import { type HandlerMetadata } from '@shadow-library/app';
 import { AUTH_ROUTE_METADATA } from '@shadow-library/auth/module';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AUTH_ROUTES_BASE_PATH, PUBLIC_ROUTE_METADATA, RouteGuardSentinel } from '@modules/auth';
 import { AppErrorCode } from '@server/classes';
 
 /**
- * Declaring the constants
- *
  * The sentinel is pulse's default-deny layer over the SDK's opt-in guard. It must let three kinds of
  * route through — SDK-guarded (`AUTH_ROUTE_METADATA`), explicitly `@Public()`, and the SDK's own
  * first-party auth routes under `AUTH_ROUTES_BASE_PATH` — and fail every undeclared route closed.

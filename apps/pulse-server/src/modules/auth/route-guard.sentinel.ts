@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type HandlerMetadata } from '@shadow-library/app';
 import { AUTH_ROUTE_METADATA } from '@shadow-library/auth/module';
 import { Logger } from '@shadow-library/common';
 import { type AsyncRouteHandler, Middleware, type MiddlewareGenerator } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
@@ -16,12 +10,6 @@ import { AUTH_ROUTES_BASE_PATH } from './auth.constants';
 import { PUBLIC_ROUTE_METADATA } from './public.decorator';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * PULSE-SPECIFIC DELTA over `@shadow-library/auth/module`: the shared `AuthGuard` is opt-in per
  * route (it only attaches where an auth decorator wrote metadata), so a controller route added
  * without a decorator would be silently public. The SDK ships no default-deny layer, so this
@@ -37,7 +25,6 @@ import { PUBLIC_ROUTE_METADATA } from './public.decorator';
  * misconfiguration at boot) and again on every rejected request.
  */
 
-/** Routes the SDK mounts under its base path all live one segment below it, e.g. `/api/auth/login` */
 const AUTH_ROUTES_PREFIX = `${AUTH_ROUTES_BASE_PATH}/`;
 
 @Middleware({ type: 'preHandler', weight: 100 })

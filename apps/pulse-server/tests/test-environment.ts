@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, beforeEach } from 'bun:test';
 
 import { Dispatcher, ShadowApplication } from '@shadow-library/app';
@@ -9,18 +6,11 @@ import { Config, Logger } from '@shadow-library/common';
 import { FastifyRouter } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { PULSE_PERMISSIONS, PULSE_SCOPES } from '@modules/auth';
 import { NotificationService } from '@modules/notification';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
-
-/**
- * Defining types
- */
 
 export interface UserTokenOptions {
   sub: string;
@@ -34,17 +24,11 @@ export interface ServiceTokenOptions {
   scopes?: readonly string[];
 }
 
-/**
- * Declaring the constants
- */
 Logger.attachTransport('file:json');
 const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost/shadow_pulse';
 
-/** Pulse's app id at identity; the SDK reads it from `AUTH_APP_ID` and it doubles as the OAuth client id */
 export const TEST_APP_ID = 'pulse';
-/** Pulse's API resource identifier; the mock's `apps/me` publishes it and the SDK derives it as the audience the guard accepts */
 export const TEST_AUDIENCE = 'api://pulse';
-/** The platform scopes an admin has granted the pulse client; the SDK's `apps/me` publishes exactly these */
 export const TEST_GRANTED_SCOPES = ['authz:check', 'authz:roles:sync', 'app-session:manage'] as const;
 /**
  * The single platform organisation operator permissions are evaluated in (pulse is single-tenant).
@@ -56,9 +40,7 @@ export const TEST_GRANTED_SCOPES = ['authz:check', 'authz:roles:sync', 'app-sess
  * request with a permission denial, which is exactly what happened before that resolution existed.
  */
 export const TEST_ORG = '1';
-/** The client id the identity server calls pulse with — the in-cluster M2M compatibility contract */
 export const IDENTITY_CLIENT_ID = 'identity-server';
-/** Generic allow-listed M2M caller used by business-logic specs */
 export const TEST_SERVICE_CLIENT_ID = 'test-service';
 const ADMIN_SUB = 'test-operator';
 
@@ -111,9 +93,7 @@ export class TestEnvironment {
         },
       });
       this.idp.setServiceAccess([
-        /** The production contract: identity calls the notification send endpoint in-cluster */
         { callerClientId: IDENTITY_CLIENT_ID, method: 'POST', path: '/api/v1/notifications' },
-        /** Blanket allowance for the generic test caller so business-logic specs stay focused */
         { callerClientId: TEST_SERVICE_CLIENT_ID, method: '*', path: '/api/v1/*' },
       ]);
       Config['cache'].set('auth.issuer', this.idp.issuer);
@@ -146,7 +126,6 @@ export class TestEnvironment {
     return this.adminHeaders;
   }
 
-  /** Mints a user bearer with an explicit permission/scope set, granting the permissions in the PDP for that principal */
   async userHeaders(options: UserTokenOptions): Promise<Record<string, string>> {
     const organisationId = options.organisationId ?? TEST_ORG;
     for (const action of options.permissions ?? []) this.idp.grantPermission({ kind: 'user', sub: options.sub }, organisationId, action);
@@ -154,14 +133,12 @@ export class TestEnvironment {
     return { authorization: `Bearer ${token}` };
   }
 
-  /** Mints a machine-to-machine bearer carrying the given scopes and no organisation */
   async serviceHeaders(options: ServiceTokenOptions = {}): Promise<Record<string, string>> {
     const clientId = options.clientId ?? TEST_SERVICE_CLIENT_ID;
     const token = await this.idp.issueToken({ sub: clientId, kind: 'service', clientId, audience: TEST_AUDIENCE, scopes: [...(options.scopes ?? [])] });
     return { authorization: `Bearer ${token}` };
   }
 
-  /** Exposes the mock IdP for advanced cases (expired tokens, key rotation, custom claims) */
   getIdP(): TestIdP {
     return this.idp;
   }

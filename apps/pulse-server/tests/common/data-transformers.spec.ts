@@ -1,20 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { CUSTOM_DATA_TRANSFORMERS } from '@server/common/data-transformers';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const toIsoDate = CUSTOM_DATA_TRANSFORMERS['date:iso'];
 
 describe('date:iso', () => {

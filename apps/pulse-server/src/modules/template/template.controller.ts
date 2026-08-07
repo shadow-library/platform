@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { RequirePermission } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Patch, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { PULSE_PERMISSIONS } from '@modules/auth';
 
 import {
@@ -22,14 +16,6 @@ import {
   UpdateTemplateBody,
 } from './template.dto';
 import { TemplateService } from './template.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/templates')
 export class TemplateController {

@@ -1,6 +1,4 @@
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import assert from 'node:assert';
 
 import { and, desc, eq, InferInsertModel, max } from 'drizzle-orm';
@@ -8,9 +6,6 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { PrimaryDatabase, schema, Template } from '@server/database';
@@ -19,10 +14,6 @@ import { buildRenderGlobals } from './render-context';
 import { TemplateEngineService } from './rendering/template-engine.service';
 import { TemplateResolverService } from './template-resolver.service';
 import { buildSampleData, parseUndefinedVariable } from './variable-schema.util';
-
-/**
- * Defining types
- */
 
 export type CreateLayout = Omit<InferInsertModel<typeof schema.layouts>, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateLayout = Partial<Pick<CreateLayout, 'name' | 'description' | 'isActive'>>;
@@ -37,10 +28,6 @@ export interface LayoutPublishOptions {
   notes?: string;
   editedBy?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /** A minimal, valid content fragment used to exercise a layout's `{{ content }}` slot when gating a publish. */
 const PROBE_CONTENT = '<p>preview</p>';
@@ -110,7 +97,6 @@ export class LayoutService {
     });
   }
 
-  /** Writes the draft body, opening the single draft version if none exists yet. */
   async saveDraft(layoutId: bigint, data: SaveLayoutDraftData, editedBy?: string): Promise<Template.LayoutVersion> {
     await this.getLayoutOrThrow(layoutId);
     const existing = await this.getDraft(layoutId);
@@ -163,7 +149,6 @@ export class LayoutService {
     return published;
   }
 
-  /** Proves the layout composes a probe fragment under strict Liquid; an undeclared global becomes a publish rejection. */
   private async assertLayoutRenders(body: string): Promise<void> {
     const partials = await this.resolver.publishedPartials();
     try {

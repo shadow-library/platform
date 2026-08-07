@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, index, jsonb, pgEnum, pgTable, smallint, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { templates, templateVersions } from './templates';
-
-/**
- * Defining types
- */
 
 export namespace Notification {
   export type Status = InferEnum<typeof notificationStatus>;
@@ -20,10 +10,6 @@ export namespace Notification {
   export type Job = InferSelectModel<typeof notificationJobs>;
   export type Message = InferSelectModel<typeof notificationMessages>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const priority = pgEnum('priority', ['LOW', 'MEDIUM', 'HIGH']);
 export const notificationChannel = pgEnum('notification_channel', ['EMAIL', 'SMS', 'PUSH']);
@@ -77,10 +63,6 @@ export const notificationMessages = pgTable(
   },
   t => [index('notification_messages_created_at_channel_idx').on(t.createdAt)],
 );
-
-/**
- * Declaring the relations
- */
 
 export const notificationJobRelations = relations(notificationJobs, ({ one, many }) => ({
   template: one(templates, { fields: [notificationJobs.templateId], references: [templates.id] }),

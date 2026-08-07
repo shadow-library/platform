@@ -1,20 +1,12 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
 import { and, eq, inArray } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { type PrimaryDatabase, schema } from '@server/database';
 import { seedBaseline } from '@server/database/seed';
 import { TestEnvironment } from '@tests/test-environment';
 
 /**
- * Declaring the constants
- *
  * XA-1 regression: the production baseline seed (`seedBaseline`, run by `src/migrate.ts` after migrations) must
  * populate the template catalogue an empty deployment starts with, and must be safe to run again on every boot.
  */
@@ -71,7 +63,6 @@ describe('Baseline Seed', () => {
   it('should re-establish the catalogue when run against an emptied datastore', async () => {
     const db = testEnv.getPostgresClient();
 
-    /** Clear the catalogue (and the demo messages that reference it) to simulate the empty datastore a fresh deploy migrates. */
     await db.delete(schema.notificationMessages);
     await db.delete(schema.notificationJobs);
     await db.delete(schema.templates);

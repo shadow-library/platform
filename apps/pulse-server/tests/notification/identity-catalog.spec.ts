@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
 import { and, eq, isNull } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { PULSE_SCOPES } from '@modules/auth';
 import { type Notification, schema } from '@server/database';
 import { IDENTITY_CLIENT_ID, TEST_REGEX, TestEnvironment } from '@tests/test-environment';
-
-/**
- * Defining types
- */
 
 interface CatalogEntry {
   templateKey: string;
@@ -35,18 +25,13 @@ interface SendResult {
   channelResults: ChannelResult[];
 }
 
-/**
- * Declaring the constants
- */
 const testEnv = new TestEnvironment('identity_catalog_test');
 
-/** The service name identity-server stamps on every notification (its `notification.service-name` config) */
 const IDENTITY_SERVICE = 'shadow-identity';
 const EMAIL_RECIPIENT = 'user@shadow.test';
 const PHONE_RECIPIENT = '+919876543210';
 const DEFAULT_LOCALE = 'en-ZZ';
 
-/** Every template key identity-server can send, each with a payload shaped exactly like the sending call site constructs it */
 const IDENTITY_CATALOG: CatalogEntry[] = [
   { templateKey: 'auth.register.otp', channels: ['EMAIL', 'SMS'], payload: { code: '482913' }, fragments: ['482913'] },
   { templateKey: 'auth.login.otp', channels: ['EMAIL', 'SMS'], payload: { code: '175306' }, fragments: ['175306'] },

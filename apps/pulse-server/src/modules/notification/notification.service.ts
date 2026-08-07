@@ -1,6 +1,4 @@
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import assert from 'node:assert';
 
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
@@ -10,9 +8,6 @@ import { Injectable } from '@shadow-library/app';
 import { AppError, type AppErrorObject, Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { SenderEndpointService, SenderRoutingRuleService } from '@modules/configuration';
 import { DEFAULT_LOCALE, type ResolvedTemplate, resolvePayload, TemplateResolverService } from '@modules/template';
 import { AppErrorCode } from '@server/classes';
@@ -21,10 +16,6 @@ import { Configuration, Notification, PrimaryDatabase, schema, Template } from '
 
 import { NotificationProviderService } from './notification-provider.service';
 import { NotificationOpResult } from './providers';
-
-/**
- * Defining types
- */
 
 export enum NotificationStatus {
   ACCEPTED = 'ACCEPTED',
@@ -83,9 +74,6 @@ export type NotificationMessage = Notification.Message & {
   messageType: Template.MessageType;
 };
 
-/**
- * Declaring the constants
- */
 const MAX_ATTEMPTS = 5;
 const BASE_DELAY_SECONDS: Record<Template.MessageType, number> = { OTP: 2, TRANSACTIONAL: 30, PROMOTIONAL: 5 * 60 };
 const MAX_DELAY_SECONDS: Record<Template.MessageType, number> = { OTP: 30, TRANSACTIONAL: 30 * 60, PROMOTIONAL: 6 * 60 * 60 };

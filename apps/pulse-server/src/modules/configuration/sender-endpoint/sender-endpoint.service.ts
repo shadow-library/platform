@@ -1,6 +1,4 @@
-/**
- * Importing npm packages
- */
+/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import assert from 'node:assert';
 
 import { and, asc, desc, eq, InferInsertModel } from 'drizzle-orm';
@@ -8,16 +6,9 @@ import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { Configuration, Notification, PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface ListSenderEndpointsQuery extends Partial<OffsetPagination> {
   channel?: Notification.Channel;
@@ -28,10 +19,6 @@ export interface ListSenderEndpointsQuery extends Partial<OffsetPagination> {
 export type CreateSenderEndpoint = Omit<InferInsertModel<typeof schema.senderEndpoints>, 'id' | 'createdAt' | 'updatedAt'>;
 
 export type UpdateSenderEndpoint = Partial<Pick<CreateSenderEndpoint, 'identifier' | 'weight' | 'isActive'>>;
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class SenderEndpointService {

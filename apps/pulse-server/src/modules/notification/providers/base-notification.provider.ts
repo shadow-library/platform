@@ -1,15 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export interface BaseConfig {
   notificationId: string;
   payload?: Record<string, any>;
@@ -52,10 +40,6 @@ interface FailureOpResult {
 }
 
 export type NotificationOpResult = SuccessOpResult | FailureOpResult;
-
-/**
- * Declaring the constants
- */
 
 export interface SMSProvider {
   sendSMS(config: SendSMSConfig): Promise<NotificationOpResult>;

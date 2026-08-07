@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { NotificationChannel, VersionStatus } from '@server/common';
 import { type Notification, type Template } from '@server/database';
 
 import { TemplateParams } from './template.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class ContentResponse {

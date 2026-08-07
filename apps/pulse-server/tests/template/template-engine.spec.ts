@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { TemplateEngineService } from '@modules/template';
 
-/**
- * Declaring the constants
- */
 const engine = new TemplateEngineService();
 
 const LAYOUT = `<html><head><style>.wrap{background:#fff}.btn{color:#4f46e5}</style></head><body><div class="wrap"><header>{{ brand }}</header>{{ content | raw }}<footer>&copy; Shadow</footer></div></body></html>`;
@@ -33,7 +24,6 @@ describe('TemplateEngineService', () => {
     expect(out.body).toContain('<h1>Sign in</h1>');
     expect(out.body).toContain('<div class="otp">482913</div>');
     expect(out.body).toContain('Shadow'); // layout header rendered
-    /** juice inlined the layout CSS onto the element. */
     expect(out.body).toMatch(/<div class="wrap"[^>]*style="[^"]*background/i);
   });
 
