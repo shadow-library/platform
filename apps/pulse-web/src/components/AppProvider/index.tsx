@@ -1,26 +1,14 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement } from 'react';
 import { ThemeProvider } from '@shadow-library/ui';
 import { themeCookieDomain } from '@shadow-library/web';
 
-/**
- *  Importing user defined modules
- */
 import { ConfirmProvider } from '@/features/shared/ConfirmProvider';
-
-/**
- * Declaring types
- */
 
 export interface AppProviderProps {
   children?: React.ReactNode;
 }
 
 /**
- * Declaring constants
- *
  * The QueryClientProvider is installed by `createAppRouter` (via the SSR-query integration's router
  * `Wrap`), so this provider owns only theming and the confirm dialog.
  */

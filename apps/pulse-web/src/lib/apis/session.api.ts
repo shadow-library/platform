@@ -1,17 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type UserInfo, userInfoQueryOptions } from '@shadow-library/web';
 import { createAuthApi } from '@shadow-library/web/auth';
 
-/**
- * Importing user defined packages
- */
 import { apiClient } from './transport';
 
 /**
- * Defining types
- *
  * `/api/auth/*` is `@shadow-library/auth`'s surface, not pulse's: the SDK owns `session`, `logout`,
  * `organisations` and `organisation` on every service that mounts it. `createAuthApi` is the client half of
  * that contract, so this module binds it to pulse's auth surface and re-exports it under the names the app
@@ -20,8 +12,6 @@ import { apiClient } from './transport';
 export type { AuthOrganisation as OrganisationResponse, AuthPrincipal as SessionResponse } from '@shadow-library/web/auth';
 
 /**
- * Declaring the constants
- *
  * The session mirrors live auth state, so `createAuthApi`'s default `staleTime: 0` is kept: the route gate
  * and the in-shell `useSessionGuard` both re-validate against the server rather than trusting a cached
  * snapshot, so the shell is shown only while the session is currently valid.

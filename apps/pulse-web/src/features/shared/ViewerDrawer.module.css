@@ -29,7 +29,6 @@
   margin-bottom: 6px;
 }
 
-/* ── Source view ── */
 .sourceSubject {
   font-family: var(--sh-font-mono);
   font-size: 0.875rem;
@@ -71,7 +70,6 @@
   color: var(--sh-text-secondary);
 }
 
-/* ── Email preview ── */
 .emailCard {
   border: 1px solid var(--sh-border-default);
   border-radius: var(--sh-radius-lg);
@@ -153,7 +151,6 @@
   line-height: 1.6;
 }
 
-/* ── SMS preview ── */
 .smsWrap {
   max-width: 400px;
   margin: 0 auto;
@@ -196,7 +193,6 @@
   text-align: right;
 }
 
-/* ── Push preview ── */
 .pushWrap {
   max-width: 420px;
   margin: 0 auto;

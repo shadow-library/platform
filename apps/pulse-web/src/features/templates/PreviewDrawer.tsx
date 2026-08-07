@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { Alert, Button, FormField, Input, Select, Textarea } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { CHANNEL_OPTIONS, type ViewerData, ViewerDrawer } from '@/features/shared';
 import { type NotificationChannel, usePreviewMutation } from '@/lib';
 

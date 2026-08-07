@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import {
   queryOptions,
   useMutation,
@@ -13,9 +10,6 @@ import {
 } from '@tanstack/react-query';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * Importing user defined packages
- */
 import {
   type ChannelSettingResponse,
   type ContentResponse,
@@ -39,13 +33,6 @@ import {
   type UpdateTemplateBody,
 } from './studio.types';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const templateKeys = {
   all: ['templates'],
   lists: () => [...templateKeys.all, 'list'],
@@ -65,7 +52,6 @@ export function useListTemplatesQuery(params: ListTemplatesQueryParams = {}): Us
   });
 }
 
-/** Shared by the template detail route's loader prefetch and `useTemplateQuery`. */
 export const templateQueryOptions = (templateId: string): UseQueryOptions<TemplateDetailResponse, ApiError> =>
   queryOptions<TemplateDetailResponse, ApiError>({
     queryKey: templateKeys.detail(templateId),

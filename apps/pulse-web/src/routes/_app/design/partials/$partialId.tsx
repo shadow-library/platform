@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
 
-/**
- *  Importing user defined modules
- */
 import { PartialDetail } from '@/features/design';
 import { partialQueryOptions } from '@/lib/apis';
 

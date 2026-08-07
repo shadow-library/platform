@@ -1,18 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement } from 'react';
 import { Card, cn } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { formatNumber, successRate } from '@/features/shared';
 import { type NotificationDeliveryStats } from '@/lib';
 
 import styles from './Dashboard.module.css';
 
-/** One channel's today stats: a success bar plus a total/succeeded/failed/pending grid. */
 export default function ChannelCard({ label, stats }: { label: string; stats: NotificationDeliveryStats }): ReactElement {
   const ratePercent = stats.total > 0 ? (stats.succeeded / stats.total) * 100 : 0;
 

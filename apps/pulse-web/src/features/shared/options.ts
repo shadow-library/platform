@@ -1,19 +1,10 @@
-/**
- * Importing user defined packages
- */
 import { type MessageType, type NotificationChannel, type NotificationServiceProvider, type Priority, type VersionStatus } from '@/lib';
 
-/**
- * Defining types
- */
 export interface Option {
   value: string;
   label: string;
 }
 
-/**
- * Declaring constants — canonical option lists mirroring the server enums.
- */
 export const MESSAGE_TYPE_OPTIONS: { value: MessageType; label: string }[] = [
   { value: 'OTP', label: 'OTP' },
   { value: 'TRANSACTIONAL', label: 'Transactional' },
@@ -52,7 +43,6 @@ export const PROVIDER_OPTIONS: { value: NotificationServiceProvider; label: stri
   { value: 'AWS_SES', label: 'AWS SES' },
 ];
 
-/** Filter dropdowns prepend an "all" sentinel. */
 export const ALL = 'ALL';
 
 export const CHANNEL_FILTER_OPTIONS: Option[] = [{ value: ALL, label: 'All channels' }, ...CHANNEL_OPTIONS];

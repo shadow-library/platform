@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, useState } from 'react';
 import { Alert, Badge, Button, Card, Combobox, FormField, Input, Textarea } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { Mono, type Option, OutlineBadge, PageHeader, trimToUndefined } from '@/features/shared';
 import { type CreateNotificationBody, type CreateNotificationResponse, type NotificationRecipients, useCreateNotificationMutation, useListTemplatesQuery } from '@/lib';
 

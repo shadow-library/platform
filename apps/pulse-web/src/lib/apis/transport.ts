@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { createApiClient } from '@shadow-library/web';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /** Query hooks that poll — a static interval polls forever; the function form reads the query's own last-fetched data to decide whether to keep polling. */
 export interface PollingOptions<TData = unknown> {
@@ -17,8 +6,6 @@ export interface PollingOptions<TData = unknown> {
 }
 
 /**
- * Declaring the constants
- *
  * The whole of pulse-web's transport configuration. `@shadow-library/web` owns the request builder, the
  * browser/SSR split, the CSRF double-submit and the error contract, so what is left here is the two base
  * paths this app talks to and how to reach the backend during SSR.

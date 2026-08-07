@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement } from 'react';
 import { DescriptionList, Drawer } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { AnyOrValue, formatDateTime, Mono, OutlineBadge, StatusBadge } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type SenderProfileResponse } from '@/lib';
@@ -20,7 +14,6 @@ interface RuleDrawerProps {
   onOpenChange: (open: boolean) => void;
 }
 
-/** Read-only expansion of a routing rule: its match conditions and the sender profile it resolves to. */
 export default function RuleDrawer({ rule, profile, onOpenChange }: RuleDrawerProps): ReactElement {
   return (
     <Drawer open={!!rule} onOpenChange={onOpenChange} placement="right" size="md">

@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { Button, Table, type TableColumn } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { formatDateTime, FormDrawer, type FormValues, Mono, Muted, PageHeader, StatusBadge, TextOrDash, trimToUndefined } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type PartialResponse, useCreatePartialMutation, useListPartialsQuery, useUpdatePartialMutation } from '@/lib';

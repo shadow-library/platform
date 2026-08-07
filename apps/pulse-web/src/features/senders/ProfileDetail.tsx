@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import { Alert, Breadcrumbs, Button, Card, DescriptionList, Select, Spinner, Table, type TableColumn } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import {
   ACTIVE_FILTER_OPTIONS,
   ALL,

@@ -1,10 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import {
   type CreateTemplateBody as GeneratedCreateTemplateBody,
   type ListTemplateResponse as GeneratedListTemplateResponse,
@@ -18,8 +11,6 @@ import {
 } from './api-types.gen';
 
 /**
- * Defining types
- *
  * Every shape that's a byte-for-byte match for something `api-types.gen.ts` already exports (the vast
  * majority of what this file used to hand-author) has been deleted — `src/lib/apis/index.ts` now
  * resolves those names straight off the generated file, so they can never drift again (see
@@ -103,7 +94,3 @@ export interface ListLayoutResponse {
 export interface ListPartialResponse {
   items: PartialResponse[];
 }
-
-/**
- * Declaring the constants
- */

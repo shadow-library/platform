@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement } from 'react';
 
 import styles from './icons.module.css';
 
-/**
- * Inline SVG icon set for the Pulse shell — no icon-library dependency.
- */
 function StrokeIcon({ paths, size = 18, strokeWidth = 1.8 }: { paths: string[]; size?: number; strokeWidth?: number }): ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -78,7 +72,6 @@ export function SunIcon(): ReactElement {
   );
 }
 
-/** The pulse waveform glyph in an accent square — reused as the workspace mark and preview avatar. */
 export function PulseSquare({ size = 26, radius = 7 }: { size?: number; radius?: number }): ReactElement {
   return (
     <div className={styles.mark} style={{ width: size, height: size, borderRadius: radius }}>
@@ -99,7 +92,6 @@ export function PulseSquare({ size = 26, radius = 7 }: { size?: number; radius?:
   );
 }
 
-/** Full workspace identity shown in the sidebar header. */
 export function PulseMark(): ReactElement {
   return (
     <div className={styles.workspace}>

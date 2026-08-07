@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { formatDay } from '@/features/shared';
 import { type NotificationStatsWithDate } from '@/lib';
 
 import styles from './Dashboard.module.css';
 
-/**
- * Declaring constants
- */
 const W = 900;
 const H = 240;
 const PAD_L = 4;
@@ -28,7 +19,6 @@ const SEGMENTS: { key: 'succeeded' | 'pending' | 'failed'; fill: string }[] = [
   { key: 'failed', fill: 'var(--sh-danger-solid)' },
 ];
 
-/** 14-day stacked volume bars — succeeded / pending / failed, one bar per day. */
 export default function VolumeChart({ stats }: { stats: NotificationStatsWithDate[] }): ReactElement {
   const maxValue = Math.max(1, ...stats.map(s => s.total)) * 1.05;
   const slot = (W - PAD_L - PAD_R) / Math.max(1, stats.length);

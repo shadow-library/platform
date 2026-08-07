@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import {
   queryOptions,
   useMutation,
@@ -13,9 +10,6 @@ import {
 } from '@tanstack/react-query';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * Importing user defined packages/modules
- */
 import {
   type CreateSenderEndpointBody,
   type CreateSenderProfileBody,
@@ -28,14 +22,6 @@ import {
   type UpdateSenderEndpointBody,
   type UpdateSenderProfileBody,
 } from './api-types.gen';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const senderProfileKeys = {
   all: ['sender-profiles'],
@@ -54,7 +40,6 @@ export function useListSenderProfilesQuery(params: ListSenderProfilesQueryParams
   });
 }
 
-/** Shared by the sender profile detail route's loader prefetch and `useSenderProfileQuery`. */
 export const senderProfileQueryOptions = (profileId: string): UseQueryOptions<SenderProfileResponse, ApiError> =>
   queryOptions<SenderProfileResponse, ApiError>({
     queryKey: senderProfileKeys.detail(profileId),

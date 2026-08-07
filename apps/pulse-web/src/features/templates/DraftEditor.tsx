@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, useMemo, useState } from 'react';
 import { Alert, Button, Card, cn, Combobox, FormField, Input, Select, Textarea } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { CHANNEL_OPTIONS, type Option, SectionHeader, trimToUndefined, useConfirm } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import {

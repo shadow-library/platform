@@ -1,19 +1,10 @@
-/**
- * Importing user defined packages
- */
 import { type FormConfig, MESSAGE_TYPE_OPTIONS, type Option } from '@/features/shared';
 import { type SenderRoutingRuleResponse } from '@/lib';
 
-/**
- * Defining types
- */
 // NOTE: the generated `SenderRoutingRuleResponse` omits `id`, yet update/delete address a rule by
 // `routingRuleId`. The runtime payload is expected to carry it; typed optional here and read defensively.
 export type RoutingRule = SenderRoutingRuleResponse & { id?: string };
 
-/**
- * Declaring constants
- */
 const MESSAGE_TYPE_FORM_OPTIONS: Option[] = [{ value: 'NONE', label: 'Any' }, ...MESSAGE_TYPE_OPTIONS];
 
 export function ruleFormConfig(row: RoutingRule | null, senderOptions: Option[]): FormConfig {

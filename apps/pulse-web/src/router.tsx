@@ -1,19 +1,11 @@
-/**
- * Importing npm packages
- */
 import { createAppRouter } from '@shadow-library/web/router';
 
-/**
- * Importing user defined packages
- */
 import NotFound from '@/components/NotFound';
 import RouteError from '@/components/RouteError';
 
 import { routeTree } from '../generated/routeTree.gen';
 
 /**
- * Declaring the constants
- *
  * TanStack Start calls this once per request on the server and once on the client. `createAppRouter`
  * (from `@shadow-library/web`) owns the per-request QueryClient, the SSR-query integration, and the
  * shared preload/staleness/pending defaults — so this app only supplies its own error and not-found

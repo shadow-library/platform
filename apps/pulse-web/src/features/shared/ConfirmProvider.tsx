@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createContext, type PropsWithChildren, type ReactElement, type ReactNode, useCallback, useContext, useRef, useState } from 'react';
 import { ConfirmDialog } from '@shadow-library/ui';
 
-/**
- * Defining types
- */
 export interface ConfirmOptions {
   title: ReactNode;
   description?: ReactNode;
@@ -20,12 +14,8 @@ interface ConfirmState extends ConfirmOptions {
   open: boolean;
 }
 
-/**
- * Declaring constants
- */
 const ConfirmContext = createContext<ConfirmFn>(() => Promise.resolve(false));
 
-/** Await a yes/no from a single shared confirm dialog: `if (await confirm({...})) …`. */
 export function useConfirm(): ConfirmFn {
   return useContext(ConfirmContext);
 }

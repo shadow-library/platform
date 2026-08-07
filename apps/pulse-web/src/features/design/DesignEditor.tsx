@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, useState } from 'react';
 import { Alert, Button, Card, FormField, Input, Table, type TableColumn, Textarea } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { formatDateTime, Mono, Muted, SectionHeader, TextOrDash, VersionStatusBadge } from '@/features/shared';
 import { type VersionStatus } from '@/lib';
 

@@ -1,17 +1,10 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
 import { Spinner } from '@shadow-library/ui';
 
-/**
- *  Importing user defined modules
- */
 import Layout from '@/components/Layout';
 import { requireSession, useSessionGuard } from '@/lib/session';
 
-/** The authenticated admin group — every page of this internal tool sits behind the session gate. */
 export const Route = createFileRoute('/_app')({
   beforeLoad: ({ context, location }) => requireSession(context.queryClient, location.href),
   component: AuthenticatedShell,

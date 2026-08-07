@@ -1,6 +1,5 @@
 @import '@shadow-library/ui/styles.css';
 
-/* App-level globals — the library ships tokens + reset; these are Pulse-shell conventions. */
 html,
 body {
   margin: 0;
@@ -22,8 +21,6 @@ a:hover {
   color: var(--sh-accent-hover);
 }
 
-/* Scrollbar skin (matches the Pulse design). Applied globally now that the shell owns the scrolling
-   content region — there is no app-side element left to hang a class on. */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

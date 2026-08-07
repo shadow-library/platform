@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * Importing user defined packages
- */
 import {
   type CreatePartialBody,
   type PartialDetailResponse,
@@ -17,13 +11,6 @@ import {
 } from './api-types.gen';
 import { type ListPartialResponse, type UpsertPartialDraftBody } from './studio.types';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const partialKeys = {
   all: ['partials'],
   lists: () => [...partialKeys.all, 'list'],
@@ -38,7 +25,6 @@ export const listPartialsQueryOptions = (): UseQueryOptions<ListPartialResponse,
     queryFn: () => APIRequest.get('/partials').execute(),
   });
 
-/** Shared by the partial detail route's loader prefetch and `usePartialQuery`. */
 export const partialQueryOptions = (partialId: string): UseQueryOptions<PartialDetailResponse, ApiError> =>
   queryOptions<PartialDetailResponse, ApiError>({
     queryKey: partialKeys.detail(partialId),

@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { useEffect, useRef, useState } from 'react';
 import { type SortDirection, type TableSort, toPositiveInt } from '@shadow-library/ui';
 import { useSearchParams } from '@shadow-library/web/router';
 
-/**
- * Defining types
- */
 export interface TablePagination {
   page: number;
   pageSize: number;
@@ -16,10 +10,6 @@ export interface TablePagination {
   onPageSizeChange: (size: number) => void;
 }
 
-/**
- * Bridges the URL `offset`/`limit` state (what the server paginates on) to the page-based
- * `Pagination` component.
- */
 export function useTablePagination(total: number | undefined, defaultLimit = 20): TablePagination {
   const { search, appendSearch } = useSearchParams();
   const safeTotal = total ?? 0;

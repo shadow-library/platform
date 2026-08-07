@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, type ReactNode } from 'react';
 import { cn } from '@shadow-library/ui';
 
 import styles from './PageHeader.module.css';
 
-/**
- * Defining types
- */
 export interface PageHeaderProps {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -18,7 +12,6 @@ export interface PageHeaderProps {
   mono?: boolean;
 }
 
-/** Page-level title block: optional breadcrumb, an H1 + subtitle, and a trailing action. */
 export function PageHeader({ title, subtitle, action, breadcrumb, mono }: PageHeaderProps): ReactElement {
   return (
     <>
@@ -34,7 +27,6 @@ export function PageHeader({ title, subtitle, action, breadcrumb, mono }: PageHe
   );
 }
 
-/** In-page section header (H2 + subtitle + trailing action) used above secondary tables. */
 export function SectionHeader({ title, subtitle, action }: { title: ReactNode; subtitle?: ReactNode; action?: ReactNode }): ReactElement {
   return (
     <div className={styles.sectionHeader}>

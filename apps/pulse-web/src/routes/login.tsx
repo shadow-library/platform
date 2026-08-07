@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect } from 'react';
 import { Spinner } from '@shadow-library/ui';
 
-/**
- *  Importing user defined modules
- */
-
-/**
- * Defining types
- */
 interface LoginSearch {
   returnTo: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * The bounce target of the session gate: `requireSession` lands here with the intended destination in

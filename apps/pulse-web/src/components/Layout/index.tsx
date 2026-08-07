@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { type PropsWithChildren, type ReactElement } from 'react';
@@ -8,18 +5,11 @@ import { Button, IconButton, useTheme } from '@shadow-library/ui';
 import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
 
-/**
- * Importing user defined components
- */
 import { DashboardIcon, LayoutIcon, LogIcon, MoonIcon, PartialIcon, PulseMark, RoutingIcon, SenderIcon, SendIcon, SunIcon, TemplateIcon } from '@/features/shared';
 import { logout, meQuery } from '@/lib/apis';
 
 import styles from './Layout.module.css';
 import OrgSwitcher from './OrgSwitcher';
-
-/**
- * Declaring the constants
- */
 
 const NAV: NavConfig = {
   variant: 'sections',
@@ -53,10 +43,6 @@ function ThemeToggle(): ReactElement {
   );
 }
 
-/**
- * The operations chrome. `AppShell` places the rail, pins it, gutters and centres the content, and below
- * md swaps the rail for its nav drawer — the app had no layout at all under a desktop viewport before.
- */
 export default function Layout({ children }: PropsWithChildren): ReactElement {
   const navigate = useNavigate();
   const me = useQuery(meQuery);
@@ -95,7 +81,6 @@ export default function Layout({ children }: PropsWithChildren): ReactElement {
       actions={
         <>
           <OrgSwitcher />
-          {/* A phone bar has no room for it, and the drawer's Messaging section reaches the same screen. */}
           <span className={styles.sendAction}>
             <Button variant="primary" size="sm" onClick={() => navigate({ to: '/send' })}>
               Send notification

@@ -1,7 +1,3 @@
-/* The flex root, the rail placement, and the scrolling gutter-and-column content region all come from
-   the design system's Shell now. What is left here is the header and the sidebar footer toggle. */
-
-/* ── Header ── */
 .header {
   height: 60px;
   flex-shrink: 0;
@@ -49,7 +45,6 @@
   flex: 1;
 }
 
-/* Wide enough for an organisation name without letting a long one crowd out the header actions. */
 .orgSwitcher {
   min-width: 180px;
   max-width: 260px;
@@ -83,7 +78,6 @@
   font-family: var(--sh-font-mono);
 }
 
-/* ── Sidebar footer theme toggle ── */
 .themeToggle {
   display: flex;
   align-items: center;

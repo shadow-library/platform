@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, useState } from 'react';
 import { Badge, Card, EmptyState, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
 import { useSearchParams } from '@shadow-library/web/router';
 
-/**
- * Importing user defined packages
- */
 import {
   ALL,
   CHANNEL_FILTER_OPTIONS,

@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * Importing user defined packages
- */
 import { type DashboardStats } from './api-types.gen';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const dashboardKeys = {
   stats: ['stats'],

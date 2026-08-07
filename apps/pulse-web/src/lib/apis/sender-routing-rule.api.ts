@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { useMutation, type UseMutationOptions, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * Importing user defined packages/modules
- */
 import {
   type CreateRoutingRuleBody,
   type ListSenderRoutingRuleResponse,
@@ -15,14 +9,6 @@ import {
   type SenderRoutingRuleResponse,
   type UpdateSenderRoutingRuleBody,
 } from './api-types.gen';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const senderRoutingRuleKeys = {
   all: ['sender-routing-rules'],

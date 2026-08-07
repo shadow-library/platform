@@ -1,22 +1,9 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * Importing user defined packages
- */
 import { type CreateLayoutBody, type LayoutDetailResponse, type LayoutResponse, type LayoutVersionResponse, type PublishLayoutBody, type UpdateLayoutBody } from './api-types.gen';
 import { type ListLayoutResponse, type UpsertLayoutDraftBody } from './studio.types';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const layoutKeys = {
   all: ['layouts'],
   lists: () => [...layoutKeys.all, 'list'],
@@ -31,7 +18,6 @@ export const listLayoutsQueryOptions = (): UseQueryOptions<ListLayoutResponse, A
     queryFn: () => APIRequest.get('/layouts').execute(),
   });
 
-/** Shared by the layout detail route's loader prefetch and `useLayoutQuery`. */
 export const layoutQueryOptions = (layoutId: string): UseQueryOptions<LayoutDetailResponse, ApiError> =>
   queryOptions<LayoutDetailResponse, ApiError>({
     queryKey: layoutKeys.detail(layoutId),

@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useRouter } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
 import { EmptyState } from '@shadow-library/ui';
 
 /**
- * Importing user defined packages
- */
-
-/**
- * Declaring the constants
- *
  * The shared not-found surface — used as both the router's `defaultNotFoundComponent` (any unmatched
  * route) and the root route's own `notFoundComponent` (a path that matches nothing in the tree at all).
  * Root's own `component` still renders normally for this case (root itself always matches), so this

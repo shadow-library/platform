@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 
-/**
- *  Importing user defined modules
- */
 import { Dashboard } from '@/features/dashboard';
 import { dashboardStatsQueryOptions } from '@/lib/apis';
 

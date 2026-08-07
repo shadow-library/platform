@@ -1,23 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type ErrorComponentProps, useRouter } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
 import { AccessDenied, EmptyState } from '@shadow-library/ui';
 import { isApiError } from '@shadow-library/web';
 import { isAccessDeniedError } from '@shadow-library/web/router';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * The router's last resort for anything a route throws.

@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * Importing user defined packages/modules
- */
 import { type CreateNotificationBody, type CreateNotificationResponse, type ListMessagesQueryParams, type ListNotificationMessagesResponse } from './api-types.gen';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const notificationKeys = {
   messages: ['notification-messages'],

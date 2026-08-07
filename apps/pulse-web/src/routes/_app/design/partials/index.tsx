@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 
-/**
- *  Importing user defined modules
- */
 import { PartialList } from '@/features/design';
 import { listPartialsQueryOptions } from '@/lib/apis';
 

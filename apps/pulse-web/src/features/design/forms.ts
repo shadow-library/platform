@@ -1,12 +1,6 @@
-/**
- * Importing user defined packages
- */
 import { type FormConfig } from '@/features/shared';
 import { type LayoutResponse, type PartialResponse } from '@/lib';
 
-/**
- * Declaring the constants
- */
 export function layoutFormConfig(row: LayoutResponse | null): FormConfig {
   const edit = !!row;
   return {

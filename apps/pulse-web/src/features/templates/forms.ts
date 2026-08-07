@@ -1,12 +1,6 @@
-/**
- * Importing user defined packages
- */
 import { type FormConfig, MESSAGE_TYPE_OPTIONS, PRIORITY_OPTIONS } from '@/features/shared';
 import { type TemplateResponse } from '@/lib';
 
-/**
- * Declaring the constants
- */
 export function templateFormConfig(row: TemplateResponse | null): FormConfig {
   const edit = !!row;
   return {

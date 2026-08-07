@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, useState } from 'react';
 import { Alert, Button, Table, type TableColumn } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { formatDateTime, Mono, Muted, SectionHeader, TextOrDash, useConfirm, VersionStatusBadge } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { useRollbackVersionMutation, type VersionResponse } from '@/lib';

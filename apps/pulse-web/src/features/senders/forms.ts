@@ -1,6 +1,3 @@
-/**
- * Importing user defined packages
- */
 import { CHANNEL_OPTIONS, type FormConfig, PROVIDER_OPTIONS } from '@/features/shared';
 import { type SenderEndpointResponse, type SenderProfileResponse } from '@/lib';
 

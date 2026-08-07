@@ -1,21 +1,12 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react';
 import { Drawer, SegmentedControl } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { type NotificationChannel } from '@/lib';
 
 import { OutlineBadge } from './cells';
 import { PulseSquare } from './icons';
 import styles from './ViewerDrawer.module.css';
 
-/**
- * Defining types
- */
 export interface ViewerData {
   channel: NotificationChannel;
   title: string;
@@ -44,11 +35,6 @@ export interface ViewerDrawerProps {
 
 type ViewerMode = 'rendered' | 'source';
 
-/**
- * Read-only inspector for template content or a sent message: a rendered channel preview
- * (email / SMS / push) with a toggle to the raw template source and rendering payload. With `controls`
- * it doubles as a live preview surface whose inputs drive the `data` the parent feeds back in.
- */
 export function ViewerDrawer({ open, data, onOpenChange, title, meta, controls, placeholder }: ViewerDrawerProps): ReactElement {
   const [mode, setMode] = useState<ViewerMode>('rendered');
   const wasOpen = useRef(false);

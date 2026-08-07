@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 
-/**
- *  Importing user defined modules
- */
 import { LayoutList } from '@/features/design';
 import { listLayoutsQueryOptions } from '@/lib/apis';
 

@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { Select } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { organisationsQueryOptions, switchOrganisation } from '@/lib/apis';
 
 import styles from './Layout.module.css';

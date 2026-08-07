@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useMemo, useState } from 'react';
 import { Alert, Breadcrumbs, Button, Card, DescriptionList, Spinner } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { formatDateTime, FormDrawer, type FormValues, OutlineBadge, PageHeader, PriorityBadge, StatusBadge, TextOrDash, trimToUndefined } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type MessageType, type Priority, useListVersionsQuery, useTemplateQuery, useUpdateTemplateMutation } from '@/lib';

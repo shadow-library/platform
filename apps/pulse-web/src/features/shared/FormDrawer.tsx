@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react';
 import { Combobox, Drawer, FormField, Input, Select, Switch, Textarea } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import styles from './FormDrawer.module.css';
 import { type Option } from './options';
 
-/**
- * Defining types
- */
 export type FormFieldType = 'text' | 'number' | 'textarea' | 'select' | 'combobox' | 'switch';
 export type FormValue = string | number | boolean | undefined;
 export type FormValues = Record<string, FormValue>;
@@ -42,7 +33,6 @@ export interface FormDrawerProps {
   onSubmit: (values: FormValues) => void;
 }
 
-/** The shape a feature builds per entity to drive a `FormDrawer` (create + edit). */
 export interface FormConfig {
   title: string;
   meta: string;
@@ -51,10 +41,6 @@ export interface FormConfig {
   initialValues: FormValues;
 }
 
-/**
- * A single config-driven create/edit drawer reused by every entity form.
- * Seeds its own state on each open edge, then hands the collected values back on submit.
- */
 export function FormDrawer(props: FormDrawerProps): ReactElement {
   const { open, onOpenChange, title, meta, submitLabel = 'Save', fields, initialValues, loading, onSubmit } = props;
   const [values, setValues] = useState<FormValues>(initialValues);

@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, useMemo, useState } from 'react';
 import { Alert, Badge, Button, FormField, Input, Select, Switch, Table, type TableColumn } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { OutlineBadge, SectionHeader, TextOrDash, trimToUndefined, useConfirm, VARIABLE_TYPE_OPTIONS } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type TemplateVariableSchema, type TemplateVariableType, useUpdateTemplateMutation } from '@/lib';

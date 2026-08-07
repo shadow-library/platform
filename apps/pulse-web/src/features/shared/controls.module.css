@@ -1,4 +1,3 @@
-/* Shared layout helpers for list/detail pages — imported directly by feature pages. */
 .toolbar {
   display: flex;
   gap: 12px;

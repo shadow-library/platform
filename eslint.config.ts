@@ -186,8 +186,10 @@ export default defineConfig([
   {
     files: ['apps/identity-server/**/*.{ts,tsx}'],
     languageOptions: { globals: resolveGlobals('both') },
-    rules: { 'perfectionist/sort-imports': 'off' },
   },
+
+  /** Pulse Web keeps its established import order after organizational banner comments are removed. */
+  { files: ['apps/pulse-web/**/*.{ts,tsx}'], rules: { 'perfectionist/sort-imports': 'off' } },
 
   /** Router/API modules whose return type is inferred (TanStack Router, generated API clients) — cannot be written out by hand. */
   {

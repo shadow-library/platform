@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement } from 'react';
 import { Alert, Card, cn, Spinner, Statistic } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { formatDay, successRate } from '@/features/shared';
 import { type NotificationDeliveryStats, useStatsQuery } from '@/lib';
 

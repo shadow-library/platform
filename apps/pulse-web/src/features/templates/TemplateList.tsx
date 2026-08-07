@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { Button, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
 import { useSearchParams } from '@shadow-library/web/router';
 
-/**
- * Importing user defined packages
- */
 import {
   ALL,
   formatDateTime,
