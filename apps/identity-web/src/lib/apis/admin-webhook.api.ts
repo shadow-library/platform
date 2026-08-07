@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import {
   type CreatedWebhookResponse,
   type CreateWebhookBody,
@@ -17,23 +11,14 @@ import {
 } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * Defining types
- */
-
 export type { CreateWebhookBody, CreatedWebhookResponse, UpdateWebhookBody, WebhookDeliveriesResponse, WebhookDeliveryItem, WebhookItem, WebhookListResponse };
 export type DeliveryStatus = WebhookDeliveryItem['status'];
 
-/**
- * Declaring the constants
- */
 export const adminWebhookKeys = {
   all: ['admin', 'webhooks'] as const,
   detail: (id: string) => [...adminWebhookKeys.all, id] as const,
   deliveries: (id: string, status?: DeliveryStatus) => [...adminWebhookKeys.all, id, 'deliveries', status] as const,
 };
-
-/** ---------- queries ---------- */
 
 export const webhooksQueryOptions = () =>
   queryOptions<WebhookListResponse, ApiError>({
@@ -66,8 +51,6 @@ export const webhookDeliveriesQueryOptions = (id: string, status?: DeliveryStatu
 export function useWebhookDeliveriesQuery(id: string, status?: DeliveryStatus, enabled = true): UseQueryResult<WebhookDeliveriesResponse, ApiError> {
   return useQuery(webhookDeliveriesQueryOptions(id, status, enabled));
 }
-
-/** ---------- mutations ---------- */
 
 export function useCreateWebhookMutation(): UseMutationResult<CreatedWebhookResponse, ApiError, CreateWebhookBody> {
   const queryClient = useQueryClient();

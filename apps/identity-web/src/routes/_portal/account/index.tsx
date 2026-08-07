@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { type ReactNode } from 'react';
 import { Alert, Avatar, Button } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { BuildingIcon, ChevronRightIcon, MailIcon, MonitorIcon, PlugIcon, ShieldCheckIcon, UserIcon } from '@/components/icons';
 import { PageHeader, StatusChip } from '@/components/si';
 import {

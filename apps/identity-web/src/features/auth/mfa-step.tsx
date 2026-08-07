@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { useEffect, useState } from 'react';
 import { Button, FormField, Input, OtpInput } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { FingerprintIcon, IdCardIcon, LockIcon, SmartphoneIcon } from '@/components/icons';
 import { MethodRow, StepHeader } from './auth-parts';
 import styles from './auth-parts.module.css';
 import { AuthCard, AuthMedallion } from './auth-shell';
-
-/**
- * Defining types
- */
 
 /** Which entry a second factor collects — the chooser is the upfront "pick a step" surface. */
 type MfaView = 'chooser' | 'totp' | 'recovery';
@@ -38,10 +28,6 @@ interface MfaLockedCardProps {
   onRecovery?: () => void;
   onRestart: () => void;
 }
-
-/**
- * Declaring the constants
- */
 
 const formatCountdown = (ms: number): string => {
   const total = Math.max(0, Math.ceil(ms / 1000));

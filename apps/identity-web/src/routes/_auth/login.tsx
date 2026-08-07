@@ -1,22 +1,13 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, FormField, Input, Spinner } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { ExternalLinkIcon, KeyIcon } from '@/components/icons';
 import { assertPasskey, AuthCard, AuthMedallion, AuthScreen, IdentifierChip, MfaLockedCard, MfaStep, OtpEntry, StepHeader, useFlow } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
 import { authApi, type FlowState } from '@/lib/apis';
 import { useDeviceId } from '@/lib/hooks';
 
-/**
- * Declaring the constants
- */
 interface LoginSearch {
   returnTo?: string;
   client?: string;

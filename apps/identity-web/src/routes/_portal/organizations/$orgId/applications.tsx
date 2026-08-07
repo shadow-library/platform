@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { Avatar, Switch, Table, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { QueryState, SectionCard, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import {
@@ -26,9 +20,6 @@ import {
 
 import styles from './applications.module.css';
 
-/**
- * Declaring the constants
- */
 const VISIBILITY: Record<ApplicationVisibility, { label: string; intent: 'success' | 'warning' | 'info' }> = {
   PUBLIC: { label: 'Public', intent: 'success' },
   RESTRICTED: { label: 'Restricted', intent: 'warning' },

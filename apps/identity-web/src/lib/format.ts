@@ -1,9 +1,4 @@
 /**
- * Presentation helpers for identity resources — relative/absolute time, device summaries, and the
- * small derived bits (initials, country flags) the screens render from lean API models.
- */
-
-/**
  * Date/time formatting is pinned to a single locale. `toLocale*(undefined, …)` resolves to the
  * host's locale, which differs between the SSR runtime and the browser (e.g. `Jul 19, 2026` vs
  * `19 Jul 2026`) and triggers a React hydration mismatch. A fixed locale renders identically on
@@ -11,7 +6,6 @@
  */
 const DATE_LOCALE = 'en-US';
 
-/** A compact relative time ("4m ago", "yesterday") from an ISO timestamp. */
 export function relativeTime(iso?: string | null): string {
   if (!iso) return '';
   const then = new Date(iso).getTime();
@@ -28,7 +22,6 @@ export function relativeTime(iso?: string | null): string {
   return new Date(iso).toLocaleDateString(DATE_LOCALE, { month: 'short', day: 'numeric' });
 }
 
-/** An absolute, human timestamp ("12 Jul 2026, 14:05"). */
 export function formatDateTime(iso?: string | null): string {
   if (!iso) return '';
   const date = new Date(iso);
@@ -36,7 +29,6 @@ export function formatDateTime(iso?: string | null): string {
   return date.toLocaleString(DATE_LOCALE, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-/** A date without the clock time ("12 Jul 2026"). */
 export function formatDate(iso?: string | null): string {
   if (!iso) return '';
   const date = new Date(iso);
@@ -44,7 +36,6 @@ export function formatDate(iso?: string | null): string {
   return date.toLocaleDateString(DATE_LOCALE, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-/** Up to two initials from a display name, for avatar fallbacks and monograms. */
 export function initials(name?: string | null): string {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -54,7 +45,6 @@ export function initials(name?: string | null): string {
   return (first + last).toUpperCase();
 }
 
-/** A full name from first/last parts, falling back to the email local part or a generic label. */
 export function displayName(user: { firstName?: string | null; lastName?: string | null; email?: string | null }): string {
   const full = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
   if (full) return full;
@@ -78,7 +68,6 @@ const PLATFORMS: [RegExp, string][] = [
   [/linux/i, 'Linux'],
 ];
 
-/** A short "Chrome · macOS" summary from a session's device name or raw user-agent string. */
 export function deviceSummary(session: { deviceName?: string | null; userAgent?: string | null }): string {
   if (session.deviceName?.trim()) return session.deviceName.trim();
   const ua = session.userAgent ?? '';
@@ -87,7 +76,6 @@ export function deviceSummary(session: { deviceName?: string | null; userAgent?:
   return [browser, platform].filter(Boolean).join(' · ') || 'Unknown device';
 }
 
-/** The regional-indicator emoji flag for a 2-letter ISO country code. */
 export function countryFlag(code?: string | null): string {
   if (!code || code.length !== 2) return '';
   const base = 0x1f1e6;
@@ -99,7 +87,6 @@ export function countryFlag(code?: string | null): string {
   return String.fromCodePoint(...chars);
 }
 
-/** "1 member" / "3 members" — count with a correctly pluralized noun. */
 export function countLabel(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }

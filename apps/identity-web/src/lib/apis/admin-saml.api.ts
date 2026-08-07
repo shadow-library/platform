@@ -1,24 +1,11 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type CreateServiceProviderBody, type ServiceProviderItem, type ServiceProviderListResponse, type UpdateServiceProviderBody } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
-
-/**
- * Defining types
- */
 
 export type { CreateServiceProviderBody, ServiceProviderItem, ServiceProviderListResponse, UpdateServiceProviderBody };
 export type SamlNameIdFormat = ServiceProviderItem['nameIdFormat'];
 
-/**
- * Declaring the constants
- */
 export const adminSamlKeys = {
   all: ['admin', 'saml'] as const,
   detail: (id: string) => [...adminSamlKeys.all, id] as const,

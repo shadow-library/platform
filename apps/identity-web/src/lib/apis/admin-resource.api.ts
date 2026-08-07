@@ -1,23 +1,10 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type CreateScopeBody, type ResourceItem, type ResourceListResponse, type ScopeItem } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * Defining types
- */
-
 export type { CreateScopeBody, ResourceItem, ResourceListResponse, ScopeItem };
 
-/**
- * Declaring the constants
- */
 export const adminResourceKeys = {
   all: ['admin', 'resources'] as const,
 };

@@ -95,7 +95,6 @@
   gap: 14px;
 }
 
-/* enroll */
 .enrollCard {
   background: var(--sh-surface-card);
   border: 1px solid var(--sh-border-subtle);

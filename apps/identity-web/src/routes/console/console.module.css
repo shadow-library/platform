@@ -156,7 +156,6 @@
   text-decoration: underline;
 }
 
-/* application overview */
 .overview {
   display: flex;
   flex-direction: column;
@@ -238,7 +237,6 @@
   }
 }
 
-/* resource cards */
 .resourceList {
   display: flex;
   flex-direction: column;
@@ -286,7 +284,6 @@
   color: var(--sh-text-tertiary);
 }
 
-/* generic list rows (saml, webhooks, roles) */
 .rowList {
   display: flex;
   flex-direction: column;
@@ -436,7 +433,6 @@
   line-height: 1.5;
 }
 
-/* per-tab section headers (clients / resources / roles / members) */
 .tabHead {
   display: flex;
   align-items: flex-start;
@@ -478,7 +474,6 @@
   color: var(--sh-text-tertiary);
 }
 
-/* client detail */
 .clientDetailPage {
   display: flex;
   flex-direction: column;

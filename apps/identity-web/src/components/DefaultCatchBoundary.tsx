@@ -1,21 +1,13 @@
-/**
- * Importing npm packages
- */
 import { type ErrorComponentProps, Link, useRouter } from '@tanstack/react-router';
 import { Button } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { ShieldAlertIcon } from '@/components/icons';
 import { isApiError } from '@/lib/apis';
 
 import styles from './boundary.module.css';
 
 /**
- * Declaring the constants
- *
- * The router's `defaultErrorComponent`. It surfaces a safe message — `ApiError` messages are curated for
+ * The router's `defaultErrorComponent` surfaces a safe message — `ApiError` messages are curated for
  * users, anything else collapses to a generic sentence so stack traces / internal details never reach the
  * page — and offers retry (re-runs the failed loaders) plus an escape hatch. A 401 that escaped the route
  * guards means the session lapsed mid-view, so it points at sign-in instead of a pointless retry.

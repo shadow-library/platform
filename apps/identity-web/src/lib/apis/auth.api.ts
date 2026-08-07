@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQueryClient } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type JsonObject } from '@/types';
 
 import {
@@ -21,8 +15,6 @@ import {
 import { type ApiError, APIRequest } from './transport';
 
 /**
- * Defining types
- *
  * The interactive-auth DTOs come from the generated OpenAPI schema (`api-types.gen.ts`); the client-only
  * abstractions below (`FlowState`, `ChallengeProof`, `WebauthnChallenge`) compose them into the shapes the
  * flow pages actually render. Flow endpoints answer 200/401/429 with typed bodies rather than error
@@ -64,11 +56,6 @@ export interface ChallengeProof {
   webauthn?: Record<string, unknown>;
 }
 
-/**
- * Declaring the constants
- */
-
-/** Query options for the sign-in consent prompt — the consent route loads it before rendering. */
 export const consentPromptQueryOptions = (clientId: string, scope: string, enabled = true) =>
   queryOptions<ConsentPrompt, ApiError>({
     queryKey: ['auth', 'consent', clientId, scope] as const,
@@ -156,7 +143,6 @@ export const authApi = {
   },
 };
 
-/** Ends the current session (revokes it + its refresh families) and clears every cached query. */
 export function useSignoutMutation(): UseMutationResult<undefined, ApiError, undefined> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, undefined>({

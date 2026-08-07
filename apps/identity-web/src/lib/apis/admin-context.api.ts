@@ -1,22 +1,10 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type AdminContextResponse } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * Defining types
- */
 export type { AdminContextResponse };
 
-/**
- * Declaring the constants
- */
 export const adminContextKeys = {
   all: ['admin', 'context'] as const,
 };

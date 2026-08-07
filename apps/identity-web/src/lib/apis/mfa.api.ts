@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type JsonObject } from '@/types';
 
 import {
@@ -18,10 +12,6 @@ import {
 } from './api-types.gen';
 import { meKeys } from './me.api';
 import { type ApiError, APIRequest } from './transport';
-
-/**
- * Defining types
- */
 
 export type MfaFactorType = MfaEnrollmentItem['type'];
 export type MfaEnrollment = MfaEnrollmentItem;
@@ -64,9 +54,6 @@ export interface WebauthnRegisterInput {
   label?: string;
 }
 
-/**
- * Declaring the constants
- */
 export const mfaKeys = {
   all: ['mfa'] as const,
 };
@@ -81,14 +68,12 @@ export function useMfaQuery(): UseQueryResult<MfaEnrollmentsResponse, ApiError> 
   return useQuery(mfaQueryOptions());
 }
 
-/** Begin TOTP enrollment — returns the seed + otpauth URI to show once. */
 export function useTotpEnrollMutation(): UseMutationResult<TotpEnrollment, ApiError, undefined> {
   return useMutation<TotpEnrollment, ApiError, undefined>({
     mutationFn: () => APIRequest.post('/me/mfa/totp/enroll').body({}).execute<TotpEnrollment>(),
   });
 }
 
-/** Activate the pending TOTP enrollment with a proof code; the first factor also returns recovery codes. */
 export function useTotpActivateMutation(): UseMutationResult<TotpActivation, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<TotpActivation, ApiError, string>({
@@ -108,7 +93,6 @@ export function useRemoveTotpMutation(): UseMutationResult<undefined, ApiError, 
   });
 }
 
-/** The methods the current account may use to elevate, so the UI never prompts for a factor it lacks. */
 export function useStepUpMethodsQuery(enabled = true): UseQueryResult<StepUpMethodsResponse, ApiError> {
   return useQuery(
     queryOptions<StepUpMethodsResponse, ApiError>({
@@ -133,7 +117,6 @@ export function useStepUpIntentQuery(clientId: string, enabled = true): UseQuery
   return useQuery(stepUpIntentQueryOptions(clientId, enabled));
 }
 
-/** Elevate the current session to AAL2 with a TOTP code or — for accounts with no second factor — a password. */
 export function useStepUpMutation(): UseMutationResult<StepUpState, ApiError, StepUpProof> {
   const queryClient = useQueryClient();
   return useMutation<StepUpState, ApiError, StepUpProof>({
@@ -142,7 +125,6 @@ export function useStepUpMutation(): UseMutationResult<StepUpState, ApiError, St
   });
 }
 
-/** Options for the passkey step-up ceremony; the browser runs the assertion between this and verify. */
 export function requestPasskeyStepUpOptions(): Promise<WebauthnOptions> {
   return APIRequest.post('/me/webauthn/step-up/options')
     .body({})
@@ -158,21 +140,18 @@ export function verifyPasskeyStepUp(assertion: WebauthnAttestation, intent?: Ste
     .execute<StepUpState>();
 }
 
-/** Regenerate the recovery-code batch (step-up required); the previous batch is retired atomically. */
 export function useRegenerateRecoveryCodesMutation(): UseMutationResult<{ recoveryCodes: string[] }, ApiError, undefined> {
   return useMutation<{ recoveryCodes: string[] }, ApiError, undefined>({
     mutationFn: () => APIRequest.post('/me/mfa/recovery-codes').body({}).execute<{ recoveryCodes: string[] }>(),
   });
 }
 
-/** Fetch WebAuthn registration options for enrolling a passkey. */
 export function useWebauthnRegisterOptionsMutation(): UseMutationResult<WebauthnOptions, ApiError, undefined> {
   return useMutation<WebauthnOptions, ApiError, undefined>({
     mutationFn: () => APIRequest.post('/me/webauthn/register/options').body({}).execute<WebauthnOptions>(),
   });
 }
 
-/** Complete passkey registration; the first factor returns the recovery-code batch. */
 export function useWebauthnRegisterVerifyMutation(): UseMutationResult<TotpActivation, ApiError, WebauthnRegisterInput> {
   const queryClient = useQueryClient();
   return useMutation<TotpActivation, ApiError, WebauthnRegisterInput>({

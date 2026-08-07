@@ -1,17 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type QueryClient } from '@tanstack/react-query';
 import { requireAuth, type SessionGuardStatus, useSessionGuard as useSharedSessionGuard } from '@shadow-library/web/router';
 
-/**
- * Importing user defined packages
- */
 import { meQueryOptions, type MeResponse } from '@/lib/apis';
 
 /**
- * Declaring the constants
- *
  * The SSR-safe auth gate for the authenticated route groups. Built on `@shadow-library/web`'s
  * `requireAuth`, it ensures the `me` query server-side before any protected markup renders — so an
  * unauthenticated visitor is redirected to `/login` (302 on the initial request, client navigation

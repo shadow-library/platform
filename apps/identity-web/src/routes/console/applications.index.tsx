@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Avatar, Button, Dialog, FormField, Input, Table, Textarea, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { PlusIcon } from '@/components/icons';
 import { PageHeader, StatusChip } from '@/components/si';
 import { SecretDialog } from '@/features/console';
@@ -24,7 +18,6 @@ import { formatDate } from '@/lib/format';
 
 import styles from './console.module.css';
 
-/** Platform visibility, shown at a glance in the list (details and the selector live on the application page). */
 const VISIBILITY: Record<ApplicationVisibility, { label: string; intent: 'success' | 'warning' | 'info' }> = {
   PUBLIC: { label: 'Public', intent: 'success' },
   RESTRICTED: { label: 'Restricted', intent: 'warning' },

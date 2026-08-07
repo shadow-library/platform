@@ -1,19 +1,9 @@
 /// <reference types="bun" />
-/**
- * Importing npm packages
- */
 import { join } from 'node:path';
 
 import { Config, Logger } from '@shadow-library/common';
 import { serve } from '@shadow-library/web/server-entry';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Declaring the constants
- */
 if (Config.isProd()) Logger.attachTransport('console:json');
 else if (Config.isDev()) Logger.attachTransport('console:pretty').attachTransport('file:json');
 

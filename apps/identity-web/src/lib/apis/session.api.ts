@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type MeSessionItem, type MeSessionsResponse } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * Defining types
- */
-
-/** One active session for the signed-in user (`GET /me/sessions`). */
 export type SessionItem = MeSessionItem;
 export type SessionsResponse = MeSessionsResponse;
 
-/**
- * Declaring the constants
- */
 export const sessionKeys = {
   all: ['sessions'] as const,
 };
@@ -34,7 +20,6 @@ export function useSessionsQuery(): UseQueryResult<SessionsResponse, ApiError> {
   return useQuery(sessionsQueryOptions());
 }
 
-/** Revoke one session (step-up required). Cascades to its refresh-token families server-side. */
 export function useRevokeSessionMutation(): UseMutationResult<{ revoked: number }, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<{ revoked: number }, ApiError, string>({
@@ -43,7 +28,6 @@ export function useRevokeSessionMutation(): UseMutationResult<{ revoked: number 
   });
 }
 
-/** Revoke every session except the current one (step-up required). */
 export function useRevokeOtherSessionsMutation(): UseMutationResult<{ revoked: number }, ApiError, undefined> {
   const queryClient = useQueryClient();
   return useMutation<{ revoked: number }, ApiError, undefined>({

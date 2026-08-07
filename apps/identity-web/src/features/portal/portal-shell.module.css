@@ -5,8 +5,6 @@
   min-height: 100vh;
 }
 
-/* The session-assurance chip. Neutral at AAL1, flipping to success once the session is elevated, so the
-   strength of the current session is legible without opening the security page. */
 .aalBadge {
   display: inline-flex;
   align-items: center;

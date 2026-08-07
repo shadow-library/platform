@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Avatar, Badge, Button, Dialog, DropdownMenu, FormField, IconButton, Input, Select, Table, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { MailIcon, MoreIcon, PlusIcon, SearchIcon } from '@/components/icons';
 import { QueryState } from '@/components/si';
 import {

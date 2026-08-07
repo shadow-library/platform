@@ -1,10 +1,3 @@
-/**
- * Shared Shadow Identity UI primitives, built on the Shadow UI design system.
- *
- * The small, repeated pieces every screen leans on — a status chip, a page header, a titled section
- * card, and a query gate — so each screen speaks the same visual language. Interactive components
- * (Dialog, Badge, DescriptionList, …) come straight from `@shadow-library/ui`; these only compose them.
- */
 import { type ApiError } from '@/lib/apis';
 import { type ReactElement, type ReactNode } from 'react';
 
@@ -24,7 +17,6 @@ interface StatusChipProps {
   children: ReactNode;
 }
 
-/** A small, colour-coded status marker — a thin alias over the DS `Badge` with the app's intent set. */
 export function StatusChip({ intent = 'neutral', dot = false, children }: StatusChipProps): ReactElement {
   return (
     <Badge intent={CHIP_INTENT[intent]} variant="soft" dot={dot}>
@@ -40,7 +32,6 @@ interface PageHeaderProps {
   tags?: ReactNode;
 }
 
-/** The standard page header: title on the left, actions on the right, optional subtitle and tags. */
 export function PageHeader({ title, subtitle, actions, tags }: PageHeaderProps): ReactElement {
   return (
     <div className={styles.pageHeader}>
@@ -65,7 +56,6 @@ interface SectionCardProps {
   bodyClassName?: string;
 }
 
-/** A titled surface card used to group content on the screens. */
 export function SectionCard({ title, description, action, children, className, bodyClassName }: SectionCardProps): ReactElement {
   return (
     <section className={`${styles.section}${className ? ` ${className}` : ''}`}>
@@ -98,7 +88,6 @@ interface QueryStateProps {
   children: ReactElement;
 }
 
-/** Loading / error / empty gate for a TanStack Query — renders children only once data has arrived. */
 export function QueryState({ isLoading, error, isEmpty, emptyTitle = 'Nothing here yet', emptyDescription, emptyAction, children }: QueryStateProps): ReactElement {
   if (isLoading)
     return (
@@ -116,7 +105,6 @@ export function QueryState({ isLoading, error, isEmpty, emptyTitle = 'Nothing he
   return children;
 }
 
-/** A full-height centred spinner for suspense-style waits inside a pane. */
 export function PaneLoader(): ReactElement {
   return (
     <div className={styles.paneLoader}>
@@ -144,7 +132,6 @@ export function ThemeToggle(): ReactElement {
   );
 }
 
-/** A value rendered in the monospace face — IDs, tokens, keys. */
 export function Mono({ children }: { children: ReactNode }): ReactElement {
   return <span className={styles.mono}>{children}</span>;
 }
@@ -154,7 +141,6 @@ interface CopyButtonProps {
   label?: string;
 }
 
-/** A ghost icon button that copies a value to the clipboard and confirms with a toast. */
 export function CopyButton({ value, label = 'Copy' }: CopyButtonProps): ReactElement {
   return (
     <IconButton

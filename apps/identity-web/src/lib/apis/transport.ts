@@ -1,20 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createApiClient } from '@shadow-library/web';
 
 /**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * The whole of identity-web's transport configuration. `@shadow-library/web` owns the request builder, the
+ * `@shadow-library/web` owns the request builder, the
  * browser/SSR split, the CSRF double-submit and the error contract, so what is left here is the one base
  * path this app talks to and how to reach the backend during SSR.
  *

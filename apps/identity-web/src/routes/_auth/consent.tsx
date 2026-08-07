@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar, Button, Spinner } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { AlertTriangleIcon, BadgeCheckIcon, BuildingIcon, LockIcon, MailIcon, RefreshIcon, UserIcon, XCircleIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, StepHeader } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
@@ -16,9 +10,6 @@ import { StepUpFields } from '@/features/portal';
 import { authApi, consentPromptQueryOptions, type ConsentScope, useMeQuery, useSignoutMutation, useStepUpMethodsQuery } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
-/**
- * Defining types
- */
 interface ConsentSearch {
   clientId?: string;
   scope?: string;
@@ -31,10 +22,6 @@ interface ConsentSearch {
  * derived from the query, so only the states the user drives live here — never as parallel booleans.
  */
 type ConsentPhase = { step: 'review' } | { step: 'stepup' } | { step: 'denied'; redirectTo?: string };
-
-/**
- * Declaring the constants
- */
 
 /** How long the denied confirmation lingers before handing control back — long enough to read, short enough not to stall. */
 const DENIED_REDIRECT_DELAY_MS = 1400;

@@ -1,21 +1,12 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Alert, Button, FormField, Input, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { ClockIcon, MailIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, MfaStep, OtpEntry, StepHeader, useFlow } from '@/features/auth';
 import { authApi } from '@/lib/apis';
 import { useDeviceId } from '@/lib/hooks';
 
-/**
- * Declaring the constants
- */
 interface RecoverSearch {
   identifier?: string;
 }

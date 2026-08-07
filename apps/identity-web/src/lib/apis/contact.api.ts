@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type AddContactResponse, type ContactItemDto, type ContactListResponse } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
-
-/**
- * Defining types
- */
 
 /** An email or phone the user has claimed; `verifiedAt` present once proven. */
 export type ContactItem = ContactItemDto;
@@ -23,15 +13,10 @@ export interface VerifyContactInput {
   code: string;
 }
 
-/**
- * Declaring the constants
- */
 export const contactKeys = {
   emails: ['contacts', 'emails'] as const,
   phones: ['contacts', 'phones'] as const,
 };
-
-/** ---------- emails ---------- */
 
 export const emailsQueryOptions = () =>
   queryOptions<ContactListResponse, ApiError>({
@@ -72,8 +57,6 @@ export function useRemoveEmailMutation(): UseMutationResult<undefined, ApiError,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: contactKeys.emails }),
   });
 }
-
-/** ---------- phones ---------- */
 
 export const phonesQueryOptions = () =>
   queryOptions<ContactListResponse, ApiError>({

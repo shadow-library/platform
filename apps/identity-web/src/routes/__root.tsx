@@ -1,7 +1,4 @@
 /// <reference types="vite/client" />
-/**
- * Importing npm packages
- */
 import { type QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
@@ -9,29 +6,17 @@ import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { ClientOnly, themeInitScript } from '@shadow-library/ui';
 import { NavProgress } from '@shadow-library/ui/router';
 
-/**
- *  Importing user defined modules
- */
 import AppProvider from '@/components/AppProvider';
 import { DefaultCatchBoundary } from '@/components/DefaultCatchBoundary';
 import { NotFound } from '@/components/NotFound';
 import { getPublicRuntimeConfig } from '@/lib/apis';
 import '@/styles.css';
 
-/**
- * Declaring types
- */
-
 interface RouterContext {
   queryClient: QueryClient;
 }
 
-/**
- * Declaring constants
- */
-
 export const Route = createRootRouteWithContext<RouterContext>()({
-  /** Resolves deploy-time public config (root domain) once on the server; hydrates to every route. */
   loader: () => getPublicRuntimeConfig(),
   head: () => ({
     meta: [

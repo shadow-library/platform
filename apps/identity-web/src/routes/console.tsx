@@ -1,16 +1,9 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { Spinner } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { ConsoleShell } from '@/features/console';
 import { requireSession, useSessionGuard } from '@/lib/session';
 
-/** The privileged operator console (`/console/*`). Session is gated here; the identity server enforces admin authorization per endpoint. */
 export const Route = createFileRoute('/console')({
   beforeLoad: ({ context, location }) => requireSession(context.queryClient, location.href),
   component: ConsoleGroup,

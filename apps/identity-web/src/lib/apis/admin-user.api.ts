@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type JsonValue } from '@/types';
 
 import {
@@ -19,10 +13,6 @@ import {
 } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * Defining types
- */
-
 export type { UserAuditEventItem, UserAuditEventsResponse, UserContactItem, UserDetailResponse, UserMfaSummary, UserSearchResponse, UserSummaryItem };
 export type UserStatus = UserSummaryItem['status'];
 export type LockMode = UserSummaryItem['lockMode'];
@@ -35,7 +25,6 @@ export interface UserSearchParams {
   limit?: number;
 }
 
-/** Combined client-side input for the lock action. */
 export interface LockUserInput {
   userId: string;
   mode: 'OTP_ONLY' | 'FULL';
@@ -54,17 +43,12 @@ export interface BlockUserInput {
   reason?: string;
 }
 
-/**
- * Declaring the constants
- */
 export const adminUserKeys = {
   all: ['admin', 'users'] as const,
   list: (params?: UserSearchParams) => [...adminUserKeys.all, 'list', params] as const,
   detail: (userId: string) => [...adminUserKeys.all, userId] as const,
   audit: (userId: string) => [...adminUserKeys.all, userId, 'audit'] as const,
 };
-
-/** ---------- queries ---------- */
 
 export const adminUsersQueryOptions = (params?: UserSearchParams) =>
   queryOptions<UserSearchResponse, ApiError>({
@@ -97,8 +81,6 @@ export const adminUserAuditQueryOptions = (userId: string, enabled = true) =>
 export function useUserAuditQuery(userId: string, enabled = true): UseQueryResult<UserAuditEventsResponse, ApiError> {
   return useQuery(adminUserAuditQueryOptions(userId, enabled));
 }
-
-/** ---------- lifecycle mutations ---------- */
 
 /** Refreshes both the searched list and the affected user's detail after a lifecycle action (AAL2). */
 function useUserActionMutation<V extends { userId: string }>(action: (vars: V) => Promise<unknown>): UseMutationResult<unknown, ApiError, V> {

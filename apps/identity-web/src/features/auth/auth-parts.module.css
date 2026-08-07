@@ -50,7 +50,6 @@
   color: var(--sh-text-secondary);
 }
 
-/* identifier chip */
 .idChip {
   display: flex;
   align-items: center;
@@ -86,7 +85,6 @@
   white-space: nowrap;
 }
 
-/* method rows */
 .methodList {
   display: flex;
   flex-direction: column;
@@ -171,7 +169,6 @@
   color: var(--sh-text-tertiary);
 }
 
-/* otp */
 .otp {
   display: flex;
   flex-direction: column;
@@ -202,7 +199,6 @@
   color: var(--sh-danger-text);
 }
 
-/* login-specific helpers */
 .orDivider {
   display: flex;
   align-items: center;
@@ -291,7 +287,6 @@
   flex: none;
 }
 
-/* consent */
 .scopeList {
   display: flex;
   flex-direction: column;
@@ -383,7 +378,6 @@
   width: 100%;
 }
 
-/* invitation */
 .inviteHead {
   display: flex;
   flex-direction: column;

@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Button, Spinner } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { AlertTriangleIcon, LockIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, StepHeader } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
@@ -14,19 +8,12 @@ import { StepUpFields } from '@/features/portal';
 import { stepUpIntentQueryOptions, useRootDomain, useStepUpIntentQuery, useStepUpMethodsQuery } from '@/lib/apis';
 import { requireSession } from '@/lib/session';
 
-/**
- * Defining types
- */
 /** Kept snake_case to round-trip the SDK's OAuth-style URL — a renamed shape makes the router rewrite the address with duplicate params. */
 interface StepUpSearch {
   client_id?: string;
   resource?: string;
   return_to?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * The hosted step-up prompt (D-19, T-801). A first-party SDK redirects the browser here — same origin

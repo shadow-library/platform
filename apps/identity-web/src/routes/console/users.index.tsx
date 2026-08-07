@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Avatar, Input, Pagination, Select, Table } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { SearchIcon } from '@/components/icons';
 import { PageHeader, StatusChip } from '@/components/si';
 import { type UserStatus, type UserSummaryItem, useUsersQuery } from '@/lib/apis';

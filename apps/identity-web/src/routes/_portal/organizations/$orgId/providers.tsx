@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button, ConfirmDialog, Dialog, FormField, Input, Switch, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { PlusIcon } from '@/components/icons';
 import { QueryState, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
@@ -62,7 +56,6 @@ function IdpDialog({
   const [form, setForm] = useState<IdpForm>(EMPTY_FORM);
   const [ready, setReady] = useState(false);
 
-  /** Seed the form the first render the dialog opens, from the provider being edited (secret never echoed). */
   if (open && !ready) {
     setForm(
       editing

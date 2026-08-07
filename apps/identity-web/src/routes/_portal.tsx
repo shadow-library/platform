@@ -1,16 +1,9 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { Spinner } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { PortalShell } from '@/features/portal';
 import { requireSession, useSessionGuard } from '@/lib/session';
 
-/** The authenticated account-portal group (account, applications, organisations list). */
 export const Route = createFileRoute('/_portal')({
   beforeLoad: ({ context, location }) => requireSession(context.queryClient, location.href),
   component: PortalGroup,

@@ -1,27 +1,15 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { CheckIcon, LockIcon } from '@/components/icons';
 
 import styles from './auth-shell.module.css';
 
-/**
- * Defining types
- */
 interface AuthScreenProps {
   children: ReactNode;
   /** Page-specific footer row (e.g. "New to Shadow? Create an account"). */
   footer?: ReactNode;
 }
 
-/**
- * Declaring the constants
- */
 const BRAND_POINTS = ['Phishing-resistant passkeys', 'Enterprise SSO & SCIM provisioning', 'SOC 2 Type II · ISO 27001'];
 
 function BrandGlyph({ size = 26, onAccent = false }: { size?: number; onAccent?: boolean }): React.JSX.Element {
@@ -38,7 +26,6 @@ function BrandGlyph({ size = 26, onAccent = false }: { size?: number; onAccent?:
   );
 }
 
-/** The indigo marketing rail shown beside every hosted-auth form (hidden on narrow viewports). */
 function AuthBrandPanel(): React.JSX.Element {
   return (
     <div className={styles.brandPanel} aria-hidden="true">
@@ -69,7 +56,6 @@ function AuthBrandPanel(): React.JSX.Element {
   );
 }
 
-/** The split-screen chrome for the hosted-auth pages: brand rail + a centred form column. */
 export function AuthScreen({ children, footer }: AuthScreenProps): React.JSX.Element {
   return (
     <div className={styles.screen}>
@@ -94,12 +80,10 @@ export function AuthScreen({ children, footer }: AuthScreenProps): React.JSX.Ele
   );
 }
 
-/** The rounded surface card the auth steps render inside. */
 export function AuthCard({ children, className }: { children: ReactNode; className?: string }): React.JSX.Element {
   return <div className={`${styles.card}${className ? ` ${className}` : ''}`}>{children}</div>;
 }
 
-/** A centred icon medallion (passkey prompt, lock-out, success). */
 export function AuthMedallion({ children, intent = 'accent' }: { children: ReactNode; intent?: 'accent' | 'danger' | 'success' | 'warning' | 'neutral' }): React.JSX.Element {
   return (
     <div className={styles.medallion} data-intent={intent}>

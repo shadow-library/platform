@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { type ReactNode } from 'react';
 import { Button } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { AlertTriangleIcon, BanIcon, ClockIcon, InfoIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, StepHeader } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
 
-/**
- * Declaring the constants
- */
 interface ErrorSearch {
   error?: string;
   error_description?: string;

@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button, ConfirmDialog, Dialog, Drawer, DropdownMenu, FormField, IconButton, Input, Spinner, Tag, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { MoreIcon, PlusIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/si';
 import { SecretDialog } from '@/features/console';

@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import {
   type ApplicationDetailResponse,
   type ApplicationListResponse,
@@ -21,10 +15,6 @@ import {
   type UpdateApplicationBody,
 } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
-
-/**
- * Defining types
- */
 
 export type {
   ApplicationDetailResponse,
@@ -44,9 +34,6 @@ export type {
 /** An application's platform visibility: who could ever be granted it (D-A1). */
 export type ApplicationVisibility = ApplicationDetailResponse['visibility'];
 
-/**
- * Declaring the constants
- */
 export const adminApplicationKeys = {
   all: ['admin', 'applications'] as const,
   list: () => [...adminApplicationKeys.all, 'list'] as const,
@@ -54,8 +41,6 @@ export const adminApplicationKeys = {
   members: (id: string) => [...adminApplicationKeys.all, id, 'members'] as const,
   organisations: (id: string) => [...adminApplicationKeys.all, id, 'organisations'] as const,
 };
-
-/** ---------- queries ---------- */
 
 export const adminApplicationsQueryOptions = () =>
   queryOptions<ApplicationListResponse, ApiError>({
@@ -88,8 +73,6 @@ export const adminApplicationMembersQueryOptions = (appId: string, enabled = tru
 export function useApplicationMembersQuery(appId: string, enabled = true): UseQueryResult<ApplicationMemberListResponse, ApiError> {
   return useQuery(adminApplicationMembersQueryOptions(appId, enabled));
 }
-
-/** ---------- mutations ---------- */
 
 export function useCreateApplicationMutation(): UseMutationResult<CreateApplicationResponse, ApiError, CreateApplicationBody> {
   const queryClient = useQueryClient();
@@ -125,8 +108,6 @@ export function useRemoveApplicationMemberMutation(): UseMutationResult<undefine
     onSuccess: (_data, { appId }) => queryClient.invalidateQueries({ queryKey: adminApplicationKeys.members(appId) }),
   });
 }
-
-/** ---------- releases (RESTRICTED apps) ---------- */
 
 export const adminApplicationOrganisationsQueryOptions = (appId: string, enabled = true) =>
   queryOptions<ApplicationOrganisationListResponse, ApiError>({

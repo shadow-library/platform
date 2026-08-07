@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import {
@@ -26,9 +23,6 @@ import {
   type TokenValue,
 } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { ArrowLeftIcon, ExternalLinkIcon } from '@/components/icons';
 import { type ChipIntent, StatusChip } from '@/components/si';
 import { SecretDialog } from '@/features/console';
@@ -67,9 +61,6 @@ import { formatDate, relativeTime } from '@/lib/format';
 
 import styles from './console.module.css';
 
-/**
- * Defining types
- */
 type Tab = 'overview' | 'credentials' | 'api' | 'roles' | 'members' | 'organisations';
 
 type Require = (action: () => void) => void;
@@ -81,8 +72,6 @@ interface VisibilityMeta {
 }
 
 /**
- * Declaring the constants
- *
  * The application is the unit of identity (D-21): it is provisioned with exactly one OAuth client and
  * one `api://<app>` resource, so the console administers those *through* the application rather than as
  * standalone objects. The credentials tab manages the client (secret, public URLs, workload subjects);
@@ -837,7 +826,6 @@ function ApiScopesTab(props: { appName: string; resource?: ResourceItem; resourc
   const [addScopeOpen, setAddScopeOpen] = useState(false);
   const [grantScopeId, setGrantScopeId] = useState('');
 
-  /** Every scope on another application's resource, tagged with its owning API — the pool this application may be granted. */
   const foreignScopes = useMemo(
     () => resources.filter(item => item.id !== resource?.id).flatMap(item => item.scopes.map(scope => ({ ...scope, resource: item.displayName ?? item.identifier }))),
     [resources, resource?.id],

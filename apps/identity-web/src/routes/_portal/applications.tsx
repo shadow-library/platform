@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { Avatar } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { ExternalLinkIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/si';
 import { type MyApplication, myApplicationsQueryOptions, useMyApplicationsQuery, useRootDomain } from '@/lib/apis';
@@ -19,7 +13,6 @@ export const Route = createFileRoute('/_portal/applications')({
   component: ApplicationsPage,
 });
 
-/** Prefer the app's declared home page; fall back to its subdomain on the platform root domain. */
 function appUrl(app: MyApplication, rootDomain: string): string {
   return app.homePageUrl || `https://${app.subDomain}.${rootDomain}`;
 }

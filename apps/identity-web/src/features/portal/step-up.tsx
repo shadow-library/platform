@@ -1,23 +1,14 @@
-/**
- * Importing npm packages
- */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { Button, Dialog, FormField, Input, OtpInput, Spinner, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { LockIcon } from '@/components/icons';
 import { assertPasskey } from '@/features/auth';
 import { meKeys, requestPasskeyStepUpOptions, type StepUpIntent, type StepUpMethod, useMeQuery, useStepUpMethodsQuery, useStepUpMutation, verifyPasskeyStepUp } from '@/lib/apis';
 
 import styles from './portal.module.css';
 
-/**
- * Defining types
- */
 interface StepUpFieldsProps {
   methods: StepUpMethod[] | undefined;
   loading?: boolean;
@@ -35,9 +26,6 @@ interface StepUpDialogProps {
   onElevated: () => void;
 }
 
-/**
- * Declaring the constants
- */
 const OTP_LENGTH = 6;
 const METHOD_PRIORITY: StepUpMethod[] = ['TOTP', 'WEBAUTHN', 'PASSWORD'];
 const METHOD_LABEL: Record<StepUpMethod, string> = { TOTP: 'authenticator app', WEBAUTHN: 'passkey', PASSWORD: 'password' };

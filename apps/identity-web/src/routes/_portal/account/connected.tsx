@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { Avatar, Button, Tag, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { PageHeader, QueryState, StatusChip } from '@/components/si';
 import { type ConsentRecord, consentsQueryOptions, useMyConsentsQuery, useRevokeConsentMutation } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';

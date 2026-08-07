@@ -1,29 +1,18 @@
-/**
- * Importing npm packages
- */
 import { Link, useNavigate } from '@tanstack/react-router';
 import { type ReactNode } from 'react';
 import { Avatar, Badge, Button } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { type MemberRole, useOrgAccess } from '@/lib/apis';
 import { formatDate } from '@/lib/format';
 
 import styles from './org.module.css';
 
-/**
- * Defining types
- */
 interface OrgWorkspaceProps {
   orgId: string;
   children: ReactNode;
 }
 
 /**
- * Declaring the constants
- *
  * Domains only exist for team organisations, and identity providers are an org-admin surface —
  * tabs the server would refuse are hidden rather than left to error.
  */
@@ -38,11 +27,6 @@ const TABS = [
 
 const ROLE_INTENT: Record<MemberRole, 'info' | 'neutral'> = { OWNER: 'info', ADMIN: 'neutral', MEMBER: 'neutral' };
 
-/**
- * The single-organisation workspace: an identity header (name, the caller's role, slug/created meta)
- * over a tab bar for settings, members, domains, and identity providers. Rendered inside the portal
- * shell, so it is a sub-layout rather than its own chrome.
- */
 export function OrgWorkspace({ orgId, children }: OrgWorkspaceProps): React.JSX.Element {
   const navigate = useNavigate();
   const { org, canManage } = useOrgAccess(orgId);

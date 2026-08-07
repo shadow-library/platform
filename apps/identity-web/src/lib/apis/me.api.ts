@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type ChangePasswordBody, type ChangePasswordResponse, type MeResponse, type UpdateProfileBody } from './api-types.gen';
 import { sessionKeys } from './session.api';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * Defining types
- */
-
-/** `GET /me` — profile basics plus the current session's assurance, for first-party surfaces. */
 export type { ChangePasswordBody, MeResponse, UpdateProfileBody };
 
-/**
- * Declaring the constants
- */
 export const meKeys = {
   all: ['me'] as const,
 };
@@ -41,7 +27,6 @@ export function useMeQuery(enabled = true): UseQueryResult<MeResponse, ApiError>
   return useQuery(meQueryOptions(enabled));
 }
 
-/** Updates the signed-in user's display name; the fresh `MeResponse` seeds the cache so the UI reflects it at once. */
 export function useUpdateProfileMutation(): UseMutationResult<MeResponse, ApiError, UpdateProfileBody> {
   const queryClient = useQueryClient();
   return useMutation<MeResponse, ApiError, UpdateProfileBody>({

@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Badge, Button, ConfirmDialog, Dialog, FormField, Input, Select, Spinner, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { BuildingIcon, PlusIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
 import { Mono, PageHeader } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
@@ -27,9 +21,6 @@ import { relativeTime } from '@/lib/format';
 
 import styles from './console.module.css';
 
-/**
- * Declaring the constants
- */
 export const Route = createFileRoute('/console/roles')({
   /** The chosen application and role live in the URL (`?app=&role=`) so they survive refresh and are deep-linkable. */
   validateSearch: (search: Record<string, unknown>): { app?: string; role?: number } => {
@@ -37,14 +28,12 @@ export const Route = createFileRoute('/console/roles')({
     const role = typeof roleRaw === 'number' ? roleRaw : typeof roleRaw === 'string' && /^\d+$/.test(roleRaw) ? Number(roleRaw) : undefined;
     return { app: typeof search.app === 'string' ? search.app : undefined, role };
   },
-  /** The application list feeds the picker; permissions and assignments load once an application/role is chosen. */
   loader: ({ context }) => context.queryClient.ensureQueryData(adminApplicationsQueryOptions()),
   component: RolesPage,
 });
 
 const PRINCIPAL_LABEL: Record<PrincipalType, string> = { USER: 'User', SERVICE_ACCOUNT: 'Service account', ORGANISATION: 'Organisation' };
 
-/** An ORGANISATION grant is a vendor-controlled tier the whole org holds (D-A5); its principal *is* the organisation. */
 const PRINCIPAL_ICON: Record<PrincipalType, React.JSX.Element> = {
   USER: <UserIcon size={15} />,
   SERVICE_ACCOUNT: <TerminalIcon size={15} />,
@@ -213,7 +202,6 @@ function RolesPage(): React.JSX.Element {
   const navigate = Route.useNavigate();
   const { app: appParam, role: selectedRoleId } = Route.useSearch();
   const firstAppId = apps.data?.items[0]?.id;
-  /** Default to the first application until the operator picks another — derived, so no effect is needed. */
   const effectiveAppId = appParam || (firstAppId === undefined ? '' : String(firstAppId));
 
   const app = useApplicationQuery(effectiveAppId, Boolean(effectiveAppId));
@@ -221,7 +209,6 @@ function RolesPage(): React.JSX.Element {
 
   const roles = app.data?.roles ?? [];
   const perms = permissions.data?.items ?? [];
-  /** Selection survives only while the chosen role still belongs to the current application. */
   const selectedRole = roles.find(role => role.id === selectedRoleId) ?? null;
 
   return (

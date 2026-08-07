@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
 import { IconButton, Spinner } from '@shadow-library/ui';
 import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 
-/**
- * Importing user defined packages
- */
 import { BellIcon, BrandGlyph, BuildingIcon, GridIcon, MailIcon, MonitorIcon, PlugIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
 import { ThemeToggle } from '@/components/si';
 import { useAdminContextQuery, useMeQuery, useSignoutMutation } from '@/lib/apis';
@@ -16,9 +10,6 @@ import { displayName } from '@/lib/format';
 
 import styles from './portal-shell.module.css';
 
-/**
- * Declaring the constants
- */
 /** `isStaff` gates the platform section — an admin whose /admin/context grants any permission. */
 function navConfig(isStaff: boolean): NavConfig {
   return {
@@ -42,7 +33,6 @@ function navConfig(isStaff: boolean): NavConfig {
   };
 }
 
-/** The breadcrumb's leaf, read off the same config the sidebar renders so the two can't disagree. */
 function activeLabel(nav: NavConfig, pathname: string): string {
   const leaves = nav.sections.filter(section => section.hidden !== true).flatMap(section => section.items);
   const match = leaves.find(item => 'to' in item && (item.exact === true ? pathname === item.to : pathname.startsWith(item.to)));

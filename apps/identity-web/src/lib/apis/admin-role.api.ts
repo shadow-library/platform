@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type AssignmentListResponse, type PermissionItem, type PermissionListResponse, type RoleAssignmentBody, type RoleAssignmentItem } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
-
-/**
- * Defining types
- */
 
 export type { AssignmentListResponse, PermissionItem, PermissionListResponse, RoleAssignmentBody, RoleAssignmentItem };
 export type PrincipalType = RoleAssignmentItem['principalType'];
@@ -24,8 +14,6 @@ export interface AssignmentListParams {
 }
 
 /**
- * Declaring the constants
- *
  * Role and permission *definitions* are owned by each application and pushed declaratively through the
  * SDK's catalog sync (`PUT /api/v1/authz/catalog`); the console can only read them. What it still drives
  * is *assignment* — granting a defined role to a principal.
@@ -34,8 +22,6 @@ export const adminRoleKeys = {
   permissions: (applicationId: number) => ['admin', 'permissions', applicationId] as const,
   assignments: (params?: AssignmentListParams) => ['admin', 'role-assignments', params] as const,
 };
-
-/** ---------- queries + mutations ---------- */
 
 export const permissionsQueryOptions = (applicationId: number, enabled = true) =>
   queryOptions<PermissionListResponse, ApiError>({

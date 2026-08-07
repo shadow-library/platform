@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button, ConfirmDialog, DescriptionList, FormField, Input, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { SectionCard } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import { myOrganisationsQueryOptions, useDeleteOrganisationMutation, useMyOrganisationsQuery, useRenameOrganisationMutation } from '@/lib/apis';

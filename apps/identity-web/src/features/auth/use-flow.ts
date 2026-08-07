@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { useCallback, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { type FlowState, isApiError } from '@/lib/apis';
-
-/**
- * Defining types
- */
 
 /** Why a flow became unrecoverable: `expired` (timed out / not found) vs `locked` (terminated after too many failures). */
 export type DeadReason = 'expired' | 'locked';
@@ -35,9 +25,6 @@ export interface FlowActions {
   hydrate(state: FlowState): void;
 }
 
-/**
- * Declaring the constants
- */
 const RETRY_MESSAGE = (seconds?: number): string => (seconds ? `Too many attempts — try again in ${seconds}s.` : 'Too many attempts — try again shortly.');
 
 const REJECTED_MESSAGE = (attemptsLeft: number): string =>

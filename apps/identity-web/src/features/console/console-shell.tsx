@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
 import { Button, Spinner } from '@shadow-library/ui';
 import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 
-/**
- * Importing user defined packages
- */
 import { ArrowLeftIcon, BrandGlyph, GridIcon, LayersIcon, LinkIcon, ShieldCheckIcon, UserIcon, UsersIcon, WebhookIcon } from '@/components/icons';
 import { ThemeToggle } from '@/components/si';
 import { useMeQuery, useSignoutMutation } from '@/lib/apis';
@@ -16,9 +10,6 @@ import { displayName } from '@/lib/format';
 
 import styles from './console-shell.module.css';
 
-/**
- * Declaring the constants
- */
 const NAV: NavConfig = {
   variant: 'sections',
   sections: [
@@ -42,7 +33,6 @@ const NAV: NavConfig = {
 
 const CRUMB = new Map(NAV.sections.flatMap(section => section.items).map(item => ('to' in item ? [item.to, item.label] : [item.label, item.label])));
 
-/** The operator console chrome — the same shell as the portal, marked privileged by its warning tone. */
 export function ConsoleShell({ children }: { children: ReactNode }): React.JSX.Element {
   const me = useMeQuery();
   const navigate = useNavigate();

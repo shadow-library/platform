@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { Alert, Button, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { MonitorIcon, SmartphoneIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';

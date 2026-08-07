@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { Avatar, Button } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { CheckIcon, MailIcon, MinusIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, StepHeader } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
@@ -27,7 +21,7 @@ export const Route = createFileRoute('/invite/$token')({
     try {
       await context.queryClient.ensureQueryData(meQueryOptions());
     } catch {
-      /** signed-out invite landing is expected */
+      // A missing session is valid on the invite landing page.
     }
   },
   component: InvitePage,

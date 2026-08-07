@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 import { Button, FormField, OtpInput } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { ChevronRightIcon } from '@/components/icons';
 
 import styles from './auth-parts.module.css';
 
-/**
- * Defining types
- */
 interface StepHeaderProps {
   title: ReactNode;
   description?: ReactNode;
@@ -51,11 +42,6 @@ interface OtpEntryProps {
   length?: number;
 }
 
-/**
- * Declaring the constants
- */
-
-/** The segmented progress bar + step label at the top of a wizard step. */
 export function StepProgress({ total, current, label }: { total: number; current: number; label?: ReactNode }): React.JSX.Element {
   return (
     <div className={styles.progress}>
@@ -69,7 +55,6 @@ export function StepProgress({ total, current, label }: { total: number; current
   );
 }
 
-/** The two-line heading used at the top of every auth step. */
 export function StepHeader({ title, description, align = 'start' }: StepHeaderProps): React.JSX.Element {
   return (
     <div className={styles.stepHeader} data-align={align}>
@@ -79,7 +64,6 @@ export function StepHeader({ title, description, align = 'start' }: StepHeaderPr
   );
 }
 
-/** The "current identifier" pill with a Change action, shown once an identifier is locked in. */
 export function IdentifierChip({ label, onChange }: IdentifierChipProps): React.JSX.Element {
   return (
     <div className={styles.idChip}>
@@ -96,7 +80,6 @@ export function IdentifierChip({ label, onChange }: IdentifierChipProps): React.
   );
 }
 
-/** A selectable factor/method row (authenticator, SMS, passkey, recovery code). */
 export function MethodRow({ icon, title, description, badge, selected, onClick }: MethodRowProps): React.JSX.Element {
   return (
     <button type="button" className={styles.methodRow} data-selected={selected || undefined} onClick={onClick}>
@@ -110,7 +93,6 @@ export function MethodRow({ icon, title, description, badge, selected, onClick }
   );
 }
 
-/** Segmented one-time-code entry with an optional resend row and an "another way" escape hatch. */
 export function OtpEntry({
   title,
   sentTo,

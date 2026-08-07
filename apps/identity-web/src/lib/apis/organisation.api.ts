@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import {
   type CreateIdentityProviderBody,
   type CreateOrganisationBody,
@@ -24,10 +18,6 @@ import {
   type UpdateIdentityProviderBody,
 } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
-
-/**
- * Defining types
- */
 
 export type {
   CreateIdentityProviderBody,
@@ -67,9 +57,6 @@ export interface OrgAccess {
   canManage: boolean;
 }
 
-/**
- * Declaring the constants
- */
 export const orgKeys = {
   all: ['organisations'] as const,
   mine: () => [...orgKeys.all, 'mine'] as const,
@@ -79,8 +66,6 @@ export const orgKeys = {
   domains: (id: string) => [...orgKeys.all, id, 'domains'] as const,
   idps: (id: string) => [...orgKeys.all, id, 'identity-providers'] as const,
 };
-
-/** ---------- my organisations ---------- */
 
 export const myOrganisationsQueryOptions = () =>
   queryOptions<MyOrganisationsResponse, ApiError>({
@@ -151,8 +136,6 @@ export function useLeaveOrganisationMutation(): UseMutationResult<undefined, Api
   });
 }
 
-/** ---------- members ---------- */
-
 export const membersQueryOptions = (orgId: string, enabled = true) =>
   queryOptions<MembersResponse, ApiError>({
     queryKey: orgKeys.members(orgId),
@@ -188,8 +171,6 @@ export function useRemoveMemberMutation(orgId: string): UseMutationResult<undefi
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.members(orgId) }),
   });
 }
-
-/** ---------- invitations ---------- */
 
 export const invitationsQueryOptions = (orgId: string, enabled = true) =>
   queryOptions<InvitationsResponse, ApiError>({
@@ -233,8 +214,6 @@ export function useDeclineInvitationMutation(): UseMutationResult<undefined, Api
   });
 }
 
-/** ---------- domains ---------- */
-
 export const domainsQueryOptions = (orgId: string, enabled = true) =>
   queryOptions<DomainsResponse, ApiError>({
     queryKey: orgKeys.domains(orgId),
@@ -269,8 +248,6 @@ export function useRemoveDomainMutation(orgId: string): UseMutationResult<undefi
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.domains(orgId) }),
   });
 }
-
-/** ---------- identity providers ---------- */
 
 export const identityProvidersQueryOptions = (orgId: string, enabled = true) =>
   queryOptions<IdentityProviderListResponse, ApiError>({

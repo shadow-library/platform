@@ -5,7 +5,6 @@
   min-height: 100vh;
 }
 
-/* The console's standing reminder that these screens act on other people's accounts. */
 .privileged {
   display: inline-flex;
   align-items: center;

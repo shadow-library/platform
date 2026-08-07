@@ -1,29 +1,16 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Badge, Button, Input, Select, Spinner, Switch, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { SectionCard } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import { organisationPoliciesQueryOptions, type PolicyItem, useClearPolicyMutation, usePoliciesQuery, useSetPolicyMutation } from '@/lib/apis';
 
 import styles from './security.module.css';
 
-/**
- * Defining types
- */
 type RequireGate = (action: () => void) => void;
 
-/**
- * Declaring the constants
- *
- * Largest-unit-first so a duration renders in the coarsest unit that divides it evenly (600s → 10 minutes).
- */
+/** Largest-unit-first so a duration renders in the coarsest unit that divides it evenly (600s → 10 minutes). */
 const DURATION_UNITS: { label: string; seconds: number }[] = [
   { label: 'days', seconds: 86400 },
   { label: 'hours', seconds: 3600 },
@@ -106,7 +93,6 @@ function PolicyRow({ orgId, policy, require }: { orgId: string; policy: PolicyIt
           <span className={styles.rowLabel}>{policy.label}</span>
           <Badge intent={configured ? 'info' : 'neutral'}>{configured ? 'Configured' : 'Inherited'}</Badge>
         </div>
-        {/* What the setting governs, then how it combines across the organisations a member belongs to. */}
         <div className={styles.rowHint}>
           {policy.description} {fold}
         </div>

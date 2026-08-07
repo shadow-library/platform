@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 import { Button, Dialog } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { SecretOncePanel } from '@/features/portal';
 
-/**
- * Defining types
- */
 interface SecretDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -22,7 +13,6 @@ interface SecretDialogProps {
   downloadName?: string;
 }
 
-/** A modal wrapper around `SecretOncePanel` for the console's one-time secrets (client / webhook secrets). */
 export function SecretDialog({ open, onOpenChange, title, description, secret, codes, downloadName }: SecretDialogProps): React.JSX.Element {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

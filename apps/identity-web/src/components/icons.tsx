@@ -1,8 +1,3 @@
-/**
- * Lucide-style stroke icons used across Shadow Identity, matching the design comps. A single 24×24
- * stroke grid keeps every glyph visually consistent; `size` scales width/height together and colour
- * follows `currentColor`.
- */
 import { type SVGProps } from 'react';
 
 export interface IconProps extends SVGProps<SVGSVGElement> {
@@ -439,10 +434,6 @@ export const SparkIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
-/**
- * The Shadow Identity mark — two offset rounded squares behind a person glyph. Shared by both shells so
- * the portal and the console cannot drift apart on the one thing that says which product this is.
- */
 export const BrandGlyph = ({ size = 24 }: { size?: number }): React.JSX.Element => (
   <svg width={size} height={size} viewBox="0 0 28 28" fill="none" aria-hidden="true">
     <rect x="7" y="7" width="17" height="17" rx="5" fill="var(--sh-accent-soft)" />

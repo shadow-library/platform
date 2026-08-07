@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Dialog, FormField, Input, OtpInput, Spinner, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { FingerprintIcon, KeyIcon, SmartphoneIcon } from '@/components/icons';
 import { CopyButton, PageHeader } from '@/components/si';
 import { registerPasskey } from '@/features/auth';

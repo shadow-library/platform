@@ -1,22 +1,13 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, DescriptionList, FormField, Input, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { PageHeader, QueryState } from '@/components/si';
 import { useMeQuery, useUpdateProfileMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
 import styles from './profile.module.css';
 
-/**
- * Declaring the constants
- */
 export const Route = createFileRoute('/_portal/account/profile')({
   component: ProfilePage,
 });
@@ -30,7 +21,6 @@ function ProfilePage(): React.JSX.Element {
   const [lastName, setLastName] = useState('');
   const [seeded, setSeeded] = useState(false);
 
-  /** Seed the inline form once the warm session lands; the form then owns its state until save/cancel. */
   useEffect(() => {
     if (!user || seeded) return;
     setFirstName(user.firstName ?? '');

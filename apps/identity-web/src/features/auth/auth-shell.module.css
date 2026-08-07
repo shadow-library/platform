@@ -5,7 +5,6 @@
   background: var(--sh-surface-app);
 }
 
-/* ---------- brand rail ---------- */
 .brandPanel {
   flex: 1 1 0;
   min-width: 0;
@@ -101,7 +100,6 @@
   opacity: 0.72;
 }
 
-/* ---------- form column ---------- */
 /* Mirrors the brand rail (both flex: 1 1 0 → a 50/50 split); the form content is centered within
    its half and capped at --form-width so the card breathes instead of stretching the full panel. */
 .formCol {
@@ -169,7 +167,6 @@
   color: var(--sh-text-placeholder);
 }
 
-/* ---------- card + medallion ---------- */
 .card {
   background: var(--sh-surface-card);
   border: 1px solid var(--sh-border-subtle);
@@ -216,7 +213,7 @@
   .brandPanel {
     display: none;
   }
-  /* Brand rail gone → the form column already spans full width; just tighten the gutters. */
+
   .formCol {
     padding: 28px 24px;
   }

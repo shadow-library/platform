@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode, useState } from 'react';
 import { Button, Checkbox, copyText, downloadTextFile } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { AlertTriangleIcon, CopyIcon, DownloadIcon } from '@/components/icons';
 import { CopyButton } from '@/components/si';
 
 import styles from './portal.module.css';
 
-/**
- * Defining types
- */
 interface SecretOncePanelProps {
   title?: ReactNode;
   description?: ReactNode;
@@ -28,11 +19,6 @@ interface SecretOncePanelProps {
   downloadName?: string;
 }
 
-/**
- * The reveal-once surface for secrets the server shows exactly once — recovery-code batches, client
- * secrets, webhook signing keys. Warning-framed, with copy-all + download, and an optional
- * "I've saved it" gate before the caller is allowed to dismiss it.
- */
 export function SecretOncePanel({
   title = 'Save this now — you won’t see it again',
   description = 'Store it in a password manager. It cannot be retrieved later.',

@@ -1,32 +1,17 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type ClientDetailResponse, type ClientListResponse, type ClientSummaryItem, type RotateSecretResponse, type UpdateClientBody } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
-
-/**
- * Defining types
- */
 
 export type { ClientDetailResponse, ClientListResponse, ClientSummaryItem, RotateSecretResponse, UpdateClientBody };
 export type ClientKind = ClientSummaryItem['kind'];
 export type GrantType = 'authorization_code' | 'refresh_token' | 'client_credentials';
 
-/**
- * Declaring the constants
- */
 export const adminClientKeys = {
   all: ['admin', 'clients'] as const,
   list: () => [...adminClientKeys.all, 'list'] as const,
   detail: (clientId: string) => [...adminClientKeys.all, clientId] as const,
 };
-
-/** ---------- queries ---------- */
 
 export const adminClientsQueryOptions = () =>
   queryOptions<ClientListResponse, ApiError>({
@@ -48,8 +33,6 @@ export const adminClientQueryOptions = (clientId: string, enabled = true) =>
 export function useClientQuery(clientId: string, enabled = true): UseQueryResult<ClientDetailResponse, ApiError> {
   return useQuery(adminClientQueryOptions(clientId, enabled));
 }
-
-/** ---------- mutations ---------- */
 
 export function useUpdateClientMutation(): UseMutationResult<ClientDetailResponse, ApiError, { clientId: string; body: UpdateClientBody }> {
   const queryClient = useQueryClient();

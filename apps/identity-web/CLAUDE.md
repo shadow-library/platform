@@ -98,9 +98,11 @@ logic worth covering in isolation. Copy `.env.example` → `.env` before first r
 
 ## Frontend / SSR patterns — follow these exactly
 
-- **File section banners** open every source file (except barrels): `Importing npm packages` →
-  `Importing user defined packages` → `Defining types` → `Declaring the constants` (api files use
-  `Declaring the server functions`). npm imports first, then `@/`-aliased local imports; CSS-module import last.
+- **Comments are rare and rationale-first.** Do not add file-section banners or comments that restate names,
+  types, configuration keys, or control flow. Keep non-obvious security, compatibility, ordering, and design
+  constraints. Reusable option fields retain caller-facing JSDoc when their semantics are not evident from the
+  type alone. Preserve the established import order; `@shadow-library/*` belongs with external npm packages,
+  before `@/`-aliased local imports, and CSS-module imports remain in their existing position.
 - **Routing** is TanStack Start **file-based** in `src/routes/` (generated `src/routeTree.gen.ts` — never edit by
   hand). `_`-prefixed layout/pathless routes (`_auth`, `_portal`), `$`-prefixed dynamic params (`$orgId`,
   `invite.$token`). Define routes with `createFileRoute('/path')({ ... })`; type query params with

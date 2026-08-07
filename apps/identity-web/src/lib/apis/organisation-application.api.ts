@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type OrganisationApplicationItem, type OrganisationApplicationsResponse, type UpdateOrganisationBody } from './api-types.gen';
 import { orgKeys } from './organisation.api';
 import { type ApiError, APIRequest } from './transport';
-
-/**
- * Defining types
- */
 
 export type { OrganisationApplicationItem, OrganisationApplicationsResponse };
 
@@ -20,17 +10,13 @@ export type { OrganisationApplicationItem, OrganisationApplicationsResponse };
 export type AppAccessMode = OrganisationApplicationsResponse['appAccessMode'];
 
 /**
- * Declaring the constants
- *
- * The applications an organisation's members may reach. Reading the list is an org-ADMIN surface;
+ * Reading the list is an org-ADMIN surface;
  * assigning/unassigning apps needs ADMIN + step-up, and flipping the access mode is OWNER + step-up —
  * so callers gate the affordances the same way and the server remains the authority.
  */
 export const orgApplicationKeys = {
   list: (orgId: string) => [...orgKeys.detail(orgId), 'applications'] as const,
 };
-
-/** ---------- queries + mutations ---------- */
 
 export const orgApplicationsQueryOptions = (orgId: string, enabled = true) =>
   queryOptions<OrganisationApplicationsResponse, ApiError>({
