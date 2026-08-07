@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { cn, EmptyState, Input, SegmentedControl } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { BookmarkIcon, CloseIcon, PlayIcon, ShieldIcon } from '@/components/icons';
 import { Cover } from '@/components/novel';
 import { libraryQueryOptions, progressQueryOptions, sessionQueryOptions, sharedQueryOptions, useToggleLibraryMutation } from '@/lib/apis';
@@ -16,9 +10,6 @@ import { type LibraryEntry, type ReadingProgress } from '@/lib/apis/types';
 
 import styles from './library-screen.module.css';
 
-/**
- * Defining types
- */
 export interface LibrarySearch {
   view?: 'grid' | 'list';
 }
@@ -34,14 +25,6 @@ interface ShelfItem {
   finished: boolean;
 }
 
-/**
- * Declaring the constants
- *
- * The library shelf from the mockups: saved novels with reading-progress overlays, a grid/list toggle,
- * pill filter tabs with counts, search, and a guest sync note. Local-first — guests keep a device shelf; a
- * session syncs it to the server. The `view` toggle rides a search param (mirroring browse) so it survives
- * reloads and is shareable; the active tab and query stay local UI state.
- */
 const route = getRouteApi('/_shell/library');
 
 const FILTERS: { value: LibraryFilter; label: string }[] = [
@@ -67,7 +50,6 @@ function matches(filter: LibraryFilter, item: ShelfItem): boolean {
   }
 }
 
-/** Compact "last opened" label from progress timestamps. Client-only — the shelf is empty during SSR. */
 function timeAgo(iso: string): string {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
   if (mins < 1) return 'just now';
@@ -144,7 +126,6 @@ export function LibraryScreen(): React.JSX.Element {
         </div>
       )}
 
-      {/* Above the shelf, not inside it: these are novels someone gave you access to, not ones you saved. */}
       {(shared.data?.length ?? 0) > 0 && (
         <section className={styles.sharedSection} aria-labelledby="shared-heading">
           <h2 id="shared-heading" className={styles.sharedTitle}>

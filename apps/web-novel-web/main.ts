@@ -1,18 +1,10 @@
 /// <reference types="bun" />
-/**
- * Importing npm packages
- */
+
 import { join } from 'node:path';
 
 import { serve } from '@shadow-library/web/server-entry';
 
 /**
- * Importing user defined packages
- */
-
-/**
- * Declaring the constants
- *
  * The production server — static assets (immutable cache + gzip), SSR streaming, `/sw.js` with
  * service-worker headers, `*.webmanifest` as `application/manifest+json`, a backend-independent liveness
  * probe, and graceful drain — is the shared Bun server from `@shadow-library/web`. This entry only points

@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useRouter } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar, Button, cn, Input, Pagination, Tabs, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import {
   AlertIcon,
   BackIcon,
@@ -43,19 +37,9 @@ import { getDownloadedNovel } from '@/lib/offline';
 import { MatureGate, useMatureGate } from './mature-gate';
 import styles from './novel-screen.module.css';
 
-/**
- * Defining types
- */
 type ReviewSort = 'helpful' | 'rating' | 'recent';
 type CommentSort = 'recent' | 'top';
 
-/**
- * Declaring the constants
- *
- * The novel detail screen: cover hero with actions, a stats strip, and sticky Overview / Chapters /
- * Reviews / Comments tabs. Overview carries synopsis + characters + illustrations + related; chapters
- * adds sort, select-to-download, and per-row markers; reviews and comments render the community layer.
- */
 const CHAPTER_PAGE_SIZE = 100;
 const NEW_CHAPTER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -75,7 +59,6 @@ const COMMENT_SORTS: { value: CommentSort; label: string }[] = [
   { value: 'top', label: 'Top' },
 ];
 
-/** Local glyphs the shared icon set does not carry, drawn in the same Lucide stroke style. */
 function glyph(paths: React.ReactNode): (props: { size?: number; className?: string }) => React.JSX.Element {
   return function Glyph({ size = 18, className }): React.JSX.Element {
     return (

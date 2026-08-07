@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { OfflineContentManager, OfflineStore } from '@shadow-library/web/offline';
 
-/**
- * Importing user defined packages
- */
 import { type NovelCover } from '@/lib/apis/types';
-
-/**
- * Defining types
- */
 
 /** The per-novel download record stored under `novel:<slug>` — the source of truth for the offline library. */
 export interface DownloadedNovel {
@@ -25,8 +15,6 @@ export interface DownloadedNovel {
 }
 
 /**
- * Declaring the constants
- *
  * One IndexedDB database for all explicitly-downloaded content (SW-independent, so downloads work even
  * where service workers don't). Chapters are stored one key per chapter so partial downloads and per-range
  * updates stay cheap; the `novel:` record indexes them for the offline-library screen.

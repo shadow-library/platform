@@ -1,22 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Link } from '@tanstack/react-router';
 import { Button } from '@shadow-library/ui';
-
-/**
- * Importing user defined packages
- */
 
 import styles from './boundary.module.css';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The 404 surface from the mockups ("Lost in the shadows") — plain content, so it renders inside whichever
  * layout is already mounted.
  */

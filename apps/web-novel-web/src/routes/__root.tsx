@@ -1,7 +1,5 @@
 /// <reference types="vite/client" />
-/**
- * Importing npm packages
- */
+
 import { type QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
@@ -10,28 +8,15 @@ import { ClientOnly, themeInitScript } from '@shadow-library/ui';
 import { NavProgress } from '@shadow-library/ui/router';
 import { pwaHeadLinks, pwaHeadMeta } from '@shadow-library/web/pwa';
 
-/**
- * Importing user defined packages
- */
 import AppProvider from '@/components/AppProvider';
 import { DefaultCatchBoundary } from '@/components/DefaultCatchBoundary';
 import { NotFound } from '@/components/NotFound';
 import '@/styles.css';
 
-/**
- * Defining types
- */
 interface RouterContext {
   queryClient: QueryClient;
 }
 
-/**
- * Declaring the constants
- *
- * The document shell. PWA head tags come from the ecosystem helpers (`pwaHeadLinks`/`pwaHeadMeta`) and
- * `data-density="touch"` on <html> turns on finger-first control metrics app-wide — this is a reading PWA
- * first, a desktop site second.
- */
 const PWA_HEAD = { manifestUrl: '/manifest.webmanifest', themeColor: '#4f46e5', appleTouchIcon: '/icons/icon.svg', appleTitle: 'Shadow Webnovel' };
 
 export const Route = createRootRouteWithContext<RouterContext>()({
@@ -69,7 +54,6 @@ function RootDocument({ children }: { children: React.ReactNode }): React.JSX.El
     <html lang="en" data-density="touch" suppressHydrationWarning>
       <head>
         <HeadContent />
-        {/* Applies the persisted theme before paint so there is no flash and no `data-theme` mismatch. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript({ legacyStorageKey: 'webnovel-theme' }) }} />
       </head>
       <body>

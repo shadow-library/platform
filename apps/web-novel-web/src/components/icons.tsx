@@ -1,22 +1,9 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 interface IconProps {
   size?: number;
   className?: string;
 }
 
 /**
- * Declaring the constants
- *
  * The app's icon set — inline Lucide-style strokes lifted from the design handoff so the built app carries
  * no icon dependency and every glyph matches the mockups.
  */

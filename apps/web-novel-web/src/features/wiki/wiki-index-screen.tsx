@@ -1,32 +1,14 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useRouter } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { cn } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { BackIcon, BookIcon, LockIcon } from '@/components/icons';
 import { getProgress, novelQueryOptions, sessionQueryOptions, wikiIndexQueryOptions } from '@/lib/apis';
 
 import { WIKI_TYPE_LABEL, WikiEntryCard } from './wiki-entry-card';
 import styles from './wiki.module.css';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * The wiki index: every entry the reader has unlocked so far, filterable by type, with the
- * "N more entries unlock as you read" affordance driven by the server's `lockedCount`. Two distinct empty
- * states matter here — a novel with no wiki at all vs. one where a wiki exists but nothing is unlocked yet
- * — so they read differently instead of collapsing into one generic "nothing here" box.
- */
 const route = getRouteApi('/_shell/novels/$slug_/wiki');
 
 export function WikiIndexScreen(): React.JSX.Element {

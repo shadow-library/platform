@@ -1,31 +1,16 @@
-/**
- * Importing npm packages
- */
 import { Link } from '@tanstack/react-router';
 import { Badge, cn } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { type WikiEntrySummary, type WikiEntryType } from '@/lib/apis/types';
 
 import styles from './wiki.module.css';
 
-/**
- * Defining types
- */
 export interface WikiEntryCardProps {
   slug: string;
   entry: WikiEntrySummary;
   className?: string;
 }
 
-/**
- * Declaring the constants
- *
- * Shared display labels — the index grid, the preview strip on the novel screen, and the entry detail
- * header all agree on how a type reads, so the taxonomy is defined once here.
- */
 export const WIKI_TYPE_LABEL: Record<WikiEntryType, string> = {
   character: 'Character',
   faction: 'Faction',
@@ -44,7 +29,6 @@ const WIKI_TYPE_INTENT: Record<WikiEntryType, 'info' | 'success' | 'warning' | '
   power_rule: 'info',
 };
 
-/** A deterministic gradient keyed on the entry's name, so a portrait without `imageUrl` still reads as distinct. */
 const PORTRAIT_PALETTE: [string, string][] = [
   ['#6366f1', '#312e81'],
   ['#0ea5e9', '#0c4a6e'],
@@ -70,7 +54,6 @@ export function WikiTypeBadge({ type, size = 'sm' }: { type: WikiEntryType; size
   );
 }
 
-/** Portrait art: the real image when the server resolved one, else a deterministic gradient + initial. */
 export function WikiPortrait({ name, imageUrl, className }: { name: string; imageUrl?: string; className?: string }): React.JSX.Element {
   if (imageUrl) return <img src={imageUrl} alt={name} className={cn(styles.portrait, styles.portraitImg, className)} />;
   const [from, to] = portraitGradient(name);

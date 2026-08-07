@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { Badge, Button, EmptyState, Progress, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { DownloadIcon } from '@/components/icons';
 import { Cover } from '@/components/novel';
 import { fetchChapter, getProgress, sessionQueryOptions } from '@/lib/apis';
@@ -27,9 +21,6 @@ import {
 
 import styles from './downloads-screen.module.css';
 
-/**
- * Defining types
- */
 interface DownloadRow {
   record: DownloadedNovel;
   bytes: number;
@@ -37,14 +28,6 @@ interface DownloadRow {
 
 type EntryStatus = 'downloading' | 'paused' | 'failed' | 'complete' | 'update';
 
-/**
- * Declaring the constants
- *
- * The offline library from the mockups: a device-storage summary and per-novel entries. Complete entries read
- * straight from IndexedDB (offline-safe); in-flight entries are driven by the in-memory `downloadQueue`, whose
- * pause/resume/cancel/retry controls mutate its state and re-render this screen. "Update · N new" surfaces the
- * chapters a novel has beyond what is stored, and downloading them exercises the same queue.
- */
 const STATUS: Record<EntryStatus, { label: string; intent: 'neutral' | 'info' | 'success' | 'danger' }> = {
   downloading: { label: 'Downloading', intent: 'info' },
   paused: { label: 'Paused', intent: 'neutral' },

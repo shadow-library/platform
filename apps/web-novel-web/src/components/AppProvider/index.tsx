@@ -1,24 +1,13 @@
-/**
- * Importing npm packages
- */
 import { ThemeProvider, Toaster, TooltipProvider } from '@shadow-library/ui';
 import { themeCookieDomain } from '@shadow-library/web';
 
-/**
- * Importing user defined packages
- */
 import { PwaLifecycle } from '@/components/PwaLifecycle';
 
-/**
- * Defining types
- */
 export interface AppProviderProps {
   children?: React.ReactNode;
 }
 
 /**
- * Declaring the constants
- *
  * The QueryClient lives in the router context (`createAppRouter`), so this mounts only the design-system
  * providers plus the PWA lifecycle (service worker registration, update prompt, offline/reconnect banners,
  * query-cache persistence).

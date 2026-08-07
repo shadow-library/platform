@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
@@ -11,16 +8,6 @@ import { defineConfig, type Plugin } from 'vite';
 import { buildManifest } from '@shadow-library/web/pwa';
 
 /**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The browser talks to webnovel-server on the same origin (`/api/...`), so dev proxies `/api` to the backend
  * at `API_ORIGIN` (falling back to `SERVER_URL`, then localhost). Production fronts this Start server and the
  * API with a reverse proxy that routes `/api` to webnovel-server and everything else here.

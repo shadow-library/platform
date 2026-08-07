@@ -1,31 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type QueryClient } from '@tanstack/react-query';
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { type WikiEntryDetail, type WikiIndex, wikiKeys } from '@/lib/apis';
 import { getRouter } from '@/router';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Route-level rendering for the wiki index and entry detail screens. The live-contract screens read their
- * data from React Query, so each case seeds the router's own QueryClient with the exact wire response for the
- * route's key before mounting — the loader's `ensureQueryData` then serves the cached value and no network is
- * touched. This covers the reader-visible states: an unlocked roster (with the "more unlock" affordance), a
- * novel with no wiki at all, a fully spoiler-locked wiki, an unlocked entry, and an unknown key that — with no
- * seed and no server — fails through to the default error boundary.
- */
 function renderAt(path: string, seed?: (client: QueryClient) => void) {
   const router = getRouter();
   seed?.(router.options.context.queryClient);

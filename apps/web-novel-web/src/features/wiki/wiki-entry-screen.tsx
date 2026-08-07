@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useRouter } from '@tanstack/react-router';
 import { cn } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { BackIcon, LockIcon } from '@/components/icons';
 import { wikiEntryQueryOptions } from '@/lib/apis';
 import { type WikiFacet } from '@/lib/apis/types';
@@ -15,18 +9,6 @@ import { type WikiFacet } from '@/lib/apis/types';
 import { WikiPortrait, WikiTypeBadge } from './wiki-entry-card';
 import styles from './wiki.module.css';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * A wiki entry's detail: portrait, type, its facets rendered as titled prose sections in `sortOrder`, an
- * image gallery, and the `hiddenFacetCount` affordance. A 404 (unknown entry, or one still spoiler-locked —
- * the server answers both identically) bubbles to the router's default error boundary exactly like an
- * unknown novel does, so there is no bespoke not-found handling here.
- */
 const route = getRouteApi('/_shell/novels/$slug_/wiki_/$entryKey');
 
 function facetTitle(facetKey: string): string {

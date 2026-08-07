@@ -1,21 +1,9 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, notFound } from '@tanstack/react-router';
 
-/**
- * Importing user defined packages
- */
 import { WikiEntryScreen } from '@/features/wiki';
 import { isApiError, wikiEntryQueryOptions } from '@/lib/apis';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * `ensureQueryData` awaits the fetch in the loader, so a WBN_009 (unknown or still spoiler-locked entry)
  * throws here — mapped to `notFound()` the same way `novels.$slug` maps an unknown novel slug, so the router
  * renders the real 404 boundary instead of the generic `DefaultCatchBoundary` (which would read as a 500).

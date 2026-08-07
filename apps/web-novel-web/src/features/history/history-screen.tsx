@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { EmptyState, Input } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { HistoryIcon, PlayIcon } from '@/components/icons';
 import { Cover } from '@/components/novel';
 import { catalogQueryOptions, clearProgressMirror, coverFor, progressKeys, type ProgressMap, progressQueryOptions, sessionQueryOptions } from '@/lib/apis';
@@ -16,9 +10,6 @@ import { type NovelCover, type NovelSummary, type ReadingProgress } from '@/lib/
 
 import styles from './history-screen.module.css';
 
-/**
- * Defining types
- */
 interface HistoryItem {
   slug: string;
   ordinal: number;
@@ -33,14 +24,6 @@ interface HistoryGroup {
   items: HistoryItem[];
 }
 
-/**
- * Declaring the constants
- *
- * The reading-history screen from the mockups: the latest chapter opened per novel on this device, grouped
- * newest-first by the day it was opened. Reading progress is device-local (localStorage) — so the list is
- * empty during SSR and fills in on the client, exactly like the library shelf. Novel titles/covers are
- * resolved from the catalog; unresolved slugs fall back to a deterministic gradient and a slug-derived name.
- */
 const DAY_MS = 86_400_000;
 
 function dayKey(date: Date): string {
@@ -72,7 +55,6 @@ function relativeWhen(iso: string, now: Date): string {
   return new Date(iso).toLocaleDateString('en-US');
 }
 
-/** Prettify a slug into a display title for novels not present in the resolved catalog page. */
 function titleFromSlug(slug: string): string {
   return slug
     .split('-')
@@ -91,7 +73,6 @@ function toItem(entry: ReadingProgress, novel: NovelSummary | undefined, now: Da
   };
 }
 
-/** `entries` arrive sorted newest-first, so consecutive same-day rows fall into one group in a single pass. */
 function buildGroups(entries: ReadingProgress[], resolve: (slug: string) => NovelSummary | undefined, now: Date): HistoryGroup[] {
   const groups: HistoryGroup[] = [];
   let currentKey = '';

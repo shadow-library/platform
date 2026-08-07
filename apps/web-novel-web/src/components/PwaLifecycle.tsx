@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { useQueryClient } from '@tanstack/react-query';
 import { persistQueryClient } from '@tanstack/react-query-persist-client';
 import { Link } from '@tanstack/react-router';
@@ -8,20 +5,11 @@ import { useEffect, useRef } from 'react';
 import { Banner, toast } from '@shadow-library/ui';
 import { useOnlineStatus, useServiceWorker } from '@shadow-library/web/pwa';
 
-/**
- * Importing user defined packages
- */
 import { sessionKeys, syncPendingProgress } from '@/lib/apis';
 import { type SessionUser } from '@/lib/apis/types';
 import { PERSIST_BUSTER, PERSIST_MAX_AGE, queryPersister, shouldPersistQueryKey } from '@/lib/offline';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The PWA plumbing, mounted once at the root:
  * - service worker registration with the prompt-then-reload update UX (never a surprise refresh),
  * - offline / reconnected banners driven by `useOnlineStatus`,
@@ -66,7 +54,6 @@ function ConnectivityBanners(): React.JSX.Element | null {
     }
     if (!wasOffline.current) return;
     wasOffline.current = false;
-    // Back online: revalidate everything on screen and push the signed-in user's progress writes that queued while offline.
     void queryClient.invalidateQueries();
     void syncPendingProgress(queryClient.getQueryData<SessionUser | null>(sessionKeys.session)?.userId);
     toast.success('Back online — syncing your library and progress.');

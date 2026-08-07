@@ -1,14 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- *
  * The reader's internal client view-model — the presentation shapes every screen is built on. It is
  * deliberately distinct from the generated wire contract (`api-types.gen.ts`): it carries derived, client-only
  * fields (gradient covers, humanized labels, the `ongoing`/`completed`/`hiatus` status the UI speaks) that the
@@ -208,7 +198,3 @@ export interface WikiEntryDetail extends WikiEntrySummary {
   /** Facets that exist on this entry but are still spoiler-locked for this reader. */
   hiddenFacetCount: number;
 }
-
-/**
- * Declaring the constants
- */

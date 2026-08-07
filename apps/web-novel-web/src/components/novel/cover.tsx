@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { Badge, cn } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { StarIcon } from '@/components/icons';
 import { type NovelCover, type NovelStatus } from '@/lib/apis/types';
 
 import styles from './novel.module.css';
 
-/**
- * Defining types
- */
 export interface CoverProps {
   cover: NovelCover;
   title: string;
@@ -23,8 +14,6 @@ export interface CoverProps {
 }
 
 /**
- * Declaring the constants
- *
  * Cover artwork: the real image when `cover.imageUrl` was resolved server-side, else the deterministic
  * gradient + title glyph placeholder — the same device-independent trick the design prototype uses, so a
  * cover-less novel still renders offline and with zero requests.

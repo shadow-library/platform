@@ -1,28 +1,11 @@
-/**
- * Importing npm packages
- */
 import { getRouteApi, useRouter } from '@tanstack/react-router';
 import { Button } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { LockIcon } from '@/components/icons';
 import { loginUrl } from '@/lib/apis';
 
 import styles from './login-screen.module.css';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * The sign-in entry from the mockups. Authentication itself lives on the identity provider — this screen
- * only hands the browser to webnovel-server's OIDC login route (which redirects to the IdP and back).
- * Reading never requires an account, so the escape hatch is prominent.
- */
 const route = getRouteApi('/login');
 
 export function LoginScreen(): React.JSX.Element {

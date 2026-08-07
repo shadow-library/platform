@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQueryClient } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { namespacedKey, readLocal, removeLocal, writeLocal } from '@/lib/local-store';
 
 import { type LibraryItem, type LibraryListResponse } from './api-types.gen';
@@ -14,16 +8,12 @@ import { type ApiError, APIRequest } from './transport';
 import { type LibraryEntry, type NovelSummary } from './types';
 
 /**
- * Defining types
- *
  * The live `GET /api/library` wire shape comes from the generated contract: a wrapped `{ items }` list of lean
  * `LibraryItem` shelf entries — no author/rating/chapter count, `live`/`retired` status — keyed by `slug`, not
  * the client's `novelSlug`. `toLibraryEntry` normalizes each item into the internal model at this boundary.
  */
 
 /**
- * Declaring the constants
- *
  * Library entries are local-first (guests get a device library, per the design), mirrored to the server's
  * `GET/POST/DELETE /api/library` when a session exists so a sign-in syncs the shelf. The local mirror keeps
  * a `NovelSummary` snapshot so the shelf renders offline without a catalog fetch. The mirror is namespaced
@@ -47,7 +37,6 @@ function writeLibrary(entries: LibraryEntry[], userId?: string): void {
   writeLocal(namespacedKey(LIBRARY_STORAGE_KEY, userId), entries);
 }
 
-/** Drop the current user's device shelf — called on sign-out so the next account starts clean. */
 export function clearLibraryMirror(userId?: string): void {
   removeLocal(namespacedKey(LIBRARY_STORAGE_KEY, userId));
 }

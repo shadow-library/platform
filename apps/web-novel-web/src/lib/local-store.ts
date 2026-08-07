@@ -1,18 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * Guest-first persistence: the library and reading progress always live on this device (localStorage),
  * matching the design's "saved on this device — sign in to sync" model. SSR-safe: every accessor no-ops
  * without `window`.

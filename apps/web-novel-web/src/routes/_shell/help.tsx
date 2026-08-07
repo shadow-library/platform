@@ -1,20 +1,8 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 
-/**
- * Importing user defined packages
- */
 import { HELP_TABS, HelpScreen, type HelpSearch, type HelpTab } from '@/features/help';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * Help is device-local and account-agnostic, so the screen is public. The active view is a search param
  * (`?tab=…`) so other screens (e.g. Settings) can deep-link straight to the FAQ or the legal document.
  */

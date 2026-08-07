@@ -1,19 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 /** Lifecycle of an in-flight download. `complete` is not modelled here — finished downloads live in the OfflineStore. */
 export type DownloadTaskState = 'downloading' | 'paused' | 'failed';
 
-/** A render-friendly view of one active download, exposed through the queue snapshot. */
 export interface DownloadTask {
   slug: string;
   title: string;
@@ -44,8 +31,6 @@ interface InternalTask extends DownloadTask {
 }
 
 /**
- * Declaring the constants
- *
  * A tiny in-memory, SSR-safe download manager. Real background-download infrastructure does not exist, so this
  * drives the offline-library states (downloading / paused / failed) cooperatively: it walks the requested
  * ordinals, calling the caller's `step` per chapter and honouring pause/resume/cancel between chapters. A short
@@ -179,5 +164,4 @@ export class DownloadQueue {
   }
 }
 
-/** One shared queue for the whole app so any screen observing it sees the same in-flight downloads. */
 export const downloadQueue = new DownloadQueue();

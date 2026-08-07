@@ -1,19 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createServiceWorker } from '@shadow-library/web/service-worker';
 
 /**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The runtime-configured caching worker (emitted as `/sw.js` by vite.sw.config.ts). Chapter content is
  * immutable per `contentHash`, so it is cache-first — anything previously read stays readable offline;
  * public catalog reads are network-first with a cached fallback; hashed client assets are cache-first.

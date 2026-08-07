@@ -1,15 +1,5 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { readLocal, writeLocal } from '@/lib/local-store';
 
-/**
- * Defining types
- */
 export type ReaderTheme = 'light' | 'sepia' | 'dark';
 export type ReaderFont = 'serif' | 'sans';
 export type ReaderWidth = 'narrow' | 'normal' | 'wide';
@@ -32,8 +22,6 @@ export interface ReaderPalette {
 }
 
 /**
- * Declaring the constants
- *
  * Reader typography and theme, persisted per device. The reading surface deliberately has its own palette
  * (paper/sepia/ink, per the mockups) independent of the app theme; system fonts keep chapters readable
  * offline with zero external font fetches.

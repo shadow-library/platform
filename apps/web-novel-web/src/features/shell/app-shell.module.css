@@ -24,7 +24,6 @@
     inset 0 1px 0 rgb(255 255 255 / 0.25);
 }
 
-/* Two stacked lines — "Shadow" over "WEBNOVEL" — as in the design, not inline side-by-side. */
 .logoText {
   display: flex;
   flex-direction: column;

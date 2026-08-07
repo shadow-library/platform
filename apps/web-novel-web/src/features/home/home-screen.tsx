@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { Button, toast } from '@shadow-library/ui';
 import { usePwaInstall } from '@shadow-library/web/pwa';
 
-/**
- * Importing user defined packages
- */
 import { ChevronRightIcon, DownloadIcon, ExternalIcon, PlayIcon, StarIcon } from '@/components/icons';
 import { Cover, formatCount, NovelCard } from '@/components/novel';
 import styles from '@/features/home/home-screen.module.css';
@@ -16,20 +10,11 @@ import { catalogQueryOptions, progressQueryOptions, sessionQueryOptions } from '
 import { type NovelSummary, type ReadingProgress } from '@/lib/apis/types';
 import { NOVEL_FORGE_URL } from '@/lib/constants';
 
-/**
- * Defining types
- */
 interface ContinueItem {
   novel: NovelSummary;
   progress: ReadingProgress;
 }
 
-/**
- * Declaring the constants
- *
- * The dashboard from the mockups: continue-reading hero, resume cards, trending poster row, recently
- * updated list, genre chips, and the Novel Forge / install-app promo pair.
- */
 function timeAgo(iso: string): string {
   const hours = Math.max(1, Math.round((Date.now() - Date.parse(iso)) / 3_600_000));
   if (hours < 24) return `${hours}h ago`;

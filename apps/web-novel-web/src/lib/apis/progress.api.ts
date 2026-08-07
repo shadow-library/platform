@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { namespacedKey, readLocal, removeLocal, writeLocal } from '@/lib/local-store';
 
 import { type ProgressListItem, type ProgressListResponse } from './api-types.gen';
@@ -13,8 +7,6 @@ import { type ApiError, APIRequest } from './transport';
 import { type ReadingProgress } from './types';
 
 /**
- * Defining types
- *
  * The live `GET /api/me/progress` wire shape comes from the generated contract: a wrapped `{ items }` list of
  * `ProgressListItem`s carrying `novelSlug`/`ordinal`/`position`/`updatedAt`. `toReadingProgress` picks the
  * fields explicitly so future server additions never leak into the localStorage mirror.
@@ -22,8 +14,6 @@ import { type ReadingProgress } from './types';
 export type ProgressMap = Record<string, ReadingProgress>;
 
 /**
- * Declaring the constants
- *
  * Reading progress is local-first (written on every reader scroll, works offline) and mirrored to
  * `GET/PUT /api/novels/:slug/progress` when signed in. Writes that fail (offline) are queued as dirty slugs
  * and re-pushed by `syncPendingProgress` when connectivity returns. The mirror and its pending queue are
@@ -49,7 +39,6 @@ export function getProgress(slug: string, userId?: string): ReadingProgress | un
   return readProgressMap(userId)[slug];
 }
 
-/** Drop the current user's reading history and pending queue — called on sign-out. */
 export function clearProgressMirror(userId?: string): void {
   removeLocal(namespacedKey(PROGRESS_STORAGE_KEY, userId));
   removeLocal(namespacedKey(PENDING_STORAGE_KEY, userId));
@@ -97,7 +86,6 @@ export function saveProgress(slug: string, ordinal: number, position: number, us
   return entry;
 }
 
-/** Re-push the signed-in user's progress writes that failed while offline — called from the reconnect handler. */
 export async function syncPendingProgress(userId?: string): Promise<void> {
   if (!userId) return;
   const pendingStorageKey = namespacedKey(PENDING_STORAGE_KEY, userId);

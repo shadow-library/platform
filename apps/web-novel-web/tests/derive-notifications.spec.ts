@@ -1,26 +1,10 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { deriveNotifications } from '@/lib/apis/notifications.api';
 import { type LibraryEntry, type NovelSummary, type ReadingProgress } from '@/lib/apis/types';
 import { type DownloadedNovel } from '@/lib/offline/store';
 import { DEFAULT_SETTINGS } from '@/lib/settings-store';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * The Updates feed has no server behind it — it is derived from the reader's own shelf, progress and
- * downloads. These pin the derivation so it can never silently start inventing entries again.
- */
 function novel(overrides: Partial<NovelSummary> = {}): NovelSummary {
   return {
     slug: 'clockwork-saint',

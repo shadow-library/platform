@@ -1,21 +1,12 @@
-/**
- * Importing npm packages
- */
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, ConfirmDialog, SegmentedControl, Select, Switch, type ThemeMode, toast, useTheme } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { BookIcon, ChevronRightIcon, SettingsSlidersIcon } from '@/components/icons';
 import { APP_LANGUAGES, clearAllLocalData, DEFAULT_SETTINGS, loadSettings, saveSettings, type ToggleKey, type WebnovelSettings } from '@/lib/settings-store';
 
 import styles from './settings-screen.module.css';
 
-/**
- * Defining types
- */
 export type SettingsSection = 'appearance' | 'reader' | 'downloads' | 'notifications' | 'data' | 'content' | 'about';
 
 export interface SettingsSearch {
@@ -34,8 +25,6 @@ interface ThemeOption {
 }
 
 /**
- * Declaring the constants
- *
  * The account-agnostic preferences screen from the mockups: a sticky left rail of sections and a right pane
  * of controls. Every toggle and select is device-local (persisted through `settings-store`), except the theme
  * picker: theme is a platform-wide preference shared with the other Shadow apps, so it reads and writes the

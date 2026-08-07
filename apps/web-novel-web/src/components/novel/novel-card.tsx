@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 
-/**
- * Importing user defined packages
- */
 import { BookmarkFilledIcon, BookmarkIcon, CheckIcon } from '@/components/icons';
 import { isInLibrary, libraryQueryOptions, sessionQueryOptions, useToggleLibraryMutation } from '@/lib/apis';
 import { type NovelSummary } from '@/lib/apis/types';
@@ -14,17 +8,12 @@ import { type NovelSummary } from '@/lib/apis/types';
 import { Cover, RatingRow, StatusBadge } from './cover';
 import styles from './novel.module.css';
 
-/**
- * Defining types
- */
 export interface NovelCardProps {
   novel: NovelSummary;
   downloaded?: boolean;
 }
 
 /**
- * Declaring the constants
- *
  * The poster card from the browse grid mockups: 3/4 cover, bookmark toggle top-left, downloaded tick
  * top-right, then author, rating and status underneath.
  */

@@ -1,15 +1,5 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { readLocal, removeLocal, writeLocal } from '@/lib/local-store';
 
-/**
- * Defining types
- */
 export interface WebnovelSettings {
   appLanguage: string;
   wifiOnlyDownloads: boolean;
@@ -25,12 +15,9 @@ export interface WebnovelSettings {
   markReadOnScroll: boolean;
 }
 
-/** The boolean-valued preference keys — every toggle row is keyed by exactly one of these. */
 export type ToggleKey = { [K in keyof WebnovelSettings]: WebnovelSettings[K] extends boolean ? K : never }[keyof WebnovelSettings];
 
 /**
- * Declaring the constants
- *
  * Device-local app preferences, persisted per browser like the library and reader settings — never synced
  * to an account, never sent to the server. SSR-safe: reads flow through the guarded `local-store` accessors,
  * so importing or calling these on the server yields the defaults instead of ever touching `window`.
@@ -73,12 +60,10 @@ export function saveSettings(settings: WebnovelSettings): void {
   writeLocal(SETTINGS_STORAGE_KEY, settings);
 }
 
-/** Whether this device has confirmed adult access at the mature gate. SSR-safe: no `window` yields `false`. */
 export function hasMatureConsent(): boolean {
   return readLocal<boolean>(MATURE_CONSENT_STORAGE_KEY, false);
 }
 
-/** Record the one-tap "I'm 18+" consent from the mature gate so it never blocks this device again. */
 export function grantMatureConsent(): void {
   writeLocal<boolean>(MATURE_CONSENT_STORAGE_KEY, true);
 }

@@ -1,22 +1,9 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 
-/**
- * Importing user defined packages
- */
 import { BROWSE_PAGE_SIZE, BrowseScreen, type BrowseSearch, type UpdatedWindow } from '@/features/browse';
 import { catalogQueryOptions } from '@/lib/apis';
 import { type CatalogSort, type NovelStatus } from '@/lib/apis/types';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const SORTS: CatalogSort[] = ['trending', 'popular', 'rating', 'updated', 'chapters', 'title'];
 const STATUSES: NovelStatus[] = ['ongoing', 'completed', 'hiatus'];
 const MIN_RATINGS = [3, 3.5, 4, 4.5];

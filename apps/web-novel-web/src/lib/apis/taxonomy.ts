@@ -1,18 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The curated browse taxonomy the discovery surfaces render as static chips — the genres panel and the search
  * overlay's suggestions. This is presentation content, not API data: the live catalog derives the genres it
  * actually holds from the `/api/novels` response, while these lists give the reader a stable set of entry

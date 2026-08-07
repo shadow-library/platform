@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate, useRouter } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, cn, Drawer, Input, Slider, toast, useMediaQuery } from '@shadow-library/ui';
 import { useOnlineStatus } from '@shadow-library/web/pwa';
 
-/**
- * Importing user defined packages
- */
 import { BackIcon, BookmarkFilledIcon, BookmarkIcon, ChevronRightIcon, ListIcon, PlayIcon, SettingsSlidersIcon, StarIcon, WifiOffIcon } from '@/components/icons';
 import { MatureGate, useMatureGate } from '@/features/novel/mature-gate';
 import {
@@ -40,18 +34,7 @@ import {
 
 import styles from './reader-screen.module.css';
 
-/**
- * Defining types
- */
 const route = getRouteApi('/read/$slug/$ordinal');
-
-/**
- * Declaring the constants
- *
- * The reading surface: its own palette (paper/sepia/ink), sticky progress hairline, top and bottom chrome
- * that hide on tap, live typography settings, a chapter drawer, and end-of-chapter navigation. Progress is
- * written on scroll (debounced) and the next chapter is prefetched so it stays readable offline.
- */
 
 // Brightness is a device-local reading dim, persisted through the same local-store primitive as the other
 // reader settings but under its own key so it never rides the synced settings object.
@@ -121,7 +104,6 @@ export function ReaderScreen(): React.JSX.Element {
     toast.warning('You’re offline. Reconnect to download this chapter for offline reading.');
   };
 
-  // Track scroll → progress hairline + persisted reading position (debounced, local-first).
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     if (gateVisible) return;
@@ -144,7 +126,6 @@ export function ReaderScreen(): React.JSX.Element {
     };
   }, [slug, ordinal, userId, queryClient, gateVisible]);
 
-  // Restore the saved position once the chapter is on screen, and prefetch the next chapter.
   useEffect(() => {
     if (gateVisible || !chapter.data) return;
     const saved = getProgress(slug, userId);

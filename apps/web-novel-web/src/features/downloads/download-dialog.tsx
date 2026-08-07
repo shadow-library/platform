@@ -1,34 +1,18 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Button, Dialog, Input, Progress, toast } from '@shadow-library/ui';
 import { useOfflineDownload } from '@shadow-library/web/offline';
 
-/**
- * Importing user defined packages
- */
 import { fetchChapter, getProgress, sessionQueryOptions } from '@/lib/apis';
 import { type ChapterContent, type NovelDetail } from '@/lib/apis/types';
 import { chapterKey, type DownloadedNovel, getDownloadedNovel, novelKey, offlineManager, offlineStore } from '@/lib/offline';
 
-/**
- * Defining types
- */
 export interface DownloadDialogProps {
   novel: NovelDetail;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-/**
- * Declaring the constants
- *
- * The "Download for offline" dialog. Chapters are fetched through the canonical API layer and persisted
- * one key per chapter in the `OfflineStore` (via `useOfflineDownload`'s manager), so the reader can fall
- * back per-chapter with no service worker involved. Ranges are capped per batch to keep downloads honest.
- */
 const MAX_BATCH = 200;
 const EST_BYTES_PER_CHAPTER = 8_000;
 

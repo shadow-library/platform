@@ -1,26 +1,10 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 
-/**
- * Importing user defined packages
- */
 import { CATALOG_TAGS, catalogQueryOptions } from '@/lib/apis';
 
 import styles from './genres-screen.module.css';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * The genres & tags hub: a grid of genre cards (each deep-links into the filtered catalog) and a popular
- * tag cloud, per the genres mockup.
- */
 export function GenresScreen(): React.JSX.Element {
   const catalog = useQuery(catalogQueryOptions({ limit: 100 }));
   const genres = catalog.data?.genres ?? [];

@@ -64,9 +64,10 @@ provides, and do not begin work before the skill is loaded.
 - **Formatting/style:** Prettier — single quotes, trailing commas `all`, print width **180**,
   `arrowParens: avoid`; 2-space indent, semicolons. `PascalCase` types/classes/components, `camelCase` values,
   `UPPER_SNAKE_CASE` constants; kebab-case files with a role suffix (`*.api.ts`, `*.spec.tsx`, etc.).
-- **File section banners:** open source files (not barrels) with the ecosystem's banner blocks in order,
-  keeping empty ones — `Importing npm packages`, `Importing user defined packages`, `Defining types`,
-  `Declaring the constants`.
+- **Comments:** keep implementation comments only for non-obvious rationale, security boundaries, SSR behavior,
+  compatibility constraints, or ordering requirements. Do not add section banners or restate names, types, or
+  control flow. Reusable type and option fields retain caller-facing JSDoc when their semantics are not evident
+  from the type alone.
 - `src/routeTree.gen.ts` is **generated** (excluded from lint, formatted by `format:gen`) — never hand-edit it.
 - **Named exports + a barrel `index.ts` per folder.** Comment the _why_, never the _what_.
 

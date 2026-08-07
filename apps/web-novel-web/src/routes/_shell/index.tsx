@@ -1,21 +1,8 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 
-/**
- * Importing user defined packages
- */
 import { HomeScreen } from '@/features/home';
 import { catalogQueryOptions } from '@/lib/apis';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 export const Route = createFileRoute('/_shell/')({
   loader: async ({ context }) => {
     // Block on all three home rows the screen renders (trending, updated, popular) so the catalog is

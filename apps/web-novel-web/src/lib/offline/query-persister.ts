@@ -1,19 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createIDBPersister } from '@shadow-library/web/offline';
 
 /**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The whole-query-cache persister and the policy governing what is allowed to reach disk. On-device
  * per-user state (auth/session, library, reading progress) is deliberately kept OUT of the persisted cache —
  * only public catalog and chapter content is dehydrated, so offline reading still works without writing PII

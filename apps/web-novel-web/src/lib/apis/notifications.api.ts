@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { namespacedKey, readLocal, removeLocal, writeLocal } from '@/lib/local-store';
 import { type DownloadedNovel, listDownloadedNovels } from '@/lib/offline/store';
 import { DEFAULT_SETTINGS, loadSettings, type WebnovelSettings } from '@/lib/settings-store';
@@ -14,10 +8,6 @@ import { DEFAULT_SETTINGS, loadSettings, type WebnovelSettings } from '@/lib/set
 import { libraryQueryOptions } from './library.api';
 import { progressQueryOptions } from './progress.api';
 import { type LibraryEntry, type ReadingProgress } from './types';
-
-/**
- * Defining types
- */
 
 /** The kinds of update this client can actually observe. Replies and product news have no data source here. */
 export type NotificationType = 'chapter' | 'download';
@@ -50,8 +40,6 @@ interface DeriveInput {
 }
 
 /**
- * Declaring the constants
- *
  * webnovel-server has no notifications endpoint, so rather than invent a feed, this derives one from the
  * signals the client genuinely holds: the reader's own shelf and reading progress (a novel that moved on
  * after they last opened it) and the offline store (chapters actually saved to this device). Nothing is
@@ -81,7 +69,6 @@ function writeReadIds(ids: string[], userId?: string): void {
   writeLocal(namespacedKey(READ_STORAGE_KEY, userId), ids);
 }
 
-/** Drop the current user's read markers — called on sign-out so the next account starts clean. */
 export function clearNotificationsMirror(userId?: string): void {
   removeLocal(namespacedKey(READ_STORAGE_KEY, userId));
 }

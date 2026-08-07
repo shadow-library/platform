@@ -1,21 +1,8 @@
-/**
- * Importing npm packages
- */
 import { notifyManager } from '@tanstack/react-query';
 import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 
 /**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * Flush React Query notifications synchronously. Queries settle asynchronously, so one can resolve after a
  * test has torn jsdom down; the default batch scheduler would then run its callback with no `window` and
  * crash the run. A synchronous scheduler notifies inline while the tree is still mounted.

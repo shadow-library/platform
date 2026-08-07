@@ -84,7 +84,6 @@
   color: var(--sh-accent);
 }
 
-/* ── Entry grid ─────────────────────────────────────────────── */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -135,7 +134,6 @@
   margin-top: 4px;
 }
 
-/* ── Preview strip (novel screen Wiki tab) ─────────────────── */
 .hscroll {
   display: flex;
   gap: 14px;
@@ -154,7 +152,6 @@
   justify-content: center;
 }
 
-/* ── Empty states ───────────────────────────────────────────── */
 .emptyBox {
   padding: 40px 24px;
   border-radius: 14px;
@@ -175,7 +172,6 @@
   line-height: 1.5;
 }
 
-/* ── Entry detail ───────────────────────────────────────────── */
 .detailHead {
   display: flex;
   gap: 22px;

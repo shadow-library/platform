@@ -1,22 +1,10 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { clearProgressMirror, getProgress, readProgressMap, saveProgress } from '@/lib/apis';
 import { namespacedKey } from '@/lib/local-store';
 import { shouldPersistQueryKey } from '@/lib/offline';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The on-device partitioning guarantees behind WNW-02/03: per-user state must never reach the persisted
  * query cache, and the localStorage mirror must isolate one account's reading history from another's. The
  * test runtime ships no `localStorage` (the app no-ops without it), so a fresh in-memory Storage is

@@ -1,21 +1,12 @@
-/**
- * Importing npm packages
- */
 import { Link } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { AlertIcon } from '@/components/icons';
 import { grantMatureConsent, hasMatureConsent, loadSettings } from '@/lib/settings-store';
 
 import styles from './mature-gate.module.css';
 
-/**
- * Defining types
- */
 interface MatureGateProps {
   novelTitle: string;
   onContinue: () => void;
@@ -26,13 +17,6 @@ interface MatureGateState {
   gateVisible: boolean;
   reveal: () => void;
 }
-
-/**
- * Declaring the constants
- *
- * A full-screen blocking interstitial for mature titles, mirroring the design canvas's MATURE GATE. It sits
- * over the novel's content region and before the reader's chapter body; consent is per device, never synced.
- */
 
 /**
  * Resolve whether a mature title must stay gated for this device. The decision depends on `localStorage`

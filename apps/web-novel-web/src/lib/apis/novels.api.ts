@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { chapterKey, offlineStore } from '@/lib/offline';
 
 import {
@@ -30,8 +24,6 @@ import {
 } from './types';
 
 /**
- * Defining types
- *
  * The live webnovel-server wire shapes come straight from the generated contract (`api-types.gen`), aliased to
  * `Server*` names at the import. The server publishes a leaner model than the client one — no author/rating/
  * views, `blurb` for `synopsis`, `live`/`retired` for status, raw `content` text, and `limit`/`offset` paging —
@@ -42,8 +34,6 @@ import {
 export type ServerNovelStatus = ServerNovelSummary['status'];
 
 /**
- * Declaring the constants
- *
  * The canonical webnovel-server read surface. Every query forwards TanStack Query's abort `signal` into
  * `APIRequest.signal(...)` so navigation cancels in-flight requests.
  */

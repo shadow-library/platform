@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button, Textarea, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { AlertIcon, BackIcon, BookIcon, ListIcon, ShieldIcon } from '@/components/icons';
 
 import styles from './help-screen.module.css';
 
-/**
- * Defining types
- */
 export type HelpTab = 'hub' | 'faq' | 'feedback' | 'about' | 'legal';
 
 export interface HelpSearch {
@@ -40,13 +31,6 @@ interface LegalSection {
   body: string;
 }
 
-/**
- * Declaring the constants
- *
- * The help hub is a self-contained docs surface: a landing grid of cards that deep-link into four read-only
- * sub-views plus a local-only feedback form. Every view shares one route (`/help`) and switches on the `tab`
- * search param, so Settings and other screens can link straight to the FAQ or the legal document.
- */
 export const HELP_TABS: HelpTab[] = ['hub', 'faq', 'feedback', 'about', 'legal'];
 
 const TAB_TITLES: Record<HelpTab, string> = {

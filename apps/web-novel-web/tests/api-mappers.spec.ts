@@ -1,23 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { type LibraryEntry, type ReadingProgress, toLibraryEntry, toReadingProgress } from '@/lib/apis';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Recorded webnovel-server responses (shapes verified against the reader module DTOs) exercised through the
- * boundary mappers, so a server contract drift breaks here instead of in a screen.
- */
 const LIBRARY_RESPONSE = {
   items: [
     {

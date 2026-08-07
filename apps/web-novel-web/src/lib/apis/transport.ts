@@ -1,19 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createApiClient } from '@shadow-library/web';
 
 /**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The whole of the reader's transport configuration. `@shadow-library/web` owns the request builder, the
  * browser/SSR split, the CSRF double-submit and the error contract; what is left here is the two base paths
  * this app talks to and how to reach webnovel-server during SSR.
@@ -34,7 +21,6 @@ export const apiClient = createApiClient({
   ssr: import.meta.env.SSR ? () => import('@shadow-library/web/server').then(m => m.createSsrTransport({ fallback: 'http://localhost:8080' })) : undefined,
 });
 
-/** The reader's public and authed API surface (`/api/novels`, `/api/library`, …). */
 export const APIRequest = apiClient.api;
 
 export { ApiError, isApiError } from '@shadow-library/web';

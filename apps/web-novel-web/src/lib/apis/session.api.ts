@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type QueryClient, queryOptions } from '@tanstack/react-query';
 import { type UserInfo, userInfoQueryOptions } from '@shadow-library/web';
 import { type AuthPrincipal, createAuthApi } from '@shadow-library/web/auth';
 import { requireAuth } from '@shadow-library/web/router';
 
-/**
- * Importing user defined packages
- */
 import { queryPersister } from '@/lib/offline';
 
 import { clearLibraryMirror } from './library.api';
@@ -18,12 +12,6 @@ import { apiClient, ApiError, isApiError } from './transport';
 import { type SessionUser } from './types';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * `/api/auth/*` is `@shadow-library/auth`'s surface, not the reader's: webnovel-server mounts the SDK, so
  * `GET /api/auth/session`, `GET /api/auth/login?return_to=` and `POST /api/auth/logout` are the SDK's
  * contract. `createAuthApi` is the client half of it, so the principal shape and the login/logout routes come

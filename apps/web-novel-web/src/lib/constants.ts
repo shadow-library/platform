@@ -1,20 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-/**
  * Novel Forge — the platform's authoring studio — is a separate first-party deployment, so every "write a
  * novel" affordance is a real external link rather than SPA navigation, and its host differs per environment
  * (`novel-forge.shadow-apps.test` in the dev cluster, `novel-forge.shadow-apps.com` in production). It is read

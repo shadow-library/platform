@@ -1,22 +1,13 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { Button, EmptyState } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { BookIcon, DownloadIcon } from '@/components/icons';
 import { sessionQueryOptions, useNotifications } from '@/lib/apis';
 import { type Notification, type NotificationType } from '@/lib/apis/notifications.api';
 
 import styles from './notifications-screen.module.css';
 
-/**
- * Defining types
- */
 type NotifIcon = (props: { size?: number }) => React.JSX.Element;
 
 interface TypeMeta {
@@ -24,13 +15,6 @@ interface TypeMeta {
   tone: string | undefined;
 }
 
-/**
- * Declaring the constants
- *
- * The "Updates" surface: a vertical feed derived from the reader's own shelf, progress and downloads (see
- * `notifications.api.ts` — there is no server feed). Each row is an action button that marks the update read
- * and opens its novel. `icons.tsx` has no bell glyph, so that one is defined here rather than in the shared set.
- */
 const BellIcon: NotifIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
@@ -43,7 +27,6 @@ const TYPE_META: Record<NotificationType, TypeMeta> = {
   download: { Icon: DownloadIcon, tone: styles.toneDownload },
 };
 
-/** Compact relative label ("18m ago", "3h ago", "2d ago"). Runs client-side only — the feed is empty during SSR. */
 function formatRelativeTime(iso: string): string {
   const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
   if (minutes < 1) return 'Just now';

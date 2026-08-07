@@ -1,21 +1,9 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, notFound } from '@tanstack/react-router';
 
-/**
- * Importing user defined packages
- */
 import { WikiIndexScreen } from '@/features/wiki';
 import { isApiError, novelQueryOptions, wikiIndexQueryOptions } from '@/lib/apis';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * A restricted or unknown novel slug 404s the same way `novels.$slug` does — mapped to `notFound()` here too
  * so the wiki index doesn't surface it as a 500 through `DefaultCatchBoundary`.
  */

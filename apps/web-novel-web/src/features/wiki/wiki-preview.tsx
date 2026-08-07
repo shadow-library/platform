@@ -1,34 +1,19 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { cn } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { LockIcon } from '@/components/icons';
 import { wikiIndexQueryOptions } from '@/lib/apis';
 
 import { WikiEntryCard } from './wiki-entry-card';
 import styles from './wiki.module.css';
 
-/**
- * Defining types
- */
 export interface WikiPreviewProps {
   slug: string;
-  /** Cap on how many cards the strip shows before "Browse full wiki" — the index route has the rest. */
+
   limit?: number;
 }
 
-/**
- * Declaring the constants
- *
- * The novel screen's "Wiki" tab: a compact preview of the unlocked roster with the same two empty states as
- * the full index (no wiki at all vs. wiki exists but locked), always ending in a link to the full wiki index.
- */
 export function WikiPreview({ slug, limit = 8 }: WikiPreviewProps): React.JSX.Element {
   const wiki = useQuery(wikiIndexQueryOptions(slug));
 

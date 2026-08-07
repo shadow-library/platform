@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { Button, cn, Drawer, EmptyState, Pagination, SegmentedControl, Select, Skeleton, Slider, Switch, Tag } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { SearchIcon, SettingsSlidersIcon } from '@/components/icons';
 import { Cover, NovelCard, RatingRow, StatusBadge } from '@/components/novel';
 import { catalogQueryOptions } from '@/lib/apis';
@@ -16,9 +10,6 @@ import { type CatalogSort, type NovelDetail, type NovelStatus, type NovelSummary
 
 import styles from './browse-screen.module.css';
 
-/**
- * Defining types
- */
 export type UpdatedWindow = 'day' | 'week' | 'month' | 'year';
 
 export interface BrowseSearch {
@@ -45,14 +36,6 @@ export interface BrowseSearch {
  *  a harmless no-op while it does not. */
 type EnrichedSummary = NovelSummary & Partial<Pick<NovelDetail, 'language' | 'mature' | 'translator'>>;
 
-/**
- * Declaring the constants
- *
- * The catalog screen from the browse mockups: toolbar (filters, count, sort, grid/list), removable filter
- * chips, poster grid or detail list, pagination, and the filter drawer with genre/status/rating/chapter/
- * recency/language/translation sections.
- */
-/** Shared with the route loader so the SSR prefetch lands on the exact query key the screen reads */
 export const BROWSE_PAGE_SIZE = 24;
 const SORT_LABELS: Record<CatalogSort, string> = {
   trending: 'Trending',
@@ -81,14 +64,12 @@ const UPDATED_LABELS: Record<UpdatedWindow, string> = { day: 'Today', week: 'Thi
 const DAY_MS = 86_400_000;
 const UPDATED_WINDOW_MS: Record<UpdatedWindow, number> = { day: DAY_MS, week: 7 * DAY_MS, month: 30 * DAY_MS, year: 365 * DAY_MS };
 
-/** Fixed list — the summary DTO carries no language, so the chips are presentational until it does. */
 const LANGUAGE_OPTIONS = ['English', 'Chinese', 'Korean', 'Japanese'];
 
 const CHAPTER_MIN = 0;
 const CHAPTER_MAX = 13_000;
 const CHAPTER_STEP = 100;
 
-/** Every filter the drawer owns, cleared in one patch — reused by Reset and Clear all. */
 const CLEARED_FILTERS: Partial<BrowseSearch> = {
   genre: undefined,
   status: undefined,

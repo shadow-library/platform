@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { BottomNavigation, IconButton, Kbd, matchPath, Tooltip, useMediaQuery, useTheme } from '@shadow-library/ui';
 import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 
-/**
- * Importing user defined packages
- */
 import { BookIcon, BookmarkIcon, CompassIcon, DownloadIcon, HistoryIcon, HomeIcon, MoonIcon, SearchIcon, SettingsSlidersIcon, SunIcon, TagIcon } from '@/components/icons';
 import { SearchOverlay } from '@/features/search';
 import { loginUrl, meQuery, purgeOnLogout, sessionQueryOptions, signOut, useNotifications } from '@/lib/apis';
@@ -17,18 +11,10 @@ import { NOVEL_FORGE_URL } from '@/lib/constants';
 
 import styles from './app-shell.module.css';
 
-/**
- * Defining types
- */
 export interface AppShellProps {
   children?: React.ReactNode;
 }
 
-/**
- * Declaring the constants
- */
-
-/** Glyphs the shared icon set doesn't ship — kept local so `icons.tsx` stays the design's canonical set. */
 function glyph(paths: React.ReactNode): (props: { size?: number }) => React.JSX.Element {
   return function Glyph({ size = 18 }: { size?: number }): React.JSX.Element {
     return (
@@ -59,7 +45,6 @@ const HelpIcon = glyph(
   </>,
 );
 
-/** The primary destinations, which also drive the phone bottom bar. */
 const MAIN_NAV: NavLeaf[] = [
   { to: '/', label: 'Home', icon: <HomeIcon size={16} />, exact: true },
   { to: '/browse', label: 'Browse', icon: <CompassIcon size={16} /> },
@@ -80,22 +65,6 @@ const SECONDARY_NAV: NavLeaf[] = [
 
 const NAV: NavConfig = { variant: 'sections', sections: [{ items: MAIN_NAV }, { items: SECONDARY_NAV }] };
 
-/**
- * The reader's chrome. `AppShell` supplies the rail, the top bar, the account menu and the sub-md drawer;
- * this adds the phone bottom bar and the full-screen search overlay.
- *
- * Reading is public, so the account menu has a signed-out face: a "Sign in" call to action rather than an
- * avatar with nothing behind it.
- *
- * The content region is handed over whole (`fluid` + no gutters) because the novel screen is banded — its
- * hero and sticky tab bar span the region edge to edge with a centred column inside, which shell gutters
- * would turn into floating cards. The screens therefore re-create the column and gutters from the shell's
- * own `--sh-page-max` / `--sh-shell-gutter-*` values, so this app measures exactly what Pulse and Identity
- * measure. A screen needing a narrower line (help's running text) narrows inside that constant page.
- *
- * The bottom-nav reservation is the shell's: it restates it for `contentPadding="none"`, so this must not
- * add its own or phones get it twice.
- */
 export function AppShell({ children }: AppShellProps): React.JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();
@@ -111,7 +80,6 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
   const me = useQuery({ ...meQuery, enabled: Boolean(user) });
   const { unreadCount } = useNotifications(user?.userId);
 
-  // A global "/" opens search from anywhere — but stay out of the way while the reader is typing.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -179,7 +147,6 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
   );
 }
 
-/** The phone's primary destinations. The most specific match wins, so `/library/x` still lights Library. */
 function PhoneNav(): React.JSX.Element {
   const { pathname } = useLocation();
   const navigate = useNavigate();

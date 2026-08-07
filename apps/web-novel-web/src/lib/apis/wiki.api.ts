@@ -1,17 +1,9 @@
-/**
- * Importing npm packages
- */
 import { queryOptions } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type ApiError, APIRequest } from './transport';
 import { type WikiEntryDetail, type WikiEntryType, type WikiIndex } from './types';
 
 /**
- * Defining types
- *
  * The live webnovel-server wiki wire shapes (verified against `WikiListResponse`/`WikiEntryDetailResponse` in
  * `wiki.dto.ts`, and against the regenerated `api-types.gen.ts`). The shapes already match the client model
  * 1:1, so no mapper is needed at this boundary — unlike `novels.api.ts`, which normalizes a leaner server
@@ -49,8 +41,6 @@ interface ServerWikiEntryDetailResponse extends ServerWikiListItem {
 }
 
 /**
- * Declaring the constants
- *
  * The reader's wiki read surface. Both endpoints forward TanStack Query's abort `signal` so navigation
  * cancels in-flight requests, and paths are surface-relative (`/novels/:slug/wiki`) because `APIRequest` is
  * already rooted at `/api`. A 404 — an unknown novel, or a wiki entry that is missing *or still

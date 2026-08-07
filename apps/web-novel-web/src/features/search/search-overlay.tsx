@@ -1,44 +1,25 @@
-/**
- * Importing npm packages
- */
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar, Input } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { ChevronRightIcon, HistoryIcon, SearchIcon } from '@/components/icons';
 import { CATALOG_GENRES, CATALOG_TAGS, catalogQueryOptions, type NovelSummary } from '@/lib/apis';
 import { readLocal, writeLocal } from '@/lib/local-store';
 
 import styles from './search-overlay.module.css';
 
-/**
- * Defining types
- */
 export interface SearchOverlayProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-/**
- * Declaring the constants
- *
- * The command-bar the top-bar search button and the global "/" hotkey open. Empty query → recent (device
- * local) + trending suggestions; a live query → a debounced catalog lookup plus the genres/tags that match
- * the term. Recents are a plain device-local list (search terms aren't per-account state like the library),
- * seeded empty and SSR-safe through `local-store`. The panel only exists while `open`, so autofocus, the
- * catalog query, and the recents read all key off the reader deliberately opening it.
- */
 const RECENTS_STORAGE_KEY = 'webnovel:search-recents';
 const RECENTS_LIMIT = 6;
 const RESULTS_LIMIT = 6;
 const DEBOUNCE_MS = 180;
 const TRENDING = CATALOG_TAGS.slice(0, 8);
 
-/** Trending-up glyph — not part of the shared icon set, kept local to this overlay. */
 function TrendingIcon({ size = 18 }: { size?: number }): React.JSX.Element {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -52,7 +33,6 @@ function readRecents(): string[] {
   return readLocal<string[]>(RECENTS_STORAGE_KEY, []);
 }
 
-/** Push a term to the front, de-duplicated case-insensitively, capped — the most-recent-first history. */
 function recordRecent(term: string): void {
   const value = term.trim();
   if (!value) return;
@@ -70,13 +50,11 @@ export function SearchOverlay({ open, onOpenChange }: SearchOverlayProps): React
   const term = debounced.trim();
   const catalog = useQuery({ ...catalogQueryOptions({ q: term, limit: RESULTS_LIMIT }), enabled: open && term.length > 0 });
 
-  // Debounce the query so a burst of keystrokes fires one catalog lookup, not one per character.
   useEffect(() => {
     const id = window.setTimeout(() => setDebounced(query), DEBOUNCE_MS);
     return () => window.clearTimeout(id);
   }, [query]);
 
-  // Opening resets the field, pulls the latest device-local recents, and lands focus in the input.
   useEffect(() => {
     if (!open) return;
     setQuery('');
@@ -86,7 +64,6 @@ export function SearchOverlay({ open, onOpenChange }: SearchOverlayProps): React
     return () => window.cancelAnimationFrame(id);
   }, [open]);
 
-  // Escape closes even while the input holds focus — the listener is on the window, not the field.
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent): void => {

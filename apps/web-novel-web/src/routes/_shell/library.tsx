@@ -1,21 +1,9 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 
-/**
- * Importing user defined packages
- */
 import { LibraryScreen, type LibrarySearch } from '@/features/library';
 import { requireSession } from '@/lib/apis';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The library is the one authed screen — `requireSession` (the generic `requireAuth` under the hood)
  * 302-redirects guests to `/login?returnTo=/library` before any shelf markup renders. The grid/list `view`
  * rides a search param so the layout choice survives reloads; only the non-default `list` is serialized.

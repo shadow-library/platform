@@ -1,4 +1,3 @@
-/* Shadow UI design system: tokens, reset, utilities, and component styles. */
 @import '@shadow-library/ui/styles.css';
 
 :root {
@@ -7,9 +6,6 @@
   --wn-prose-max: 760px;
 }
 
-/* ========================================
-   App base
-   ======================================== */
 * {
   box-sizing: border-box;
 }
@@ -39,9 +35,6 @@ a:hover {
   color: var(--sh-accent-hover);
 }
 
-/* ========================================
-   Shared helpers (mirrors the design handoff's utility surface)
-   ======================================== */
 .wn-clamp2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
