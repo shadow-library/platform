@@ -1,19 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, eq, type SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
@@ -21,10 +11,6 @@ import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datast
 import { PublishAuditService } from './publish-audit.service';
 import { type ChapterUpsertBody, type ManifestItem, type NovelAccessBody, type NovelAccessResponse, type NovelUpsertBody } from './publish.dto';
 import { type PublishAuditEntry } from './publish.types';
-
-/**
- * Defining types
- */
 
 export interface UpsertResult {
   outcome: 'applied' | 'noop';
@@ -41,8 +27,6 @@ interface StaleMarker {
 }
 
 /**
- * Declaring the constants
- *
  * Optimistic-concurrency rules (same for novels and chapters): an incoming revision behind the
  * stored one is a 409 stale rejection; an equal revision carrying identical content is a no-op;
  * anything else replaces the row and stores the incoming revision. Every branch — including the
@@ -145,7 +129,6 @@ export class PublishService {
     return result;
   }
 
-  /** Unpublish is idempotent: deleting an absent chapter (or an unknown novel) is a recorded no-op */
   async unpublishChapter(slug: string, ordinal: number): Promise<UnpublishResult> {
     const caller = this.caller();
     const base: Omit<PublishAuditEntry, 'outcome'> = { action: 'chapter.unpublish', novelSlug: slug, ordinal, ...caller };
@@ -223,7 +206,6 @@ export class PublishService {
     return result;
   }
 
-  /** The access counterpart of the manifest: the forge diffs this to heal drift. Reads are not audited */
   async getAccess(slug: string): Promise<NovelAccessResponse> {
     const novel = await this.getNovelBySlug(slug);
     const grants = await this.db
@@ -239,7 +221,6 @@ export class PublishService {
     };
   }
 
-  /** The reconciliation primitive: the forge diffs this against its publication ledger. Reads are not audited */
   async getManifest(slug: string): Promise<ManifestItem[]> {
     const novel = await this.getNovelBySlug(slug);
     const chapters = await this.db
@@ -259,7 +240,6 @@ export class PublishService {
     return and(eq(schema.publishedChapters.novelId, novelId), eq(schema.publishedChapters.ordinal, ordinal)) as SQL;
   }
 
-  /** Metadata PUTs are full replacements, so absent optional fields compare as their defaults */
   private isNovelUnchanged(stored: Novel, body: NovelUpsertBody): boolean {
     return (
       stored.title === body.title &&

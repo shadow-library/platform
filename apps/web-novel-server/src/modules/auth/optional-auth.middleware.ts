@@ -1,28 +1,12 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { type HandlerMetadata } from '@shadow-library/app';
 import { AuthClient, type AuthPrincipal } from '@shadow-library/auth';
 import { AppSessionService, AUTH_PRINCIPAL, parseCookies } from '@shadow-library/auth/module';
 import { Logger } from '@shadow-library/common';
 import { ContextService, type HttpRequest, Middleware, type RouteHandler } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The SDK's `AuthGuard` is all-or-nothing by design: a route either demands a credential or never
  * sees one. The public catalog needs the third thing — read it anonymously, but if the caller does
  * carry a session, resolve them so a novel shared with them is reachable at the same URL as

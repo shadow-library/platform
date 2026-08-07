@@ -1,27 +1,11 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { type HandlerMetadata } from '@shadow-library/app';
 import { AuthGuardErrorCode } from '@shadow-library/auth/module';
 import { Logger } from '@shadow-library/common';
 import { ContextService, Middleware, type RouteHandler } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * Defence-in-depth over the scope guard for the `/internal/*` surface: `web-novel:publish` must only
  * ever ride an identity-issued M2M token, but the auth guard runs its service-access allowlist only
  * for service principals — a user-kind token that somehow carried the scope would pass on scope

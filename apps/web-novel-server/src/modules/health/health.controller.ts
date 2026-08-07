@@ -1,32 +1,11 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { sql } from 'drizzle-orm';
 import { tryCatch } from '@shadow-library/common';
 import { Get, HttpController, type HttpResponse, Res, RespondFor } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type PrimaryDatabase } from '@server/modules/datastore';
 
 import { HealthResponse, ReadyResponse } from './health.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Liveness and readiness on the main port for load balancers and the Docker healthcheck; the
- * HttpCoreModule additionally serves a bare liveness/readiness pair on the health port (8081).
- */
 
 @HttpController('/health')
 export class HealthController {

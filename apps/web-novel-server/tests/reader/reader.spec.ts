@@ -1,23 +1,10 @@
-/**
- * Importing npm packages
- */
 import { beforeAll, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { schema } from '@server/modules/datastore';
 
 import { csrfPair, TEST_REGEX, TestEnvironment } from '../test-environment';
 import { idp, LOGIN_COOKIE_NAME, LOGIN_SCOPES, SESSION_COOKIE_NAME } from '../test-idp';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('reader').init();
 
 /**

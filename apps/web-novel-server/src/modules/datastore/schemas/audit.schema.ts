@@ -1,20 +1,5 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel } from 'drizzle-orm';
 import { bigserial, index, integer, pgEnum, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export type PublishAuditLog = InferSelectModel<typeof publishAuditLog>;
 export namespace PublishAuditLog {
@@ -22,8 +7,6 @@ export namespace PublishAuditLog {
 }
 
 /**
- * Declaring the tables
- *
  * Append-only trail of the internal publish surface: exactly one row per mutation call, including
  * every rejected attempt. It carries no foreign keys — audit rows must outlive the novels and
  * chapters they describe (an unpublish or a rebuild must not erase its own history).

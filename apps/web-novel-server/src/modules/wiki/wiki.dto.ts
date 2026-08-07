@@ -1,24 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { WIKI_ENTRY_TYPES, type WikiEntryType } from '@server/modules/publish';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class WikiListItem {
@@ -31,8 +13,7 @@ export class WikiListItem {
   @Field()
   name: string;
 
-  /** Absolute public URL, resolved server-side from the storage origin; absent when the entry has no image. */
-  @Field(() => String, { optional: true })
+  @Field(() => String, { optional: true, description: 'Absolute public URL; absent when the entry has no image.' })
   imageUrl?: string;
 }
 
@@ -41,8 +22,7 @@ export class WikiListResponse {
   @Field(() => [WikiListItem])
   items: WikiListItem[];
 
-  /** How many entries exist but lie beyond the reader's gate. A count only — never the entries themselves. */
-  @Field(() => Integer)
+  @Field(() => Integer, { description: "Number of entries hidden beyond the reader's progress gate; hidden entries are never returned." })
   lockedCount: number;
 }
 
@@ -90,7 +70,6 @@ export class WikiEntryDetailResponse {
   @Field(() => [WikiImageItem])
   images: WikiImageItem[];
 
-  /** How many facets exist but lie beyond the reader's gate. A count only — never the facet content. */
-  @Field(() => Integer)
+  @Field(() => Integer, { description: "Number of facets hidden beyond the reader's progress gate; hidden facet content is never returned." })
   hiddenFacetCount: number;
 }

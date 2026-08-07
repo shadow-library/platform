@@ -1,30 +1,17 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
 import { asc, eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { schema } from '@server/modules/datastore';
 
 import { TestEnvironment } from '../test-environment';
 import { forgeToken, userToken } from '../test-idp';
-
-/**
- * Defining types
- */
 
 interface PushOptions {
   body?: object;
   token?: string;
 }
 
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('wiki-ingest').init();
 const SLUG = 'moonfall';
 

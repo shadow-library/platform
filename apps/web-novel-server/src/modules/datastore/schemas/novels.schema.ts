@@ -1,20 +1,5 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel } from 'drizzle-orm';
 import { bigint, bigserial, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export type Novel = InferSelectModel<typeof novels>;
 export namespace Novel {
@@ -24,8 +9,6 @@ export namespace Novel {
 }
 
 /**
- * Declaring the tables
- *
  * These tables are the serving copy of a projection owned by novel-forge-server: dropping them
  * and re-pushing every publication must converge to identical state. `revision` values are
  * assigned by the forge (monotonic per row) and drive the optimistic-concurrency rules on the

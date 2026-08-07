@@ -1,23 +1,10 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { schema } from '@server/modules/datastore';
 
 import { TestEnvironment } from '../test-environment';
 import { forgeToken } from '../test-idp';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('catalog').init();
 
 const seedCatalog = async () => {

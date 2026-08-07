@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, beforeEach } from 'bun:test';
 import { randomBytes } from 'node:crypto';
 
@@ -10,21 +7,11 @@ import { Config, Logger } from '@shadow-library/common';
 import { FastifyRouter } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppModule } from '@server/app.module';
 import { APP_NAME } from '@server/constants';
 import { PrimaryDatabase } from '@server/modules/datastore';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 Logger.attachTransport('file:json');
 const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost:5432/shadow_webnovel';
 

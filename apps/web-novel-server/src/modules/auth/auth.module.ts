@@ -1,26 +1,10 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { forwardRef, type Import, Module } from '@shadow-library/app';
 import { AuthModule } from '@shadow-library/auth/module';
 import { FastifyModule } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { OptionalAuthResolver } from './optional-auth.middleware';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The auth SDK's dynamic module carries a live `AuthClient` in a value provider, and `@Module`
  * deep-freezes everything reachable from its metadata. The forwardRef defers construction to
  * module resolution — after the freeze — so the client stays mutable.

@@ -1,32 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { TestEnvironment } from '../test-environment';
 import { forgeToken, userToken } from '../test-idp';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * The access ladder end to end, driven entirely over HTTP: the forge pushes a tier and a grant set
- * on the internal surface, and readers are then judged by it on the public one.
- *
- * The assertions people will be tempted to relax later, and why they must not be:
- *  - a denied read answers **404**, byte-identical to an unknown slug, so a probe cannot confirm
- *    that a private novel exists;
- *  - a non-public novel is absent from `GET /api/novels` **even for the reader it was shared with**,
- *    because staying out of browse/search/sort is the whole point of the feature;
- *  - a non-public chapter answers `private, no-store`, because the public path is CDN-cached and a
- *    shared cache holding one reader's copy would hand it to everyone.
- */
 
 const env = new TestEnvironment('access').init();
 
@@ -70,11 +45,6 @@ async function read(path: string, sub?: string, org?: string) {
   return bearer ? mock.headers({ authorization: `Bearer ${bearer}` }) : mock;
 }
 
-/**
- * Publishes a novel at the given tier with one chapter, so every test starts from a readable novel.
- * The access push is `200 applied` or `204 no-op` depending on whether it moved anything — seeding a
- * PUBLIC novel changes nothing, since the metadata push already carried the tier.
- */
 async function seed(slug: string, visibility: string, access: object = {}): Promise<void> {
   expect((await push('put', `/internal/novels/${slug}`, novelBody(1, { visibility }))).statusCode).toBe(200);
   expect([200, 204]).toContain((await push('put', `/internal/novels/${slug}/access`, { visibility, revision: 1, ...access })).statusCode);
@@ -160,7 +130,6 @@ describe('Novel access', () => {
 
       expect((await read('/api/novels/detail-private')).statusCode).toBe(404);
       expect((await read('/api/novels/detail-private', OUTSIDER)).statusCode).toBe(404);
-      /** Identical to the answer an unknown slug gets — that sameness is the point. */
       expect((await read('/api/novels/unknown-slug')).json()).toMatchObject({ code: 'WBN_001' });
       expect((await read('/api/novels/detail-private', OUTSIDER)).json()).toMatchObject({ code: 'WBN_001' });
 
@@ -200,7 +169,6 @@ describe('Novel access', () => {
       await seed('org-novel', 'ORGANISATION', { organisationId: ORG_ID });
 
       expect((await read('/api/novels/org-novel', ORG_MEMBER, ORG_ID)).statusCode).toBe(200);
-      /** A member of some other organisation is a stranger here. */
       expect((await read('/api/novels/org-novel', OUTSIDER, '9999')).statusCode).toBe(404);
       expect((await read('/api/novels/org-novel')).statusCode).toBe(404);
     });
@@ -238,7 +206,6 @@ describe('Novel access', () => {
 
       expect((await push('put', '/internal/novels/revoked-novel/access', { visibility: 'RESTRICTED', subjectIds: [], revision: 2 })).statusCode).toBe(200);
 
-      /** The library row still exists; it simply stops being shown, because the row carries title and cover. */
       expect(((await authed('get', '/api/library', GRANTEE)).json() as { items: unknown[] }).items).toHaveLength(0);
       expect(((await authed('get', '/api/shared', GRANTEE)).json() as { items: unknown[] }).items).toHaveLength(0);
       expect((await read('/api/novels/revoked-novel', GRANTEE)).statusCode).toBe(404);

@@ -1,27 +1,11 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferSelectModel } from 'drizzle-orm';
 import { bigint, index, pgTable, primaryKey, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { novels } from './novels.schema';
-
-/**
- * Defining types
- */
 
 export type NovelGrant = InferSelectModel<typeof novelGrants>;
 
 /**
- * Declaring the tables
- *
  * Who may read a `RESTRICTED` novel. Part of the forge-owned projection, not audience data: the
  * author decides the share list in novel-forge and it arrives over `PUT /internal/novels/:slug/access`
  * as a full replacement, so dropping this table and re-pushing converges to identical state.
@@ -38,9 +22,5 @@ export const novelGrants = pgTable(
       .references(() => novels.id, { onDelete: 'cascade' }),
     subjectId: varchar('subject_id', { length: 128 }).notNull(),
   },
-  table => [
-    primaryKey({ name: 'novel_grants_novel_id_subject_id_pk', columns: [table.novelId, table.subjectId] }),
-    /** Drives the "shared with me" shelf, which reads by subject across every novel. */
-    index('novel_grants_subject_id_idx').on(table.subjectId),
-  ],
+  table => [primaryKey({ name: 'novel_grants_novel_id_subject_id_pk', columns: [table.novelId, table.subjectId] }), index('novel_grants_subject_id_idx').on(table.subjectId)],
 );

@@ -1,10 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { and, asc, count, eq, gt, lte, sql } from 'drizzle-orm';
@@ -13,19 +6,12 @@ import { type AuthPrincipal } from '@shadow-library/auth';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { CatalogService } from '@server/modules/catalog';
 import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
 
 import { type WikiEntryDetailResponse, type WikiListResponse } from './wiki.dto';
-
-/**
- * Defining types
- */
 
 /**
  * What the controller needs to answer a wiki read: the serialized body, plus the tier and whether the
@@ -39,8 +25,6 @@ export interface WikiRead<T> {
 }
 
 /**
- * Declaring the constants
- *
  * The gate is the reader's furthest-reached ordinal, or 0 for an anonymous reader or one with no progress —
  * entries and facets at ordinal 0 are the pre-reading public view. Everything gated is filtered in SQL by
  * `<= gate`, so nothing beyond the reader's progress is ever loaded, let alone serialized. A missing entry

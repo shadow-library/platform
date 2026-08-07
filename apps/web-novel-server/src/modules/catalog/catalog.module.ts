@@ -1,15 +1,5 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Module } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { DatabaseModule } from '@server/modules/datastore';
 import { AuthClient } from '@shadow-library/auth';
 import { resolveAuthClientConfig } from '@shadow-library/auth/module';
@@ -18,14 +8,6 @@ import { FastifyModule } from '@shadow-library/fastify';
 import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
 import { NovelAccessService } from './novel-access.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * The membership lookup rides a module-owned `AuthClient` built from the SDK's own config resolver —

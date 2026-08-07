@@ -1,19 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { type AuthPrincipal } from '@shadow-library/auth';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { CatalogService, NovelAccessService } from '@server/modules/catalog';
@@ -22,12 +12,6 @@ import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datast
 import { type LibraryItem, type ProgressBody, type ProgressListItem, type ProgressResponse } from './reader.dto';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * Audience data: originates here, stays here — never crosses back to the forge. `userId` is the
  * identity subject; there is deliberately no local account row to attach it to.
  */
@@ -44,10 +28,6 @@ export class ReaderService {
   ) {
     this.db = databaseService.getPostgresClient();
   }
-
-  /*!
-   * Reading progress
-   */
 
   async listProgress(principal: AuthPrincipal): Promise<ProgressListItem[]> {
     const rows = await this.db
@@ -105,10 +85,6 @@ export class ReaderService {
     return { ordinal: progress.ordinal, position: progress.position, furthestOrdinal: progress.furthestOrdinal, updatedAt: updatedAt.toISOString() };
   }
 
-  /*!
-   * Library
-   */
-
   async listLibrary(principal: AuthPrincipal): Promise<LibraryItem[]> {
     const rows = await this.db
       .select({ novel: schema.novels, addedAt: schema.library.addedAt })
@@ -159,14 +135,12 @@ export class ReaderService {
     };
   }
 
-  /** Idempotent: re-adding an existing entry keeps the original addedAt */
   async addToLibrary(principal: AuthPrincipal, slug: string): Promise<void> {
     const novel = await this.catalogService.getReadableNovel(slug, principal);
     await this.db.insert(schema.library).values({ userId: principal.sub, novelId: novel.id }).onConflictDoNothing();
     this.logger.debug('novel added to library', { userId: principal.sub, slug });
   }
 
-  /** Idempotent: removing an absent entry (or an unknown slug) succeeds silently */
   async removeFromLibrary(userId: string, slug: string): Promise<void> {
     const [novel] = await this.db.select({ id: schema.novels.id }).from(schema.novels).where(eq(schema.novels.slug, slug));
     if (!novel) return;

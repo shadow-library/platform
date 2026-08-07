@@ -1,34 +1,15 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { csrfPair, TestEnvironment } from '../test-environment';
 import { AUDIENCE, idp, LOGIN_COOKIE_NAME, LOGIN_SCOPES, SESSION_COOKIE_NAME, WEB_NOVEL_CLIENT_ID } from '../test-idp';
-
-/**
- * Defining types
- */
 
 interface LoginResult {
   sessionCookie: string;
   redirectedTo: string;
 }
 
-/**
- * Declaring the constants
- *
- * The reader login surface is now owned entirely by `@shadow-library/auth`'s `AuthModule`, mounted at
- * `/api/auth`. The dance is first-party (D-18): the callback redeems the authorization code for an
- * opaque app-session handle held in the `__Host-shadow-session` cookie, and `GET /api/auth/session`
- * resolves that handle into the flat principal `{ sub, scopes, ... }`.
- */
 const env = new TestEnvironment('session').init();
 
-/** Drives the full first-party dance against the mock IdP: login redirect → authorization code → callback */
 async function loginAs(sub: string, options: { returnTo?: string } = {}): Promise<LoginResult> {
   const returnTo = options.returnTo ?? '/browse';
   const loginResponse = await env

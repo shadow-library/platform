@@ -1,19 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type PublishAction = 'novel.upsert' | 'novel.access' | 'chapter.upsert' | 'chapter.unpublish' | 'wiki.upsert' | 'wiki.delete';
 
 export type PublishOutcome = 'applied' | 'noop' | 'stale_rejected' | 'unauthorized' | 'error';
@@ -31,7 +15,6 @@ export interface PublishAuditEntry {
   error?: string;
 }
 
-/** Route metadata payload the `@PublishAudited` decorator writes and the trailer middleware reads */
 export interface PublishAuditRouteMetadata {
   action: PublishAction;
 }
@@ -46,9 +29,4 @@ declare module 'fastify' {
   }
 }
 
-/**
- * Declaring the constants
- */
-
-/** Handler-metadata key carrying the `PublishAuditRouteMetadata` for audited internal routes */
 export const PUBLISH_AUDIT_METADATA = 'webNovelPublishAudit';

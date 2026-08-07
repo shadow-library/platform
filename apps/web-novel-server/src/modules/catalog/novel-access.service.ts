@@ -1,25 +1,11 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, eq, inArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AuthClient, type AuthPrincipal } from '@shadow-library/auth';
 import { Config, Logger, LRUCache } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
-
-/**
- * Defining types
- */
 
 /** The subset of a novel the decision needs; taking the whole row would tempt callers to pass a stale copy. */
 export type AccessSubject = Pick<Novel, 'id' | 'visibility' | 'organisationId'>;
@@ -29,8 +15,6 @@ interface MembershipResponse {
 }
 
 /**
- * Declaring the constants
- *
  * The single answer to "may this caller read this novel". Every read path funnels through it, so
  * there is one place to get right and one place to audit — a second, subtly different predicate
  * somewhere else is how a leak of this shape happens.

@@ -63,9 +63,12 @@ the ecosystem already provides, and do not begin work before the skill is loaded
   `arrowParens: avoid`; 2-space indent, semicolons. `PascalCase` types/classes, `camelCase` values,
   `UPPER_SNAKE_CASE` constants; kebab-case files with a role suffix
   (`*.controller.ts` / `*.service.ts` / `*.dto.ts` / `*.module.ts` / `*.spec.ts`).
-- **File section banners:** open every source file (not barrels) with the ecosystem's banner blocks in order,
-  keeping empty ones — `Importing packages with side effects`, `Importing npm packages`,
-  `Importing user defined packages`, `Defining types`, `Declaring the constants`.
+- **Comments:** implementation comments explain only non-obvious constraints, deviations, failure ordering,
+  or interoperability details. Do not add section banners or restate names, types, configuration keys, or
+  control flow. Keep caller-facing JSDoc on reusable options when their semantics are not evident from the
+  type, and put schema DTO guidance in `@Field` descriptions so it reaches API consumers.
+- **Imports:** preserve the established declaration and named-specifier order. Treat `@shadow-library/*` as
+  external npm packages, not as user-defined aliases.
 - **Named exports + a barrel `index.ts` per folder.** Comment the _why_, never the _what_.
 
 ## 4. Commands

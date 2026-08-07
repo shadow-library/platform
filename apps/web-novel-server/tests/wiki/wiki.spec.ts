@@ -1,31 +1,12 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { schema } from '@server/modules/datastore';
 
 import { TestEnvironment } from '../test-environment';
 import { userToken } from '../test-idp';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * The spoiler gate end to end: an entry, facet or image is visible only once the reader has reached its
- * ordinal. Anonymous readers and those with no progress gate at 0; a signed-in reader gates at their
- * furthest-reached chapter. A hidden entry is indistinguishable from a nonexistent one (both 404 WBN_009),
- * and a novel the reader may not see hides its wiki behind the same 404 the catalog gives (WBN_001).
- */
 const env = new TestEnvironment('wiki').init();
 
-/** Seeds a PUBLIC novel with three entries at ascending reveal ordinals, and a gated facet/image on Alice. */
 async function seedNovel(slug = 'moonfall', visibility: 'PUBLIC' | 'RESTRICTED' = 'PUBLIC'): Promise<bigint> {
   const db = env.getPostgresClient();
   const [novel] = await db
@@ -54,12 +35,10 @@ async function seedNovel(slug = 'moonfall', visibility: 'PUBLIC' | 'RESTRICTED' 
   return novelId;
 }
 
-/** Sets a reader's gate by writing their furthest-reached ordinal for the novel. */
 async function setGate(userId: string, novelId: bigint, furthestOrdinal: number): Promise<void> {
   await env.getPostgresClient().insert(schema.readingProgress).values({ userId, novelId, ordinal: furthestOrdinal, position: 0, furthestOrdinal });
 }
 
-/** An anonymous read, or a signed-in one when `sub` is given. The token is minted before the chain is built. */
 async function read(path: string, sub?: string) {
   const bearer = sub ? await userToken(sub) : undefined;
   const mock = env.getRouter().mockRequest().get(path);

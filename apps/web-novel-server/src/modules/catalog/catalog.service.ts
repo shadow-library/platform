@@ -1,19 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, count, desc, eq, ilike, sql, type SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { type AuthPrincipal } from '@shadow-library/auth';
 import { AppError, Config, Logger, LRUCache } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
@@ -21,23 +11,16 @@ import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datast
 import { type ChapterContentResponse, type ChapterMetaItem, type NovelCatalogQuery, type NovelCatalogResponse, type NovelDetailResponse, type NovelSummary } from './catalog.dto';
 import { NovelAccessService } from './novel-access.service';
 
-/**
- * Defining types
- */
-
 export interface ChapterRef {
   novelSlug: string;
   chapterId: bigint;
   ordinal: number;
   contentHash: string;
   revision: number;
-  /** Carried so the controller can decide the caching story without a second lookup */
   visibility: Novel['visibility'];
 }
 
 /**
- * Declaring the constants
- *
  * Chapter payloads are cached under a key that includes the forge-assigned revision, so a
  * republish (revision bump) is a natural cache miss and stale entries simply age out of the LRU —
  * no explicit invalidation path exists or is needed.
@@ -92,7 +75,6 @@ export class CatalogService {
     return { ...this.toSummary(novel, chapters?.value ?? 0), createdAt: novel.createdAt.toISOString() };
   }
 
-  /** Returns the tier alongside the list so the controller can pick a caching story without a second lookup. */
   async listChapters(slug: string, principal: AuthPrincipal | null): Promise<{ items: ChapterMetaItem[]; visibility: Novel['visibility'] }> {
     const novel = await this.getReadableNovel(slug, principal);
     const chapters = await this.db
@@ -115,7 +97,6 @@ export class CatalogService {
     return { items, visibility: novel.visibility };
   }
 
-  /** Cheap lookup (no content column) that carries everything ETag handling needs */
   async getChapterRef(slug: string, ordinal: number, principal: AuthPrincipal | null): Promise<ChapterRef> {
     const novel = await this.getReadableNovel(slug, principal);
     const [chapter] = await this.db
@@ -191,7 +172,6 @@ export class CatalogService {
     return query.sortOrder === 'asc' ? asc(column) : desc(column);
   }
 
-  /** Resolves a stored content-addressed ref to the absolute URL clients fetch it from; `undefined` covers both a missing ref and no cover at all. */
   imageUrl(ref: string | null | undefined): string | undefined {
     if (!ref) return undefined;
     return `${this.publicOrigin}/${ref}`;

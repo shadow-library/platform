@@ -1,30 +1,14 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { type FastifyRequest } from 'fastify';
 import { type AuthPrincipal } from '@shadow-library/auth';
 import { Config } from '@shadow-library/common';
 import { ContextService, Get, HttpController, type HttpResponse, Params, Req, Res, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { NovelSlugParams, WikiEntryKeyParams } from '@server/modules/publish';
 
 import { WikiEntryDetailResponse, WikiListResponse } from './wiki.dto';
 import { type WikiRead, WikiService } from './wiki.service';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The public, spoiler-gated wiki surface. It shares the `/api/novels` prefix (and so the same optional-auth
  * resolver and access rules as the catalog): read anonymously at gate 0, or as a signed-in reader gated by
  * their furthest ordinal. A public novel read anonymously is CDN-cacheable with an ETag; anything reader-
@@ -52,12 +36,10 @@ export class WikiController {
     return this.finish(read, request, response);
   }
 
-  /** Present only when the caller carried a credential; the optional-auth resolver never demands one. */
   private principal(): AuthPrincipal | null {
     return this.context.getAuthPrincipalOrNull();
   }
 
-  /** Sets the ETag and cache policy, short-circuits to 304 on a match, else returns the body for serialization. */
   private finish<T>(read: WikiRead<T>, request: FastifyRequest, response: HttpResponse): T | undefined {
     response.header('etag', read.etag);
     this.applyCachePolicy(response, read.visibility, read.personalized);

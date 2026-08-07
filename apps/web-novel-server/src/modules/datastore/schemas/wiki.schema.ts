@@ -1,29 +1,13 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferSelectModel } from 'drizzle-orm';
 import { bigint, bigserial, integer, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { novels } from './novels.schema';
-
-/**
- * Defining types
- */
 
 export type WikiEntry = InferSelectModel<typeof wikiEntries>;
 export type WikiEntryFacet = InferSelectModel<typeof wikiEntryFacets>;
 export type WikiEntryImage = InferSelectModel<typeof wikiEntryImages>;
 
 /**
- * Declaring the tables
- *
  * The serving copy of a novel's character/lore wiki — a forge-owned projection like the novels and
  * chapters beside it: dropping every row and re-pushing must converge to identical state. `revision`
  * is forge-assigned per entry and drives the optimistic-concurrency rules on the internal wiki push

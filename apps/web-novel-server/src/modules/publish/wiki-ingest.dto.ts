@@ -1,34 +1,14 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { INT4_MAX, NovelSlugParams } from './publish.dto';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-/** The kinds of wiki entry the forge may push; the reader stores what the forge decided, never inventing a value. */
 export const WIKI_ENTRY_TYPES = ['character', 'faction', 'location', 'item', 'concept', 'power_rule'] as const;
 
 export type WikiEntryType = (typeof WIKI_ENTRY_TYPES)[number];
 
 @Schema()
 export class WikiEntryKeyParams extends NovelSlugParams {
-  /** Forge-assigned stable key; mirrors the `entry_key` column width. */
-  @Field({ pattern: '^[A-Za-z0-9._-]{1,128}$', maxLength: 128 })
+  @Field({ pattern: '^[A-Za-z0-9._-]{1,128}$', maxLength: 128, description: 'Forge-assigned stable wiki entry key.' })
   entryKey: string;
 }
 
@@ -43,8 +23,7 @@ export class WikiFacetInput {
   @Field(() => Integer, { minimum: 0, maximum: INT4_MAX })
   sortOrder: number;
 
-  /** Reader ordinal from which this facet is shown; a facet gated ahead of the reader is never loaded. */
-  @Field(() => Integer, { minimum: 0, maximum: INT4_MAX })
+  @Field(() => Integer, { minimum: 0, maximum: INT4_MAX, description: 'First reader ordinal at which this facet becomes visible.' })
   visibleFromOrdinal: number;
 }
 
@@ -75,19 +54,16 @@ export class WikiEntryUpsertBody {
   @Field({ maxLength: 256 })
   name: string;
 
-  /** Content-addressed storage ref (e.g. `<sha256>.webp`); resolved to a public URL only at read time. */
-  @Field(() => String, { optional: true, maxLength: 512 })
+  @Field(() => String, { optional: true, maxLength: 512, description: 'Content-addressed storage reference, such as <sha256>.webp.' })
   imageRef?: string;
 
-  /** Reader ordinal at which the entry first appears; 0 means pre-reading public info. */
-  @Field(() => Integer, { minimum: 0, maximum: INT4_MAX })
+  @Field(() => Integer, { minimum: 0, maximum: INT4_MAX, description: 'First reader ordinal at which this entry appears; 0 exposes it before reading.' })
   firstVisibleOrdinal: number;
 
   @Field({ maxLength: 128 })
   contentHash: string;
 
-  /** Forge-assigned monotonic revision driving the optimistic-concurrency rules */
-  @Field(() => Integer, { minimum: 0, maximum: INT4_MAX })
+  @Field(() => Integer, { minimum: 0, maximum: INT4_MAX, description: 'Forge-assigned monotonic revision used for optimistic concurrency.' })
   revision: number;
 
   @Field(() => [WikiFacetInput])
@@ -97,7 +73,6 @@ export class WikiEntryUpsertBody {
   images: WikiImageInput[];
 }
 
-/** The reconciliation primitive for the wiki, mirroring `ManifestItem` for chapters. */
 @Schema()
 export class WikiManifestItem {
   @Field()

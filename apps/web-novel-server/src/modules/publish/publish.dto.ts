@@ -1,29 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /** Every numeric field here lands in an int4 column (including the audit trail) — values beyond this must be rejected, not passed through to the database */
 export const INT4_MAX = 2_147_483_647;
 
-/** Mirrors the `novel_visibility` pg enum; the reader never invents a value, it only stores what the forge decided. */
 export const NOVEL_VISIBILITIES = ['PUBLIC', 'ORGANISATION', 'RESTRICTED'] as const;
 
 /**
@@ -40,8 +20,7 @@ export class NovelSlugParams {
 
 @Schema()
 export class ChapterOrdinalParams extends NovelSlugParams {
-  /** Capped at 9 digits so the parsed ordinal always fits int4 */
-  @Field(() => String, { pattern: '^\\d{1,9}$' })
+  @Field(() => String, { pattern: '^\\d{1,9}$', description: 'A positive chapter ordinal of at most 9 digits.' })
   @Transform('int:parse')
   ordinal: number;
 }
@@ -63,16 +42,13 @@ export class NovelUpsertBody {
   @Field(() => String, { enum: ['live', 'retired'], optional: true })
   status?: 'live' | 'retired';
 
-  /**
-   * Required, not optional-defaulting-to-`PUBLIC`. A default here would mean one forge bug — a
-   * dropped field, a stale client — silently publishes a private manuscript to the open catalog.
-   * Demanding it makes the same bug a 400 that publishes nothing, which is the direction to fail in.
-   */
-  @Field(() => String, { enum: [...NOVEL_VISIBILITIES] })
+  @Field(() => String, {
+    enum: [...NOVEL_VISIBILITIES],
+    description: 'Required access tier. It has no PUBLIC default so an omitted value cannot accidentally publish private content.',
+  })
   visibility: (typeof NOVEL_VISIBILITIES)[number];
 
-  /** Forge-assigned monotonic revision driving the optimistic-concurrency rules */
-  @Field(() => Integer, { minimum: 0, maximum: INT4_MAX })
+  @Field(() => Integer, { minimum: 0, maximum: INT4_MAX, description: 'Forge-assigned monotonic revision used for optimistic concurrency.' })
   revision: number;
 }
 
@@ -90,19 +66,21 @@ export class NovelAccessBody {
   @Field(() => String, { enum: [...NOVEL_VISIBILITIES] })
   visibility: (typeof NOVEL_VISIBILITIES)[number];
 
-  /** Required for `ORGANISATION`, rejected otherwise — enforced in the service, where the tier is known. */
-  @Field(() => String, { optional: true, maxLength: 64 })
+  @Field(() => String, { optional: true, maxLength: 64, description: 'Required only when visibility is ORGANISATION.' })
   organisationId?: string;
 
-  /** Resolved identity subjects only; the forge does the email lookup, so no address ever reaches this service. */
-  @Field(() => [String], { optional: true, maxItems: MAX_GRANT_SUBJECTS, uniqueItems: true })
+  @Field(() => [String], {
+    optional: true,
+    maxItems: MAX_GRANT_SUBJECTS,
+    uniqueItems: true,
+    description: 'Resolved identity subject IDs. Email addresses are not accepted.',
+  })
   subjectIds?: string[];
 
   @Field(() => Integer, { minimum: 0, maximum: INT4_MAX })
   revision: number;
 }
 
-/** The reconciliation primitive for access, mirroring `ManifestItem` for chapters. */
 @Schema()
 export class NovelAccessResponse {
   @Field(() => String, { enum: [...NOVEL_VISIBILITIES] })
@@ -132,8 +110,7 @@ export class ChapterUpsertBody {
   @Field({ maxLength: 128 })
   contentHash: string;
 
-  /** Forge-assigned monotonic revision driving the optimistic-concurrency rules */
-  @Field(() => Integer, { minimum: 0, maximum: INT4_MAX })
+  @Field(() => Integer, { minimum: 0, maximum: INT4_MAX, description: 'Forge-assigned monotonic revision used for optimistic concurrency.' })
   revision: number;
 
   @Field(() => Integer, { optional: true, minimum: 0, maximum: INT4_MAX })

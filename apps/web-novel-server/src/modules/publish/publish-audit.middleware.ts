@@ -1,27 +1,13 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { type HandlerMetadata } from '@shadow-library/app';
 import { decodeJwt } from '@shadow-library/auth';
 import { AuthGuardErrorCode } from '@shadow-library/auth/module';
 import { AppError, Logger, tryCatch } from '@shadow-library/common';
 import { type HttpRequest, type HttpResponse, Middleware, type RouteHandler } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 
 import { PublishAuditService } from './publish-audit.service';
 import { PUBLISH_AUDIT_METADATA, type PublishAuditEntry, type PublishAuditRouteMetadata } from './publish.types';
-
-/**
- * Defining types
- */
 
 interface CallerInfo {
   callerSub?: string;
@@ -29,8 +15,6 @@ interface CallerInfo {
 }
 
 /**
- * Declaring the constants
- *
  * Route-level `onError` trailer for the audited internal routes: any mutation call that fails
  * before or outside the publish service (missing/invalid token, missing scope, validation error,
  * unexpected failure) still leaves exactly one audit row. The hook runs before the error response

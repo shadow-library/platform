@@ -1,36 +1,16 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { EnumType, Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Paginated, PaginationQuery } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { NOVEL_VISIBILITIES } from '@server/modules/publish';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const NOVEL_SORT_FIELDS = EnumType.create('NovelSortBy', ['updatedAt', 'createdAt', 'title'] as const);
 
 @Schema()
 export class NovelCatalogQuery extends PaginationQuery(NOVEL_SORT_FIELDS, { sortBy: 'updatedAt', sortOrder: 'desc' }) {
-  /** Case-insensitive substring match on the title */
-  @Field(() => String, { optional: true })
+  @Field(() => String, { optional: true, description: 'Case-insensitive substring match on the title.' })
   search?: string;
 
-  /** Exact match against any of the novel's genre strings */
-  @Field(() => String, { optional: true })
+  @Field(() => String, { optional: true, description: "Exact match against any of the novel's genre strings." })
   genre?: string;
 
   @Field(() => String, { enum: ['live', 'retired'], optional: true })
@@ -48,8 +28,7 @@ export class NovelSummary {
   @Field(() => String, { optional: true })
   blurb?: string;
 
-  /** Absolute public URL, resolved server-side from the storage origin; absent when the novel has no cover. */
-  @Field(() => String, { optional: true })
+  @Field(() => String, { optional: true, description: 'Absolute public URL; absent when the novel has no cover.' })
   coverUrl?: string;
 
   @Field(() => [String])
@@ -58,8 +37,7 @@ export class NovelSummary {
   @Field(() => String, { enum: ['live', 'retired'] })
   status: 'live' | 'retired';
 
-  /** Safe to surface: only a caller already cleared to see the novel ever receives this. */
-  @Field(() => String, { enum: [...NOVEL_VISIBILITIES] })
+  @Field(() => String, { enum: [...NOVEL_VISIBILITIES], description: 'The access tier already authorized for the caller.' })
   visibility: (typeof NOVEL_VISIBILITIES)[number];
 
   @Field(() => Integer)

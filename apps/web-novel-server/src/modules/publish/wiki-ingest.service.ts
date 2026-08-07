@@ -1,19 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, eq, type SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
@@ -23,18 +13,12 @@ import { type UnpublishResult, type UpsertResult } from './publish.service';
 import { type PublishAuditEntry } from './publish.types';
 import { type WikiEntryUpsertBody, type WikiManifestItem } from './wiki-ingest.dto';
 
-/**
- * Defining types
- */
-
 interface StaleMarker {
   outcome: 'stale';
   stored: number;
 }
 
 /**
- * Declaring the constants
- *
  * The wiki push obeys the same optimistic-concurrency ladder as the chapter push: a revision behind the
  * stored one is a 409 stale rejection, an equal revision carrying an identical content hash is a no-op, and
  * anything else replaces the entry and its whole set of facets and images in one transaction — the reader
@@ -129,7 +113,6 @@ export class WikiIngestService {
     return result;
   }
 
-  /** Delete is idempotent: removing an absent entry (or an unknown novel) is a recorded no-op. Cascades drop facets/images. */
   async deleteEntry(slug: string, entryKey: string): Promise<UnpublishResult> {
     const caller = this.caller();
     const base: Omit<PublishAuditEntry, 'outcome'> = { action: 'wiki.delete', novelSlug: slug, ...caller };
@@ -154,7 +137,6 @@ export class WikiIngestService {
     return result;
   }
 
-  /** The reconciliation primitive: the forge diffs this against its wiki ledger. Reads are not audited. */
   async getManifest(slug: string): Promise<WikiManifestItem[]> {
     const novel = await this.getNovelBySlug(slug);
     return this.db

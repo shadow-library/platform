@@ -1,30 +1,17 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
 import { asc, eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { schema } from '@server/modules/datastore';
 
 import { TestEnvironment } from '../test-environment';
 import { AUDIENCE, forgeToken, idp, userToken } from '../test-idp';
-
-/**
- * Defining types
- */
 
 interface PushOptions {
   body?: object;
   token?: string;
 }
 
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('publish').init();
 const SLUG = 'moonfall';
 
@@ -46,7 +33,6 @@ const chapterBody = (revision: number, contentHash: string, overrides: object = 
   ...overrides,
 });
 
-/** Builds and dispatches an internal-surface request; the chain resolves to the response */
 async function push(method: 'put' | 'delete' | 'get', path: string, options: PushOptions = {}) {
   const bearer = options.token ?? (await forgeToken());
   const mock = env.getRouter().mockRequest();

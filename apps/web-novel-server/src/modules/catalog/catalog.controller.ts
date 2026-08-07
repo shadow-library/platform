@@ -1,30 +1,14 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { type FastifyRequest } from 'fastify';
 import { type AuthPrincipal } from '@shadow-library/auth';
 import { Config } from '@shadow-library/common';
 import { ContextService, Get, HttpController, type HttpResponse, Params, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { ChapterOrdinalParams, NOVEL_VISIBILITIES, NovelSlugParams } from '@server/modules/publish';
 
 import { ChapterContentResponse, ChapterListResponse, NovelCatalogQuery, NovelCatalogResponse, NovelDetailResponse } from './catalog.dto';
 import { CatalogService } from './catalog.service';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The public, unauthenticated reading surface. Chapter content is served cache-first: the ETag is
  * the forge's contentHash, `If-None-Match` short-circuits to 304, and a modest max-age keeps CDNs
  * and browsers holding a copy — a republish changes the hash, so revalidation misses naturally.
@@ -69,7 +53,6 @@ export class CatalogController {
     return this.catalogService.getChapterContent(ref);
   }
 
-  /** Present only when the caller carried a credential; `OptionalAuthResolver` never demands one. */
   private principal(): AuthPrincipal | null {
     return this.context.getAuthPrincipalOrNull();
   }
