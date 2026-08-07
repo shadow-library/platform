@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Alert, Button, Dialog, FileUpload, Switch, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { PageContainer, PageHeader, QueryState, SectionCard, StatusChip } from '@/components/nf';
 import { type CollectionResult, type ImportPlanResponse, type PlanBundle, useImportPlanMutation, useProjectQuery } from '@/lib/apis';
 
@@ -16,10 +10,6 @@ import styles from './import-plan.module.css';
 export const Route = createFileRoute('/novels/$novelId/import-plan')({
   component: ImportPlanScreen,
 });
-
-/**
- * Declaring the constants
- */
 
 const BUNDLE_FORMAT = 'novel-forge-plan';
 // Mirrors the server's accepted set (`plan-import.service.ts`): v2 added the optional `facts` collection
@@ -111,7 +101,6 @@ function ImportPlanScreen(): React.JSX.Element {
     else doImport();
   };
 
-  // `ApiError.fieldErrors` folds the backend's field problems into a `{ field: message }` map for inline display.
   const fieldErrors = Object.entries(importPlan.error?.fieldErrors ?? {});
 
   return (

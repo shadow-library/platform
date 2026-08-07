@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Dialog, FormField, IconButton, Kbd, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { WarningIcon } from '@/components/icons';
 import { type ChipIntent, PaneError, PaneLoader, StatusChip } from '@/components/nf';
 import {
@@ -23,7 +17,6 @@ import {
 import styles from './review.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/review')({
-  // The review queue is this screen's only data — prefetch it so it renders server-side.
   loader: ({ context, params }) => context.queryClient.prefetchQuery(reviewQueueQueryOptions(params.novelId)),
   component: ReviewScreen,
 });

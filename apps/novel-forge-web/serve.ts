@@ -1,9 +1,4 @@
 /**
- * The production entry (`bun run serve.ts`, package.json `start`), now `serve` from
- * `@shadow-library/web/server-entry`: hashed client assets with immutable caching + gzip, streamed SSR,
- * a backend-independent `/healthz` liveness probe on its own port (`HEALTH_PORT`, default 3001), and
- * graceful drain on shutdown.
- *
  * This server deliberately does not proxy `/api`. The deployment fronts it with an ingress that routes
  * `/api/*` to novel-forge-server and everything else here, on one origin — which is what makes the
  * browser's API calls same-origin, so its cookies and the CSRF double-submit work without a proxy hop

@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Button, Checkbox, SegmentedControl, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { type ChipIntent, Markdown, PaneError, PaneLoader, StatusChip } from '@/components/nf';
 import {
   listProposalsQueryOptions,
@@ -22,7 +16,6 @@ import { relativeTime } from '@/lib/format';
 import styles from './proposals.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/proposals')({
-  // The pending proposals are the review surface's landing data (the screen defaults to the pending filter).
   loader: ({ context, params }) => context.queryClient.prefetchQuery(listProposalsQueryOptions(params.novelId, { limit: 100, status: 'pending' })),
   component: ProposalsScreen,
 });
@@ -51,7 +44,6 @@ function proposalTitle(p: ProposalResponse): string {
   return p.summary?.trim() || `${p.kind} · ${p.scopeType}`;
 }
 
-/** A one-line human summary of a change-set op: its type plus the key that identifies the target. */
 export function opLabel(op: Record<string, unknown>): string {
   const type = String(op.op ?? 'unknown');
   const target =

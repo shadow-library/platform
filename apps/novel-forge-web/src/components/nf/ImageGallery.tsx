@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { useRef } from 'react';
 import { Spinner } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { ImageIcon, TrashIcon } from '@/components/icons';
 import { ACCEPT_ATTR, readImageFile, type UploadMime } from './image-file';
 import styles from './ImageGallery.module.css';
 
-/**
- * Defining types
- */
 export interface GalleryImage {
   id: string;
   url?: string;
@@ -28,10 +19,6 @@ interface ImageGalleryProps {
   onRemove: (id: string) => void;
 }
 
-/**
- * A grid of reference images with per-tile removal and an always-present "add" tile. Used for entity
- * galleries and chapter scene images; the parent owns the mutations and passes resolved image URLs.
- */
 export function ImageGallery({ images, busy, addLabel = 'Add image', onAdd, onRemove }: ImageGalleryProps): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
 

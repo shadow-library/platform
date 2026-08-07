@@ -1,7 +1,3 @@
-/**
- * The project-scoped screens, shared by the sidebar nav and the topbar breadcrumb/command palette.
- */
-/** The novel id from the route, absent in global (no-project) mode. */
 export interface NovelParams {
   novelId?: string;
 }

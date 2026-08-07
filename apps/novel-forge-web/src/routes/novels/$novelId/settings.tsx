@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Dialog, FormField, Input, SegmentedControl, Select, Tabs, Textarea, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { PageContainer, PageHeader, QueryState, SectionCard } from '@/components/nf';
 import {
   type AiModelOption,
@@ -25,15 +19,12 @@ import { decodeModelRef, encodeModelRef, projectTitle } from '@/lib/format';
 import styles from './settings.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/settings')({
-  // The model registry backs the settings model pickers; prefetch it (project is already seeded by the
-  // parent novel loader) so the form renders populated on the server.
   loader: ({ context }) => context.queryClient.prefetchQuery(aiModelsQueryOptions()),
   component: SettingsScreen,
 });
 
 type ModelKind = 'llm' | 'embedding' | 'image';
 
-// The backend keys per-role overrides by `AiRole`; `ProjectModelOverrides` is that exact, closed set.
 type AiRole = keyof ProjectModelOverrides;
 
 // The author picks a model per *group*, not per fine-grained role. Selecting a group's model fans that
@@ -50,8 +41,6 @@ const GROUP_ROLES: Record<ModelGroup, AiRole[]> = {
   image: ['image'],
 };
 
-// The router resolves each role from `config.models[role]` as a `{ provider, model }` pair, falling back
-// to the active server profile's default when unset. A group left on INHERIT omits all its roles.
 const INHERIT = 'inherit';
 
 interface RoleDef {
@@ -71,8 +60,6 @@ interface ProviderGroup {
   providers: string[];
 }
 
-// Product-facing model groups — one dial each. Picking a model fans out across the group's roles
-// (GROUP_ROLES). Embeddings are omitted: locked to the pgvector schema.
 const ROLE_GROUPS: RoleGroup[] = [
   {
     title: 'Text generation',
@@ -92,7 +79,6 @@ const ROLE_GROUPS: RoleGroup[] = [
 
 const ALL_ROLES = ROLE_GROUPS.flatMap(g => g.roles);
 
-// Each provider is rendered as its own visual group, in the order authors most often reach for them.
 const PROVIDER_GROUPS: ProviderGroup[] = [
   { label: 'xAI · API key', providers: ['xai'] },
   { label: 'Anthropic · API key', providers: ['anthropic'] },
@@ -149,14 +135,11 @@ function SettingsScreen(): React.JSX.Element {
     if (!project) return;
     setTitle(projectTitle(project));
     setBrief(project.brief ?? '');
-    // The API returns the effective instructions (the project's override, or the default), so the field
-    // is always pre-filled with what the AI will actually use.
     setInstructions(project.instructions ?? '');
     setContentMode(project.contentMode);
     const overrides = project.config?.models ?? {};
     const next: Partial<Record<ModelGroup, string>> = {};
     for (const group of ALL_ROLES) {
-      // The UI writes a group's choice across all its roles, so any set member reflects the group value.
       const entry = GROUP_ROLES[group.key].map(role => overrides[role]).find(Boolean);
       next[group.key] = entry ? encodeModelRef(entry.provider, entry.model) : INHERIT;
     }

@@ -26,7 +26,6 @@
   background: var(--sh-surface-well);
 }
 
-/* Remove button sits top-right, revealed on hover/focus of the tile. */
 .remove {
   position: absolute;
   top: 6px;
@@ -77,7 +76,6 @@
   white-space: nowrap;
 }
 
-/* The add tile mirrors the image tiles' footprint with a dashed, accent-tinted affordance. */
 .addTile {
   display: flex;
   flex-direction: column;

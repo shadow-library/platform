@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { type QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
@@ -9,24 +6,15 @@ import { type ReactNode } from 'react';
 import { ClientOnly, themeInitScript } from '@shadow-library/ui';
 import { NavProgress } from '@shadow-library/ui/router';
 
-/**
- *  Importing user defined modules
- */
 import { AppProviders } from '@/components/AppProvider';
 import { AppShell } from '@/components/Layout';
 import { DefaultCatchBoundary, RouteNotFound } from '@/components/nf';
 import appCss from '@/styles.css?url';
 
-/**
- * Declaring types
- */
 interface RouterContext {
   queryClient: QueryClient;
 }
 
-/**
- * Declaring constants
- */
 export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [

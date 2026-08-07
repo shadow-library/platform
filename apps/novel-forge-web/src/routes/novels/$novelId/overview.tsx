@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Alert, Button, Dialog, EmptyState, FormField, IconButton, Input, Select, Spinner, toast, Tooltip } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon, ResetIcon } from '@/components/icons';
 import { PageContainer, SectionCard, StatusChip } from '@/components/nf';
 import { ImageUpload } from '@/components/nf/ImageUpload';
@@ -33,15 +27,12 @@ import { LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectKindTag, pro
 import styles from './overview.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/overview')({
-  // Status stats and the AI-usage chart are the overview's primary data — prefetch both so they render on
-  // the server. Recent runs stay a client query (secondary panel).
   loader: async ({ context, params }) => {
     await Promise.all([context.queryClient.prefetchQuery(projectStatusQueryOptions(params.novelId)), context.queryClient.prefetchQuery(aiUsageQueryOptions(params.novelId))]);
   },
   component: OverviewScreen,
 });
 
-// The primary CTA target — the next actionable screen derived from real status counts.
 interface NextStep {
   label: string;
   to: '/novels/$novelId/story-bible' | '/novels/$novelId/volumes' | '/novels/$novelId/chapters';
@@ -95,13 +86,10 @@ interface RoleBarProps {
   maxTokens: number;
 }
 
-/** Short label under a bar; the tooltip carries the full role and its counts. */
 function roleLabel(role: string): string {
   return role.replace(/^bible:/, '');
 }
 
-// Each bar's height is the role's total token usage (works even for local models where cost is $0);
-// the tooltip breaks out calls, input/output tokens, and cost.
 function RoleBar({ usage, maxTokens }: RoleBarProps): React.JSX.Element {
   const tokens = usage.inputTokens + usage.outputTokens;
   const pct = maxTokens > 0 ? Math.max(4, Math.round((tokens / maxTokens) * 100)) : 4;
@@ -153,7 +141,6 @@ function RunRow({ run }: RunRowProps): React.JSX.Element {
   );
 }
 
-/** The most recently updated job of `kind`, if any — shared by the polling decision and the render. */
 function latestJob(items: GenerationJobItem[], kind: GenerationJobItem['kind']): GenerationJobItem | undefined {
   return items.filter(j => j.kind === kind).sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))[0];
 }
@@ -176,15 +163,9 @@ const IMPORT_PHASE_LABEL: Record<string, string> = {
 
 interface ImportJobBannerProps {
   job: GenerationJobItem;
-  /** Only offered on a failed job — an in-flight import clears itself once the job leaves this list's active states. */
   onDismiss?: () => void;
 }
 
-/**
- * Surfaces the background `import` job's progress right where a freshly imported novel lands —
- * the same `{ phase, done, total }` shape rebrand/reforge poll, rendered as a compact inline bar
- * instead of a full pipeline dashboard since there is nothing else to configure here.
- */
 function ImportJobBanner({ job, onDismiss }: ImportJobBannerProps): React.JSX.Element {
   const progress = (job.progress ?? null) as ImportJobProgress | null;
   const pct = progress?.total ? Math.round(((progress.done ?? 0) / progress.total) * 100) : null;
@@ -243,7 +224,6 @@ function OverviewScreen(): React.JSX.Element {
   const [cloneName, setCloneName] = useState('');
   const [resetOpen, setResetOpen] = useState(false);
   const [resetStage, setResetStage] = useState<ResetBody['stage']>('generate');
-  // A failed import banner has no other exit — a fresh import (a different job id) un-dismisses itself.
   const [dismissedImportJobId, setDismissedImportJobId] = useState<string | null>(null);
 
   const project = projectQuery.data;
@@ -253,8 +233,6 @@ function OverviewScreen(): React.JSX.Element {
   const phase = lifecyclePhase(status);
   const isSource = project?.kind === 'source';
 
-  // Route the primary CTA to the actual next actionable step, derived from real status counts rather
-  // than always dropping into the (possibly empty) chapters editor.
   const volumesTotal = status?.volumesTotal ?? 0;
   const draftsTotal = status?.draftsTotal ?? 0;
   const draftsFinal = status?.draftsFinal ?? 0;
@@ -274,8 +252,6 @@ function OverviewScreen(): React.JSX.Element {
     navigate({ to: next.to, params: { novelId } });
   };
 
-  // The most recent `import` job, if any — surfaced right on the landing page a fresh import navigates
-  // to, the same status/progress shape rebrand/reforge poll (`GET /projects/:id/jobs`).
   const importJob = latestJob(jobsQuery.data?.items ?? [], 'import');
 
   const roles = usage?.roles ?? [];

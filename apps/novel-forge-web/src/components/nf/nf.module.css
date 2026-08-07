@@ -81,7 +81,6 @@
     linear-gradient(to top left, transparent calc(50% - 1px), var(--sh-border-default) calc(50% - 1px), var(--sh-border-default) calc(50% + 1px), transparent calc(50% + 1px));
 }
 
-/* Solid-colour variant drops the diagonal-cross wireframe. */
 .assetBox[data-solid='true'] {
   background-image: none;
 }

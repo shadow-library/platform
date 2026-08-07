@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { Button, IconButton, Spinner, toast, Tooltip } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { EditIcon, ResetIcon, SourceIcon } from '@/components/icons';
 import { type ChipIntent, PageHeader, QueryState, StatusChip } from '@/components/nf';
 import {
@@ -26,8 +20,6 @@ import {
 import styles from './source.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/source')({
-  // The extracted-chapter list and lifecycle status are the pipeline screen's primary data; the
-  // background pipeline jobs stay a client (polling) query.
   loader: async ({ context, params }) => {
     await Promise.all([
       context.queryClient.prefetchQuery(listChaptersQueryOptions(params.novelId, { limit: 200 })),

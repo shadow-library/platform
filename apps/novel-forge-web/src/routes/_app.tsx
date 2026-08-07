@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { Spinner } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { AppShell } from '@/components/Layout';
 import { meQuery } from '@/lib/apis';
 import { requireSession, useSessionGuard } from '@/lib/session';

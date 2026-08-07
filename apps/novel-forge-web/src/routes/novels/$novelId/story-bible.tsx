@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { ChevronDownIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
 import { Markdown, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
@@ -51,7 +45,6 @@ export const Route = createFileRoute('/novels/$novelId/story-bible')({
       entity: typeof search.entity === 'string' && search.entity ? search.entity : undefined,
     };
   },
-  // The entity catalog is the bible's primary data; a selected entity's full record is fetched on demand.
   loader: ({ context, params }) => context.queryClient.prefetchQuery(listEntitiesQueryOptions(params.novelId, { limit: 500 })),
   component: StoryBibleScreen,
 });
@@ -101,7 +94,6 @@ function TypeGlyph({ type, size }: TypeGlyphProps): React.JSX.Element {
   );
 }
 
-/** CSS custom properties driving the `.iconTile` class (size, radius, and colours). */
 function iconTile(size: number, radius: number, background: string, color: string): React.CSSProperties {
   return { '--tile-size': `${size}px`, '--tile-radius': `${radius}px`, '--tile-bg': background, '--tile-fg': color } as React.CSSProperties;
 }

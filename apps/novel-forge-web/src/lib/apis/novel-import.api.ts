@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type ImportNovelResponse, type NovelBundle } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
-
-/**
- * Declaring the constants
- */
 
 /**
  * Imports a hand-authored `novel-import` bundle (§ docs/novel-import-format.md in the server repo):

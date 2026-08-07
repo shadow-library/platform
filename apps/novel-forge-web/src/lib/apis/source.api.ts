@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useMutation, type UseMutationResult, useQueryClient } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type ConsolidateResponse, type ExtractBody, type JobEnqueueResponse, type SkeletonResponse } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
-/**
- * Source-pipeline actions for imported source projects: extract a bible from the chapters the
- * novel-import bundle landed, consolidate entities, and build the skeleton. Each enqueues
- * background work, so success invalidates the project's chapters, jobs, and status.
- */
 function useSourceInvalidation(projectId: string): () => void {
   const queryClient = useQueryClient();
   return () => {

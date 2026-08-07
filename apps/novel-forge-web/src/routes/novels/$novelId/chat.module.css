@@ -8,7 +8,6 @@
   gap: 16px;
 }
 
-/* Thread */
 .thread {
   flex: 1;
   min-width: 0;
@@ -194,7 +193,6 @@
   white-space: nowrap;
 }
 
-/* Session rail */
 .railTitleRow {
   display: flex;
   align-items: center;

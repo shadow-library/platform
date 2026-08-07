@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { useMutation, type UseMutationResult, useQueryClient } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type ImportPlanBody, type ImportPlanResponse } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
-
-/**
- * Declaring the constants
- */
 
 /**
  * Imports an offline-authored plan bundle (bible, entities, volumes, arcs, briefs) in one

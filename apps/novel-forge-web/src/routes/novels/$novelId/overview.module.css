@@ -12,7 +12,6 @@
   margin-bottom: 24px;
 }
 
-/* A book-cover portrait (3:4) with a floor so it stays legible; top-aligned with the title block. */
 .headerCover {
   width: 144px;
   min-width: 144px;
@@ -51,7 +50,6 @@
   font-size: var(--sh-text-body);
   color: var(--sh-text-secondary);
   max-width: 620px;
-  /* Keep a runaway brief from ballooning the header — cap it and let the ellipsis hint at more. */
   display: -webkit-box;
   -webkit-line-clamp: 4;
   line-clamp: 4;
@@ -65,7 +63,6 @@
   flex-shrink: 0;
 }
 
-/* Lifecycle stepper */
 .stepper {
   display: flex;
   align-items: center;
@@ -141,7 +138,6 @@
   margin-bottom: 20px;
 }
 
-/* Import job banner */
 .progressHead {
   display: flex;
   align-items: center;
@@ -185,7 +181,6 @@
   color: var(--sh-danger-text);
 }
 
-/* Stat cards */
 .statGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -238,7 +233,6 @@
   margin-top: 2px;
 }
 
-/* Usage + runs */
 .mainGrid {
   display: grid;
   grid-template-columns: 1.4fr 1fr;

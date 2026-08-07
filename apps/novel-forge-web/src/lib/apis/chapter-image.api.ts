@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type AddChapterImageBody } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
-
-/**
- * Defining types
- */
 
 // Scene illustrations attached to an authored chapter. Hand-authored until the generated OpenAPI
 // types pick up the new endpoints on redeploy.
@@ -28,10 +18,6 @@ export interface ChapterImage {
 export interface ChapterImageList {
   items: ChapterImage[];
 }
-
-/**
- * Declaring the constants
- */
 
 const chapterImageKeys = {
   all: (projectId: string) => ['projects', projectId, 'chapter-images'] as const,

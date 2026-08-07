@@ -1,25 +1,12 @@
-/**
- * Importing npm packages
- */
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import { type ReactElement } from 'react';
 
-/**
- * Defining types
- */
 interface MarkdownProps {
   content: string | null | undefined;
   className?: string;
 }
 
-/**
- * Declaring the constants
- */
-
-// One GitHub-flavored-Markdown renderer shared by every surface that shows model-authored text —
-// chapter prose, chat replies, entity summaries, proposed change bodies — so `**bold**`, lists, and
-// tables format the same way instead of leaking their raw marks.
 marked.setOptions({ gfm: true, breaks: true });
 
 /**

@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { Spinner } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
-
-/**
- * Defining types
- */
 interface LoginSearch {
   returnTo: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * The only public route. There is no local sign-in UI — the backend's relying-party auth module owns the

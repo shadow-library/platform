@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type JobEnqueueResponse, type JobResponse, type RebrandConfigBody, type RebrandStartBody } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
@@ -162,7 +156,6 @@ export function useRerunRebrandChapterMutation(projectId: string): UseMutationRe
   });
 }
 
-/** Fetch-on-click manuscript download; not a hook so the bytes never sit in the query cache. */
 export function fetchRebrandManuscript(projectId: string): Promise<{ markdown: string }> {
   return APIRequest.get(`/projects/${projectId}/rebrand/manuscript`).execute();
 }

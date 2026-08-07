@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Checkbox, Dialog, FormField, Input, SegmentedControl, Select, Spinner, Textarea, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { ArchiveIcon, ProposalsIcon, SendIcon, TrashIcon } from '@/components/icons';
 import { type ChipIntent, Markdown, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
@@ -76,11 +70,6 @@ const OP_RESULT_INTENT: Record<string, ChipIntent> = {
   pending: 'warning',
 };
 
-/**
- * The new-chat dialog: the author picks the scope the chat reasons over (and the concrete volume /
- * arc / chapter / document when the scope needs one) so the backend assembles exactly that context.
- * The Control hub scope sees everything and can also run the pipeline; its mode picks how changes land.
- */
 interface NewChatDialogProps {
   novelId: string;
   open: boolean;
@@ -259,11 +248,6 @@ function NewChatDialog({ novelId, open, onOpenChange, onCreated }: NewChatDialog
   );
 }
 
-/**
- * The inline review card under an assistant message that staged a change-set: per-op accept/decline
- * while pending, per-op results after apply, and a revert for applied changes. This is the manual
- * mode loop and the auto-mode receipt in one component.
- */
 interface TurnProposalCardProps {
   novelId: string;
   proposalId: string;
@@ -384,7 +368,6 @@ function TurnProposalCard({ novelId, proposalId }: TurnProposalCardProps): React
   );
 }
 
-/** The project-wide change history: every applied/reverted change with per-change revert and rollback-to-here. */
 interface HistoryDialogProps {
   novelId: string;
   open: boolean;

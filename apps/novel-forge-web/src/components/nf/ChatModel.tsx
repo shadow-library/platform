@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { useState } from 'react';
 import { DropdownMenu, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { ChevronDownIcon } from '@/components/icons';
 import {
   type AiModelOption,
@@ -69,7 +63,6 @@ interface ResolvedDefault {
   group: string;
 }
 
-/** Human-friendly name for a provider/model pair, preferring the registry label. */
 export function modelLabel(models: AiModelOption[], provider?: string | null, modelId?: string | null): string {
   if (!provider || !modelId) return 'default';
   const match = models.find(m => m.provider === provider && m.id === modelId);
@@ -80,20 +73,12 @@ function resolveDefault(scopeType: ChatScope, config: ProjectConfig | undefined,
   const scopeRole = SCOPE_CHAT_ROLE[scopeType];
   const group = SCOPE_GROUP[scopeType];
   const configured = config?.models ?? {};
-  // Explicit project override for this scope's role.
   if (configured[scopeRole]) return { ...configured[scopeRole], group };
-  // Refinement chat with no explicit chat model follows the Planning selection.
   if (group === 'chat' && configured.plan) return { ...configured.plan, group: 'planning' };
-  // Otherwise the profile default for the group (the /ai/models `defaults` are keyed by group).
   const fromProfile = defaults.find(d => d.role === group);
   return fromProfile ? { provider: fromProfile.provider, model: fromProfile.model, group } : undefined;
 }
 
-/**
- * The compact inline model menu for chat composers: a quiet text trigger, a radio menu behind it.
- * Shows the resolved default (and which settings role it came from); a pick stores a per-session
- * override, "Default" clears it.
- */
 interface ChatModelMenuProps {
   novelId: string;
   session?: ChatSessionResponse;
@@ -163,7 +148,6 @@ interface MessageModelTagProps {
   message: ChatMessageResponse;
 }
 
-/** Which model produced an assistant reply and when — a quiet "model · time" caption under the bubble. */
 export function MessageModelTag({ message }: MessageModelTagProps): React.JSX.Element | null {
   const modelsQuery = useAiModelsQuery();
   if (message.role !== 'assistant') return null;

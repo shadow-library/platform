@@ -26,7 +26,6 @@
   text-align: center;
 }
 
-/* Action bar sits along the bottom, revealed on hover/focus of the preview. */
 .bar {
   position: absolute;
   left: 0;
@@ -45,7 +44,6 @@
   opacity: 1;
 }
 
-/* Always show the bar while there is no image, so the upload affordance is discoverable. */
 .preview[data-empty='true'] .bar {
   opacity: 1;
   background: none;

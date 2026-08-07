@@ -5,10 +5,6 @@ import viteReact from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, type PluginOption } from 'vite';
 
-// One backend origin drives everything: the SSR transport's target (`src/lib/apis/transport.ts`, via
-// `createSsrTransport`) and the dev `/api` proxy, which stands in for the production ingress — the browser
-// calls the same-origin `/api/*` and something in front routes that prefix to the backend. Defaults to the
-// local backend on 8080.
 const API_ORIGIN = process.env.API_ORIGIN || 'http://localhost:8080';
 
 // Bundle analysis is opt-in (`ANALYZE=1 bun run build`) so ordinary builds — which now run twice, once

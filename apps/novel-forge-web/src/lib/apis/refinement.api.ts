@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import {
   type ApplyProposalResponse,
   type AuditBibleResponse,
@@ -78,7 +72,6 @@ interface ApplyProposalVariables {
   opIndexes?: number[];
 }
 
-/** A chat turn touches the session's messages, the session list (last-turn/summary), any proposal it staged, and — in auto mode — the change history. */
 function invalidateChat(queryClient: ReturnType<typeof useQueryClient>, projectId: string, sessionId: string): void {
   queryClient.invalidateQueries({ queryKey: refinementKeys.messages(projectId, sessionId) });
   queryClient.invalidateQueries({ queryKey: refinementKeys.sessions(projectId) });
@@ -143,7 +136,6 @@ export function useChatTurnMutation(projectId: string, sessionId: string): UseMu
   });
 }
 
-/** A chat turn where the session is picked at call time — for composers that resolve their session lazily. */
 export function useForgeTurnMutation(projectId: string): UseMutationResult<ChatTurnResponse, ApiError, ForgeTurnVariables> {
   const queryClient = useQueryClient();
   return useMutation<ChatTurnResponse, ApiError, ForgeTurnVariables>({
@@ -160,7 +152,6 @@ export function useSetSessionStatusMutation(projectId: string): UseMutationResul
   });
 }
 
-/** Deletes a chat and its whole message history. Proposals it staged survive, detached. */
 export function useDeleteChatSessionMutation(projectId: string): UseMutationResult<ChatSessionResponse, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<ChatSessionResponse, ApiError, string>({
@@ -169,7 +160,6 @@ export function useDeleteChatSessionMutation(projectId: string): UseMutationResu
   });
 }
 
-/** Sets (or clears, with nulls) the per-session model override so every turn in that chat uses it. */
 export function useUpdateSessionModelMutation(projectId: string): UseMutationResult<ChatSessionResponse, ApiError, SessionModelVariables> {
   const queryClient = useQueryClient();
   return useMutation<ChatSessionResponse, ApiError, SessionModelVariables>({
@@ -178,7 +168,6 @@ export function useUpdateSessionModelMutation(projectId: string): UseMutationRes
   });
 }
 
-/** Flips the manual ⇄ auto mode (or renames) a chat session mid-conversation. */
 export function useUpdateChatSessionMutation(projectId: string): UseMutationResult<ChatSessionResponse, ApiError, SessionUpdateVariables> {
   const queryClient = useQueryClient();
   return useMutation<ChatSessionResponse, ApiError, SessionUpdateVariables>({
@@ -224,7 +213,6 @@ export function useApplyProposalMutation(projectId: string): UseMutationResult<A
   });
 }
 
-/** Undoes an applied proposal from its stored inverse ops; 409 when the artifact moved since. */
 export function useRevertProposalMutation(projectId: string): UseMutationResult<RevertProposalResponse, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<RevertProposalResponse, ApiError, string>({
@@ -233,7 +221,6 @@ export function useRevertProposalMutation(projectId: string): UseMutationResult<
   });
 }
 
-/** The project-wide change history: every applied/reverted change, newest first, with revertibility. */
 export function useListChangesQuery(projectId: string, enabled = true): UseQueryResult<ListChangesResponse, ApiError> {
   return useQuery<ListChangesResponse, ApiError>({
     queryKey: refinementKeys.changes(projectId),
@@ -242,7 +229,6 @@ export function useListChangesQuery(projectId: string, enabled = true): UseQuery
   });
 }
 
-/** Reverts every change applied after the anchor, newest first — "roll back to here". */
 export function useRollbackMutation(projectId: string): UseMutationResult<RollbackResponse, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<RollbackResponse, ApiError, string>({
@@ -259,7 +245,6 @@ export function useDiscardProposalMutation(projectId: string): UseMutationResult
   });
 }
 
-/** Audits the whole bible for contradictions; any findings arrive as a reviewable proposal. */
 export function useAuditBibleMutation(projectId: string): UseMutationResult<AuditBibleResponse, ApiError, undefined> {
   const queryClient = useQueryClient();
   return useMutation<AuditBibleResponse, ApiError, undefined>({

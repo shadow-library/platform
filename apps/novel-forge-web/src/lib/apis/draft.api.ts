@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import {
   type DraftResponse,
   type FeedbackBody,
@@ -27,10 +21,6 @@ import {
 } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
-/**
- * Drafts are the generated chapters of a project (distinct from imported source
- * chapters). They back the editor, review/diff, versions, and approvals screens.
- */
 const draftKeys = {
   all: (projectId: string) => ['projects', projectId, 'drafts'] as const,
   list: (projectId: string) => [...draftKeys.all(projectId), 'list'] as const,
@@ -88,7 +78,6 @@ export function useUpdateDraftMutation(projectId: string, n: number): UseMutatio
   });
 }
 
-/** Deletes a chapter draft (and its revisions); used by the chapter list's delete action. */
 export function useDeleteDraftMutation(projectId: string): UseMutationResult<undefined, ApiError, number> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, number>({
@@ -105,7 +94,6 @@ export function useApproveDraftMutation(projectId: string): UseMutationResult<Dr
   });
 }
 
-/** Runs the AI revision pass: the note becomes the feedback the model rewrites the draft against. */
 export function useReviseDraftMutation(projectId: string, n: number): UseMutationResult<DraftResponse, ApiError, { note: string }> {
   const queryClient = useQueryClient();
   return useMutation<DraftResponse, ApiError, { note: string }>({
@@ -114,7 +102,6 @@ export function useReviseDraftMutation(projectId: string, n: number): UseMutatio
   });
 }
 
-/** Records a human review disposition (approve / request revision / reject / comment) against a draft. */
 export function useDraftFeedbackMutation(projectId: string, n: number): UseMutationResult<UserFeedbackResponse, ApiError, FeedbackBody> {
   const queryClient = useQueryClient();
   return useMutation<UserFeedbackResponse, ApiError, FeedbackBody>({
@@ -123,7 +110,6 @@ export function useDraftFeedbackMutation(projectId: string, n: number): UseMutat
   });
 }
 
-/** Kicks off backend chapter generation and returns the enqueued job so callers can track its progress. */
 export function useGenerateMutation(projectId: string): UseMutationResult<JobEnqueueResponse, ApiError, GenerateBody> {
   const queryClient = useQueryClient();
   return useMutation<JobEnqueueResponse, ApiError, GenerateBody>({
@@ -135,7 +121,6 @@ export function useGenerateMutation(projectId: string): UseMutationResult<JobEnq
   });
 }
 
-/** Runs the continuity judge on a chapter on demand (the manual "Verify" action) and records its verdict. */
 export function useJudgeDraftMutation(projectId: string, n: number): UseMutationResult<JudgeResponse, ApiError, undefined> {
   const queryClient = useQueryClient();
   return useMutation<JudgeResponse, ApiError, undefined>({
@@ -144,7 +129,6 @@ export function useJudgeDraftMutation(projectId: string, n: number): UseMutation
   });
 }
 
-/** Folds the canon a chapter establishes back into the bible as a reviewable refinement proposal. */
 export function useExtractToBibleMutation(projectId: string, n: number): UseMutationResult<ProposalResponse, ApiError, undefined> {
   const queryClient = useQueryClient();
   return useMutation<ProposalResponse, ApiError, undefined>({
@@ -169,7 +153,6 @@ export function useSeedFromBriefMutation(projectId: string): UseMutationResult<W
   });
 }
 
-/** Generates the structured volume plan (creates draft volumes). Feeds the Volumes & Arcs screen. */
 export function usePlanMutation(projectId: string): UseMutationResult<PlanResponse, ApiError, PlanBody> {
   const queryClient = useQueryClient();
   return useMutation<PlanResponse, ApiError, PlanBody>({
@@ -181,7 +164,6 @@ export function usePlanMutation(projectId: string): UseMutationResult<PlanRespon
   });
 }
 
-/** Generates chapter briefs (outlines) from the approved volume plan. Feeds the chapter generator. */
 export function useOutlineMutation(projectId: string): UseMutationResult<OutlineResponse, ApiError, OutlineBody | undefined> {
   const queryClient = useQueryClient();
   return useMutation<OutlineResponse, ApiError, OutlineBody | undefined>({

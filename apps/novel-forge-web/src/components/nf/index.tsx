@@ -1,10 +1,3 @@
-/**
- * Shared Novel Forge UI primitives, built on the Shadow UI design system.
- *
- * These are the small, repeated pieces the screens lean on — a status chip, a
- * page header, a query gate, and a couple of tag flavours — kept here so every
- * screen speaks the same visual language.
- */
 import { type ApiError } from '@/lib/apis';
 import { type CSSProperties, type ReactElement, type ReactNode } from 'react';
 
@@ -25,7 +18,6 @@ interface StatusChipProps {
   children: ReactNode;
 }
 
-/** A small, colour-coded status chip — the design's `.nf-chip` (intent surfaces live in styles.css). */
 export function StatusChip({ intent = 'neutral', dot = false, children }: StatusChipProps): ReactElement {
   return (
     <span className="nf-chip" data-intent={intent}>
@@ -40,7 +32,6 @@ interface AiTagProps {
   icon?: boolean;
 }
 
-/** A tag marking an AI-generated / human-in-the-loop touchpoint. */
 export function AiTag({ children = 'AI', icon = true }: AiTagProps): ReactElement {
   return (
     <StatusChip intent="ai">
@@ -50,18 +41,11 @@ export function AiTag({ children = 'AI', icon = true }: AiTagProps): ReactElemen
   );
 }
 
-/**
- * Shared layout primitives live as global classes in styles.css so navigating between pages never
- * shifts the content column or the split-pane rail: `.nf-page` (centered column), `.nf-splitpane`,
- * `.nf-rail`, and `.nf-detail`, all sized from the `--nf-*` dimension variables.
- */
-
 interface PageContainerProps {
   children: ReactNode;
   className?: string;
 }
 
-/** The centered content column shared by the non-split-pane screens. */
 export function PageContainer({ children, className }: PageContainerProps): ReactElement {
   return <div className={`nf-page ${styles.pageContainer}${className ? ` ${className}` : ''}`}>{children}</div>;
 }
@@ -73,7 +57,6 @@ interface PageHeaderProps {
   tags?: ReactNode;
 }
 
-/** The standard page header: title on the left, actions on the right, optional subtitle and tags. */
 export function PageHeader({ title, subtitle, extra, tags }: PageHeaderProps): ReactElement {
   return (
     <div className={styles.pageHeader}>
@@ -96,7 +79,6 @@ interface SectionCardProps {
   className?: string;
 }
 
-/** A titled surface card used to group content on the screens. */
 export function SectionCard({ title, action, children, className }: SectionCardProps): ReactElement {
   return (
     <section className={`${styles.sectionCard}${className ? ` ${className}` : ''}`}>
@@ -111,10 +93,6 @@ export function SectionCard({ title, action, children, className }: SectionCardP
   );
 }
 
-/**
- * Loading / error / empty gate for a TanStack Query. Renders children only once
- * data has arrived, keeping the wired screens free of boilerplate.
- */
 interface EmptyAction {
   label: string;
   onClick: () => void;
@@ -154,7 +132,6 @@ interface AssetBoxProps {
   color?: string;
 }
 
-/** A neutral image/asset placeholder box with the diagonal-cross wireframe motif. */
 export function AssetBox({ height = 80, width, radius = 8, color }: AssetBoxProps): ReactElement {
   return (
     <div
@@ -172,7 +149,6 @@ export function AssetBox({ height = 80, width, radius = 8, color }: AssetBoxProp
   );
 }
 
-/** A full-height centred spinner for suspense-style waits inside a pane. */
 export function PaneLoader(): ReactElement {
   return (
     <div className={styles.paneLoader}>
@@ -185,7 +161,6 @@ interface PaneErrorProps {
   error: ApiError;
 }
 
-/** A retry-capable inline error, for panes that manage their own layout. */
 export function PaneError({ error }: PaneErrorProps): ReactElement {
   return (
     <div className={styles.paneError}>
@@ -196,10 +171,6 @@ export function PaneError({ error }: PaneErrorProps): ReactElement {
   );
 }
 
-/**
- * A quiet inline row action (archive, delete, …) for list cards. Pair with a `.nf-rowactions`
- * wrapper inside a `.nf-selrow` — the actions stay invisible until the row is hovered or focused.
- */
 interface RowActionProps {
   label: string;
   danger?: boolean;

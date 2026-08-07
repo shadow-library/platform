@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useMutation, type UseMutationResult, useQueryClient } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type ContinuityProposalResponse } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
-/**
- * Continuity proposals are the AI's suggested canon edits for a single chapter, surfaced in the
- * review flow. The chapter editor's "ask Forge to revise" action asks the model to draft one; the
- * pending set is read from the review queue.
- */
 export function useProposeContinuityMutation(projectId: string): UseMutationResult<ContinuityProposalResponse, ApiError, number> {
   const queryClient = useQueryClient();
   return useMutation<ContinuityProposalResponse, ApiError, number>({

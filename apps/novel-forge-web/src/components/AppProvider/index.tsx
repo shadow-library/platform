@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { ThemeProvider, Toaster, TooltipProvider } from '@shadow-library/ui';
 import { themeCookieDomain } from '@shadow-library/web';
 
-/**
- * Declaring types
- */
 export interface AppProvidersProps {
   children?: React.ReactNode;
 }
-
-/**
- * Declaring constants
- */
 
 /**
  * App-wide client providers, rendered inside the root document around every route. The QueryClientProvider

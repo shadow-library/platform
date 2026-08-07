@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type BibleDocResponse, type BibleSection, type ListBibleDocResponse, type UpsertBibleDocBody } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 

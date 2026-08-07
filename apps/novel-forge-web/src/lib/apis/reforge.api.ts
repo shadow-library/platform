@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type JobEnqueueResponse, type JobResponse } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
@@ -173,7 +167,6 @@ export function useRerunReforgeChapterMutation(projectId: string): UseMutationRe
   });
 }
 
-/** Fetch-on-click manuscript download; not a hook so the bytes never sit in the query cache. */
 export function fetchReforgeManuscript(projectId: string): Promise<{ markdown: string }> {
   return APIRequest.get(`/projects/${projectId}/reforge/manuscript`).execute();
 }

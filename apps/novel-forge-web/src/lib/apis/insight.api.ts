@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type AiUsageResponse, type AssetsResponse, type CostResponse, type ListGenerationJobResponse } from './api-types.gen';
 import { ApiError, APIRequest, type PollingOptions } from './transport';
 
-/**
- * Cross-cutting project insights: AI spend, background jobs, and rendered output.
- */
 const insightKeys = {
   aiUsage: (projectId: string) => ['projects', projectId, 'ai-usage'] as const,
   jobs: (projectId: string) => ['projects', projectId, 'jobs'] as const,

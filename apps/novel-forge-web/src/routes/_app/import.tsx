@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Alert, Button, FileUpload, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { PageContainer, PageHeader, SectionCard } from '@/components/nf';
 import { type NovelBundle, useImportNovelMutation } from '@/lib/apis';
 
@@ -17,10 +11,6 @@ export const Route = createFileRoute('/_app/import')({
   head: () => ({ meta: [{ title: 'Import novel · Novel Forge' }] }),
   component: ImportNovelScreen,
 });
-
-/**
- * Declaring the constants
- */
 
 const BUNDLE_FORMAT = 'novel-import';
 const BUNDLE_SCHEMA_VERSION = 1;
@@ -81,7 +71,6 @@ function ImportNovelScreen(): React.JSX.Element {
     });
   };
 
-  // `ApiError.fieldErrors` folds the backend's field problems into a `{ field: message }` map for inline display.
   const fieldErrors = Object.entries(importNovel.error?.fieldErrors ?? {});
 
   return (

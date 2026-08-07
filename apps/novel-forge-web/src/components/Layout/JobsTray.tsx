@@ -1,28 +1,15 @@
-/**
- * Importing npm packages
- */
 import { Popover, Spinner } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { useListJobsQuery } from '@/lib/apis';
 
 import { BellIcon } from '../icons';
 import styles from './JobsTray.module.css';
 import { type NovelParams } from './routes';
 
-/**
- * Declaring the constants
- */
 function isRunning(status: string): boolean {
   return status === 'pending' || status === 'in_progress';
 }
 
-/**
- * The background-job tray. Generation runs long enough that an author will navigate away mid-run, so the
- * chrome carries the progress rather than the screen that started it.
- */
 export function JobsTray({ novelId }: NovelParams): React.JSX.Element {
   const jobsQuery = useListJobsQuery(novelId ?? '', Boolean(novelId));
   const jobs = jobsQuery.data?.items ?? [];

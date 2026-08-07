@@ -1,28 +1,13 @@
-/**
- * Importing npm packages
- */
 import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type AccessGrantItem, type PublicationAccessBody, type PublicationAccessResponse } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
-/**
- * The reader-publish surface (reader-publish design §7): the forge-side publication ledger and the
- * actions that push a novel and its approved chapters to the external reader service. Types are
- * hand-authored until the OpenAPI spec regenerates.
- */
+/** Publication ledger types remain hand-authored until the OpenAPI spec regenerates. */
 
 export type PublicationStatus = 'live' | 'retired';
 export type ChapterPublicationStatus = 'scheduled' | 'published' | 'failed' | 'unpublished';
-/**
- * The access shapes come from the generated OpenAPI mirror rather than being hand-authored like the
- * ledger types above — the server surfaces them, so there is no reason to restate them here and let
- * the two drift. Only the alias below is local, because the generated response name reads oddly at
- * the call sites.
- */
+/** Local aliases retain the generated access contract while improving its call-site names. */
 export type PublicationAccess = PublicationAccessResponse;
 export type AccessGrant = AccessGrantItem;
 export type GrantState = AccessGrantItem['state'];
@@ -125,10 +110,6 @@ export function usePublicationAccessQuery(projectId: string, enabled = true): Us
   });
 }
 
-/**
- * Replaces the whole access record. The response echoes each grant's resolved state, so the panel can
- * show immediately which addresses named an account and which are still waiting for one.
- */
 export function useSetPublicationAccessMutation(projectId: string): UseMutationResult<PublicationAccess, ApiError, PublicationAccessBody> {
   const invalidate = usePublishingInvalidation(projectId);
   return useMutation<PublicationAccess, ApiError, PublicationAccessBody>({
@@ -137,7 +118,6 @@ export function useSetPublicationAccessMutation(projectId: string): UseMutationR
   });
 }
 
-/** First call creates the publication and goes live; later calls update metadata (the slug stays immutable). */
 export function usePublishNovelMutation(projectId: string): UseMutationResult<Publication, ApiError, PublishNovelBody> {
   const invalidate = usePublishingInvalidation(projectId);
   return useMutation<Publication, ApiError, PublishNovelBody>({
@@ -146,7 +126,6 @@ export function usePublishNovelMutation(projectId: string): UseMutationResult<Pu
   });
 }
 
-/** Publish now (no `scheduledAt`), schedule, or republish after edits — the backend treats them as one action. */
 export function usePublishChapterMutation(projectId: string): UseMutationResult<ChapterPublication, ApiError, PublishChapterVariables> {
   const invalidate = usePublishingInvalidation(projectId);
   return useMutation<ChapterPublication, ApiError, PublishChapterVariables>({
@@ -158,7 +137,6 @@ export function usePublishChapterMutation(projectId: string): UseMutationResult<
   });
 }
 
-/** Unpublishes (stubs) a chapter on the reader; republishing later reuses the same ordinal. */
 export function useUnpublishChapterMutation(projectId: string): UseMutationResult<ChapterPublication, ApiError, number> {
   const invalidate = usePublishingInvalidation(projectId);
   return useMutation<ChapterPublication, ApiError, number>({
@@ -167,7 +145,6 @@ export function useUnpublishChapterMutation(projectId: string): UseMutationResul
   });
 }
 
-/** Diffs the reader's manifest against the ledger and re-pushes mismatches; synchronous, returns the summary. */
 export function useReconcileMutation(projectId: string): UseMutationResult<ReconcileResult, ApiError, undefined> {
   const invalidate = usePublishingInvalidation(projectId);
   return useMutation<ReconcileResult, ApiError, undefined>({

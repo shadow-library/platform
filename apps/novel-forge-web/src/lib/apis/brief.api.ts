@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type BriefResponse, type ListBriefSummaryResponse, type UpdateBriefBody } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
-/**
- * Per-chapter briefs — the structured plan the writing step turns into prose.
- */
 const briefKeys = {
   list: (projectId: string) => ['projects', projectId, 'briefs', 'list'] as const,
   detail: (projectId: string, n: number) => ['projects', projectId, 'briefs', n] as const,

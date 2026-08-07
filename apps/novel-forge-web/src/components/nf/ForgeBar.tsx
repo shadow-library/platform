@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { useEffect, useRef, useState } from 'react';
 import { Button, IconButton, Textarea, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { SparkIcon } from '@/components/icons';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import { type ChatScope, type ChatTurnResponse, useCreateChatSessionMutation, useForgeTurnMutation, useListChatSessionsQuery } from '@/lib/apis';
@@ -23,12 +17,6 @@ export interface ForgeScope {
   title: string;
 }
 
-/**
- * The compact Forge composer from the design: a floating pill ("✦ Ask Forge to update X…") that
- * expands in place into a small card — borderless input, scope chip pre-set to what's on screen,
- * a quiet model menu, and a Propose button. Each ask lands as a reviewable proposal; the latest
- * reply shows inline so quick back-and-forth never leaves the page.
- */
 export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; scope: ForgeScope; placeholder?: string }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
@@ -41,14 +29,12 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
   const createSession = useCreateChatSessionMutation(novelId);
   const turn = useForgeTurnMutation(novelId);
 
-  // The bar follows the content on screen — a different section means a different conversation.
   useEffect(() => {
     setSessionId(undefined);
     setLast(undefined);
     creatingRef.current = false;
   }, [scope.type, scope.ref, scope.title]);
 
-  // Reuse the section's existing scoped session, or open one the first time it is refined.
   useEffect(() => {
     if (!open || sessionId || !sessionsQuery.isSuccess) return;
     const match = sessionsQuery.data.items.find(s => (s.scopeRef ?? '') === (scope.ref ?? '') && (s.title ?? '') === scope.title);

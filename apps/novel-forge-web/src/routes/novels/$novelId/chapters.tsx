@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import DOMPurify from 'dompurify';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, ButtonGroup, Dialog, Drawer, DropdownMenu, IconButton, SegmentedControl, Spinner, toast, Tooltip } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, TrashIcon, WarningIcon } from '@/components/icons';
 import { type ChipIntent, Markdown, PaneError, PaneLoader, QueryState, RowAction, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
@@ -38,7 +32,6 @@ import {
 
 import styles from './chapters.module.css';
 
-// Maps a status chip intent to the three-way tone used by the verdict banner and status pill.
 function toneOf(intent: ChipIntent): 'success' | 'danger' | 'warning' {
   return intent === 'success' ? 'success' : intent === 'danger' ? 'danger' : 'warning';
 }
@@ -58,8 +51,6 @@ export const Route = createFileRoute('/novels/$novelId/chapters')({
       job: typeof search.job === 'string' && search.job ? search.job : undefined,
     };
   },
-  // The draft list, briefs, and lifecycle status back the default chapters view. The editor, live
-  // generation progress, and per-chapter drawers are search-param / interaction driven and load on the client.
   loader: async ({ context, params }) => {
     await Promise.all([
       context.queryClient.prefetchQuery(listDraftsQueryOptions(params.novelId)),
@@ -95,10 +86,6 @@ function wordCount(body?: string | null): number {
   return body.trim().split(/\s+/).filter(Boolean).length;
 }
 
-// ─── Prose formatting ───────────────────────────────────────────────────────────
-// Chapter prose is authored and stored as GitHub-flavored Markdown (bold, italic, lists, tables); the
-// reading view and the editor's Preview tab render it through the shared <Markdown> component.
-
 // Defense in depth: strip dangerous HTML from the Markdown source before it is persisted, so the stored
 // manuscript stays clean regardless of where the prose came from.
 function sanitizeSource(md: string): string {
@@ -113,10 +100,6 @@ const RUN_INTENT: Record<string, ChipIntent> = {
   cancelled: 'neutral',
 };
 
-/**
- * The in-app generation progress screen: shown as soon as a generate job is triggered, it follows
- * the job and its per-chapter workflow runs live until the drafts land.
- */
 interface GenerationProgressProps {
   novelId: string;
   jobId: string;
@@ -237,8 +220,6 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
     generate.mutate({ limit: 5 }, { onSuccess: job => onProgress(job.jobId), onError: e => toast.danger(e.message) });
   };
 
-  // "Write manually" seeds a blank human-authored draft (generator='human' on the backend) and drops
-  // straight into the editor.
   const writeManually = (): void => {
     createManual.mutate({ body: '' }, { onSuccess: () => onOpen(nextManualChapter), onError: e => toast.danger(e.message) });
   };
@@ -455,10 +436,6 @@ function ChapterSwitchDrawer({ open, onOpenChange, novelId, current, onPick }: C
   );
 }
 
-/**
- * The Markdown formatting toolbar: the small set of marks a novelist actually reaches for — bold,
- * italic, bulleted / numbered lists, and tables. Each acts on the write-tab textarea's selection.
- */
 interface ProseToolbarProps {
   onBold: () => void;
   onItalic: () => void;
@@ -548,7 +525,6 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
     setEditing(true);
   };
 
-  // ─── Markdown toolbar actions — operate on the Write textarea's current selection ────────────────
   const surround = (before: string, after: string): void => {
     const el = editorRef.current;
     if (!el) return;
@@ -619,7 +595,6 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
     approveDraft.mutate(chapter, { onSuccess: () => toast.success(`Chapter ${chapter} approved`), onError: err => toast.danger(err.message) });
   };
 
-  // The manual "Verify" pass: run the continuity judge against the bible on demand.
   const runJudge = (): void => {
     judge.mutate(undefined, {
       onSuccess: r => (r.verdict === 'contradiction' ? toast.danger('Judge flagged a contradiction — open review for details') : toast.success('Judge verdict: consistent')),
@@ -627,7 +602,6 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
     });
   };
 
-  // Fold the canon this chapter establishes back into the bible as a reviewable proposal.
   const runExtract = (): void => {
     extract.mutate(undefined, {
       onSuccess: () => toast.success('Canon proposal drafted — review it on the Proposals page'),
@@ -764,7 +738,6 @@ function ChaptersScreen(): React.JSX.Element {
   const { chapter, job } = Route.useSearch();
   const navigate = Route.useNavigate();
 
-  // Chapter and job are mutually exclusive views; setting one clears the other.
   const openChapter = (n?: number): Promise<void> => navigate({ search: { chapter: n } });
   const openJob = (jobId?: string): Promise<void> => navigate({ search: { job: jobId } });
 

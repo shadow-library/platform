@@ -42,7 +42,6 @@
   color: var(--sh-text-tertiary);
 }
 
-/* Progress card */
 .progressHead {
   display: flex;
   align-items: center;
@@ -85,7 +84,6 @@
   gap: 6px;
 }
 
-/* Chapter table */
 .sectionHead {
   display: flex;
   align-items: center;
@@ -166,7 +164,6 @@
   gap: 4px;
 }
 
-/* Reader drawer */
 .readerControls {
   margin-bottom: 14px;
 }

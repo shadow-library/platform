@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button, SegmentedControl } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { BookIcon, PlusIcon, UploadIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';

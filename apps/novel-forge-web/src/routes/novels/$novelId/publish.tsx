@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Dialog, FormField, Input, SegmentedControl, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { type ChipIntent, PageContainer, PageHeader, QueryState, SectionCard, StatusChip } from '@/components/nf';
 import {
   type ChapterPublication,
@@ -39,13 +33,8 @@ export const Route = createFileRoute('/novels/$novelId/publish')({
   component: PublishScreen,
 });
 
-/**
- * Declaring the constants
- */
-
 const STATUS_CHIP: Record<ChapterPublicationStatus, ChipIntent> = { scheduled: 'info', published: 'success', failed: 'danger', unpublished: 'neutral' };
 
-/** A draft is releasable once review signed it off; anything unreviewed trips the backend's PUB_002 gate. */
 function isApproved(draft: DraftResponse): boolean {
   return draft.reviewStatus === 'approved' || draft.reviewStatus === 'final';
 }
@@ -60,8 +49,6 @@ interface ActionError {
   chapter: number;
   message: string;
 }
-
-// ─── Novel metadata card ─────────────────────────────────────────────────────
 
 interface NovelCardProps {
   novelId: string;
@@ -177,8 +164,6 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
   );
 }
 
-// ─── Visibility & access card ────────────────────────────────────────────────
-
 const VISIBILITY_HELP: Record<PublicationVisibility, string> = {
   PUBLIC: 'Anyone can find and read it. Listed in browse, search and sort.',
   ORGANISATION: 'Every member of your current organisation can read it. Hidden from browse, search and sort.',
@@ -209,7 +194,6 @@ function AccessCard({ novelId, published }: AccessCardProps): React.JSX.Element 
     setHydrated(true);
   }, [access.data, hydrated]);
 
-  /** Accepts a comma- or space-separated paste, so an author can bring a list from anywhere. */
   const addDraft = (): void => {
     const added = draft
       .split(/[\s,;]+/)
@@ -316,8 +300,6 @@ function AccessCard({ novelId, published }: AccessCardProps): React.JSX.Element 
   );
 }
 
-// ─── Reconcile summary ───────────────────────────────────────────────────────
-
 interface ReconcileSummaryProps {
   result: ReconcileResult;
 }
@@ -352,8 +334,6 @@ function ReconcileSummary({ result }: ReconcileSummaryProps): React.JSX.Element 
   );
 }
 
-// ─── Chapter ledger ──────────────────────────────────────────────────────────
-
 interface PublicationCellProps {
   ledger: ChapterPublication | undefined;
 }
@@ -377,8 +357,6 @@ function PublicationCell({ ledger }: PublicationCellProps): React.JSX.Element {
     </span>
   );
 }
-
-// ─── Screen ──────────────────────────────────────────────────────────────────
 
 function PublishScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();

@@ -15,7 +15,6 @@
   flex-shrink: 0;
 }
 
-/* Breadcrumb */
 .crumbCurrent {
   color: var(--sh-text-primary);
   font-size: var(--sh-text-body-sm);
@@ -34,7 +33,6 @@
   border-radius: 6px;
 }
 
-/* A small uppercase field label. */
 .sectionLabel {
   font-size: 10px;
   font-weight: 700;
@@ -53,7 +51,6 @@
   text-align: justify;
 }
 
-/* Floating Forge composer, centered at the bottom of the pane. */
 .forgeDock {
   position: absolute;
   left: 50%;
@@ -65,7 +62,6 @@
   z-index: 5;
 }
 
-/* Volumes list header */
 .listHead {
   display: flex;
   align-items: flex-end;
@@ -88,7 +84,6 @@
   border-top: 1px solid var(--sh-border-subtle);
 }
 
-/* Record eyebrow + title shared by the volume / arc / brief detail views. */
 .recordKind {
   font-family: var(--sh-font-mono);
   font-size: 12px;
@@ -166,7 +161,6 @@
   color: var(--sh-text-tertiary);
 }
 
-/* Shared record rows (self-contained so they don't fight `.nf-selrow` specificity). */
 .row {
   display: flex;
   align-items: center;
@@ -183,7 +177,6 @@
   background: var(--sh-bg-hover);
 }
 
-/* A chapter with no brief yet: shown for context but not a navigation target. */
 .row:disabled {
   cursor: default;
   opacity: 0.55;
@@ -287,7 +280,6 @@
   text-overflow: ellipsis;
 }
 
-/* Brief detail */
 .briefMeta {
   display: flex;
   align-items: center;
@@ -320,7 +312,6 @@
   white-space: pre-wrap;
 }
 
-/* Plan dialog */
 .dialogRow {
   display: flex;
   gap: 12px;
@@ -330,7 +321,6 @@
   flex: 1;
 }
 
-/* Screen shell */
 .screen {
   position: absolute;
   inset: 0;

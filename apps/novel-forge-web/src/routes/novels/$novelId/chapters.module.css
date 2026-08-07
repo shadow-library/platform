@@ -7,7 +7,6 @@
   inset: 0;
 }
 
-/* Generation progress */
 .progressScreen {
   position: absolute;
   inset: 0;
@@ -99,7 +98,6 @@
   font-weight: 600;
 }
 
-/* Chapter list */
 .screenScroll {
   position: absolute;
   inset: 0;
@@ -134,7 +132,6 @@
   color: var(--sh-text-secondary);
 }
 
-/* The dropdown caret is a slim segment of the attached ButtonGroup; ButtonGroup fuses the borders. */
 .splitCaret {
   padding-inline: 8px;
 }
@@ -220,7 +217,6 @@
   flex-shrink: 0;
 }
 
-/* Review drawer */
 .verdict {
   display: flex;
   align-items: center;
@@ -279,7 +275,6 @@
   color: var(--sh-text-tertiary);
 }
 
-/* Chapter switch drawer */
 .switchNum {
   font-family: var(--sh-font-mono);
   font-size: 11px;
@@ -317,7 +312,6 @@
   background: var(--nf-dot);
 }
 
-/* Prose toolbar */
 .toolbar {
   display: flex;
   align-items: center;
@@ -349,7 +343,6 @@
   color: var(--sh-text-tertiary);
 }
 
-/* Chapter editor */
 .editorScreen {
   position: absolute;
   inset: 0;
@@ -497,7 +490,6 @@
   color: var(--sh-text-tertiary);
 }
 
-/* Scene illustrations sit below the prose, in the app sans font rather than the reader's serif. */
 .sceneImages {
   margin-top: 44px;
   padding-top: 26px;

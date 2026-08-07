@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import { type PropsWithChildren, useMemo, useState } from 'react';
 import { type CommandItem, CommandPalette, IconButton, Kbd, toast, Tooltip, useTheme } from '@shadow-library/ui';
 import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
 
-/**
- * Importing user defined modules
- */
 import { useListProjectsQuery, useListProposalsQuery, useLogoutMutation, useMeQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery } from '@/lib/apis';
 import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle } from '@/lib/format';
 
@@ -19,15 +13,8 @@ import { JobsTray } from './JobsTray';
 import { type NovelParams } from './routes';
 import { PROJECT_SCREENS, type ProjectScreen, SCREEN_LABEL, screensForKind } from './screens';
 
-/**
- * Declaring the constants
- */
 const PROJECT_LIMIT = 50;
 
-/**
- * The light/dark switch, in the top bar's utility cluster alongside every other Shadow app. It used to
- * sit in the sidebar footer, which put it behind a hamburger on a phone.
- */
 function ThemeToggle(): React.JSX.Element {
   const { theme, toggleTheme } = useTheme();
   const dark = theme === 'dark';
@@ -38,18 +25,6 @@ function ThemeToggle(): React.JSX.Element {
   );
 }
 
-/**
- * The application chrome. `AppShell` from the design system owns the rail, the top bar, the account menu,
- * and the sub-md nav drawer; Novel Forge supplies its destinations, the project switcher's data, and the
- * lifecycle bar.
- *
- * One nav with two modes — global (every project) and project (a single novel's workspace) — chosen by
- * whether the route carries a `novelId`.
- *
- * The content region is handed over whole (`fluid` + no gutters) because screens here disagree about what
- * it is: document screens opt into the 1120px `nf-page` column, while the editor, chat, and bible fill it
- * edge to edge off `.content`'s positioning context (see `.nf-splitpane` in styles.css).
- */
 export default function AppShell({ children }: PropsWithChildren): React.JSX.Element {
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -72,7 +47,6 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   const status = statusQuery.data;
   const phase = lifecyclePhase(status);
 
-  /** Live counts keyed by screen, so the nav declaration stays static and the numbers stay current. */
   const badges: Record<string, NavLeaf['badge']> = {
     chapters: { count: status?.chaptersTotal ?? 0 },
     review: { count: reviewQuery.data?.drafts.length ?? 0, intent: 'warning' },

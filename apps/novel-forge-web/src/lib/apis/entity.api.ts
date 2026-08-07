@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import {
   type AddEntityImageBody,
   type CreateEntityBody,
@@ -16,10 +10,6 @@ import {
   type UploadImageBody,
 } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
-
-/**
- * Defining types
- */
 
 // The gallery of additional reference images an entity carries, alongside its single `imageUrl`
 // portrait. Hand-authored until the generated OpenAPI types pick up the new fields on redeploy.
@@ -32,9 +22,6 @@ export interface EntityImage {
 
 export type EntityWithImages = EntityResponse & { images?: EntityImage[] };
 
-/**
- * Declaring the constants
- */
 const entityKeys = {
   all: (projectId: string) => ['projects', projectId, 'entities'] as const,
   list: (projectId: string, params?: ListEntitiesQueryParams) => [...entityKeys.all(projectId), 'list', params] as const,
@@ -102,7 +89,6 @@ export function useDeleteEntityImageMutation(projectId: string, entityKey: strin
   });
 }
 
-/** Appends a reference image to the entity's gallery (distinct from the single portrait `imageUrl`). */
 export function useAddEntityImageMutation(projectId: string, entityKey: string): UseMutationResult<EntityWithImages, ApiError, AddEntityImageBody> {
   const queryClient = useQueryClient();
   return useMutation<EntityWithImages, ApiError, AddEntityImageBody>({
@@ -111,7 +97,6 @@ export function useAddEntityImageMutation(projectId: string, entityKey: string):
   });
 }
 
-/** Removes a single gallery image by its id. */
 export function useDeleteEntityImageByIdMutation(projectId: string, entityKey: string): UseMutationResult<EntityWithImages, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<EntityWithImages, ApiError, string>({

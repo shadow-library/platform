@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, notFound, Outlet } from '@tanstack/react-router';
 
-/**
- * Importing user defined modules
- */
 import { AppShell } from '@/components/Layout';
 import { isApiError, meQuery, projectQueryOptions } from '@/lib/apis';
 import { projectTitle } from '@/lib/format';
@@ -18,7 +12,6 @@ import { requireSession } from '@/lib/session';
 export const Route = createFileRoute('/novels/$novelId')({
   beforeLoad: ({ context, location }) => requireSession(context.queryClient, location.href),
   loader: async ({ context, params }) => {
-    // Same shell, same reason as `_app`: warm the author's name for SSR, and never let it fail the screen.
     const me = context.queryClient.ensureQueryData(meQuery).catch(() => undefined);
     try {
       const project = await context.queryClient.ensureQueryData(projectQueryOptions(params.novelId));
@@ -29,8 +22,6 @@ export const Route = createFileRoute('/novels/$novelId')({
       throw err;
     }
   },
-  // Data-driven document title: the project's name (from the loader) shows in the browser tab across the
-  // whole workspace; leaf screens inherit it.
   head: ({ loaderData }) => ({ meta: [{ title: loaderData ? `${projectTitle(loaderData)} · Novel Forge` : 'Novel Forge' }] }),
   component: () => (
     <AppShell>

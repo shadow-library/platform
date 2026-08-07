@@ -1,21 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type QueryClient } from '@tanstack/react-query';
 import { requireAuth, type SessionGuardStatus, useSessionGuard as useSharedSessionGuard } from '@shadow-library/web/router';
 
-/**
- * Importing user defined packages
- */
 import { sessionQuery, type SessionResponse } from '@/lib/apis';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The SSR-safe auth gate for every route group — Novel Forge is a private authoring workshop, nothing is
  * public. Built on `@shadow-library/web`'s `requireAuth`, it ensures the session query server-side before
  * any protected markup renders, so an unauthenticated visitor is redirected (302 on the initial request,

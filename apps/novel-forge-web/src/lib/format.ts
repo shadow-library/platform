@@ -1,9 +1,3 @@
-/**
- * Presentation helpers for backend resources.
- *
- * The API models are intentionally lean (no cover art, no display genre), so
- * the UI derives a few stable presentational bits from the data it does have.
- */
 import { type ProjectModelRef, type ProjectResponse, type ProjectStatusResponse } from '@/lib/apis';
 
 // A role's model override is a `{ provider, model }` pair, but a `Select` needs a single string value,
@@ -51,7 +45,6 @@ export function messageTime(iso: string): string {
   return `${day}, ${time}`;
 }
 
-/** A deterministic, pleasant cover colour derived from an id — stable per project. */
 export function coverColor(id: string): string {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
@@ -59,7 +52,6 @@ export function coverColor(id: string): string {
   return `hsl(${hue} 42% 32%)`;
 }
 
-/** The best human title for a project — its explicit title, falling back to its name. */
 export function projectTitle(project: Pick<ProjectResponse, 'name' | 'title'>): string {
   return project.title?.trim() || project.name;
 }
@@ -73,12 +65,10 @@ export function projectKindLabel(kind: ProjectResponse['kind']): string {
   return kindLabels[kind] ?? kind;
 }
 
-/** The short, lowercase kind label used in the coloured chips (e.g. `source`, `new-novel`). */
 export function projectKindTag(kind: ProjectResponse['kind']): string {
   return kind === 'source' ? 'source' : 'new-novel';
 }
 
-/** A stable accent colour (a `--sh-*` token) for a project's rail dot and card stripe. */
 export function projectDotColor(project: Pick<ProjectResponse, 'kind'>): string {
   return project.kind === 'source' ? 'var(--sh-indigo-400)' : 'var(--sh-green-400)';
 }
@@ -86,10 +76,8 @@ export function projectDotColor(project: Pick<ProjectResponse, 'kind'>): string 
 export const LIFECYCLE_PHASES = ['Bible', 'Plan', 'Arcs', 'Drafts', 'Review'] as const;
 
 export interface LifecyclePhase {
-  /** Number of phases completed (0…5). */
   completed: number;
   total: number;
-  /** The phase the project is currently in. */
   label: string;
 }
 

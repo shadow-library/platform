@@ -1,8 +1,3 @@
-/**
- * Lucide-style stroke icons used across Novel Forge, matching the design comps.
- * A single 24×24 stroke grid keeps every glyph visually consistent; `size`
- * scales width/height together and colour follows `currentColor`.
- */
 import type { SVGProps } from 'react';
 
 export interface IconProps extends SVGProps<SVGSVGElement> {

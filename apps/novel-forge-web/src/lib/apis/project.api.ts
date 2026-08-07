@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import {
   type CloneProjectBody,
   type CreateProjectBody,
@@ -20,9 +14,6 @@ import {
 } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
-/**
- * Declaring the constants
- */
 const projectKeys = {
   all: ['projects'] as const,
   lists: () => [...projectKeys.all, 'list'] as const,
@@ -118,7 +109,6 @@ export function useDeleteProjectMutation(): UseMutationResult<undefined, ApiErro
   });
 }
 
-/** Clones a project into a fresh copy, optionally resetting derived artefacts. */
 export function useCloneProjectMutation(projectId: string): UseMutationResult<ProjectResponse, ApiError, CloneProjectBody> {
   const queryClient = useQueryClient();
   return useMutation<ProjectResponse, ApiError, CloneProjectBody>({
@@ -127,7 +117,6 @@ export function useCloneProjectMutation(projectId: string): UseMutationResult<Pr
   });
 }
 
-/** Resets a project's derived state up to a lifecycle stage (extract / plan / generate / all). */
 export function useResetProjectMutation(projectId: string): UseMutationResult<ResetResponse, ApiError, ResetBody> {
   const queryClient = useQueryClient();
   return useMutation<ResetResponse, ApiError, ResetBody>({

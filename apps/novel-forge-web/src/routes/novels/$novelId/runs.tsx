@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Dialog, Spinner } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { type ChipIntent, PaneError, PaneLoader, StatusChip } from '@/components/nf';
 import {
   listRunsQueryOptions,
@@ -25,7 +19,6 @@ import { relativeTime } from '@/lib/format';
 import styles from './runs.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/runs')({
-  // The run list is the screen's primary data; the detail ladder (context, calls) is fetched on demand.
   loader: ({ context, params }) => context.queryClient.prefetchQuery(listRunsQueryOptions(params.novelId)),
   component: RunsScreen,
 });
@@ -92,7 +85,6 @@ function RunListItem({ run, selected, onSelect }: RunListItemProps): React.JSX.E
   );
 }
 
-/** One model call: the summary row, plus the raw model output fetched lazily when expanded. */
 interface ModelCallRowProps {
   novelId: string;
   runId: string;
@@ -395,7 +387,6 @@ function RunDetail({ novelId, runId }: RunDetailProps): React.JSX.Element {
 
 function RunsScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
-  // Newest runs arrive first from the API; keep polling while any run is still executing.
   const runsQuery = useListRunsQuery(novelId, true, { refetchInterval: 4000 });
   // Memoized so identity is stable across renders where the query data hasn't changed — otherwise the
   // `?? []` fallback mints a new array every render and re-triggers the effect below on every render.

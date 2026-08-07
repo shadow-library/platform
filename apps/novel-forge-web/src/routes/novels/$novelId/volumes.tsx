@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { Button, Dialog, FormField, Input, Textarea, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { ChevronRightIcon, SparkIcon } from '@/components/icons';
 import { PaneError, PaneLoader, QueryState, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
@@ -47,7 +41,6 @@ export const Route = createFileRoute('/novels/$novelId/volumes')({
       chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : undefined,
     };
   },
-  // The volume list is the screen's spine; per-volume arcs/briefs and a selected brief load on demand.
   loader: ({ context, params }) => context.queryClient.prefetchQuery(listVolumesQueryOptions(params.novelId, { limit: 50 })),
   component: VolumesScreen,
 });
@@ -94,7 +87,6 @@ interface ForgeDockAreaProps {
   placeholder?: string;
 }
 
-/** The floating Forge composer, centered at the bottom of the pane, above the scrolled content. */
 function ForgeDockArea({ novelId, scope, placeholder }: ForgeDockAreaProps): React.JSX.Element {
   return (
     <div className={styles.forgeDock}>
@@ -102,8 +94,6 @@ function ForgeDockArea({ novelId, scope, placeholder }: ForgeDockAreaProps): Rea
     </div>
   );
 }
-
-// ─── Level 1: volumes ───────────────────────────────────────────────────────────
 
 interface PlanDialogProps {
   novelId: string;
@@ -231,8 +221,6 @@ function VolumesList({ novelId, onOpen }: VolumesListProps): React.JSX.Element {
   );
 }
 
-// ─── Level 2: one volume, its arcs ──────────────────────────────────────────────
-
 interface VolumeDetailProps {
   novelId: string;
   volumeKey: string;
@@ -343,8 +331,6 @@ function VolumeDetail({ novelId, volumeKey, onOpenArc }: VolumeDetailProps): Rea
   );
 }
 
-// ─── Level 3: one arc, its chapter briefs ───────────────────────────────────────
-
 interface ArcDetailProps {
   novelId: string;
   volumeKey: string;
@@ -410,7 +396,6 @@ function ArcDetail({ novelId, volumeKey, arcKey, onOpenBrief }: ArcDetailProps):
       <div className={styles.listBordered}>
         {chapters.map(n => {
           const brief = briefByChapter.get(n);
-          // A chapter with no brief has nothing to open — keep it visible for context but not clickable.
           return (
             <button key={n} className={`${styles.row} ${styles.rowBrief}`} disabled={!brief} onClick={() => onOpenBrief(n)}>
               <span className={styles.briefNum}>{String(n).padStart(2, '0')}</span>
@@ -434,8 +419,6 @@ function ArcDetail({ novelId, volumeKey, arcKey, onOpenBrief }: ArcDetailProps):
     </div>
   );
 }
-
-// ─── Level 4: one chapter brief ────────────────────────────────────────────────
 
 interface BriefDetailProps {
   novelId: string;
@@ -516,19 +499,13 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
   );
 }
 
-// ─── Screen ─────────────────────────────────────────────────────────────────────
-
 function VolumesScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const { volume: volumeKey, arc: arcKey, chapter } = Route.useSearch();
   const navigate = Route.useNavigate();
 
-  // The active record is derived purely from the URL: chapter → brief, arc (with its volume) → arc,
-  // volume → volume, otherwise the volume list.
   const level = chapter != null ? 'brief' : arcKey && volumeKey ? 'arc' : volumeKey ? 'volume' : 'volumes';
 
-  // Volume/arc titles for the breadcrumb and Forge scope — the queries are shared (React Query dedupes)
-  // with the detail panes below, so this adds no extra requests.
   const volumeQuery = useVolumeQuery(novelId, volumeKey ?? '', Boolean(volumeKey));
   const arcsQuery = useListArcsQuery(novelId, volumeKey, Boolean(volumeKey) && (Boolean(arcKey) || chapter != null));
   const volumeTitle = volumeQuery.data ? (volumeQuery.data.title ?? `Volume ${volumeQuery.data.ordinal}`) : (volumeKey ?? '');

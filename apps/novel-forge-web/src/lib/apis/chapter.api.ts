@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type ChapterResponse, type ListChapterResponse, type ListChaptersQueryParams } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
-/**
- * Source chapters are a project's chapters supplied via a novel-import bundle (distinct from
- * generated drafts). They back the Chapters list screen.
- */
 const chapterKeys = {
   all: (projectId: string) => ['projects', projectId, 'chapters'] as const,
   list: (projectId: string, params?: ListChaptersQueryParams) => [...chapterKeys.all(projectId), 'list', params] as const,

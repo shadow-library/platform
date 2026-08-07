@@ -188,8 +188,11 @@ export default defineConfig([
     languageOptions: { globals: resolveGlobals('both') },
   },
 
-  /** Pulse Web keeps its established import order after organizational banner comments are removed. */
-  { files: ['apps/pulse-web/**/*.{ts,tsx}'], rules: { 'perfectionist/sort-imports': 'off' } },
+  /** These apps keep their established import order after organizational banner comments are removed. */
+  {
+    files: ['apps/novel-forge-web/**/*.{ts,tsx}', 'apps/pulse-web/**/*.{ts,tsx}'],
+    rules: { 'perfectionist/sort-imports': 'off' },
+  },
 
   /** Router/API modules whose return type is inferred (TanStack Router, generated API clients) — cannot be written out by hand. */
   {

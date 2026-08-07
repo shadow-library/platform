@@ -4,7 +4,6 @@
   gap: 16px;
 }
 
-/* Novel metadata form */
 .form {
   display: flex;
   flex-direction: column;
@@ -48,7 +47,6 @@
   gap: 4px;
 }
 
-/* Chapter ledger table */
 .table {
   border: 1px solid var(--sh-border-subtle);
   border-radius: var(--sh-radius-lg);

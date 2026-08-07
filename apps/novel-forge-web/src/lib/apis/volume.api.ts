@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import {
   type ApproveArcsResponse,
   type ApprovePlanResponse,
@@ -20,9 +14,6 @@ import {
 } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
-/**
- * Declaring the constants
- */
 const volumeKeys = {
   all: (projectId: string) => ['projects', projectId, 'volumes'] as const,
   list: (projectId: string, params?: ListVolumesQueryParams) => [...volumeKeys.all(projectId), 'list', params] as const,
@@ -58,7 +49,6 @@ export function useListArcsQuery(projectId: string, volumeKey: string | undefine
   });
 }
 
-/** AI-plans the arcs of one volume. The result is a staged proposal — apply it from Proposals. */
 export function usePlanArcsMutation(projectId: string, volumeKey: string): UseMutationResult<PlanArcsResponse, ApiError, PlanArcsBody> {
   const queryClient = useQueryClient();
   return useMutation<PlanArcsResponse, ApiError, PlanArcsBody>({
@@ -67,7 +57,6 @@ export function usePlanArcsMutation(projectId: string, volumeKey: string): UseMu
   });
 }
 
-/** Approves every arc of a volume, unlocking brief generation for its chapters. */
 export function useApproveArcsMutation(projectId: string, volumeKey: string): UseMutationResult<ApproveArcsResponse, ApiError, undefined> {
   const queryClient = useQueryClient();
   return useMutation<ApproveArcsResponse, ApiError, undefined>({
@@ -76,7 +65,6 @@ export function useApproveArcsMutation(projectId: string, volumeKey: string): Us
   });
 }
 
-/** Generates the chapter briefs for exactly one arc's span. */
 export function useOutlineArcMutation(projectId: string, arcKey: string): UseMutationResult<OutlineResponse, ApiError, OutlineArcBody | undefined> {
   const queryClient = useQueryClient();
   return useMutation<OutlineResponse, ApiError, OutlineArcBody | undefined>({
@@ -88,7 +76,6 @@ export function useOutlineArcMutation(projectId: string, arcKey: string): UseMut
   });
 }
 
-/** Approves the whole volume plan, locking the structure for drafting. */
 export function useApproveVolumesMutation(projectId: string): UseMutationResult<ApprovePlanResponse, ApiError, undefined> {
   const queryClient = useQueryClient();
   return useMutation<ApprovePlanResponse, ApiError, undefined>({

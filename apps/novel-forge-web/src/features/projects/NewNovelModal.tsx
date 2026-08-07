@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { useState } from 'react';
 import { Button, Dialog, FormField, Input, SegmentedControl, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { AiTag } from '@/components/nf';
 import { type CreateProjectBody, type ProjectResponse, useCreateProjectMutation } from '@/lib/apis';
 

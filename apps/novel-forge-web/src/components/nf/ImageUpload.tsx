@@ -1,21 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode, useRef } from 'react';
 import { Spinner } from '@shadow-library/ui';
 
-/**
- * Importing user defined packages
- */
 import { ImageIcon, TrashIcon } from '@/components/icons';
 import { ACCEPT_ATTR, readImageFile, type UploadMime } from './image-file';
 import styles from './ImageUpload.module.css';
 
-/**
- * A small, reusable image picker: shows the current image (or a placeholder) and reveals Upload /
- * Replace / Remove actions over it. The parent sizes and shapes the box via `className`, and receives
- * the chosen file as base64 bytes ready for the upload endpoints.
- */
 interface ImageUploadProps {
   src?: string;
   alt: string;

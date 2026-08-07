@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { Button, Checkbox, Drawer, FormField, Input, SegmentedControl, Spinner, Textarea, toast } from '@shadow-library/ui';
 
-/**
- * Importing user defined modules
- */
 import { type ChipIntent, PageHeader, QueryState, StatusChip } from '@/components/nf';
 import {
   type ConversionStatus,
@@ -55,8 +49,6 @@ function jobIsActive(status?: RebrandOverview): boolean {
   const jobStatus = status?.job?.status;
   return jobStatus === 'pending' || jobStatus === 'in_progress';
 }
-
-// ─── Config card ─────────────────────────────────────────────────────────────
 
 interface ConfigCardProps {
   novelId: string;
@@ -116,8 +108,6 @@ function ConfigCard({ novelId, status }: ConfigCardProps): React.JSX.Element {
   );
 }
 
-// ─── Progress card ───────────────────────────────────────────────────────────
-
 interface ProgressCardProps {
   status: RebrandOverview;
 }
@@ -160,8 +150,6 @@ function ProgressCard({ status }: ProgressCardProps): React.JSX.Element {
     </div>
   );
 }
-
-// ─── Reader drawer ───────────────────────────────────────────────────────────
 
 interface ReaderDrawerProps {
   novelId: string;
@@ -221,8 +209,6 @@ function ReaderDrawer({ novelId, chapter, onClose }: ReaderDrawerProps): React.J
     </Drawer>
   );
 }
-
-// ─── Screen ──────────────────────────────────────────────────────────────────
 
 function RebrandScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();

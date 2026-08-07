@@ -16,7 +16,6 @@
   color: var(--sh-accent);
 }
 
-/* A square glyph tile; size, radius, and colours come from the `--tile-*` custom properties. */
 .iconTile {
   width: var(--tile-size);
   height: var(--tile-size);
@@ -29,7 +28,6 @@
   color: var(--tile-fg);
 }
 
-/* Type picker */
 .picker {
   position: relative;
 }
@@ -116,7 +114,6 @@
   color: var(--sh-text-tertiary);
 }
 
-/* Overview */
 .overviewHead {
   height: 60px;
   flex-shrink: 0;
@@ -187,7 +184,6 @@
   text-overflow: ellipsis;
 }
 
-/* Entity dialog */
 .dialogForm {
   display: flex;
   flex-direction: column;
@@ -200,7 +196,6 @@
   gap: 14px;
 }
 
-/* Entity detail */
 .detailHead {
   height: 60px;
   flex-shrink: 0;
@@ -299,7 +294,6 @@
   z-index: 5;
 }
 
-/* Empty pane */
 .emptyPane {
   display: flex;
   flex-direction: column;
@@ -335,7 +329,6 @@
   line-height: 1.6;
 }
 
-/* Screen rail */
 .railHead {
   padding: 14px 16px 12px;
 }

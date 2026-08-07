@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
 import {
   BookIcon,
   ChatIcon,
@@ -24,9 +18,6 @@ import {
 } from '../icons';
 import { type ProjectRoute } from './routes';
 
-/**
- * Defining types
- */
 export interface ProjectScreen {
   /** The last path segment — what the breadcrumb reads off the location. */
   segment: string;
@@ -40,10 +31,6 @@ export interface ProjectScreen {
   /** Sits below the nav divider rather than in the main run. */
   trailing?: boolean;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Every project-scoped screen, declared once. The sidebar nav, the breadcrumb's leaf label, and the
@@ -69,7 +56,6 @@ export const PROJECT_SCREENS: ProjectScreen[] = [
 
 export const SCREEN_LABEL = new Map(PROJECT_SCREENS.map(screen => [screen.segment, screen.label]));
 
-/** The screens that apply to a project of this kind; an unknown kind gets the kind-agnostic ones. */
 export function screensForKind(kind?: string): ProjectScreen[] {
   return PROJECT_SCREENS.filter(screen => (!screen.sourceOnly || kind === 'source') && (!screen.newNovelOnly || kind === 'new_novel'));
 }

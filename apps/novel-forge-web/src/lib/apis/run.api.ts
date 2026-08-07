@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type ListWorkflowRunResponse, type RunContextResponse, type RunModelCallDetailResponse, type WorkflowRunDetailResponse } from './api-types.gen';
 import { ApiError, APIRequest, type PollingOptions } from './transport';
 
-/**
- * Workflow runs are the orchestrator's execution records — every generate, judge,
- * repair, or plan step. They back the Workflow Runs screen (list + detail ladder).
- */
 const runKeys = {
   all: (projectId: string) => ['projects', projectId, 'runs'] as const,
   detail: (projectId: string, runId: string) => [...runKeys.all(projectId), runId] as const,
@@ -38,7 +28,6 @@ export function useRunQuery(projectId: string, runId: string | undefined, enable
   });
 }
 
-/** The exact rendered context that fed the run's prompt — fetched on demand, it can be tens of KB. */
 export function useRunContextQuery(projectId: string, runId: string | undefined, enabled = true): UseQueryResult<RunContextResponse, ApiError> {
   return useQuery<RunContextResponse, ApiError>({
     queryKey: runKeys.context(projectId, runId ?? ''),
@@ -48,7 +37,6 @@ export function useRunContextQuery(projectId: string, runId: string | undefined,
   });
 }
 
-/** One model call in full (raw output + error) — fetched when the author expands the row. */
 export function useRunCallQuery(projectId: string, runId: string, callId: string | undefined, enabled = true): UseQueryResult<RunModelCallDetailResponse, ApiError> {
   return useQuery<RunModelCallDetailResponse, ApiError>({
     queryKey: runKeys.call(projectId, runId, callId ?? ''),
