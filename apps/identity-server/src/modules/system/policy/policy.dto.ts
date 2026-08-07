@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
 import { POLICY_KEYS } from './policy.registry';
-
-/**
- * Defining types
- */
 
 @Schema()
 export class OrganisationPolicyParams {
@@ -45,14 +35,12 @@ export class SetPolicyBody {
   enabled?: boolean;
 }
 
-/** Mirrors `SetPolicyBody`: the `*Value` trio describes an `integer` key, the `*Enabled` trio a `boolean` one. */
 @Schema()
 export class PolicyItem {
   @Field()
   key: string;
 
-  /** The setting's name; `description` explains it underneath. */
-  @Field()
+  @Field({ description: "The setting's display name; description contains its explanatory text." })
   label: string;
 
   @Field()
@@ -73,8 +61,7 @@ export class PolicyItem {
   @Field(() => Number, { optional: true })
   effectiveValue?: number;
 
-  /** Absent when the organisation inherits the platform default rather than setting its own value. */
-  @Field(() => Number, { optional: true })
+  @Field(() => Number, { optional: true, description: 'Absent when the organisation inherits the platform default.' })
   configuredValue?: number;
 
   @Field(() => Boolean, { optional: true })
@@ -83,8 +70,7 @@ export class PolicyItem {
   @Field(() => Boolean, { optional: true })
   effectiveEnabled?: boolean;
 
-  /** Absent when the organisation inherits the platform default rather than setting its own value. */
-  @Field(() => Boolean, { optional: true })
+  @Field(() => Boolean, { optional: true, description: 'Absent when the organisation inherits the platform default.' })
   configuredEnabled?: boolean;
 }
 
@@ -99,7 +85,3 @@ export class PolicyActionResponse {
   @Field(() => Boolean)
   success: boolean;
 }
-
-/**
- * Declaring the constants
- */

@@ -1,12 +1,5 @@
-/**
- * Importing npm packages
- */
-
 import { Body, Delete, Get, HttpController, HttpStatus, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { Auth, Context } from '@server/modules/access';
 
 import {
@@ -23,14 +16,6 @@ import {
   TotpEnrollResponse,
 } from './mfa.dto';
 import { MfaService } from './mfa.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/me/mfa')
 @Auth({ session: true })
@@ -73,14 +58,12 @@ export class MfaController {
     return { success: true };
   }
 
-  /** The methods this account may use to elevate, so the client never prompts for an unavailable factor. */
   @Get('/step-up/methods')
   @RespondFor(200, StepUpMethodsResponse)
   async stepUpMethods(): Promise<StepUpMethodsResponse> {
     return { methods: await this.mfaService.getStepUpMethods(Context.getSession().userId) };
   }
 
-  /** The beneficiary label the hosted step-up prompt renders for an app-initiated ceremony (D-19, T-801). */
   @Get('/step-up/intent')
   @RespondFor(200, StepUpIntentResponse)
   resolveStepUpIntent(@Query() query: StepUpIntentQuery): ReturnType<MfaService['resolveStepUpIntent']> {

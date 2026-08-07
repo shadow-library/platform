@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
 
 import { and, eq, ne } from 'drizzle-orm';
@@ -8,18 +5,11 @@ import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, PrimaryDatabase, schema, UserSession } from '@server/modules/infrastructure/datastore';
 
 import { buildSessionCookies, CookieSpec } from './session-cookie';
 import { SESSION_ABSOLUTE_TTL_MS, SESSION_CACHE_TTL_S, SESSION_ELEVATION_TTL_MS, SESSION_IDLE_TTL_MS, SESSION_TOUCH_THROTTLE_MS } from './session.constants';
-
-/**
- * Defining types
- */
 
 export interface CreateSession {
   userId: bigint;
@@ -43,12 +33,6 @@ export interface SessionWithDevice {
   deviceName: string | null;
 }
 
-/**
- * What an open step-up window was performed for (D-19, T-801). `clientId` absent means the ceremony
- * carried no application intent — the identity console's own step-up — and no application may claim
- * it. A resolved `resource` is always present alongside a client so the audience comparison has a
- * value on both sides.
- */
 export interface ElevationIntent {
   clientId: string;
   resource: string;
@@ -73,10 +57,6 @@ export interface ValidatedSession {
 }
 
 export type TerminationReason = 'REVOKED' | 'TERMINATED' | 'EXPIRED';
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class SessionService {
@@ -116,7 +96,6 @@ export class SessionService {
         userSignInEventId: input.signInEventId ?? null,
         deviceId,
         aal,
-        /** A session born from a fresh second-factor proof starts inside the step-up window. */
         elevatedUntil: aal === 'AAL2' ? new Date(Date.now() + SESSION_ELEVATION_TTL_MS) : null,
         expiresAt,
         ipAddress: input.ipAddress ?? null,
@@ -132,7 +111,6 @@ export class SessionService {
     return { session, secret, cookies: buildSessionCookies(secret, expiresAt) };
   }
 
-  /** Resolves a session secret to a live session, enforcing absolute and idle expiry. */
   async validate(secret: string): Promise<ValidatedSession | null> {
     const hash = this.hashSecret(secret);
     const cached = await this.redis.get(this.cacheKey(hash));
@@ -152,12 +130,6 @@ export class SessionService {
     return this.toValidated(session);
   }
 
-  /**
-   * Validates a session by id rather than by secret, for flows that hold a session reference instead
-   * of the cookie — refresh-token rotation and first-party app sessions. Exercising such a reference
-   * is genuine session activity, so the idle window is refreshed on success just as it is for a
-   * cookie-borne request.
-   */
   async validateById(sessionId: bigint): Promise<ValidatedSession | null> {
     const session = await this.getById(sessionId);
     if (!session || session.status !== 'ACTIVE') return null;
@@ -173,7 +145,6 @@ export class SessionService {
     return this.toValidated(session);
   }
 
-  /** Refreshes `last_used_at` at most once per throttle window to bound write amplification. */
   private async touch(session: UserSession, now: number): Promise<void> {
     if (session.lastUsedAt.getTime() + SESSION_TOUCH_THROTTLE_MS > now) return;
     const lastUsedAt = new Date(now);
@@ -181,14 +152,6 @@ export class SessionService {
     session.lastUsedAt = lastUsedAt;
   }
 
-  /**
-   * Records a fresh second-factor proof: the session's achieved AAL becomes AAL2 permanently while
-   * the elevation window that gates sensitive operations is time-boxed.
-   *
-   * The window is opened *for* the intent the ceremony declared (D-19, T-801) and only a matching
-   * claim can spend it. Re-elevating overwrites the previous intent, so a window is never claimable
-   * by an application the user did not just step up for.
-   */
   async elevate(sessionId: bigint, intent?: ElevationIntent): Promise<ValidatedSession | null> {
     const elevatedUntil = new Date(Date.now() + SESSION_ELEVATION_TTL_MS);
     const [session] = await this.db
@@ -205,24 +168,11 @@ export class SessionService {
     return session.elevatedUntil !== null && session.elevatedUntil > Date.now();
   }
 
-  /**
-   * Whether an open window was opened for this exact `(client, audience)` pair. A window with no
-   * intent belongs to the identity console and is claimable by no application, so elevated authority
-   * can never cross from the console — or from a sibling application — into an API.
-   */
   matchesElevationIntent(session: ValidatedSession, clientId: string, resource: string): boolean {
     const intent = session.elevationIntent;
     return intent !== null && intent.clientId === clientId && intent.resource === resource;
   }
 
-  /**
-   * Spends the step-up window while leaving the achieved `aal` intact.
-   *
-   * A step-up is proof for one privileged act, not a mode the session sits in. Once an application has
-   * exchanged it for an audience-scoped elevation grant, the window is closed so no second application
-   * — and no identity-domain route — can ride the same proof. `aal` remains AAL2 because the user did
-   * demonstrate a second factor; only the right to act on it is consumed.
-   */
   async consumeElevation(sessionId: bigint): Promise<void> {
     const [session] = await this.db
       .update(schema.userSessions)
@@ -241,7 +191,6 @@ export class SessionService {
     if (session) await this.invalidate(session);
   }
 
-  /** Global sign-out: terminates every active session for the user, optionally sparing one. */
   async terminateAllForUser(userId: bigint, exceptSessionId?: bigint): Promise<void> {
     const condition = exceptSessionId
       ? and(eq(schema.userSessions.userId, userId), eq(schema.userSessions.status, 'ACTIVE'), ne(schema.userSessions.id, exceptSessionId))
@@ -259,7 +208,6 @@ export class SessionService {
     return session ?? null;
   }
 
-  /** Active sessions joined with their device labels, for the self-service session list (§4.4). */
   async listActiveDetailed(userId: bigint): Promise<SessionWithDevice[]> {
     return this.db
       .select({ session: schema.userSessions, deviceName: schema.devices.name })
@@ -301,7 +249,6 @@ export class SessionService {
     await this.redis.srem(this.userSetKey(session.userId), session.sessionHash);
   }
 
-  /** Both columns are written together, so a client without a resource is not a representable state. */
   private static toIntent(session: UserSession): ElevationIntent | null {
     if (!session.elevationIntentClientId || !session.elevationIntentResource) return null;
     return { clientId: session.elevationIntentClientId, resource: session.elevationIntentResource };

@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
-
-/**
- * Defining types
- */
 
 const ORGANISATION_TYPES = ['PERSONAL', 'TEAM'] as const;
 
@@ -30,8 +20,7 @@ export class CreateAppSessionBody {
 
 @Schema()
 export class AppSessionResponse {
-  /** The opaque handle. Returned once; the application sets it as a cookie on its own domain. */
-  @Field()
+  @Field({ description: 'Opaque handle returned once for the application to store as a cookie on its own domain.' })
   sessionHandle: string;
 
   @Field()
@@ -49,16 +38,13 @@ export class MintAppTokenBody {
   @Field()
   sessionHandle: string;
 
-  /** RFC 8707 target API. Omitted, the token addresses the identity service itself. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'RFC 8707 target API; omitted to address the identity service itself.' })
   resource?: string;
 
-  /** Narrows the token to a subset of the session's consented scope; defaults to all of it. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: "Narrows the token to a subset of the session's consented scope; omitted to use the full scope." })
   scope?: string;
 
-  /** Requires a step-up already granted for this exact resource. */
-  @Field(() => Boolean, { optional: true })
+  @Field(() => Boolean, { optional: true, description: 'Requires an existing step-up grant bound to this exact resource.' })
   elevated?: boolean;
 }
 
@@ -124,8 +110,7 @@ export class AppSessionOrganisationItem {
   @Field(() => String, { enum: [...ORGANISATION_TYPES] })
   type: OrganisationType;
 
-  /** Whether the session is acting in this organisation right now. */
-  @Field(() => Boolean)
+  @Field(() => Boolean, { description: 'Whether the session is currently acting in this organisation.' })
   active: boolean;
 }
 
@@ -146,11 +131,7 @@ export class SwitchOrganisationBody {
 
 @Schema()
 export class SwitchOrganisationResponse {
-  /**
-   * The rotated handle. Switching organisation issues a new one and retires the old, so the caller must
-   * replace its stored handle — the previous value is dead the moment this returns.
-   */
-  @Field()
+  @Field({ description: 'Rotated handle that replaces the previous handle, which is invalid as soon as this response is issued.' })
   sessionHandle: string;
 
   @Field()
@@ -159,7 +140,3 @@ export class SwitchOrganisationResponse {
   @Field()
   expiresAt: string;
 }
-
-/**
- * Declaring the constants
- */

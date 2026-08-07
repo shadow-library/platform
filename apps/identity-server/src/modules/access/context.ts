@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { type AdminActor } from '@server/modules/admin';
 import { type JwtClaims } from '@server/modules/auth/keys';
@@ -17,24 +11,8 @@ import { type Organisation } from '@server/modules/infrastructure/datastore';
 import { type AuthContext, type AuthenticatedRequest, type ClientInfo } from './access.types';
 import { clientInfoOf } from './auth-context.accessor';
 
-/**
- * Defining types
- *
- * The request-scoped `ContextService` is extended (via its `extend()` method) with typed auth
- * accessors so controllers read the guard-resolved identity straight off the ambient context.
- * `ContextService` is ALS-bound to the router's single instance and is not DI-visible to feature
- * modules, so `ContextBinder` (registered in the root module, where the instance is injectable) binds
- * that one instance to the module-level `Context` — handlers call `Context.getSession()` directly,
- * with no `@Ctx` parameter. The shared `ContextExtension` interface is deliberately not augmented
- * here (the `@shadow-library/auth` SDK augments it for its own `getAuthPrincipal`, and `extend`'s
- * signature would then force every extender to satisfy the union); the accessor types live on the
- * local `ExtendedContext` instead.
- */
 type ExtendedContext = ContextService & typeof AUTH_CONTEXT_EXTENSION;
 
-/**
- * Declaring the constants
- */
 const authOf = (context: ContextService): AuthContext => {
   const request = context.getRequest() as AuthenticatedRequest;
   if (!request.auth) throw AppErrorCode.AUTH_005.create();
@@ -83,7 +61,6 @@ const current = (): ExtendedContext => {
   return boundContext;
 };
 
-/** Ambient accessor for the guard-resolved identity of the in-flight request; backed by the router's `ContextService`. */
 export const Context = {
   getAuth: (): AuthContext => current().getAuth(),
   getSession: (): ValidatedSession => current().getSession(),
@@ -94,15 +71,9 @@ export const Context = {
   getClientInfo: (): ClientInfo => current().getClientInfo(),
 };
 
-/**
- * Extends the router's `ContextService` with the auth accessors and binds it to `Context`. Registered
- * in the root module (the only scope where `ContextService` is DI-visible) and constructed eagerly at
- * bootstrap, before any request is served.
- */
 @Injectable()
 export class ContextBinder {
   constructor(context: ContextService) {
-    /** Cast around `extend`'s signature, which the SDK's `ContextExtension` augmentation constrains to its own members. */
     (context.extend as (extension: typeof AUTH_CONTEXT_EXTENSION) => ContextService)(AUTH_CONTEXT_EXTENSION);
     boundContext = context as ExtendedContext;
   }

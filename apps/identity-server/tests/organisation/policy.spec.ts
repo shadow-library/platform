@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
@@ -13,13 +7,6 @@ import { PolicyService } from '@server/modules/system/policy';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('org-policy').init();
 
 describe('PolicyService', () => {
@@ -49,7 +36,6 @@ describe('PolicyService', () => {
 
   it('should let an organisation tighten a lifetime but never extend one', async () => {
     await policyService.set(organisationId, 'auth.access_token.ttl', 7200);
-    /** The registry default is stricter, and `MIN` keeps the stricter of the two. */
     expect(await policyService.resolve('auth.access_token.ttl', { organisationIds: [organisationId] })).toBe(3600);
   });
 
@@ -71,18 +57,12 @@ describe('PolicyService', () => {
   });
 
   it('should reject an unknown key and an out-of-bounds or non-integer value', async () => {
-    /** The registry is the gate that stops a generic key/value table becoming untyped configuration. */
     const setUnknown = policyService.set as (organisationId: bigint, key: string, value: number) => Promise<void>;
     expect(setUnknown(organisationId, 'auth.nonexistent', 60)).rejects.toThrow();
     expect(policyService.set(organisationId, 'auth.access_token.ttl', 1)).rejects.toThrow();
     expect(policyService.set(organisationId, 'auth.access_token.ttl', 10.5)).rejects.toThrow();
   });
 
-  /**
-   * `mfa.email_otp_fallback.enabled` is the first boolean key (T-808, D-20). Booleans fold with
-   * `AND`, which is `MIN`'s analogue: an organisation may refuse the fallback but never re-enable it
-   * over another organisation's refusal.
-   */
   describe('boolean policies', () => {
     it('should default the email-OTP fallback to enabled', async () => {
       expect(await policyService.resolve('mfa.email_otp_fallback.enabled', { organisationIds: [organisationId] })).toBe(true);
@@ -140,7 +120,6 @@ describe('PolicyService', () => {
     expect(access?.effectiveValue).toBe(3600);
   });
 
-  /** The wire is where a boolean is most easily lost — the previous shape would have emitted `1`. */
   describe('over the HTTP policy surface', () => {
     let ownerSecret: string;
     let teamId: string;

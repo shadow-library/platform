@@ -1,32 +1,18 @@
-/**
- * Importing npm packages
- */
 import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { DatabaseService } from '@server/modules/infrastructure/datastore';
 
 import { M2M_CLIENT_BUCKET, M2M_CLIENT_LIMIT, M2M_CLIENT_WINDOW_SECONDS } from './security.constants';
 
-/**
- * Defining types
- */
-
 export interface RateDecision {
   allowed: boolean;
   remaining: number;
   retryAfterSeconds: number;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Redis-backed fixed-window counters for the tiered abuse controls (architecture §13.2), plus the
@@ -40,7 +26,6 @@ export class RateLimiterService {
   private readonly redis: Redis;
   private readonly allowlist: Set<string>;
 
-  /** Runtime kill-switch, initialised from config; mutable so operators and tests can flip it without a reboot. */
   enabled: boolean;
 
   constructor(databaseService: DatabaseService) {
@@ -58,7 +43,6 @@ export class RateLimiterService {
     return this.allowlist.has(ip);
   }
 
-  /** Counts a hit against `bucket:key` and reports whether the caller is still within budget. */
   async consume(bucket: string, key: string, limit: number, windowSeconds: number): Promise<RateDecision> {
     if (!this.enabled) return { allowed: true, remaining: limit, retryAfterSeconds: 0 };
     const redisKey = `rl:${bucket}:${key}`;
@@ -73,11 +57,6 @@ export class RateLimiterService {
     return { allowed: count <= limit, remaining: Math.max(0, limit - count), retryAfterSeconds };
   }
 
-  /**
-   * Reports a counter's standing without counting a hit against it. M2M routes read the IP tier this
-   * way so an authenticated fleet never spends it, while a caller that has already flooded past the
-   * limit is still turned away before the handler runs.
-   */
   async peek(bucket: string, key: string, limit: number, windowSeconds: number): Promise<RateDecision> {
     if (!this.enabled) return { allowed: true, remaining: limit, retryAfterSeconds: 0 };
     const redisKey = `rl:${bucket}:${key}`;
@@ -86,11 +65,6 @@ export class RateLimiterService {
     return { allowed: hits < limit, remaining: Math.max(0, limit - hits), retryAfterSeconds: ttl > 0 ? ttl : windowSeconds };
   }
 
-  /**
-   * Charges one M2M call to the client that made it, once its credential has been proven. Callers
-   * invoke this at the point of authentication, so an unauthenticated request can never reach a
-   * client's budget — nor spend another client's.
-   */
   async consumeClientBudget(clientId: string): Promise<void> {
     const decision = await this.consume(M2M_CLIENT_BUCKET, clientId, M2M_CLIENT_LIMIT, M2M_CLIENT_WINDOW_SECONDS);
     if (decision.allowed) return;
@@ -98,7 +72,6 @@ export class RateLimiterService {
     throw AppErrorCode.SEC_001.create();
   }
 
-  /** Temporarily denies every request from the IP; used by failure correlation and incident response. */
   async blockIp(ip: string, ttlSeconds: number): Promise<void> {
     await this.redis.set(`rl:ipblock:${ip}`, '1', 'EX', ttlSeconds);
     this.logger.warn('IP address blocked', { securityEvent: 'security.ip_blocked', ip, ttlSeconds });
@@ -108,7 +81,6 @@ export class RateLimiterService {
     await this.redis.del(`rl:ipblock:${ip}`);
   }
 
-  /** Returns the remaining block duration in seconds, or 0 when the IP is not blocked. */
   async getIpBlockTtl(ip: string): Promise<number> {
     const ttl = await this.redis.ttl(`rl:ipblock:${ip}`);
     return ttl > 0 ? ttl : 0;

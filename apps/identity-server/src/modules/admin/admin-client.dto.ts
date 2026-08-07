@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
-
-/**
- * Defining types
- */
 
 const CLIENT_KINDS = ['WEB_CONFIDENTIAL', 'SPA_PUBLIC', 'NATIVE_PUBLIC', 'SERVICE'] as const;
 type ClientKind = (typeof CLIENT_KINDS)[number];
-
-/**
- * Declaring the constants
- */
 
 export const ALLOWED_GRANT_TYPES = ['authorization_code', 'refresh_token', 'client_credentials'] as const;
 
@@ -38,8 +24,7 @@ export class ClientScopeParams {
 
 @Schema()
 export class RegisterClientBody {
-  /** Admin-chosen, immutable client id slug — lowercase letters, digits and hyphens. Embedded in tokens and configs. */
-  @Field({ ...PATTERN.CLIENT_ID })
+  @Field({ ...PATTERN.CLIENT_ID, description: 'Admin-chosen immutable client identifier embedded in tokens and configuration.' })
   clientId: string;
 
   @Field(() => Number)
@@ -63,26 +48,27 @@ export class RegisterClientBody {
   @Field(() => Number, { optional: true, minimum: 60, maximum: 86400 })
   accessTokenTtl?: number;
 
-  /** OIDC back-channel logout endpoint; logout tokens POST here on session termination. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'OIDC back-channel logout endpoint to which logout tokens are posted on session termination.' })
   backchannelLogoutUri?: string;
 
-  /** k8s SA subjects and/or namespace-scoped patterns (`system:serviceaccount:<ns>:<name>`, `…:<ns>:*`) allowed to authenticate this client (D-16). */
-  @Field(() => [String], { optional: true })
+  @Field(() => [String], {
+    optional: true,
+    description: 'Kubernetes service-account subjects or namespace-scoped patterns allowed to authenticate this client.',
+  })
   workloadSubjects?: string[];
 
-  /**
-   * Confidential-client authentication method. `workload_identity` binds k8s SA subjects and
-   * mints no secret; `client_secret` mints a rotatable secret. Ignored for public clients.
-   */
-  @Field(() => String, { optional: true, enum: ['client_secret', 'workload_identity'] })
+  @Field(() => String, {
+    optional: true,
+    enum: ['client_secret', 'workload_identity'],
+    description:
+      'Confidential-client authentication method; workload_identity binds Kubernetes service accounts without a secret, while client_secret mints a rotatable secret. Ignored for public clients.',
+  })
   authMethod?: 'client_secret' | 'workload_identity';
 }
 
 @Schema()
 export class ClientListQuery {
-  /** Restrict the listing to a single application's clients (used by the Applications console). */
-  @Field(() => Number, { optional: true })
+  @Field(() => Number, { optional: true, description: "Restricts the listing to one application's clients." })
   applicationId?: number;
 }
 
@@ -91,8 +77,7 @@ export class RegisterClientResponse {
   @Field()
   clientId: string;
 
-  /** Returned exactly once at registration; only its argon2id hash is stored. */
-  @Field(() => String, { optional: true })
+  @Field(() => String, { optional: true, description: 'Client secret returned exactly once; only its Argon2id hash is stored.' })
   secret?: string;
 }
 
@@ -137,16 +122,16 @@ export class ClientDetailResponse extends ClientSummaryItem {
   @Field(() => Number)
   accessTokenTtl: number;
 
-  /** How the client authenticates: `none` (public/PKCE), `client_secret`, or `workload_identity` (k8s). */
-  @Field(() => String, { enum: ['none', 'client_secret', 'workload_identity'] })
+  @Field(() => String, {
+    enum: ['none', 'client_secret', 'workload_identity'],
+    description: 'Client authentication method: none for public PKCE clients, client_secret, or workload_identity for Kubernetes service accounts.',
+  })
   authMethod: 'none' | 'client_secret' | 'workload_identity';
 
-  /** The bound k8s SA subjects/patterns, present only for `workload_identity` clients (D-16). */
-  @Field(() => [String], { optional: true })
+  @Field(() => [String], { optional: true, description: 'Kubernetes service-account subjects or patterns; present only for workload_identity clients.' })
   workloadSubjects?: string[];
 
-  /** OIDC back-channel logout endpoint; logout tokens POST here on session termination. */
-  @Field(() => String, { optional: true })
+  @Field(() => String, { optional: true, description: 'OIDC back-channel logout endpoint to which logout tokens are posted on session termination.' })
   backchannelLogoutUri?: string;
 
   @Field()
@@ -164,18 +149,19 @@ export class UpdateClientBody {
   @Field(() => [String], { optional: true })
   redirectUris?: string[];
 
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'OIDC back-channel logout endpoint to which logout tokens are posted on session termination.' })
   backchannelLogoutUri?: string;
 
-  /** Replaces the full set of k8s SA subjects/patterns bound to this client; pass an empty array to unbind (D-16). */
-  @Field(() => [String], { optional: true })
+  @Field(() => [String], {
+    optional: true,
+    description: 'Replaces the full set of Kubernetes service-account subjects or patterns; pass an empty array to remove all bindings.',
+  })
   workloadSubjects?: string[];
 }
 
 @Schema()
 export class RotateSecretResponse {
-  /** The replacement secret, shown exactly once. */
-  @Field()
+  @Field({ description: 'Replacement client secret, shown exactly once.' })
   secret: string;
 
   @Field()
@@ -217,8 +203,11 @@ export class CreateScopeBody {
   @Field(() => Boolean, { optional: true })
   isSensitive?: boolean;
 
-  /** Which principal kind may hold this scope: `USER`, `SERVICE` (M2M), or `BOTH` (default). */
-  @Field(() => String, { optional: true, enum: ['USER', 'SERVICE', 'BOTH'] })
+  @Field(() => String, {
+    optional: true,
+    enum: ['USER', 'SERVICE', 'BOTH'],
+    description: 'Principal kind that may hold this scope: USER, SERVICE for machine-to-machine access, or BOTH. Defaults to BOTH.',
+  })
   principalType?: 'USER' | 'SERVICE' | 'BOTH';
 }
 
@@ -236,8 +225,10 @@ export class ScopeItem {
   @Field(() => Boolean)
   isSensitive: boolean;
 
-  /** Which principal kind may hold this scope: `USER`, `SERVICE` (M2M), or `BOTH`. */
-  @Field(() => String, { enum: ['USER', 'SERVICE', 'BOTH'] })
+  @Field(() => String, {
+    enum: ['USER', 'SERVICE', 'BOTH'],
+    description: 'Principal kind that may hold this scope: USER, SERVICE for machine-to-machine access, or BOTH.',
+  })
   principalType: 'USER' | 'SERVICE' | 'BOTH';
 }
 

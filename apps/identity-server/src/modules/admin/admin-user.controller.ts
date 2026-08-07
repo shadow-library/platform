@@ -1,13 +1,6 @@
-/**
- * Importing npm packages
- */
-
 import { ValidationError } from '@shadow-library/common';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { ERROR_MESSAGES } from '@server/constants';
 import { Auth, Context } from '@server/modules/access';
@@ -25,14 +18,6 @@ import {
 } from './admin-user.dto';
 import { AdminActionContext, AdminUserService } from './admin-user.service';
 import { ADMIN_PERMISSIONS } from './admin.constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/admin/users')
 @Auth({ permission: ADMIN_PERMISSIONS.usersRead })
@@ -82,7 +67,6 @@ export class AdminUserController {
     };
   }
 
-  /** Shared by every endpoint taking an expiry: an unparseable or already-past instant is a client error, not a silent no-op. */
   private parseExpiry(value: string | undefined): Date | undefined {
     if (!value) return undefined;
     const until = new Date(value);
@@ -138,7 +122,6 @@ export class AdminUserController {
     return { success: true };
   }
 
-  /** A temporary hold: `until` lapses it without further administrative action, and omitting it holds indefinitely. */
   @Post('/:userId/suspend')
   @Auth({ permission: ADMIN_PERMISSIONS.usersManage, elevated: true })
   @HttpStatus(200)
@@ -148,7 +131,6 @@ export class AdminUserController {
     return { success: true };
   }
 
-  /** Punitive and indefinite — a block never lapses, so it accepts no expiry. */
   @Post('/:userId/block')
   @Auth({ permission: ADMIN_PERMISSIONS.usersManage, elevated: true })
   @HttpStatus(200)

@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { base32Decode, hotp } from '@server/modules/auth/mfa';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
@@ -15,13 +9,6 @@ import { schema } from '@server/modules/infrastructure/datastore';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('recovery-codes').init();
 const EMAIL = 'codes@example.com';
 

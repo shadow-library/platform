@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { KeyProvider } from '@server/modules/auth/keys';
@@ -24,10 +18,6 @@ import { NotificationService } from '@server/modules/infrastructure/notification
 import { RecoveryCodeService } from './recovery-code.service';
 import { base32Encode, buildOtpauthUri, verifyTotp } from './totp';
 
-/**
- * Defining types
- */
-
 export interface TotpProvisioning {
   secret: string;
   uri: string;
@@ -38,7 +28,6 @@ export interface EnrollmentSummary {
   label: string;
   createdAt: Date;
   lastUsedAt: Date | null;
-  /** WEBAUTHN entries carry the credential id so self-service removal can target one passkey. */
   credentialId?: string;
 }
 
@@ -47,11 +36,6 @@ export interface MfaFactors {
   webauthn: boolean;
 }
 
-/**
- * How a session may be elevated to AAL2 for the step-up window. A strong second factor (TOTP or a
- * passkey) is preferred; `PASSWORD` re-entry is offered only to accounts that hold no second factor,
- * and never elevates over one. An empty method set means the account must first enrol a factor.
- */
 export type StepUpMethod = 'TOTP' | 'WEBAUTHN' | 'PASSWORD';
 
 interface SerializedSecret {
@@ -60,9 +44,6 @@ interface SerializedSecret {
   authTag: string;
 }
 
-/**
- * Declaring the constants
- */
 const TOTP_SECRET_BYTES = 20;
 const ENROLLED_TEMPLATE = 'auth.mfa.enrolled';
 const DISABLED_TEMPLATE = 'auth.mfa.disabled';
@@ -87,13 +68,11 @@ export class MfaService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /** True when the user holds any verified second factor; drives the login-flow MFA gate. */
   async hasMfa(userId: bigint): Promise<boolean> {
     const factors = await this.getFactors(userId);
     return factors.totp || factors.webauthn;
   }
 
-  /** Which factor kinds the user holds; drives the login flow's MFA step selection. */
   async getFactors(userId: bigint): Promise<MfaFactors> {
     const enrollment = await this.db.query.mfaEnrollments.findFirst({
       where: and(eq(schema.mfaEnrollments.userId, userId), isNotNull(schema.mfaEnrollments.verifiedAt)),
@@ -103,12 +82,6 @@ export class MfaService {
     return { totp: enrollment !== undefined, webauthn: credential !== undefined };
   }
 
-  /**
-   * The step-up methods this account may use to elevate, so a client never prompts for a factor the
-   * user cannot satisfy. `PASSWORD` appears only when no second factor exists (re-proving the password
-   * is a recency check, not a second factor); a passwordless account with no factor gets an empty set,
-   * signalling the caller to route the user through first-factor enrolment instead.
-   */
   async getStepUpMethods(userId: bigint): Promise<StepUpMethod[]> {
     const factors = await this.getFactors(userId);
     const methods: StepUpMethod[] = [];
@@ -135,10 +108,6 @@ export class MfaService {
     ];
   }
 
-  /**
-   * Provisions a fresh TOTP seed. The enrollment stays unusable until the user proves possession
-   * via `activateTotp`; re-provisioning simply replaces any prior unverified attempt.
-   */
   async enrollTotp(userId: bigint): Promise<TotpProvisioning> {
     const active = await this.getTotpEnrollment(userId, 'verified');
     if (active) throw AppErrorCode.MFA_003.create();
@@ -158,7 +127,6 @@ export class MfaService {
     return { secret: secretBase32, uri: buildOtpauthUri(new URL(this.issuer).hostname, account, secretBase32) };
   }
 
-  /** Activates a pending TOTP enrollment once the user proves possession with a valid code. */
   async activateTotp(userId: bigint, code: string): Promise<void> {
     const pending = await this.getTotpEnrollment(userId, 'pending');
     if (!pending) throw AppErrorCode.MFA_001.create();
@@ -176,10 +144,6 @@ export class MfaService {
     this.logger.info('totp enrolled', { userId });
   }
 
-  /**
-   * Verifies a TOTP code against the active enrollment. A code is accepted at most once: the
-   * matched time-step must exceed the last accepted one, closing the replay window.
-   */
   async verifyTotp(userId: bigint, code: string): Promise<boolean> {
     const enrollment = await this.getTotpEnrollment(userId, 'verified');
     if (!enrollment) return false;
@@ -205,25 +169,17 @@ export class MfaService {
     this.logger.info('totp disabled', { userId });
   }
 
-  /* --------------------------- caller-facing orchestration --------------------------- */
-
-  /** Factors plus remaining recovery-code count for the self-service MFA surface. */
   async listEnrollmentSummary(userId: bigint): Promise<{ enrollments: EnrollmentSummary[]; recoveryCodesRemaining: number }> {
     const enrollments = await this.listEnrollments(userId);
     const recoveryCodesRemaining = await this.recoveryCodeService.countRemaining(userId);
     return { enrollments, recoveryCodesRemaining };
   }
 
-  /**
-   * Provisioning the first factor requires only a session (the user cannot step up without any
-   * factor yet); once MFA exists, changing factors demands a fresh second-factor proof.
-   */
   async beginTotpEnrollment(userId: bigint, elevated: boolean): Promise<TotpProvisioning> {
     if ((await this.hasMfa(userId)) && !elevated) throw AppErrorCode.AUTH_006.create();
     return this.enrollTotp(userId);
   }
 
-  /** Activation of the account's first factor also provisions its recovery-code batch (T-403). */
   async completeTotpActivation(session: ValidatedSession, code: string): Promise<{ success: true; recoveryCodes?: string[] }> {
     await this.activateTotp(session.userId, code);
     await this.sessionService.elevate(session.id);
@@ -236,20 +192,6 @@ export class MfaService {
     return { recoveryCodes: await this.recoveryCodeService.generate(userId) };
   }
 
-  /**
-   * Elevates an existing session to AAL2 for the step-up window. A TOTP code is required when the
-   * account holds a second factor; an account with none may instead re-prove its password.
-   *
-   * The security invariant: a password must never elevate over an enrolled second factor — otherwise
-   * a hijacked session could downgrade an AAL2 account to a single password. The accepted proof is
-   * therefore derived from the account's own enrolled factors, not from what the caller supplies.
-   * Passkey-only accounts elevate through the WebAuthn step-up ceremony, not this method.
-   */
-  /**
-   * The beneficiary label a hosted step-up prompt shows for an app-initiated ceremony (D-19, T-801).
-   * An unknown or inactive client id resolves to no name — the prompt renders that as a neutral
-   * failure rather than confirming or denying the id's existence.
-   */
   async resolveStepUpIntent(clientId: string): Promise<{ applicationName?: string }> {
     const applicationName = await this.clientService.resolveApplicationLabel(clientId);
     return { applicationName: applicationName ?? undefined };
@@ -259,7 +201,6 @@ export class MfaService {
     session: ValidatedSession,
     proof: { code?: string; password?: string; clientId?: string; resource?: string },
   ): Promise<{ aal: 'AAL1' | 'AAL2'; elevatedUntil: Date }> {
-    /** Resolved before the factor check so a bad intent fails the ceremony rather than opening an unclaimable window. */
     const intent = await this.clientService.resolveElevationIntent(proof.clientId, proof.resource);
 
     const factors = await this.getFactors(session.userId);

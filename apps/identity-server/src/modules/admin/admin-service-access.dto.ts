@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class ServiceAccessListQuery {
@@ -24,20 +10,16 @@ export class ServiceAccessListQuery {
 
 @Schema()
 export class CreateServiceAccessBody {
-  /** The application whose routes the rule opens up */
-  @Field(() => Number)
+  @Field(() => Number, { description: 'Application whose routes the rule opens.' })
   applicationId: number;
 
-  /** The SERVICE client allowed to call (client id slug or legacy UUID) */
-  @Field({ ...PATTERN.CLIENT_ID })
+  @Field({ ...PATTERN.CLIENT_ID, description: 'Service client allowed to call the routes.' })
   callerClientId: string;
 
-  /** HTTP method the rule covers, or `*` for all methods */
-  @Field({ maxLength: 10 })
+  @Field({ maxLength: 10, description: 'HTTP method covered by the rule, or * for all methods.' })
   method: string;
 
-  /** Route path the rule covers; a trailing `*` matches any suffix */
-  @Field({ maxLength: 512 })
+  @Field({ maxLength: 512, description: 'Route path covered by the rule; a trailing * matches any suffix.' })
   pathPattern: string;
 }
 

@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { createPrivateKey, generateKeyPairSync, randomUUID } from 'node:crypto';
 
 import * as x509 from '@peculiar/x509';
@@ -8,16 +5,9 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { Injectable, OnModuleInit } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { KeyProvider } from '@server/modules/auth/keys';
 import { DatabaseService, PrimaryDatabase, schema, SigningKey } from '@server/modules/infrastructure/datastore';
-
-/**
- * Defining types
- */
 
 export interface SamlSigningKey {
   kid: string;
@@ -25,16 +15,9 @@ export interface SamlSigningKey {
   certificatePem: string;
 }
 
-/**
- * Declaring the constants
- *
- * SAML signing keys are RSA-2048: XML-DSIG interoperability effectively requires RSA — SPs in the
- * wild do not accept Ed25519 — so the SAML subsystem keeps its own key lineage (purpose = SAML)
- * beside the OIDC Ed25519 one, sharing the envelope encryption and rotation states. The metadata
- * document publishes every non-retired certificate so SPs keep verifying across a rotation window.
- */
 const PUBLISHED_STATUSES: SigningKey.Status[] = ['PENDING', 'ACTIVE', 'RETIRING'];
 const CERTIFICATE_VALIDITY_YEARS = 10;
+/** XML-DSIG interoperability with deployed service providers requires RSA rather than the OIDC Ed25519 lineage. */
 const RSA_ALGORITHM = { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256', publicExponent: new Uint8Array([1, 0, 1]), modulusLength: 2048 } as const;
 
 @Injectable()
@@ -114,7 +97,6 @@ export class SamlKeyService implements OnModuleInit {
     return kid;
   }
 
-  /** Promotes a new key to active; the previous active key keeps verifying via metadata until retired. */
   async rotate(newKid?: string): Promise<string> {
     const kid = newKid ?? (await this.generateKey('PENDING'));
     await this.db.transaction(async tx => {
@@ -135,7 +117,6 @@ export class SamlKeyService implements OnModuleInit {
     return { kid: key.kid, privateKeyPem: key.privateKeyPem, certificatePem: key.certificatePem };
   }
 
-  /** Every certificate an SP may still see signatures from, active first (metadata KeyDescriptors). */
   getPublishedCertificates(): string[] {
     const ordered = [...this.keys.values()].sort((a, b) => (a.status === 'ACTIVE' ? -1 : b.status === 'ACTIVE' ? 1 : 0));
     return ordered.map(key => key.certificatePem);

@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { Logger, utils } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { SessionService } from '@server/modules/auth/session';
@@ -18,10 +12,6 @@ import { AuthFlowContext, AuthFlowService, DeviceContext } from './auth-flow.ser
 import { OTP_RESEND_BUDGET } from './challenge-flow.service';
 import { ChallengeService } from './challenge.service';
 import { FlowStepResult } from './flow.types';
-
-/**
- * Defining types
- */
 
 export interface RegisterInitInput {
   email: string;
@@ -48,9 +38,6 @@ export interface RegistrationInitResult extends RegistrationStepState {
   metadata: { maskedEmail: string };
 }
 
-/**
- * Declaring the constants
- */
 const MAX_FLOW_FAILURES = 3;
 const AWAITING_EMAIL_OTP = 'AWAITING_EMAIL_OTP';
 const AWAITING_DEMOGRAPHICS = 'AWAITING_DEMOGRAPHICS';
@@ -71,10 +58,6 @@ export class RegistrationService {
     private readonly sessionService: SessionService,
   ) {}
 
-  /**
-   * Starts a registration flow. The response is identical whether or not the email already exists
-   * (D-12); when it does, no OTP is issued and any code submission fails generically.
-   */
   async init(input: RegisterInitInput): Promise<RegistrationInitResult> {
     const email = input.email.toLowerCase();
     const exists = await this.userEmailService.isEmailExists(email);

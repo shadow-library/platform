@@ -1,24 +1,11 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AccessTokenService, OAuthClientService } from '@server/modules/auth/oauth';
 import { ServiceAccessService } from '@server/modules/authz';
 import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('service-access').init();
 
 describe('ServiceAccessService', () => {

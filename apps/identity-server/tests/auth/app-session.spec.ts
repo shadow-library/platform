@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { KeyService } from '@server/modules/auth/keys';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
@@ -15,13 +9,6 @@ import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('app-session').init();
 const REDIRECT_URI = 'https://app.example.com/callback';
 const REPORTS = 'api://reports';
@@ -41,7 +28,6 @@ describe('First-party app sessions', () => {
   let sessionSecret: string;
   let sessionId: bigint;
 
-  /** Registers a first-party client entitled to manage app sessions and to reach both test APIs. */
   const registerApp = async (name: string) => {
     const clientService = env.getService(OAuthClientService);
     const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
@@ -62,7 +48,6 @@ describe('First-party app sessions', () => {
     });
   };
 
-  /** The application's own machine credential — required alongside the handle for every call. */
   const serviceToken = async (app: { clientId: string; secret?: string }) => {
     const response = await env
       .getRouter()
@@ -92,7 +77,6 @@ describe('First-party app sessions', () => {
     return { code: new URL(redirect.headers.location ?? '').searchParams.get('code') ?? '', verifier };
   };
 
-  /** The service token is resolved before the chain is built: `mockRequest` cannot be interleaved. */
   const openSession = async (app = client, resource = REPORTS, scope = 'openid reports:read reports:export') => {
     const { code, verifier } = await authorizationCode(resource, scope, app);
     const bearer = await serviceToken(app);
@@ -168,7 +152,6 @@ describe('First-party app sessions', () => {
   });
 
   describe('step-up isolation', () => {
-    /** A ceremony always declares what it is for (D-19, T-801); an intentless window is claimable by nobody. */
     const elevateCentralSession = (app = client, resource = REPORTS) => env.getService(SessionService).elevate(sessionId, { clientId: app.clientId, resource });
 
     it('should withhold a sensitive scope from an ordinary token and require a grant to elevate', async () => {
@@ -201,7 +184,6 @@ describe('First-party app sessions', () => {
       await elevateCentralSession();
       expect((await claimElevation(mine.sessionHandle)).statusCode).toBe(200);
 
-      /** The proof was spent by the first application, so the second must send the user through its own step-up. */
       expect((await claimElevation(theirs.sessionHandle, REPORTS, rival)).statusCode).toBe(403);
       expect((await mint(theirs.sessionHandle, { elevated: true }, rival)).statusCode).toBe(403);
     });
@@ -246,7 +228,6 @@ describe('First-party app sessions', () => {
       const parent = await sessionService.validateById(sessionId);
       expect(parent).not.toBeNull();
       expect(sessionService.isElevated(parent!)).toBe(false);
-      /** The achieved assurance is a fact about the login and survives; only the right to act on it is spent. */
       expect(parent!.aal).toBe('AAL2');
     });
 
@@ -255,18 +236,12 @@ describe('First-party app sessions', () => {
       expect((await claimElevation(sessionHandle)).statusCode).toBe(403);
     });
 
-    /**
-     * Spending the window is not enough on its own: before T-801 a live window was claimable
-     * first-come-first-served, so whichever application asked first won a proof the user performed
-     * for someone else.
-     */
     describe('intent binding', () => {
       it('should refuse a claim from a client the step-up was not performed for', async () => {
         const theirs = (await openSession(rival)).json() as { sessionHandle: string };
         await elevateCentralSession(client);
 
         expect((await claimElevation(theirs.sessionHandle, REPORTS, rival)).statusCode).toBe(403);
-        /** The window was not spent by the refused claim, so its rightful owner can still take it. */
         const mine = (await openSession()).json() as { sessionHandle: string };
         expect((await claimElevation(mine.sessionHandle)).statusCode).toBe(200);
       });
@@ -279,7 +254,6 @@ describe('First-party app sessions', () => {
         expect((await claimElevation(sessionHandle, REPORTS)).statusCode).toBe(200);
       });
 
-      /** The identity console steps up for itself; no application may spend that proof. */
       it('should make a console step-up unclaimable by every application', async () => {
         const mine = (await openSession()).json() as { sessionHandle: string };
         const theirs = (await openSession(rival)).json() as { sessionHandle: string };
@@ -305,7 +279,6 @@ describe('First-party app sessions', () => {
         await sessionService.elevate(sessionId, intent ?? undefined);
         expect((await sessionService.validateById(sessionId))?.elevationIntent).toEqual({ clientId: client.clientId, resource: REPORTS });
 
-        /** A misconfigured step-up URL fails the ceremony rather than opening a window nothing can claim. */
         expect(env.getService(OAuthClientService).resolveElevationIntent('no-such-client', REPORTS)).rejects.toThrow();
       });
 
@@ -314,7 +287,6 @@ describe('First-party app sessions', () => {
         const intent = await env.getService(OAuthClientService).resolveElevationIntent(client.clientId);
         await env.getService(SessionService).elevate(sessionId, intent ?? undefined);
 
-        /** Neither side named a resource, so both resolve to `shadow-identity` and the claim matches. */
         const bearer = await serviceToken(client);
         const claim = await env
           .getRouter()

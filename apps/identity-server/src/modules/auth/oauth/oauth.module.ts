@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Module } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { KeyModule } from '@server/modules/auth/keys';
 import { SessionModule } from '@server/modules/auth/session';
 import { TokenModule } from '@server/modules/auth/token';
@@ -26,14 +20,6 @@ import { OAuthClientService } from './oauth-client.service';
 import { OAuthController } from './oauth.controller';
 import { OAuthService } from './oauth.service';
 import { WorkloadIdentityService } from './workload-identity.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Module({
   imports: [DatabaseModule, KeyModule, SessionModule, TokenModule, UserModule, AuditModule, ApplicationModule, PolicyModule, SecurityModule],

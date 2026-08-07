@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { and, eq } from 'drizzle-orm';
@@ -8,9 +5,6 @@ import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { UserEmailService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
@@ -20,18 +14,6 @@ import { RateLimiterService } from '@server/modules/infrastructure/security';
 
 import { DeviceContext } from './auth-flow.service';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * T-502/T-503: a successful login from an unseen device or IP alerts the account owner; failed
- * logins are correlated per source IP across accounts, and a burst past the threshold temp-blocks
- * the IP at Tier-1. GeoIP / impossible-travel signals need an external location database and are
- * deferred (docs/tasks.md). Thresholds are mutable for operational tuning and tests.
- */
 const NEW_SIGNIN_TEMPLATE = 'security.new-signin';
 const IP_FAILURE_WINDOW_SECONDS = 900;
 const IP_BLOCK_TTL_SECONDS = 3600;
@@ -42,7 +24,6 @@ export class SuspiciousLoginService {
   private readonly db: PrimaryDatabase;
   private readonly redis: Redis;
 
-  /** Failed logins from one IP within the window before it is temp-blocked. */
   ipFailureThreshold = 30;
 
   constructor(
@@ -56,10 +37,6 @@ export class SuspiciousLoginService {
     this.redis = databaseService.getRedisClient();
   }
 
-  /**
-   * Runs before the sign-in event and session are recorded, so "previously seen" reflects only
-   * genuinely prior logins. First-ever logins never alert — everything is new then.
-   */
   async assessLogin(userId: bigint, device: DeviceContext): Promise<void> {
     const priorSuccess = await this.db.query.userSignInEvents.findFirst({
       where: and(eq(schema.userSignInEvents.userId, userId), eq(schema.userSignInEvents.status, 'SUCCESS')),
@@ -89,7 +66,6 @@ export class SuspiciousLoginService {
     });
   }
 
-  /** Correlates failed logins per source IP across accounts; a burst temp-blocks the IP (Tier-1). */
   async recordFailure(ip: string): Promise<void> {
     const key = `rl:ipfail:${ip}`;
     const results = await this.redis.multi().incr(key).call('EXPIRE', key, IP_FAILURE_WINDOW_SECONDS, 'NX').exec();

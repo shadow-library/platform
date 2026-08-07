@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type ValidatedSession } from '@server/modules/auth/session';
@@ -20,10 +14,6 @@ import { DatabaseService, Organisation, PrimaryDatabase, schema } from '@server/
 import { NotificationService } from '@server/modules/infrastructure/notification';
 
 import { InvitationService } from './invitation.service';
-
-/**
- * Defining types
- */
 
 type OrgWriter = Pick<PrimaryDatabase, 'insert'>;
 
@@ -73,14 +63,6 @@ export interface MembershipWithOrganisation {
   organisation: Organisation;
 }
 
-/**
- * Declaring the constants
- *
- * Org-level roles govern organisation administration only (membership, domains, lifecycle);
- * product permissions stay on the PDP's `role_assignments`, keeping exactly one authorization
- * system (DB §4). Absent orgs and foreign orgs answer identically (ORG_001) so organisation ids
- * cannot be probed.
- */
 const ROLE_RANK: Record<Organisation.MemberRole, number> = { MEMBER: 0, ADMIN: 1, OWNER: 2 };
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])?$/;
 
@@ -121,10 +103,6 @@ export class OrganisationService {
     });
   }
 
-  /**
-   * Creates a user's synthetic personal workspace and its owner membership (D-1). Accepts the
-   * surrounding transaction so the workspace is committed atomically with the user.
-   */
   async createPersonalWorkspace(userId: bigint, name: string, executor: OrgWriter = this.db): Promise<Organisation> {
     const slug = this.generateSlug(name);
     const [organisation] = await executor.insert(schema.organisations).values({ name, slug, type: 'PERSONAL', status: 'ACTIVE' }).returning();
@@ -137,7 +115,6 @@ export class OrganisationService {
     return organisation;
   }
 
-  /** Creates a team organisation with the creator as its first owner. */
   async createTeam(userId: bigint, input: CreateTeamInput): Promise<Organisation> {
     if (input.slug && !SLUG_PATTERN.test(input.slug)) throw AppErrorCode.ORG_006.create();
     const slug = input.slug ?? this.generateSlug(input.name);
@@ -176,13 +153,7 @@ export class OrganisationService {
     return organisation ?? null;
   }
 
-  /**
-   * Validates an org-wide role-grant target (T-904, D-A5): the id must name a live TEAM organisation.
-   * A personal workspace is single-user and holds no tier; an absent, suspended, or deleted org is not
-   * a live grant target.
-   */
   async assertActiveTeam(organisationId: string): Promise<Organisation> {
-    /** Org ids are numeric; a malformed value simply names no organisation. */
     if (!/^\d+$/.test(organisationId)) throw AppErrorCode.ORG_002.create();
     const organisation = await this.getById(BigInt(organisationId));
     if (!organisation || organisation.status !== 'ACTIVE') throw AppErrorCode.ORG_002.create();
@@ -190,7 +161,6 @@ export class OrganisationService {
     return organisation;
   }
 
-  /** Idempotently adds a member; an existing membership (any role) is left untouched. */
   async ensureMember(organisationId: bigint, userId: bigint, role: Organisation.MemberRole): Promise<void> {
     await this.db.insert(schema.organisationMembers).values({ organisationId, userId, role }).onConflictDoNothing();
   }
@@ -202,11 +172,6 @@ export class OrganisationService {
     return membership ?? null;
   }
 
-  /**
-   * Throws unless the user is a live member of the organisation; the guard for every org-scoped read. A held member
-   * reads as ORG_001 rather than a distinct code — inside the tenant they are indistinguishable from a non-member,
-   * and the hold is only ever explained to them by the administrator who applied it.
-   */
   async assertMember(userId: bigint, organisationId: bigint): Promise<Organisation.Member> {
     const membership = await this.getMembership(userId, organisationId);
     if (!membership) throw AppErrorCode.ORG_001.create();
@@ -214,7 +179,6 @@ export class OrganisationService {
     return membership;
   }
 
-  /** Mirrors the account-level rule: a SUSPENDED hold past its `statusUntil` has served its term and repairs itself on read. */
   private async resolveMemberStatus(membership: Organisation.Member): Promise<Organisation.MemberStatus> {
     if (membership.status !== 'SUSPENDED' || !membership.statusUntil || membership.statusUntil.getTime() > Date.now()) return membership.status;
     await this.db
@@ -226,11 +190,6 @@ export class OrganisationService {
     return 'ACTIVE';
   }
 
-  /**
-   * The guard for team administration: the caller must belong to a live TEAM organisation with at
-   * least the given role. Membership is checked before anything else so absent and foreign orgs
-   * are indistinguishable; personal workspaces reject administration outright (D-1).
-   */
   async requireRole(userId: bigint, organisationId: bigint, minimumRole: Organisation.MemberRole): Promise<MembershipWithOrganisation> {
     const membership = await this.assertMember(userId, organisationId);
     const organisation = await this.getById(organisationId);
@@ -248,13 +207,10 @@ export class OrganisationService {
     this.logger.info('renamed organisation', { organisationId, name });
   }
 
-  /** Soft-deletes the organisation; role-assignment revocation and auditing ride on the caller. */
   async softDelete(organisationId: bigint): Promise<void> {
     await this.db.update(schema.organisations).set({ status: 'DELETED', deletedAt: new Date(), updatedAt: new Date() }).where(eq(schema.organisations.id, organisationId));
     this.logger.info('soft-deleted organisation', { organisationId });
   }
-
-  /* --------------------------- caller-facing orchestration --------------------------- */
 
   async createOrganisation(caller: CallerContext, input: CreateTeamInput): Promise<Organisation> {
     const organisation = await this.createTeam(caller.session.userId, input);
@@ -262,7 +218,6 @@ export class OrganisationService {
     return organisation;
   }
 
-  /** A live organisation for a caller the guard already confirmed as a member. */
   async getOrganisation(organisationId: bigint): Promise<Organisation> {
     const organisation = await this.getById(organisationId);
     if (!organisation || organisation.status === 'DELETED') throw AppErrorCode.ORG_001.create();
@@ -275,14 +230,12 @@ export class OrganisationService {
     return { ...organisation, name };
   }
 
-  /** Deletion revokes every product-role grant scoped to the org so no PDP decision survives it. */
   async deleteOrganisation(caller: CallerContext, organisationId: bigint): Promise<void> {
     await this.softDelete(organisationId);
     await this.policyDecisionService.revokeAllForOrganisation(organisationId.toString());
     await this.audit(caller, organisationId, 'org.deleted');
   }
 
-  /** Members flattened for the member-management surface, with native id/date the serializer converts. */
   async listMemberItems(organisationId: bigint): Promise<MemberListItem[]> {
     const members = await this.db.query.organisationMembers.findMany({ where: eq(schema.organisationMembers.organisationId, organisationId) });
     return Promise.all(
@@ -298,11 +251,6 @@ export class OrganisationService {
     );
   }
 
-  /**
-   * Changes a member's org role. Promoting to OWNER is owner-only and step-up-gated; an owner target
-   * is owner-only and AAL2-gated; otherwise a caller only administers members ranked strictly below
-   * them. Last-owner protection rides on `updateMemberRole`.
-   */
   async changeMemberRole(caller: CallerContext, callerMembership: Organisation.Member, organisationId: bigint, targetUserId: bigint, role: Organisation.MemberRole): Promise<void> {
     if (role === 'OWNER') {
       if (!this.isElevated(caller.session)) throw AppErrorCode.AUTH_006.create();
@@ -353,7 +301,6 @@ export class OrganisationService {
       })
       .where(and(eq(schema.organisationMembers.organisationId, organisationId), eq(schema.organisationMembers.userId, targetUserId)));
 
-    /** A held member keeps the account but loses this tenant: org-scoped grants and refresh families go, the session does not. */
     if (!restored) {
       await this.policyDecisionService.revokeAllForPrincipalInOrganisation({ type: 'USER', id: targetUserId.toString() }, organisationId.toString());
       await this.refreshTokenService.revokeForUserOrganisation(targetUserId, organisationId);
@@ -392,9 +339,6 @@ export class OrganisationService {
     await this.audit(caller, organisationId, 'org.invitation_revoked', 'organisation_invitation', invitation.id.toString());
   }
 
-  /* --------------------------- self-service membership --------------------------- */
-
-  /** The caller's live organisations flattened with their role, for the self-service list. */
   async listMyOrganisationItems(userId: bigint): Promise<MyOrganisationListItem[]> {
     const entries = await this.listOrganisationsForUser(userId);
     return entries
@@ -411,7 +355,6 @@ export class OrganisationService {
       }));
   }
 
-  /** Leaving is removal of oneself: same last-owner protection, same grant revocation. */
   async leaveOrganisation(caller: CallerContext, organisationId: bigint): Promise<void> {
     const membership = await this.getMembership(caller.session.userId, organisationId);
     const organisation = await this.getById(organisationId);
@@ -433,7 +376,6 @@ export class OrganisationService {
     await this.audit(caller, invitation.organisationId, 'org.invitation_declined', 'organisation_invitation', invitation.id.toString());
   }
 
-  /** Changes a member's org role; refuses to demote the last remaining owner. */
   async updateMemberRole(organisationId: bigint, userId: bigint, role: Organisation.MemberRole): Promise<Organisation.Member> {
     const membership = await this.getMembership(userId, organisationId);
     if (!membership) throw AppErrorCode.USR_001.create();
@@ -448,7 +390,6 @@ export class OrganisationService {
     return updated;
   }
 
-  /** Removes a member; refuses to remove the last remaining owner. */
   async removeMember(organisationId: bigint, userId: bigint): Promise<Organisation.Member> {
     const membership = await this.getMembership(userId, organisationId);
     if (!membership) throw AppErrorCode.USR_001.create();
@@ -468,13 +409,11 @@ export class OrganisationService {
     }
   }
 
-  /** Lists the members of an organisation, but only for a caller who belongs to it (tenant scope). */
   async listMembers(callerUserId: bigint, organisationId: bigint): Promise<Organisation.Member[]> {
     await this.assertMember(callerUserId, organisationId);
     return this.db.query.organisationMembers.findMany({ where: eq(schema.organisationMembers.organisationId, organisationId) });
   }
 
-  /** Members with their primary verified email, for the member-management surface. */
   async listMembersDetailed(organisationId: bigint): Promise<MemberDetail[]> {
     const members = await this.db.query.organisationMembers.findMany({ where: eq(schema.organisationMembers.organisationId, organisationId) });
     return Promise.all(members.map(async member => ({ member, email: await this.getPrimaryVerifiedEmail(member.userId) })));
@@ -484,7 +423,6 @@ export class OrganisationService {
     return this.db.query.organisationMembers.findMany({ where: eq(schema.organisationMembers.userId, userId) });
   }
 
-  /** Memberships joined with their organisations, for the self-service organisations list. */
   async listOrganisationsForUser(userId: bigint): Promise<MembershipWithOrganisation[]> {
     const memberships = await this.listMembershipsForUser(userId);
     const detailed = await Promise.all(
@@ -501,17 +439,12 @@ export class OrganisationService {
     return organisation ?? null;
   }
 
-  /**
-   * The user's primary verified email, resolved directly against the schema: `UserModule` imports
-   * this module for workspace provisioning, so importing `UserEmailService` back would be a cycle.
-   */
   async getPrimaryVerifiedEmail(userId: bigint): Promise<string | null> {
     const emails = await this.db.query.userEmails.findMany({ where: and(eq(schema.userEmails.userId, userId), isNotNull(schema.userEmails.verifiedAt)) });
     const primary = emails.find(email => email.isPrimary) ?? emails[0];
     return primary?.emailId ?? null;
   }
 
-  /** Derives a URL-safe slug from the name; a random suffix keeps generated slugs collision-free. */
   private generateSlug(name: string): string {
     const base = name
       .toLowerCase()

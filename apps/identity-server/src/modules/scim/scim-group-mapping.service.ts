@@ -1,22 +1,12 @@
-/**
- * Importing npm packages
- */
 import { and, eq, inArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { PolicyDecisionService, type Principal } from '@server/modules/authz';
 import { Application, DatabaseService, PrimaryDatabase, schema, ScimGroup, ScimGroupRoleMapping } from '@server/modules/infrastructure/datastore';
 import { OrganisationApplicationService } from '@server/modules/system/application';
-
-/**
- * Defining types
- */
 
 export interface GroupMappingRow {
   id: string;
@@ -33,8 +23,6 @@ export interface GroupMappingFilter {
 }
 
 /**
- * Declaring the constants
- *
  * The group→role sync engine (T-905). A mapping never stores an assignment: it is glue that drives
  * ordinary `role_assignments` rows carrying a `scim:group:<groupId>` provenance marker (D-A9), org =
  * the group's organisation, principal = the member USER. `reconcile` is the single source of truth —
@@ -58,8 +46,6 @@ export class ScimGroupMappingService {
   ) {
     this.db = databaseService.getPostgresClient();
   }
-
-  /* --------------------------------- mapping CRUD (admin) --------------------------------- */
 
   async listMappings(filter: GroupMappingFilter): Promise<GroupMappingRow[]> {
     const conditions = [
@@ -86,12 +72,6 @@ export class ScimGroupMappingService {
     return mapping ?? null;
   }
 
-  /**
-   * Creates a mapping and backfills every current group member with the role. Idempotent — a repeated
-   * create resolves to the existing row and re-runs the backfill (a no-op once materialised), matching
-   * the house behaviour of the neighbouring admin release/assign mutations. Validation: the group must
-   * exist and the role's application must be reachable by the group's organisation (the ORG_011 rule).
-   */
   async createMapping(role: Application.Role, groupId: string, createdBy: string): Promise<GroupMappingRow> {
     const group = await this.requireGroup(groupId);
     await this.organisationApplicationService.assertReachable(group.organisationId, role.applicationId);
@@ -107,7 +87,6 @@ export class ScimGroupMappingService {
     return { id: mapping.id, groupId: mapping.groupId, roleId: mapping.roleId, organisationId: group.organisationId, createdBy: mapping.createdBy, createdAt: mapping.createdAt };
   }
 
-  /** Deletes a mapping and reconciles every current member, revoking the marker row unless another mapped group in the org still grants the role. */
   async deleteMapping(mapping: ScimGroupRoleMapping): Promise<void> {
     const group = await this.requireGroup(mapping.groupId);
     await this.db.delete(schema.scimGroupRoleMappings).where(eq(schema.scimGroupRoleMappings.id, mapping.id));
@@ -115,14 +94,6 @@ export class ScimGroupMappingService {
     this.logger.info('deleted scim group role mapping', { mappingId: mapping.id, groupId: mapping.groupId, roleId: mapping.roleId });
   }
 
-  /* ------------------------------------- sync hooks -------------------------------------- */
-
-  /**
-   * Reconciles a set of directory members against the group's mapped roles after a membership change.
-   * `directoryIds` is the union of the members before and after the change, so added members gain the
-   * role and removed members (whose directory row still exists) lose the marker row unless overlap
-   * keeps it. A group with no mappings costs one indexed query and returns.
-   */
   async syncMembership(group: ScimGroup, directoryIds: string[]): Promise<void> {
     if (directoryIds.length === 0) return;
     const roleIds = await this.mappedRoleIds(group.id);
@@ -147,14 +118,6 @@ export class ScimGroupMappingService {
     for (const pair of pairs) await this.reconcile(pair.userId, pair.roleId, organisationId);
   }
 
-  /* --------------------------------------- internals -------------------------------------- */
-
-  /**
-   * Brings one (member, role, org) triple to its derived truth: if any mapped group in the org that the
-   * user still belongs to grants the role, ensure a marker row exists; otherwise revoke — but only a
-   * marker row, so a manual grant of the same role is never touched. An already-correct triple bumps no
-   * version, so an unrelated membership edit does not invalidate every member's decision cache.
-   */
   private async reconcile(userId: bigint, roleId: number, organisationId: bigint): Promise<void> {
     const principal: Principal = { type: 'USER', id: userId.toString() };
     const grantingGroupId = await this.grantingGroupId(userId, roleId, organisationId);
@@ -178,7 +141,6 @@ export class ScimGroupMappingService {
     for (const userId of await this.memberUserIds(group.id)) await this.reconcile(userId, roleId, group.organisationId);
   }
 
-  /** The id of one mapped group in the organisation that still grants the role to the user, or null when none does. */
   private async grantingGroupId(userId: bigint, roleId: number, organisationId: bigint): Promise<string | null> {
     const [row] = await this.db
       .select({ id: schema.scimGroups.id })

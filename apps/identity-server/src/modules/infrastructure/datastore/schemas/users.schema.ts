@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
 import { bigint, bigserial, boolean, date, index, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { userSessions, userSignInEvents } from './auth-tokens.schemas';
-
-/**
- * Defining the types
- */
 
 export type User = InferSelectModel<typeof users>;
 export namespace User {
@@ -29,10 +19,6 @@ export namespace User {
   export type PasswordAlgorithm = InferEnum<typeof passwordAlgorithm>;
 }
 
-/**
- * Declaring the tables
- */
-
 export const userStatus = pgEnum('user_status', ['ACTIVE', 'INACTIVE', 'DISABLED', 'BLOCKED', 'SUSPENDED', 'CLOSED']);
 export const userLockMode = pgEnum('user_lock_mode', ['NONE', 'OTP_ONLY', 'FULL']);
 export const gender = pgEnum('gender', ['MALE', 'FEMALE', 'OTHER', 'UNSPECIFIED']);
@@ -43,18 +29,12 @@ export const users = pgTable('users', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   username: varchar('username', { length: 32 }).unique(),
   status: userStatus('status').notNull().default('INACTIVE'),
-  /** The user's synthetic personal workspace (D-1); set in the same transaction as user creation. */
   personalOrganisationId: bigint('personal_organisation_id', { mode: 'bigint' }),
-  /**
-   * Why the account left ACTIVE, shown to administrators and recorded in the audit trail. `statusUntil` auto-expires a
-   * temporary SUSPENDED hold; BLOCKED and DISABLED leave it null because they end only by an explicit admin action.
-   */
   statusReason: varchar('status_reason', { length: 256 }),
   statusChangedAt: timestamp('status_changed_at', { withTimezone: true }),
   statusUntil: timestamp('status_until', { withTimezone: true }),
   lockMode: userLockMode('lock_mode').notNull().default('NONE'),
   lockedUntil: timestamp('locked_until', { withTimezone: true }),
-  /** Admin-forced credential reset (T-602): the password step refuses until recovery replaces it. */
   passwordResetRequired: boolean('password_reset_required').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -72,11 +52,6 @@ export const userProfiles = pgTable('user_profiles', {
   avatarUrl: text('avatar_url'),
 });
 
-/**
- * Global uniqueness applies only to verified addresses: an unverified claim must never block the
- * rightful owner from verifying the same address (pre-verification squatting, DB doc §2).
- * Unverified claims are purged by the worker after seven days.
- */
 export const userEmails = pgTable(
   'user_emails',
   {
@@ -157,10 +132,6 @@ export const passwordHistory = pgTable(
   },
   t => [index('password_history_user_id_created_at_idx').on(t.userId, t.createdAt)],
 );
-
-/**
- * Declaring the relations
- */
 
 export const usersRelations = relations(users, ({ many, one }) => ({
   profile: one(userProfiles),

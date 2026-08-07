@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { and, eq, isNotNull } from 'drizzle-orm';
@@ -8,9 +5,6 @@ import validator from 'validator';
 import { Injectable } from '@shadow-library/app';
 import { Logger, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES } from '@server/constants';
 import { ChallengeService } from '@server/modules/auth/flow';
@@ -18,10 +12,6 @@ import { UserEmailService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
-
-/**
- * Defining types
- */
 
 export interface ContactItem {
   value: string;
@@ -34,18 +24,10 @@ interface ContactChangePayload {
   type: string;
 }
 
-/**
- * Declaring the constants
- */
 const EMAIL_VERIFY_TEMPLATE = 'user.email.verification';
 const PHONE_VERIFY_TEMPLATE = 'user.phone.verification';
 const CONTACT_CHANGED_TEMPLATE = 'user.contact.changed';
 
-/**
- * Manages a user's additional email addresses and phone numbers. Adding an identifier issues an
- * OTP challenge to prove ownership; verified-only uniqueness means responses stay identical
- * whether or not the address belongs to another account (D-12).
- */
 @Injectable()
 export class ContactService {
   private readonly logger = Logger.getLogger(APP_NAME, ContactService.name);
@@ -141,7 +123,6 @@ export class ContactService {
     this.logger.info('phone verified', { userId });
   }
 
-  /** The primary email is the login identifier and notification target; it can never be removed. */
   async removeEmail(userId: bigint, email: string): Promise<void> {
     const emailId = email.toLowerCase();
     const row = await this.db.query.userEmails.findFirst({ where: and(eq(schema.userEmails.userId, userId), eq(schema.userEmails.emailId, emailId)) });
@@ -165,7 +146,6 @@ export class ContactService {
     this.logger.info('phone removed', { userId });
   }
 
-  /** Primary can only move to a verified address so the login identifier is always provable. */
   async setPrimaryEmail(userId: bigint, email: string): Promise<void> {
     const emailId = email.toLowerCase();
     const target = await this.db.query.userEmails.findFirst({

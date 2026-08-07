@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
-
-/**
- * Defining types
- */
 
 const DELIVERY_STATUSES = ['PENDING', 'SENDING', 'SENT', 'FAILED', 'DEAD'] as const;
 type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class WebhookIdParams {
@@ -97,8 +83,7 @@ export class CreatedWebhookResponse {
   @Field(() => WebhookItem)
   webhook: WebhookItem;
 
-  /** Signing secret; shown exactly once. */
-  @Field()
+  @Field({ description: 'Webhook signing secret, shown exactly once.' })
   secret: string;
 }
 

@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { createHmac } from 'node:crypto';
 
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, PrimaryDatabase, schema, WebhookDelivery } from '@server/modules/infrastructure/datastore';
@@ -18,13 +12,6 @@ import { WebhookTargetGuard } from './webhook-target.guard';
 import { WEBHOOK_EVENT_HEADER, WEBHOOK_ID_HEADER, WEBHOOK_SIGNATURE_HEADER } from './webhook.constants';
 import { WebhookService } from './webhook.service';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const MAX_ATTEMPTS = 5;
 const CLAIMABLE_STATUSES: WebhookDelivery.Status[] = ['PENDING', 'FAILED'];
 
@@ -41,7 +28,6 @@ export class WebhookDeliveryService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /** `t=<unix>,v1=<hex>[,v1=<hex>]` — one v1 per currently valid signing secret (rotation overlap). */
   signatureFor(secrets: string[], timestamp: number, payload: string): string {
     const signatures = secrets.map(secret => `v1=${createHmac('sha256', secret).update(`${timestamp}.${payload}`).digest('hex')}`);
     return [`t=${timestamp}`, ...signatures].join(',');
@@ -59,7 +45,6 @@ export class WebhookDeliveryService {
       .limit(limit);
   }
 
-  /** Puts a delivery (dead-lettered or otherwise settled) back into the claimable pool afresh. */
   async redeliver(subscriptionId: bigint, deliveryId: bigint): Promise<WebhookDelivery> {
     const [delivery] = await this.db
       .update(schema.webhookDeliveries)
@@ -70,7 +55,6 @@ export class WebhookDeliveryService {
     return delivery;
   }
 
-  /** Requeues deliveries stranded in SENDING by a worker crash; runs once at worker boot. */
   async recoverStuckDeliveries(): Promise<number> {
     const recovered = await this.db
       .update(schema.webhookDeliveries)
@@ -81,7 +65,6 @@ export class WebhookDeliveryService {
     return recovered.length;
   }
 
-  /** Claims a batch of due deliveries and posts them. Worker-driven. */
   async dispatchPending(limit = 20): Promise<number> {
     const claimed = await this.db.transaction(async tx => {
       const rows = await tx
@@ -121,7 +104,6 @@ export class WebhookDeliveryService {
   private async send(delivery: WebhookDelivery): Promise<number> {
     const subscription = await this.webhookService.getById(delivery.subscriptionId);
     if (!subscription.isActive) throw AppError.internal('subscription is disabled');
-    /** Re-checked at send time: DNS may have changed since registration (rebinding). */
     await this.targetGuard.assertDeliverable(subscription.targetUrl);
 
     const timestamp = Math.floor(Date.now() / 1000);

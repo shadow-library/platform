@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { ValidatedSession } from '@server/modules/auth/session';
@@ -15,24 +9,10 @@ import { OrganisationService } from '@server/modules/identity/organisation';
 
 import { ADMIN_PERMISSIONS, AdminPermission, PLATFORM_ORG_NAME } from './admin.constants';
 
-/**
- * Defining types
- */
-
 export interface AdminActor {
   session: ValidatedSession;
-  /** The platform organisation in which the actor's administrative assignment was resolved. */
   organisationId: string;
 }
-
-/**
- * Declaring the constants
- *
- * Every admin endpoint authenticates the caller's first-party session, then asks the PDP whether
- * the caller holds the required permission in the platform organisation (T-601). Reads accept any
- * live session; mutations demand a fresh second-factor proof (AAL2 step-up) so a hijacked idle
- * session cannot administrate.
- */
 
 @Injectable()
 export class AdminAccessService {
@@ -59,13 +39,11 @@ export class AdminAccessService {
     return { type: 'USER', id: session.userId.toString() };
   }
 
-  /** Confirms the resolved session holds the permission in the platform organisation; the AccessGuard's permission check. */
   async authorize(session: ValidatedSession, permission: AdminPermission): Promise<AdminActor> {
     const organisationId = await this.getPlatformOrganisationId();
     const userId = session.userId.toString();
     const decision = await this.policyDecisionService.check({ principal: this.principalOf(session), organisationId, action: permission });
     if (decision.decision !== 'PERMIT') {
-      /** A denied admin call is a security-relevant event: surface it at warn even in production. */
       this.logger.warn('admin access denied', { securityEvent: 'admin.access_denied', userId, permission, aal: session.aal });
       throw AppErrorCode.ADM_001.create();
     }
@@ -73,23 +51,13 @@ export class AdminAccessService {
     return { session, organisationId };
   }
 
-  /**
-   * Lists which admin permissions the caller's session holds in the platform organisation. The
-   * console uses it to decide whether to render at all and which nav entries to show; an empty
-   * result means the user is not staff. Authorization on each endpoint remains server-side.
-   */
   async listGrantedPermissions(session: ValidatedSession): Promise<AdminPermission[]> {
     const organisationId = await this.getPlatformOrganisationId();
     const held = await this.policyDecisionService.listPermissions(this.principalOf(session), organisationId);
     return Object.values(ADMIN_PERMISSIONS).filter(permission => held.has(permission));
   }
 
-  /**
-   * Role administration accepts two tiers: `iam:roles:manage` works platform-wide, while
-   * `app:roles:manage` only counts when the permission is owned by the application whose roles
-   * are being touched — so an application admin can never reach across applications. The caller's
-   * session (with its required step-up) is resolved by the AccessGuard.
-   */
+  /** `app:roles:manage` is accepted only when its owning application is the target, preventing cross-application administration. */
   async requireRoleAdmin(session: ValidatedSession, applicationId: number): Promise<AdminActor> {
     const organisationId = await this.getPlatformOrganisationId();
     const principal = this.principalOf(session);

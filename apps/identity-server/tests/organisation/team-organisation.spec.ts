@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { PolicyDecisionService } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
@@ -16,15 +10,8 @@ import { ApplicationRoleService, ApplicationService } from '@server/modules/syst
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
 type Method = 'get' | 'post' | 'patch' | 'delete';
 
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('team-organisation').init();
 
 describe('Team organisations', () => {
@@ -81,7 +68,6 @@ describe('Team organisations', () => {
       const suspended = await setStatus(memberId, { status: 'SUSPENDED', reason: 'on leave' });
       expect(suspended.statusCode).toBe(200);
 
-      /** The hold is org-scoped: the member is refused inside the tenant but their global account stays ACTIVE. */
       const members = await request('get', `/api/v1/organisations/${orgId}/members`, memberSecret);
       expect(members.statusCode).toBe(403);
       expect((await env.getService(UserService).getUser(memberId))?.status).toBe('ACTIVE');
@@ -113,10 +99,8 @@ describe('Team organisations', () => {
     });
 
     it('should apply the same rank and owner protections as removal', async () => {
-      /** An ADMIN may not hold an OWNER, nor another ADMIN, nor themselves. */
       expect((await setStatus(ownerId, { status: 'SUSPENDED' })).statusCode).toBe(403);
       expect((await setStatus(adminId, { status: 'SUSPENDED' })).statusCode).toBe(403);
-      /** Holding the only owner would leave the organisation unadministrable. */
       expect((await setStatus(ownerId, { status: 'SUSPENDED' }, ownerSecret)).statusCode).toBe(403);
       expect((await setStatus(memberId, { status: 'SUSPENDED' }, memberSecret)).statusCode).toBe(403);
     });

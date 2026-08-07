@@ -1,23 +1,13 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomInt } from 'node:crypto';
 
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, PrimaryDatabase, schema, VerificationChallenge } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
 import { RateLimiterService } from '@server/modules/infrastructure/security';
-
-/**
- * Defining types
- */
 
 export interface IssueChallenge {
   flowId: string;
@@ -27,13 +17,6 @@ export interface IssueChallenge {
   templateKey: string;
 }
 
-/**
- * Declaring the constants
- *
- * Tier-2 anti-bombing (architecture §13.2): at most 5 OTP deliveries per identifier per hour,
- * across every flow kind. Exceeding the budget silently skips delivery — a distinguishable
- * refusal would let a caller probe whether an identifier is receiving real mail (D-12).
- */
 const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
 const IDENTIFIER_SEND_LIMIT = 5;
@@ -56,7 +39,6 @@ export class ChallengeService {
     return createHash('sha256').update(code).digest('hex');
   }
 
-  /** Issues a numeric OTP: persisted as a hash and delivered via the notification outbox. */
   async issue(input: IssueChallenge): Promise<void> {
     const budget = await this.rateLimiter.consume('otp-ident', input.target.toLowerCase(), IDENTIFIER_SEND_LIMIT, IDENTIFIER_SEND_WINDOW_SECONDS);
     if (!budget.allowed) {
@@ -80,15 +62,10 @@ export class ChallengeService {
     this.logger.debug('challenge issued', { flowId: input.flowId, type: input.type });
   }
 
-  /**
-   * Verifies the latest unconsumed challenge for a flow. Returns false on expiry, exhausted
-   * attempts, or mismatch; increments the attempt counter on a wrong code.
-   */
   async verify(flowId: string, code: string): Promise<boolean> {
     return (await this.verifyAndGet(flowId, code)) !== null;
   }
 
-  /** Like `verify`, but returns the consumed challenge so callers can act on its target. */
   async verifyAndGet(flowId: string, code: string): Promise<VerificationChallenge | null> {
     const challenge = await this.db.query.verificationChallenges.findFirst({
       where: and(eq(schema.verificationChallenges.flowId, flowId), isNull(schema.verificationChallenges.consumedAt)),

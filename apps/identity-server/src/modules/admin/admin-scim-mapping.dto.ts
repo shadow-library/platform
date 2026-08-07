@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class GroupMappingListQuery {
@@ -27,8 +13,7 @@ export class GroupMappingListQuery {
 
 @Schema()
 export class CreateGroupMappingBody {
-  /** The SCIM group whose members inherit the role; its organisation scopes the derived assignments. */
-  @Field({ ...PATTERN.UUID })
+  @Field({ ...PATTERN.UUID, description: 'SCIM group whose members inherit the role; the group organisation scopes the derived assignments.' })
   groupId: string;
 
   @Field(() => Number)

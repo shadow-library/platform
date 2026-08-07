@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
@@ -17,13 +11,6 @@ import { ApplicationService } from '@server/modules/system/application';
 import { csrfPair, TestEnvironment } from '../test-environment';
 import { WebauthnEmulator } from './webauthn-emulator';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('webauthn').init();
 const EMAIL = 'passkey@example.com';
 const RP_ID = 'localhost';
@@ -42,7 +29,6 @@ describe('WebAuthn passkeys', () => {
     return chain.headers({ 'x-csrf-token': csrf.header }).cookies({ [SESSION_COOKIE_NAME]: cookie, 'csrf-token': csrf.cookie });
   };
 
-  /** Runs the full registration ceremony over HTTP and returns the verify response body. */
   const registerPasskey = async (cookie = sessionSecret, authenticator = emulator): Promise<Record<string, unknown>> => {
     const options = await request('post', '/api/v1/me/webauthn/register/options', cookie);
     expect(options.statusCode).toBe(200);
@@ -77,7 +63,6 @@ describe('WebAuthn passkeys', () => {
       expect(credential).toMatchObject({ credentialId: emulator.credentialIdB64, label: 'test key', backupEligible: false });
 
       const list = await request('get', '/api/v1/me/mfa');
-      // credentialId must ride the list so self-service removal can target one passkey (M6b ui).
       expect((list.json() as { enrollments: { type: string }[] }).enrollments).toContainEqual(
         expect.objectContaining({ type: 'WEBAUTHN', label: 'test key', credentialId: emulator.credentialIdB64 }),
       );
@@ -185,7 +170,6 @@ describe('WebAuthn passkeys', () => {
       expect(options.statusCode).toBe(404);
     });
 
-    /** A passkey ceremony records the same D-19 intent a TOTP one does (T-801). */
     it('should record the declared elevation intent alongside the assertion', async () => {
       await registerPasskey();
       const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;

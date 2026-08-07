@@ -1,30 +1,14 @@
-/**
- * Importing npm packages
- */
 import { type FastifyReply, type FastifyRequest } from 'fastify';
 import { type HandlerMetadata } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { AsyncRouteHandler, Middleware, MiddlewareGenerator } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 
 import { M2M_BUDGET_METADATA } from './m2m-budget.decorator';
 import { RateLimiterService } from './rate-limiter.service';
 import { GENERAL_LIMIT, GENERAL_WINDOW_SECONDS, IP_GENERAL_BUCKET } from './security.constants';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Statuses that mean the caller never proved a client identity, so the request belongs to the IP
- * tier rather than to any client's budget.
- */
 const UNAUTHENTICATED_STATUSES = new Set([401, 403]);
 
 /**
@@ -44,7 +28,6 @@ export class M2MRateLimitMiddleware implements MiddlewareGenerator {
 
   constructor(private readonly rateLimiter: RateLimiterService) {}
 
-  /** Namespaced so the router's metadata-keyed handler cache cannot share this with another generator. */
   cacheKey(metadata: HandlerMetadata): string {
     return `m2m-rate-limit:${String(metadata.method)}:${String(metadata.path)}`;
   }

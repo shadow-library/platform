@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { KeyObject, sign, verify } from 'node:crypto';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface JwtHeader {
   alg: 'EdDSA';
@@ -18,13 +7,6 @@ export interface JwtHeader {
 }
 
 export type JwtClaims = Record<string, unknown>;
-
-/**
- * Declaring the constants
- *
- * A minimal EdDSA (Ed25519) JWT codec built on node:crypto. It intentionally supports only EdDSA:
- * pinning a single algorithm at the codec level removes the algorithm-confusion attack surface.
- */
 
 const encodeSegment = (value: object): string => Buffer.from(JSON.stringify(value)).toString('base64url');
 
@@ -44,7 +26,6 @@ export function decodeJwtHeader(token: string): JwtHeader | null {
   }
 }
 
-/** Verifies the signature only. Claim validation (iss/aud/exp) is the caller's responsibility. */
 export function verifyJwtSignature(token: string, publicKey: KeyObject): JwtClaims | null {
   const [header, payload, signature] = token.split('.');
   if (!header || !payload || !signature) return null;

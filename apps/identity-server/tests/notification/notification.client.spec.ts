@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { eq } from 'drizzle-orm';
 import { Config } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { KeyService } from '@server/modules/auth/keys';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { schema } from '@server/modules/infrastructure/datastore';
@@ -17,22 +11,11 @@ import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
 interface CapturedRequest {
   authorization: string | null;
   body: Record<string, unknown>;
 }
 
-/**
- * Declaring the constants
- *
- * A fake pulse-server is stood up before the app boots and the `pulse-server` service is pointed at
- * it via `SERVICE_URL_PULSE_SERVER`, so dispatches run through the real client/transport (including
- * the `svc://` resolution) and every Authorization header is captured for claim assertions.
- */
 let responseStatus = 202;
 const captured: CapturedRequest[] = [];
 const fakePulse = Bun.serve({
@@ -54,11 +37,7 @@ describe('NotificationClient', () => {
   let client: NotificationClient;
   let tokenService: NotificationTokenService;
 
-  /**
-   * Identity's own outbound notification client is no longer auto-seeded (consumer integrations are
-   * configured by an administrator), so the suite provisions it against the freshly cloned database:
-   * the `identity-server` service client plus the `notifications:send` grant the token service needs.
-   */
+  /** Provision directly because administrator-owned outbound integrations are deliberately absent from the seed. */
   const provisionNotificationClient = async (): Promise<void> => {
     const application = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity');
     const oauthClientService = env.getService(OAuthClientService);
@@ -83,7 +62,6 @@ describe('NotificationClient', () => {
 
     expect(captured).toHaveLength(1);
     expect(captured[0]?.authorization).toStartWith('Bearer ');
-    /** The caller identifies itself by the identity application's name (no separate service-name config). */
     expect(captured[0]?.body.service).toBe('shadow-identity');
     const token = lastToken();
     const claims = decodeClaims(token);
@@ -93,7 +71,6 @@ describe('NotificationClient', () => {
     expect(claims.scope).toBe('notifications:send');
     expect(claims.sub).toBe(claims.client_id as string);
     expect(claims.exp as number).toBeGreaterThan(Date.now() / 1000);
-    /** Offline signature verification against identity's own JWKS, exactly as pulse validates it. */
     expect(env.getService(KeyService).verify(token)).not.toBeNull();
   });
 

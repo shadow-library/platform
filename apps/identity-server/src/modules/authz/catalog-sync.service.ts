@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { and, eq, inArray, notInArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { AuditService } from '@server/modules/infrastructure/audit';
@@ -15,10 +9,6 @@ import { DatabaseService, PrimaryDatabase, schema } from '@server/modules/infras
 import { ApplicationService } from '@server/modules/system/application';
 
 import { PolicyDecisionService, type Principal } from './policy-decision.service';
-
-/**
- * Defining types
- */
 
 interface CatalogPermission {
   name: string;
@@ -29,14 +19,12 @@ interface CatalogRole {
   name: string;
   description?: string;
   permissions: string[];
-  /** A default role's permissions are unioned into every user's PDP resolution for this application (D-A6); omitting the flag clears it. */
   default?: boolean;
 }
 
 export interface CatalogManifest {
   permissions: CatalogPermission[];
   roles: CatalogRole[];
-  /** Overrides the deletion guardrail; a deliberate catalog shrink must say so explicitly */
   force?: boolean;
 }
 
@@ -49,8 +37,6 @@ export interface CatalogSyncResult {
 }
 
 /**
- * Declaring the constants
- *
  * A service token's client id is a UUID; guard the lookup so a malformed value is a clean 403
  * rather than a Postgres cast error.
  *
@@ -77,7 +63,6 @@ export class CatalogSyncService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /** Resolves the application a service account owns from its client id; the caller can only ever touch its own application's catalog. */
   private async resolveApplicationId(clientId: string): Promise<number> {
     const client = await this.db.query.oauthClients.findFirst({ where: eq(schema.oauthClients.id, clientId), columns: { applicationId: true } });
     if (!client) throw AppErrorCode.AUTHZ_002.create();
@@ -104,7 +89,6 @@ export class CatalogSyncService {
 
     const permissionsDeleted = existingPermissions.filter(row => !kept.permissions.has(row.name)).length;
     const rolesDeleted = existingRoles.filter(row => !kept.roles.has(row.name)).length;
-    /** Integer form of `deleted > existing / 2`, so an even split is allowed and only a majority trips. */
     const exceedsHalf = (deleted: number, existing: number): boolean => deleted * 2 > existing;
     if (!exceedsHalf(permissionsDeleted, existingPermissions.length) && !exceedsHalf(rolesDeleted, existingRoles.length)) return;
 

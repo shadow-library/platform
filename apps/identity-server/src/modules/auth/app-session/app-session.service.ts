@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
 
 import { and, eq, gt } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, OIDC_PROTOCOL_SCOPES } from '@server/constants';
 import { AccessTokenService, AuthorizationCodeService, DEFAULT_AUDIENCE, OAuthClientService, verifyPkce } from '@server/modules/auth/oauth';
@@ -18,10 +12,6 @@ import { UserService } from '@server/modules/identity/user';
 import { AppSession, AppSessionElevation, DatabaseService, OAuthClient, Organisation, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationAccessService } from '@server/modules/system/application';
 import { PolicyService } from '@server/modules/system/policy';
-
-/**
- * Defining types
- */
 
 export interface CreateAppSession {
   client: OAuthClient;
@@ -33,7 +23,6 @@ export interface CreateAppSession {
 }
 
 export interface AppSessionResult {
-  /** The opaque handle. Returned exactly once; the application stores it in its own cookie. */
   handle: string;
   userId: bigint;
   expiresAt: Date;
@@ -45,7 +34,6 @@ export interface MintTokenInput {
   handle: string;
   resource?: string;
   scope?: string;
-  /** Requires a step-up grant already held for this exact audience; never falls back to the central session. */
   elevated?: boolean;
 }
 
@@ -63,14 +51,10 @@ export interface SessionOrganisations {
 }
 
 export interface SwitchedOrganisation {
-  /** The rotated handle; the one the caller presented is dead. */
   handle: string;
   expiresAt: Date;
 }
 
-/**
- * Declaring the constants
- */
 @Injectable()
 export class AppSessionService {
   private readonly logger = Logger.getLogger(APP_NAME, AppSessionService.name);
@@ -93,11 +77,6 @@ export class AppSessionService {
     return createHash('sha256').update(handle).digest('hex');
   }
 
-  /**
-   * Exchanges an authorization code for an application session. The application authenticates with its
-   * own M2M token, so the browser never sees a token and the handle it does receive is worthless
-   * without those credentials.
-   */
   async create(input: CreateAppSession): Promise<AppSessionResult> {
     if (!input.client.isFirstParty) {
       this.logger.warn('app session refused: only first-party clients may hold one', { securityEvent: 'app_session.denied', clientId: input.client.id });
@@ -120,11 +99,6 @@ export class AppSessionService {
     const identitySessionId = BigInt(payload.sessionId);
     if (!(await this.sessionService.validateById(identitySessionId))) throw AppErrorCode.OAU_003.create();
 
-    /**
-     * The session's organisation is where its capability is evaluated, so it has to be one the user
-     * actually reaches this application through (D-A1) — not their personal workspace, which grants
-     * only PUBLIC applications and never carries the role assignments a team application depends on.
-     */
     await this.applicationAccessService.assertUserAccess(user.id, input.client.applicationId);
     const organisationId =
       (await this.applicationAccessService.resolveActiveOrganisationId(user.id, input.client.applicationId)) ??
@@ -160,19 +134,9 @@ export class AppSessionService {
     return { handle, userId: user.id, expiresAt, scope: payload.scope };
   }
 
-  /**
-   * Mints an access token for a live application session. The central session is re-validated on every
-   * call, so a sign-out at the identity service stops token issuance everywhere immediately.
-   */
   async mintToken(input: MintTokenInput): Promise<MintedToken> {
     const live = await this.requireLiveSession(input.client, input.handle);
 
-    /**
-     * The revocation story (T-902, D-A4): back-channel logout never reaches an app-session client, so
-     * this per-mint gate is the only place a lost assignment takes effect. A denial — hidden or
-     * denied alike — ends the app session and reads to the SDK exactly as a stale handle does
-     * (`AUTH_005`), which is its cue to restart the login.
-     */
     await this.assertApplicationAccess(live, input.client);
     const session = await this.realignOrganisation(live, input.client);
 
@@ -180,7 +144,6 @@ export class AppSessionService {
     const audience = input.resource ?? DEFAULT_AUDIENCE;
     const grantedHere = new Map(granted.filter(scope => scope.resourceIdentifier === audience).map(scope => [scope.name, scope]));
     if (input.resource !== undefined && grantedHere.size === 0 && !(await this.clientService.isOwnAudience(input.client, input.resource))) {
-      /** Same carve-out as the OAuth grant resolver: an application's own canonical audience needs no scope grant (D-21). */
       this.logger.warn('app session token refused: client holds no scope on the requested resource', {
         securityEvent: 'oauth.audience_denied',
         clientId: input.client.id,
@@ -192,11 +155,6 @@ export class AppSessionService {
     const elevation = input.elevated ? await this.requireElevation(session, audience) : null;
     const consented = new Set(session.grantedScope.split(' ').filter(Boolean));
     const requested = (input.scope ?? session.grantedScope).split(' ').filter(Boolean);
-    /**
-     * Three ceilings compose: the user's consent, the client's grant on this audience, and — for a
-     * sensitive scope — a step-up grant addressed to this same audience. A sensitive capability is
-     * therefore unreachable from an ordinary token no matter what the caller asks for.
-     */
     const scopes = requested.filter(name => {
       if (OIDC_PROTOCOL_SCOPES.has(name)) return consented.has(name);
       const scope = grantedHere.get(name);
@@ -236,21 +194,6 @@ export class AppSessionService {
     return { accessToken, expiresIn, scope, audience, aal };
   }
 
-  /**
-   * Converts a completed step-up on the identity domain into a grant addressed to one application
-   * session and one audience, then **consumes** the central elevation.
-   *
-   * Consuming it is the whole point: the proof is spent here rather than left standing on the session,
-   * so a second application — or the same application targeting a different API — cannot ride this
-   * step-up and must send the user through their own. Elevation therefore never bleeds sideways
-   * between services, and never lingers on the parent session.
-   *
-   * Consuming it is not enough on its own, though: a live window was previously claimable
-   * first-come-first-served, so whichever application asked first won a proof the user performed for
-   * someone else. The claim must therefore also match the intent recorded when the ceremony began
-   * (D-19, T-801), and a window opened with no intent — the identity console's own step-up — is
-   * claimable by no application at all.
-   */
   async claimElevation(client: OAuthClient, handle: string, resource?: string): Promise<Date> {
     const session = await this.requireLiveSession(client, handle);
     const audience = resource ?? DEFAULT_AUDIENCE;
@@ -296,23 +239,12 @@ export class AppSessionService {
     return expiresAt;
   }
 
-  /** The organisations this session may act in, with the one it currently acts in flagged. */
   async listOrganisations(client: OAuthClient, handle: string): Promise<SessionOrganisations> {
     const session = await this.requireLiveSession(client, handle);
     const organisations = await this.applicationAccessService.listGrantingOrganisations(session.userId, client.applicationId);
     return { organisations, activeId: session.organisationId };
   }
 
-  /**
-   * Moves an application session into another organisation the user reaches this application through.
-   *
-   * The handle is rotated, and that rotation is the invalidation mechanism rather than mere hygiene.
-   * Applications cache minted tokens against the handle they hold, so a switch served by one replica
-   * can never reach a sibling replica's cache — the old organisation's authority would otherwise stay
-   * live for the remainder of the token's lifetime. Retiring the handle makes every such entry
-   * unreachable by construction, and matches the rule that a session identifier is rotated whenever
-   * the context it authorises changes.
-   */
   async switchOrganisation(client: OAuthClient, handle: string, organisationId: bigint): Promise<SwitchedOrganisation> {
     const session = await this.requireLiveSession(client, handle);
     await this.assertApplicationAccess(session, client);
@@ -344,7 +276,6 @@ export class AppSessionService {
     return { handle: rotated, expiresAt: session.expiresAt };
   }
 
-  /** Ends one application session without touching the central session or any sibling application. */
   async revoke(client: OAuthClient, handle: string): Promise<void> {
     const [session] = await this.db
       .update(schema.appSessions)
@@ -354,7 +285,6 @@ export class AppSessionService {
     if (session) this.logger.info('app session revoked', { securityEvent: 'app_session.revoked', clientId: client.id, appSessionId: session.id.toString() });
   }
 
-  /** Cascades a central sign-out to every application session it produced. */
   async revokeForIdentitySession(identitySessionId: bigint): Promise<void> {
     await this.db
       .update(schema.appSessions)
@@ -364,7 +294,6 @@ export class AppSessionService {
 
   private async requireLiveSession(client: OAuthClient, handle: string): Promise<AppSession> {
     const session = await this.db.query.appSessions.findFirst({ where: eq(schema.appSessions.sessionHash, this.hash(handle)) });
-    /** A handle presented by a client other than the one it was issued to is treated as unknown. */
     if (!session || session.clientId !== client.id || session.status !== 'ACTIVE') throw AppErrorCode.AUTH_005.create();
 
     const now = Date.now();
@@ -374,7 +303,6 @@ export class AppSessionService {
       throw AppErrorCode.AUTH_005.create();
     }
 
-    /** The central session stays authoritative: a sign-out there ends every application session at once. */
     if (!(await this.sessionService.validateById(session.identitySessionId))) {
       await this.revokeForIdentitySession(session.identitySessionId);
       this.logger.warn('app session refused: the central session is no longer active', {
@@ -387,7 +315,6 @@ export class AppSessionService {
     return session;
   }
 
-  /** Denies a mint whose user has lost access to the client's application, revoking the app session so no further mint is attempted. */
   private async assertApplicationAccess(session: AppSession, client: OAuthClient): Promise<void> {
     try {
       await this.applicationAccessService.assertUserAccess(session.userId, client.applicationId);
@@ -404,13 +331,6 @@ export class AppSessionService {
     }
   }
 
-  /**
-   * Re-points a session whose organisation no longer grants the application — a membership ended, an
-   * assignment moved, or the session predates organisations being resolved from reachability at all.
-   * Access was asserted a moment ago, so a granting organisation exists; ending the session over a
-   * stale pointer would be gratuitous. A still-granting organisation is left untouched, which is what
-   * makes a deliberate switch (D3) survive every subsequent mint.
-   */
   private async realignOrganisation(session: AppSession, client: OAuthClient): Promise<AppSession> {
     const granting = await this.applicationAccessService.listGrantingOrganisations(session.userId, client.applicationId);
     if (session.organisationId !== null && granting.some(organisation => organisation.id === session.organisationId)) return session;
@@ -444,7 +364,6 @@ export class AppSessionService {
 
   private async elevatedTtl(organisationIds: (bigint | null | undefined)[], elevationExpiresAt: Date): Promise<number> {
     const configured = await this.policyService.resolve('auth.elevated_token.ttl', { organisationIds });
-    /** An elevated token must never outlive the grant behind it, so the remaining window is the ceiling. */
     const remaining = Math.floor((elevationExpiresAt.getTime() - Date.now()) / 1000);
     return Math.max(1, Math.min(configured, remaining));
   }

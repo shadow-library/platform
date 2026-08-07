@@ -1,12 +1,5 @@
-/**
- * Importing npm packages
- */
-
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { Auth, Context } from '@server/modules/access';
 import { OAuthClientService } from '@server/modules/auth/oauth';
@@ -30,14 +23,6 @@ import {
 } from './admin-client.dto';
 import { AdminActionResponse } from './admin-user.dto';
 import { ADMIN_PERMISSIONS } from './admin.constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/admin/clients')
 @Auth({ permission: ADMIN_PERMISSIONS.clientsRead })
@@ -140,7 +125,6 @@ export class AdminClientController {
       name: body.name,
       isActive: body.isActive,
       redirectUris: body.redirectUris,
-      /** An empty string clears the back-channel logout URI; an empty array unbinds workload identity; undefined leaves each untouched. */
       backchannelLogoutUri: body.backchannelLogoutUri === '' ? null : body.backchannelLogoutUri,
       workloadSubjects: body.workloadSubjects,
     });

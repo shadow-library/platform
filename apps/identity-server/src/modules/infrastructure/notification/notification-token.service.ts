@@ -1,45 +1,22 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { KeyService } from '@server/modules/auth/keys';
 import { DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
-
-/**
- * Defining types
- */
 
 interface CachedToken {
   token: string;
   expiresAt: number;
 }
 
-/**
- * Declaring the constants
- */
 const SERVICE_CLIENT_NAME = 'identity-server';
 const NOTIFICATIONS_SEND_SCOPE = 'notifications:send';
-/** Refresh this long before `exp` so an in-flight dispatch never presents an already-expired token. */
 const REFRESH_SKEW_MS = 30_000;
 
-/**
- * Mints the M2M service token identity attaches to its pulse-server notification calls. Identity
- * is the issuer itself and never persists its own client secret in plaintext, so instead of
- * round-tripping through its own `/oauth2/token` endpoint it signs the token in-process with the
- * active OIDC key (mirroring {@link BackChannelLogoutService}), replicating the exact claim shape
- * of the `client_credentials` grant — verifiers cannot tell the difference. The scope grant is
- * still checked against the database so seed drift surfaces here as an explicit error instead of
- * an opaque 403 from pulse. Tokens are cached until shortly before expiry.
- */
 @Injectable()
 export class NotificationTokenService {
   private readonly logger = Logger.getLogger(APP_NAME, NotificationTokenService.name);
@@ -61,7 +38,6 @@ export class NotificationTokenService {
     return this.cached.token;
   }
 
-  /** Drops the cached token so the next dispatch mints a fresh one; called when pulse rejects it. */
   invalidate(): void {
     this.cached = null;
   }
@@ -88,7 +64,6 @@ export class NotificationTokenService {
       .where(and(eq(schema.oauthClientScopeGrants.clientId, client.id), eq(schema.scopes.name, NOTIFICATIONS_SEND_SCOPE)));
     if (grants.length === 0) throw AppError.internal(`Scope '${NOTIFICATIONS_SEND_SCOPE}' is not granted to service client '${SERVICE_CLIENT_NAME}'`);
 
-    /** Claim order and shape mirror `AccessTokenService.mintAccessToken` for the `client_credentials` grant. */
     const iat = Math.floor(Date.now() / 1000);
     const claims = {
       iss: this.issuer,

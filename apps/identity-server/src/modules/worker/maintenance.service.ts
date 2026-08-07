@@ -1,30 +1,12 @@
-/**
- * Importing npm packages
- */
 import { and, eq, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const UNVERIFIED_CLAIM_TTL_DAYS = 7;
 
-/**
- * Periodic data hygiene. Stale unverified email/phone claims are purged so an abandoned claim can
- * never indefinitely shadow an address (DB doc §2); consumed or expired OTP challenges age out
- * with them.
- */
 @Injectable()
 export class MaintenanceService {
   private readonly logger = Logger.getLogger(APP_NAME, MaintenanceService.name);
@@ -54,11 +36,6 @@ export class MaintenanceService {
     return purged;
   }
 
-  /**
-   * Retires application sessions whose central session has ended or whose own deadline has passed, and
-   * drops step-up grants that have closed. Neither sweep is load-bearing — an app session is validated
-   * against its central session on every use — but it keeps dead rows from accumulating.
-   */
   async purgeStaleAppSessions(): Promise<number> {
     const orphaned = await this.db
       .update(schema.appSessions)

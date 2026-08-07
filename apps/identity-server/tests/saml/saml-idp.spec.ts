@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { randomUUID } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
 
 import { SignedXml } from 'xml-crypto';
 
-/**
- * Importing user defined packages
- */
 import { IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { SamlKeyService, SamlService } from '@server/modules/auth/saml';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
@@ -20,13 +14,6 @@ import { ApplicationService } from '@server/modules/system/application';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('saml-idp').init();
 const SP_ENTITY_ID = 'https://sp.example.com';
 const SP_ACS_URL = 'https://sp.example.com/saml/acs';

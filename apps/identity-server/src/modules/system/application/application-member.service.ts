@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { and, eq, inArray, ne } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { Application, DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
 import { ApplicationAccessService } from './application-access.service';
-
-/**
- * Defining types
- */
 
 export interface ApplicationMemberRow {
   userId: bigint;
@@ -35,10 +25,6 @@ export interface UserApplicationRow {
   lastUsedAt: Date;
 }
 
-/**
- * A launcher entry: an application the user may currently enter, enriched with its usage timestamps when
- * the user has opened it before. First/last-used are null for an accessible app never yet opened.
- */
 export interface AccessibleApplicationRow {
   id: number;
   name: string;
@@ -50,15 +36,6 @@ export interface AccessibleApplicationRow {
   firstUsedAt: Date | null;
   lastUsedAt: Date | null;
 }
-
-/**
- * Declaring the constants
- *
- * Application membership is the per-user, per-application record provisioned on a user's first
- * consent grant for the application (see ConsentService). It is deliberately NOT a service account:
- * "service account" in this system is an M2M SERVICE OAuth client (D-2). This is a human's usage
- * link, the anchor products attach default roles and state to.
- */
 
 @Injectable()
 export class ApplicationMemberService {
@@ -72,7 +49,6 @@ export class ApplicationMemberService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /** Provisions a membership on first use, or refreshes `last_used_at` on later grants — idempotent. */
   async ensureMembership(applicationId: number, userId: bigint): Promise<void> {
     await this.db
       .insert(schema.applicationMembers)
@@ -88,7 +64,6 @@ export class ApplicationMemberService {
     return membership ?? null;
   }
 
-  /** Removes a user's membership; returns false when there was nothing to remove. */
   async removeMembership(applicationId: number, userId: bigint): Promise<boolean> {
     const removed = await this.db
       .delete(schema.applicationMembers)
@@ -97,7 +72,6 @@ export class ApplicationMemberService {
     return removed.length > 0;
   }
 
-  /** Members of an application, enriched with a display identifier (primary email resolved in a batch). */
   async listMembers(applicationId: number): Promise<ApplicationMemberRow[]> {
     const rows = await this.db
       .select({
@@ -123,7 +97,6 @@ export class ApplicationMemberService {
     return rows.map(row => ({ ...row, primaryEmail: primaryByUser.get(row.userId) ?? null }));
   }
 
-  /** Applications the user has used, most-recently-used first. */
   async listApplicationsForUser(userId: bigint): Promise<UserApplicationRow[]> {
     return this.db
       .select({
@@ -182,7 +155,6 @@ export class ApplicationMemberService {
       .sort((a, b) => this.launcherRank(b) - this.launcherRank(a));
   }
 
-  /** Most-recently-used first; never-used apps (rank 0) fall to the end while keeping a stable catalogue order. */
   private launcherRank(row: AccessibleApplicationRow): number {
     return row.lastUsedAt?.getTime() ?? 0;
   }

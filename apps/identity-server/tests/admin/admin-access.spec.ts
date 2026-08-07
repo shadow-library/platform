@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { ADMIN_PERMISSIONS, AdminAccessService, IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
 import { PolicyDecisionService } from '@server/modules/authz';
@@ -15,17 +9,6 @@ import { ApplicationRoleService, ApplicationService } from '@server/modules/syst
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * The AccessGuard now owns session resolution and AAL step-up gating (covered end-to-end in the
- * guard and admin HTTP specs); what remains here is AdminAccessService's authorization surface,
- * which the guard delegates to against an already-resolved session.
- */
 const env = new TestEnvironment('admin-access').init();
 const ADMIN_EMAIL = 'admin@shadow-apps.com';
 

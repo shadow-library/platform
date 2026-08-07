@@ -1,32 +1,11 @@
-/**
- * Importing npm packages
- */
 import { InferSelectModel } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, integer, pgTable, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { organisations } from './organisations.schema';
 import { users } from './users.schema';
 
-/**
- * Defining types
- */
-
 export type IdentityProvider = InferSelectModel<typeof identityProviders>;
 export type FederatedIdentity = InferSelectModel<typeof federatedIdentities>;
-
-/**
- * Declaring the constants
- *
- * Inbound OIDC federation (T-702): an organisation with a VERIFIED domain may delegate its
- * workforce sign-in to an external IdP. Discovery endpoints are snapshotted at configuration time
- * (SSRF-guarded), the upstream client secret is AES-256-GCM enveloped like every other stored
- * secret, and `enforced` turns home-realm discovery from an offer into a requirement (with a
- * break-glass carve-out for platform administrators so a broken upstream can't lock operators
- * out). One IdP per organisation until a real multi-IdP need appears.
- */
 
 export const identityProviders = pgTable('identity_providers', {
   id: uuid('id').defaultRandom().primaryKey(),

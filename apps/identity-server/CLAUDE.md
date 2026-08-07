@@ -103,10 +103,13 @@ to auto-apply. Copy `.env.example` → `.env` before first run.
 
 ## Backend patterns — follow these exactly
 
-- **File section banners** open every source file (except barrels), in order, keeping empty ones:
-  `Importing packages with side effects` → `Importing npm packages` → `Importing user defined packages` →
-  `Defining types` → `Declaring the constants`. npm imports first, then internal (`@server/*`, `@modules/*`,
-  `@tests/*` aliases or relative), separated by a blank line.
+- **Implementation comments are rare and rationale-first.** Remove them whenever names, types, or control flow
+  explain the behavior. Keep only non-obvious constraints, deviations, failure ordering, or interoperability
+  details; never retain restatements, narration, or organizational banners. Keep caller-facing JSDoc on reusable
+  type and option fields when the type alone does not explain their semantics or accepted values. Put schema DTO
+  field guidance in the `@Field` description so generated API consumers receive it. Preserve established import
+  order: npm packages (including `@shadow-library/*`) precede internal `@server/*`, `@modules/*`, `@tests/*`, and
+  relative imports, with the existing group separation intact.
 - **Feature modules** live in `src/modules/<domain>/<feature>/` as `*.module.ts` / `*.controller.ts` /
   `*.dto.ts` / `*.service.ts` / `*.constants.ts` / `*.types.ts`, each with a barrel `index.ts`.
 - **Controllers are thin adapters.** `@HttpController('/api/v1/...')` with **full explicit paths** (no global

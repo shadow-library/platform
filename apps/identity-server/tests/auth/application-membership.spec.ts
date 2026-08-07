@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { ConsentService, OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
@@ -14,13 +8,6 @@ import { ApplicationMemberService, ApplicationService } from '@server/modules/sy
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('application-membership').init();
 
 describe('Application membership provisioning', () => {
@@ -68,7 +55,6 @@ describe('Application membership provisioning', () => {
     expect(second?.lastUsedAt.getTime()).toBeGreaterThanOrEqual(first?.lastUsedAt.getTime() ?? 0);
   });
 
-  /** The launcher points elsewhere, so it is fixtured on a real product app — identity excludes itself by design. */
   it("lists the user's applications through the self-service endpoint", async () => {
     const user = await newUser('me');
     const name = `membership-app-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;

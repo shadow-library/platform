@@ -1,31 +1,13 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { and, asc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { KeyService } from '@server/modules/auth/keys';
 import { DatabaseService, OidcLogoutDelivery, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * OIDC Back-Channel Logout 1.0: when a session terminates, every client that obtained tokens in
- * that session and registered a `backchannel_logout_uri` receives a signed logout token. Delivery
- * rides a transactional outbox (mirroring the notification pipeline) so it survives crashes and
- * retries with backoff; the worker process is the only sender.
- */
 const LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
 const LOGOUT_TOKEN_TTL_SECONDS = 120;
 const MAX_ATTEMPTS = 5;
@@ -44,11 +26,6 @@ export class BackChannelLogoutService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /**
-   * Queues logout notifications for every registered client that holds a refresh-token family
-   * bound to the session. Family status is deliberately ignored: revocation usually precedes the
-   * enqueue in the same request.
-   */
   async enqueueForSession(sessionId: bigint, userId: bigint): Promise<number> {
     const targets = await this.db
       .selectDistinct({ clientId: schema.oauthClients.id, uri: schema.oauthClients.backchannelLogoutUri })
@@ -64,10 +41,6 @@ export class BackChannelLogoutService {
     return targets.length;
   }
 
-  /**
-   * The logout token is minted at send time: it expires in minutes while delivery retries may
-   * span hours. Per spec it carries the `events` claim and `sid`, and never a `nonce`.
-   */
   private mintLogoutToken(delivery: OidcLogoutDelivery): string {
     const iat = Math.floor(Date.now() / 1000);
     const claims = {
@@ -83,7 +56,6 @@ export class BackChannelLogoutService {
     return this.keyService.sign(claims).token;
   }
 
-  /** Requeues deliveries stranded in SENDING by a worker crash; runs once at worker boot. */
   async recoverStuckDeliveries(): Promise<number> {
     const recovered = await this.db
       .update(schema.oidcLogoutDeliveries)
@@ -94,7 +66,6 @@ export class BackChannelLogoutService {
     return recovered.length;
   }
 
-  /** Claims a batch of due deliveries and posts the logout tokens. Worker-driven. */
   async dispatchPending(limit = 20): Promise<number> {
     const claimed = await this.db.transaction(async tx => {
       const rows = await tx
@@ -130,8 +101,8 @@ export class BackChannelLogoutService {
     return sent;
   }
 
-  /** Raw fetch, not APIRequest: the spec mandates a form-encoded body and delivery needs a hard timeout — APIRequest offers neither. */
   private async send(delivery: OidcLogoutDelivery): Promise<void> {
+    /** Mint at delivery time because retry windows can outlive the logout token. */
     const token = this.mintLogoutToken(delivery);
     const response = await fetch(delivery.logoutUri, {
       method: 'POST',

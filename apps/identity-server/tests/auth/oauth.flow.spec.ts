@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
 
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { KeyService } from '@server/modules/auth/keys';
 import { ConsentService, OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
@@ -18,13 +12,6 @@ import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('oauth-flow').init();
 const REDIRECT_URI = 'https://app.example.com/callback';
 
@@ -118,14 +105,9 @@ describe('OAuth authorization-code flow', () => {
       .get('/oauth2/userinfo')
       .headers({ authorization: `Bearer ${body.access_token}` });
     expect(userinfo.json()).toMatchObject({ sub: userId.toString(), email: 'oauth@example.com' });
-    /** No `profile` scope was consented to, so the name is withheld even though one is on file. */
     expect(userinfo.json()).not.toHaveProperty('name');
   });
 
-  /**
-   * The claims that let an application put a person's name on screen without building an endpoint of
-   * its own — released against the token's own scope, per OIDC Core §5.4.
-   */
   it('should release the profile claims to a token that consented to the profile scope', async () => {
     await env.getService(UserService).updateProfile(userId, { firstName: 'Leander', lastName: 'Paul' });
 

@@ -1,27 +1,13 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
-
-/**
- * Defining types
- *
- * First-party interaction DTOs for the consent screen, so they use the project's camelCase
- * convention rather than the OAuth wire format.
- */
 
 @Schema()
 export class ConsentPromptQuery {
   @Field()
   clientId: string;
 
-  /** Space-delimited scope string exactly as it appears on the authorize request. */
-  @Field()
+  @Field({ description: 'Space-delimited scope string exactly as supplied on the authorization request.' })
   scope: string;
 }
 
@@ -42,10 +28,9 @@ export class ConsentPromptResponse {
   @Field()
   clientName: string;
 
-  @Field(() => Boolean)
+  @Field(() => Boolean, { description: 'Whether active consent already covers every requested scope, allowing the UI to skip the prompt.' })
   isFirstParty: boolean;
 
-  /** True when an active consent already covers every requested scope — the UI can skip the prompt. */
   @Field(() => Boolean)
   alreadyGranted: boolean;
 
@@ -64,8 +49,7 @@ export class ConsentDecisionBody {
   @Field(() => String, { enum: ['APPROVE', 'DENY'] })
   decision: 'APPROVE' | 'DENY';
 
-  /** Required on DENY so the server can build the error redirect after validating the URI. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'Required for DENY so the server can validate the URI and construct the error redirect.' })
   redirectUri?: string;
 
   @Field({ optional: true })
@@ -77,15 +61,13 @@ export class ConsentDecisionResponse {
   @Field(() => String, { enum: ['APPROVE', 'DENY'] })
   decision: 'APPROVE' | 'DENY';
 
-  /** On DENY, the validated client redirect carrying `error=access_denied`. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'For DENY decisions, the validated client redirect carrying error=access_denied.' })
   redirectTo?: string;
 }
 
 @Schema()
 export class ConsentClientParams {
-  /** Client ids are admin-chosen slugs (legacy lowercase UUIDs also match). */
-  @Field({ ...PATTERN.CLIENT_ID })
+  @Field({ ...PATTERN.CLIENT_ID, description: 'Admin-chosen client identifier slug; legacy lowercase UUIDs are also accepted.' })
   clientId: string;
 }
 
@@ -97,8 +79,7 @@ export class ConsentRecordDto {
   @Field()
   clientName: string;
 
-  /** User-facing name of the application the client belongs to — what the connected-apps surface shows. */
-  @Field()
+  @Field({ description: 'User-facing name of the application to which the client belongs.' })
   applicationName: string;
 
   @Field(() => [String])

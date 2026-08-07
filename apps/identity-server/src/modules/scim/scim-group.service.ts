@@ -1,32 +1,13 @@
-/**
- * Importing npm packages
- */
 import { and, asc, count, eq, inArray, SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, PrimaryDatabase, schema, ScimGroup } from '@server/modules/infrastructure/datastore';
 
 import { ScimTenant } from './scim-auth.service';
 import { ScimGroupMappingService } from './scim-group-mapping.service';
 import { asRecord, asString, GROUP_SCHEMA, ScimError, ScimFilter, ScimGroupInput, ScimGroupResource, ScimListResult, ScimPage, ScimPatchOperation } from './scim.types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * SCIM groups are the tenant's provisioning structure: membership references directory entries
- * (never platform user ids). A group carries authorization semantics only where the vendor has
- * mapped it onto an application role (T-905); every membership change is handed to the sync engine,
- * which materialises or revokes the derived role assignments for the affected members.
- */
 
 @Injectable()
 export class ScimGroupService {
@@ -92,7 +73,6 @@ export class ScimGroupService {
     const before = await this.memberDirectoryIds(group.id);
     for (const operation of operations) {
       const path = operation.path?.toLowerCase() ?? '';
-      /** Entra removes single members with the filter form `members[value eq "<id>"]`. */
       const filtered = path.match(/^members\[value eq "([^"]+)"\]$/);
 
       if ((operation.op === 'add' || operation.op === 'replace') && path === 'members') {
@@ -126,14 +106,12 @@ export class ScimGroupService {
 
   async remove(tenant: ScimTenant, id: string): Promise<void> {
     const group = await this.requireGroup(tenant, id);
-    /** Capture the derived (member, role) grants before the delete cascades the group's members and mappings away, then revoke the markers left behind. */
     const pairs = await this.mappingService.collectMemberRolePairs(group);
     await this.db.delete(schema.scimGroups).where(eq(schema.scimGroups.id, group.id));
     await this.mappingService.reconcilePairs(group.organisationId, pairs);
     await this.audit(tenant, 'scim.group.deleted', group.id);
   }
 
-  /** Reconciles the members touched by a membership change (the union of before and after) against the group's mapped roles. */
   private async syncMappings(group: ScimGroup, before: string[]): Promise<void> {
     const after = await this.memberDirectoryIds(group.id);
     await this.mappingService.syncMembership(group, [...new Set([...before, ...after])]);
@@ -153,7 +131,6 @@ export class ScimGroupService {
     return group;
   }
 
-  /** Members must be directory entries of the same tenant — platform user ids never appear on this surface. */
   private async addMembers(tenant: ScimTenant, groupId: string, directoryIds: string[]): Promise<void> {
     const unique = [...new Set(directoryIds)];
     const entries = await this.db.query.scimDirectory.findMany({

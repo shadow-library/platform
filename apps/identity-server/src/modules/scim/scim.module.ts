@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Module } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { KeyModule } from '@server/modules/auth/keys';
 import { OAuthModule } from '@server/modules/auth/oauth';
 import { SessionModule } from '@server/modules/auth/session';
@@ -22,14 +16,6 @@ import { ScimGroupMappingService } from './scim-group-mapping.service';
 import { ScimGroupService } from './scim-group.service';
 import { ScimUserService } from './scim-user.service';
 import { ScimController } from './scim.controller';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Module({
   imports: [DatabaseModule, KeyModule, OAuthModule, SessionModule, TokenModule, AuthzModule, OrganisationModule, UserModule, AuditModule, ApplicationModule],

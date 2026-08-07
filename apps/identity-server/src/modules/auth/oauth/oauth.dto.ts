@@ -1,18 +1,4 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- *
- * These DTOs mirror the OAuth 2.0 / OIDC wire format, so their property names are snake_case by
- * design rather than the project's usual camelCase.
- */
 
 @Schema()
 export class AuthorizeQuery {
@@ -79,18 +65,16 @@ export class TokenRequestBody {
   @Field({ optional: true })
   client_assertion?: string;
 
-  /** RFC 8693 token exchange (D-22): the user token being delegated, and the types framing it. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'RFC 8693 subject token being delegated during token exchange.' })
   subject_token?: string;
 
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'RFC 8693 type of the delegated subject token.' })
   subject_token_type?: string;
 
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'RFC 8693 token type requested from the exchange.' })
   requested_token_type?: string;
 
-  /** Accepted only so it can be refused: the actor is always the authenticated caller. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'Accepted only to reject it; the actor is always the authenticated caller.' })
   actor_token?: string;
 }
 
@@ -114,8 +98,7 @@ export class TokenResponse {
   @Field({ optional: true })
   refresh_token?: string;
 
-  /** RFC 8693 requires the issued type to be stated; present on exchange responses only. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'RFC 8693 issued token type; present only on token-exchange responses.' })
   issued_token_type?: string;
 }
 
@@ -161,28 +144,18 @@ export class RevocationResponse {
   revoked: boolean;
 }
 
-/**
- * OIDC Core §5.1 standard claims, in their wire spelling. Which of them appear is decided by the
- * token's scope, and an unavailable claim is absent rather than null.
- *
- * `email` is released without requiring the `email` scope, which the spec would ask for. That is
- * deliberate and it is backwards compatibility, not an oversight: this endpoint has always answered
- * with the address for any valid token, and retroactively gating it would silently break every
- * client already relying on it. New claims are gated properly; the old one keeps its contract.
- */
 @Schema()
 export class UserInfoResponse {
   @Field()
   sub: string;
 
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'Released for every valid token without requiring the email scope for backward compatibility.' })
   email?: string;
 
   @Field(() => Boolean, { optional: true })
   email_verified?: boolean;
 
-  /** The one presentable string, composed from the chosen display name or the legal name parts. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'Presentable name composed from the preferred display name or legal name parts.' })
   name?: string;
 
   @Field({ optional: true })
@@ -248,10 +221,9 @@ export class DiscoveryResponse {
   @Field(() => Boolean)
   backchannel_logout_session_supported: boolean;
 
-  /** Global first-party endpoints (D-21 §8.6) — a service derives them rather than configuring them. */
-  @Field()
+  @Field({ description: 'Global first-party endpoint derived by services rather than configured independently.' })
   step_up_endpoint: string;
 
-  @Field()
+  @Field({ description: 'Global first-party endpoint derived by services rather than configured independently.' })
   app_session_endpoint: string;
 }

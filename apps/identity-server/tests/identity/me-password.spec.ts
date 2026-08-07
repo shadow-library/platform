@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('me-password').init();
 const EMAIL = 'change-password@example.com';
 const PASSWORD = 'Password@123';
@@ -35,7 +26,6 @@ describe('MeController /me/password', () => {
       .body({ currentPassword, newPassword });
   };
 
-  /** Drives a fresh sign-in to prove which password the credential now accepts. */
   const signInWith = async (password: string): Promise<number> => {
     const init = await env.getRouter().mockRequest().post('/api/v1/auth/login/init').body({ identifier: EMAIL });
     const { flowId } = init.json() as { flowId: string };

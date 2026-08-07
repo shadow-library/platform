@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { AuthFlowService } from '@server/modules/auth/flow';
 import { base32Decode, hotp, MfaService } from '@server/modules/auth/mfa';
 import { SESSION_COOKIE_NAME } from '@server/modules/auth/session';
@@ -16,10 +10,6 @@ import { schema } from '@server/modules/infrastructure/datastore';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
 interface FlowResponse {
   flowId: string;
   status: string;
@@ -27,9 +17,6 @@ interface FlowResponse {
   metadata?: { maskedEmail?: string };
 }
 
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('challenge_surface').init();
 const EMAIL = 'surface@example.com';
 const PASSWORD = 'Password@123';
@@ -47,7 +34,6 @@ const outboxCountFor = async (email: string): Promise<number> => {
   return rows.filter(entry => entry.recipients.email === email).length;
 };
 
-/** Rewinds the flow's cooldown clock so resends are immediately permitted. */
 const expireCooldown = async (flowId: string): Promise<void> => {
   const flowService = env.getService(AuthFlowService);
   const flow = await flowService.get(flowId);
@@ -69,10 +55,6 @@ describe('Challenge surface', () => {
   };
 
   describe('methods', () => {
-    /**
-     * The list still derives from the shape of the typed identifier rather than the resolved account, so it stays
-     * stable across accounts. It is no longer an enumeration control — the identifier step refuses unknown accounts outright.
-     */
     it('should derive the advertised methods from the identifier shape', async () => {
       const emailFlow = await initLogin(EMAIL);
       const response = await env.getRouter().mockRequest().get(`/api/v1/auth/challenge/methods?flowId=${emailFlow}`);

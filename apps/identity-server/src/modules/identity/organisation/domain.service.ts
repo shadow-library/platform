@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { and, eq, ne } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type ValidatedSession } from '@server/modules/auth/session';
@@ -18,17 +12,12 @@ import { DatabaseService, Organisation, PrimaryDatabase, schema } from '@server/
 
 import { DnsTxtResolver } from './dns-txt.resolver';
 
-/**
- * Defining types
- */
-
 export interface DomainChallenge {
   domain: Organisation.Domain;
   txtRecordName: string;
   txtRecordValue: string;
 }
 
-/** Wire shape of a domain: native id/date the response serializer converts. */
 export interface DomainDetail {
   id: bigint;
   domain: string;
@@ -46,8 +35,6 @@ interface CallerContext {
 }
 
 /**
- * Declaring the constants
- *
  * Ownership is proven with a DNS TXT record at `_shadow-identity.<domain>`. Only one organisation
  * may hold a domain VERIFIED at a time (partial unique index is the authority; the service
  * pre-checks for a friendlier failure). A VERIFIED domain never demotes on a failed re-check —
@@ -74,7 +61,6 @@ export class DomainService {
     return { domain, txtRecordName: `${TXT_PREFIX}.${domain.domain}`, txtRecordValue: `${TXT_VALUE_PREFIX}${domain.verificationToken}` };
   }
 
-  /** Flattens a challenge to the wire shape; native id/date are converted by the response serializer. */
   private toDomainItem(challenge: DomainChallenge): DomainDetail {
     const { domain } = challenge;
     return {
@@ -102,8 +88,6 @@ export class DomainService {
       ipAddress: caller.ip,
     });
   }
-
-  /* --------------------------- caller-facing orchestration --------------------------- */
 
   async listDomainItems(organisationId: bigint): Promise<DomainDetail[]> {
     const domains = await this.list(organisationId);
@@ -154,7 +138,6 @@ export class DomainService {
     return domain;
   }
 
-  /** Runs the TXT lookup and records the outcome; VERIFIED status only ever improves or holds. */
   async verify(organisationId: bigint, domainId: bigint): Promise<Organisation.Domain> {
     const domain = await this.getById(organisationId, domainId);
     const checkedAt = new Date();
@@ -193,7 +176,6 @@ export class DomainService {
       if (!updated) throw AppErrorCode.ORG_010.create();
       return updated;
     } catch (error) {
-      /** Lost the race for the partial unique index: another org verified between pre-check and update. */
       if (AppError.is(error)) throw error;
       const [failed] = await this.db
         .update(schema.organisationDomains)

@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { and, eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { CatalogSyncService, PolicyDecisionService } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
@@ -17,25 +11,13 @@ import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
 interface Manifest {
   permissions: { name: string }[];
   roles: { name: string; permissions: string[]; default?: boolean }[];
 }
 
-/**
- * Declaring the constants
- *
- * Customer tiering (T-904): default roles give every signed-in user a baseline with no assignment
- * row, and `ORGANISATION`-principal grants extend a tier to every live member of an organisation.
- * A dedicated application keeps these roles off the seeded platform catalog.
- */
 const env = new TestEnvironment('authz-tiering').init();
 
-/** basic is the customer baseline (a default role); premium is the vendor-sold tier (an org-wide grant). */
 const tierManifest = (basicDefault: boolean): Manifest => ({
   permissions: [{ name: 'tier:basic' }, { name: 'tier:premium' }],
   roles: [
@@ -111,7 +93,6 @@ describe('Customer tiering', () => {
       await sync.sync(clientId, tierManifest(true));
       expect((await customer())?.isDefault).toBe(true);
 
-      /** A re-push that omits `default` is the source of truth — the flag is cleared, not left set. */
       await sync.sync(clientId, tierManifest(false));
       expect((await customer())?.isDefault).toBe(false);
 

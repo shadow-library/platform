@@ -1,12 +1,5 @@
-/**
- * Importing npm packages
- */
-
 import { Body, Delete, Get, HttpController, Params, Patch, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { Auth, Context } from '@server/modules/access';
@@ -33,10 +26,6 @@ import {
 import { AdminActionResponse } from './admin-user.dto';
 import { ADMIN_PERMISSIONS } from './admin.constants';
 
-/**
- * Defining types
- */
-
 interface ApplicationUpdate {
   subDomain?: string;
   displayName?: string;
@@ -47,15 +36,6 @@ interface ApplicationUpdate {
   visibility?: Application.Visibility;
   publicUrls?: string[];
 }
-
-/**
- * Declaring the constants
- *
- * Applications are the parent product entities that own OAuth clients, API resources, roles and
- * signing keys. Creating one is the entry point every other admin surface builds on (a client or
- * resource cannot exist without an `applicationId`). The platform application (`shadow-identity`)
- * is protected: it may never be deactivated or deleted, since the whole IdP hangs off it.
- */
 
 @HttpController('/api/v1/admin/applications')
 export class AdminApplicationController {
@@ -129,11 +109,6 @@ export class AdminApplicationController {
       publicUrls: body.publicUrls ? this.normaliseOrigins(body.publicUrls) : undefined,
     });
 
-    /**
-     * The application *is* the unit of identity (D-21), so its client and its `api://<app>` resource
-     * are provisioned with it. Registering them separately was the step that let an application's
-     * two clients drift apart and made "which client id?" an ambiguous question.
-     */
     const provisioned = await this.clientService.provisionApplicationIdentity({
       applicationId: application.id,
       name: application.name,
@@ -174,10 +149,6 @@ export class AdminApplicationController {
     if (update.publicUrls !== undefined) await this.regenerateRelyingPartyRedirectUris(application.id, update.publicUrls);
     await this.record(actor, 'admin.application.updated', String(application.id), { fields });
 
-    /**
-     * Visibility is the platform-wide gate every organisation's grant set is resolved against, so a change
-     * invalidates every cached grant set (not just one org's) and is audited on its own action for the trail.
-     */
     if (body.visibility !== undefined) {
       await this.accessService.invalidateGlobal();
       await this.record(actor, 'application.visibility.changed', String(application.id), { visibility: body.visibility });
@@ -185,16 +156,10 @@ export class AdminApplicationController {
     return { success: true };
   }
 
-  /** Trims trailing slashes and de-duplicates origins so distinct spellings can't collide into duplicate redirect URIs. */
   private normaliseOrigins(origins: string[]): string[] {
     return [...new Set(origins.map(origin => origin.trim().replace(/\/$/, '')).filter(Boolean))];
   }
 
-  /**
-   * Public origins are the authoritative input; the relying-party clients' redirect URIs are the
-   * derived enforcement artifact. Changing the origins rewrites the `/api/auth/callback` redirect
-   * URI set of every confidential (server-rendered) client the application owns.
-   */
   private async regenerateRelyingPartyRedirectUris(applicationId: number, publicUrls: string[]): Promise<void> {
     const redirectUris = publicUrls.map(origin => `${origin}${OAUTH_CALLBACK_PATH}`);
     const clients = await this.clientService.listClients(applicationId);
@@ -211,12 +176,6 @@ export class AdminApplicationController {
     const application = this.applicationService.getApplicationByIdOrThrow(params.applicationId);
     if (application.name === APP_NAME) throw AppErrorCode.APP_004.create();
 
-    /**
-     * Clients FK-restrict the delete, and under D-21 every application owns its own provisioned
-     * client — so that one goes with it, since it *is* the application's identity. Any further
-     * client is a separate registration someone made deliberately: the guard still refuses rather
-     * than destroying it as a side effect.
-     */
     const clients = (await this.clientService.listClients()).filter(client => client.applicationId === application.id);
     if (clients.some(client => client.id !== application.name)) throw AppErrorCode.APP_005.create();
     for (const client of clients) await this.clientService.deleteClient(client.id);
@@ -249,7 +208,6 @@ export class AdminApplicationController {
   async removeApplicationMember(@Params() params: ApplicationMemberParams): Promise<AdminActionResponse> {
     const actor = Context.getActor();
     const application = this.applicationService.getApplicationByIdOrThrow(params.applicationId);
-    /** Idempotent: removing an absent membership is a no-op, so re-runs converge without a 404 race. */
     await this.memberService.removeMembership(application.id, params.userId);
     await this.record(actor, 'admin.application.member_removed', String(application.id), { userId: params.userId.toString() });
     return { success: true };
@@ -288,7 +246,6 @@ export class AdminApplicationController {
     return { success: true };
   }
 
-  /** The acting platform admin, resolved from the ambient context for audit attribution of a release change. */
   private auditActor(): { actorId: string; ip?: string } {
     return { actorId: Context.getActor().session.userId.toString(), ip: Context.getClientInfo().ip };
   }

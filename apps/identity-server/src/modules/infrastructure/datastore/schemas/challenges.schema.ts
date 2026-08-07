@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel } from 'drizzle-orm';
 import { bigint, index, integer, pgEnum, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export type VerificationChallenge = InferSelectModel<typeof verificationChallenges>;
 
@@ -18,17 +7,8 @@ export namespace VerificationChallenge {
   export type Type = InferEnum<typeof challengeType>;
 }
 
-/**
- * Declaring the constants
- */
-
 export const challengeType = pgEnum('challenge_type', ['EMAIL_OTP', 'SMS_OTP', 'EMAIL_LINK']);
 
-/**
- * One-time verification challenges (OTP codes, magic links). The code is stored only as a SHA-256
- * hash; the plaintext lives solely in the delivered notification. `user_id` has no foreign key so a
- * challenge can precede account creation (registration).
- */
 export const verificationChallenges = pgTable(
   'verification_challenges',
   {

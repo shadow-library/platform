@@ -1,22 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export type HealthStatus = 'ok' | 'degraded';
 export type DependencyStatus = 'up' | 'down';
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class HealthResponse {

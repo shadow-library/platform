@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { OAuthClientService } from '@server/modules/auth/oauth';
@@ -17,13 +11,6 @@ import { ApplicationMemberService, ApplicationService } from '@server/modules/sy
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('admin-applications').init();
 
 describe('Admin application API', () => {
@@ -101,14 +88,12 @@ describe('Admin application API', () => {
     expect(detail.json()).toMatchObject({ displayName: 'Novel Forge', logoUrl: 'https://cdn.example.com/logo.png' });
   });
 
-  /** An application *is* its client and its audience (D-21), so registration provisions both at once. */
   it('should provision one client and one derived audience with the application', async () => {
     const name = uniqueName('provisioned');
     const created = await request('post', '/api/v1/admin/applications').body({ name, subDomain: 'provisioned' });
     expect(created.statusCode).toBe(201);
     const body = created.json() as { clientId: string; audience: string; clientSecret?: string };
     expect(body).toMatchObject({ clientId: name, audience: `api://${name}` });
-    /** The secret is shown exactly once, here. */
     expect(body.clientSecret).toBeString();
   });
 
@@ -122,7 +107,6 @@ describe('Admin application API', () => {
 
     const detail = await request('get', `/api/v1/admin/applications/${id}`);
     expect(detail.statusCode).toBe(404);
-    /** Its identity went with it rather than being left orphaned. */
     expect(await env.getService(OAuthClientService).getClient(name)).toBeNull();
   });
 
@@ -184,7 +168,6 @@ describe('Admin application API', () => {
   });
 
   it('should store public URLs on the application and regenerate its relying-party redirect URIs', async () => {
-    /** Consumer apps are no longer seeded, so the test registers its own application and RP client. */
     const created = await request('post', '/api/v1/admin/applications').body({ name: uniqueName('pulse'), subDomain: 'pulse', displayName: 'Pulse' });
     expect(created.statusCode).toBe(201);
     const { id } = created.json() as { id: number };
@@ -192,7 +175,6 @@ describe('Admin application API', () => {
       .getService(OAuthClientService)
       .register({ applicationId: id, name: 'pulse-rp', kind: 'WEB_CONFIDENTIAL', grantTypes: ['authorization_code', 'refresh_token'], redirectUris: [] });
 
-    /** Two spellings of the same origin must collapse to one, not collide into a duplicate redirect URI. */
     const updated = await request('patch', `/api/v1/admin/applications/${id}`).body({ publicUrls: ['https://pulse.example.com', 'https://pulse.example.com/'] });
     expect(updated.statusCode).toBe(200);
 

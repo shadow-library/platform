@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 import { inflateRawSync } from 'node:zlib';
 
 import { XMLParser } from 'fast-xml-parser';
 import { SignedXml } from 'xml-crypto';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface ParsedAuthnRequest {
   id: string;
@@ -40,16 +29,6 @@ export interface BuildResponseParams {
   validitySeconds: number;
 }
 
-/**
- * Declaring the constants
- *
- * All SAML documents this service SIGNS are constructed here from typed parameters — never echoed
- * from caller input — so the signing path never canonicalizes attacker-shaped XML. The only
- * untrusted XML parsed is the AuthnRequest, read with entity processing disabled (XXE-safe) and
- * only ever used for exact-match lookups; SP request signatures are NOT verified (hand-rolled
- * XML-DSIG verification is an XSW minefield), which is safe because nothing security-relevant is
- * taken from the request: the assertion always goes to the registered ACS URL.
- */
 const NS_ASSERTION = 'urn:oasis:names:tc:SAML:2.0:assertion';
 const NS_PROTOCOL = 'urn:oasis:names:tc:SAML:2.0:protocol';
 const NAME_ID_FORMATS: Record<string, string> = {
@@ -71,7 +50,6 @@ export function nameIdFormatUri(format: string): string {
   return NAME_ID_FORMATS[format] ?? (NAME_ID_FORMATS.EMAIL as string);
 }
 
-/** Redirect-binding SAMLRequest values are base64(raw-deflate(xml)); POST binding is plain base64. */
 export function decodeSamlRequest(encoded: string): string | null {
   let raw: Buffer;
   try {
@@ -87,6 +65,7 @@ export function decodeSamlRequest(encoded: string): string | null {
   }
 }
 
+/** AuthnRequest signatures are intentionally not verified; security-relevant destinations come only from registered SP configuration. */
 export function parseAuthnRequest(xml: string): ParsedAuthnRequest | null {
   let doc: Record<string, Record<string, string> | undefined>;
   try {
@@ -107,7 +86,6 @@ export function certificateToBase64(pem: string): string {
   return pem.replace(/-----(BEGIN|END) CERTIFICATE-----/g, '').replace(/\s+/g, '');
 }
 
-/** Builds the samlp:Response with a signed saml:Assertion (enveloped RSA-SHA256, exclusive c14n). */
 export function buildSignedResponse(params: BuildResponseParams): string {
   const now = new Date();
   const notOnOrAfter = new Date(now.getTime() + params.validitySeconds * 1000);
@@ -163,7 +141,6 @@ export function buildSignedResponse(params: BuildResponseParams): string {
   );
 }
 
-/** IdP metadata: entity id, signing certificates (active first), and the redirect-binding SSO endpoint. */
 export function buildMetadata(entityId: string, ssoUrl: string, certificates: string[]): string {
   const keyDescriptors = certificates
     .map(

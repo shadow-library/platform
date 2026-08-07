@@ -1,24 +1,11 @@
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import validator, { StrongPasswordOptions } from 'validator';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME, ERROR_MESSAGES, hibpRangeUrl } from '@server/constants';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const STRENGTH_OPTIONS: StrongPasswordOptions = { minLength: 8, minLowercase: 1, minUppercase: 1, minNumbers: 1, minSymbols: 1 };
 
 /**

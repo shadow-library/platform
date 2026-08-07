@@ -1,36 +1,19 @@
-/**
- * Importing npm packages
- */
 import { and, eq, inArray } from 'drizzle-orm';
 import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
 import { isPolicyKey, POLICY_KEYS, POLICY_REGISTRY, PolicyDefinition, PolicyKey, PolicyValue } from './policy.registry';
 
-/**
- * Defining types
- */
-
-/**
- * The sources that contribute to one effective value. Every organisation listed applies, so a user
- * from one organisation signing into an application owned by another is governed by both — the
- * stricter of the two wins for every duration.
- */
 export interface PolicyScope {
   organisationIds?: (bigint | null | undefined)[];
-  /** A client-level value such as `oauth_clients.access_token_ttl`, folded alongside the organisation overrides. */
   clientValue?: number | null;
 }
 
-/** A policy as presented to an administrator: what it means, what it is now, and whether it was set here. */
 export interface PolicyDescriptor {
   key: PolicyKey;
   label: string;
@@ -40,13 +23,9 @@ export interface PolicyDescriptor {
   min?: number;
   max?: number;
   effectiveValue: number | boolean;
-  /** The value stored for this organisation, or `null` when it inherits the platform default. */
   configuredValue: number | boolean | null;
 }
 
-/**
- * Declaring the constants
- */
 const CACHE_TTL_S = 300;
 
 @Injectable()
@@ -64,11 +43,6 @@ export class PolicyService {
     return `org_policy:${organisationId}`;
   }
 
-  /**
-   * Resolves the value the runtime should use for a key. Candidates are folded with the key's declared
-   * strategy and then clamped to its bounds, so no combination of overrides can produce a value the
-   * registry forbids.
-   */
   async resolve<K extends PolicyKey>(key: K, scope: PolicyScope = {}): Promise<PolicyValue<K>> {
     const definition = POLICY_REGISTRY[key] as PolicyDefinition;
     const organisationIds = [...new Set((scope.organisationIds ?? []).filter((id): id is bigint => typeof id === 'bigint'))];
@@ -77,17 +51,11 @@ export class PolicyService {
     return this.clamp(definition, this.fold(definition, candidates)) as PolicyValue<K>;
   }
 
-  /** Resolves several keys against one scope, for call sites that need a whole policy set at once. */
   async resolveAll<K extends PolicyKey>(keys: readonly K[], scope: PolicyScope = {}): Promise<Record<K, PolicyValue<K>>> {
     const entries = await Promise.all(keys.map(async key => [key, await this.resolve(key, scope)] as const));
     return Object.fromEntries(entries) as Record<K, PolicyValue<K>>;
   }
 
-  /**
-   * Picks the field a key reads from a write request. The wire carries one optional field per value
-   * type because a scalar union is not expressible, so the registry — not the caller — decides which
-   * of them is authoritative; an absent or mistyped field is a validation failure, never a default.
-   */
   selectValue<K extends PolicyKey>(key: K, wire: { value?: number; enabled?: boolean }): PolicyValue<K> {
     this.assertKnown(key);
     const definition = POLICY_REGISTRY[key] as PolicyDefinition;
@@ -109,7 +77,6 @@ export class PolicyService {
     this.logger.info('organisation policy updated', { organisationId, policyKey: key, value });
   }
 
-  /** Removes an override so the organisation falls back to the platform default. */
   async clear(organisationId: bigint, key: PolicyKey): Promise<void> {
     this.assertKnown(key);
     await this.db.delete(schema.organisationPolicies).where(and(eq(schema.organisationPolicies.organisationId, organisationId), eq(schema.organisationPolicies.policyKey, key)));
@@ -117,7 +84,6 @@ export class PolicyService {
     this.logger.info('organisation policy cleared', { organisationId, policyKey: key });
   }
 
-  /** The full catalogue for one organisation: every key, its metadata, its effective and configured values. */
   async listForOrganisation(organisationId: bigint): Promise<PolicyDescriptor[]> {
     const configured = await this.readAll(organisationId);
     return Promise.all(
@@ -143,11 +109,6 @@ export class PolicyService {
     return all[key] ?? null;
   }
 
-  /**
-   * Every override an organisation holds, cached as one map. Policies are read on each token mint, so
-   * the read is collapsed to a single round trip and invalidated explicitly on write rather than
-   * being left to expire.
-   */
   private async readAll(organisationId: bigint): Promise<Partial<Record<PolicyKey, number | boolean>>> {
     const cached = await this.redis.get(this.cacheKey(organisationId));
     if (cached) return JSON.parse(cached) as Partial<Record<PolicyKey, number | boolean>>;
@@ -159,7 +120,6 @@ export class PolicyService {
 
     const overrides: Partial<Record<PolicyKey, number | boolean>> = {};
     for (const row of rows) {
-      /** A key retired from the registry stays in the table but stops being honoured. */
       if (isPolicyKey(row.policyKey)) overrides[row.policyKey] = row.policyValue as number | boolean;
     }
     await this.redis.set(this.cacheKey(organisationId), JSON.stringify(overrides), 'EX', CACHE_TTL_S);

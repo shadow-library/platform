@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { Injectable, OnModuleInit } from '@shadow-library/app';
 import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { ADMIN_PERMISSIONS, IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
 import { APP_SESSION_SCOPE } from '@server/modules/auth/app-session';
@@ -20,18 +14,10 @@ import { ApplicationRoleService, ApplicationService } from '@server/modules/syst
 
 import { EcosystemSeedService } from './ecosystem-seed.service';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const PLATFORM_RESOURCE = 'shadow-identity';
 const AUTHZ_CHECK_SCOPE = 'authz:check';
 const AUTHZ_ROLES_SYNC_SCOPE = 'authz:roles:sync';
 const SCIM_PROVISION_SCOPE = 'scim:provision';
-/** Reaches the directory seam — naming a person by email, and asking whether one is in an organisation. */
 const USERS_RESOLVE_SCOPE = 'users:resolve';
 
 const ADMIN_PERMISSION_DESCRIPTIONS: Record<string, string> = {
@@ -47,17 +33,6 @@ const ADMIN_PERMISSION_DESCRIPTIONS: Record<string, string> = {
   [ADMIN_PERMISSIONS.appRolesManage]: 'Manage roles and assignments of the owning application only',
 };
 
-/**
- * Idempotently provisions the records the platform cannot run without: the identity application
- * itself, its administrator role and permission taxonomy, the platform organisation that scopes
- * administrative role assignments, and a bootstrap administrator account. Runs on every boot and
- * is a no-op once the records exist, so it is safe under horizontal scaling and repeated restarts.
- *
- * First-party ecosystem applications are declared as data in `ecosystem-seed.constants.ts` and
- * provisioned by {@link EcosystemSeedService}, invoked as the final bootstrap step so it can rely on
- * the platform application and its scopes already existing; any other consumer application is
- * registered by an administrator through the console.
- */
 @Injectable()
 export class BootstrapService implements OnModuleInit {
   private readonly logger = Logger.getLogger(APP_NAME, BootstrapService.name);
@@ -78,23 +53,15 @@ export class BootstrapService implements OnModuleInit {
     const organisationId = await this.ensurePlatformOrganisation();
     await this.ensureAdminAuthorization();
     const adminUserId = await this.ensureBootstrapAdmin(organisationId);
-    /** Runs last: the ecosystem seed provisions the product applications and identity's outbound client on top of the platform records above. */
     await this.ecosystemSeedService.seed({ adminUserId, platformOrganisationId: organisationId });
   }
 
-  /**
-   * The PDP endpoint demands a service token carrying `authz:check`; the scope must therefore
-   * exist before any client can be granted it. Runs unconditionally so existing deployments pick
-   * it up on upgrade — and so {@link EcosystemSeedService}, which only ever resolves platform
-   * scopes and never creates them, finds every scope its seeded grants reference.
-   */
   private async ensurePlatformScopes(): Promise<void> {
     const application = this.applicationService.getApplicationOrThrow(APP_NAME);
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, AUTHZ_CHECK_SCOPE);
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, AUTHZ_ROLES_SYNC_SCOPE);
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, SCIM_PROVISION_SCOPE);
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, APP_SESSION_SCOPE);
-    /** Service-only: the directory answers questions about other people, which no user token may ever ask on its own behalf. */
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, USERS_RESOLVE_SCOPE, 'SERVICE');
   }
 
@@ -105,13 +72,11 @@ export class BootstrapService implements OnModuleInit {
     this.logger.info(`Bootstrapped platform application '${APP_NAME}'`, { applicationId: application.id });
   }
 
-  /** Administrative role assignments are org-scoped (D-1), so platform admins need a platform org. */
   private async ensurePlatformOrganisation(): Promise<bigint> {
     const organisation = await this.organisationService.ensureTeamOrganisation(PLATFORM_ORG_NAME);
     return organisation.id;
   }
 
-  /** Seeds the admin permission taxonomy (T-601) and grants all of it to the IAMAdmin role. */
   private async ensureAdminAuthorization(): Promise<void> {
     const application = this.applicationService.getApplicationOrThrow(APP_NAME);
     const role =
@@ -131,11 +96,6 @@ export class BootstrapService implements OnModuleInit {
     if (!admin) {
       const configuredPassword = Config.get('auth.bootstrap.admin-password');
       const password = configuredPassword || this.generatePassword();
-      /**
-       * The seed password only exists to bootstrap the very first sign-in: `passwordResetRequired`
-       * makes that first login refuse the credential and route the admin through recovery to set
-       * their own password (T-602), so a shared/default secret is never left standing.
-       */
       admin = await this.userService.createUserWithPassword({
         email,
         password,
@@ -149,7 +109,6 @@ export class BootstrapService implements OnModuleInit {
       this.logger.info('Bootstrapped platform administrator — first sign-in requires a password reset', { userId: admin.id, email });
     }
 
-    /** Membership and role assignment run even for a pre-existing admin so upgrades converge. */
     const application = this.applicationService.getApplicationOrThrow(APP_NAME);
     const role =
       application.roles.find(candidate => candidate.roleName === IAM_ADMIN_ROLE) ??
@@ -159,7 +118,6 @@ export class BootstrapService implements OnModuleInit {
     return admin.id;
   }
 
-  /** Generates a password that satisfies the strong-password policy without a static literal. */
   private generatePassword(): string {
     return `${randomBytes(24).toString('base64url')}Aa1!`;
   }

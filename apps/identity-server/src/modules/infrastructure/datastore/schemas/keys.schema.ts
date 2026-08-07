@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, sql } from 'drizzle-orm';
 import { integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export type SigningKey = InferSelectModel<typeof signingKeys>;
 
@@ -19,10 +8,6 @@ export namespace SigningKey {
   export type Status = InferEnum<typeof signingKeyStatus>;
   export type Purpose = InferEnum<typeof signingKeyPurpose>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const signingKeyAlgorithm = pgEnum('signing_key_algorithm', ['EdDSA', 'RS256']);
 export const signingKeyStatus = pgEnum('signing_key_status', ['PENDING', 'ACTIVE', 'RETIRING', 'RETIRED']);
@@ -36,10 +21,8 @@ export const signingKeys = pgTable(
     algorithm: signingKeyAlgorithm('algorithm').notNull().default('EdDSA'),
     purpose: signingKeyPurpose('purpose').notNull().default('OIDC'),
     publicJwk: jsonb('public_jwk').notNull().$type<Record<string, string>>(),
-    /** Self-signed X.509 for the SAML metadata KeyDescriptor; null for OIDC keys (JWKS needs none). */
     certificatePem: text('certificate_pem'),
 
-    /** Ed25519 private key (PKCS#8), envelope-encrypted with AES-256-GCM under the master key. */
     privateKeyCiphertext: text('private_key_ciphertext').notNull(),
     privateKeyIv: text('private_key_iv').notNull(),
     privateKeyAuthTag: text('private_key_auth_tag').notNull(),

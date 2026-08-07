@@ -1,13 +1,6 @@
-/**
- * Importing npm packages
- */
-
 import { ValidationError } from '@shadow-library/common';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { ERROR_MESSAGES } from '@server/constants';
 import { Auth, Context } from '@server/modules/access';
 import { type Organisation } from '@server/modules/infrastructure/datastore';
@@ -31,14 +24,6 @@ import {
   UpdateOrganisationBody,
 } from './organisation.dto';
 import { type MemberListItem, OrganisationService } from './organisation.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/organisations')
 export class OrganisationController {
@@ -71,11 +56,6 @@ export class OrganisationController {
     return this.organisationService.getOrganisation(params.organisationId);
   }
 
-  /**
-   * A rename is ADMIN-level (the guard), but flipping `appAccessMode` governs every member's app surface,
-   * so it demands an elevated OWNER — a field-dependent authorization enforced in the service, leaving the
-   * rename path's semantics untouched when `appAccessMode` is absent.
-   */
   @Patch('/:organisationId')
   @Auth({ orgRole: 'ADMIN' })
   @RespondFor(200, OrganisationResponse)
@@ -112,10 +92,6 @@ export class OrganisationController {
     return { success: true };
   }
 
-  /**
-   * Org-scoped only: this pauses or bars the member inside this organisation and never touches their global account,
-   * which a tenant administrator has no standing to disable.
-   */
   @Patch('/:organisationId/members/:userId/status')
   @Auth({ orgRole: 'ADMIN' })
   @RespondFor(200, OrganisationActionResponse)
@@ -125,7 +101,6 @@ export class OrganisationController {
     return { success: true };
   }
 
-  /** Only a suspension lapses on its own, so only a suspension may carry an expiry — and it must be in the future. */
   private parseExpiry(status: Organisation.MemberStatus, value: string | undefined): Date | undefined {
     if (!value) return undefined;
     if (status !== 'SUSPENDED') throw new ValidationError('until', ERROR_MESSAGES.EXPIRY_NOT_APPLICABLE);

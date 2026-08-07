@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { assertValidWorkloadBinding, isWorkloadPattern, matchesWorkloadBinding } from '@server/modules/auth/oauth';
 
-/**
- * Declaring the constants
- */
 const SERVER = 'system:serviceaccount:novel-forge:novel-forge-server';
 const WEB = 'system:serviceaccount:novel-forge:novel-forge-web';
 

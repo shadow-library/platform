@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
 import { BackChannelLogoutService, RefreshTokenService } from '@server/modules/auth/token';
 import { AuditService } from '@server/modules/infrastructure/audit';
-
-/**
- * Defining types
- */
 
 interface SessionCaller {
   session: ValidatedSession;
@@ -31,14 +21,6 @@ export interface MeSessionListItem {
   deviceName?: string;
   isCurrent: boolean;
 }
-
-/**
- * Declaring the constants
- *
- * Self-service session management (api-contract §4.4): users see every device holding a live session
- * and can cut any of them loose. Revoking a session tears down its refresh-token families and fans
- * out a back-channel logout to every relying party that holds a session for it.
- */
 
 @Injectable()
 export class MeSessionsService {
@@ -66,7 +48,6 @@ export class MeSessionsService {
 
   async revokeMySession(caller: SessionCaller, sessionId: bigint): Promise<{ revoked: number }> {
     const target = await this.sessionService.getById(sessionId);
-    /** Absence and other-owner cases answer identically: no probing other users' session ids. */
     if (!target || target.userId !== caller.session.userId || target.status !== 'ACTIVE') throw AppErrorCode.USR_001.create();
 
     await this.sessionService.revoke(sessionId, 'REVOKED');

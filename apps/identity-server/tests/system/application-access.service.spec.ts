@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
 import { Application, Organisation, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationAccessService, ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
-
-/**
- * Defining types
- */
 
 interface OrgOptions {
   type?: Organisation.Type;
@@ -24,9 +14,6 @@ interface OrgOptions {
   appAccessMode?: Organisation.AppAccessMode;
 }
 
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('application-access').init();
 
 const rejection = <T>(promise: Promise<T>): Promise<any> =>
@@ -42,7 +29,6 @@ describe('ApplicationAccessService', () => {
 
   const uniq = (): string => `${Date.now()}-${seq++}`;
 
-  /** A minimal user with no personal workspace, so a test controls its membership set exactly. */
   const createUser = async (): Promise<bigint> => {
     const [user] = await db.insert(schema.users).values({ status: 'ACTIVE' }).returning({ id: schema.users.id });
     return user!.id;

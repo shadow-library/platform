@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { base32Decode, base32Encode, hotp } from '@server/modules/auth/mfa';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
@@ -17,13 +11,6 @@ import { ApplicationService } from '@server/modules/system/application';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('mfa').init();
 
 const currentStep = () => Math.floor(Date.now() / 1000 / 30);
@@ -47,7 +34,6 @@ describe('MFA', () => {
     return chain.headers({ 'x-csrf-token': csrf.header }).cookies({ [SESSION_COOKIE_NAME]: cookie, 'csrf-token': csrf.cookie });
   };
 
-  /** Enrolls and activates TOTP over HTTP, returning the base32 seed. */
   const setupTotp = async (): Promise<string> => {
     const enroll = await request('post', '/api/v1/me/mfa/totp/enroll');
     expect(enroll.statusCode).toBe(200);
@@ -180,10 +166,6 @@ describe('MFA', () => {
       expect(stepUp.statusCode).toBe(401);
     });
 
-    /**
-     * The window is opened *for* what the ceremony declared (D-19, T-801), so only a matching
-     * application can spend it and a console step-up can be spent by none.
-     */
     describe('elevation intent', () => {
       const sessionFor = async () => {
         const created = await env.getService(SessionService).create({ userId });
@@ -221,16 +203,10 @@ describe('MFA', () => {
 
         const stepUp = await request('post', '/api/v1/me/mfa/step-up', session.secret).body({ code: codeAt(secret, currentStep() + 1), clientId: 'no-such-client' });
         expect(stepUp.statusCode).toBe(401);
-        /** The ceremony failed outright, so no window was opened. */
         expect(await intentOf(session.id)).toBeNull();
       });
     });
 
-    /**
-     * The hosted prompt resolves the client id it was handed to a human application name (D-19,
-     * T-801). An unknown id yields no name so the prompt can fail neutrally rather than confirm the
-     * id's existence.
-     */
     describe('intent label', () => {
       it('should resolve the owning application display name for a client id', async () => {
         const application = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity');
@@ -300,7 +276,6 @@ describe('MFA', () => {
       const secret = await setupTotp();
       const aal1 = (await env.getService(SessionService).create({ userId })).secret;
 
-      // A TOTP account must present its code; a password must not be accepted as a step-up here.
       const viaPassword = await request('post', '/api/v1/me/mfa/step-up', aal1).body({ password: 'Password@123' });
       expect(viaPassword.statusCode).toBe(401);
 

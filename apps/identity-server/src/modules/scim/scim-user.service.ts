@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { and, asc, count, eq, SQL, sql } from 'drizzle-orm';
 import validator from 'validator';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { SessionService } from '@server/modules/auth/session';
@@ -36,10 +30,6 @@ import {
   USER_SCHEMA,
 } from './scim.types';
 
-/**
- * Defining types
- */
-
 interface ScimUserChanges {
   externalId?: string | null;
   active?: boolean;
@@ -48,8 +38,6 @@ interface ScimUserChanges {
 }
 
 /**
- * Declaring the constants
- *
  * Ownership rules (recorded decisions, T-704):
  * - `userName` must be an email whose domain the organisation has VERIFIED — a tenant can only
  *   provision its own namespace, which also closes the account-enumeration oracle for foreign
@@ -81,8 +69,6 @@ export class ScimUserService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /* ----------------------------------------- reads ----------------------------------------- */
-
   async list(tenant: ScimTenant, filter: ScimFilter | undefined, page: ScimPage): Promise<ScimListResult<ScimUserResource>> {
     const conditions: SQL[] = [eq(schema.scimDirectory.organisationId, tenant.organisationId)];
     if (filter?.attribute === 'userName') conditions.push(sql`lower(${schema.scimDirectory.userName}) = ${filter.value.toLowerCase()}`);
@@ -103,8 +89,6 @@ export class ScimUserService {
   async get(tenant: ScimTenant, id: string): Promise<ScimUserResource> {
     return this.toResource(await this.requireEntry(tenant, id));
   }
-
-  /* ---------------------------------------- create ----------------------------------------- */
 
   async create(tenant: ScimTenant, input: ScimUserInput): Promise<ScimUserResource> {
     const email = input.userName.toLowerCase();
@@ -144,8 +128,6 @@ export class ScimUserService {
     this.logger.info('scim user provisioned', { organisationId: tenant.organisationId.toString(), userId: userId.toString(), adopted: Boolean(existing) });
     return this.toResource({ ...entry, active: input.active });
   }
-
-  /* ------------------------------------ replace / patch ------------------------------------ */
 
   async replace(tenant: ScimTenant, id: string, input: ScimUserInput): Promise<ScimUserResource> {
     const entry = await this.requireEntry(tenant, id);
@@ -190,8 +172,6 @@ export class ScimUserService {
     return this.toResource(await this.requireEntry(tenant, id));
   }
 
-  /* ---------------------------------------- delete ----------------------------------------- */
-
   async remove(tenant: ScimTenant, id: string): Promise<void> {
     const entry = await this.requireEntry(tenant, id);
     if (entry.active) await this.setActive(entry, false);
@@ -199,8 +179,6 @@ export class ScimUserService {
     await this.audit(tenant, 'scim.user.deprovisioned', entry.userId);
     this.logger.info('scim user deprovisioned', { organisationId: tenant.organisationId.toString(), userId: entry.userId.toString() });
   }
-
-  /* --------------------------------------- internals --------------------------------------- */
 
   async requireEntry(tenant: ScimTenant, id: string): Promise<ScimDirectoryEntry> {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -242,7 +220,6 @@ export class ScimUserService {
       await this.revokeAccountAccess(entry.userId);
     } else {
       await this.removeMembership(entry);
-      /** Ending the membership drops every org-scoped grant with it — manual and SCIM-group-derived alike (T-905) — as the removeMember/leave paths already do; the bare removeMember does not. */
       await this.policyDecisionService.revokeAllForPrincipalInOrganisation({ type: 'USER', id: entry.userId.toString() }, entry.organisationId.toString());
       await this.refreshTokenService.revokeForUserOrganisation(entry.userId, entry.organisationId);
     }
@@ -253,7 +230,6 @@ export class ScimUserService {
     try {
       await this.organisationService.removeMember(entry.organisationId, entry.userId);
     } catch (error) {
-      /** Absent membership is fine (already removed by an admin); a last-owner refusal is the tenant's conflict to resolve. */
       if (AppError.is(error, AppErrorCode.ORG_004)) throw new ScimError(409, 'Cannot deprovision the last owner of the organisation', 'mutability');
       if (!AppError.is(error, AppErrorCode.USR_001)) throw error;
     }

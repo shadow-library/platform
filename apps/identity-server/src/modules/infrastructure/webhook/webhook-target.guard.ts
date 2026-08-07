@@ -1,26 +1,14 @@
-/**
- * Importing npm packages
- */
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 
 import { Injectable } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
-
-/**
- * Defining types
- */
 
 type LookupFn = (hostname: string) => Promise<{ address: string }[]>;
 
 /**
- * Declaring the constants
- *
  * SSRF guard for outbound webhook targets: https-only, no loopback/link-local/private/CGNAT
  * destinations — checked syntactically at registration AND against resolved addresses right
  * before delivery, since DNS can change between the two (rebinding). `allowInsecureTargets`
@@ -55,13 +43,10 @@ export function isPrivateAddress(address: string): boolean {
 
 @Injectable()
 export class WebhookTargetGuard {
-  /** Mutable so the test harness can exercise both strict and relaxed behaviour at runtime. */
   allowInsecureTargets: boolean = Config.get('webhooks.allow-insecure-targets');
 
-  /** Injectable resolver seam: delivery-time address checks must be testable without real DNS. */
   lookupAddresses: LookupFn = async hostname => lookup(hostname, { all: true, verbatim: true });
 
-  /** Registration-time syntactic checks; throws WHK_002 for anything not plainly a public https URL. */
   assertAcceptableUrl(rawUrl: string): URL {
     let url: URL;
     try {
@@ -80,7 +65,6 @@ export class WebhookTargetGuard {
     return url;
   }
 
-  /** Delivery-time check against the addresses the hostname actually resolves to right now. */
   async assertDeliverable(rawUrl: string): Promise<void> {
     const url = this.assertAcceptableUrl(rawUrl);
     if (this.allowInsecureTargets) return;

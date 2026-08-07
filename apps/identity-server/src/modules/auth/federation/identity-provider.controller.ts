@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Body, Delete, Get, HttpController, Params, Patch, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { Auth, Context } from '@server/modules/access';
 import { type IdentityProvider } from '@server/modules/infrastructure/datastore';
 
@@ -18,18 +12,6 @@ import {
   UpdateIdentityProviderBody,
 } from './federation.dto';
 import { IdentityProviderService } from './identity-provider.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Identity provider configuration follows the verified-domain authorization split (T-703): every
- * mutation needs an org ADMIN with AAL2 step-up — pointing sign-in at a different issuer is
- * account takeover at organisation scale, so it demands the same ceremony as domain changes.
- */
 
 @HttpController('/api/v1/organisations/:organisationId/identity-providers')
 @Auth({ orgRole: 'ADMIN' })

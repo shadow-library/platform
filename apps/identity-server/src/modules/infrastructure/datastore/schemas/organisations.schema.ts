@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, pgEnum, pgTable, primaryKey, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { users } from './users.schema';
-
-/**
- * Defining types
- */
 
 export type Organisation = InferSelectModel<typeof organisations>;
 
@@ -28,21 +18,12 @@ export namespace Organisation {
   export type AppAccessMode = InferEnum<typeof organisationAppAccessMode>;
 }
 
-/**
- * Declaring the constants
- */
-
 export const organisationType = pgEnum('organisation_type', ['PERSONAL', 'TEAM']);
 export const organisationStatus = pgEnum('organisation_status', ['ACTIVE', 'SUSPENDED', 'DELETED']);
 export const organisationMemberRole = pgEnum('organisation_member_role', ['OWNER', 'ADMIN', 'MEMBER']);
 export const organisationMemberStatus = pgEnum('organisation_member_status', ['ACTIVE', 'SUSPENDED', 'BLOCKED']);
 export const organisationDomainStatus = pgEnum('organisation_domain_status', ['PENDING', 'VERIFIED', 'FAILED']);
 
-/**
- * Whether the org's members get every app it could reach (`ALL_APPS`) or only an explicitly assigned
- * allowlist (`ASSIGNED_ONLY`) (T-901). A plain column, not an `organisation_policies` key: the policy
- * registry folds a value across every applicable org, whereas this is read for one specific org.
- */
 export const organisationAppAccessMode = pgEnum('organisation_app_access_mode', ['ALL_APPS', 'ASSIGNED_ONLY']);
 
 export const organisations = pgTable('organisations', {
@@ -68,10 +49,6 @@ export const organisationMembers = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     isDefault: boolean('is_default').notNull().default(false),
     role: organisationMemberRole('role').notNull().default('MEMBER'),
-    /**
-     * Org-scoped access hold. A tenant administrator may pause or bar a member here without touching `users.status`,
-     * which is global — an adopted personal account must keep working in its own workspace and in other tenants.
-     */
     status: organisationMemberStatus('status').notNull().default('ACTIVE'),
     statusReason: varchar('status_reason', { length: 256 }),
     statusChangedAt: timestamp('status_changed_at', { withTimezone: true }),
@@ -81,11 +58,6 @@ export const organisationMembers = pgTable(
   t => [primaryKey({ columns: [t.organisationId, t.userId] })],
 );
 
-/**
- * A pending invitation is one with no accepted/declined/revoked timestamp; the partial unique
- * index keeps at most one live invitation per (organisation, email) while history rows remain.
- * Tokens are stored as SHA-256 hashes — the plaintext travels only in the invitation email.
- */
 export const organisationInvitations = pgTable(
   'organisation_invitations',
   {
@@ -111,12 +83,6 @@ export const organisationInvitations = pgTable(
   ],
 );
 
-/**
- * DNS-TXT-proven domain ownership (T-703). A domain may be VERIFIED by at most one organisation
- * at a time (partial unique index); PENDING claims may coexist so a domain moving between orgs
- * never needs the old row deleted first. Verification evidence (checked time, matched record) is
- * retained for audit. SAML/SCIM/JIT-provisioning attach to VERIFIED domains in later milestones.
- */
 export const organisationDomains = pgTable(
   'organisation_domains',
   {
@@ -140,10 +106,6 @@ export const organisationDomains = pgTable(
       .where(sql`${t.status} = 'VERIFIED'`),
   ],
 );
-
-/**
- * Declaring the relations
- */
 
 export const organisationRelations = relations(organisations, ({ many }) => ({
   members: many(organisationMembers),

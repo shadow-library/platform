@@ -1,24 +1,6 @@
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Per-test-file DB cloning: `scripts/db.ts create-template` provisions and migrates the template
- * database once (see `shadow.db.templateSeed` in this workspace's package.json); every test file then
- * clones its own isolated copy from it via `CREATE DATABASE ... TEMPLATE`, through `TestEnvironment`.
- */
 const logger = Logger.getLogger('Tests', 'TemplateDBCloner');
 const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost:5432/shadow_identity';
 const baseUrl = baseConnectionString.replace(/\/[^/]*$/, '');

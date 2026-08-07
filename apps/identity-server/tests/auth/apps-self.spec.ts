@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AccessTokenService, applicationAudience, OAuthClientService } from '@server/modules/auth/oauth';
 import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
-
-/**
- * Defining types
- */
 
 interface SelfDescription {
   appId: string;
@@ -27,9 +17,6 @@ interface SelfDescription {
   accessTokenTtl: number;
 }
 
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('apps-self').init();
 
 const ORIGIN = 'https://reports.example.com';
@@ -38,7 +25,6 @@ describe('GET /api/v1/apps/me', () => {
   let clientId: string;
   let applicationId: number;
 
-  /** A service token addressed to the platform API — what a service holds after client_credentials. */
   const serviceToken = (subject = clientId, scope = '') =>
     env.getService(AccessTokenService).mintAccessToken({ subject, audience: 'shadow-identity', scope, clientId: subject, ttlSeconds: 60, actorType: 'service' }).token;
 
@@ -77,7 +63,6 @@ describe('GET /api/v1/apps/me', () => {
     expect(body.sensitiveScopes).toEqual(['reports:purge']);
   });
 
-  /** `grants` is the ceiling for a delegated call (D-22), so it must list other applications only. */
   it('should list grants on other applications but never its own surface', async () => {
     const clients = env.getService(OAuthClientService);
     const own = (await clients.listResources()).find(candidate => candidate.identifier === applicationAudience('reports'));
@@ -95,7 +80,6 @@ describe('GET /api/v1/apps/me', () => {
   it('should require a service token and answer only about the caller', async () => {
     expect((await describeSelf()).statusCode).toBe(401);
 
-    /** A token naming a client that no longer exists describes nothing. */
     expect((await describeSelf(serviceToken('vanished-client'))).statusCode).toBe(401);
   });
 

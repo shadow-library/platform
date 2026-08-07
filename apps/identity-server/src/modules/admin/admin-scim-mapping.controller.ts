@@ -1,12 +1,5 @@
-/**
- * Importing npm packages
- */
-
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { Auth, Context } from '@server/modules/access';
 import { AuditService } from '@server/modules/infrastructure/audit';
@@ -18,20 +11,7 @@ import { CreateGroupMappingBody, GroupMappingIdParams, GroupMappingItem, GroupMa
 import { AdminActionResponse } from './admin-user.dto';
 import { ADMIN_PERMISSIONS } from './admin.constants';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * The vendor-controlled seam between a tenant's directory groups and its bought capability (T-905,
- * D-A8): mapping a group onto an application role is how a sold tier reaches the tenant's directory
- * structure, so it rides the same two-tier `requireRoleAdmin` (+ AAL2 step-up) as a role assignment —
- * never an org admin, which would bypass D-A5. Reads accept any role-manage admin; mutations are
- * authorised against the *role's* application, so an app-scoped admin can only map its own roles. The
- * SCIM protocol surface is untouched — the sync itself hangs off the existing membership path.
- */
+/** Mutations authorize against the role's application so an app-scoped admin cannot map another application's roles. */
 
 @HttpController('/api/v1/admin/scim/group-mappings')
 export class AdminScimMappingController {

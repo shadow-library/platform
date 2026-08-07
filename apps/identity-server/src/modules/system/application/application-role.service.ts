@@ -1,33 +1,19 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes/app-error-code';
 import { APP_NAME } from '@server/constants';
 import { Application, DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
 import { ApplicationService } from './application.service';
 
-/**
- * Defining types
- */
-
 export interface IRole {
   roleName: string;
   description?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class ApplicationRoleService {

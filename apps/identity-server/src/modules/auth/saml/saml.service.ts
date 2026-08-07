@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { createHmac, hkdfSync, randomUUID } from 'node:crypto';
 
 import { eq } from 'drizzle-orm';
@@ -8,9 +5,6 @@ import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { SessionService, ValidatedSession } from '@server/modules/auth/session';
@@ -22,15 +16,10 @@ import { ApplicationAccessService, ApplicationService } from '@server/modules/sy
 import { SamlKeyService } from './saml-key.service';
 import { AssertionAttribute, buildMetadata, buildSignedResponse, decodeSamlRequest, parseAuthnRequest } from './saml-xml';
 
-/**
- * Defining types
- */
-
 export interface CreateServiceProvider {
   entityId: string;
   name: string;
   acsUrl: string;
-  /** Links the SP to an application so SP-initiated SSO enforces the access gate before asserting (T-902). */
   applicationId?: number | null;
   nameIdFormat?: SamlServiceProvider.NameIdFormat;
   releasedAttributes?: string[];
@@ -48,10 +37,7 @@ export interface UpdateServiceProvider {
 }
 
 export type SsoResult =
-  | { kind: 'login'; resumeId: string }
-  | { kind: 'post'; acsUrl: string; samlResponse: string; relayState?: string }
-  /** The signed-in user may not reach the linked application; the browser is sent to the hosted access-denied page. */
-  | { kind: 'denied'; applicationName: string };
+  { kind: 'login'; resumeId: string } | { kind: 'post'; acsUrl: string; samlResponse: string; relayState?: string } | { kind: 'denied'; applicationName: string };
 
 interface PendingSsoRequest {
   serviceProviderId: string;
@@ -59,14 +45,6 @@ interface PendingSsoRequest {
   relayState?: string;
 }
 
-/**
- * Declaring the constants
- *
- * The pending-request store is the IdP-side replay guard: an SSO attempt that detours through the
- * hosted login is parked in Redis under a single-use resume id, so a captured resume link cannot
- * mint a second assertion. Assertions themselves live five minutes and carry `InResponseTo`, the
- * registered ACS as `Recipient`, and an `AudienceRestriction` — the SP-side replay anchors.
- */
 const PENDING_TTL_SECONDS = 600;
 const ASSERTION_VALIDITY_SECONDS = 300;
 const RELEASABLE_ATTRIBUTES = ['email', 'first_name', 'last_name', 'display_name'] as const;
@@ -90,12 +68,9 @@ export class SamlService {
   ) {
     this.db = databaseService.getPostgresClient();
     this.redis = databaseService.getRedisClient();
-    /** Pairwise NameIDs are HMAC(user id, key derived from the master key) — stable, unlinkable across SPs. */
     const masterKey = Config.get('security.master-encryption-key');
     this.pairwiseKey = Buffer.from(hkdfSync('sha256', masterKey, 'shadow-identity', 'saml-pairwise-name-id', 32));
   }
-
-  /* ------------------------------- service provider registry ------------------------------- */
 
   private assertValidServiceProvider(entityId: string, acsUrl: string, releasedAttributes: string[]): void {
     if (!entityId.trim()) throw AppErrorCode.SML_001.create();
@@ -110,7 +85,6 @@ export class SamlService {
     if (invalid.length > 0) throw AppErrorCode.SML_001.create();
   }
 
-  /** A linked application must exist; an unknown id is a `APP_001`, the same not-found every admin surface answers. */
   private assertApplicationExists(applicationId: number | null | undefined): void {
     if (applicationId !== null && applicationId !== undefined) this.applicationService.getApplicationByIdOrThrow(applicationId);
   }
@@ -166,13 +140,10 @@ export class SamlService {
     return this.db.query.samlServiceProviders.findMany({ orderBy: (table, { asc }) => asc(table.createdAt) });
   }
 
-  /* --------------------------------------- sso flow --------------------------------------- */
-
   getMetadata(): string {
     return buildMetadata(this.issuer, `${this.issuer}/saml2/sso`, this.samlKeyService.getPublishedCertificates());
   }
 
-  /** SP-initiated SSO entry (HTTP-Redirect binding in, HTTP-POST binding out). */
   async handleSsoRequest(samlRequest: string, relayState: string | undefined, sessionSecret: string | undefined): Promise<SsoResult> {
     const xml = decodeSamlRequest(samlRequest);
     const request = xml ? parseAuthnRequest(xml) : null;
@@ -192,7 +163,6 @@ export class SamlService {
     return this.issueResponse(serviceProvider, session, request.id, relayState);
   }
 
-  /** Completes an SSO attempt parked for login; the resume id is single-use. */
   async resume(resumeId: string, sessionSecret: string | undefined): Promise<SsoResult> {
     const session = sessionSecret ? await this.sessionService.validate(sessionSecret) : null;
     if (!session) return { kind: 'login', resumeId };
@@ -209,7 +179,6 @@ export class SamlService {
     return `saml_sso:${resumeId}`;
   }
 
-  /** Runs the access gate for a linked SP; returns a `denied` result to relay, or `null` when the user may proceed. */
   private async assertApplicationAccess(userId: bigint, applicationId: number): Promise<Extract<SsoResult, { kind: 'denied' }> | null> {
     try {
       await this.applicationAccessService.assertUserAccess(userId, applicationId);
@@ -228,11 +197,6 @@ export class SamlService {
   }
 
   private async issueResponse(serviceProvider: SamlServiceProvider, session: ValidatedSession, requestId: string, relayState?: string): Promise<SsoResult> {
-    /**
-     * A linked SP runs the same sign-in gate an OAuth authorize does (T-902); an unlinked SP keeps its
-     * pre-T-902 behaviour untouched. There is no OAuth `redirect_uri` here, so a denial — hidden or
-     * denied alike — sends the browser to the hosted access-denied page rather than the SP.
-     */
     if (serviceProvider.applicationId !== null) {
       const denied = await this.assertApplicationAccess(session.userId, serviceProvider.applicationId);
       if (denied) return denied;

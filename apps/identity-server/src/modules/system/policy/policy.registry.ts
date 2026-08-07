@@ -1,16 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
  * How the candidate values for one key — the platform default, an optional client-level value, and
  * every applicable organisation override — collapse into the single value the runtime uses.
  *
@@ -21,16 +9,10 @@
 export type PolicyResolution = 'MIN' | 'MAX' | 'AND' | 'OR' | 'OVERRIDE';
 
 export interface PolicyDefinition {
-  /** The setting's name, as a title beside its control. */
   label: string;
-  /**
-   * Rendered under the label; describes the effect, not the mechanism. A duration states what it governs
-   * but never its unit — the editor lets an administrator pick one, so naming seconds here contradicts it.
-   */
   description: string;
   type: 'integer' | 'boolean';
   default: number | boolean;
-  /** Inclusive bounds for an `integer` policy. They also clamp the folded result, so no combination of overrides can escape them. */
   min?: number;
   max?: number;
   resolution: PolicyResolution;
@@ -40,24 +22,12 @@ export type PolicyKey = keyof typeof POLICY_REGISTRY;
 
 type ValueOf<D> = D extends { type: 'boolean' } ? boolean : number;
 
-/** The concrete value type a key carries, derived from its declared `type`. */
 export type PolicyValue<K extends PolicyKey> = ValueOf<(typeof POLICY_REGISTRY)[K]>;
-
-/**
- * Declaring the constants
- */
 
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-/**
- * The catalogue of settings an organisation may override. A key must appear here to be readable or
- * writable: `PolicyService` refuses anything else, which is what keeps a generic key/value table from
- * degenerating into untyped, undocumented configuration.
- *
- * Adding a policy is a single entry here plus its read site — no migration, no DTO change.
- */
 export const POLICY_REGISTRY = {
   'auth.access_token.ttl': {
     label: 'Access token lifetime',
@@ -114,11 +84,6 @@ export const POLICY_REGISTRY = {
     max: 180 * DAY,
     resolution: 'MIN',
   },
-  /**
-   * An emailed code sets the strength of AAL2 to control of the inbox, so an organisation must be
-   * able to refuse it. `AND` mirrors `MIN` for booleans: any applicable organisation disabling the
-   * fallback disables it for the meeting, so an organisation may tighten but never loosen.
-   */
   'mfa.email_otp_fallback.enabled': {
     label: 'Allow emailed one-time codes',
     description:

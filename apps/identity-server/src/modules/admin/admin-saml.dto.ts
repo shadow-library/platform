@@ -1,21 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type SamlNameIdFormatValue = 'EMAIL' | 'PERSISTENT';
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class ServiceProviderIdParams {
@@ -34,8 +19,7 @@ export class CreateServiceProviderBody {
   @Field({ maxLength: 2048 })
   acsUrl: string;
 
-  /** Links the SP to an application; a linked SP enforces the access gate before asserting (T-902). */
-  @Field(() => Number, { optional: true })
+  @Field(() => Number, { optional: true, description: 'Links the service provider to an application and enforces that application access gate before issuing assertions.' })
   applicationId?: number;
 
   @Field(() => String, { optional: true, enum: ['EMAIL', 'PERSISTENT'] })
@@ -56,8 +40,11 @@ export class UpdateServiceProviderBody {
   @Field({ optional: true, maxLength: 2048 })
   acsUrl?: string;
 
-  /** Links (or, as `null`, unlinks) the application whose access gate the SP enforces (T-902). */
-  @Field(() => Number, { optional: true, nullable: true })
+  @Field(() => Number, {
+    optional: true,
+    nullable: true,
+    description: 'Links the service provider to the application whose access gate it enforces; null removes the link.',
+  })
   applicationId?: number | null;
 
   @Field(() => String, { optional: true, enum: ['EMAIL', 'PERSISTENT'] })

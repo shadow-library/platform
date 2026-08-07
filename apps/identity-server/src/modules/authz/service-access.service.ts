@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, PrimaryDatabase, schema, ServiceRouteAccess } from '@server/modules/infrastructure/datastore';
-
-/**
- * Defining types
- */
 
 export interface CreateServiceAccessRule {
   applicationId: number;
@@ -24,14 +14,6 @@ export interface CreateServiceAccessRule {
   createdBy?: string;
 }
 
-/**
- * Declaring the constants
- *
- * The admin-managed M2M route allowlist (D-17). Admins configure which caller client may invoke
- * which routes of a target application; each consuming service loads its own application's rules
- * at startup through the SDK and enforces them locally, deny-by-default. Route code never names
- * callers, and granting a new caller is an admin operation instead of a redeploy.
- */
 const ALLOWED_METHODS = new Set(['*', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 const UUID_PATTERN = /^[0-9a-fA-F-]{36}$/;
 
@@ -44,7 +26,6 @@ export class ServiceAccessService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /** Rules a service enforces for its own routes, resolved from the caller's client id (an ecosystem client id, e.g. `pulse-server`) */
   async listForClient(clientId: string): Promise<ServiceRouteAccess[]> {
     const client = await this.db.query.oauthClients.findFirst({ where: eq(schema.oauthClients.id, clientId), columns: { applicationId: true } });
     if (!client) throw AppErrorCode.AUTHZ_002.create();
@@ -81,7 +62,6 @@ export class ServiceAccessService {
     return deleted.length > 0;
   }
 
-  /** Idempotent create: a conflict means the identical rule already exists, so return it */
   private async getExisting(input: CreateServiceAccessRule, method: string): Promise<ServiceRouteAccess> {
     const rules = await this.listForApplication(input.applicationId);
     const existing = rules.find(rule => rule.callerClientId === input.callerClientId && rule.method === method && rule.pathPattern === input.pathPattern);

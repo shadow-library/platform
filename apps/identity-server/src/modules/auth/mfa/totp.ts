@@ -1,30 +1,13 @@
-/**
- * Importing npm packages
- */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export interface TotpOptions {
-  /** Time-step size in seconds (RFC 6238 default). */
   stepSeconds?: number;
-  /** Number of steps accepted on either side of the current one. */
   window?: number;
-  /** Clock override for tests. */
   now?: number;
 }
 
-/**
- * Declaring the constants
- */
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const CODE_DIGITS = 6;
 const DEFAULT_STEP_SECONDS = 30;
@@ -63,7 +46,6 @@ export function base32Decode(encoded: string): Buffer {
   return Buffer.from(bytes);
 }
 
-/** RFC 4226 HOTP: HMAC-SHA1 with dynamic truncation to a zero-padded 6-digit code. */
 export function hotp(secret: Buffer, counter: number): string {
   const message = Buffer.alloc(8);
   message.writeBigUInt64BE(BigInt(counter));
@@ -74,11 +56,6 @@ export function hotp(secret: Buffer, counter: number): string {
   return binary.padStart(CODE_DIGITS, '0');
 }
 
-/**
- * Verifies a TOTP code within the accept window and returns the matched time-step counter so the
- * caller can persist it for replay rejection, or null when no step matches. Comparison is
- * constant-time per candidate step.
- */
 export function verifyTotp(secret: Buffer, code: string, options: TotpOptions = {}): number | null {
   if (!/^\d{6}$/.test(code)) return null;
   const stepSeconds = options.stepSeconds ?? DEFAULT_STEP_SECONDS;
@@ -94,7 +71,6 @@ export function verifyTotp(secret: Buffer, code: string, options: TotpOptions = 
   return null;
 }
 
-/** Builds the otpauth:// provisioning URI consumed by authenticator apps. */
 export function buildOtpauthUri(issuer: string, account: string, secretBase32: string): string {
   const label = `${encodeURIComponent(issuer)}:${encodeURIComponent(account)}`;
   const params = new URLSearchParams({ secret: secretBase32, issuer, algorithm: 'SHA1', digits: CODE_DIGITS.toString(), period: DEFAULT_STEP_SECONDS.toString() });

@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { Logger, utils, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES } from '@server/constants';
 import { MfaService, RecoveryCodeService } from '@server/modules/auth/mfa';
@@ -21,10 +15,6 @@ import { OTP_RESEND_BUDGET } from './challenge-flow.service';
 import { ChallengeService } from './challenge.service';
 import { FlowStepResult } from './flow.types';
 import { SignInEventService } from './sign-in-event.service';
-
-/**
- * Defining types
- */
 
 export interface RecoverInitInput {
   identifier: string;
@@ -43,9 +33,6 @@ export interface RecoveryMfaProof {
   recoveryCode?: string;
 }
 
-/**
- * Declaring the constants
- */
 const MAX_FLOW_FAILURES = 3;
 const AWAITING_EMAIL_OTP = 'AWAITING_EMAIL_OTP';
 const AWAITING_TOTP = 'AWAITING_TOTP';
@@ -72,10 +59,6 @@ export class RecoveryService {
     private readonly recoveryCodeService: RecoveryCodeService,
   ) {}
 
-  /**
-   * Starts recovery. Neutral for unknown accounts (D-12): a flow is always created but an OTP is
-   * only issued (to the account's verified email) when the identifier resolves to a user.
-   */
   async init(input: RecoverInitInput): Promise<RecoveryInitResult> {
     const user = await this.userService.getUser(input.identifier);
     const email = user ? await this.userEmailService.getPrimaryEmail(user.id) : null;
@@ -88,16 +71,10 @@ export class RecoveryService {
     });
     if (user && email) await this.challengeService.issue({ flowId: flow.flowId, type: 'EMAIL_OTP', target: email, userId: user.id, templateKey: OTP_TEMPLATE });
 
-    /** The masked address is derived from the typed identifier only, never the resolved account (D-12). */
     const metadata = input.identifier.includes('@') ? { maskedEmail: utils.string.maskEmail(input.identifier) } : undefined;
     return { flowId: flow.flowId, status: flow.status, resendsLeft: OTP_RESEND_BUDGET, metadata };
   }
 
-  /**
-   * Proves control of the verified email. For MFA-enrolled accounts the flow then demands a
-   * second factor: recovery MUST NOT downgrade an MFA account to single-factor takeover
-   * (docs/auth/overview.md §5).
-   */
   async verifyOtp(flowId: string, code: string): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId, AWAITING_EMAIL_OTP);
     const valid = Boolean(flow.userId) && (await this.challengeService.verify(flowId, code));
@@ -108,7 +85,6 @@ export class RecoveryService {
     return { outcome: 'CONTINUE', flowId, status: next.status };
   }
 
-  /** Satisfies the recovery MFA gate with a TOTP code or a single-use recovery code. */
   async verifyMfa(flowId: string, proof: RecoveryMfaProof): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId, AWAITING_TOTP);
     const userId = BigInt(flow.userId ?? '0');
@@ -128,7 +104,6 @@ export class RecoveryService {
     const flow = await this.requireFlow(flowId, AWAITING_NEW_PASSWORD);
     const userId = BigInt(flow.userId ?? '0');
 
-    /** Recovery mints a session, so it has to honour the same status gate as login — otherwise a blocked account could reset its way back in. */
     const user = await this.userService.getUser(userId);
     if (!user) throw AppErrorCode.AUTH_008.create();
     this.userService.assertLoginAllowed(await this.userService.resolveEffectiveStatus(user));

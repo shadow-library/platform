@@ -1,25 +1,12 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { sql } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { schema } from '@server/modules/infrastructure/datastore';
 import { NotificationClient, NotificationService, SendNotification } from '@server/modules/infrastructure/notification';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('notification').init();
 
 let sentCalls: SendNotification[] = [];

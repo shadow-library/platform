@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { and, desc, eq, notInArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
-
-/**
- * Defining types
- */
 
 export interface PasswordHash {
   hash: string;
@@ -26,8 +16,6 @@ export interface VerifyResult {
 }
 
 /**
- * Declaring the constants
- *
  * Argon2id cost parameters are pinned and versioned so a policy change becomes a rehash-on-verify
  * migration rather than a silent divergence. Bumping PARAMS_VERSION marks every older hash for
  * upgrade the next time its owner authenticates.
@@ -58,11 +46,6 @@ export class PasswordService {
     return { valid, needsRehash: valid && stored.version !== PASSWORD_PARAMS_VERSION };
   }
 
-  /**
-   * Verifies a user's password credential, transparently upgrading the stored hash when the pinned
-   * parameters have changed. Returns false (after a constant-work dummy verification) when the user
-   * has no password identity, so callers cannot distinguish "no credential" from "wrong password".
-   */
   async verifyForUser(userId: bigint | null, password: string): Promise<boolean> {
     const identity = userId
       ? await this.db.query.userAuthIdentities.findFirst({
@@ -90,7 +73,6 @@ export class PasswordService {
     return result.valid;
   }
 
-  /** Whether the user holds a password credential — false for federated-only (passwordless) accounts. */
   async hasPassword(userId: bigint): Promise<boolean> {
     const identity = await this.db.query.userAuthIdentities.findFirst({
       where: and(eq(schema.userAuthIdentities.userId, userId), eq(schema.userAuthIdentities.provider, 'PASSWORD')),
@@ -99,10 +81,6 @@ export class PasswordService {
     return identity !== undefined;
   }
 
-  /**
-   * Sets (or creates) a user's password credential and records it in history. Used by recovery and
-   * password change; callers should reject reused passwords via isReused beforehand.
-   */
   async changePassword(userId: bigint, password: string, providerKey: string): Promise<void> {
     const { hash, version } = await this.hash(password);
     await this.db.transaction(async tx => {
@@ -123,14 +101,12 @@ export class PasswordService {
         .values({ userAuthIdentityId: identity.id, hash, version, algorithm: 'ARGON2ID' })
         .onConflictDoUpdate({ target: schema.userPasswords.userAuthIdentityId, set: { hash, version, algorithm: 'ARGON2ID' } });
       await tx.insert(schema.passwordHistory).values({ userId, hash });
-      /** A replaced credential satisfies any admin-forced reset (T-602). */
       await tx.update(schema.users).set({ passwordResetRequired: false }).where(eq(schema.users.id, userId));
     });
     await this.pruneHistory(userId);
     this.logger.info('password changed', { userId });
   }
 
-  /** Rejects a candidate password that matches the current or any of the recent stored hashes. */
   async isReused(userId: bigint, password: string): Promise<boolean> {
     const history = await this.db
       .select({ hash: schema.passwordHistory.hash })

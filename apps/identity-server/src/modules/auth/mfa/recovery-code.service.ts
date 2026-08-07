@@ -1,31 +1,15 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { UserEmailService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Crockford-style alphabet without lookalike characters (0/O, 1/I/L) so codes survive being read
- * aloud or written down; 10 symbols of 5 bits each carry 50 bits of entropy per code.
- */
 const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
 const CODE_LENGTH = 10;
 const BATCH_SIZE = 10;
@@ -57,14 +41,9 @@ export class RecoveryCodeService {
     return code.toUpperCase().replace(/[^0-9A-Z]/g, '');
   }
 
-  /**
-   * Issues a fresh batch of single-use codes, atomically retiring any previous generation. The
-   * plaintext codes exist only in the returned array; the database holds argon2id hashes.
-   */
   async generate(userId: bigint): Promise<string[]> {
     const codes = Array.from({ length: BATCH_SIZE }, () => this.generateCode());
     const hashes: string[] = [];
-    /** Hashed sequentially: ten concurrent argon2id computations would spike ~640 MiB of RAM. */
     for (const code of codes) hashes.push(await Bun.password.hash(this.normalize(code), ARGON2_OPTIONS));
 
     await this.db.transaction(async tx => {
@@ -82,11 +61,6 @@ export class RecoveryCodeService {
     return codes;
   }
 
-  /**
-   * Consumes a recovery code as an MFA bypass. The `used_at IS NULL` guard in the update makes
-   * consumption single-use even under concurrent attempts; the user is alerted because a bypass
-   * of their second factor is a security-relevant event they did not necessarily initiate.
-   */
   async consume(userId: bigint, code: string): Promise<boolean> {
     const normalized = this.normalize(code);
     const candidates = await this.db.query.recoveryCodes.findMany({

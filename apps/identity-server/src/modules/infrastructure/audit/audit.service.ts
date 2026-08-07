@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 import { createHash } from 'node:crypto';
 
@@ -8,16 +5,9 @@ import { asc, desc, eq, isNull, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { AuditEvent, DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { WebhookService } from '@server/modules/infrastructure/webhook';
-
-/**
- * Defining types
- */
 
 export interface AuditInput {
   action: string;
@@ -37,11 +27,6 @@ export interface ChainVerification {
   brokenAt?: string;
 }
 
-/**
- * Declaring the constants
- *
- * Keys whose values must never be written into the audit detail, even if a caller passes them.
- */
 const REDACTED_KEYS = new Set(['password', 'token', 'secret', 'code', 'hash', 'privatekey', 'authorization', 'cookie']);
 const GLOBAL_CHAIN = 'global';
 
@@ -72,11 +57,6 @@ export class AuditService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /**
-   * Appends an event to its organisation's hash chain. A per-chain transaction advisory lock
-   * serialises concurrent writers so the chain cannot fork; the hash binds the canonical row to
-   * its predecessor, making any later tampering detectable.
-   */
   async record(input: AuditInput): Promise<AuditEvent> {
     const chainKey = input.organisationId ?? GLOBAL_CHAIN;
     const id = Bun.randomUUIDv7();
@@ -113,13 +93,11 @@ export class AuditService {
         .values({ ...record, prevHash, hash })
         .returning();
       assert(inserted, 'Audit event insertion failed');
-      /** Same transaction: an audit event and its webhook deliveries commit or vanish together. */
       await this.webhookService.fanOut(inserted, tx);
       return inserted;
     });
   }
 
-  /** Most-recent-first trail of events a subject performed or was the target of (admin views). */
   async listForSubject(subjectId: string, limit = 50): Promise<AuditEvent[]> {
     return this.db
       .select()
@@ -129,7 +107,6 @@ export class AuditService {
       .limit(limit);
   }
 
-  /** Recomputes every hash in a chain and reports the first row that fails to match. */
   async verifyChain(organisationId: string | null = null): Promise<ChainVerification> {
     const rows = await this.db.select().from(schema.auditEvents).where(this.chainCondition(organisationId)).orderBy(asc(schema.auditEvents.id));
     let prevHash: string | null = null;

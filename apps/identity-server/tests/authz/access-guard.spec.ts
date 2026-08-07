@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { type FastifyRequest } from 'fastify';
 import { type HandlerMetadata } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { type AuthContext, type AuthenticatedRequest, type AuthOptions } from '@server/modules/access';
 import { ACCESS_METADATA } from '@server/modules/access/access.decorator';
 import { AccessGuard } from '@server/modules/access/access.guard';
@@ -22,13 +16,6 @@ import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('access-guard').init();
 
 describe('AccessGuard', () => {
@@ -40,7 +27,6 @@ describe('AccessGuard', () => {
 
   const metadataFor = (options?: AuthOptions): HandlerMetadata => ({ [ACCESS_METADATA]: options, method: 'GET', path: '/test' }) as unknown as HandlerMetadata;
 
-  /** Runs the guard for the given route options against a request, returning the attached context or the thrown error. */
   const resolve = async (options: AuthOptions | undefined, request: FastifyRequest): Promise<AuthContext | Error> => {
     const handler = guard.generate(metadataFor(options));
     if (!handler) throw new Error('guard produced no handler');

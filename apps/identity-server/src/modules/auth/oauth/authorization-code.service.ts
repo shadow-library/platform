@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
 
 import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { DatabaseService } from '@server/modules/infrastructure/datastore';
-
-/**
- * Defining types
- */
 
 export interface AuthorizationCodePayload {
   clientId: string;
@@ -30,12 +20,6 @@ export interface AuthorizationCodePayload {
   organisationId?: string;
 }
 
-/**
- * Declaring the constants
- *
- * Authorization codes are single-use and short-lived; they live only in Redis, keyed by a hash of
- * the code so the plaintext is never persisted.
- */
 const CODE_TTL_SECONDS = 60;
 
 @Injectable()
@@ -54,12 +38,10 @@ export class AuthorizationCodeService {
   async issue(payload: AuthorizationCodePayload): Promise<string> {
     const code = randomBytes(32).toString('base64url');
     await this.redis.set(this.key(code), JSON.stringify(payload), 'EX', CODE_TTL_SECONDS);
-    /** The code plaintext is never logged; only the bound context (debug-only, dev/local). */
     this.logger.debug('issued authorization code', { clientId: payload.clientId, userId: payload.userId, sessionId: payload.sessionId, ttlSeconds: CODE_TTL_SECONDS });
     return code;
   }
 
-  /** Atomically fetches and deletes a code, enforcing single use. */
   async consume(code: string): Promise<AuthorizationCodePayload | null> {
     const raw = await this.redis.getdel(this.key(code));
     if (!raw) {

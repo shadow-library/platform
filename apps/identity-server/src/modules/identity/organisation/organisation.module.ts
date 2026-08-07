@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Module } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { SessionModule } from '@server/modules/auth/session';
 import { TokenModule } from '@server/modules/auth/token';
 import { AuthzModule } from '@server/modules/authz';
@@ -22,14 +16,6 @@ import { InvitationService } from './invitation.service';
 import { MeOrganisationController } from './me-organisation.controller';
 import { OrganisationController } from './organisation.controller';
 import { OrganisationService } from './organisation.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Module({
   imports: [DatabaseModule, SessionModule, TokenModule, AuthzModule, AuditModule, NotificationModule, SecurityModule, ApplicationModule],

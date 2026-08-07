@@ -1,26 +1,12 @@
-/**
- * Importing npm packages
- */
 import { sql } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 import { Get, HttpController, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { Auth } from '@server/modules/access';
 import { DatabaseService } from '@server/modules/infrastructure/datastore';
 
 import { DependencyStatus, HealthResponse, ReadinessResponse } from './health.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController()
 export class HealthController {

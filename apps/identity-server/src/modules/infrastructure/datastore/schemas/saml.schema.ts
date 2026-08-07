@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel } from 'drizzle-orm';
 import { boolean, integer, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { applications } from './applications.schema';
-
-/**
- * Defining types
- */
 
 export type SamlServiceProvider = InferSelectModel<typeof samlServiceProviders>;
 
@@ -20,8 +10,6 @@ export namespace SamlServiceProvider {
 }
 
 /**
- * Declaring the constants
- *
  * Registered SAML 2.0 relying parties (T-701). Service providers are platform-tier integrations,
  * managed by the same administrators as OAuth clients. The ACS URL is matched exactly against the
  * AuthnRequest (never taken from the request alone) so a compromised SP request can never redirect
@@ -37,10 +25,8 @@ export const samlServiceProviders = pgTable('saml_service_providers', {
   entityId: text('entity_id').notNull().unique(),
   name: varchar('name', { length: 255 }).notNull(),
   acsUrl: text('acs_url').notNull(),
-  /** When linked, SP-initiated SSO enforces the application access gate before issuing an assertion (T-902); `SET NULL` keeps the SP working, ungated, if the application is deleted. */
   applicationId: integer('application_id').references(() => applications.id, { onDelete: 'set null' }),
   nameIdFormat: samlNameIdFormat('name_id_format').notNull().default('EMAIL'),
-  /** Standard attributes released in the assertion; allowed values: email, first_name, last_name, display_name. */
   releasedAttributes: text('released_attributes').array().notNull(),
   spCertificatePem: text('sp_certificate_pem'),
   isActive: boolean('is_active').notNull().default(true),

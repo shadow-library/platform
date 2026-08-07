@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
 import { bigint, index, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { userSessions } from './auth-tokens.schemas';
 import { users } from './users.schema';
-
-/**
- * Defining types
- */
 
 export type RefreshTokenFamily = InferSelectModel<typeof refreshTokenFamilies>;
 export type RefreshToken = InferSelectModel<typeof refreshTokens>;
@@ -23,18 +13,10 @@ export namespace RefreshToken {
   export type RevokeReason = InferEnum<typeof refreshRevokeReason>;
 }
 
-/**
- * Declaring the constants
- */
-
 export const refreshFamilyStatus = pgEnum('refresh_family_status', ['ACTIVE', 'REVOKED']);
 export const refreshRevokeReason = pgEnum('refresh_revoke_reason', ['ROTATION_REUSE', 'LOGOUT', 'ADMIN', 'EXPIRY']);
 export const refreshTokenStatus = pgEnum('refresh_token_status', ['ACTIVE', 'ROTATED', 'REVOKED']);
 
-/**
- * A refresh-token family groups the rotation chain issued to one client for one session. Presenting
- * any superseded member is treated as theft: the whole family (and its session) is revoked (D-11).
- */
 export const refreshTokenFamilies = pgTable(
   'refresh_token_families',
   {
@@ -78,10 +60,6 @@ export const refreshTokens = pgTable(
     index('refresh_tokens_family_id_idx').on(t.familyId),
   ],
 );
-
-/**
- * Declaring the relations
- */
 
 export const refreshTokenFamilyRelations = relations(refreshTokenFamilies, ({ many, one }) => ({
   tokens: many(refreshTokens),

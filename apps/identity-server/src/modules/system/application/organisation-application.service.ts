@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { AuditService } from '@server/modules/infrastructure/audit';
@@ -16,11 +10,6 @@ import { Application, DatabaseService, Organisation, PrimaryDatabase, schema } f
 import { ApplicationAccessService } from './application-access.service';
 import { ApplicationService } from './application.service';
 
-/**
- * Defining types
- */
-
-/** The audit attribution for a mutation: the acting user's id and, where a browser call, its ip. */
 export interface AppAccessActor {
   actorId: string;
   ip?: string;
@@ -51,16 +40,6 @@ export interface OrganisationApplicationsView {
   applications: OrganisationApplicationRow[];
 }
 
-/**
- * Declaring the constants
- *
- * The write side of the access model (T-903): platform admins release RESTRICTED apps to organisations
- * (`PLATFORM_RELEASE`) and org admins assign reachable apps to their own allowlist (`ORG_ASSIGNMENT`).
- * Every mutation bumps the affected organisation's grant version through `ApplicationAccessService` so
- * the sign-in gate and every token mint (T-902) converge, and records the change on the audit chain —
- * platform actions on the global chain, org actions on the organisation's own chain.
- */
-
 @Injectable()
 export class OrganisationApplicationService {
   private readonly logger = Logger.getLogger(APP_NAME, OrganisationApplicationService.name);
@@ -75,9 +54,6 @@ export class OrganisationApplicationService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /* --------------------------- platform-admin release surface --------------------------- */
-
-  /** The organisations an application reaches beyond the universal PUBLIC set: its releases and its org assignments. */
   async listApplicationOrganisations(applicationId: number): Promise<ApplicationOrganisationRow[]> {
     this.applicationService.getApplicationByIdOrThrow(applicationId);
     return this.db
@@ -95,7 +71,6 @@ export class OrganisationApplicationService {
       .orderBy(schema.organisationApplications.assignedAt);
   }
 
-  /** Releases a RESTRICTED app to a live team organisation. Idempotent — a repeated release is a no-op. */
   async release(actor: AppAccessActor, applicationId: number, organisationId: bigint): Promise<void> {
     const application = this.applicationService.getApplicationByIdOrThrow(applicationId);
     if (application.visibility !== 'RESTRICTED') throw AppErrorCode.APP_008.create();
@@ -107,7 +82,6 @@ export class OrganisationApplicationService {
     this.logger.info('released application to organisation', { applicationId, organisationId });
   }
 
-  /** Withdraws a platform release; the org's members lose the RESTRICTED app on their next mint (D-A4). Idempotent. */
   async revoke(actor: AppAccessActor, applicationId: number, organisationId: bigint): Promise<void> {
     this.applicationService.getApplicationByIdOrThrow(applicationId);
     await this.db.delete(schema.organisationApplications).where(this.rowCondition(organisationId, applicationId, 'PLATFORM_RELEASE'));
@@ -116,12 +90,6 @@ export class OrganisationApplicationService {
     this.logger.info('revoked application release from organisation', { applicationId, organisationId });
   }
 
-  /* --------------------------- org-admin assignment surface --------------------------- */
-
-  /**
-   * The apps an organisation may offer its members — the universal PUBLIC set plus any RESTRICTED apps
-   * released to it — each flagged with whether the org has assigned it, alongside the org's access mode.
-   */
   async listForOrganisation(organisationId: bigint): Promise<OrganisationApplicationsView> {
     const organisation = await this.db.query.organisations.findFirst({ where: eq(schema.organisations.id, organisationId) });
     if (!organisation) throw AppErrorCode.ORG_002.create();
@@ -146,11 +114,6 @@ export class OrganisationApplicationService {
     };
   }
 
-  /**
-   * Adds an app to the org's assignment allowlist. Guardrail (D-A1): an org can only assign apps its
-   * members could actually reach — an inactive, INTERNAL, or unreleased RESTRICTED app is refused so an
-   * assignment can never promise access the sign-in gate would then deny. Idempotent.
-   */
   async assign(actor: AppAccessActor, organisationId: bigint, applicationId: number): Promise<void> {
     await this.assertReachable(organisationId, applicationId);
 
@@ -160,7 +123,6 @@ export class OrganisationApplicationService {
     this.logger.info('assigned application to organisation', { applicationId, organisationId });
   }
 
-  /** Removes an app from the org's allowlist; members lose it on their next mint (D-A4). Idempotent. */
   async unassign(actor: AppAccessActor, organisationId: bigint, applicationId: number): Promise<void> {
     await this.db.delete(schema.organisationApplications).where(this.rowCondition(organisationId, applicationId, 'ORG_ASSIGNMENT'));
     await this.accessService.invalidateOrganisation(organisationId.toString());
@@ -168,11 +130,6 @@ export class OrganisationApplicationService {
     this.logger.info('unassigned application from organisation', { applicationId, organisationId });
   }
 
-  /**
-   * Switches the org between open (`ALL_APPS`) and managed-allowlist (`ASSIGNED_ONLY`) access. Stricter
-   * than the rest of org administration: only an elevated owner may flip it, since it governs every
-   * member's app surface (field-dependent authorization, mirroring `OrganisationService.changeMemberRole`).
-   */
   async changeAppAccessMode(
     actor: AppAccessActor,
     organisationId: bigint,
@@ -194,23 +151,12 @@ export class OrganisationApplicationService {
     return organisation;
   }
 
-  /* --------------------------- reachability --------------------------- */
-
-  /**
-   * The ORG_011 reachability rule (D-A1): an organisation may only be handed an application its members
-   * could actually reach — active, never INTERNAL, and a RESTRICTED app only once released to the org.
-   * Shared by org self-assignment (T-903) and SCIM group→role mapping (T-905), so a mapping can never
-   * promise a role on an app the sign-in gate would then refuse the group's members entry to.
-   */
   async assertReachable(organisationId: bigint, applicationId: number): Promise<void> {
     const application = this.applicationService.getApplicationByIdOrThrow(applicationId);
     if (!application.isActive || application.visibility === 'INTERNAL') throw AppErrorCode.ORG_011.create();
     if (application.visibility === 'RESTRICTED' && !(await this.hasRelease(organisationId, applicationId))) throw AppErrorCode.ORG_011.create();
   }
 
-  /* --------------------------- internals --------------------------- */
-
-  /** A release target must be a live team organisation; a personal workspace or an absent/inactive org is not one. */
   private async assertReleasableOrganisation(organisationId: bigint): Promise<void> {
     const organisation = await this.db.query.organisations.findFirst({ where: eq(schema.organisations.id, organisationId) });
     if (!organisation || organisation.status !== 'ACTIVE') throw AppErrorCode.ORG_002.create();
@@ -237,7 +183,6 @@ export class OrganisationApplicationService {
     );
   }
 
-  /** Platform-admin actions live on the global chain, attributed to the acting user with the app as target. */
   private recordGlobal(actor: AppAccessActor, action: string, applicationId: number, detail: Record<string, unknown>): Promise<unknown> {
     return this.auditService.record({
       action,
@@ -251,7 +196,6 @@ export class OrganisationApplicationService {
     });
   }
 
-  /** Org-scoped actions live on the organisation's own hash chain, like every other org mutation. */
   private recordForOrganisation(actor: AppAccessActor, organisationId: bigint, action: string, applicationId?: number, detail?: Record<string, unknown>): Promise<unknown> {
     return this.auditService.record({
       action,

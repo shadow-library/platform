@@ -1,25 +1,13 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class RoleAssignmentBody {
-  /** `ORGANISATION` mints a vendor-controlled org-wide tier grant (D-A5): principalId is the org id and the assignment is scoped to that same org. */
-  @Field(() => String, { enum: ['USER', 'SERVICE_ACCOUNT', 'ORGANISATION'] })
+  @Field(() => String, {
+    enum: ['USER', 'SERVICE_ACCOUNT', 'ORGANISATION'],
+    description: 'ORGANISATION creates an organisation-wide tier grant whose principal and assignment scope are the same organisation.',
+  })
   principalType: 'USER' | 'SERVICE_ACCOUNT' | 'ORGANISATION';
 
   @Field()
@@ -28,8 +16,7 @@ export class RoleAssignmentBody {
   @Field(() => Number)
   roleId: number;
 
-  /** Ignored for an `ORGANISATION` grant, whose scope is derived from principalId — the server never trusts a divergent value. */
-  @Field({ ...PATTERN.ID })
+  @Field({ ...PATTERN.ID, description: 'Ignored for ORGANISATION grants, whose scope is derived from principalId.' })
   organisationId: string;
 }
 
@@ -53,8 +40,10 @@ export class RoleAssignmentItem {
   @Field()
   id: string;
 
-  /** Read-only projection: it reflects any stored assignment, including the ORGANISATION principal the admin API begins minting in T-904. */
-  @Field(() => String, { enum: ['USER', 'SERVICE_ACCOUNT', 'ORGANISATION'] })
+  @Field(() => String, {
+    enum: ['USER', 'SERVICE_ACCOUNT', 'ORGANISATION'],
+    description: 'Read-only projection of the stored assignment, including organisation principals.',
+  })
   principalType: 'USER' | 'SERVICE_ACCOUNT' | 'ORGANISATION';
 
   @Field()

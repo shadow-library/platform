@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Body, Delete, Get, HttpController, HttpStatus, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { Auth, Context } from '@server/modules/access';
 
 import { AddContactResponse, AddEmailBody, AddPhoneBody, ContactListResponse, ContactOperationResponse, RemoveEmailBody, RemovePhoneBody, VerifyContactBody } from './contact.dto';
 import { type ContactItem, ContactService } from './contact.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/me')
 @Auth({ session: true })

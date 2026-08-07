@@ -1,22 +1,12 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { Config, utils } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { UserEmailService } from '@server/modules/identity/user';
 import { VerificationChallenge } from '@server/modules/infrastructure/datastore';
 
 import { AuthFlowContext, AuthFlowService } from './auth-flow.service';
 import { ChallengeService } from './challenge.service';
-
-/**
- * Defining types
- */
 
 export type ChallengeMethodName = 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP';
 
@@ -44,13 +34,6 @@ interface ChallengeDelivery {
 
 export type ResendResult = { status: 'SENT'; resendsLeft: number; retryAfterSeconds: number } | { status: 'LIMITED'; retryAfterSeconds: number };
 
-/**
- * Declaring the constants
- *
- * Tier-2 per-flow budgets (architecture §13.2): 3 resends per flow beyond the initial send and a
- * 60s cooldown between sends. The per-identifier hourly delivery cap lives in `ChallengeService`
- * so it also covers initial sends and contact-verification traffic.
- */
 export const OTP_RESEND_BUDGET = 3;
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -71,11 +54,6 @@ export class ChallengeFlowService {
     private readonly userEmailService: UserEmailService,
   ) {}
 
-  /**
-   * Advertises the authentication methods for a login flow. The list is derived from the shape of
-   * the typed identifier and the universally available methods only — never from the resolved
-   * account — so known and unknown identifiers produce identical output (D-12).
-   */
   async listMethods(flowId: string): Promise<ChallengeMethodDescriptor[]> {
     const flow = await this.requireLoginFlow(flowId);
     const methods: ChallengeMethodDescriptor[] = [{ name: 'PASSWORD' }, { name: 'WEBAUTHN' }];
@@ -84,10 +62,8 @@ export class ChallengeFlowService {
     return methods;
   }
 
-  /** Switches a login flow to another first-factor method; OTP methods issue their first code here. */
   async changeMethod(flowId: string, method: ChallengeMethodName): Promise<MethodChangeResult> {
     const flow = await this.requireLoginFlow(flowId);
-    /** Enforced federation admits no local first factor — switching methods must not reopen one (T-702). */
     if (flow.federated?.enforced) throw AppErrorCode.AUTH_007.create();
     if (MFA_STATUSES.includes(flow.status)) throw AppErrorCode.AUTH_002.create();
 
@@ -111,11 +87,6 @@ export class ChallengeFlowService {
     return { flowId, status: next.status, resendsLeft: next.resendsLeft, metadata };
   }
 
-  /**
-   * Re-issues the pending OTP for a flow, bounded by the per-flow budget and the send cooldown.
-   * The per-identifier cap is enforced silently: the response still reads SENT, delivery is just
-   * skipped, because a distinguishable refusal would leak delivery activity for the identifier.
-   */
   async resend(flowId: string, method: 'EMAIL_OTP' | 'SMS_OTP'): Promise<ResendResult> {
     const flow = await this.requireFlow(flowId);
     if (OTP_STATUSES[flow.status] !== method) throw AppErrorCode.AUTH_002.create();
@@ -138,12 +109,10 @@ export class ChallengeFlowService {
     await this.challengeService.issue({ flowId: flow.flowId, type, target, userId: flow.userId ? BigInt(flow.userId) : null, templateKey });
   }
 
-  /** Resolves where a resent code goes; null means the flow has no real recipient and delivery is pretend-only. */
   private async resolveDelivery(flow: AuthFlowContext): Promise<ChallengeDelivery | null> {
     if (flow.kind === 'REGISTRATION') return flow.regData?.exists ? null : { target: flow.identifier, templateKey: REGISTER_OTP_TEMPLATE };
     if (flow.kind === 'LOGIN') return flow.userId ? { target: flow.identifier, templateKey: LOGIN_OTP_TEMPLATE } : null;
 
-    /** RECOVERY codes go to the account's primary email, which only resolved users have. */
     if (!flow.userId) return null;
     const target = await this.userEmailService.getPrimaryEmail(BigInt(flow.userId));
     return target ? { target, templateKey: RECOVERY_OTP_TEMPLATE } : null;

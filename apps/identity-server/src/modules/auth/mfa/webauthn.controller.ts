@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Body, Delete, HttpController, HttpStatus, Params, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { Auth, Context } from '@server/modules/access';
 
 import { OperationSuccessResponse, StepUpResponse } from './mfa.dto';
@@ -18,14 +12,6 @@ import {
   WebauthnStepUpOptionsResponse,
 } from './webauthn.dto';
 import { WebauthnService } from './webauthn.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/me/webauthn')
 @Auth({ session: true })

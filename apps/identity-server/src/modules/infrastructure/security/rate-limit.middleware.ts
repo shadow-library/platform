@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type FastifyReply, type FastifyRequest } from 'fastify';
 import { type HandlerMetadata } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { AsyncRouteHandler, Middleware, MiddlewareGenerator } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
@@ -16,18 +10,6 @@ import { M2M_BUDGET_METADATA } from './m2m-budget.decorator';
 import { RATE_LIMIT_METADATA, RateLimitPolicy } from './rate-limit.decorator';
 import { RateDecision, RateLimiterService } from './rate-limiter.service';
 import { GENERAL_LIMIT, GENERAL_WINDOW_SECONDS, IP_GENERAL_BUCKET } from './security.constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * The general budget (Tier-1 baseline, architecture §13.2) applies to every route; decorated
- * routes add their own tighter budget. Runs at `onRequest` so rejected floods never reach body
- * parsing, and before the CSRF middleware (weight 90).
- */
 
 @Middleware({ type: 'onRequest', weight: 95 })
 export class RateLimitMiddleware implements MiddlewareGenerator {
@@ -57,11 +39,6 @@ export class RateLimitMiddleware implements MiddlewareGenerator {
       const blockTtl = await this.guarded(() => this.rateLimiter.getIpBlockTtl(ip), failClosed);
       if (blockTtl) return this.reject(reply, blockTtl);
 
-      /**
-       * An M2M route only reads the IP tier: a caller that already flooded it is turned away, but a
-       * request that goes on to authenticate is charged to its own client budget instead (T-804).
-       * `M2MRateLimitMiddleware` counts the ones that never authenticate.
-       */
       const chargeIp = isM2M ? this.rateLimiter.peek.bind(this.rateLimiter) : this.rateLimiter.consume.bind(this.rateLimiter);
       const general = await this.guarded(() => chargeIp(IP_GENERAL_BUCKET, ip, GENERAL_LIMIT, GENERAL_WINDOW_SECONDS), failClosed);
       if (general && !general.allowed) return this.reject(reply, general.retryAfterSeconds);
@@ -72,10 +49,6 @@ export class RateLimitMiddleware implements MiddlewareGenerator {
     };
   }
 
-  /**
-   * Wraps a Redis-backed check: the authentication surface (decorated routes) fails closed on a
-   * backend error, everything else degrades to unlimited rather than unavailable.
-   */
   private async guarded<T extends RateDecision | number>(check: () => Promise<T>, failClosed: boolean): Promise<T | null> {
     try {
       return await check();

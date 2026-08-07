@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Config } from '@shadow-library/common';
 import { FastifyModule } from '@shadow-library/fastify';
 import { HttpCoreModule } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AccessModule } from '@server/modules/access/access.module';
 import { AdminModule } from '@server/modules/admin';
 import { AppSessionModule } from '@server/modules/auth/app-session';
@@ -30,21 +24,8 @@ import { SecurityModule } from '@server/modules/infrastructure/security';
 import { ScimModule } from '@server/modules/scim';
 import { PolicyModule } from '@server/modules/system/policy';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Routes carry explicit, full paths at the controller level rather than a global
- * prefix: an identity provider mixes unprefixed root routes (`/health`,
- * `/.well-known/*`) with the versioned `/api/v1/*` surface.
- */
-
 export const AppHttpCoreModule = HttpCoreModule.forRoot({
   helmet: {
-    /** The browser UI is a separate app; this service serves only JSON, so nothing inline is needed. */
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -59,11 +40,6 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({
       },
     },
   },
-  /**
-   * OpenAPI is generated from the class-schema DTOs and served (non-prod) at
-   * `/dev/api-docs/openapi.json`. `identity-web` consumes it via `bun run generate:api-types`,
-   * so the client's request/response types stay in lockstep with the controllers.
-   */
   openapi: { normalizeSchemaIds: true },
 });
 
@@ -93,9 +69,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     AccessModule,
   ],
 
-  /** The browser UI is a separate app (identity-web); this service exposes only the JSON/OAuth API. */
   fastifyFactory: async instance => {
-    /** SCIM clients send RFC 7644's dedicated media type; the payload is ordinary JSON. */
     instance.addContentTypeParser('application/scim+json', { parseAs: 'string' }, (_request, body, done) => {
       try {
         done(null, typeof body === 'string' && body.length > 0 ? JSON.parse(body) : {});
@@ -104,12 +78,6 @@ export const HttpRouteModule = FastifyModule.forRoot({
       }
     });
 
-    /**
-     * RFC 6749 §2.3.1 requires the token, revocation and introspection endpoints to take
-     * form-encoded parameters, which is what every conforming OAuth client library sends. Decoding
-     * to a plain object lets the same class-schema DTOs validate both encodings. Repeated keys
-     * collapse to the last occurrence — no OAuth parameter is defined as multi-valued.
-     */
     instance.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, done) => {
       try {
         done(null, Object.fromEntries(new URLSearchParams(typeof body === 'string' ? body : '')));

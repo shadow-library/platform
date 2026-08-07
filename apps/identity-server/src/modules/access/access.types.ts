@@ -1,25 +1,13 @@
-/**
- * Importing npm packages
- */
 import { type FastifyRequest } from 'fastify';
 
-/**
- * Importing user defined packages
- */
 import { type AdminActor, type AdminPermission } from '@server/modules/admin';
 import { type JwtClaims } from '@server/modules/auth/keys';
 import { type ValidatedSession } from '@server/modules/auth/session';
 import { type Organisation } from '@server/modules/infrastructure/datastore';
 
 /**
- * Defining types
- */
-
-/**
- * Declares what a route needs to be entered. The central `AccessGuard` reads this off the route
- * metadata and resolves identity plus the coarse, route-level authorization; anything that depends
- * on the request body or on comparing the caller against a target (member rank, last-owner
- * protection, conditional step-up) stays in the handler.
+ * Route-entry requirements resolved by the central access guard. Authorization that depends on
+ * request bodies or comparing the caller with a target remains the handler's responsibility.
  */
 export interface AuthOptions {
   /** Require a live first-party session (AAL1). Implied by `elevated`, `permission`, `orgRole` and `orgMember`. */
@@ -36,8 +24,8 @@ export interface AuthOptions {
   orgParam?: string;
   /**
    * Accept only an M2M service token (mutually exclusive with the session modes). A string
-   * additionally requires that scope; `true` accepts any valid service token, for a route whose
-   * only subject is the caller itself and which therefore needs no further entitlement.
+   * additionally requires that scope; `true` accepts any valid service token for a route whose
+   * only subject is the caller itself.
    */
   service?: string | true;
   /** Explicitly unauthenticated. Documents intent and makes the guard a no-op for the route. */
@@ -50,13 +38,12 @@ export interface ClientInfo {
 }
 
 /**
- * What the guard resolved for the current request. Which fields are populated is dictated by the
- * route's `AuthOptions`: `session` for the session modes, `actor` when a `permission` was checked,
- * `membership` for the org modes, `serviceToken` for the service mode. `clientInfo` is always set.
+ * Authentication state resolved by the guard. Populated fields correspond to the route's
+ * `AuthOptions`; `clientInfo` is always present.
  */
 export interface AuthContext {
   session?: ValidatedSession;
-  /** Whether the session carries a still-valid second-factor step-up; mirrors `SessionService.isElevated`. */
+  /** Whether the session carries a still-valid second-factor step-up. */
   elevated?: boolean;
   actor?: AdminActor;
   membership?: Organisation.Member;
@@ -66,5 +53,5 @@ export interface AuthContext {
   clientInfo: ClientInfo;
 }
 
-/** The request the guard augments with the resolved {@link AuthContext}. */
+/** A request augmented by the access guard with its resolved authentication context. */
 export type AuthenticatedRequest = FastifyRequest & { auth?: AuthContext };

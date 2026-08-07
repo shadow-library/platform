@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, PrimaryDatabase, schema, User, UserSession } from '@server/modules/infrastructure/datastore';
-
-/**
- * Defining types
- */
 
 export interface SignInDevice {
   deviceId?: string;
@@ -32,12 +22,6 @@ export interface SignInEventInput {
   device?: SignInDevice;
 }
 
-/**
- * Declaring the constants
- *
- * Tier-4 persistent lock: after this many failed authentications within the window, the account's
- * password credential is locked to OTP-only recovery paths (docs/auth/overview.md §8).
- */
 const LOCK_THRESHOLD = 5;
 const LOCK_WINDOW_MINUTES = 15;
 const FAILURE_STATUSES: UserSession.SignInEvent['status'][] = ['INVALID_CREDENTIALS', 'MFA_FAILED'];
@@ -72,10 +56,6 @@ export class SignInEventService {
       });
   }
 
-  /**
-   * Applies the Tier-4 persistent lock when recent failures for the user exceed the threshold.
-   * Returns true if the account is now locked to OTP-only.
-   */
   async evaluateLock(userId: bigint): Promise<boolean> {
     const since = new Date(Date.now() - LOCK_WINDOW_MINUTES * 60_000);
     const rows = await this.db

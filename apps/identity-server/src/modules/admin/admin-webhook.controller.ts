@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { Auth, Context } from '@server/modules/access';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { WebhookDelivery, WebhookSubscription } from '@server/modules/infrastructure/datastore';
@@ -26,18 +20,6 @@ import {
   WebhookListResponse,
 } from './admin-webhook.dto';
 import { ADMIN_PERMISSIONS } from './admin.constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Webhooks are platform-tier only (docs are silent on org-scoped subscriptions; recorded in
- * tasks.md): operators subscribe external systems to the audit event stream, so subscription
- * management sits behind `iam:webhooks:manage` with AAL2 on every mutation.
- */
 
 @HttpController('/api/v1/admin/webhooks')
 export class AdminWebhookController {

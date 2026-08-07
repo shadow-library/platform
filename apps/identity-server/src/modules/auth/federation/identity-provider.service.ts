@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, oidcDiscoveryUrl } from '@server/constants';
 import { KeyProvider } from '@server/modules/auth/keys';
@@ -15,10 +9,6 @@ import { type ValidatedSession } from '@server/modules/auth/session';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, IdentityProvider, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { WebhookTargetGuard } from '@server/modules/infrastructure/webhook';
-
-/**
- * Defining types
- */
 
 interface DiscoveredEndpoints {
   authorizationEndpoint: string;
@@ -51,14 +41,6 @@ interface DiscoveryDocument {
   jwks_uri?: string;
 }
 
-/**
- * Declaring the constants
- *
- * The upstream issuer passes the same SSRF guard as webhook targets (public https, no
- * credentials/private hosts; relaxed only under the test flag), and every endpoint is taken from
- * the issuer's own discovery document — never from caller input — with the RFC 8414 issuer-match
- * check so a document can't claim someone else's identity.
- */
 const DISCOVERY_TIMEOUT_MS = 10_000;
 
 @Injectable()
@@ -87,8 +69,6 @@ export class IdentityProviderService {
     });
   }
 
-  /* --------------------------- caller-facing orchestration --------------------------- */
-
   async registerIdentityProvider(session: ValidatedSession, organisationId: bigint, input: CreateIdentityProvider): Promise<IdentityProvider> {
     const provider = await this.create(organisationId, input);
     await this.audit(session, organisationId, 'org.idp.configured', provider.id);
@@ -106,7 +86,6 @@ export class IdentityProviderService {
     await this.audit(session, organisationId, 'org.idp.removed', id);
   }
 
-  /** Raw fetch, not APIRequest: admin-supplied issuers need a hard timeout, which APIRequest does not expose. */
   private async discover(issuer: string): Promise<DiscoveredEndpoints> {
     this.targetGuard.assertAcceptableUrl(issuer);
     const url = oidcDiscoveryUrl(issuer);
@@ -196,7 +175,6 @@ export class IdentityProviderService {
     return provider ?? null;
   }
 
-  /** Home-realm discovery: an email under an org's VERIFIED domain routes to that org's active IdP. */
   async routeForEmail(email: string): Promise<IdentityProvider | null> {
     const domain = email.split('@')[1]?.toLowerCase();
     if (!domain) return null;

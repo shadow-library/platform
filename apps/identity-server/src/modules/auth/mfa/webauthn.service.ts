@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import {
   type AuthenticationResponseJSON,
   type AuthenticatorAttachment,
@@ -15,9 +12,6 @@ import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { OAuthClientService } from '@server/modules/auth/oauth';
@@ -30,10 +24,6 @@ import { NotificationService } from '@server/modules/infrastructure/notification
 import { MfaService } from './mfa.service';
 import { RecoveryCodeService } from './recovery-code.service';
 import { WebauthnAssertion } from './webauthn.dto';
-
-/**
- * Defining types
- */
 
 export interface WebauthnAuthenticationResult {
   userId: bigint;
@@ -61,9 +51,6 @@ export interface WebauthnRegistrationOptions {
   extensions?: { credProps?: boolean };
 }
 
-/**
- * Declaring the constants
- */
 const CHALLENGE_TTL_SECONDS = 300;
 const RP_NAME = 'Shadow Accounts';
 const ENROLLED_TEMPLATE = 'auth.mfa.enrolled';
@@ -91,9 +78,6 @@ export class WebauthnService {
     this.redis = databaseService.getRedisClient();
   }
 
-  /* --------------------------- caller-facing orchestration --------------------------- */
-
-  /** Adding the first factor needs only a session; changing factors once MFA exists needs step-up. */
   private async authorizeFactorChange(userId: bigint, elevated: boolean): Promise<void> {
     if ((await this.mfaService.hasMfa(userId)) && !elevated) throw AppErrorCode.AUTH_006.create();
   }
@@ -103,7 +87,6 @@ export class WebauthnService {
     return this.toRegistrationOptions(await this.startRegistration(userId));
   }
 
-  /** Completing the first passkey elevates the session and provisions the recovery-code batch (T-403). */
   async completeRegistration(session: ValidatedSession, elevated: boolean, input: WebauthnRegisterInput): Promise<{ success: true; recoveryCodes?: string[] }> {
     await this.authorizeFactorChange(session.userId, elevated);
     const response: RegistrationResponseJSON = {
@@ -129,21 +112,11 @@ export class WebauthnService {
     await this.remove(userId, credentialId);
   }
 
-  /**
-   * Begins a passkey step-up ceremony bound to the current session. Unlike login, there is no auth
-   * flow: the challenge is keyed by the session id. A user with no passkey cannot step up this way.
-   */
   async beginStepUp(session: ValidatedSession): Promise<PublicKeyCredentialRequestOptionsJSON> {
     if (!(await this.hasCredential(session.userId))) throw AppErrorCode.MFA_001.create();
     return this.startAuthentication(this.stepUpKey(session.id), session.userId, true);
   }
 
-  /**
-   * Completes a passkey step-up: a user-verified assertion by the session's own user elevates it to
-   * AAL2. The window is opened for the intent the ceremony declared, so only a matching application
-   * can spend it (D-19, T-801); an intent naming an unknown client fails here rather than opening a
-   * window nothing can claim.
-   */
   async completeStepUp(
     session: ValidatedSession,
     assertion: WebauthnAssertion,
@@ -220,7 +193,6 @@ export class WebauthnService {
     return credential !== undefined;
   }
 
-  /** Begins a registration ceremony; the challenge lives server-side only, bound to the user. */
   async startRegistration(userId: bigint): Promise<PublicKeyCredentialCreationOptionsJSON> {
     const email = (await this.userEmailService.getPrimaryEmail(userId)) ?? userId.toString();
     const existing = await this.listForUser(userId);
@@ -270,11 +242,6 @@ export class WebauthnService {
     return row;
   }
 
-  /**
-   * Begins an authentication ceremony bound to an opaque flow key. When the flow resolves to no
-   * user (enumeration neutrality, D-12) the options simply carry no credential hints — the shape
-   * of the response is identical either way.
-   */
   async startAuthentication(flowKey: string, userId: bigint | null, firstFactor = false): Promise<PublicKeyCredentialRequestOptionsJSON> {
     const credentials = userId ? await this.listForUser(userId) : [];
     const options = await generateAuthenticationOptions({
@@ -286,11 +253,6 @@ export class WebauthnService {
     return options;
   }
 
-  /**
-   * Completes an assertion. Returns null (never throws) on any verification failure so callers
-   * can route it through their neutral failure paths; a signature-counter regression additionally
-   * raises a security audit event because it indicates a cloned authenticator.
-   */
   async finishAuthentication(flowKey: string, response: AuthenticationResponseJSON, firstFactor = false): Promise<WebauthnAuthenticationResult | null> {
     const stored = await this.db.query.webauthnCredentials.findFirst({ where: eq(schema.webauthnCredentials.credentialId, response.id) });
     const expectedChallenge = await this.redis.getdel(this.authenticationKey(flowKey));

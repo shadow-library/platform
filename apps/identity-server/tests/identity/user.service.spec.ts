@@ -1,26 +1,13 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { eq } from 'drizzle-orm';
 import { AppError, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { CreateUser, UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('user-service').init();
 
 const buildUser = (overrides: Partial<CreateUser> = {}): CreateUser => ({

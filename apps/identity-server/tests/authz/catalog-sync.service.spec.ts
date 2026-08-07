@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AccessTokenService, OAuthClientService } from '@server/modules/auth/oauth';
 import { CatalogSyncService, PolicyDecisionService } from '@server/modules/authz';
 import { UserService } from '@server/modules/identity/user';
@@ -14,13 +8,6 @@ import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('catalog-sync').init();
 
 interface Manifest {
@@ -34,7 +21,6 @@ const manifest = (
   permissions: Manifest['permissions'] = [{ name: 'posts:write' }, { name: 'posts:delete' }],
 ): Manifest => ({ permissions, roles });
 
-/** Shrinking a catalog past half trips the T-805 guardrail, so deletion cases opt in explicitly. */
 const forced = (roles?: Manifest['roles'], permissions?: Manifest['permissions']): Manifest => ({ ...manifest(roles, permissions), force: true });
 
 describe('CatalogSyncService', () => {
@@ -48,7 +34,6 @@ describe('CatalogSyncService', () => {
     sync = env.getService(CatalogSyncService);
     pdp = env.getService(PolicyDecisionService);
     applications = env.getService(ApplicationService);
-    /** A dedicated application so full-sync deletions never touch the seeded platform catalog. */
     const application = await applications.createApplication({ name: `catalog-${Date.now()}`, subDomain: `c${Date.now()}` });
     applicationId = application.id;
     const client = await env.getService(OAuthClientService).register({ applicationId, name: `catalog-svc-${Date.now()}`, kind: 'SERVICE', grantTypes: ['client_credentials'] });
@@ -117,10 +102,6 @@ describe('CatalogSyncService', () => {
     expect(applications.getApplicationOrThrow('shadow-identity').roles.length).toBe(seeded);
   });
 
-  /**
-   * A broken build pushing a truncated manifest must not cascade into role assignments (D-15,
-   * T-805): the guardrail refuses past a majority deletion and the catalog is left exactly as it was.
-   */
   describe('deletion guardrail', () => {
     it('should refuse a manifest deleting more than half of the permissions', async () => {
       await sync.sync(clientId, manifest([{ name: 'editor', permissions: ['posts:write'] }], [{ name: 'posts:write' }, { name: 'posts:delete' }, { name: 'posts:read' }]));
@@ -141,7 +122,6 @@ describe('CatalogSyncService', () => {
       expect(applications.getApplicationByIdOrThrow(applicationId).roles.length).toBe(3);
     });
 
-    /** Exactly half is a shrink the guardrail tolerates — only a majority is treated as a broken push. */
     it('should allow a manifest deleting exactly half without force', async () => {
       await sync.sync(clientId, manifest([{ name: 'editor', permissions: ['posts:write'] }], [{ name: 'posts:write' }, { name: 'posts:delete' }]));
       const result = await sync.sync(clientId, manifest([{ name: 'editor', permissions: ['posts:write'] }], [{ name: 'posts:write' }]));

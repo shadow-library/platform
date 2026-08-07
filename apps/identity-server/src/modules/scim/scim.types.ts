@@ -1,15 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export interface ScimName {
   givenName?: string;
   familyName?: string;
@@ -99,8 +87,6 @@ export interface ScimListResult<TResource> {
 }
 
 /**
- * Declaring the constants
- *
  * SCIM bodies are validated at runtime rather than through class-schema DTOs (recorded deviation):
  * RFC 7644 PATCH values are polymorphic (boolean | string | object | array — Entra even sends
  * `"False"` as a string for booleans), which a static JSON schema cannot express without lying.
@@ -142,7 +128,7 @@ export function asOptionalString(value: unknown, context: string): string | unde
   return asString(value, context);
 }
 
-/** Entra sends booleans as the strings "True"/"False" in PATCH values; both forms are accepted. */
+/** Accepts booleans and the case-insensitive `True`/`False` strings emitted by Entra. */
 export function asBoolean(value: unknown, context: string): boolean {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'string' && /^(true|false)$/i.test(value)) return value.toLowerCase() === 'true';

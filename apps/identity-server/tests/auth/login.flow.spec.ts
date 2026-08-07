@@ -1,26 +1,13 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { SESSION_COOKIE_NAME } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('login-flow').init();
 
 const login = (identifier: string) => env.getRouter().mockRequest().post('/api/v1/auth/login/init').body({ identifier });
@@ -85,7 +72,6 @@ describe('Login flow', () => {
       const response = await login(identifier);
       expect(response.statusCode).toBe(422);
       expect(response.json()).not.toHaveProperty('flowId');
-      /** The message has to read as guidance — a `pattern` without an `errorMessage` answers with the raw regex instead. */
       expect(response.json()).toMatchObject({ fields: [{ field: 'body.identifier', msg: 'must be a valid email address, phone number, or username' }] });
     }
   });
@@ -96,7 +82,6 @@ describe('Login flow', () => {
     expect((await login('+14155550123')).statusCode).toBe(404);
   });
 
-  /** D-12 was retired deliberately: the identifier step is now an account-existence oracle, contained by the Tier-2 rate limit. */
   it('should report an unknown identifier at the identifier step', async () => {
     const response = await login('ghost@example.com');
     expect(response.statusCode).toBe(404);
@@ -145,7 +130,6 @@ describe('Login flow', () => {
     const setCookie = ([] as string[]).concat(reset.headers['set-cookie'] ?? []);
     expect(setCookie.some(cookie => cookie.startsWith(`${SESSION_COOKIE_NAME}=`))).toBe(true);
 
-    /** The flag is cleared, so the new password signs in cleanly on the next attempt. */
     const { flowId: nextFlow } = (await login('reset@example.com')).json() as { flowId: string };
     const again = await verify(nextFlow, 'NewPassword@456');
     expect(again.json()).toMatchObject({ status: 'COMPLETED' });
@@ -173,7 +157,6 @@ describe('Login flow', () => {
       expect(response.json()).not.toHaveProperty('flowId');
     });
 
-    /** A lock that lands mid-flow must still deny the session, proving the completion backstop enforces every method. */
     it('should refuse an otp login caught by a lock mid-flow and mint no session', async () => {
       const { flowId } = (await login('login@example.com')).json() as { flowId: string };
       expect((await changeMethod(flowId, 'EMAIL_OTP')).statusCode).toBe(200);

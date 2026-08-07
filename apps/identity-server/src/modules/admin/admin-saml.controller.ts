@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Body, Delete, Get, HttpController, Params, Patch, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { Auth, Context } from '@server/modules/access';
 import { SamlService } from '@server/modules/auth/saml';
 import { AuditService } from '@server/modules/infrastructure/audit';
@@ -15,18 +9,6 @@ import { AdminActor } from './admin-access.service';
 import { CreateServiceProviderBody, ServiceProviderIdParams, ServiceProviderItem, ServiceProviderListResponse, UpdateServiceProviderBody } from './admin-saml.dto';
 import { AdminActionResponse } from './admin-user.dto';
 import { ADMIN_PERMISSIONS } from './admin.constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * SAML service providers are platform-tier integrations, administered under the same permission as
- * OAuth clients (`iam:clients:manage`) — both registries decide where this IdP will assert
- * identities to, so they share an owner.
- */
 
 @HttpController('/api/v1/admin/saml/service-providers')
 export class AdminSamlController {

@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { randomBytes, randomUUID } from 'node:crypto';
 
 import { and, arrayContains, eq, gt, inArray, isNull, ne, or } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, OIDC_PROTOCOL_SCOPES } from '@server/constants';
 import { type ElevationIntent } from '@server/modules/auth/session';
@@ -18,12 +12,7 @@ import { ApiResource, DatabaseService, OAuthClient, PrimaryDatabase, schema, Sco
 import { applicationAudience, DEFAULT_AUDIENCE, OAUTH_CALLBACK_PATH, TOKEN_EXCHANGE_GRANT } from './oauth.constants';
 import { assertValidWorkloadBinding, isWorkloadPattern, matchesWorkloadBinding } from './workload-subject.util';
 
-/**
- * Defining types
- */
-
 export interface RegisterClient {
-  /** Client id slug; a UUID string is generated when omitted (seed/programmatic callers) */
   id?: string;
   applicationId: number;
   name: string;
@@ -35,13 +24,7 @@ export interface RegisterClient {
   organisationId?: bigint | null;
   accessTokenTtl?: number;
   backchannelLogoutUri?: string;
-  /** k8s SA subjects and/or namespace-scoped patterns allowed to authenticate this client with a projected token (D-16) */
   workloadSubjects?: string[];
-  /**
-   * Confidential-client authentication method. `client_secret` mints a rotatable secret;
-   * `workload_identity` binds a k8s SA subject and mints no secret (D-16). Ignored for public
-   * clients, which always use PKCE (`none`). Defaults to `client_secret`.
-   */
   authMethod?: ClientAuthMethod;
 }
 
@@ -51,22 +34,17 @@ export interface ProvisionedApplication {
   clientId: string;
   secret?: string;
   audience: string;
-  /** False when the application already held its client, so a caller knows not to expect a secret. */
   created: boolean;
 }
 
-/** An application's own registration, as it reads itself back at `GET /api/v1/apps/me` (D-21 §8.6). */
 export interface ApplicationDescription {
-  /** The application slug — what a consumer configures as `AUTH_APP_ID` and the SDK reads back as `appId`. */
   appId: string;
-  /** Human label, for prompts that name the application. */
   name?: string;
   isFirstParty: boolean;
   audience: string | null;
   redirectUris: string[];
   scopes: string[];
   sensitiveScopes: string[];
-  /** This application's grants on *other* applications — the ceiling for delegated calls (D-22). */
   grants: { audience: string; scopes: string[] }[];
   accessTokenTtl: number;
 }
@@ -81,7 +59,6 @@ export interface UpdateClient {
   isActive?: boolean;
   redirectUris?: string[];
   backchannelLogoutUri?: string | null;
-  /** Replaces the full set of workload bindings; an empty array unbinds workload identity (D-16). */
   workloadSubjects?: string[] | null;
 }
 
@@ -90,30 +67,20 @@ export interface RotatedSecret {
   previousSecretsExpireAt: Date;
 }
 
-/** A scope granted to a client, paired with the API resource that owns it. */
 export interface GrantedScope {
   name: string;
-  /** Identifier of the owning API resource — the only audience this scope may be minted for. */
   resourceIdentifier: string;
   isSensitive: boolean;
 }
 
-/** The transaction handle drizzle passes to a `db.transaction` callback — a narrower type than the pooled db. */
 type PrimaryTransaction = Parameters<Parameters<PrimaryDatabase['transaction']>[0]>[0];
 
-/**
- * Declaring the constants
- */
 const ARGON2_OPTIONS = { algorithm: 'argon2id', memoryCost: 65536, timeCost: 3 } as const;
 const PUBLIC_KINDS: OAuthClient.Kind[] = ['SPA_PUBLIC', 'NATIVE_PUBLIC'];
-/** An application may not hold more than this many OAuth clients (first-party clients included). */
 const MAX_CLIENTS_PER_APPLICATION = 10;
-/** Client id slug: lowercase letters, digits and internal hyphens, 3–64 chars. Accepts existing UUID ids. */
 const CLIENT_ID_PATTERN = /^[a-z0-9]([a-z0-9-]{1,62}[a-z0-9])?$/;
-/** Reserved ids that would collide with system identifiers such as the default access-token audience. */
 const RESERVED_CLIENT_IDS = new Set(['shadow-identity']);
 const DUMMY_SECRET_HASH = '$argon2id$v=19$m=65536,t=3,p=1$NCJqmYBSCaQHCbd96KVjeycfea/Op9Qf6OqrtzsUMkw$YNaWD8v4qxMkTfyuv7T0n+3PYqGqYo+6ixhN31TqX6E';
-/** Matches the `cache-control: max-age=300` the discovery document already advertises, so the copy a client caches and the copy this process serves expire together. */
 const SCOPE_NAMES_TTL_SECONDS = 300;
 
 @Injectable()
@@ -121,7 +88,6 @@ export class OAuthClientService {
   private readonly logger = Logger.getLogger(APP_NAME, OAuthClientService.name);
   private readonly db: PrimaryDatabase;
 
-  /** Memoised `scopes_supported` — see {@link OAuthClientService.listActiveScopeNames}. */
   private activeScopeNames: string[] | null = null;
   private activeScopeNamesAt = 0;
   private activeScopeNamesInflight: Promise<string[]> | null = null;
@@ -135,18 +101,10 @@ export class OAuthClientService {
     if (input.id !== undefined) this.assertValidClientId(input.id);
     const isPublic = PUBLIC_KINDS.includes(input.kind);
     const workloadSubjects = input.workloadSubjects ?? [];
-    /**
-     * Auth method is exclusive: a workload-identity client authenticates only with its projected
-     * SA-token assertion (`private_key_jwt`) and holds no secret; a secret client uses
-     * `client_secret_basic`; public clients use PKCE (`none`). A caller signals workload identity
-     * explicitly via `authMethod`, or implicitly by supplying workload subjects with no method —
-     * the long-standing seed/admin shape (D-16).
-     */
     const isWorkload = !isPublic && (input.authMethod === 'workload_identity' || (input.authMethod === undefined && workloadSubjects.length > 0));
     if (isWorkload && workloadSubjects.length === 0) throw AppErrorCode.ADM_005.create();
     for (const subject of workloadSubjects) assertValidWorkloadBinding(subject);
     const authMethod: OAuthClient.AuthMethod = isPublic ? 'none' : isWorkload ? 'private_key_jwt' : 'client_secret_basic';
-    /** The admin supplies a meaningful slug; a UUID string is minted for seed/programmatic callers. */
     const clientId = input.id ?? randomUUID();
 
     await this.db.transaction(async tx => {
@@ -173,7 +131,6 @@ export class OAuthClientService {
       for (const scopeId of input.scopeIds ?? []) await tx.insert(schema.oauthClientScopeGrants).values({ clientId, scopeId });
     });
 
-    /** Only secret clients receive a secret; workload and public clients never hold one. */
     const secret = authMethod === 'client_secret_basic' ? await this.createSecret(clientId) : undefined;
     this.logger.info('Registered OAuth client', { clientId, kind: input.kind, authMethod });
     return { clientId, secret };
@@ -185,23 +142,15 @@ export class OAuthClientService {
     return client ?? null;
   }
 
-  /**
-   * Resolves the client that holds a verified subject as an *exact* binding, used when the assertion
-   * carries no `client_id` (D-16). Pattern bindings never match here — a literal `*` pattern string
-   * cannot equal a concrete subject — so wildcards are reachable only with an explicit `client_id`.
-   * The exact-subject uniqueness invariant (enforced on write) keeps this resolution deterministic.
-   */
   async resolveClientBySubject(subject: string): Promise<OAuthClient | null> {
     const client = await this.db.query.oauthClients.findFirst({ where: arrayContains(schema.oauthClients.workloadSubjects, [subject]) });
     return client ?? null;
   }
 
-  /** Whether a verified subject is covered by any of a resolved client's bindings (exact or pattern). */
   subjectMatchesClient(client: OAuthClient, subject: string): boolean {
     return (client.workloadSubjects ?? []).some(binding => matchesWorkloadBinding(binding, subject));
   }
 
-  /** Exact-string redirect-URI match — no wildcards or substring logic (C-5). */
   async isRedirectUriAllowed(clientId: string, uri: string): Promise<boolean> {
     if (!this.isValidClientId(clientId)) return false;
     const match = await this.db.query.oauthClientRedirectUris.findFirst({
@@ -210,7 +159,6 @@ export class OAuthClientService {
     return Boolean(match);
   }
 
-  /** Idempotently provisions an API resource and one of its scopes, returning the scope id. */
   async ensureScope(applicationId: number, resourceIdentifier: string, scopeName: string, principalType?: 'USER' | 'SERVICE' | 'BOTH'): Promise<string> {
     await this.db.insert(schema.apiResources).values({ applicationId, identifier: resourceIdentifier }).onConflictDoNothing();
     const resource =
@@ -227,16 +175,10 @@ export class OAuthClientService {
     return scope.id;
   }
 
-  /** Grants an already-provisioned scope to a client, tolerating re-grants. */
   async grantScope(clientId: string, scopeId: string): Promise<void> {
     await this.db.insert(schema.oauthClientScopeGrants).values({ clientId, scopeId }).onConflictDoNothing();
   }
 
-  /**
-   * Removes scopes the given principal kind may not hold: a user flow drops `SERVICE`-only scopes, a
-   * service flow drops `USER`-only scopes. Names absent from the catalog (OIDC protocol scopes such as
-   * `openid`/`profile`/`email`) pass through untouched, so a user token still carries them.
-   */
   async filterScopesForPrincipal(scopeNames: string[], kind: 'user' | 'service'): Promise<string[]> {
     if (scopeNames.length === 0) return scopeNames;
     const rows = await this.db.query.scopes.findMany({ where: inArray(schema.scopes.name, scopeNames), columns: { name: true, principalType: true } });
@@ -245,16 +187,6 @@ export class OAuthClientService {
     return scopeNames.filter(name => !disallowedNames.has(name));
   }
 
-  /**
-   * Resolves the intent a step-up ceremony declared (D-19, T-801). No client id means the ceremony
-   * carried no application intent — the identity console's own step-up — and the window it opens is
-   * claimable by no application.
-   *
-   * An unknown or inactive client is refused rather than silently recorded: the alternative opens a
-   * window nothing can ever claim, turning a misconfigured step-up URL into a failure that only
-   * surfaces one call later. Client ids already travel in browser authorize URLs, so answering here
-   * reveals nothing a caller could not already observe.
-   */
   async resolveElevationIntent(clientId?: string, resource?: string): Promise<ElevationIntent | null> {
     if (!clientId) return null;
     const client = await this.getClient(clientId);
@@ -262,12 +194,6 @@ export class OAuthClientService {
     return { clientId: client.id, resource: resource ?? DEFAULT_AUDIENCE };
   }
 
-  /**
-   * The human label a hosted step-up prompt shows for its beneficiary (D-19, T-801): the display
-   * name of the application owning a client id, or `null` when the id names no active client. Client
-   * ids already travel in browser authorize URLs, so answering reveals nothing a caller could not
-   * already observe — and the prompt renders a `null` as a neutral failure, never a probe result.
-   */
   async resolveApplicationLabel(clientId: string): Promise<string | null> {
     const client = await this.getClient(clientId);
     if (!client || !client.isActive) return null;
@@ -276,16 +202,6 @@ export class OAuthClientService {
     return application.displayName ?? application.name;
   }
 
-  /**
-   * Provisions the identity of an application: exactly one client and exactly one API resource,
-   * whose identifier is derived as `api://<app>` rather than configured (D-21). The cluster is the
-   * trust boundary, so processes inside one application share its identity; splitting a product
-   * into an `<app>` and an `<app>-server` client only ever created ambiguity about which of the two
-   * an id referred to.
-   *
-   * Idempotent: an application that already holds its client is returned unchanged, so re-running a
-   * seed or replaying a registration never mints a second credential.
-   */
   async provisionApplicationIdentity(input: { applicationId: number; name: string; publicUrls?: string[]; isFirstParty?: boolean }): Promise<ProvisionedApplication> {
     const audience = applicationAudience(input.name);
     await this.ensureResource(input.applicationId, audience, `${input.name} API`);
@@ -297,10 +213,6 @@ export class OAuthClientService {
       id: input.name,
       applicationId: input.applicationId,
       name: input.name,
-      /**
-       * One client serves both faces of an application: the browser-facing code flow and the
-       * server-to-server credential. They are the same deployment, so they are the same identity.
-       */
       kind: 'WEB_CONFIDENTIAL',
       isFirstParty: input.isFirstParty ?? true,
       grantTypes: ['authorization_code', 'client_credentials', TOKEN_EXCHANGE_GRANT],
@@ -309,12 +221,6 @@ export class OAuthClientService {
     return { clientId: registered.clientId, secret: registered.secret, audience, created: true };
   }
 
-  /**
-   * The registration a service would otherwise have restated in its own environment (D-21, §8.6):
-   * its audience, redirect URIs, the scopes its own API defines, and its grants on *other*
-   * applications — which are the ceiling for delegated calls (D-22). A client may only ever read
-   * itself, so the route needs no scope beyond a valid service token.
-   */
   async describeApplication(clientId: string): Promise<ApplicationDescription | null> {
     const client = await this.getClient(clientId);
     if (!client || !client.isActive) return null;
@@ -334,7 +240,6 @@ export class OAuthClientService {
       .where(eq(schema.oauthClientRedirectUris.clientId, client.id));
 
     const ownIdentifiers = new Set(owned.map(row => row.identifier));
-    /** Grants on an application's own API are not delegation — they are simply its own surface. */
     const foreign = (await this.getGrantedScopes(client.id)).filter(scope => !ownIdentifiers.has(scope.resourceIdentifier));
     const byAudience = new Map<string, string[]>();
     for (const scope of foreign) byAudience.set(scope.resourceIdentifier, [...(byAudience.get(scope.resourceIdentifier) ?? []), scope.name]);
@@ -352,11 +257,6 @@ export class OAuthClientService {
     };
   }
 
-  /**
-   * The application that owns an API resource, or `null` when the identifier names no active
-   * resource. Token exchange uses this to confirm a caller may exchange a token addressed to it: a
-   * service can only ever delegate onward a token that was minted for its own API (D-22).
-   */
   async getResourceOwner(identifier: string): Promise<number | null> {
     const resource = await this.db.query.apiResources.findFirst({
       where: and(eq(schema.apiResources.identifier, identifier), eq(schema.apiResources.isActive, true)),
@@ -365,12 +265,6 @@ export class OAuthClientService {
     return resource?.applicationId ?? null;
   }
 
-  /**
-   * Whether `identifier` is the client's own application's canonical audience (`api://<app>`). That
-   * audience needs no scope grant to be requested (D-21): an application's API may define no user
-   * scopes at all, because record-level authorisation there is the PDP's job. Deliberately narrow —
-   * any other resource the application owns still requires an explicit grant.
-   */
   async isOwnAudience(client: OAuthClient, identifier: string): Promise<boolean> {
     const ownerApplicationId = await this.getResourceOwner(identifier);
     if (ownerApplicationId === null || ownerApplicationId !== client.applicationId) return false;
@@ -378,7 +272,6 @@ export class OAuthClientService {
     return application !== undefined && applicationAudience(application.name) === identifier;
   }
 
-  /** Whether an RFC 8707 `resource` value is a registered, active API resource identifier. */
   async isRegisteredResource(identifier: string): Promise<boolean> {
     const resource = await this.db.query.apiResources.findFirst({
       where: and(eq(schema.apiResources.identifier, identifier), eq(schema.apiResources.isActive, true)),
@@ -387,12 +280,6 @@ export class OAuthClientService {
     return resource !== undefined;
   }
 
-  /**
-   * Every scope granted to a client, paired with the API resource that owns it. Scopes belonging to a
-   * deactivated resource are excluded, so deactivating a resource immediately stops token issuance
-   * against it. Callers match `resourceIdentifier` against the token's audience: a grant on one
-   * resource must never authorise a token addressed to another (SCOPE-02).
-   */
   async getGrantedScopes(clientId: string): Promise<GrantedScope[]> {
     if (!this.isValidClientId(clientId)) return [];
     return this.db
@@ -408,22 +295,6 @@ export class OAuthClientService {
     return granted.map(scope => scope.name);
   }
 
-  /**
-   * Distinct scope names across all active API resources, advertised as `scopes_supported` in discovery.
-   *
-   * The protocol scopes are unioned in because they are genuinely supported and hold no `scopes` row —
-   * a row belongs to an API resource, and these belong to OIDC. Omitting them made discovery say
-   * `openid` was unsupported while every authorize call honoured it, which is both wrong per OIDC Core
-   * (`openid` is required to appear here) and the reason a client validating its scopes against this
-   * list could not ask for the very scopes that release a user's profile.
-   *
-   * Memoised for {@link SCOPE_NAMES_TTL_SECONDS}, because this is the only query behind an otherwise
-   * static document that every service reads at boot — uncached it made discovery the slowest public
-   * endpoint on the server, and it is the first call the auth SDK makes. Scopes change only when an
-   * API resource is registered or deactivated, so a stale window bounded by the document's own
-   * `max-age` costs nothing. Concurrent cold callers share one query rather than each issuing their
-   * own, which matters precisely when it hurts: every service dialling a cold identity at once.
-   */
   async listActiveScopeNames(): Promise<string[]> {
     const cached = this.activeScopeNames;
     if (cached && Date.now() - this.activeScopeNamesAt < SCOPE_NAMES_TTL_SECONDS * 1000) return cached;
@@ -449,11 +320,6 @@ export class OAuthClientService {
     return this.createSecret(clientId);
   }
 
-  /**
-   * Installs an externally provided secret as the client's only active secret, revoking every other
-   * one. Backs env-driven credential rotation (ecosystem seed): the environment is the source of
-   * truth, so no overlap window applies. The secret value itself is never logged.
-   */
   async setSecret(clientId: string, secret: string): Promise<void> {
     const secretHash = await Bun.password.hash(secret, ARGON2_OPTIONS);
     await this.db.transaction(async tx => {
@@ -466,10 +332,6 @@ export class OAuthClientService {
     this.logger.info('Installed externally provided client secret', { clientId });
   }
 
-  /**
-   * Dual-secret rotation (T-201): the new secret is live immediately while previous secrets stay
-   * valid for the overlap window, so running consumers can re-configure without an outage.
-   */
   async rotateSecretWithOverlap(clientId: string, overlapHours = 24): Promise<RotatedSecret> {
     const previousSecretsExpireAt = new Date(Date.now() + overlapHours * 3_600_000);
     await this.db
@@ -490,7 +352,6 @@ export class OAuthClientService {
     });
   }
 
-  /** Maps the stored token-endpoint auth method to the public auth-method the console renders. */
   static toAuthMethod(method: OAuthClient.AuthMethod): 'none' | 'client_secret' | 'workload_identity' {
     if (method === 'none') return 'none';
     if (method === 'private_key_jwt') return 'workload_identity';
@@ -505,10 +366,8 @@ export class OAuthClientService {
     return { ...client, redirectUris: redirects.map(redirect => redirect.uri), scopes };
   }
 
-  /** Replaces the redirect-URI set atomically; partial updates would risk a dangling old URI. */
   async updateClient(clientId: string, update: UpdateClient): Promise<void> {
     if (update.redirectUris) this.assertValidRedirectUris(update.redirectUris);
-    /** A null/empty array unbinds workload identity; a populated array replaces the full binding set. */
     const workloadSubjects = update.workloadSubjects === undefined ? undefined : (update.workloadSubjects ?? []);
     if (workloadSubjects) for (const subject of workloadSubjects) assertValidWorkloadBinding(subject);
     await this.db.transaction(async tx => {
@@ -532,13 +391,6 @@ export class OAuthClientService {
     });
   }
 
-  /**
-   * Permanently removes a client. FK-cascade children (secrets, redirect URIs, scope grants, logout
-   * deliveries, and the M2M route allowlist) are dropped by the database; consents and refresh-token
-   * families reference the client by a plain id with no cascade, so they are cleared explicitly to
-   * avoid dangling rows. Already-issued stateless access tokens are not stored and survive until they
-   * expire (bounded by the client's short access-token TTL).
-   */
   async deleteClient(clientId: string): Promise<void> {
     await this.db.transaction(async tx => {
       await tx.delete(schema.consents).where(eq(schema.consents.clientId, clientId));
@@ -548,10 +400,6 @@ export class OAuthClientService {
     this.logger.info('Deleted OAuth client', { clientId });
   }
 
-  /**
-   * Rejects redirect URIs that are not absolute URLs or that carry a fragment. A registered target
-   * must be an exact absolute URI (C-5); RFC 6749 §3.1.2 forbids a fragment component.
-   */
   private assertValidRedirectUris(uris: string[]): void {
     for (const uri of uris) {
       let parsed: URL;
@@ -588,7 +436,6 @@ export class OAuthClientService {
     return resource;
   }
 
-  /** Verifies a client secret against its active (unexpired, unrevoked) secrets, in constant work. */
   async verifySecret(clientId: string, secret: string): Promise<boolean> {
     const active = this.isValidClientId(clientId)
       ? await this.db
@@ -619,21 +466,14 @@ export class OAuthClientService {
     return secret;
   }
 
-  /** Whether a value is shaped like a client id (slug or legacy UUID) — gates lookups against obvious garbage. */
   private isValidClientId(value: string): boolean {
     return CLIENT_ID_PATTERN.test(value);
   }
 
-  /** Rejects a malformed or reserved admin-supplied client id (D-16 slug ids). */
   private assertValidClientId(id: string): void {
     if (!CLIENT_ID_PATTERN.test(id) || RESERVED_CLIENT_IDS.has(id)) throw AppErrorCode.ADM_006.create();
   }
 
-  /**
-   * Enforces the exact-subject uniqueness invariant: no exact binding may be claimed by more than one
-   * client, so subject-only resolution stays unambiguous. Pattern bindings are exempt — overlapping
-   * patterns are harmless because they only ever match with an explicit `client_id` (D-16).
-   */
   private async assertExactSubjectsUnclaimed(tx: PrimaryTransaction, clientId: string, subjects: string[]): Promise<void> {
     for (const subject of subjects.filter(value => !isWorkloadPattern(value))) {
       const conflict = await tx.query.oauthClients.findFirst({

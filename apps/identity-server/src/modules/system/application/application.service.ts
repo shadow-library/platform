@@ -1,22 +1,12 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import { eq, InferInsertModel } from 'drizzle-orm';
 import { Injectable, OnModuleInit } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { Application, DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
-
-/**
- * Defining types
- */
 
 type IApplication = Omit<InferInsertModel<typeof schema.applications>, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -33,10 +23,6 @@ export interface CreateApplication {
   isActive?: boolean;
   logoUrl?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class ApplicationService implements OnModuleInit {

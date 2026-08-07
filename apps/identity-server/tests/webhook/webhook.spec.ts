@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { createHmac } from 'node:crypto';
 
 import { eq, sql } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
@@ -17,10 +11,6 @@ import { isPrivateAddress, WebhookDeliveryService, WebhookService, WebhookTarget
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
 type Method = 'get' | 'post' | 'patch' | 'delete';
 
 interface ReceivedRequest {
@@ -28,9 +18,6 @@ interface ReceivedRequest {
   body: string;
 }
 
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('webhook').init();
 const ADMIN_EMAIL = 'admin@shadow-apps.com';
 

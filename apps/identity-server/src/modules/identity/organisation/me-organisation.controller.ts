@@ -1,29 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { Auth, Context } from '@server/modules/access';
 import { type Organisation } from '@server/modules/infrastructure/datastore';
 
 import { InvitationTokenBody, MyOrganisationsResponse, OrganisationActionResponse, OrganisationIdParams, OrganisationResponse } from './organisation.dto';
 import { type MyOrganisationListItem, OrganisationService } from './organisation.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Self-service membership: the signed-in user lists their organisations, resolves invitation
- * tokens from their inbox, and leaves teams. Every route needs only a session, so `@Auth` is
- * declared once on the controller.
- */
 
 @HttpController('/api/v1/me')
 @Auth({ session: true })

@@ -1,12 +1,5 @@
-/**
- * Importing npm packages
- */
-
 import { Body, Get, HttpController, HttpStatus, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { Auth, Context } from '@server/modules/access';
 import { PolicyDecisionService, type Principal } from '@server/modules/authz';
@@ -19,20 +12,6 @@ import { AdminAccessService, AdminActor } from './admin-access.service';
 import { ApplicationIdQuery, AssignmentListQuery, AssignmentListResponse, PermissionListResponse, RoleAssignmentBody } from './admin-role.dto';
 import { AdminActionResponse } from './admin-user.dto';
 import { ADMIN_PERMISSIONS } from './admin.constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Role and permission *definitions* are owned by each application and pushed declaratively through
- * the SDK's catalog sync (`PUT /api/v1/authz/catalog`); admins no longer create them by hand. What
- * remains here is *assignment* — granting a defined role to a principal — which stays a deliberate
- * human decision, plus a read view of the catalog. `iam:roles:manage` operates anywhere while
- * `app:roles:manage` only reaches the application that owns the caller's permission.
- */
 
 @HttpController('/api/v1/admin')
 export class AdminRoleController {
@@ -50,13 +29,7 @@ export class AdminRoleController {
     return role;
   }
 
-  /**
-   * Resolves the principal and the organisation the assignment is scoped to. An `ORGANISATION` grant
-   * (D-A5) is always scoped to the organisation that is its own principal, so the scope is derived
-   * from principalId — and validated as a live TEAM org — never trusted from a divergent body value.
-   * When `validate` is false (revocation) the coupling is enforced without the liveness check, so a
-   * grant on a since-suspended org can still be withdrawn.
-   */
+  /** Organisation-grant scope is derived from the principal, never trusted from the request; revocation skips liveness so suspended-org grants remain removable. */
   private async resolveAssignment(body: RoleAssignmentBody, validate: boolean): Promise<{ principal: Principal; organisationId: string }> {
     if (body.principalType !== 'ORGANISATION') return { principal: { type: body.principalType, id: body.principalId }, organisationId: body.organisationId };
     if (validate) await this.organisationService.assertActiveTeam(body.principalId);

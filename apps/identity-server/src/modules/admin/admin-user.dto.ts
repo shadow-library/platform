@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { EnumType, Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
-
-/**
- * Defining types
- */
 
 const USER_STATUSES = ['ACTIVE', 'INACTIVE', 'DISABLED', 'BLOCKED', 'SUSPENDED', 'CLOSED'] as const;
 type UserStatus = (typeof USER_STATUSES)[number];
-
-/**
- * Declaring the constants
- */
 
 const USER_SORT_FIELDS = EnumType.create('UserSortBy', ['createdAt'] as const);
 
@@ -98,11 +84,10 @@ export class UserDetailResponse {
   @Field(() => String, { enum: [...USER_STATUSES] })
   status: UserStatus;
 
-  /** Why the account left ACTIVE, and when a temporary suspension lifts itself. */
-  @Field(() => String, { optional: true })
+  @Field(() => String, { optional: true, description: 'Reason the account left ACTIVE status.' })
   statusReason?: string;
 
-  @Field(() => String, { optional: true })
+  @Field(() => String, { optional: true, description: 'ISO-8601 instant when a temporary suspension ends.' })
   statusUntil?: string;
 
   @Field(() => String, { enum: ['NONE', 'OTP_ONLY', 'FULL'] })
@@ -135,19 +120,20 @@ export class LockUserBody {
   @Field(() => String, { enum: ['OTP_ONLY', 'FULL'] })
   mode: 'OTP_ONLY' | 'FULL';
 
-  /** ISO-8601 expiry; omitted means locked until explicitly unlocked. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'ISO-8601 expiry; omitted to keep the account locked until explicitly unlocked.' })
   until?: string;
 }
 
 @Schema()
 export class SuspendUserBody {
-  /** Recorded on the account and in the audit chain so a later administrator can see why the hold exists. */
-  @Field({ optional: true, maxLength: 256 })
+  @Field({
+    optional: true,
+    maxLength: 256,
+    description: 'Reason recorded on the account and in the audit chain so later administrators can understand the suspension.',
+  })
   reason?: string;
 
-  /** ISO-8601 instant at which the hold lapses on its own; omitted suspends until an administrator lifts it. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'ISO-8601 instant when the suspension ends; omitted to suspend until an administrator lifts it.' })
   until?: string;
 }
 

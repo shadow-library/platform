@@ -1,27 +1,8 @@
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { migrate } from 'drizzle-orm/bun-sql/migrator';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * A one-shot entry that applies the drizzle SQL migrations shipped alongside the bundle. It uses the
- * same bun-sql driver and `DATABASE_POSTGRES_URL` the server reads, so the migration job and the app
- * container share one connection contract. The folder is resolved from the working directory, which
- * holds `generated/drizzle` both in the repo and under `/app` in the image.
- */
 const logger = Logger.getLogger('Scripts', 'Migrate');
 const migrationsFolder = 'generated/drizzle';
 

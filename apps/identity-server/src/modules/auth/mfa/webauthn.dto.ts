@@ -1,22 +1,4 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- *
- * Wire DTOs mirror the W3C WebAuthn JSON serialization (`PublicKeyCredential.toJSON()`), so the
- * browser's credential objects round-trip without client-side massaging.
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class WebauthnRpEntity {
@@ -140,8 +122,7 @@ export class WebauthnChallengeResponse {
 
 @Schema()
 export class WebauthnStepUpOptionsResponse {
-  /** Assertion options for the session-scoped passkey step-up ceremony; no flow id is exposed. */
-  @Field(() => WebauthnAuthenticationOptions)
+  @Field(() => WebauthnAuthenticationOptions, { description: 'Assertion options for the session-scoped passkey step-up ceremony; no flow identifier is exposed.' })
   options: WebauthnAuthenticationOptions;
 }
 
@@ -217,17 +198,12 @@ export class WebauthnAssertion {
   authenticatorAttachment?: string;
 }
 
-/**
- * A step-up assertion additionally declares what the elevation is for (D-19, T-801). The intent
- * fields are restated rather than inherited because the assertion shape is the base here and login
- * MFA — which reuses `WebauthnAssertion` — must never carry an application intent.
- */
 @Schema()
 export class WebauthnStepUpBody extends WebauthnAssertion {
-  @Field({ optional: true, maxLength: 64 })
+  @Field({ optional: true, maxLength: 64, description: 'Application client for which the step-up assertion is performed.' })
   clientId?: string;
 
-  @Field({ optional: true, maxLength: 255 })
+  @Field({ optional: true, maxLength: 255, description: 'Target resource for which the step-up assertion is performed.' })
   resource?: string;
 }
 
@@ -236,7 +212,6 @@ export class WebauthnRegisterResponse {
   @Field()
   success: boolean;
 
-  /** Present only when this registration produced the account's first recovery-code batch. */
-  @Field(() => [String], { optional: true })
+  @Field(() => [String], { optional: true, description: "Present only when registration creates the account's first recovery-code batch." })
   recoveryCodes?: string[];
 }

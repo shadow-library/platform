@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { and, eq, isNull } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
@@ -15,13 +9,6 @@ import { MaintenanceService } from '@server/modules/worker/maintenance.service';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('contact').init();
 const EMAIL = 'contact@example.com';
 

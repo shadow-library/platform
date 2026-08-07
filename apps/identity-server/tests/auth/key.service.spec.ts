@@ -1,22 +1,9 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { EnvKeyProvider, KeyService } from '@server/modules/auth/keys';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('keys').init();
 const keyService = () => env.getService(KeyService);
 

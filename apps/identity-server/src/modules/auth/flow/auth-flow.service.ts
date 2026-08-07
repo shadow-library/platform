@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { DatabaseService } from '@server/modules/infrastructure/datastore';
-
-/**
- * Defining types
- */
 
 export type AuthFlowKind = 'LOGIN' | 'REGISTRATION' | 'RECOVERY';
 
@@ -25,14 +15,11 @@ export interface DeviceContext {
   userAgent?: string;
 }
 
-/** Server-side state of an in-flight federated login (T-702); secrets never leave the flow store. */
 export interface FederatedFlowState {
   identityProviderId: string;
   nonce: string;
   codeVerifier: string;
-  /** True when the org enforces federation and no break-glass applies: local credential steps refuse. */
   enforced: boolean;
-  /** Upstream subject awaiting an email-OTP proof before it may link to an existing local account. */
   pendingSubject?: string;
 }
 
@@ -47,25 +34,13 @@ export interface AuthFlowContext {
   globalFailureCount: number;
   device: DeviceContext;
   regData?: Record<string, unknown>;
-  /** Remaining OTP re-deliveries for this flow (Tier-2 per-flow budget) */
   resendsLeft?: number;
-  /** Epoch millis of the last OTP delivery, driving the resend cooldown */
   lastOtpSentAt?: number;
-  /** Post-login destination (validated: relative or same-origin) carried through federated detours */
   returnTo?: string;
   federated?: FederatedFlowState;
   createdAt: number;
 }
 
-/**
- * Declaring the constants
- */
-
-/**
- * Stores the ephemeral state of an in-progress authentication (login, registration, recovery) in
- * Redis, keyed by an opaque flow id with a bounded TTL. Only non-secret progress data lives here;
- * challenge codes are stored hashed in Postgres, never in the flow context.
- */
 @Injectable()
 export class AuthFlowService {
   private readonly redis: Redis;

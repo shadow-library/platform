@@ -1,18 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface EncryptedSecret {
   ciphertext: string;
@@ -21,27 +10,14 @@ export interface EncryptedSecret {
   kekVersion: number;
 }
 
-/**
- * Wraps and unwraps secrets (signing private keys, TOTP seeds) with a key-encryption key (KEK).
- * The interface is deliberately small so a KMS/HSM-backed provider can replace the env-derived
- * implementation without any schema or caller changes.
- */
 export abstract class KeyProvider {
   abstract readonly kekVersion: number;
   abstract encrypt(plaintext: Buffer): EncryptedSecret;
   abstract decrypt(secret: EncryptedSecret): Buffer;
 }
 
-/**
- * Declaring the constants
- */
 const CURRENT_KEK_VERSION = 1;
 
-/**
- * Derives a 256-bit KEK from the configured master key via SHA-256 and performs AES-256-GCM
- * envelope encryption. Suitable for development and single-region deployments; production should
- * bind this behind a managed KMS.
- */
 @Injectable()
 export class EnvKeyProvider extends KeyProvider {
   readonly kekVersion = CURRENT_KEK_VERSION;

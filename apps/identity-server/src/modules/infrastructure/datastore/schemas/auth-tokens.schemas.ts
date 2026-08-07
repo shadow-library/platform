@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, index, pgEnum, pgTable, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { userAuthProvider, users } from './users.schema';
-
-/**
- * Defining types
- */
 
 export type UserSession = InferSelectModel<typeof userSessions>;
 export type Device = InferSelectModel<typeof devices>;
@@ -22,10 +12,6 @@ export namespace UserSession {
 
   export type SignInEvent = InferSelectModel<typeof userSignInEvents>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const sessionStatus = pgEnum('session_status', ['ACTIVE', 'REVOKED', 'TERMINATED', 'EXPIRED']);
 export const sessionAal = pgEnum('session_aal', ['AAL1', 'AAL2']);
@@ -54,7 +40,6 @@ export const userSessions = pgTable(
     userId: bigint('user_id', { mode: 'bigint' })
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    /** SHA-256 of the opaque session secret; the raw secret is only ever held in the cookie. */
     sessionHash: varchar('session_hash', { length: 64 }).notNull().unique(),
     userSignInEventId: uuid('user_sign_in_event_id').references(() => userSignInEvents.id, { onDelete: 'set null' }),
     deviceId: bigint('device_id', { mode: 'bigint' }).references(() => devices.id, { onDelete: 'set null' }),
@@ -67,12 +52,6 @@ export const userSessions = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
     elevatedUntil: timestamp('elevated_until', { withTimezone: true }),
-    /**
-     * What the open step-up window was performed *for* (D-19, T-801). A window is claimable only by
-     * the application and audience named here, so elevation cannot leak to a second application or a
-     * second API. Both NULL means the ceremony carried no application intent — the identity
-     * console's own step-up — which no application may claim.
-     */
     elevationIntentClientId: varchar('elevation_intent_client_id', { length: 64 }),
     elevationIntentResource: varchar('elevation_intent_resource', { length: 255 }),
 
@@ -112,10 +91,6 @@ export const userSignInEvents = pgTable(
     index('user_sign_in_events_ip_address_created_at_idx').on(t.ipAddress, t.createdAt),
   ],
 );
-
-/**
- * Declaring the relations
- */
 
 export const deviceRelations = relations(devices, ({ one }) => ({
   user: one(users, { fields: [devices.userId], references: [users.id] }),

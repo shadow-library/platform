@@ -1,28 +1,12 @@
-/**
- * Importing packages with side effects
- */
 import 'reflect-metadata';
 
-/**
- * Importing npm packages
- */
 import path from 'node:path';
 
 import { ShadowFactory } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppModule } from './app.module';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const packageJsonPath = path.join(import.meta.dirname, 'package.json');
 const packageJsonFile = Bun.file(packageJsonPath);
 

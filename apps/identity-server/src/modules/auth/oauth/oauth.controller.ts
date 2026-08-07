@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type FastifyReply, type FastifyRequest } from 'fastify';
 import { Config } from '@shadow-library/common';
 import { Body, Get, Header, HttpController, HttpStatus, Post, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { OIDC_PROFILE_SCOPE } from '@server/constants';
 import { Auth } from '@server/modules/access';
@@ -22,10 +16,6 @@ import { TOKEN_EXCHANGE_GRANT } from './oauth.constants';
 import { AuthorizeQuery, DiscoveryResponse, IntrospectionResponseDto, RevocationResponse, TokenActionBody, TokenRequestBody, TokenResponse, UserInfoResponse } from './oauth.dto';
 import { ClientCredential, OAuthService } from './oauth.service';
 
-/**
- * Defining types
- */
-
 interface ClientAuthenticationBody {
   client_id?: string;
   client_secret?: string;
@@ -33,11 +23,6 @@ interface ClientAuthenticationBody {
   client_assertion?: string;
 }
 
-/**
- * Declaring the constants
- */
-
-/** RFC 7523 §2.2 — client authentication with a JWT (projected k8s service-account tokens, D-16) */
 const JWT_BEARER_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded';
 
@@ -68,7 +53,6 @@ export class OAuthController {
       jwks_uri: `${this.issuer}/.well-known/jwks.json`,
       revocation_endpoint: `${this.issuer}/oauth2/revoke`,
       introspection_endpoint: `${this.issuer}/oauth2/introspect`,
-      /** Secret-bearing clients may present their credential as Basic auth or as form parameters; workload clients use RFC 7523 assertions. */
       token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'private_key_jwt', 'none'],
       scopes_supported: await this.clientService.listActiveScopeNames(),
       response_types_supported: ['code'],
@@ -78,20 +62,11 @@ export class OAuthController {
       code_challenge_methods_supported: ['S256'],
       backchannel_logout_supported: true,
       backchannel_logout_session_supported: true,
-      /**
-       * Global rather than per-client, so it belongs in the public document (D-21 §8.6): a service
-       * reads its step-up URL from here instead of restating it in its own configuration. It is the
-       * hosted prompt *page* (D-19, T-801) — same origin as the issuer, served by identity-web, so it
-       * sits outside the `/api` prefix — that the SDK redirects the browser to. The prompt forwards
-       * `client_id`/`resource` into the step-up so the window it opens names its beneficiary rather
-       * than being claimable first-come-first-served.
-       */
       step_up_endpoint: `${this.issuer}/step-up`,
       app_session_endpoint: `${this.issuer}/api/v1/app-sessions`,
     };
   }
 
-  /** Client/bearer-authenticated OAuth endpoints keep `@Req`/`@Res`: they parse Basic/JWT client credentials, verify bearer tokens, and drive redirects — none of which the session guard or DTO serializer can express. */
   @Get('/oauth2/authorize')
   @Auth({ public: true })
   async authorize(@Query() query: AuthorizeQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
@@ -153,14 +128,6 @@ export class OAuthController {
     };
   }
 
-  /**
-   * The OIDC userinfo endpoint: the standard, client-agnostic way to turn a token into the person
-   * behind it, and the reason no application needs an endpoint of its own for "who am I".
-   *
-   * Profile claims are released only to a token carrying the `profile` scope, per OIDC Core §5.4.
-   * A service token never gets them whatever its scope: its `sub` names a client, not a person, so
-   * resolving it as a user id would either miss or — worse — hit an unrelated account.
-   */
   @Get('/oauth2/userinfo')
   @Auth({ public: true })
   @RespondFor(200, UserInfoResponse)
@@ -198,11 +165,6 @@ export class OAuthController {
     return { active: result.active, sub: result.sub, scope: result.scope, aud: result.aud, exp: result.exp, client_id: result.clientId, token_type: result.tokenType };
   }
 
-  /**
-   * RFC 6749 §2.3.1 mandates form encoding on the token, revocation and introspection endpoints. A
-   * request in any other encoding (JSON, most often) is refused as `invalid_request` rather than
-   * parsed, so a non-conforming client fails fast with a machine-readable OAuth error.
-   */
   private assertFormEncoded(request: FastifyRequest): void {
     const contentType = request.headers['content-type'] ?? '';
     if (!contentType.startsWith(FORM_CONTENT_TYPE)) throw AppErrorCode.OAU_001.create();

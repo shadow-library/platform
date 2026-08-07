@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { PolicyDecisionService } from '@server/modules/authz';
@@ -19,13 +13,6 @@ import { ApplicationService } from '@server/modules/system/application';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('admin-users').init();
 
 describe('Admin user lifecycle APIs', () => {
@@ -100,7 +87,6 @@ describe('Admin user lifecycle APIs', () => {
     expect(JSON.stringify(body)).not.toContain('$argon2');
   });
 
-  /** A `pattern` without an `errorMessage` answers with the raw regex, which is noise to the caller. */
   it('should reject a malformed path parameter with a readable message', async () => {
     const response = await request('get', '/api/v1/admin/users/not-a-number');
     expect(response.statusCode).toBe(422);
@@ -132,7 +118,6 @@ describe('Admin user lifecycle APIs', () => {
     expect(attempt.statusCode).toBe(200);
     expect(attempt.json()).toMatchObject({ status: 'AWAITING_PASSWORD_RESET' });
 
-    /** The inline current+new password step rotates the credential and completes the sign-in — no recovery code. */
     const reset = await env.getRouter().mockRequest().post('/api/v1/auth/login/reset-password').body({ flowId, currentPassword: 'Password@123', newPassword: 'NewPassword@456' });
     expect(reset.statusCode).toBe(200);
     expect(reset.json()).toMatchObject({ status: 'COMPLETED' });
@@ -173,7 +158,6 @@ describe('Admin user lifecycle APIs', () => {
     expect(row?.statusReason).toBe('payment overdue');
     expect(row?.statusUntil?.toISOString()).toBe(until);
 
-    /** Reactivating clears the hold rather than leaving a stale reason behind. */
     await request('post', `/api/v1/admin/users/${targetId}/reactivate`);
     const [restored] = await env.getPostgresClient().select().from(schema.users).where(eq(schema.users.id, targetUserId));
     expect(restored).toMatchObject({ status: 'ACTIVE', statusReason: null, statusUntil: null });
@@ -186,7 +170,6 @@ describe('Admin user lifecycle APIs', () => {
     const [row] = await env.getPostgresClient().select().from(schema.users).where(eq(schema.users.id, targetUserId));
     expect(row).toMatchObject({ status: 'BLOCKED', statusReason: 'fraud', statusUntil: null });
 
-    /** An expiry is meaningless on a punitive block, so the suspend endpoint is the only one that accepts one. */
     const past = await request('post', `/api/v1/admin/users/${targetId}/suspend`).body({ until: new Date(Date.now() - 1000).toISOString() });
     expect(past.statusCode).toBe(422);
   });

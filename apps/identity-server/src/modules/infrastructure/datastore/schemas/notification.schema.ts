@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel } from 'drizzle-orm';
 import { bigserial, customType, index, integer, pgEnum, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export type NotificationOutbox = InferSelectModel<typeof notificationOutbox>;
 
@@ -22,10 +11,6 @@ export namespace NotificationOutbox {
     push?: string;
   }
 }
-
-/**
- * Declaring the constants
- */
 
 export const notificationStatus = pgEnum('notification_status', ['PENDING', 'SENDING', 'SENT', 'FAILED', 'DEAD']);
 

@@ -1,12 +1,5 @@
-/**
- * Importing npm packages
- */
-
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { Auth, Context } from '@server/modules/access';
 import { ServiceAccessService } from '@server/modules/authz';
@@ -18,18 +11,6 @@ import { AdminActor } from './admin-access.service';
 import { CreateServiceAccessBody, ServiceAccessListQuery, ServiceAccessListResponse, ServiceAccessRuleItem, ServiceAccessRuleParams } from './admin-service-access.dto';
 import { AdminActionResponse } from './admin-user.dto';
 import { ADMIN_PERMISSIONS } from './admin.constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Which service may call which routes of which application lives here, in identity, instead of in
- * per-route decorators (D-17). Consuming services pull their own application's rules at startup
- * through the SDK; granting a new caller is an admin operation, not a redeploy.
- */
 
 @HttpController('/api/v1/admin/service-access')
 export class AdminServiceAccessController {

@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { KeyService } from '@server/modules/auth/keys';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
@@ -16,10 +10,6 @@ import { ApplicationAccessService, ApplicationService, OrganisationApplicationSe
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
 interface OrganisationItem {
   id: string;
   name: string;
@@ -27,9 +17,6 @@ interface OrganisationItem {
   active: boolean;
 }
 
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('app-session-organisation').init();
 const REDIRECT_URI = 'https://app.example.com/callback';
 const REPORTS = 'api://reports';
@@ -41,11 +28,6 @@ const pkce = () => {
 
 const basic = (clientId: string, secret: string) => `Basic ${Buffer.from(`${clientId}:${secret}`).toString('base64')}`;
 
-/**
- * The organisation an application session acts in is where its capability is evaluated, so it has to be
- * one the user actually reaches the application through — pinning every session to the personal
- * workspace made a role granted in a team organisation unreachable from the browser.
- */
 describe('App session organisations', () => {
   let client: { clientId: string; secret?: string };
   let applicationId: number;
@@ -144,7 +126,6 @@ describe('App session organisations', () => {
     return env.getService(KeyService).verify(accessToken)?.org;
   };
 
-  /** Moves the application behind a platform release so only the team organisation still reaches it. */
   const restrictToTeam = async () => {
     await env.getService(ApplicationService).updateApplication('shadow-identity', { visibility: 'RESTRICTED' });
     await env.getService(OrganisationApplicationService).release({ actorId: userId.toString() }, applicationId, teamOrganisationId);
@@ -169,7 +150,6 @@ describe('App session organisations', () => {
   it('should open a session in the organisation that grants the application', async () => {
     const handle = await openSession();
 
-    /** A PUBLIC application is granted by the personal workspace, so this stays exactly where it always was. */
     expect(organisationOf(await mint(handle))).toBe(personalOrganisationId.toString());
   });
 
@@ -193,11 +173,6 @@ describe('App session organisations', () => {
     expect(organisationOf(await mint(rotated))).toBe(teamOrganisationId.toString());
   });
 
-  /**
-   * Rotation is the invalidation mechanism, not hygiene: applications cache minted tokens against the
-   * handle they hold, and one replica cannot reach another's cache. Retiring the handle is what stops
-   * the previous organisation's authority outliving the switch.
-   */
   it('should retire the previous handle when the organisation changes', async () => {
     const handle = await openSession();
 
@@ -217,11 +192,6 @@ describe('App session organisations', () => {
     expect(refused.statusCode).toBe(403);
   });
 
-  /**
-   * A session whose organisation stops granting the application is re-pointed rather than ended: access
-   * itself still holds through another organisation, so revoking would be gratuitous. This is also what
-   * converges sessions opened before the organisation was resolved from reachability at all.
-   */
   it('should realign a session whose organisation no longer grants the application', async () => {
     const handle = await openSession();
     expect(organisationOf(await mint(handle))).toBe(personalOrganisationId.toString());

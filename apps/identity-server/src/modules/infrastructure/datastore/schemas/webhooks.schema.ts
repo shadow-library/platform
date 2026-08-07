@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export type WebhookSubscription = InferSelectModel<typeof webhookSubscriptions>;
 export type WebhookDelivery = InferSelectModel<typeof webhookDeliveries>;
@@ -19,17 +8,8 @@ export namespace WebhookDelivery {
   export type Status = InferEnum<typeof webhookDeliveryStatus>;
 }
 
-/**
- * Declaring the constants
- */
-
 export const webhookDeliveryStatus = pgEnum('webhook_delivery_status', ['PENDING', 'SENDING', 'SENT', 'FAILED', 'DEAD']);
 
-/**
- * Platform-tier webhook subscriptions (T-706). Signing secrets are AES-256-GCM envelopes like TOTP
- * seeds; the previous secret stays valid for a rotation overlap window so receivers can migrate
- * without dropping signatures. Event filters hold exact audit action names or `prefix.*` patterns.
- */
 export const webhookSubscriptions = pgTable('webhook_subscriptions', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   name: varchar('name', { length: 128 }).notNull(),
@@ -44,12 +24,6 @@ export const webhookSubscriptions = pgTable('webhook_subscriptions', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-/**
- * Transactional delivery outbox mirroring the back-channel logout pipeline: skip-locked claims,
- * exponential backoff, dead-letter after max attempts, crash requeue. `(subscription, event)` is
- * unique so an audit event enqueues at most once per subscription; the pair is the idempotency
- * key receivers deduplicate on.
- */
 export const webhookDeliveries = pgTable(
   'webhook_deliveries',
   {

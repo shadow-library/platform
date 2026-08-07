@@ -1,24 +1,11 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { CreateUser, UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('organisation').init();
 
 const rejection = <T>(promise: Promise<T>): Promise<any> =>

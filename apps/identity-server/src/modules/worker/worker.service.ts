@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable, OnApplicationReady, OnApplicationStop } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { BackChannelLogoutService } from '@server/modules/auth/token';
 import { NotificationService } from '@server/modules/infrastructure/notification';
@@ -14,22 +8,8 @@ import { WebhookDeliveryService } from '@server/modules/infrastructure/webhook';
 
 import { MaintenanceService } from './maintenance.service';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Maintenance runs on a coarser cadence than the notification loop: stale-claim purging is a
- * hygiene task, not a latency-sensitive one.
- */
 const MAINTENANCE_EVERY_TICKS = 720;
 
-/**
- * Drives periodic background jobs. It runs only in the worker process so the dispatch loop executes
- * exactly once regardless of how many API instances are scaled out.
- */
 @Injectable()
 export class WorkerService implements OnApplicationReady, OnApplicationStop {
   private readonly logger = Logger.getLogger(APP_NAME, WorkerService.name);
@@ -55,7 +35,6 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
     this.logger.info('Worker started', { intervalMs: this.intervalMs });
   }
 
-  /** Graceful drain: stop scheduling new ticks, then wait for the in-flight one to finish. */
   async onApplicationStop(): Promise<void> {
     if (this.timer) clearInterval(this.timer);
     if (this.current) await this.current;

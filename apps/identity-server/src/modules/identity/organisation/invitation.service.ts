@@ -1,24 +1,14 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
 
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, Organisation, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
 import { RateLimiterService } from '@server/modules/infrastructure/security';
-
-/**
- * Defining types
- */
 
 export interface InviteInput {
   organisation: Organisation;
@@ -32,14 +22,6 @@ export interface AcceptedInvitation {
   organisation: Organisation;
 }
 
-/**
- * Declaring the constants
- *
- * Invitations are capability tokens bound to an email address: the plaintext travels only in the
- * invitation email and acceptance additionally requires the caller to hold that address verified,
- * so a leaked link alone never grants membership. Owners are never invited directly — ownership is
- * granted after joining, through the owner-gated role-change path.
- */
 const INVITATION_TTL_DAYS = 7;
 const INVITE_TEMPLATE = 'organisation-invitation';
 const INVITE_BUDGET = { bucket: 'org-invite', limit: 20, windowSeconds: 3600 };
@@ -76,7 +58,6 @@ export class InvitationService {
     const expiresAt = new Date(Date.now() + INVITATION_TTL_DAYS * 86_400_000);
 
     const invitation = await this.db.transaction(async tx => {
-      /** Re-inviting supersedes the previous pending invitation instead of erroring: the older email's token dies. */
       await tx
         .update(schema.organisationInvitations)
         .set({ revokedAt: new Date() })
@@ -103,7 +84,6 @@ export class InvitationService {
     });
   }
 
-  /** Revokes a pending invitation; absent and resolved invitations answer identically. */
   async revoke(organisationId: bigint, invitationId: bigint): Promise<Organisation.Invitation> {
     const [revoked] = await this.db
       .update(schema.organisationInvitations)
@@ -114,11 +94,6 @@ export class InvitationService {
     return revoked;
   }
 
-  /**
-   * Accepts an invitation: the token must resolve to a live, unexpired invitation whose email the
-   * caller holds verified. Every failure mode answers ORG_005 so tokens cannot be probed. Already
-   * being a member resolves the invitation idempotently.
-   */
   async accept(userId: bigint, token: string): Promise<AcceptedInvitation> {
     const invitation = await this.resolvePending(userId, token);
     const organisation = await this.db.query.organisations.findFirst({ where: eq(schema.organisations.id, invitation.organisationId) });
@@ -132,14 +107,12 @@ export class InvitationService {
     return { invitation, organisation };
   }
 
-  /** Declines an invitation under the same resolution rules as acceptance. */
   async decline(userId: bigint, token: string): Promise<Organisation.Invitation> {
     const invitation = await this.resolvePending(userId, token);
     await this.db.update(schema.organisationInvitations).set({ declinedAt: new Date() }).where(eq(schema.organisationInvitations.id, invitation.id));
     return invitation;
   }
 
-  /** Resolves a token to a pending invitation addressed to one of the caller's verified emails. */
   private async resolvePending(userId: bigint, token: string): Promise<Organisation.Invitation> {
     const invitation = await this.db.query.organisationInvitations.findFirst({
       where: and(eq(schema.organisationInvitations.tokenHash, this.hashToken(token)), this.pendingCondition()),

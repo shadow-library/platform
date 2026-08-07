@@ -1,33 +1,17 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
 import { WebauthnAssertion } from '@server/modules/auth/mfa';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
 @Schema()
 export class LoginInitBody {
-  /** An email address, E.164 phone number, or username — the three shapes `UserService` resolves. */
-  @Field({ ...PATTERN.IDENTIFIER, maxLength: 320 })
+  @Field({ ...PATTERN.IDENTIFIER, maxLength: 320, description: 'Email address, E.164 phone number, or username.' })
   identifier: string;
 
   @Field({ optional: true })
   deviceId?: string;
 
-  /** Post-login destination; must be a relative path or a URL on this origin (validated server-side). */
-  @Field({ optional: true, maxLength: 2048 })
+  @Field({ optional: true, maxLength: 2048, description: 'Post-login destination; must be a relative path or a URL on this origin.' })
   returnTo?: string;
 }
 
@@ -36,8 +20,7 @@ export class FederatedLoginOptionDto {
   @Field()
   authorizationUrl: string;
 
-  /** True when the organisation mandates federated sign-in and local credential steps will refuse. */
-  @Field()
+  @Field({ description: 'True when the organisation requires federated sign-in and local credential steps are unavailable.' })
   enforced: boolean;
 }
 
@@ -67,19 +50,16 @@ export class ChallengeVerifyBody {
   @Field({ optional: true })
   code?: string;
 
-  /** Single-use MFA bypass code; accepted wherever a second factor is awaited. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'Single-use MFA bypass code accepted when a second factor is required.' })
   recoveryCode?: string;
 
-  /** Passkey assertion, as either the first factor or the MFA step. */
-  @Field(() => WebauthnAssertion, { optional: true })
+  @Field(() => WebauthnAssertion, { optional: true, description: 'Passkey assertion used as either the first factor or the MFA step.' })
   webauthn?: WebauthnAssertion;
 }
 
 @Schema()
 export class WebauthnOptionsBody {
-  /** Absent for a usernameless (discoverable credential) login; present for a flow's MFA step. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: "Absent for a usernameless discoverable-credential login; present for a flow's MFA step." })
   flowId?: string;
 
   @Field({ optional: true })
@@ -238,8 +218,7 @@ export class LoginResetPasswordBody {
   @Field()
   flowId: string;
 
-  /** Re-proves the credential the password step already accepted before it is rotated. */
-  @Field()
+  @Field({ description: 'Re-proves the credential accepted by the password step before it is rotated.' })
   currentPassword: string;
 
   @Field()

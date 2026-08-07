@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class MeResponse {
@@ -32,8 +17,7 @@ export class MeResponse {
   @Field(() => String, { enum: ['AAL1', 'AAL2'] })
   aal: 'AAL1' | 'AAL2';
 
-  /** True while the session sits inside its step-up elevation window. */
-  @Field(() => Boolean)
+  @Field(() => Boolean, { description: 'Whether the session is currently within its step-up elevation window.' })
   elevated: boolean;
 
   @Field({ optional: true })
@@ -51,8 +35,7 @@ export class UpdateProfileBody {
 
 @Schema()
 export class ChangePasswordBody {
-  /** Re-proves the account before the credential is rotated; a session cookie alone must not change a password. */
-  @Field()
+  @Field({ description: 'Re-proves the account before credential rotation; a session cookie alone cannot change the password.' })
   currentPassword: string;
 
   @Field()

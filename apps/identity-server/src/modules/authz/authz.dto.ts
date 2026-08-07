@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class CheckRequestBody {
@@ -59,12 +44,13 @@ export class CatalogRole {
   @Field({ optional: true, maxLength: 255 })
   description?: string;
 
-  /** Names of permissions this role carries; every name MUST also appear in `permissions` */
-  @Field(() => [String])
+  @Field(() => [String], { description: 'Permission names carried by this role; each name must also appear in the catalog permissions.' })
   permissions: string[];
 
-  /** When true, every signed-in user of this application holds the role implicitly — the customer baseline, no assignment row (D-A6) */
-  @Field(() => Boolean, { optional: true })
+  @Field(() => Boolean, {
+    optional: true,
+    description: 'When true, every signed-in application user implicitly holds this role without an assignment.',
+  })
   default?: boolean;
 }
 
@@ -76,8 +62,7 @@ export class CatalogSyncBody {
   @Field(() => [CatalogRole])
   roles: CatalogRole[];
 
-  /** Overrides the guardrail that refuses a manifest deleting more than half of the catalog (D-15) */
-  @Field(() => Boolean, { optional: true })
+  @Field(() => Boolean, { optional: true, description: 'Overrides the guardrail that rejects a manifest deleting more than half of the catalog.' })
   force?: boolean;
 }
 

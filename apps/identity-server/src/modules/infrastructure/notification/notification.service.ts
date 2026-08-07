@@ -1,27 +1,14 @@
-/**
- * Importing npm packages
- */
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, NotificationOutbox, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
 import { NotificationClient, SendNotification } from './notification.client';
 
-/**
- * Defining types
- */
-
 type OutboxWriter = Pick<PrimaryDatabase, 'insert'>;
 
-/**
- * Declaring the constants
- */
 const MAX_ATTEMPTS = 5;
 const CLAIMABLE_STATUSES: NotificationOutbox.Status[] = ['PENDING', 'FAILED'];
 
@@ -37,10 +24,6 @@ export class NotificationService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /**
-   * Queues a notification. Pass the surrounding transaction to persist it atomically with the
-   * domain change that triggered it; delivery happens later via the outbox.
-   */
   async enqueue(notification: SendNotification, executor: OutboxWriter = this.db): Promise<void> {
     await executor.insert(schema.notificationOutbox).values({ templateKey: notification.templateKey, recipients: notification.recipients, payload: notification.payload ?? null });
   }
@@ -60,7 +43,6 @@ export class NotificationService {
     return recovered.length;
   }
 
-  /** Claims a batch of due notifications, sends them, and records the outcome. Worker-driven. */
   async dispatchPending(limit = 20): Promise<number> {
     const claimed = await this.db.transaction(async tx => {
       const rows = await tx

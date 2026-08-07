@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
@@ -15,15 +9,8 @@ import { ApplicationAccessService, ApplicationService } from '@server/modules/sy
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
 type Method = 'get' | 'post' | 'patch' | 'delete';
 
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('organisation-application').init();
 
 describe('Organisation application assignment', () => {

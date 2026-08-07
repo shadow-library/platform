@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { SessionService } from '@server/modules/auth/session';
 import { RefreshTokenClientMismatchError, RefreshTokenReuseError, RefreshTokenService } from '@server/modules/auth/token';
 import { UserService } from '@server/modules/identity/user';
@@ -15,13 +9,6 @@ import { schema } from '@server/modules/infrastructure/datastore';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('refresh-token').init();
 
 const rejection = <T>(promise: Promise<T>): Promise<any> =>
@@ -90,7 +77,6 @@ describe('RefreshTokenService', () => {
     const error = await rejection(service.rotate(first.secret, { expectedClientId: 'client-b' }));
     expect(error).toBeInstanceOf(RefreshTokenClientMismatchError);
 
-    /** The victim's token must survive a mismatched caller — a legitimate rotation by its own client still works. */
     const rotated = await service.rotate(first.secret, { expectedClientId: 'client-a' });
     expect(rotated.secret).not.toBe(first.secret);
 
@@ -106,7 +92,6 @@ describe('RefreshTokenService', () => {
     expect(fulfilled).toHaveLength(1);
     expect(rejected).toHaveLength(1);
 
-    /** Exactly one ACTIVE successor exists — the reuse-detection invariant (one live token per family) holds under the race. */
     const active = (await env.getPostgresClient().select().from(schema.refreshTokens).where(eq(schema.refreshTokens.familyId, first.familyId))).filter(
       token => token.status === 'ACTIVE',
     );

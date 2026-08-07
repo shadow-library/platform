@@ -1,23 +1,10 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('oauth-client').init();
 
 describe('OAuthClientService', () => {
@@ -151,7 +138,6 @@ describe('OAuthClientService', () => {
     if (!client) throw new Error('client not found');
     expect(service.subjectMatchesClient(client, 'system:serviceaccount:fleet:anything')).toBe(true);
     expect(service.subjectMatchesClient(client, 'system:serviceaccount:other:anything')).toBe(false);
-    /** A pattern is unreachable by subject-only resolution. */
     expect(await service.resolveClientBySubject('system:serviceaccount:fleet:anything')).toBeNull();
   });
 

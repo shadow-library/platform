@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
 
 import { type AuthenticationResponseJSON, type AuthenticatorAttachment, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES } from '@server/constants';
 import { ADMIN_PERMISSIONS, PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
@@ -29,10 +23,6 @@ import { ChallengeService } from './challenge.service';
 import { FlowStepResult } from './flow.types';
 import { SignInEventService } from './sign-in-event.service';
 import { SuspiciousLoginService } from './suspicious-login.service';
-
-/**
- * Defining types
- */
 
 export interface LoginInitInput {
   identifier: string;
@@ -68,11 +58,6 @@ export interface WebauthnChallenge {
   options: PublicKeyCredentialRequestOptionsJSON;
 }
 
-/**
- * Declaring the constants
- *
- * A flow is terminated after this many failed submissions (Tier-3, docs/auth/overview.md §8).
- */
 const MAX_FLOW_FAILURES = 3;
 const AWAITING_PASSWORD = 'AWAITING_PASSWORD';
 const AWAITING_TOTP = 'AWAITING_TOTP';
@@ -114,15 +99,6 @@ export class LoginService {
     private readonly policyDecisionService: PolicyDecisionService,
   ) {}
 
-  /**
-   * Starts a login flow. The identifier step resolves the account and answers for it directly: an unknown identifier
-   * and a blocked, suspended or deactivated account each fail here rather than a step later (D-12 retired — see
-   * architecture.md §11). This makes the endpoint a deliberate account-existence oracle, which the Tier-2 rate limit
-   * on `login-init` is what now contains.
-   * Home-realm discovery (T-702): an email under a VERIFIED org domain with an active IdP gets a
-   * federated option; when the org enforces federation, local credential steps refuse — except for
-   * platform administrators (break-glass), so a broken upstream cannot lock operators out.
-   */
   async init(input: LoginInitInput): Promise<LoginInitResult> {
     const user = await this.userService.getUser(input.identifier);
     if (!user) throw AppErrorCode.AUTH_008.create();
@@ -148,7 +124,6 @@ export class LoginService {
       federated,
     });
 
-    /** Passkeys (and OTP for email/phone identifiers) are always advertised, so alternatives always exist. */
     const result: LoginInitResult = { flowId: flow.flowId, status: flow.status, hasAlternativeMethods: true };
     if (provider && federated) {
       const codeChallenge = createHash('sha256').update(federated.codeVerifier).digest('base64url');
@@ -160,7 +135,6 @@ export class LoginService {
     return result;
   }
 
-  /** Post-login destinations must stay on this origin: a relative path or a URL under the issuer. */
   private sanitizeReturnTo(returnTo: string | undefined): string | undefined {
     if (!returnTo) return undefined;
     if (returnTo.startsWith('/') && !returnTo.startsWith('//')) return returnTo;
@@ -189,14 +163,7 @@ export class LoginService {
 
     const user = await this.userService.getUser(userId);
     if (!user || user.status !== 'ACTIVE') return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
-    /** Tier-4 lock: a locked account only accepts OTP methods until the lock expires (§13.2). */
     if (this.isOtpLocked(user)) return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
-    /**
-     * An admin-forced reset must replace the credential before a session is minted (T-602). The
-     * caller just proved the current password, so rather than emailing a recovery code the flow
-     * continues to an inline current+new password step. Continuing (not failing) keeps the failure
-     * budget and lockouts untouched, as the credential was already proven.
-     */
     if (user.passwordResetRequired) {
       const next = await this.authFlowService.update(flow, { status: AWAITING_PASSWORD_RESET });
       return { outcome: 'CONTINUE', flowId: flow.flowId, status: next.status };
@@ -210,12 +177,6 @@ export class LoginService {
     return this.complete(flow, userId, {});
   }
 
-  /**
-   * Completes an admin-forced reset inline (T-602). The flow reaches AWAITING_PASSWORD_RESET only
-   * after the current password was accepted, so we re-prove it, then rotate the credential and drop
-   * every other session. MFA-enrolled accounts still walk their second factor before a session is
-   * minted: a rotated password must not downgrade an MFA account to single-factor takeover.
-   */
   async resetPassword(flowId: string, currentPassword: string, newPassword: string): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId);
     if (flow.status !== AWAITING_PASSWORD_RESET) throw AppErrorCode.AUTH_002.create();
@@ -244,11 +205,6 @@ export class LoginService {
     return this.complete(flow, userId, {});
   }
 
-  /**
-   * Completes the OTP first factor a `challenge/change` switched to, or the email-OTP proof that
-   * links a federated identity to an existing local account. MFA-enrolled accounts still continue
-   * to their second factor: an emailed code alone must never satisfy an MFA account.
-   */
   async verifyOtp(flowId: string, code: string): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId);
     const pendingSubject = flow.status === AWAITING_LINK_OTP ? flow.federated?.pendingSubject : undefined;
@@ -264,7 +220,6 @@ export class LoginService {
     const user = await this.userService.getUser(userId);
     if (!user || user.status !== 'ACTIVE') return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
 
-    /** The OTP proved control of the email — only now may the upstream identity attach to the account. */
     if (pendingSubject && flow.federated) {
       await this.federatedIdentityService.link(flow.federated.identityProviderId, userId, pendingSubject);
       await this.joinProviderOrganisation(flow.federated.identityProviderId, userId);
@@ -287,12 +242,6 @@ export class LoginService {
     return this.complete(flow, userId, { authMode: pendingSubject ? 'FEDERATED' : 'OTP' });
   }
 
-  /**
-   * Continues a login after the upstream IdP verified the user (T-702). Returning identities match
-   * on (provider, subject); a first-time subject whose email belongs to an existing local account
-   * must prove control via email OTP before linking (silent auto-link on email equality is an
-   * account-takeover vector); anyone else is JIT-provisioned into the organisation.
-   */
   async continueFederated(flowId: string, identity: UpstreamIdentity): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId);
     const federated = flow.federated;
@@ -337,7 +286,6 @@ export class LoginService {
     return this.continueAfterFederatedProof(flow, created.id);
   }
 
-  /** Federated proof is a first factor: MFA-enrolled accounts still walk their local second factor. */
   private async continueAfterFederatedProof(flow: AuthFlowContext, userId: bigint): Promise<FlowStepResult> {
     const factors = await this.mfaService.getFactors(userId);
     if (factors.totp || factors.webauthn) {
@@ -360,20 +308,10 @@ export class LoginService {
     return user.lockMode === 'OTP_ONLY' && user.lockedUntil !== null && user.lockedUntil.getTime() > Date.now();
   }
 
-  /**
-   * Tier-4 FULL lock: every interactive method — password, OTP, MFA, recovery and federated
-   * completion — is refused until the lock lifts (§13.2), unlike an OTP_ONLY lock which still
-   * accepts OTP. A FULL lock with no `lockedUntil` is an indefinite administrative lock that only
-   * an operator can clear.
-   */
   private isFullyLocked(user: User): boolean {
     return user.lockMode === 'FULL' && (user.lockedUntil === null || user.lockedUntil.getTime() > Date.now());
   }
 
-  /**
-   * Completes the MFA step of a login flow with a TOTP code or a single-use recovery code;
-   * sessions born here carry AAL2.
-   */
   async verifyMfa(flowId: string, proof: MfaProof): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId);
     if (!MFA_STATUSES.includes(flow.status)) throw AppErrorCode.AUTH_002.create();
@@ -387,11 +325,6 @@ export class LoginService {
     return this.complete(flow, userId, { aal: 'AAL2', mfaMode: proof.recoveryCode ? 'RECOVERY_CODE' : 'TOTP' });
   }
 
-  /**
-   * Issues WebAuthn assertion options. Without a flow this begins a usernameless (discoverable
-   * credential) login; with one it serves the flow's MFA step. Options are shaped identically
-   * whether or not credentials exist (D-12).
-   */
   async webauthnOptions(flowId: string | undefined, device: DeviceContext): Promise<WebauthnChallenge> {
     if (!flowId) {
       const flow = await this.authFlowService.create('LOGIN', AWAITING_WEBAUTHN, { identifier: '', authMethod: 'WEBAUTHN', device });
@@ -407,7 +340,6 @@ export class LoginService {
     return { flowId, options };
   }
 
-  /** Completes a login with a passkey assertion, as either the first factor or the MFA step. */
   async verifyWebauthn(flowId: string, assertion: WebauthnAssertion): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId);
     const firstFactor = flow.status === AWAITING_WEBAUTHN;
@@ -422,7 +354,6 @@ export class LoginService {
       if (!user || user.status !== 'ACTIVE') return this.handleFailure(flow, result.userId, 'INVALID_CREDENTIALS');
       flow.userId = result.userId.toString();
       flow.identifier = user.username ?? `user_${result.userId}`;
-      /** A user-verified passkey is possession + knowledge/biometric in one ceremony → AAL2. */
       return this.complete(flow, result.userId, { aal: 'AAL2', authMode: 'WEBAUTHN' });
     }
 
@@ -453,15 +384,8 @@ export class LoginService {
   }
 
   private async complete(flow: AuthFlowContext, userId: bigint, options: CompletionOptions): Promise<FlowStepResult> {
-    /**
-     * The single session-minting chokepoint, so a FULL lock is re-checked here as the backstop for
-     * paths that never pass through `init` — usernameless passkey login and a federated subject that
-     * resolves to a different account — guaranteeing no interactive method can mint a session for a
-     * fully locked account.
-     */
     const user = await this.userService.getUser(userId);
     if (user && this.isFullyLocked(user)) throw AppErrorCode.AUTH_012.create();
-    /** Assessed before the success is recorded so "previously seen" excludes this very login. */
     await this.suspiciousLoginService.assessLogin(userId, flow.device);
     await this.signInEventService.record({
       flowId: flow.flowId,

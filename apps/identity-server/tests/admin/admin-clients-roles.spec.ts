@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
@@ -19,13 +13,6 @@ import { ApplicationRoleService, ApplicationService } from '@server/modules/syst
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('admin-clients').init();
 
 describe('Admin client, resource and role APIs', () => {
@@ -185,7 +172,6 @@ describe('Admin client, resource and role APIs', () => {
       });
       const { clientId } = created.json() as { clientId: string };
 
-      /** Seed the two dependents that carry no FK cascade and would otherwise be orphaned by a naive delete. */
       const db = env.getPostgresClient();
       const user = await env.getService(UserService).createUserWithPassword({ email: `consenter-${Date.now()}@example.com`, password: 'Password@123', status: 'ACTIVE' });
       await db.insert(schema.consents).values({ userId: user.id, clientId, scopeNames: ['openid'], source: 'USER' });

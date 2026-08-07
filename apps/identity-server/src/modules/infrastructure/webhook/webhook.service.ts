@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { KeyProvider } from '@server/modules/auth/keys';
@@ -17,10 +11,6 @@ import { AuditEvent, DatabaseService, PrimaryDatabase, schema, WebhookSubscripti
 
 import { WebhookTargetGuard } from './webhook-target.guard';
 import { WEBHOOK_ROTATION_OVERLAP_HOURS, WEBHOOK_SECRET_PREFIX } from './webhook.constants';
-
-/**
- * Defining types
- */
 
 type OutboxWriter = Pick<PrimaryDatabase, 'insert' | 'query'>;
 
@@ -39,7 +29,6 @@ export interface UpdateSubscriptionInput {
 
 export interface CreatedSubscription {
   subscription: WebhookSubscription;
-  /** Plaintext signing secret; shown exactly once. */
   secret: string;
 }
 
@@ -60,8 +49,6 @@ interface SubscriptionCache {
 }
 
 /**
- * Declaring the constants
- *
  * Webhook payloads carry identifiers and event metadata only — never the audit `detail` object,
  * addresses, or secrets. Receivers needing more must call back with their own credentials, so a
  * compromised webhook endpoint leaks nothing sensitive. Event filters accept exact audit action
@@ -98,7 +85,6 @@ export class WebhookService {
     return this.keyProvider.decrypt({ ...serialized, kekVersion }).toString('utf8');
   }
 
-  /** The secrets to sign with: always the current one, plus the outgoing one inside its overlap window. */
   signingSecretsOf(subscription: WebhookSubscription): string[] {
     const secrets = [this.decryptSecret(subscription.secretCiphertext, subscription.kekVersion)];
     const overlapValid = subscription.previousSecretExpiresAt && subscription.previousSecretExpiresAt.getTime() > Date.now();
@@ -147,7 +133,6 @@ export class WebhookService {
     return updated;
   }
 
-  /** Issues a fresh secret; the outgoing one keeps signing alongside it for the overlap window. */
   async rotateSecret(subscriptionId: bigint): Promise<CreatedSubscription> {
     const subscription = await this.getById(subscriptionId);
     const secret = this.generateSecret();
@@ -183,10 +168,6 @@ export class WebhookService {
     });
   }
 
-  /**
-   * On a cache miss the lookup MUST ride the caller's executor: fan-out runs inside the audit
-   * writer's transaction, and a separate pool connection would deadlock a single-connection pool.
-   */
   private async getActiveSubscriptions(executor: OutboxWriter): Promise<WebhookSubscription[]> {
     if (this.cache && this.cache.expiresAt > Date.now()) return this.cache.subscriptions;
     const subscriptions = await executor.query.webhookSubscriptions.findMany({ where: eq(schema.webhookSubscriptions.isActive, true) });
@@ -194,11 +175,6 @@ export class WebhookService {
     return subscriptions;
   }
 
-  /**
-   * Enqueues the audit event for every matching active subscription. Runs inside the audit
-   * writer's transaction so an event and its deliveries commit or vanish together; the
-   * `(subscription, event)` unique key de-duplicates any replay.
-   */
   async fanOut(event: AuditEvent, executor: OutboxWriter = this.db): Promise<void> {
     const subscriptions = await this.getActiveSubscriptions(executor);
     const matching = subscriptions.filter(subscription => this.matches(subscription, event.action));

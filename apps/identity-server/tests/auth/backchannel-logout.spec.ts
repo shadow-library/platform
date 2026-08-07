@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { eq, sql } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { KeyService } from '@server/modules/auth/keys';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
@@ -18,13 +12,6 @@ import { ApplicationService } from '@server/modules/system/application';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('backchannel').init();
 
 const received: string[] = [];

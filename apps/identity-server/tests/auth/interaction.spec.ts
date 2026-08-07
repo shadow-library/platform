@@ -1,22 +1,12 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { ApplicationService } from '@server/modules/system/application';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
-
-/**
- * Defining types
- */
 
 interface PromptBody {
   clientName: string;
@@ -25,9 +15,6 @@ interface PromptBody {
   scopes: { name: string; description?: string; isSensitive: boolean }[];
 }
 
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('interaction').init();
 const REDIRECT_URI = 'https://thirdparty.example.com/callback';
 

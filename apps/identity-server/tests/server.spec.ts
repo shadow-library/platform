@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { TestEnvironment } from './test-environment';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('Server', () => {
   const env = new TestEnvironment('server').init();

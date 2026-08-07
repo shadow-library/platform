@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { ADMIN_PERMISSIONS, IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { PolicyDecisionService } from '@server/modules/authz';
@@ -15,23 +9,12 @@ import { ApplicationRoleService, ApplicationService } from '@server/modules/syst
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
 interface AssignmentItem {
   principalType: string;
   principalId: string;
   organisationId: string;
 }
 
-/**
- * Declaring the constants
- *
- * The vendor-controlled tier grant (T-904, D-A5): `POST /api/v1/admin/role-assignments` accepts an
- * `ORGANISATION` principal, scoped to the org that is its own principal, under the same two-tier
- * `requireRoleAdmin` authorization as user grants.
- */
 const env = new TestEnvironment('admin-role-org').init();
 
 describe('Admin ORGANISATION role assignments', () => {
@@ -124,7 +107,6 @@ describe('Admin ORGANISATION role assignments', () => {
     let appAdminSecret: string;
 
     beforeEach(async () => {
-      /** An app-scoped admin: `app:roles:manage` owned by tierApp, so it reaches tierApp's roles but no others. */
       const pdp = env.getService(PolicyDecisionService);
       const roleAdmin = await env
         .getService(ApplicationRoleService)

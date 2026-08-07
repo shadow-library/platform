@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { desc, eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { SuspiciousLoginService } from '@server/modules/auth/flow';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
@@ -15,13 +9,6 @@ import { RateLimiterService } from '@server/modules/infrastructure/security';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('suspicious_login').init();
 const EMAIL = 'watcher@example.com';
 const PASSWORD = 'Password@123';
@@ -89,7 +76,6 @@ describe('Suspicious login detection', () => {
     expect(audit).toBeDefined();
     expect(audit?.ipAddress).toBe(attackerIp);
 
-    /** With rate limiting active, the blocked IP is refused at the door. */
     const limiter = env.getService(RateLimiterService);
     limiter.enabled = true;
     const refused = await env.getRouter().mockRequest({ method: 'POST', url: '/api/v1/auth/login/init', remoteAddress: attackerIp, payload: { identifier: EMAIL } });

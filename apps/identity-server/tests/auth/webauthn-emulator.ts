@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 type CborValue = number | string | Uint8Array | { [key: string]: CborValue };
 
@@ -27,14 +16,10 @@ export interface EmulatedAssertion {
   response: { clientDataJSON: string; authenticatorData: string; signature: string; userHandle?: string };
 }
 
-/**
- * Declaring the constants
- */
 const FLAG_UP = 0x01;
 const FLAG_UV = 0x04;
 const FLAG_AT = 0x40;
 
-/** Minimal canonical CBOR encoder covering the value shapes WebAuthn attestation needs. */
 function encodeCbor(value: CborValue | Map<number, CborValue>): Buffer {
   if (typeof value === 'number') {
     if (value >= 0) return encodeHead(0, value);
@@ -64,7 +49,7 @@ function encodeHead(major: number, length: number): Buffer {
   return head;
 }
 
-/** Converts WebCrypto's raw `r||s` ECDSA signature into the DER form WebAuthn expects. */
+/** WebCrypto returns raw `r||s`; WebAuthn verification expects an ASN.1 DER ECDSA signature. */
 function rawSignatureToDer(raw: Buffer): Buffer {
   const encodeInteger = (bytes: Buffer): Buffer => {
     let start = 0;
@@ -79,11 +64,6 @@ function rawSignatureToDer(raw: Buffer): Buffer {
   return Buffer.concat([Buffer.from([0x30, r.length + s.length]), r, s]);
 }
 
-/**
- * A software WebAuthn authenticator: generates a P-256 credential and produces registration
- * attestations (fmt `none`) and assertions that verify against @simplewebauthn/server, so the
- * full ceremony is exercised end-to-end without a browser.
- */
 export class WebauthnEmulator {
   private keyPair!: CryptoKeyPair;
   private readonly credentialId = randomBytes(32);

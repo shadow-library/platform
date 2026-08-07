@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type ValidatedSession } from '@server/modules/auth/session';
@@ -17,10 +11,6 @@ import { Consent, DatabaseService, PrimaryDatabase, schema } from '@server/modul
 import { ApplicationMemberService, ApplicationService } from '@server/modules/system/application';
 
 import { OAuthClientService } from './oauth-client.service';
-
-/**
- * Defining types
- */
 
 interface ConsentCaller {
   session: ValidatedSession;
@@ -62,12 +52,6 @@ export interface ConsentDecisionData {
   redirectTo?: string;
 }
 
-/**
- * Declaring the constants
- *
- * Standard OIDC scopes never live in the scopes table (they belong to the protocol, not an API
- * resource), so the prompt describes them from this fixed map.
- */
 const OIDC_SCOPE_DESCRIPTIONS: Record<string, string> = {
   openid: 'Confirm your identity',
   profile: 'Read your basic profile (name)',
@@ -91,14 +75,10 @@ export class ConsentService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /* --------------------------- caller-facing orchestration --------------------------- */
-
-  /** Describes a pending consent prompt: who is asking and for what, in user terms. */
   async buildPrompt(userId: bigint, clientId: string, scope: string): Promise<ConsentPromptData> {
     const client = await this.clientService.getClient(clientId);
     if (!client || !client.isActive) throw AppErrorCode.OAU_001.create();
 
-    /** Only user-holdable scopes reach a consent screen; service-only scopes are dropped. */
     const requested = await this.clientService.filterScopesForPrincipal(scope.split(' ').filter(Boolean), 'user');
     const active = await this.getActive(userId, client.id);
     const alreadyGranted = active !== null && requested.every(name => active.scopeNames.includes(name));
@@ -111,7 +91,6 @@ export class ConsentService {
     return { clientName: client.name, isFirstParty: client.isFirstParty, alreadyGranted, scopes };
   }
 
-  /** Records the user's decision; denials answer with the validated `access_denied` redirect. */
   async decide(caller: ConsentCaller, input: ConsentDecisionInput): Promise<ConsentDecisionData> {
     const client = await this.clientService.getClient(input.clientId);
     if (!client || !client.isActive) throw AppErrorCode.OAU_001.create();
@@ -134,7 +113,6 @@ export class ConsentService {
     return { decision: 'DENY', redirectTo };
   }
 
-  /** The user's active grants enriched with the owning application's display name, for the connected-apps surface. */
   async listConsentRecords(userId: bigint): Promise<ConsentRecordData[]> {
     const consents = await this.listForUser(userId);
     return Promise.all(
@@ -175,7 +153,6 @@ export class ConsentService {
     return consent ?? null;
   }
 
-  /** Records a consent grant idempotently, adding any newly requested scopes to the active record. */
   async record(userId: bigint, clientId: string, scopeNames: string[], source: Consent.Source): Promise<void> {
     const existing = await this.getActive(userId, clientId);
     if (!existing) {
@@ -187,11 +164,6 @@ export class ConsentService {
     if (merged.length !== existing.scopeNames.length) await this.db.update(schema.consents).set({ scopeNames: merged }).where(eq(schema.consents.id, existing.id));
   }
 
-  /**
-   * First-use provisioning: a fresh grant enrols the user into the client's application. Best-effort
-   * by design — a usage record must never break the authorization it rides on, so a failure is
-   * logged and swallowed rather than surfaced to the OAuth flow.
-   */
   private async provisionMembership(userId: bigint, clientId: string): Promise<void> {
     try {
       const client = await this.clientService.getClient(clientId);
@@ -205,7 +177,6 @@ export class ConsentService {
     return this.db.query.consents.findMany({ where: and(eq(schema.consents.userId, userId), isNull(schema.consents.revokedAt)) });
   }
 
-  /** Withdraws consent and revokes every token the client holds for the user. */
   async withdraw(userId: bigint, clientId: string): Promise<void> {
     await this.db.update(schema.consents).set({ revokedAt: new Date() }).where(this.activeCondition(userId, clientId));
     await this.refreshTokenService.revokeForUserClient(userId, clientId);

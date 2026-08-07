@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class SessionIdParams {
@@ -54,8 +40,7 @@ export class MeSessionItem {
   @Transform('strip:null')
   deviceName?: string;
 
-  /** Marks the session making this request. */
-  @Field(() => Boolean)
+  @Field(() => Boolean, { description: 'Whether this is the session making the request.' })
   isCurrent: boolean;
 }
 

@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, boolean, index, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { applications } from './applications.schema';
-
-/**
- * Defining types
- */
 
 export type OAuthClient = InferSelectModel<typeof oauthClients>;
 export type ApiResource = InferSelectModel<typeof apiResources>;
@@ -29,15 +19,10 @@ export namespace OidcLogoutDelivery {
   export type Status = InferEnum<typeof logoutDeliveryStatus>;
 }
 
-/**
- * Declaring the constants
- */
-
 export const oauthClientKind = pgEnum('oauth_client_kind', ['WEB_CONFIDENTIAL', 'SPA_PUBLIC', 'NATIVE_PUBLIC', 'SERVICE']);
 export const tokenEndpointAuthMethod = pgEnum('token_endpoint_auth_method', ['client_secret_basic', 'none', 'private_key_jwt']);
 
 export const oauthClients = pgTable('oauth_clients', {
-  /** Admin-chosen, immutable slug (lowercase letters, digits, hyphens). Public by design; embedded in tokens and configs. */
   id: varchar('id', { length: 64 }).primaryKey(),
   applicationId: integer('application_id')
     .notNull()
@@ -48,13 +33,11 @@ export const oauthClients = pgTable('oauth_clients', {
   tokenEndpointAuthMethod: tokenEndpointAuthMethod('token_endpoint_auth_method').notNull(),
   grantTypes: text('grant_types').array().notNull(),
   requirePkce: boolean('require_pkce').notNull().default(true),
-  /** Kubernetes workload identity (D-16): the exact SA subjects and/or namespace-scoped patterns allowed to authenticate this client with a projected token instead of a secret. */
   workloadSubjects: text('workload_subjects').array(),
   accessTokenTtl: integer('access_token_ttl').notNull().default(600),
   refreshTokenTtl: integer('refresh_token_ttl'),
   organisationId: bigint('organisation_id', { mode: 'bigint' }),
   isActive: boolean('is_active').notNull().default(true),
-  /** OIDC Back-Channel Logout 1.0: logout tokens for terminated sessions POST here when set. */
   backchannelLogoutUri: text('backchannel_logout_uri'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -97,7 +80,6 @@ export const apiResources = pgTable('api_resources', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** Which principal kind may hold a scope: end users, services (M2M), or both. Enforced at token mint and consent. */
 export const scopePrincipalType = pgEnum('scope_principal_type', ['USER', 'SERVICE', 'BOTH']);
 
 export const scopes = pgTable(
@@ -110,7 +92,6 @@ export const scopes = pgTable(
     name: varchar('name', { length: 128 }).notNull(),
     description: text('description'),
     isSensitive: boolean('is_sensitive').notNull().default(false),
-    /** A `SERVICE` scope is never minted into a user token nor shown at consent; a `USER` scope is never minted into a service token. */
     principalType: scopePrincipalType('principal_type').notNull().default('BOTH'),
   },
   t => [unique('scopes_resource_name_unique').on(t.apiResourceId, t.name)],
@@ -131,11 +112,6 @@ export const oauthClientScopeGrants = pgTable(
 
 export const logoutDeliveryStatus = pgEnum('logout_delivery_status', ['PENDING', 'SENDING', 'SENT', 'FAILED', 'DEAD']);
 
-/**
- * Transactional queue of OIDC back-channel logout deliveries. The logout token itself is minted at
- * send time (they expire within minutes, while retries may span hours); the URI is snapshotted at
- * enqueue so a client edit cannot redirect in-flight notifications.
- */
 export const oidcLogoutDeliveries = pgTable(
   'oidc_logout_deliveries',
   {
@@ -155,10 +131,6 @@ export const oidcLogoutDeliveries = pgTable(
   },
   t => [index('oidc_logout_deliveries_claim_idx').on(t.status, t.nextAttemptAt)],
 );
-
-/**
- * Declaring the relations
- */
 
 export const oauthClientRelations = relations(oauthClients, ({ many, one }) => ({
   application: one(applications, { fields: [oauthClients.applicationId], references: [applications.id] }),

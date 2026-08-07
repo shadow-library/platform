@@ -1,24 +1,14 @@
-/**
- * Importing npm packages
- */
 import { createPrivateKey, createPublicKey, generateKeyPairSync, KeyObject, randomUUID } from 'node:crypto';
 
 import { and, eq, inArray, lt } from 'drizzle-orm';
 import { Injectable, OnModuleInit } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, PrimaryDatabase, schema, SigningKey } from '@server/modules/infrastructure/datastore';
 
 import { decodeJwtHeader, encodeJwt, JwtClaims, verifyJwtSignature } from './jwt';
 import { KeyProvider } from './key-provider';
-
-/**
- * Defining types
- */
 
 export interface Jwk {
   kty: string;
@@ -47,12 +37,6 @@ interface ExportedEd25519Jwk {
   x: string;
 }
 
-/**
- * Declaring the constants
- *
- * Verification keys are published while any token they signed can still be presented; the set is
- * cached in-process and refreshed on rotation.
- */
 const PUBLISHED_STATUSES: SigningKey.Status[] = ['PENDING', 'ACTIVE', 'RETIRING'];
 
 @Injectable()
@@ -78,7 +62,6 @@ export class KeyService implements OnModuleInit {
     }
   }
 
-  /** Loads every published OIDC key into memory, reconstructing the key objects from storage. */
   async reload(): Promise<void> {
     const rows = await this.db
       .select()
@@ -97,7 +80,6 @@ export class KeyService implements OnModuleInit {
     this.activeKid = activeKid;
   }
 
-  /** Generates a new Ed25519 signing key. At most one key may be ACTIVE (enforced in the schema). */
   async generateKey(status: SigningKey.Status = 'PENDING'): Promise<string> {
     const { publicKey, privateKey } = generateKeyPairSync('ed25519');
     const kid = randomUUID();
@@ -120,10 +102,6 @@ export class KeyService implements OnModuleInit {
     return kid;
   }
 
-  /**
-   * Promotes a pending key to active: the previous active key moves to RETIRING (its tokens still
-   * verify) and stale retiring keys are retired. All steps run in one transaction.
-   */
   async rotate(newKid?: string): Promise<string> {
     const kid = newKid ?? (await this.generateKey('PENDING'));
     await this.db.transaction(async tx => {
@@ -138,11 +116,6 @@ export class KeyService implements OnModuleInit {
     return kid;
   }
 
-  /**
-   * Retires RETIRING keys activated before the cutoff. Callers pass a cutoff far enough in the
-   * past (rotation period + maximum token lifetime) that no live token was signed by the key; the
-   * policy is deliberately conservative, erring toward keeping verification keys published longer.
-   */
   async retireExpiredKeys(cutoff: Date): Promise<number> {
     const retired = await this.db
       .update(schema.signingKeys)
@@ -160,7 +133,6 @@ export class KeyService implements OnModuleInit {
     return { token, kid };
   }
 
-  /** Verifies a token's signature against the key identified by its `kid`, EdDSA only. */
   verify(token: string): JwtClaims | null {
     const header = decodeJwtHeader(token);
     if (!header || header.alg !== 'EdDSA' || !header.kid) return null;

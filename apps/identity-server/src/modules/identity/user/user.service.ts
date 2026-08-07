@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import { and, eq, inArray, isNotNull, SQL } from 'drizzle-orm';
@@ -9,9 +6,6 @@ import validator from 'validator';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, MaybeNull, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES, REGEX } from '@server/constants';
 import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
@@ -22,10 +16,6 @@ import { DatabaseService, ID, PrimaryDatabase, schema, User } from '@server/modu
 import { NotificationService } from '@server/modules/infrastructure/notification';
 
 import { UserEmailService } from './user-email.service';
-
-/**
- * Defining types
- */
 
 export interface ProfileUpdate {
   firstName?: string;
@@ -56,16 +46,13 @@ export interface ProfileClaims {
 }
 
 export interface StatusHold {
-  /** Administrator-supplied justification, surfaced in the console and the audit trail. */
   reason?: string;
-  /** Lapse time for a temporary SUSPENDED hold; BLOCKED and DISABLED leave it unset. */
   until?: Date;
 }
 
 export interface CreateUser {
   username?: string;
   status?: User.Status;
-  /** Seeds the account so the first successful password login is refused until recovery replaces it (T-602). */
   passwordResetRequired?: boolean;
   password: string;
 
@@ -95,11 +82,6 @@ interface FindUserFilter {
   sql: SQL;
 }
 
-/**
- * Declaring the constants
- */
-
-/** pulse-server template that emails the account owner when their password is rotated (shared with the flow-based reset paths). */
 const PASSWORD_CHANGED_TEMPLATE = 'auth.password.changed';
 
 @Injectable()
@@ -120,10 +102,6 @@ export class UserService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /**
-   * Email/phone lookups match only verified rows: with verified-only uniqueness (DB §2), an
-   * unverified claim by another account must never capture a login or recovery identifier.
-   */
   private buildWhereClause(identifier: ID): FindUserFilter {
     if (typeof identifier === 'bigint' || /^\d{12,}$/.test(identifier)) return { table: 'users', sql: eq(schema.users.id, BigInt(identifier)) };
     else if (identifier.startsWith('+')) return { table: 'userPhones', sql: and(eq(schema.userPhones.phoneNumber, identifier), isNotNull(schema.userPhones.verifiedAt)) as SQL };
@@ -148,7 +126,6 @@ export class UserService {
     return this.createUser(data);
   }
 
-  /** Creates an account with no local credential — SCIM provisioning and federated JIT sign-up. */
   async createProvisionedUser(data: Omit<CreateUser, 'password'>): Promise<UserDetails> {
     return this.createUser(data);
   }
@@ -230,10 +207,6 @@ export class UserService {
     return user ?? null;
   }
 
-  /**
-   * A SUSPENDED hold whose `statusUntil` has passed has served its term, so the account reads ACTIVE again and the row is
-   * repaired on the way through. BLOCKED and DISABLED carry no expiry — they end only when an administrator lifts them.
-   */
   async resolveEffectiveStatus(user: User): Promise<User.Status> {
     if (user.status !== 'SUSPENDED' || !user.statusUntil || user.statusUntil.getTime() > Date.now()) return user.status;
     await this.db
@@ -244,10 +217,6 @@ export class UserService {
     return 'ACTIVE';
   }
 
-  /**
-   * Single gate for every credential-bearing entry point (login, recovery, token exchange). CLOSED reports as absent
-   * because a soft-deleted account has already been anonymised and must not be distinguishable from one that never existed.
-   */
   assertLoginAllowed(status: User.Status): void {
     if (status === 'ACTIVE') return;
     if (status === 'BLOCKED') throw AppErrorCode.AUTH_009.create();
@@ -256,10 +225,6 @@ export class UserService {
     throw AppErrorCode.AUTH_011.create();
   }
 
-  /**
-   * Canonical writer for an account status change, carrying the reason and optional expiry that make SUSPENDED
-   * distinguishable from BLOCKED. Revoking live access is the caller's responsibility — see `AdminUserService`.
-   */
   async setStatusHold(userId: bigint, status: User.Status, hold: StatusHold = {}): Promise<void> {
     const restored = status === 'ACTIVE';
     await this.db
@@ -288,8 +253,6 @@ export class UserService {
     this.logger.debug('user status updated', { identifier, status, count: result.length });
   }
 
-  /** Updates the signed-in user's own profile fields; a no-op when nothing changed. */
-  /** Identity summary for first-party surfaces: profile basics plus session assurance. */
   async getCurrentUserSummary(session: ValidatedSession, elevated: boolean): Promise<CurrentUserSummary> {
     const profile = await this.databaseService.getPostgresClient().query.userProfiles.findFirst({ where: eq(schema.userProfiles.userId, session.userId) });
     const email = await this.userEmailService.getPrimaryEmail(session.userId);
@@ -304,15 +267,6 @@ export class UserService {
     };
   }
 
-  /**
-   * The `profile` claims for a subject, or an empty object when nothing is on file.
-   *
-   * `name` is composed rather than stored: the profile keeps a chosen display name and the two legal
-   * name parts separately, while OIDC asks for one presentable string. Preferring `displayName` means
-   * a person who set one is shown as they asked to be, and everyone else still gets a name rather than
-   * a blank. Every claim is omitted rather than sent empty — a consumer must be able to tell "not set"
-   * from "set to nothing", and OIDC says an unavailable claim is simply absent.
-   */
   async getProfileClaims(userId: bigint): Promise<ProfileClaims> {
     const [profile, user] = await Promise.all([
       this.databaseService.getPostgresClient().query.userProfiles.findFirst({ where: eq(schema.userProfiles.userId, userId) }),
@@ -338,14 +292,6 @@ export class UserService {
     this.logger.debug('user profile updated', { userId });
   }
 
-  /**
-   * Self-service password change for a signed-in user. Re-proves the current credential, enforces the
-   * password policy and reuse guard, rotates the credential, then signs every *other* session out — the
-   * caller's own session is spared so they stay logged in. Mirrors the recovery and admin-forced reset
-   * paths (audit + owner notification), minus the flow machinery. A wrong current password answers with
-   * the same opaque `AUTH_003` the authenticated step-up check uses — it never reveals whether the
-   * account even has a local password.
-   */
   async changePassword(session: ValidatedSession, currentPassword: string, newPassword: string, ipAddress: string): Promise<void> {
     const { userId } = session;
     if (!(await this.passwordService.verifyForUser(userId, currentPassword))) throw AppErrorCode.AUTH_003.create();

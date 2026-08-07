@@ -1,24 +1,9 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { ERROR_MESSAGES } from './messages.constants';
-
-/**
- * Defining types
- */
 
 interface FieldPattern {
   pattern: string;
   errorMessage: { pattern: string };
 }
-
-/**
- * Declaring the constants
- */
 
 export const REGEX = {
   USERNAME: /^[a-zA-Z0-9._-]{3,32}$/,
@@ -33,22 +18,15 @@ export const REGEX = {
   SUBDOMAIN: /^[a-z0-9][a-z0-9-]{0,62}$/,
 } as const satisfies Record<string, RegExp>;
 
-/** Every shape above is anchored, so dropping the anchors leaves a branch that can be alternated with the others. */
 const unanchored = (regex: RegExp): string => regex.source.slice(1, -1);
 
-/**
- * Keying the message by `pattern` rather than passing a bare string keeps it to the shape rule alone — a plain string
- * would also stand in for the field being absent or over-length, where Ajv's own wording is already correct.
- */
 const shapedAs = (regex: RegExp, message: string): FieldPattern => ({ pattern: regex.source, errorMessage: { pattern: message } });
 
-/** The three shapes `UserService` resolves, alternated so a login identifier can never drift from them. */
 const identifier = new RegExp(`^(${[REGEX.EMAIL, REGEX.PHONE, REGEX.USERNAME].map(unanchored).join('|')})$`);
 
 /**
- * Pattern rules for `@Field`, each paired with the message the caller should see. Spread one of these in rather than
- * writing a bare `pattern` — Ajv answers an unlabelled `pattern` failure with the raw regex, which is noise to a caller
- * and a free hint to anyone probing the API.
+ * Pattern rules for `@Field`, each paired with the message the caller should see. Spread one of
+ * these instead of passing a bare `pattern`, whose default Ajv error exposes the raw expression.
  */
 export const PATTERN = {
   ID: shapedAs(REGEX.ID, ERROR_MESSAGES.INVALID_ID),

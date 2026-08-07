@@ -1,19 +1,4 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type Application } from '@server/modules/infrastructure/datastore';
-
-/**
- * Defining types
- */
 
 /** A scope exposed by an application's own API resource. */
 export interface SeedScope {
@@ -36,36 +21,25 @@ export interface SeedRole {
   description: string;
   /** Permission names from the same application's catalogue. */
   permissions: readonly string[];
-  /**
-   * Assigns the role to the bootstrap administrator in the platform organisation at creation. A
-   * catalogue nobody holds grants nobody anything, so an application reached only through platform
-   * staff needs at least one seeded holder or its console answers every request with a denial.
-   */
+  /** Assigns this role to the bootstrap administrator in the platform organisation at creation. */
   grantToBootstrapAdmin?: boolean;
 }
 
-/**
- * A scope owned by some other application that this client is granted — the delegation ceiling
- * `GET /api/v1/apps/me` surfaces. `resource` is the owning resource identifier (`api://<app>`, or
- * `shadow-identity` for identity's own platform API), and the scope must already exist: grants
- * resolve against the catalogue, they never create it.
- */
+/** A grant to a scope already exposed by another application's API resource. */
 export interface SeedScopeGrant {
+  /** Owning resource identifier: `api://<app>`, or `shadow-identity` for the platform API. */
   resource: string;
   scope: string;
 }
 
-/** A caller allow-listed onto this application's routes, which are otherwise deny-by-default (D-17). */
+/** A caller allow-listed onto an application's otherwise deny-by-default routes. */
 export interface SeedServiceAccessRule {
   callerClientId: string;
   method: string;
   pathPattern: string;
 }
 
-/**
- * One first-party application: its record, its single OAuth client (id == name), its `api://<name>`
- * API resource and everything scoped to it (D-21).
- */
+/** One first-party application and the API resource, client, catalogue and grants derived for it. */
 export interface SeedApplication {
   name: string;
   displayName: string;
@@ -74,12 +48,9 @@ export interface SeedApplication {
   resourceName: string;
   /** Defaults to `name`. */
   subDomain?: string;
-  /**
-   * The release surface a fresh deployment starts on. Applied at creation only: visibility is a
-   * platform-admin decision thereafter (`PATCH /api/v1/admin/applications/:id`).
-   */
+  /** Initial release visibility, applied only when the application is created. */
   visibility?: Application.Visibility;
-  /** Carries the pulse-style `logo192.png` asset off the application's primary origin. */
+  /** Whether the application's primary origin exposes the conventional logo asset. */
   logo?: boolean;
   scopes?: readonly SeedScope[];
   permissions?: readonly SeedPermission[];
@@ -88,16 +59,13 @@ export interface SeedApplication {
   serviceAccess?: readonly SeedServiceAccessRule[];
 }
 
-/**
- * A machine-to-machine client that is not an application's own identity — it belongs to an
- * application that some other bootstrap step owns, so only the client itself is seeded here.
- */
+/** An M2M client owned by an application but distinct from that application's own client. */
 export interface SeedServiceClient {
   /** Fixed rather than generated: consumers look the client up by this exact id. */
   id: string;
-  /** Human label used only in the first-boot credential log line. */
+  /** Human label used in the first-boot credential log line. */
   label: string;
-  /** Name of the owning application, which must already exist when the seed runs. */
+  /** Name of the owning application, which must already exist when seeding runs. */
   application: string;
   grants?: readonly SeedScopeGrant[];
 }
@@ -107,21 +75,12 @@ export interface EcosystemSeed {
   serviceClients: readonly SeedServiceClient[];
 }
 
-/**
- * Declaring the constants
- */
-
-/** Identity's own platform API keeps its bare identifier — it is the platform, not an app onboarding onto it. */
 const PLATFORM_RESOURCE = 'shadow-identity';
-/** The same string, but the application record rather than the API resource it exposes. */
 const PLATFORM_APPLICATION = 'shadow-identity';
 
-/** Every app's SDK needs these to load service-access rules, call the PDP and open app sessions. */
 const AUTHZ_CHECK = { resource: PLATFORM_RESOURCE, scope: 'authz:check' } as const;
 const APP_SESSION = { resource: PLATFORM_RESOURCE, scope: 'app-session:manage' } as const;
-/** pulse alone: its RBAC catalogue is seeded identity-side rather than pushed by the SDK. */
 const AUTHZ_ROLES_SYNC = { resource: PLATFORM_RESOURCE, scope: 'authz:roles:sync' } as const;
-/** Reaches identity's directory seam: naming a person by email or by id, and asking whether one is in an organisation. */
 const USERS_RESOLVE = { resource: PLATFORM_RESOURCE, scope: 'users:resolve' } as const;
 
 /**
@@ -133,14 +92,8 @@ const PULSE_OPERATOR_PERMISSIONS = [...PULSE_VIEWER_PERMISSIONS, 'pulse:template
 const PULSE_ADMIN_PERMISSIONS = [...PULSE_OPERATOR_PERMISSIONS, 'pulse:senders:write'] as const;
 
 /**
- * The whole first-party ecosystem the identity platform integrates with (D-21), as data. Each
- * application holds **one** client whose id equals the application name and exposes **one** API
- * resource, `api://<name>`, both derived from the name — the former `<app>` / `<app>-server` client
- * pairs are gone, since an id that could mean either of an application's two clients was ambiguous
- * at exactly the moments it mattered.
- *
- * Adding an application here is the whole change: {@link EcosystemSeedService} creates whatever is
- * missing on the next boot and never revisits what already exists.
+ * The first-party ecosystem reconciled on boot. Each application gets one client whose id equals
+ * its name and one `api://<name>` resource; existing records are never overwritten.
  */
 export const ECOSYSTEM_SEED: EcosystemSeed = {
   applications: [
@@ -150,13 +103,11 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       description: 'Centralised multi-channel notification platform for the Shadow ecosystem',
       resourceName: 'Pulse notification API',
       logo: true,
-      /** Pulse is the ecosystem's own operations console — platform staff only, and invisible to everyone else (D-A3). */
       visibility: 'INTERNAL',
       scopes: [
         {
           name: 'notifications:send',
           description: 'Send notifications through pulse',
-          /** A machine-to-machine capability, so it must never leak into a user token. */
           principalType: 'SERVICE',
         },
       ],
@@ -176,7 +127,6 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
         { name: 'PulseAdmin', description: 'Full control over pulse templates, senders and configuration', permissions: PULSE_ADMIN_PERMISSIONS, grantToBootstrapAdmin: true },
       ],
       grants: [AUTHZ_CHECK, AUTHZ_ROLES_SYNC, APP_SESSION],
-      /** pulse enforces deny-by-default, so identity's outbound notification call must be allow-listed. */
       serviceAccess: [{ callerClientId: 'identity-server', method: 'POST', pathPattern: '/api/v1/notifications' }],
     },
     {
@@ -184,11 +134,6 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       displayName: 'Novel Forge',
       description: 'Long-form fiction authoring platform for the Shadow ecosystem',
       resourceName: 'Novel Forge API',
-      /**
-       * Delegates onto web-novel: the publish grant is the ceiling `/apps/me` surfaces (D-22). The
-       * directory grant is what turns "share with someone@example.com" into an identity subject —
-       * the forge resolves at share time, so only resolved subjects are ever pushed to the reader.
-       */
       grants: [AUTHZ_CHECK, APP_SESSION, USERS_RESOLVE, { resource: 'api://web-novel', scope: 'web-novel:publish' }],
     },
     {
@@ -200,11 +145,9 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
         {
           name: 'web-novel:publish',
           description: 'Publish rendered novels to the reader',
-          /** Service-only: a user token can never carry it, and only a granted M2M client may request it. */
           principalType: 'SERVICE',
         },
       ],
-      /** The directory grant answers one question only: is this reader a member of the organisation a novel was shared with? */
       grants: [AUTHZ_CHECK, APP_SESSION, USERS_RESOLVE],
       serviceAccess: [{ callerClientId: 'novel-forge', method: '*', pathPattern: '/internal/*' }],
     },
@@ -215,7 +158,6 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       id: 'identity-server',
       label: 'identity outbound',
       application: PLATFORM_APPLICATION,
-      /** Without this grant NotificationTokenService cannot sign a token and no email/SMS is ever delivered. */
       grants: [{ resource: 'api://pulse', scope: 'notifications:send' }],
     },
   ],

@@ -1,27 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { Auth, Context } from '@server/modules/access';
 
 import { type DomainDetail, DomainService } from './domain.service';
 import { DomainItem, DomainParams, DomainsResponse, OrganisationActionResponse, OrganisationIdParams, RegisterDomainBody } from './organisation.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Domain verification hands out tenant-wide capabilities later (SAML, SCIM, JIT provisioning), so
- * every domain mutation demands an elevated org admin (AAL2); members may read. Verification never
- * auto-captures users by email domain — that policy belongs to inbound federation (T-702).
- */
 
 @HttpController('/api/v1/organisations/:organisationId/domains')
 export class DomainController {

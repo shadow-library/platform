@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export const constraintErrorMap: Record<string, AppError> = {
   applications_name_unique: AppErrorCode.APP_002.create(),

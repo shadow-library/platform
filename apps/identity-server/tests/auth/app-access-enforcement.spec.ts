@@ -1,24 +1,14 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
 
 import { and, eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { Application, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationAccessService, ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
-
-/**
- * Defining types
- */
 
 interface RegisteredApp {
   clientId: string;
@@ -27,13 +17,6 @@ interface RegisteredApp {
   audience: string;
 }
 
-/**
- * Declaring the constants
- *
- * The gate (T-902) keys on the application (D-A7), so a user is placed in an `ASSIGNED_ONLY` team with
- * no personal workspace — assignment is then the single lever that grants or removes access, and every
- * enforcement point can be exercised by toggling it.
- */
 const env = new TestEnvironment('app-access-enforcement').init();
 const REDIRECT_URI = 'https://gate.example.com/callback';
 
@@ -242,11 +225,9 @@ describe('Application access enforcement (T-902)', () => {
       expect(denied.statusCode).toBe(401);
       expect(denied.json()).toMatchObject({ code: 'AUTH_005' });
 
-      /** The revocation is permanent: even re-granting access does not resurrect the old handle. */
       await assign(app.id);
       expect((await mint(client, handle)).statusCode).toBe(401);
 
-      /** A fresh login mints again, proving the block was the assignment and not a stuck session. */
       const fresh = await openSession(client);
       expect((await mint(client, fresh)).statusCode).toBe(200);
     });
@@ -298,7 +279,6 @@ describe('Application access enforcement (T-902)', () => {
       expect(denied.statusCode).toBe(400);
       expect(denied.json()).toMatchObject({ code: 'invalid_grant' });
 
-      /** Even re-granting access does not revive the revoked family — the presented secret was consumed by rotation. */
       await assign(app.id);
       expect((await refresh(client, refreshToken)).statusCode).toBe(400);
     });

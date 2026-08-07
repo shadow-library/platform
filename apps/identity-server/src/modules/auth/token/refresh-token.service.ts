@@ -1,24 +1,14 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
 
 import { and, eq, ne } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { SessionService } from '@server/modules/auth/session';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, PrimaryDatabase, RefreshToken, schema } from '@server/modules/infrastructure/datastore';
 import { PolicyService } from '@server/modules/system/policy';
-
-/**
- * Defining types
- */
 
 export interface IssueRefreshToken {
   userId: bigint;
@@ -29,9 +19,7 @@ export interface IssueRefreshToken {
   organisationId?: bigint | null;
   ipAddress?: string;
   ipCountry?: string;
-  /** The organisation owning the client, whose policy applies alongside the user's own. */
   clientOrganisationId?: bigint | null;
-  /** Client-level override of the idle window (`oauth_clients.refresh_token_ttl`). */
   clientTtlSeconds?: number | null;
 }
 
@@ -54,11 +42,8 @@ export interface RefreshTokenResult {
 export interface RotationContext {
   ipAddress?: string;
   ipCountry?: string;
-  /** When set, the token's owning client must match before any state is mutated (prevents a forced-logout by a mismatched caller). */
   expectedClientId?: string;
-  /** The organisation owning the client, whose policy applies alongside the family's own. */
   clientOrganisationId?: bigint | null;
-  /** Client-level override of the idle window (`oauth_clients.refresh_token_ttl`). */
   clientTtlSeconds?: number | null;
 }
 
@@ -79,17 +64,12 @@ export class RefreshTokenReuseError extends Error {
   }
 }
 
-/** Raised when a refresh token is presented by a client that does not own it — before any mutation. */
 export class RefreshTokenClientMismatchError extends Error {
   constructor() {
     super('Refresh token does not belong to the presenting client');
     this.name = 'RefreshTokenClientMismatchError';
   }
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class RefreshTokenService {
@@ -109,12 +89,6 @@ export class RefreshTokenService {
     return createHash('sha256').update(secret).digest('hex');
   }
 
-  /**
-   * Refresh tokens expire on idleness rather than age: every rotation re-arms the window, so a family
-   * that keeps being exercised keeps living while one that falls silent lapses. The window is the
-   * strictest of the platform default, the client's own setting, and the policy of every organisation
-   * involved.
-   */
   private async idleExpiry(organisationIds: (bigint | null | undefined)[], clientValue?: number | null): Promise<Date> {
     const ttlSeconds = await this.policyService.resolve('auth.refresh_token.idle_ttl', { organisationIds, clientValue });
     return new Date(Date.now() + ttlSeconds * 1000);
@@ -125,7 +99,6 @@ export class RefreshTokenService {
     return { secret, tokenHash: this.hash(secret) };
   }
 
-  /** Opens a new family and issues its first refresh token. */
   async issue(input: IssueRefreshToken): Promise<RefreshTokenResult> {
     const { secret, tokenHash } = this.mint();
     const expiresAt = await this.idleExpiry([input.organisationId, input.clientOrganisationId], input.clientTtlSeconds);
@@ -163,11 +136,6 @@ export class RefreshTokenService {
     return { userId: family.userId, clientId: family.clientId, scope: family.scope, audience: family.audience, organisationId: family.organisationId, sessionId: family.sessionId };
   }
 
-  /**
-   * Rotates a refresh token: the presented token must be ACTIVE. Presenting a superseded token
-   * (ROTATED/REVOKED) means the chain leaked — the entire family and its session are revoked and a
-   * security event is recorded (D-11).
-   */
   async rotate(secret: string, context: RotationContext = {}): Promise<RefreshTokenResult> {
     const presented = await this.db.query.refreshTokens.findFirst({ where: eq(schema.refreshTokens.tokenHash, this.hash(secret)) });
     if (!presented) {
@@ -191,7 +159,7 @@ export class RefreshTokenService {
       throw new RefreshTokenReuseError();
     }
 
-    /** Verify ownership BEFORE consuming the token, so a mismatched caller cannot burn the victim's token (forced logout). */
+    /** Verify the client binding before mutation so a mismatched caller cannot burn the victim's token. */
     if (context.expectedClientId !== undefined && family.clientId !== context.expectedClientId) {
       this.logger.warn('refresh token rotation rejected: client mismatch', { familyId: family.id, tokenClientId: family.clientId });
       throw new RefreshTokenClientMismatchError();
@@ -200,7 +168,6 @@ export class RefreshTokenService {
     const { secret: nextSecret, tokenHash } = this.mint();
     const expiresAt = await this.idleExpiry([family.organisationId, context.clientOrganisationId], context.clientTtlSeconds);
     const tokenId = await this.db.transaction(async tx => {
-      /** Atomic single-use consumption: only an ACTIVE row rotates. Zero rows means a concurrent rotation already consumed it → reuse. */
       const consumed = await tx
         .update(schema.refreshTokens)
         .set({ status: 'ROTATED', rotatedAt: new Date() })
@@ -225,12 +192,6 @@ export class RefreshTokenService {
     return { secret: nextSecret, familyId: family.id, tokenId, context: this.toContext(family) };
   }
 
-  /**
-   * Revokes the family a presented refresh token belongs to (RFC 7009); a no-op if unknown. When
-   * `expectedClientId` is given the token must belong to that client, so an authenticated client can
-   * never revoke another client's tokens by presenting a captured secret. RFC 7009 §2.2 requires the
-   * unknown-token and foreign-token cases to be indistinguishable, hence the silent return.
-   */
   async revokeBySecret(secret: string, expectedClientId?: string): Promise<void> {
     const token = await this.db.query.refreshTokens.findFirst({ where: eq(schema.refreshTokens.tokenHash, this.hash(secret)) });
     if (!token) return;
@@ -247,7 +208,6 @@ export class RefreshTokenService {
     await this.revokeFamily(token.familyId, 'LOGOUT');
   }
 
-  /** Describes a refresh token for introspection: active only if the token and its family are live. */
   async describeBySecret(secret: string): Promise<RefreshTokenDescription | null> {
     const token = await this.db.query.refreshTokens.findFirst({ where: eq(schema.refreshTokens.tokenHash, this.hash(secret)) });
     if (!token) return null;
@@ -283,7 +243,6 @@ export class RefreshTokenService {
     }
   }
 
-  /** Revokes every active family a user holds, across all clients (admin lockdown, T-602). */
   async revokeAllForUser(userId: bigint): Promise<void> {
     const families = await this.db
       .update(schema.refreshTokenFamilies)
@@ -300,7 +259,6 @@ export class RefreshTokenService {
     );
   }
 
-  /** Revokes every active family a user holds in an organisation context (SCIM deprovisioning of adopted accounts). */
   async revokeForUserOrganisation(userId: bigint, organisationId: bigint): Promise<void> {
     const families = await this.db
       .update(schema.refreshTokenFamilies)
@@ -317,7 +275,6 @@ export class RefreshTokenService {
     );
   }
 
-  /** Revokes every active family a user holds for a specific client (used on consent withdrawal). */
   async revokeForUserClient(userId: bigint, clientId: string): Promise<void> {
     const families = await this.db
       .update(schema.refreshTokenFamilies)

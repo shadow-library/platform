@@ -1,31 +1,13 @@
-/**
- * Importing npm packages
- */
 import { type FastifyReply } from 'fastify';
 import { Config, Logger } from '@shadow-library/common';
 import { Get, HttpController, Query, Res } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { Auth } from '@server/modules/access';
 import { FederatedCallbackQuery, FederationError, IdentityProviderService, UpstreamOidcService } from '@server/modules/auth/federation';
 
 import { AuthFlowService } from './auth-flow.service';
 import { LoginService } from './login.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * The browser return leg of inbound federation (T-702). Every failure funnels into one neutral
- * error redirect: the upstream's error detail is logged server-side but never shown — an attacker
- * driving this endpoint learns nothing about accounts, providers, or the reason for a refusal.
- */
 
 @HttpController()
 export class FederatedController {

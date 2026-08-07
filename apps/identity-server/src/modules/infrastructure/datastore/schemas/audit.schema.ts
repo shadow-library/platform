@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel } from 'drizzle-orm';
 import { index, jsonb, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export type AuditEvent = InferSelectModel<typeof auditEvents>;
 
@@ -18,10 +7,6 @@ export namespace AuditEvent {
   export type ActorType = InferEnum<typeof auditActorType>;
   export type Outcome = InferEnum<typeof auditOutcome>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const auditActorType = pgEnum('audit_actor_type', ['USER', 'SERVICE_ACCOUNT', 'SYSTEM', 'ADMIN']);
 export const auditOutcome = pgEnum('audit_outcome', ['SUCCESS', 'DENIED', 'FAILURE']);

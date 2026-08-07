@@ -1,22 +1,12 @@
-/**
- * Importing npm packages
- */
 import { createPublicKey, verify as cryptoVerify, type JsonWebKeyInput, KeyObject } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger, LRUCache } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { IdentityProvider } from '@server/modules/infrastructure/datastore';
 
 import { IdentityProviderService } from './identity-provider.service';
-
-/**
- * Defining types
- */
 
 export interface AuthorizationRequest {
   state: string;
@@ -47,15 +37,6 @@ interface UpstreamJwk {
   [key: string]: unknown;
 }
 
-/**
- * Declaring the constants
- *
- * The server-side relying party for inbound federation. Upstream ID tokens verify against the
- * IdP's JWKS with an allow-listed algorithm set (asymmetric only — `none` and HMAC are structurally
- * impossible here) and require `email_verified: true`: an upstream asserting an unverified email
- * must never mint a session for the local account holding that address.
- */
-/** ES256 JOSE signatures are raw r||s, so EC keys verify with ieee-p1363 encoding; Ed25519 hashes internally. */
 const ALLOWED_ALGORITHMS: Record<string, { digest: string | null }> = {
   RS256: { digest: 'sha256' },
   ES256: { digest: 'sha256' },
@@ -99,7 +80,6 @@ export class UpstreamOidcService {
     return url.toString();
   }
 
-  /** Redeems the code (form-encoded, client_secret_post) and returns the verified upstream identity. Raw fetch, not APIRequest: form-encoded body + hard timeout. */
   async exchangeAndVerify(provider: IdentityProvider, code: string, codeVerifier: string, nonce: string): Promise<UpstreamIdentity> {
     const body = new URLSearchParams({
       grant_type: 'authorization_code',

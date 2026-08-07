@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
@@ -16,20 +10,8 @@ import { ApplicationRoleService, ApplicationService } from '@server/modules/syst
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
 type Json = Record<string, unknown>;
 
-/**
- * Declaring the constants
- *
- * The group→role sync engine (T-905): a mapping's derived assignments follow directory membership.
- * These specs drive the real SCIM membership surface (RFC 7644 PATCH untouched) and assert that the
- * PDP flips PERMIT/DENY for the affected members, that overlapping groups keep a shared role, that a
- * group delete cleans up, and that the existing membership-end path already revokes the derived rows.
- */
 const env = new TestEnvironment('scim-group-mapping').init();
 const USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const PATCH_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
@@ -148,7 +130,6 @@ describe('SCIM group → role mapping sync', () => {
 
     const leftFirst = await scim('patch', `/Groups/${first}`).body({ schemas: [PATCH_SCHEMA], Operations: [{ op: 'Remove', path: `members[value eq "${worker.directoryId}"]` }] });
     expect(leftFirst.statusCode).toBe(200);
-    /** The second group still maps the role, so the derived grant survives the first removal. */
     expect(await permits(worker.userId)).toBe(true);
 
     const leftSecond = await scim('patch', `/Groups/${second}`).body({
@@ -176,7 +157,6 @@ describe('SCIM group → role mapping sync', () => {
   });
 
   it('should let the existing membership-end path clean the derived rows on deprovision', async () => {
-    /** An adopted (managed=false) account whose deprovision ends org membership, which already revokes org-scoped assignments. */
     await env.getService(UserService).createUserWithPassword({ email: 'veteran@acme.example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true });
     const veteran = await createUser('veteran@acme.example.com');
     const groupId = await createGroup('Adopted', [veteran.directoryId]);
@@ -185,7 +165,6 @@ describe('SCIM group → role mapping sync', () => {
 
     const removed = await scim('delete', `/Users/${veteran.directoryId}`);
     expect(removed.statusCode).toBe(204);
-    /** Membership ended → `revokeAllForPrincipalInOrganisation` already cleared the marker row; no new code needed. */
     expect(await permits(veteran.userId)).toBe(false);
     const rows = await env.getService(PolicyDecisionService).listAssignments({ principal: { type: 'USER', id: veteran.userId.toString() }, organisationId: orgId.toString() });
     expect(rows).toHaveLength(0);

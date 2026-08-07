@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { DatabaseService, FederatedIdentity, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class FederatedIdentityService {

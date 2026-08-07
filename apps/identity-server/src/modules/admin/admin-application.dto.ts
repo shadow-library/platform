@@ -1,27 +1,13 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
-
-/**
- * Defining types
- */
 
 const APPLICATION_VISIBILITY = ['PUBLIC', 'RESTRICTED', 'INTERNAL'] as const;
 const ORGANISATION_APPLICATION_SOURCE = ['PLATFORM_RELEASE', 'ORG_ASSIGNMENT'] as const;
 
 type ApplicationVisibility = (typeof APPLICATION_VISIBILITY)[number];
 type OrganisationApplicationSource = (typeof ORGANISATION_APPLICATION_SOURCE)[number];
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class ApplicationIdParams {
@@ -32,11 +18,11 @@ export class ApplicationIdParams {
 
 @Schema()
 export class CreateApplicationBody {
-  /**
-   * The stable machine identifier an application is addressed by internally (cache key, bootstrap lookup) — slug-shaped
-   * and immutable once created. Human-facing text lives on `displayName`; the DNS label lives on `subDomain`.
-   */
-  @Field({ ...PATTERN.APPLICATION_NAME, maxLength: 63 })
+  @Field({
+    ...PATTERN.APPLICATION_NAME,
+    maxLength: 63,
+    description: 'Stable, immutable machine identifier used for internal addressing; human-facing text belongs in displayName and the DNS label in subDomain.',
+  })
   name: string;
 
   @Field({ ...PATTERN.SUBDOMAIN, maxLength: 63 })
@@ -57,8 +43,7 @@ export class CreateApplicationBody {
   @Field(() => Boolean, { optional: true })
   isActive?: boolean;
 
-  /** Public browser origins for the app's relying-party clients; each becomes an `/api/auth/callback` redirect URI. */
-  @Field(() => [String], { optional: true })
+  @Field(() => [String], { optional: true, description: 'Public browser origins for the application; each becomes an /api/auth/callback redirect URI.' })
   publicUrls?: string[];
 }
 
@@ -82,12 +67,14 @@ export class UpdateApplicationBody {
   @Field(() => Boolean, { optional: true })
   isActive?: boolean;
 
-  /** How widely the app may ever be granted (T-901); changing it re-resolves every organisation's grant set. */
-  @Field(() => String, { optional: true, enum: [...APPLICATION_VISIBILITY] })
+  @Field(() => String, {
+    optional: true,
+    enum: [...APPLICATION_VISIBILITY],
+    description: "Controls how widely the application may be granted; changing it re-resolves every organisation's grant set.",
+  })
   visibility?: ApplicationVisibility;
 
-  /** Public browser origins for the app's relying-party clients; each becomes an `/api/auth/callback` redirect URI. */
-  @Field(() => [String], { optional: true })
+  @Field(() => [String], { optional: true, description: 'Public browser origins for the application; each becomes an /api/auth/callback redirect URI.' })
   publicUrls?: string[];
 }
 
@@ -104,8 +91,7 @@ export class ApplicationOrganisationParams {
 
 @Schema()
 export class ReleaseApplicationBody {
-  /** The team organisation the RESTRICTED app is being released to. */
-  @Field(() => String, { ...PATTERN.ID })
+  @Field(() => String, { ...PATTERN.ID, description: 'Team organisation to which the restricted application is released.' })
   @Transform('bigint:parse')
   organisationId: bigint;
 }
@@ -194,8 +180,7 @@ export class ApplicationDetailResponse extends ApplicationSummaryItem {
   @Field(() => [ApplicationRoleItem])
   roles: ApplicationRoleItem[];
 
-  /** Public browser origins; each yields an `/api/auth/callback` redirect URI on the app's relying-party clients. */
-  @Field(() => [String])
+  @Field(() => [String], { description: "Public browser origins; each yields an /api/auth/callback redirect URI on the application's relying-party clients." })
   publicUrls: string[];
 
   @Field()
@@ -207,17 +192,13 @@ export class CreateApplicationResponse {
   @Field(() => Number)
   id: number;
 
-  /**
-   * The application's identity, provisioned with it rather than configured separately (D-21): one
-   * client and one derived `api://<app>` audience. The secret is shown exactly once, here.
-   */
-  @Field()
+  @Field({ description: "Provisioned client identifier for the application's identity." })
   clientId: string;
 
-  @Field()
+  @Field({ description: 'Derived api://<app> audience provisioned for the application.' })
   audience: string;
 
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'Provisioned client secret, returned exactly once.' })
   clientSecret?: string;
 }
 

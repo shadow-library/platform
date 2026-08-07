@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { ADMIN_PERMISSIONS, IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { PolicyDecisionService } from '@server/modules/authz';
@@ -16,10 +10,6 @@ import { ApplicationRoleService, ApplicationService } from '@server/modules/syst
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
 interface MappingItem {
   id: string;
   groupId: string;
@@ -27,13 +17,6 @@ interface MappingItem {
   organisationId: string;
 }
 
-/**
- * Declaring the constants
- *
- * The admin group-mapping API (T-905): mutations ride the two-tier `requireRoleAdmin` + AAL2 (D-A8),
- * authorised against the *role's* application, and are guarded by the ORG_011 reachability rule. A
- * create backfills the group's members; a delete revokes only marker rows, never a manual grant.
- */
 const env = new TestEnvironment('admin-scim-mapping').init();
 
 describe('Admin SCIM group → role mappings', () => {
@@ -160,14 +143,12 @@ describe('Admin SCIM group → role mappings', () => {
   });
 
   it('should revoke only marker rows and never a manual grant of the same role', async () => {
-    /** A manual grant carries no marker; the sync must leave it untouched when the mapping is deleted. */
     await env.getService(PolicyDecisionService).assignRole({ type: 'USER', id: memberUserId.toString() }, premiumRoleId, orgId.toString(), 'manual');
     const created = await create({ groupId, roleId: premiumRoleId });
     const mappingId = (created.json() as MappingItem).id;
 
     const deleted = await request('delete', `/api/v1/admin/scim/group-mappings/${mappingId}`);
     expect(deleted.statusCode).toBe(200);
-    /** The manual grant survives the mapping delete. */
     expect(await permits(memberUserId)).toBe(true);
     const rows = await env
       .getService(PolicyDecisionService)

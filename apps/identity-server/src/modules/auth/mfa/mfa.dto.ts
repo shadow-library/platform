@@ -1,30 +1,14 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class TotpEnrollResponse {
-  /** Base32 seed for manual entry into an authenticator app; returned exactly once. */
-  @Field()
+  @Field({ description: 'Base32 seed for manual entry into an authenticator app; returned exactly once.' })
   secret: string;
 
-  /** otpauth:// provisioning URI, typically rendered as a QR code. */
-  @Field()
+  @Field({ description: 'otpauth:// provisioning URI, typically rendered as a QR code.' })
   uri: string;
 }
 
@@ -49,8 +33,7 @@ export class MfaEnrollmentItem {
   @Transform('strip:null')
   lastUsedAt?: string;
 
-  /** Present on WEBAUTHN entries — the id `DELETE /me/webauthn/{credentialId}` expects. */
-  @Field(() => String, { optional: true })
+  @Field(() => String, { optional: true, description: 'Present for WEBAUTHN entries; use this value when deleting the credential.' })
   credentialId?: string;
 }
 
@@ -59,8 +42,7 @@ export class MfaEnrollmentsResponse {
   @Field(() => [MfaEnrollmentItem])
   enrollments: MfaEnrollmentItem[];
 
-  /** Unused single-use recovery codes remaining in the current batch. */
-  @Field(() => Number)
+  @Field(() => Number, { description: 'Unused single-use recovery codes remaining in the current batch.' })
   recoveryCodesRemaining: number;
 }
 
@@ -73,28 +55,29 @@ export class StepUpResponse {
   elevatedUntil: string;
 }
 
-/**
- * The application a step-up is being performed *for* (D-19, T-801). Only a claim naming the same
- * pair can spend the window; omitting them opens a window for the identity console alone, which no
- * application may claim.
- */
 @Schema()
 export class ElevationIntentFields {
-  @Field({ optional: true, maxLength: 64 })
+  @Field({
+    optional: true,
+    maxLength: 64,
+    description: 'Application client for which the step-up is performed; only a claim naming the same client and resource may spend the window.',
+  })
   clientId?: string;
 
-  @Field({ optional: true, maxLength: 255 })
+  @Field({
+    optional: true,
+    maxLength: 255,
+    description: 'Target resource for which the step-up is performed; omitting the client and resource opens a window usable only by the identity console.',
+  })
   resource?: string;
 }
 
 @Schema()
 export class StepUpBody extends ElevationIntentFields {
-  /** A 6-digit TOTP code — required to elevate when the account holds a second factor. */
-  @Field({ ...PATTERN.OTP, optional: true })
+  @Field({ ...PATTERN.OTP, optional: true, description: 'Six-digit TOTP code required when the account has a second factor.' })
   code?: string;
 
-  /** The account password — accepted only when the account has no second factor enrolled. */
-  @Field({ optional: true, minLength: 1 })
+  @Field({ optional: true, minLength: 1, description: 'Account password, accepted only when no second factor is enrolled.' })
   password?: string;
 }
 
@@ -104,21 +87,18 @@ export class StepUpIntentQuery {
   clientId: string;
 }
 
-/**
- * The label a hosted step-up prompt renders for an app-initiated ceremony (D-19, T-801).
- * `applicationName` is absent for an unknown or inactive client id, which the prompt shows as a
- * neutral failure rather than a probe result.
- */
 @Schema()
 export class StepUpIntentResponse {
-  @Field({ optional: true })
+  @Field({
+    optional: true,
+    description: 'Application label for a hosted step-up prompt; absent for an unknown or inactive client to avoid exposing a probe result.',
+  })
   applicationName?: string;
 }
 
 @Schema()
 export class StepUpMethodsResponse {
-  /** Methods the account may use to elevate; empty means it must enrol a factor first. */
-  @Field(() => [String])
+  @Field(() => [String], { description: 'Methods available for elevation; an empty array means the account must enroll a factor first.' })
   methods: ('TOTP' | 'WEBAUTHN' | 'PASSWORD')[];
 }
 
@@ -133,14 +113,12 @@ export class TotpActivateResponse {
   @Field()
   success: boolean;
 
-  /** Present only when this activation produced the account's first recovery-code batch. */
-  @Field(() => [String], { optional: true })
+  @Field(() => [String], { optional: true, description: "Present only when activation creates the account's first recovery-code batch." })
   recoveryCodes?: string[];
 }
 
 @Schema()
 export class RecoveryCodesResponse {
-  /** Shown exactly once; only hashes are retained server-side. */
-  @Field(() => [String])
+  @Field(() => [String], { description: 'Recovery codes shown exactly once; only hashes are retained server-side.' })
   recoveryCodes: string[];
 }

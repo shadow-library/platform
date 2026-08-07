@@ -1,18 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * Deliveries are signed Stripe-style: `x-shadow-webhook-signature: t=<unix seconds>,v1=<hex>` where
  * the HMAC-SHA256 input is `<t>.<raw body>`. During secret rotation the header carries a second
  * `v1` computed with the outgoing secret, so receivers verify against any listed signature.

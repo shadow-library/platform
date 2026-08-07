@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { and, count, desc, eq, ilike, inArray, SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES } from '@server/constants';
 import { MfaService, WebauthnService } from '@server/modules/auth/mfa';
@@ -16,10 +10,6 @@ import { BackChannelLogoutService, RefreshTokenService } from '@server/modules/a
 import { type StatusHold, UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { AuditEvent, DatabaseService, PrimaryDatabase, schema, User } from '@server/modules/infrastructure/datastore';
-
-/**
- * Defining types
- */
 
 export interface UserSearchFilter {
   email?: string;
@@ -62,16 +52,7 @@ export interface AdminActionContext {
   organisationId: string;
 }
 
-/** CLOSED is reached only through `softDelete`, and INACTIVE is a registration artefact — neither is an administrative choice. */
 export type AdministrableStatus = Extract<User.Status, 'ACTIVE' | 'DISABLED' | 'SUSPENDED' | 'BLOCKED'>;
-
-/**
- * Declaring the constants
- *
- * Account-lifecycle operations for platform administrators (T-602). Every mutation revokes what a
- * hostile session could still use, is attributed to the acting administrator in the audit chain,
- * and never exposes credential material.
- */
 
 const STATUS_AUDIT_ACTION: Record<AdministrableStatus, string> = {
   ACTIVE: 'admin.user.reactivated',
@@ -152,7 +133,6 @@ export class AdminUserService {
     return { user, emails, phones, mfa: { totp: factors.totp, webauthn: factors.webauthn, passkeyCount: passkeys.length }, activeSessionCount: sessions.length };
   }
 
-  /** A FULL lock also cuts every live credential; OTP_ONLY leaves sessions but blocks passwords. */
   async lock(userId: bigint, mode: Exclude<User.LockMode, 'NONE'>, until: Date | null, context: AdminActionContext): Promise<void> {
     await this.requireUser(userId);
     await this.db.update(schema.users).set({ lockMode: mode, lockedUntil: until, updatedAt: new Date() }).where(eq(schema.users.id, userId));
@@ -166,7 +146,6 @@ export class AdminUserService {
     await this.record('admin.user.unlocked', userId, context);
   }
 
-  /** Forces recovery at next login: flags the account and revokes everything currently issued. */
   async forcePasswordReset(userId: bigint, context: AdminActionContext): Promise<void> {
     await this.requireUser(userId);
     await this.db.update(schema.users).set({ passwordResetRequired: true, updatedAt: new Date() }).where(eq(schema.users.id, userId));
@@ -180,11 +159,6 @@ export class AdminUserService {
     await this.record('admin.user.sessions_terminated', userId, context);
   }
 
-  /**
-   * The three ways an account leaves ACTIVE differ in intent, not mechanics: DISABLED is lifecycle (offboarded),
-   * SUSPENDED is a reversible hold that may lapse on its own, BLOCKED is punitive and indefinite. All of them cut
-   * live access immediately, because a status that leaves existing sessions running would not actually stop anyone.
-   */
   async setStatus(userId: bigint, status: AdministrableStatus, context: AdminActionContext, hold: StatusHold = {}): Promise<void> {
     const user = await this.requireUser(userId);
     if (user.status === 'CLOSED') throw AppErrorCode.USR_001.create();
@@ -195,10 +169,6 @@ export class AdminUserService {
     await this.record(STATUS_AUDIT_ACTION[status], userId, context, { reason: hold.reason ?? null, until: hold.until?.toISOString() ?? null });
   }
 
-  /**
-   * Right-to-erasure (T-602): scrubs PII and credentials while keeping the numeric user skeleton so
-   * the audit chain and foreign history stay intact. Irreversible by design.
-   */
   async softDelete(userId: bigint, context: AdminActionContext): Promise<void> {
     const user = await this.requireUser(userId);
     await this.revokeAllAccess(userId);

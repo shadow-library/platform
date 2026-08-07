@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { KeyService } from '@server/modules/auth/keys';
 import { ACCESS_TOKEN_TYPE, AccessTokenService, OAuthClientService, TOKEN_EXCHANGE_GRANT } from '@server/modules/auth/oauth';
 import { UserService } from '@server/modules/identity/user';
@@ -15,10 +9,6 @@ import { eq } from 'drizzle-orm';
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
 interface RegisteredApp {
   clientId: string;
   secret?: string;
@@ -26,12 +16,6 @@ interface RegisteredApp {
   audience: string;
 }
 
-/**
- * Declaring the constants
- *
- * Two applications, each owning its own API resource. `caller` holds the user's token for its own
- * API and wants to call `target` as that user (D-22).
- */
 const env = new TestEnvironment('token-exchange').init();
 
 const CALLER_AUDIENCE = 'api://caller';
@@ -44,7 +28,6 @@ describe('RFC 8693 token exchange', () => {
 
   const basic = (app: RegisteredApp) => `Basic ${Buffer.from(`${app.clientId}:${app.secret}`).toString('base64')}`;
 
-  /** Registers an application with its own API resource and returns the client that fronts it. */
   const registerApp = async (name: string, audience: string): Promise<RegisteredApp> => {
     const applications = env.getService(ApplicationService);
     const clients = env.getService(OAuthClientService);
@@ -60,7 +43,6 @@ describe('RFC 8693 token exchange', () => {
     return { ...registered, applicationId: application.id, audience };
   };
 
-  /** Grants the caller a scope defined on the target's API, optionally a sensitive one. */
   const grantOnTarget = async (name: string, isSensitive = false): Promise<void> => {
     const clients = env.getService(OAuthClientService);
     const resources = await clients.listResources();
@@ -70,7 +52,6 @@ describe('RFC 8693 token exchange', () => {
     await clients.grantScope(caller.clientId, scopeId);
   };
 
-  /** A user token addressed to the caller's own API — what a first-party app holds for its user. */
   const userToken = (overrides: Record<string, unknown> = {}) =>
     env.getService(AccessTokenService).mintAccessToken({
       subject: userId.toString(),
@@ -107,7 +88,6 @@ describe('RFC 8693 token exchange', () => {
   beforeEach(async () => {
     caller = await registerApp('caller', CALLER_AUDIENCE);
     target = await registerApp('target', TARGET_AUDIENCE);
-    /** The subject is a real user with a personal workspace, so a PUBLIC target is reachable and the exchange gate (T-902) passes. */
     const user = await env.getService(UserService).createUserWithPassword({ email: 'exchange@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true });
     userId = user.id;
     await grantOnTarget('target:read');
@@ -131,7 +111,6 @@ describe('RFC 8693 token exchange', () => {
   });
 
   it('should bound the scope by the caller’s grants on the target, not the user’s consent', async () => {
-    /** The subject token carries `reports:read`, which the caller does not hold on the target. */
     const body = (await exchangeAsCaller()).json() as { scope: string };
     expect(body.scope).toBe('target:read');
   });
@@ -144,7 +123,6 @@ describe('RFC 8693 token exchange', () => {
     expect(widened.statusCode).toBe(400);
   });
 
-  /** An exchanged token is always AAL1 (D-19), so a scope that mints only into an elevated token is unreachable. */
   it('should never mint a sensitive scope into an exchanged token', async () => {
     await grantOnTarget('target:purge', true);
     expect(((await exchangeAsCaller()).json() as { scope: string }).scope).toBe('target:read');
@@ -171,7 +149,6 @@ describe('RFC 8693 token exchange', () => {
   });
 
   it('should refuse a caller that does not own the subject token audience', async () => {
-    /** `target` holds the user's token for nothing — it may not exchange one addressed to `caller`. */
     await env.getService(OAuthClientService).grantScope(target.clientId, await callerScopeId());
     const response = await exchange(target, {
       grant_type: TOKEN_EXCHANGE_GRANT,
@@ -196,7 +173,6 @@ describe('RFC 8693 token exchange', () => {
   });
 
   it('should refuse an exchange to an application the subject user may not reach (invalid_target)', async () => {
-    /** Making the target RESTRICTED puts it out of the personal-workspace user's reach; the delegated call may not go where the user cannot. */
     await env.getPostgresClient().update(schema.applications).set({ visibility: 'RESTRICTED' }).where(eq(schema.applications.id, target.applicationId));
     await env.getService(ApplicationAccessService).invalidateGlobal();
 

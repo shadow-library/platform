@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type FastifyRequest } from 'fastify';
 import { Injectable } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { KeyService } from '@server/modules/auth/keys';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 
 import { ScimError } from './scim.types';
-
-/**
- * Defining types
- */
 
 export interface ScimTenant {
   clientId: string;
@@ -23,8 +13,6 @@ export interface ScimTenant {
 }
 
 /**
- * Declaring the constants
- *
  * SCIM authenticates with ordinary client-credentials service tokens carrying `scim:provision`
  * (recorded decision: the reserved `scim_tokens` table was subsumed — an org-bound SERVICE client
  * already gives per-tenant, rotatable credentials with introspection and dual-secret rotation for

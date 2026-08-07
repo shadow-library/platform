@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { Body, Delete, Get, HttpController, Params, Put, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { Auth, Context } from '@server/modules/access';
 import { AuditService } from '@server/modules/infrastructure/audit';
 
 import { OrganisationPolicyParams, PolicyActionResponse, PolicyItem, PolicyKeyParams, PolicyListResponse, SetPolicyBody } from './policy.dto';
 import { PolicyKey } from './policy.registry';
 import { PolicyDescriptor, PolicyService } from './policy.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/organisations/:organisationId/policies')
 export class PolicyController {
@@ -36,7 +22,6 @@ export class PolicyController {
     return { policies: policies.map(policy => PolicyController.toItem(policy)) };
   }
 
-  /** A key emits only the value trio matching its declared type, so a boolean never arrives as `1`. */
   private static toItem(policy: PolicyDescriptor): PolicyItem {
     const item: PolicyItem = { key: policy.key, label: policy.label, description: policy.description, type: policy.type };
     if (policy.type === 'boolean') {
@@ -54,7 +39,6 @@ export class PolicyController {
     return item;
   }
 
-  /** Tightening a security policy is itself a security-sensitive act, so both writes are audited. */
   @Put('/:policyKey')
   @Auth({ orgRole: 'ADMIN', elevated: true })
   @RespondFor(200, PolicyActionResponse)

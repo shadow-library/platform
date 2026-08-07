@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class ContactItemDto {
@@ -44,15 +30,13 @@ export class AddEmailBody {
 
 @Schema()
 export class AddPhoneBody {
-  /** E.164 including the leading `+`. */
-  @Field({ ...PATTERN.PHONE })
+  @Field({ ...PATTERN.PHONE, description: 'Phone number in E.164 format, including the leading +.' })
   phone: string;
 }
 
 @Schema()
 export class AddContactResponse {
-  /** Opaque handle for the pending verification; pass it back with the OTP. */
-  @Field()
+  @Field({ description: 'Opaque handle for the pending verification; return it with the OTP.' })
   verificationId: string;
 }
 

@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Module } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { KeyModule } from '@server/modules/auth/keys';
 import { OAuthModule } from '@server/modules/auth/oauth';
 import { SessionModule } from '@server/modules/auth/session';
@@ -20,14 +14,6 @@ import { MfaService } from './mfa.service';
 import { RecoveryCodeService } from './recovery-code.service';
 import { WebauthnController } from './webauthn.controller';
 import { WebauthnService } from './webauthn.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Module({
   imports: [DatabaseModule, KeyModule, OAuthModule, SessionModule, CredentialsModule, UserModule, AuditModule, NotificationModule],

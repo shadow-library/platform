@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
@@ -16,15 +10,8 @@ import { RateLimiterService } from '@server/modules/infrastructure/security';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
 type Method = 'get' | 'post' | 'delete';
 
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('org-invitation').init();
 
 describe('Organisation invitations', () => {
@@ -41,7 +28,6 @@ describe('Organisation invitations', () => {
 
   const session = async (userId: bigint) => (await env.getService(SessionService).create({ userId, aal: 'AAL1' })).secret;
 
-  /** The invitation email rides the outbox; tests read the token exactly where the invitee would. */
   const latestToken = async (email: string): Promise<string> => {
     const rows = await env.getPostgresClient().query.notificationOutbox.findMany({ where: eq(schema.notificationOutbox.templateKey, 'organisation-invitation') });
     const payloads = rows.filter(row => (row.recipients as { email?: string }).email === email).map(row => row.payload as { token: string });

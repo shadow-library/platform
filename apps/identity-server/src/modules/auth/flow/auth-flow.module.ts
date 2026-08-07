@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Module } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { FederationModule } from '@server/modules/auth/federation';
 import { MfaModule } from '@server/modules/auth/mfa';
 import { SessionModule } from '@server/modules/auth/session';
@@ -31,14 +25,6 @@ import { RecoveryService } from './recovery.service';
 import { RegistrationService } from './registration.service';
 import { SignInEventService } from './sign-in-event.service';
 import { SuspiciousLoginService } from './suspicious-login.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Module({
   imports: [

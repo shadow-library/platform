@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { PATTERN } from '@server/constants';
-
-/**
- * Defining types
- */
 
 const ORG_TYPES = ['PERSONAL', 'TEAM'] as const;
 const ORG_STATUSES = ['ACTIVE', 'SUSPENDED', 'DELETED'] as const;
@@ -28,10 +18,6 @@ type InvitableRole = (typeof INVITABLE_ROLES)[number];
 type MemberStatus = (typeof MEMBER_STATUSES)[number];
 type AppAccessMode = (typeof APP_ACCESS_MODES)[number];
 type ApplicationVisibility = (typeof APPLICATION_VISIBILITY)[number];
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class OrganisationIdParams {
@@ -76,8 +62,11 @@ export class UpdateOrganisationBody {
   @Field({ optional: true, minLength: 1, maxLength: 255 })
   name?: string;
 
-  /** Switching to `ASSIGNED_ONLY` limits members to explicitly assigned apps; owner-only and step-up-gated. */
-  @Field(() => String, { optional: true, enum: [...APP_ACCESS_MODES] })
+  @Field(() => String, {
+    optional: true,
+    enum: [...APP_ACCESS_MODES],
+    description: 'ASSIGNED_ONLY limits members to explicitly assigned applications; changing this is owner-only and requires step-up authentication.',
+  })
   appAccessMode?: AppAccessMode;
 }
 
@@ -149,8 +138,7 @@ export class UpdateMemberStatusBody {
   @Field({ optional: true, maxLength: 256 })
   reason?: string;
 
-  /** ISO-8601 lapse time; accepted only alongside SUSPENDED. */
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'ISO-8601 suspension expiry; accepted only when the status is SUSPENDED.' })
   until?: string;
 }
 
@@ -295,8 +283,7 @@ export class OrganisationApplicationParams {
 
 @Schema()
 export class AssignApplicationBody {
-  /** The application the organisation is adding to its allowlist; must be one its members can reach. */
-  @Field(() => String, { ...PATTERN.ID })
+  @Field(() => String, { ...PATTERN.ID, description: 'Application to add to the organisation allowlist; it must be reachable by the organisation members.' })
   @Transform('int:parse')
   applicationId: number;
 }
@@ -327,8 +314,7 @@ export class OrganisationApplicationItem {
   @Field(() => String, { enum: [...APPLICATION_VISIBILITY] })
   visibility: ApplicationVisibility;
 
-  /** Whether this org has added the app to its allowlist; meaningful chiefly under `ASSIGNED_ONLY`. */
-  @Field(() => Boolean)
+  @Field(() => Boolean, { description: 'Whether the organisation added the application to its allowlist; chiefly relevant in ASSIGNED_ONLY mode.' })
   assigned: boolean;
 }
 

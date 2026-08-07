@@ -1,20 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class MyApplicationItem {
@@ -42,8 +27,7 @@ export class MyApplicationItem {
   @Transform('strip:null')
   logoUrl?: string;
 
-  /** Present only for an app the user has actually opened; an accessible-but-never-launched app omits it. */
-  @Field(() => String, { optional: true })
+  @Field(() => String, { optional: true, description: 'Present only after the user has opened the application; omitted for accessible but unused applications.' })
   @Transform('strip:null')
   firstUsedAt?: string;
 

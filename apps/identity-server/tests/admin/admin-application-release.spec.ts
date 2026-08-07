@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
@@ -18,15 +12,8 @@ import { ApplicationService } from '@server/modules/system/application';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
 type Method = 'get' | 'post' | 'delete' | 'patch';
 
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('admin-application-release').init();
 
 describe('Admin application release API', () => {

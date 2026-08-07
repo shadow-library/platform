@@ -132,7 +132,7 @@ export function createConfig(options: LintOptions = {}): Linter.Config[] {
             environment: 'bun',
             newlinesBetween: 'ignore',
             partitionByComment: true,
-            internalPattern: ['^@lib/', '^@app/', '^@shadow-library/'],
+            internalPattern: ['^@lib/', '^@app/', '^@server/', '^@modules/', '^@tests/'],
             groups: ['builtin', 'external', 'internal', ['parent', 'sibling', 'index'], 'unknown'],
           },
         ],
@@ -183,7 +183,11 @@ export default defineConfig([
   },
 
   /** identity-server also renders and ships the OIDC consent client from the same workspace: needs both global sets. */
-  { files: ['apps/identity-server/**/*.{ts,tsx}'], languageOptions: { globals: resolveGlobals('both') } },
+  {
+    files: ['apps/identity-server/**/*.{ts,tsx}'],
+    languageOptions: { globals: resolveGlobals('both') },
+    rules: { 'perfectionist/sort-imports': 'off' },
+  },
 
   /** Router/API modules whose return type is inferred (TanStack Router, generated API clients) — cannot be written out by hand. */
   {

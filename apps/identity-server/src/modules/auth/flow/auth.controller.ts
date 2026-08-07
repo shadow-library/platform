@@ -1,13 +1,6 @@
-/**
- * Importing npm packages
- */
-
 import { type FastifyReply } from 'fastify';
 import { Body, Get, HttpController, HttpStatus, Post, Query, Res, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { Auth, Context } from '@server/modules/access';
 import { WebauthnChallengeResponse } from '@server/modules/auth/mfa';
@@ -44,14 +37,6 @@ import { LoginService } from './login.service';
 import { RecoveryService } from './recovery.service';
 import { RegistrationService } from './registration.service';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
 @HttpController('/api/v1/auth')
 export class AuthController {
   constructor(
@@ -74,7 +59,6 @@ export class AuthController {
     return this.loginService.init({ identifier: body.identifier, device: this.deviceContext(body.deviceId), returnTo: body.returnTo });
   }
 
-  /** Completes an admin-forced reset inline: the flow proved the current password, this rotates it. */
   @Post('/login/reset-password')
   @Auth({ public: true })
   @HttpStatus(200)
@@ -178,7 +162,6 @@ export class AuthController {
     reply.status(204).send();
   }
 
-  /** Terminates the current session and its refresh-token families, then clears the session cookies. */
   @Post('/signout')
   @Auth({ session: true })
   async signout(@Res() reply: FastifyReply): Promise<void> {
@@ -191,7 +174,6 @@ export class AuthController {
     reply.status(204).send();
   }
 
-  /** Issues passkey assertion options for a usernameless login or a flow's MFA step. */
   @Post('/webauthn/options')
   @Auth({ public: true })
   @RateLimit({ name: 'webauthn-options', limit: 60, windowSeconds: 3600 })

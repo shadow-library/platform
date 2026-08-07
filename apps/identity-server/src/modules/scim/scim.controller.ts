@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type FastifyReply, type FastifyRequest } from 'fastify';
 import { Config } from '@shadow-library/common';
 import { Delete, Get, HttpController, Params, Patch, Post, Put, Query, Req, Res } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { ScimAuthService } from './scim-auth.service';
 import { ScimGroupService } from './scim-group.service';
 import { ScimUserService } from './scim-user.service';
@@ -15,12 +9,6 @@ import { ScimIdParams, ScimListQuery } from './scim.dto';
 import { LIST_SCHEMA, parseFilter, parseGroupInput, parsePage, parsePatchOperations, parseUserInput, SCIM_CONTENT_TYPE, ScimError, ScimListResponse } from './scim.types';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * SCIM responses are sent manually (`@Res`) rather than through `@RespondFor` DTO serialization —
  * RFC 7644 fixes the wire format, including a distinct error envelope and `application/scim+json`,
  * which must not be reshaped by the platform's error handler. `run` maps `ScimError` to the
@@ -55,8 +43,6 @@ export class ScimController {
   private toList<T>(total: number, resources: T[], startIndex: number): ScimListResponse<T> {
     return { schemas: [LIST_SCHEMA], totalResults: total, startIndex, itemsPerPage: resources.length, Resources: resources };
   }
-
-  /* ----------------------------------------- users ----------------------------------------- */
 
   @Get('/Users')
   async listUsers(@Query() query: ScimListQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
@@ -109,8 +95,6 @@ export class ScimController {
     });
   }
 
-  /* ----------------------------------------- groups ---------------------------------------- */
-
   @Get('/Groups')
   async listGroups(@Query() query: ScimListQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     await this.run(reply, 200, async () => {
@@ -161,8 +145,6 @@ export class ScimController {
       return undefined;
     });
   }
-
-  /* --------------------------------------- discovery --------------------------------------- */
 
   @Get('/ServiceProviderConfig')
   async serviceProviderConfig(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {

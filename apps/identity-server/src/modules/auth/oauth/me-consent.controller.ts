@@ -1,27 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Delete, Get, HttpController, Params, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { Auth, Context } from '@server/modules/access';
 
 import { ConsentClientParams, ConsentOperationResponse, ConsentRecordsResponse } from './consent.dto';
 import { type ConsentRecordData, ConsentService } from './consent.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
- * Self-service consent management (the account portal's "Connected apps" surface): the signed-in user
- * reviews the applications holding an active grant and revokes any of them. Revocation cascades to the
- * client's refresh-token families through `ConsentService.withdraw`.
- */
 
 @HttpController('/api/v1/me/consents')
 @Auth({ session: true })

@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Body, Delete, HttpController, HttpStatus, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { Auth, Context } from '@server/modules/access';
 import { OAuthClientService } from '@server/modules/auth/oauth';
@@ -28,19 +22,6 @@ import {
 } from './app-session.dto';
 import { AppSessionService } from './app-session.service';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-/**
- * The first-party session surface. Every route is machine-to-machine: the application presents its own
- * service token, so possessing a session handle alone never yields a token. This is deliberately not
- * part of `/oauth2/*`, which stays a plain, conforming OAuth surface.
- */
 @HttpController('/api/v1/app-sessions')
 @Auth({ service: APP_SESSION_SCOPE })
 @M2MBudget()
@@ -92,10 +73,6 @@ export class AppSessionController {
     return { expiresAt: expiresAt.toISOString() };
   }
 
-  /**
-   * A read, but a POST: the handle is a bearer secret and must never reach a query string, an access
-   * log or a `Referer` header. Every sibling route carries it in the body for the same reason.
-   */
   @Post('/organisations')
   @HttpStatus(200)
   @RespondFor(200, AppSessionOrganisationsResponse)
@@ -130,11 +107,6 @@ export class AppSessionController {
     return { success: true };
   }
 
-  /**
-   * The acting client is taken from the verified service token, never from the request body, and the
-   * call is charged to that client's own budget — a fleet of pods behind one egress IP is many
-   * callers, not one (T-804).
-   */
   private async callingClient(): Promise<OAuthClient> {
     const claims = Context.getServiceToken();
     const clientId = typeof claims.client_id === 'string' ? claims.client_id : '';

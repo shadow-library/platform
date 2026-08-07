@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Body, Get, HttpController, Params, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { Auth, Context } from '@server/modules/access';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { AuditService } from '@server/modules/infrastructure/audit';
@@ -13,14 +7,6 @@ import { ApplicationService } from '@server/modules/system/application';
 
 import { CreatedResponse, CreateResourceBody, CreateScopeBody, ResourceIdParams, ResourceListResponse } from './admin-client.dto';
 import { ADMIN_PERMISSIONS } from './admin.constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/admin/resources')
 export class AdminResourceController {

@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Module } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { KeyModule } from '@server/modules/auth/keys';
 import { SessionModule } from '@server/modules/auth/session';
 import { OrganisationModule } from '@server/modules/identity/organisation';
@@ -17,14 +11,6 @@ import { FederatedIdentityService } from './federated-identity.service';
 import { IdentityProviderController } from './identity-provider.controller';
 import { IdentityProviderService } from './identity-provider.service';
 import { UpstreamOidcService } from './upstream-oidc.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Module({
   imports: [DatabaseModule, KeyModule, SessionModule, OrganisationModule, AuditModule, WebhookModule],

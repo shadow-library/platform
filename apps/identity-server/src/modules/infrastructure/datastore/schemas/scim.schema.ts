@@ -1,34 +1,14 @@
-/**
- * Importing npm packages
- */
 import { InferSelectModel, relations, sql } from 'drizzle-orm';
 import { bigint, boolean, integer, pgTable, primaryKey, timestamp, unique, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { applicationRoles } from './applications.schema';
 import { organisations } from './organisations.schema';
 import { users } from './users.schema';
-
-/**
- * Defining types
- */
 
 export type ScimDirectoryEntry = InferSelectModel<typeof scimDirectory>;
 export type ScimGroup = InferSelectModel<typeof scimGroups>;
 export type ScimGroupMember = InferSelectModel<typeof scimGroupMembers>;
 export type ScimGroupRoleMapping = InferSelectModel<typeof scimGroupRoleMappings>;
-
-/**
- * Declaring the constants
- *
- * The SCIM directory is a tenant's provisioning view (T-704): each row maps an org to a user the
- * tenant manages, under a SCIM resource id that never leaks platform user ids. `managed` is the
- * ownership boundary — true means the account was born via this tenant's SCIM and may be
- * deactivated at account level; false marks an adopted pre-existing account whose deprovisioning
- * only ever strips org membership, never touches the account itself.
- */
 
 export const scimDirectory = pgTable(
   'scim_directory',
@@ -84,13 +64,6 @@ export const scimGroupMembers = pgTable(
   t => [primaryKey({ columns: [t.groupId, t.directoryId] })],
 );
 
-/**
- * Maps a tenant's directory group onto an application role (T-905, D-A9): every current and future
- * member of the group is granted the mapped role for the group's organisation, as ordinary
- * `role_assignments` rows carrying the `scim:group:<groupId>` provenance marker. The mapping is
- * provisioning-to-authorization glue only — it holds no assignments itself; the sync engine
- * materialises and revokes the marker rows. `unique(group_id, role_id)` makes a create idempotent.
- */
 export const scimGroupRoleMappings = pgTable(
   'scim_group_role_mappings',
   {
@@ -106,10 +79,6 @@ export const scimGroupRoleMappings = pgTable(
   },
   t => [unique('scim_group_role_mappings_group_role_unique').on(t.groupId, t.roleId)],
 );
-
-/**
- * Declaring the relations
- */
 
 export const scimDirectoryRelations = relations(scimDirectory, ({ one, many }) => ({
   organisation: one(organisations, { fields: [scimDirectory.organisationId], references: [organisations.id] }),

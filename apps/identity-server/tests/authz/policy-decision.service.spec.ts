@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AccessTokenService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService } from '@server/modules/authz';
 import { UserService } from '@server/modules/identity/user';
@@ -13,13 +7,6 @@ import { ApplicationRoleService, ApplicationService } from '@server/modules/syst
 
 import { TestEnvironment } from '../test-environment';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const env = new TestEnvironment('authz').init();
 
 describe('PolicyDecisionService', () => {

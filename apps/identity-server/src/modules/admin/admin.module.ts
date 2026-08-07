@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Module } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { MfaModule } from '@server/modules/auth/mfa';
 import { OAuthModule } from '@server/modules/auth/oauth';
 import { SamlModule } from '@server/modules/auth/saml';
@@ -32,14 +26,6 @@ import { AdminServiceAccessController } from './admin-service-access.controller'
 import { AdminUserController } from './admin-user.controller';
 import { AdminUserService } from './admin-user.service';
 import { AdminWebhookController } from './admin-webhook.controller';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Module({
   imports: [
