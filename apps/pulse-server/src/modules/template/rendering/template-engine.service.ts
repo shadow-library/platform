@@ -1,4 +1,3 @@
-/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import juice from 'juice';
 import { Liquid } from 'liquidjs';
 import { Injectable } from '@shadow-library/app';

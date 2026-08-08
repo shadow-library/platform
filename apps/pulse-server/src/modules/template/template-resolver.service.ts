@@ -1,4 +1,3 @@
-/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { InMemoryStore, Logger, LRUCache } from '@shadow-library/common';

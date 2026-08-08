@@ -1,4 +1,3 @@
-/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { Logger } from '@shadow-library/common';

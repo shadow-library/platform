@@ -1,4 +1,3 @@
-/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Logger } from '@shadow-library/common';

@@ -1,4 +1,3 @@
-/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import { BunSQLDatabase, drizzle } from 'drizzle-orm/bun-sql';
 import { DatabaseModule as CoreDatabaseModule } from '@shadow-library/modules';
 

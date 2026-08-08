@@ -122,20 +122,8 @@ export function createConfig(options: LintOptions = {}): Linter.Config[] {
         '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
         'n/prefer-node-protocol': 'error',
         'no-console': 'error',
-        'perfectionist/sort-imports': [
-          'error',
-          {
-            type: 'natural',
-            order: 'asc',
-            ignoreCase: true,
-            // Pinned so `bun:*` specifiers group as builtins no matter which runtime hosts the ESLint CLI.
-            environment: 'bun',
-            newlinesBetween: 'ignore',
-            partitionByComment: true,
-            internalPattern: ['^@lib/', '^@app/', '^@server/', '^@modules/', '^@tests/'],
-            groups: ['builtin', 'external', 'internal', ['parent', 'sibling', 'index'], 'unknown'],
-          },
-        ],
+        // Preserve established declarations; removing organizational banner partitions must not rewrite imports.
+        'perfectionist/sort-imports': 'off',
         'perfectionist/sort-named-imports': ['error', { type: 'natural', order: 'asc', ignoreCase: true }],
         ...options.rules,
       },
@@ -186,18 +174,6 @@ export default defineConfig([
   {
     files: ['apps/identity-server/**/*.{ts,tsx}'],
     languageOptions: { globals: resolveGlobals('both') },
-  },
-
-  /** These apps keep their established import order after organizational banner comments are removed. */
-  {
-    files: [
-      'apps/novel-forge-server/**/*.{ts,tsx}',
-      'apps/novel-forge-web/**/*.{ts,tsx}',
-      'apps/pulse-web/**/*.{ts,tsx}',
-      'apps/web-novel-server/**/*.{ts,tsx}',
-      'apps/web-novel-web/**/*.{ts,tsx}',
-    ],
-    rules: { 'perfectionist/sort-imports': 'off' },
   },
 
   /** Router/API modules whose return type is inferred (TanStack Router, generated API clients) — cannot be written out by hand. */

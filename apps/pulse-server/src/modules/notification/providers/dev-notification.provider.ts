@@ -1,4 +1,3 @@
-/* eslint-disable perfectionist/sort-imports -- Preserve the established import order. */
 import assert from 'node:assert';
 
 import { InferInsertModel } from 'drizzle-orm';
