@@ -1,32 +1,14 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { arcContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Plan, type PrimaryDatabase, schema } from '@server/database';
 
 import { type ApproveArcsResponse, type UpsertArcBody } from './arc.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class ArcService {

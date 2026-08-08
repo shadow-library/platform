@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
-
-/**
- * Declaring the constants
- */
 
 describe('AppErrorCode', () => {
   it('should define project error codes', () => {

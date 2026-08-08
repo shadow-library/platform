@@ -1,25 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { redactJobForResponse } from '@modules/jobs/job-response';
 import { type Job } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 function baseJob(overrides: Partial<Job.Row> = {}): Job.Row {
   return {

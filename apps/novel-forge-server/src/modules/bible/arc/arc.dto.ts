@@ -1,26 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { PlanStatus } from '@server/common';
 import { type Plan } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class VolumeArcsParams {

@@ -1,26 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-/**
- * Importing user defined packages
- */
 import { type JudgeOutput, JudgeSchema } from '../schemas/judge.schema';
 import { type PromptModule } from './types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const system =
   'You are a continuity judge for a serialized novel. You receive a newly drafted chapter and the established canon. Your task: identify any contradiction between the draft and canon facts. A contradiction is a HARD finding if it directly contradicts an established fact (character ability, location, relationship, or event) — it blocks acceptance. A SOFT finding is a stylistic wrinkle or minor inconsistency that does not contradict canon. Return structured JSON. If the chapter is consistent with canon, return an empty findings array and verdict: consistent. Be strict: invented canon in the draft (character has a power not established) counts as a hard finding.\n\nWhen the task includes an "## ENDING CONTRACT", additionally assess the draft ending against it and return endingCompliance: compliant only when the ending lands the contracted hookType, leaves the openQuestion unanswered, ends in the handoffState, and resolves nothing listed in mustNotResolve. A hurried or conclusive ending against a contract is non-compliant — list each violated field in issues. Ending-contract violations do not change the continuity verdict; report them only in endingCompliance. Omit endingCompliance entirely when no contract is provided.\n\nWhen the task includes a "## FORBIDDEN KNOWLEDGE" list, additionally assess epistemic compliance and return knowledgeCompliance: compliant only when the draft neither states a forbidden fact, nor paraphrases it, nor lets a character act on information they could only have if they already knew it. Facts the context marks "## REVEALED THIS CHAPTER" are allowed once the draft shows their discovery on-page. Knowledge leaks do not change the continuity verdict; report them only in knowledgeCompliance, each issue citing the forbidden fact key. Omit knowledgeCompliance entirely when no forbidden list is provided.\n\nRespond with ONLY one valid JSON object — nothing outside the JSON, no markdown fences — of exactly this shape:\n{"verdict": "consistent" or "contradiction", "findings": [{"severity": "hard" or "soft", "text": "..."}], "endingCompliance": {"compliant": true/false, "issues": ["..."]} (only when a contract was provided), "knowledgeCompliance": {"compliant": true/false, "issues": ["..."]} (only when a forbidden list was provided)}';

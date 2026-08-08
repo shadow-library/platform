@@ -1,25 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { ChapterPublicationStatus, PublicationGrantState, PublicationStatus, PublicationVisibility } from '@server/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class PublishingProjectParams {
@@ -40,9 +22,12 @@ export class PublishingChapterParams {
 
 @Schema()
 export class PublishNovelBody {
-  // Set at first publish and immutable afterwards — the slug anchors reader URLs (design §3); later
-  // values are ignored. Omitted on first publish, it is derived from the title.
-  @Field(() => String, { optional: true, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 128 })
+  @Field(() => String, {
+    optional: true,
+    pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$',
+    maxLength: 128,
+    description: 'Immutable reader URL slug set on first publish; omission derives it from the title and later values are ignored.',
+  })
   novelSlug?: string;
 
   @Field(() => String, { optional: true, maxLength: 256 })
@@ -57,16 +42,18 @@ export class PublishNovelBody {
   @Field(() => [String], { optional: true })
   genres?: string[];
 
-  // POST /publish is the go-live action, so an omitted status always means 'live'
-  @Field(() => String, { enum: ['live', 'retired'], optional: true })
+  @Field(() => String, { enum: ['live', 'retired'], optional: true, description: "Publication status; omission defaults to 'live'." })
   status?: 'live' | 'retired';
 }
 
 @Schema()
 export class PublishChapterBody {
-  // Request bodies cannot use ajv's date-time format (only response serialisation registers it), so
-  // the ISO 8601 shape is enforced by pattern and parsed with `new Date` in the service.
-  @Field(() => String, { optional: true, pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$' })
+  // Request validation cannot use AJV's date-time format because only response serialisation registers it.
+  @Field(() => String, {
+    optional: true,
+    pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$',
+    description: 'ISO 8601 release time; omission publishes immediately.',
+  })
   scheduledAt?: string;
 }
 
@@ -171,8 +158,7 @@ export class WikiReconcileResult {
   @Field(() => [WikiReconcileFailureItem])
   failed: WikiReconcileFailureItem[];
 
-  // Reader wiki entries the ledger cannot account for — reported for the author, never deleted (design §6).
-  @Field(() => [String])
+  @Field(() => [String], { description: 'Reader wiki entries absent from the ledger; reported but never automatically deleted.' })
   unknownEntries: string[];
 }
 
@@ -196,8 +182,7 @@ export class ReconcileResponse {
   @Field(() => [ReconcileFailureItem])
   failed: ReconcileFailureItem[];
 
-  // Reader ordinals the ledger cannot account for — reported for the author, never deleted (design §6).
-  @Field(() => [Integer])
+  @Field(() => [Integer], { description: 'Reader chapter ordinals absent from the ledger; reported but never automatically deleted.' })
   unknownOrdinals: number[];
 
   @Field(() => WikiReconcileResult)
@@ -213,12 +198,8 @@ export class AccessGrantInput {
   email: string;
 }
 
-/**
- * A full replacement of the access record. `organisationId` is deliberately absent: it comes from
- * the session's active organisation, never from the client, so a caller cannot share a novel into
- * an organisation they are not acting in.
- */
-@Schema()
+// organisationId must come from the active session so callers cannot share into another organisation.
+@Schema({ description: 'Full replacement for a publication access policy and its restricted-tier grants.' })
 export class PublicationAccessBody {
   @Field(() => PublicationVisibility)
   visibility: string;
@@ -232,8 +213,11 @@ export class AccessGrantItem {
   @Field()
   email: string;
 
-  /** Absent while the address names no verified account; such a grant conveys no access and is never pushed. */
-  @Field(() => String, { optional: true, nullable: true })
+  @Field(() => String, {
+    optional: true,
+    nullable: true,
+    description: 'Verified account subject; absent addresses convey no access and are not pushed to the reader.',
+  })
   subjectId?: string | null;
 
   @Field(() => PublicationGrantState)
@@ -257,8 +241,7 @@ export class PublicationAccessResponse {
 
 @Schema()
 export class PublicationsLedgerResponse {
-  // Omitted (not null) while the project has never been published — the UI shows an empty panel.
-  @Field(() => PublicationResponse, { optional: true })
+  @Field(() => PublicationResponse, { optional: true, description: 'Publication details; omitted until the project is first published.' })
   publication?: PublicationResponse;
 
   @Field(() => [ChapterPublicationResponse])

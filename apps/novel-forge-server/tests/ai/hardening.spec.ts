@@ -1,29 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it, mock } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { applyBudget, countTokens, truncateAtParagraph } from '@modules/ai/context/token-budget';
 import { routeAfterJudge, routeAfterPatch, sameFinding } from '@modules/ai/graphs/chapter-generation.graph';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function makeDbStub() {
   const noRows = mock(async () => []);
@@ -53,8 +33,6 @@ function makeAssembler() {
   return new ContextAssembler(fakeDatabaseService, fakeCatalog);
 }
 
-// ─── token-budget / countTokens ─────────────────────────────────────────────
-
 describe('countTokens — edge cases', () => {
   it('returns 0 for an empty string', () => {
     expect(countTokens('')).toBe(0);
@@ -65,8 +43,6 @@ describe('countTokens — edge cases', () => {
     expect(typeof countTokens('   ')).toBe('number');
   });
 });
-
-// ─── token-budget / applyBudget ─────────────────────────────────────────────
 
 describe('applyBudget — edge cases', () => {
   it('force-includes the first section when it alone exceeds the budget (at-least-one guarantee)', () => {
@@ -93,8 +69,6 @@ describe('applyBudget — edge cases', () => {
   });
 });
 
-// ─── token-budget / truncateAtParagraph ─────────────────────────────────────
-
 describe('truncateAtParagraph — edge cases', () => {
   it('truncates at word boundary when text has no paragraph breaks', () => {
     // A single long line (no \n\n) that exceeds maxTokens.
@@ -119,8 +93,6 @@ describe('truncateAtParagraph — edge cases', () => {
     expect(result).toBe(text);
   });
 });
-
-// ─── sameFinding — judge normalization corners ───────────────────────────────
 
 describe('sameFinding', () => {
   it('detects duplicate finding regardless of casing', () => {
@@ -150,8 +122,6 @@ describe('sameFinding', () => {
     expect(sameFinding([], [])).toBe(false);
   });
 });
-
-// ─── routeAfterJudge — routing corners ──────────────────────────────────────
 
 describe('routeAfterJudge', () => {
   const base = { verdict: 'contradiction' as const, autoFix: true, attempt: 0, maxFixes: 3, findings: [{ severity: 'hard' as const, text: 'some issue' }], previousFindings: [] };
@@ -195,8 +165,6 @@ describe('routeAfterJudge', () => {
   });
 });
 
-// ─── routeAfterPatch ─────────────────────────────────────────────────────────
-
 describe('routeAfterPatch', () => {
   it('routes to "persistDraft" when patch was applied', () => {
     expect(routeAfterPatch({ patchApplied: true })).toBe('persistDraft');
@@ -206,8 +174,6 @@ describe('routeAfterPatch', () => {
     expect(routeAfterPatch({ patchApplied: false })).toBe('repairRewrite');
   });
 });
-
-// ─── ContextAssembler.resolveRefs — unknown ref type ────────────────────────
 
 describe('ContextAssembler.resolveRefs — unknown ref type', () => {
   it('returns the ref in unresolved when the prefix is unknown', async () => {

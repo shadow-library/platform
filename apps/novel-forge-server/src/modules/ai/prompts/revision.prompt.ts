@@ -1,26 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-/**
- * Importing user defined packages
- */
 import { type GenerationOutput, GenerationSchema } from '../schemas/generation.schema';
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const system = `${AUTHORING_STYLE}\n\nYou are revising a novel chapter based on editorial feedback. You receive the current draft, the original chapter brief, the established canon context, and specific feedback. Revise the chapter to address all blocking feedback. For suggestions, use your judgement — incorporate them if they strengthen the chapter without violating canon. Maintain the chapter's structure and objectives. Return the complete revised chapter.
 

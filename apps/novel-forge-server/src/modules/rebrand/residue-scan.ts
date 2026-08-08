@@ -1,19 +1,4 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { BANNED_REAL_WORLD_TERMS } from './banned-terms';
-
-/**
- * Defining types
- */
 
 /** The subset of a glossary row the pure scan functions need — callers pass DB rows or model output. */
 export interface GlossaryLike {
@@ -30,10 +15,6 @@ export interface ResidueIssue {
   detail: string;
   excerpt?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 // Terms shorter than this are too collision-prone to scan for ("Ye", "Li" are English-adjacent).
 const MIN_TERM_LENGTH = 3;

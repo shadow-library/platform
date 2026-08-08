@@ -1,26 +1,12 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, eq } from 'drizzle-orm';
 import { zipSync } from 'fflate';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 interface ManifestChapter {
   title: string;
@@ -78,10 +64,6 @@ export interface NovelPackage {
   chapterCount: number;
   imageCount: number;
 }
-
-/**
- * Declaring the constants
- */
 
 const SCHEMA_VERSION = 1 as const;
 const MIME_EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };

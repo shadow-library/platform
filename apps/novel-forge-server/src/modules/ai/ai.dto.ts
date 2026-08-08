@@ -1,23 +1,4 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class AiModelOption {
@@ -33,8 +14,7 @@ export class AiModelOption {
   @Field(() => String, { enum: ['llm', 'embedding', 'image'] })
   kind: string;
 
-  // Whether the server can currently route to this model; the picker renders the rest disabled.
-  @Field()
+  @Field({ description: 'Whether the server can currently route requests to this model.' })
   enabled: boolean;
 
   @Field(() => Integer, { optional: true })
@@ -67,8 +47,7 @@ export class AiRoleDefault {
 
 @Schema()
 export class AiModelsResponse {
-  // The active server profile ('production' | 'local-test'); roles left unset inherit its defaults.
-  @Field()
+  @Field({ description: "The active server profile. Roles without an override inherit this profile's defaults." })
   profile: string;
 
   @Field(() => [AiModelOption])

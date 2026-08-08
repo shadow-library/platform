@@ -1,19 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { and, asc, desc, eq, gt, inArray, lt, ne, sql, sum } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { renderBriefBody } from '@server/common';
 import { APP_NAME } from '@server/constants';
@@ -56,10 +46,6 @@ import {
   type UpdateContinuityBody,
   type UpdateDraftBody,
 } from './generation.dto';
-
-/**
- * Defining types
- */
 
 export interface RunContextSectionSummary {
   key: string;
@@ -114,10 +100,6 @@ export interface JobEnqueueResult {
   target: string;
 }
 
-/**
- * Declaring the constants
- */
-
 @Injectable()
 export class GenerationService {
   private readonly logger = Logger.getLogger(APP_NAME, GenerationService.name);
@@ -139,8 +121,6 @@ export class GenerationService {
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
-
-  // ─── Planning ────────────────────────────────────────────────────────────────
 
   async seedFromBrief(projectId: bigint, body: SeedFromBriefBody): Promise<WorkflowRunResult> {
     return this.workflowRunService.runBibleBuilder({ projectId, brief: body.brief, force: body.force });
@@ -222,8 +202,6 @@ export class GenerationService {
   approvePlan(projectId: bigint): Promise<{ volumesApproved: number; approved: boolean }> {
     return approveVolumePlan(this.db, projectId);
   }
-
-  // ─── Outlines / Briefs ───────────────────────────────────────────────────────
 
   async outline(projectId: bigint, body: OutlineBody): Promise<{ briefs: Generation.Brief[] }> {
     const [catalog, volumes] = await Promise.all([
@@ -398,12 +376,9 @@ export class GenerationService {
     return result;
   }
 
-  // ─── Generation + Drafts ─────────────────────────────────────────────────────
-
   async generate(projectId: bigint, body: GenerateBody): Promise<JobEnqueueResult> {
     const limit = body.limit ?? 1;
 
-    // Guard: volumes must be approved before generating.
     const approvedVolumes = await this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.status, ['approved', 'source'])) });
     if (approvedVolumes.length === 0) throw AppErrorCode.PLN_001.create();
 
@@ -418,7 +393,6 @@ export class GenerationService {
       return { jobId: activeJob.id, kind: 'generate', status: activeJob.status, target: activeJob.target ?? '' };
     }
 
-    // Guard: no unresolved contradiction drafts.
     const contradiction = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.reviewStatus, 'contradiction')) });
     if (contradiction) throw AppErrorCode.DRF_003.create();
 
@@ -430,7 +404,6 @@ export class GenerationService {
     const started = new Set(existingDrafts.map(d => d.chapter));
     const pending = allBriefs.map(b => b.chapter).filter(chapter => !started.has(chapter));
 
-    // Fall back to the first volume's opening chapter only when there is no outline to generate from.
     let chapters = pending.slice(0, limit);
     if (chapters.length === 0 && allBriefs.length === 0) chapters = [approvedVolumes[0]?.startChapter ?? 1];
 
@@ -467,7 +440,6 @@ export class GenerationService {
   }
 
   async updateDraft(projectId: bigint, chapter: number, body: UpdateDraftBody): Promise<Generation.Draft> {
-    // Upsert draft and log a hand_edited revision.
     const [draft] = await this.db
       .insert(schema.drafts)
       .values({
@@ -496,7 +468,6 @@ export class GenerationService {
       .returning();
     if (!draft) throw AppErrorCode.DRF_001.create();
 
-    // Upsert a draft_revisions row for this hand edit.
     await this.db
       .insert(schema.draftRevisions)
       .values({ projectId, draftId: draft.id, revision: draft.revision, source: 'hand_edited', body: draft.body, summary: draft.summary })
@@ -511,13 +482,11 @@ export class GenerationService {
     const draft = await this.getDraft(projectId, chapter);
     if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
 
-    // Create user_feedback row for this revision request.
     const [feedback] = await this.db
       .insert(schema.userFeedback)
       .values({ projectId, artifactType: 'draft', artifactRef: String(chapter), disposition: 'revision_requested', note: body.note })
       .returning();
 
-    // Get context pack for this chapter.
     const pack = await this.contextAssembler.forChapter(projectId, chapter);
     const brief = await this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
@@ -589,7 +558,6 @@ export class GenerationService {
       { maxRounds: 4 },
     );
 
-    // Parse the last AI message as JudgeOutput.
     const lastAi = [...resultMessages].reverse().find(m => m._getType() === 'ai');
     const rawContent = lastAi ? (typeof lastAi.content === 'string' ? lastAi.content : JSON.stringify(lastAi.content)) : '{}';
     const parsed = parseSchema<JudgeOutput>(JudgeSchema, this.tryParseJson(rawContent));
@@ -598,7 +566,6 @@ export class GenerationService {
     if (!parsed.success) this.logger.warn('judgeDraft: judge output failed to parse — defaulting to consistent', { projectId, chapter });
     this.logger.info('judgeDraft: verdict', { projectId, chapter, verdict: judgeOutput.verdict, findings: judgeOutput.findings.length });
 
-    // Update draft with judge result.
     await this.db
       .update(schema.drafts)
       .set({
@@ -739,15 +706,11 @@ export class GenerationService {
     return draft;
   }
 
-  // ─── Finalize ────────────────────────────────────────────────────────────────
-
   async finalize(projectId: bigint, body: FinalizeBody): Promise<WorkflowRunResult> {
-    // Find the target draft.
     let draft: Generation.Draft | null = null;
     if (body.chapter !== undefined) {
       draft = (await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, body.chapter)) })) ?? null;
     } else {
-      // Find the first approved draft in chapter order.
       draft =
         (await this.db.query.drafts.findFirst({
           where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.reviewStatus, 'approved')),
@@ -760,7 +723,6 @@ export class GenerationService {
     if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
     this.logger.info('finalize: finalizing chapter', { projectId, chapter: draft.chapter, draftId: draft.id, generator: draft.generator });
 
-    // Enforce order: all previous chapters must have a final draft.
     if (draft.chapter > 1) {
       const prevFinal = await this.db.query.drafts.findFirst({
         where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, draft.chapter - 1), eq(schema.drafts.status, 'final')),
@@ -775,7 +737,6 @@ export class GenerationService {
     });
     if (stale) throw AppErrorCode.FIN_002.create();
 
-    // Block if the most recent novel validation flagged an unresolved error for this very chapter.
     const latestReport = await this.db.query.validationReports.findFirst({
       where: and(eq(schema.validationReports.projectId, projectId), eq(schema.validationReports.scope, 'novel')),
       orderBy: desc(schema.validationReports.createdAt),
@@ -795,8 +756,6 @@ export class GenerationService {
     });
   }
 
-  // ─── Grok interlude ──────────────────────────────────────────────────────────
-
   async generateGrok(projectId: bigint, chapter: number, body: GenerateGrokBody): Promise<Generation.Draft> {
     const [brief, project] = await Promise.all([
       this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
@@ -806,7 +765,6 @@ export class GenerationService {
     const pack = await this.contextAssembler.forChapter(projectId, chapter);
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.generation.key, promptVersion: PROMPT_REGISTRY.generation.version, role: PROMPT_REGISTRY.generation.key };
 
-    // Force xAI routing via grok_only contentMode override.
     const result = (await this.modelRouter.structured(
       PROMPT_REGISTRY.generation,
       { contextPack: pack.rendered, chapterBrief: brief?.body ?? '', guidance: body.guidance ?? '' },
@@ -937,7 +895,6 @@ export class GenerationService {
     // Apply every canon mutation, mark the proposal applied, and flag the chapter in one transaction:
     // a partial application must never be recorded as `applied`.
     const updated = await this.db.transaction(async tx => {
-      // Insert new entities introduced in this chapter.
       if (delta.newEntities && delta.newEntities.length > 0) {
         await tx
           .insert(schema.entities)
@@ -955,7 +912,6 @@ export class GenerationService {
           .onConflictDoNothing();
       }
 
-      // Upsert entity appearances for appeared entities.
       if (delta.appeared && delta.appeared.length > 0) {
         const entityRows = await tx.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, delta.appeared)) });
         for (const entity of entityRows) {
@@ -963,7 +919,6 @@ export class GenerationService {
         }
       }
 
-      // Upsert plot threads.
       if (delta.threads && delta.threads.length > 0) {
         for (const t of delta.threads) {
           await tx
@@ -989,7 +944,6 @@ export class GenerationService {
         }
       }
 
-      // Upsert mysteries.
       if (delta.mysteries && delta.mysteries.length > 0) {
         for (const m of delta.mysteries) {
           await tx
@@ -1016,7 +970,6 @@ export class GenerationService {
         }
       }
 
-      // Mark proposal applied and chapter continuityApplied.
       const [row] = await tx
         .update(schema.continuityProposals)
         .set({ status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
@@ -1043,8 +996,6 @@ export class GenerationService {
       .returning();
     return updated ?? proposalRow;
   }
-
-  // ─── Validation / Review ─────────────────────────────────────────────────────
 
   async validate(projectId: bigint): Promise<WorkflowRunResult> {
     this.logger.info('validate: running full-novel validation', { projectId });
@@ -1073,8 +1024,6 @@ export class GenerationService {
     return review;
   }
 
-  // ─── Human review queue / runs ────────────────────────────────────────────────
-
   async getReviewQueue(projectId: bigint): Promise<ReviewQueueResult> {
     const [drafts, proposals] = await Promise.all([
       this.db.query.drafts.findMany({
@@ -1094,11 +1043,6 @@ export class GenerationService {
     return this.db.query.workflowRuns.findMany({ where: eq(schema.workflowRuns.projectId, projectId), orderBy: [desc(schema.workflowRuns.startedAt)], limit: 20 });
   }
 
-  /**
-   * The full audit picture of one run (chat-hub follow-up): every model call, every tool call, and
-   * the context pack's per-section token anatomy — the input tokens live in the assembled pack, not
-   * the user's one-line message, and this is where that becomes visible and optimisable.
-   */
   async getRun(projectId: bigint, runId: string): Promise<Ai.WorkflowRun & { modelCalls: Ai.ModelCall[]; toolCalls: Ai.ToolCall[]; contextPack?: RunContextPackSummary }> {
     const run = await this.db.query.workflowRuns.findFirst({ where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)) });
     if (!run) throw AppErrorCode.PRJ_001.create();
@@ -1114,7 +1058,6 @@ export class GenerationService {
     return { ...run, modelCalls, toolCalls, ...(contextPack ? { contextPack } : {}) };
   }
 
-  /** The pack's token anatomy without the rendered text — section keys, tiers, segments, and sizes. */
   private async loadPackSummary(contextPackId: bigint | null): Promise<RunContextPackSummary | null> {
     if (contextPackId === null) return null;
     const pack = await this.db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, contextPackId) });
@@ -1123,7 +1066,6 @@ export class GenerationService {
     return { id: String(pack.id), purpose: pack.purpose, budgetTokens: pack.budgetTokens, usedTokens: pack.usedTokens, sections };
   }
 
-  /** One model call in full — the raw model output and error detail are too heavy for the run table. */
   async getRunCall(projectId: bigint, runId: string, callId: bigint): Promise<Ai.ModelCall> {
     const call = await this.db.query.modelCalls.findFirst({
       where: and(eq(schema.modelCalls.projectId, projectId), eq(schema.modelCalls.runId, runId), eq(schema.modelCalls.id, callId)),
@@ -1132,7 +1074,6 @@ export class GenerationService {
     return call;
   }
 
-  /** The exact rendered context that fed the run's prompt, with the section anatomy alongside. */
   async getRunContext(projectId: bigint, runId: string): Promise<RunContextPackSummary & { rendered: string }> {
     const run = await this.db.query.workflowRuns.findFirst({ where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)) });
     if (!run) throw AppErrorCode.PRJ_001.create();
@@ -1172,13 +1113,10 @@ export class GenerationService {
       totalCostUsd += costUsd;
     }
 
-    // Busiest roles first so the chart reads left-to-right by workload.
     roles.sort((a, b) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens));
 
     return { totalInputTokens, totalOutputTokens, totalCostUsd, callsPerRole, roles };
   }
-
-  // ─── Search ──────────────────────────────────────────────────────────────────
 
   async search(projectId: bigint, query: { q: string; index?: string; k?: number }): Promise<SearchResult> {
     const k = query.k ?? 5;
@@ -1193,8 +1131,6 @@ export class GenerationService {
     return { hits: hits.map(h => ({ text: h.text, score: h.score, metadata: h.metadata as Record<string, unknown> })) };
   }
 
-  // ─── Manuscript ──────────────────────────────────────────────────────────────
-
   async getManuscript(projectId: bigint): Promise<{ markdown: string }> {
     const finalDrafts = await this.db.query.drafts.findMany({
       where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.status, 'final')),
@@ -1204,8 +1140,6 @@ export class GenerationService {
     const markdown = finalDrafts.map(d => `# ${d.title ?? `Chapter ${d.chapter}`}\n\n${d.body}`).join('\n\n---\n\n');
     return { markdown };
   }
-
-  // ─── Backfill ────────────────────────────────────────────────────────────────
 
   async listJobs(projectId: bigint): Promise<Job.Row[]> {
     const jobs = await this.jobService.listByProject(projectId);
@@ -1218,8 +1152,6 @@ export class GenerationService {
     this.jobExecutor.dispatch(jobId).catch(err => this.logger.error('backfill job dispatch failed', { err, jobId }));
     return { jobId, kind: 'backfill', status: 'pending', target: 'all' };
   }
-
-  // ─── Helpers ─────────────────────────────────────────────────────────────────
 
   private tryParseJson(raw: string): unknown {
     try {

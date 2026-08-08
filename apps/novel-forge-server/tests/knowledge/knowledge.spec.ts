@@ -1,27 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { beforeAll, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { KnowledgeRepository } from '@modules/extraction';
 import { type PrimaryDatabase, schema } from '@server/database';
 import { TestEnvironment } from '@tests/test-environment';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const pgAvailable = await (async () => {
   try {
@@ -84,7 +66,7 @@ describe.if(pgAvailable)('KnowledgeRepository', () => {
     const entity = await repo.upsertEntity(projectId, { entityKey: 'npc', type: 'character', name: 'NPC' });
 
     await repo.addAppearance({ entityId: entity.id, projectId, chapter: 1 });
-    await repo.addAppearance({ entityId: entity.id, projectId, chapter: 1 }); // duplicate — should not throw
+    await repo.addAppearance({ entityId: entity.id, projectId, chapter: 1 });
 
     const rows = await db.query.entityAppearances.findMany({ where: (t, { and, eq }) => and(eq(t.entityId, entity.id), eq(t.chapter, 1)) });
     expect(rows.length).toBe(1);
@@ -96,9 +78,7 @@ describe.if(pgAvailable)('KnowledgeRepository', () => {
     await repo.upsertPlotThread(projectId, { threadKey: 'arc-1', status: 'open', openedChapter: 3, closedChapter: undefined });
     const updated = await repo.upsertPlotThread(projectId, { threadKey: 'arc-1', status: 'closed', openedChapter: 10, closedChapter: 20 });
 
-    // openedChapter keeps the first value (3), not overwritten by 10
     expect(updated.openedChapter).toBe(3);
-    // closedChapter takes EXCLUDED value when provided
     expect(updated.closedChapter).toBe(20);
   });
 

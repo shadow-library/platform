@@ -1,22 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, index, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { jsonb } from './jsonb';
 import { projects } from './projects';
-
-/**
- * Defining types
- */
 
 export namespace Knowledge {
   export type Entity = InferSelectModel<typeof entities>;
@@ -33,10 +19,6 @@ export namespace Knowledge {
   export type EntityWikiVisibility = InferEnum<typeof entityWikiVisibility>;
   export type FactSource = InferEnum<typeof factSource>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const entityType = pgEnum('entity_type', ['character', 'faction', 'location', 'power_rule', 'item', 'concept']);
 export const factSource = pgEnum('fact_source', ['brief', 'manual', 'import']);

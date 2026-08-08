@@ -1,19 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { and, between, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
@@ -24,19 +14,11 @@ import { CatalogService } from './catalog.service';
 import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextSegment, type ContextTier, joinSections, renderSection } from './sections';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
 
-/**
- * Defining types
- */
-
 export interface ChatScopeInput {
   scopeType: schema.Refinement.ChatScope;
   scopeRef: string | null;
   createdAt: Date;
 }
-
-/**
- * Declaring the constants
- */
 
 export const DEFAULT_BUDGET = 24_000;
 export const PREV_ENDING_TAIL = 500;
@@ -102,7 +84,6 @@ export class ContextAssembler {
   }
 
   async resolveRefs(projectId: bigint, refs: string[]): Promise<{ resolved: ContextSection[]; unresolved: string[] }> {
-    // Group refs by type for batched queries.
     const entityKeys: string[] = [];
     const worldFactCategories: string[] = [];
     const threadKeys: string[] = [];
@@ -143,7 +124,6 @@ export class ContextAssembler {
       }
     }
 
-    // Batch fetch all types in parallel.
     const [entitiesRows, worldFactRows, threadRows, mysteryRows, chapterRows, volumeRows] = await Promise.all([
       entityKeys.length > 0
         ? this.db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, entityKeys)), with: { aliases: true } })
@@ -159,7 +139,6 @@ export class ContextAssembler {
       volumeKeys.length > 0 ? this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, volumeKeys)) }) : [],
     ]);
 
-    // Build lookup maps.
     const entityMap = new Map(entitiesRows.map(e => [e.entityKey, e]));
     const worldFactMap = new Map<string, (typeof worldFactRows)[number][]>();
     for (const f of worldFactRows) {
@@ -175,7 +154,6 @@ export class ContextAssembler {
     const resolved: ContextSection[] = [];
     const unresolved: string[] = [];
 
-    // Process refs in input order to preserve priority.
     for (const ref of refs) {
       const colon = ref.indexOf(':');
       if (colon === -1) {
@@ -292,7 +270,6 @@ export class ContextAssembler {
 
     const sections: ContextSection[] = [];
 
-    // a. prev_ending
     if (prevChapter) {
       const isGrok = prevChapter.generator === 'grok';
       const isFinal = prevChapter.status === 'done';
@@ -307,26 +284,22 @@ export class ContextAssembler {
       }
     }
 
-    // b. continuation_state
     const prevState = prevDraft?.state;
     if (prevState != null) {
       const content = typeof prevState === 'string' ? prevState : JSON.stringify(prevState);
       sections.push(makeSection('continuation_state', content, 'working', [`chapter:${chapter - 1}`]));
     }
 
-    // c. brief
     if (brief) {
       sections.push(makeSection('brief', brief.body, 'approved_intent', [`chapter:${chapter}`]));
     }
 
-    // d. volume_objective
     if (currentVolume) {
       const content = [currentVolume.objective, currentVolume.conflict].filter(Boolean).join('\n');
       sections.push(makeSection('volume_objective', content, 'approved_intent', [`volume:${currentVolume.volumeKey}`]));
     }
 
-    // d2. knowledge sections — the epistemic filter (character-knowledge design §5). Only the POV
-    // cast's ledgered facts enter the drafting pack; still-hidden facts surface as behavioral
+    // Only the POV cast's ledgered facts enter the drafting pack; still-hidden facts surface as behavioral
     // constraints, never as text. Absent a contract the feature is off and nothing changes.
     const knowledgeContract = parseKnowledgeContract(brief?.knowledgeContract);
     if (knowledgeContract) {
@@ -362,7 +335,6 @@ export class ContextAssembler {
       }
     }
 
-    // e. Resolve contextRefs from brief
     const contextRefs = Array.isArray(brief?.contextRefs) ? (brief.contextRefs as string[]) : [];
     let unresolvedRefs: string[] = [];
     let refSections: ContextSection[] = [];
@@ -373,16 +345,14 @@ export class ContextAssembler {
       refSections = resolved;
     }
 
-    // Apply FULL_CAST_MAX: entity sections beyond FULL_CAST_MAX move to lowest priority.
+    // Only the first FULL_CAST_MAX entity refs retain caller-requested priority; the rest move below memory and style.
     const entityRefSections = refSections.filter(s => s.key.startsWith('ref:entity:'));
     const nonEntityRefSections = refSections.filter(s => !s.key.startsWith('ref:entity:'));
     const priorityEntitySections = entityRefSections.slice(0, FULL_CAST_MAX);
     const excessEntitySections = entityRefSections.slice(FULL_CAST_MAX);
 
-    // Insert priority ref sections here, excess goes after memory/writing_style.
     for (const s of [...priorityEntitySections, ...nonEntityRefSections]) sections.push(s);
 
-    // f. memory
     if (recentChapters.length > 0) {
       const lines = recentChapters
         .slice()
@@ -391,11 +361,9 @@ export class ContextAssembler {
       sections.push(makeSection('memory', lines.join('\n'), 'canonical', []));
     }
 
-    // g. writing_style — always present: the chapter generator has no other source for how to write the
-    // prose (voice, craft, length). It comes from the project's editable `instructions`, or the default.
+    // Writing style is always present because this is the generator's only source for voice, craft, and length.
     sections.push(makeSection('writing_style', project?.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS, 'canonical', []));
 
-    // Excess entity sections go at lowest priority.
     for (const s of excessEntitySections) sections.push(s);
 
     return this.finalize(projectId, 'generation', chapter, sections, unresolvedRefs, budgetTokens, opts?.dryRun);
@@ -426,13 +394,11 @@ export class ContextAssembler {
 
     const sections: ContextSection[] = [];
 
-    // 1. volume_objective
     if (currentVolume) {
       const parts = [currentVolume.objective, currentVolume.conflict, currentVolume.payoff].filter(Boolean);
       sections.push(makeSection('volume_objective', parts.join('\n'), 'approved_intent', [`volume:${currentVolume.volumeKey}`]));
     }
 
-    // 2. memory — volume epitomes + recent chapter summaries
     const memoryParts: string[] = [];
     for (const v of prevVolumes) {
       if (v.epitome) memoryParts.push(`Vol ${v.ordinal} (${v.title ?? v.volumeKey}): ${v.epitome}`);
@@ -446,13 +412,11 @@ export class ContextAssembler {
       sections.push(makeSection('memory', memoryParts.join('\n'), 'canonical', []));
     }
 
-    // 3. catalog (lowest priority)
     const catalogText = await this.catalogService.render(projectId);
     if (catalogText) {
       sections.push(makeSection('catalog', catalogText, 'canonical', []));
     }
 
-    // 4. Retrieval hits — best-effort; empty degrades gracefully.
     if (this.retrievalService) {
       const query = currentVolume?.objective?.split('\n')[0] ?? '';
       if (query) {
@@ -506,7 +470,6 @@ export class ContextAssembler {
     void feedbackId; // Used for audit context, not for filtering here.
     const sections: ContextSection[] = [];
 
-    // 1. prev_ending
     if (prevChapter) {
       const isGrok = prevChapter.generator === 'grok';
       const isFinal = prevChapter.status === 'done';
@@ -519,21 +482,18 @@ export class ContextAssembler {
       }
     }
 
-    // 2. continuation_state
     const prevState = prevDraft?.state;
     if (prevState != null) {
       const content = typeof prevState === 'string' ? prevState : JSON.stringify(prevState);
       sections.push(makeSection('continuation_state', content, 'working', [`chapter:${chapter - 1}`]));
     }
 
-    // 3. brief + volume_objective
     if (brief) sections.push(makeSection('brief', brief.body, 'approved_intent', [`chapter:${chapter}`]));
     if (currentVolume) {
       const content = [currentVolume.objective, currentVolume.conflict].filter(Boolean).join('\n');
       sections.push(makeSection('volume_objective', content, 'approved_intent', [`volume:${currentVolume.volumeKey}`]));
     }
 
-    // 4. Re-resolve contextRefs fresh
     const contextRefs = Array.isArray(brief?.contextRefs) ? (brief.contextRefs as string[]) : [];
     let unresolvedRefs: string[] = [];
     if (contextRefs.length > 0) {
@@ -542,18 +502,15 @@ export class ContextAssembler {
       for (const s of resolved) sections.push(s);
     }
 
-    // 5. Current draft prose
     if (currentDraft?.body) {
       sections.push(makeSection('current_draft', currentDraft.body, 'working', [`chapter:${chapter}`]));
     }
 
-    // 6. Feedback
     if (feedbackRows.length > 0) {
       const notes = feedbackRows.map((f, i) => `${i + 1}. ${f.note ?? f.disposition}`).join('\n');
       sections.push(makeSection('feedback', notes, 'working', []));
     }
 
-    // memory + writing_style (lower priority, helps with coherence)
     if (recentChapters.length > 0) {
       const lines = recentChapters
         .slice()
@@ -590,25 +547,21 @@ export class ContextAssembler {
 
     const sections: ContextSection[] = [];
 
-    // 1. Chapter summaries for the window
     if (chapterRows.length > 0) {
       const lines = chapterRows.map((c, i) => `${i + 1}. Ch ${c.number}: ${c.summary ?? ''}`);
       sections.push(makeSection('chapter_window', lines.join('\n'), 'canonical', []));
     }
 
-    // 2. Plot threads touching the window
     if (threadRows.length > 0) {
       const lines = threadRows.map(t => `**${t.threadKey}** (${t.status}${t.intentionallyOpen ? ', intentionally open — do not flag as unresolved' : ''}): ${t.summary ?? ''}`);
       sections.push(makeSection('plot_threads', lines.join('\n'), 'canonical', []));
     }
 
-    // 3. Mysteries touching the window
     if (mysteryRows.length > 0) {
       const lines = mysteryRows.map(m => `**${m.mysteryKey}** (${m.status}${m.intentionallyOpen ? ', intentionally open — do not flag as unresolved' : ''}): ${m.question}`);
       sections.push(makeSection('mysteries', lines.join('\n'), 'canonical', []));
     }
 
-    // 4. World facts (all categories)
     if (worldFactRows.length > 0) {
       const byCategory = new Map<string, string[]>();
       for (const f of worldFactRows) {

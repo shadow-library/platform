@@ -1,32 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { asc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type PrimaryDatabase, schema } from '@server/database';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-/**
- * Renders the extracted knowledge for a project as a Markdown string.
- *
- * Used for display and export — no LLM call, purely a DB read + template render.
- */
 @Injectable()
 export class AssetService {
   private readonly db: PrimaryDatabase;

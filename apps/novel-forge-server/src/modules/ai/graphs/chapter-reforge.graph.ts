@@ -1,17 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { and, desc, eq, lt, ne, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Reforge } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -24,10 +14,6 @@ import { type ReforgeJudgeOutput, type ReforgeOutlineOutput, type ReforgeWriteOu
 import { type TelemetryContext } from '../telemetry.handler';
 
 // Direct file import of DI-free pure functions — never the rebrand barrel, whose service imports the AI module.
-
-/**
- * Defining types
- */
 
 export interface ReforgeGraphServices {
   db: PrimaryDatabase;
@@ -73,10 +59,6 @@ const ChapterReforgeAnnotation = Annotation.Root({
 
 type ReforgeState = typeof ChapterReforgeAnnotation.State;
 
-/**
- * Declaring the constants
- */
-
 const logger = Logger.getLogger(APP_NAME, 'chapter-reforge.graph');
 
 /**
@@ -119,7 +101,6 @@ export function createChapterReforgeGraph(services: ReforgeGraphServices): Retur
 function buildChapterReforgeGraph(services: ReforgeGraphServices) {
   const { db, contextAssembler, modelRouter, checkpointer } = services;
 
-  // ─── loadChapter ──────────────────────────────────────────────────────────────
   async function loadChapter(state: ReforgeState) {
     const projectId = BigInt(state.projectId);
     const [chapter, reforge, rebrand, glossaryRows, previous] = await Promise.all([
@@ -160,7 +141,6 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     };
   }
 
-  // ─── outlineContext ────────────────────────────────────────────────────────────
   async function outlineContext(state: ReforgeState) {
     const projectId = BigInt(state.projectId);
     const glossarySlice = renderGlossarySlice(selectGlossarySlice(state.chapterProse, state.glossary));
@@ -171,7 +151,6 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     return { outlinePack: pack.rendered, glossarySlice };
   }
 
-  // ─── outline ────────────────────────────────────────────────────────────────────
   async function outline(state: ReforgeState) {
     const projectId = BigInt(state.projectId);
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
@@ -189,7 +168,6 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     return { outline: result, renderedOutline: renderOutline(result) };
   }
 
-  // ─── writeContext ────────────────────────────────────────────────────────────────
   async function writeContext(state: ReforgeState) {
     const projectId = BigInt(state.projectId);
     const pack = await contextAssembler.forReforge(projectId, state.chapter, {
@@ -206,7 +184,6 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     return { writePack: pack.rendered };
   }
 
-  // ─── write (also the repair pass) ────────────────────────────────────────────────
   async function write(state: ReforgeState) {
     const projectId = BigInt(state.projectId);
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
@@ -238,7 +215,6 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     return { written: result };
   }
 
-  // ─── residueScan (deterministic, free — runs on every attempt) ───────────────────
   function residueScan(state: ReforgeState) {
     if (!state.written) return { residueIssues: [] };
     const combined = [...state.glossary, ...(state.written.discoveredNames ?? [])];
@@ -248,7 +224,6 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     return { residueIssues };
   }
 
-  // ─── judge (fidelity — beat coverage, naming, de-nationalization; NOT prose taste) ─
   async function judge(state: ReforgeState) {
     if (!state.written || state.settings.judgeEnabled === false) return { judgeIssues: [], fidelity: null };
 
@@ -277,14 +252,12 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     return { judgeIssues, fidelity: result };
   }
 
-  // ─── prepareRepair ────────────────────────────────────────────────────────────────
   function prepareRepair(state: ReforgeState) {
     const issues: ReforgeIssue[] = [...state.residueIssues, ...state.judgeIssues];
     logger.debug('reforge repair pass', { chapter: state.chapter, issues: issues.length });
     return { attempt: state.attempt + 1, repairNotes: renderIssues(issues) };
   }
 
-  // ─── persistReforge ────────────────────────────────────────────────────────────────
   async function persistReforge(state: ReforgeState) {
     if (!state.written) throw AppError.internal('[persistReforge] No written output to persist');
     const projectId = BigInt(state.projectId);
@@ -334,7 +307,6 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     return { outcome: status };
   }
 
-  // ─── mergeGlossary ───────────────────────────────────────────────────────────────
   // Runs even for attention rows — later chapters need the discovered names either way. Conflicts
   // keep the existing mapping: a name is never re-mapped once made (design §2).
   async function mergeGlossary(state: ReforgeState) {

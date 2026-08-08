@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { and, asc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
-/**
- * Importing user defined packages
- */
 import { ConcurrencyController } from '@modules/jobs/concurrency.controller';
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { JobService } from '@modules/jobs/job.service';
@@ -21,20 +11,12 @@ import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
-/**
- * Defining types
- */
-
 interface Harness {
   executor: JobExecutor;
   jobService: JobService;
   recombineCalls: bigint[];
   coverSaves: { contentType: string; bytes: number }[];
 }
-
-/**
- * Declaring the constants
- */
 
 const COVER_REF = `${'a'.repeat(64)}.jpg`;
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -190,9 +172,9 @@ describe.if(pgAvailable)('JobExecutor.runImport', () => {
     expect(job?.lastError).toBeTruthy();
 
     // Batch 1 (chapters 1-25) landed; batch 2 never committed any of its rows (single INSERT, all-or-nothing).
-    expect(await db.$count(schema.chapters, eq(schema.chapters.projectId, projectId))).toBe(26); // 25 imported + the pre-seeded row
+    expect(await db.$count(schema.chapters, eq(schema.chapters.projectId, projectId))).toBe(26);
     const preseeded = await db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, 27)) });
-    expect(preseeded?.title).toBe('Already here'); // untouched by the failed batch
+    expect(preseeded?.title).toBe('Already here');
 
     // The project row is left in place for the caller to inspect/retry/delete — nothing auto-rolls-back.
     const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });

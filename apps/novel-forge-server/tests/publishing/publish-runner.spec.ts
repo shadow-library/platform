@@ -1,23 +1,15 @@
 /**
- * Importing packages with side effects
- *
  * The test IdP must be evaluated first: it stands up the mock issuer the push client's AuthClient
  * mints its `web-novel:publish` tokens against.
  */
 import { APP_ID, AUTH_AUDIENCE, CLIENT_SECRET, testIdP } from '@tests/test-idp';
 
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AuthClient } from '@shadow-library/auth';
 
-/**
- * Importing user defined packages
- */
 import { ConcurrencyController } from '@modules/jobs/concurrency.controller';
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { JobService } from '@modules/jobs/job.service';
@@ -32,14 +24,6 @@ import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 import { MockReaderService } from './mock-reader';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 const dbName = `${baseConnectionString.split('/').pop()}_publish_runner`;

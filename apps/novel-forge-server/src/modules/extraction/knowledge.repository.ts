@@ -1,24 +1,10 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type Job, type Knowledge, type PrimaryDatabase, schema, type Story } from '@server/database';
-
-/**
- * Defining types
- */
 
 export type UpsertEntityInput = Pick<Knowledge.Entity, 'entityKey' | 'type' | 'name'> &
   Partial<Pick<Knowledge.Entity, 'attributes' | 'significance' | 'firstSeenChapter' | 'status' | 'origin' | 'notes' | 'motivation' | 'body' | 'imagePath'>>;
@@ -66,10 +52,6 @@ export interface CorpusStats {
   draftsFinal: number;
   volumesTotal: number;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class KnowledgeRepository {

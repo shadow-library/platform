@@ -1,22 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, index, integer, pgEnum, pgTable, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { jsonb } from './jsonb';
 import { projects } from './projects';
-
-/**
- * Defining types
- */
 
 export namespace Rebrand {
   export type Row = InferSelectModel<typeof rebrands>;
@@ -34,10 +20,6 @@ export namespace Rebrand {
     auditEnabled?: boolean;
   }
 }
-
-/**
- * Declaring the constants
- */
 
 // Advisory display state only — resume logic derives the real phase from worldNotes and the
 // chapter_conversions rows, so a stale status can never corrupt a run.

@@ -1,10 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import { type Serialized } from '@langchain/core/load/serializable';
 import { type LLMResult } from '@langchain/core/outputs';
@@ -12,17 +5,10 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { countTokens } from './context/token-budget';
-
-/**
- * Defining types
- */
 
 export interface TelemetryContext {
   projectId: bigint;
@@ -41,10 +27,6 @@ interface PendingCall {
   attempt: number;
   promptTokensEstimate: number;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class TelemetryHandler extends BaseCallbackHandler {

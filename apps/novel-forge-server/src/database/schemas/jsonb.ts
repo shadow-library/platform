@@ -1,19 +1,4 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { customType } from 'drizzle-orm/pg-core';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * Drop-in replacement for drizzle's `jsonb` for the bun-sql driver. Drizzle's built-in helper

@@ -1,27 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, OmitType, PartialType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-/**
- * Importing user defined packages
- */
 import { EntityOrigin, EntitySignificance, EntityType, SortByTime } from '@server/common';
 import { entitySignificance, type Knowledge } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class EntityProjectParams {
@@ -92,8 +74,7 @@ export class EntityImageResponse {
   @Field(() => String)
   id: bigint;
 
-  // Absolute public object-storage URL, resolved server-side from the runtime `storage.public-origin`.
-  @Field()
+  @Field({ description: 'Absolute public URL for the stored image.' })
   imageUrl: string;
 
   @Field({ optional: true, nullable: true })
@@ -141,13 +122,10 @@ export class EntityResponse {
   @Field({ optional: true, nullable: true })
   body?: string | null;
 
-  // Absolute public object-storage URL for the portrait, resolved server-side from the runtime
-  // `storage.public-origin`; absent when the entity has no portrait.
-  @Field({ optional: true, nullable: true })
+  @Field({ optional: true, nullable: true, description: 'Absolute public URL for the portrait, or null when the entity has no portrait.' })
   imageUrl?: string | null;
 
-  // The entity's gallery of additional reference images, populated on the single-entity `get` route.
-  @Field(() => [EntityImageResponse], { optional: true })
+  @Field(() => [EntityImageResponse], { optional: true, description: "The entity's additional reference images. Included by the single-entity endpoint." })
   images?: EntityImageResponse[];
 
   @Field(() => String, { format: 'date-time' })
@@ -162,8 +140,7 @@ export class UploadImageBody {
   @Field(() => String, { enum: ['image/png', 'image/jpeg', 'image/webp'] })
   mime: 'image/png' | 'image/jpeg' | 'image/webp';
 
-  // Base64-encoded image bytes, without the `data:` URL prefix.
-  @Field()
+  @Field({ description: 'Base64-encoded image bytes without a data URL prefix.' })
   image: string;
 }
 

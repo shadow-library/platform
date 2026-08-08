@@ -1,32 +1,14 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import { chunkText } from './chunker';
 import { EmbeddingService } from './embedding.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class IndexingService {
@@ -67,7 +49,6 @@ export class IndexingService {
     );
   }
 
-  // Delete all chapter_chunks for (projectId, chapter).
   async deleteProse(projectId: bigint, chapter: number): Promise<void> {
     await this.db.delete(schema.chapterChunks).where(and(eq(schema.chapterChunks.projectId, projectId), eq(schema.chapterChunks.chapter, chapter)));
   }
@@ -88,7 +69,6 @@ export class IndexingService {
 
   // Backfill: find all chapters for projectId with status='done' and generator!='grok'
   // that have zero chapter_chunks rows, then addProse for each.
-  // Returns { indexed, skipped } (skipped = content null/empty).
   async backfill(projectId: bigint): Promise<{ indexed: number; skipped: number }> {
     const doneChapters = await this.db.query.chapters.findMany({
       where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')),
@@ -97,7 +77,6 @@ export class IndexingService {
     const standardChapters = doneChapters.filter(c => c.generator !== 'grok');
     this.logger.info('backfill: reindexing prose', { projectId, doneChapters: doneChapters.length, standardChapters: standardChapters.length });
 
-    // Find chapters that already have chunks.
     const indexedCounts = await this.db.execute<{ chapter: number; cnt: number }>(sql`
       SELECT chapter, COUNT(*)::int AS cnt
       FROM chapter_chunks

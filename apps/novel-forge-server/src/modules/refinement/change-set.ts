@@ -1,19 +1,4 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type Bible } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface EndingContract {
   hookType: 'cliffhanger' | 'revelation' | 'quiet_dread' | 'promise' | 'turn';
@@ -239,10 +224,6 @@ interface OpSpec {
   required: Record<string, FieldKind>;
   optional: Record<string, FieldKind>;
 }
-
-/**
- * Declaring the constants
- */
 
 const HOOK_TYPES = ['cliffhanger', 'revelation', 'quiet_dread', 'promise', 'turn'];
 const BIBLE_SECTIONS = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];

@@ -1,19 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { Logger, throwError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Publishing, schema } from '@server/database';
@@ -21,12 +11,6 @@ import { type PublicationAccessBody, type PublicationAccessResponse } from './pu
 import { PublishingService } from './publishing.service';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * The forge owns who may read a published novel; the reader holds a projection of that decision and
  * never writes it. Everything here is therefore about producing a record that converges: the reader
  * can be wiped and re-pushed from these rows alone.

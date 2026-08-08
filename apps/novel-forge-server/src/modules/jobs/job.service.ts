@@ -1,24 +1,10 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type Job, type PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface JobProgress {
   done: number;
@@ -26,10 +12,6 @@ export interface JobProgress {
   current: string;
   phase: string;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class JobService {
@@ -60,20 +42,17 @@ export class JobService {
       return inserted.id;
     }
 
-    // Conflict on the (projectId, kind, target) unique index — inspect the existing job.
     const existing = await this.db.query.jobs.findFirst({
       where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, kind), eq(schema.jobs.target, target)),
       columns: { id: true, status: true },
     });
     if (!existing) throw AppError.internal(`enqueue: job not found after conflict on (${projectId}, ${kind}, ${target})`);
 
-    // Active job: real dedup — return it as-is without disturbing an in-flight run.
     if (existing.status === 'pending' || existing.status === 'in_progress') {
       this.logger.debug('enqueue: deduped onto active job', { jobId: existing.id, kind, target, status: existing.status });
       return existing.id;
     }
 
-    // Terminal job (done/failed): reset it so the re-request runs again from a clean slate.
     this.logger.info('Job re-enqueued (terminal job reset to pending)', { jobId: existing.id, kind, target, previousStatus: existing.status });
     await this.db
       .update(schema.jobs)
@@ -82,7 +61,6 @@ export class JobService {
     return existing.id;
   }
 
-  // Pending jobs awaiting dispatch — used by the executor to drain the queue on boot after crash recovery.
   async findPending(): Promise<Job.Row[]> {
     return this.db.query.jobs.findMany({ where: eq(schema.jobs.status, 'pending'), orderBy: desc(schema.jobs.createdAt) });
   }
@@ -140,8 +118,6 @@ export class JobService {
     return this.db.query.jobs.findMany({ where: eq(schema.jobs.projectId, projectId), orderBy: desc(schema.jobs.createdAt) });
   }
 
-  // On boot: reset all in-progress jobs back to pending so they can be re-dispatched.
-  // In-progress rows indicate the server crashed mid-run; the job must be retried.
   async recoverStuck(): Promise<void> {
     const stuck = await this.db.query.jobs.findMany({
       where: eq(schema.jobs.status, 'in_progress'),

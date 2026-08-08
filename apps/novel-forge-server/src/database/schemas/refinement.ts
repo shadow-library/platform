@@ -1,22 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { jsonb } from './jsonb';
 import { projects } from './projects';
-
-/**
- * Defining types
- */
 
 export namespace Refinement {
   export type ChatSession = InferSelectModel<typeof chatSessions>;
@@ -29,10 +15,6 @@ export namespace Refinement {
   export type Kind = InferEnum<typeof refinementKind>;
   export type ProposalStatus = InferEnum<typeof refinementProposalStatus>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const chatScope = pgEnum('chat_scope', ['project', 'novel', 'bible_document', 'volume_plan', 'volume', 'arc_plan', 'arc', 'brief']);
 export const chatSessionStatus = pgEnum('chat_session_status', ['active', 'archived']);

@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it, mock } from 'bun:test';
 
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 
-/**
- * Importing user defined packages
- */
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { applyAnthropicCacheControl } from '@modules/ai/prompt-caching';
 import { chatRefinePrompt } from '@modules/ai/prompts/chat-refine.prompt';
-
-/**
- * Declaring the constants
- */
 
 const bigText = 'the sect trials continue with rising stakes and sharper blades. '.repeat(150);
 const smallText = 'short volatile tail';

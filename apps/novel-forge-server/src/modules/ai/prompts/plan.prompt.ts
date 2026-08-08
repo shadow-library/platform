@@ -1,27 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-/**
- * Importing user defined packages
- */
 import { type PlanOutput, PlanSchema, validatePlanContiguity } from '../schemas/plan.schema';
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const system =
   `${AUTHORING_STYLE}\n\nYou are a serialized novel planner. Given the novel skeleton (character arcs and power curve), the target volume count, and chapters_per_volume, produce a volume plan. Each volume is a self-contained arc with a clear objective, central conflict, and payoff. Volumes must together fulfill all major character arcs and the power curve trajectory. Chapter spans must be contiguous. Volumes should escalate in stakes. When the skeleton is missing or thin, derive the arcs from the brief — never return fewer volumes than requested.\n\n` +

@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
@@ -26,10 +16,6 @@ import { type ChangeOp } from './change-set';
 import { ProposalService } from './proposal.service';
 import { type ContextPreviewResponse } from './refine.dto';
 import { renderManifest } from './required-bible-docs';
-
-/**
- * Defining types
- */
 
 export interface PremiseEnhanceResult {
   proposal: Refinement.Proposal;
@@ -56,10 +42,6 @@ export interface ContextPreviewInput {
   scopeRef?: string;
   volumeKey?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class RefineService {

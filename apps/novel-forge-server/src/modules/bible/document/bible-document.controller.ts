@@ -1,28 +1,10 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Put, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 
 import { BibleDocParams, BibleDocProjectParams, BibleDocResponse, ListBibleDocResponse, UpsertBibleDocBody } from './bible-document.dto';
 import { BibleDocumentService } from './bible-document.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/bible')

@@ -1,22 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, index, integer, pgEnum, pgTable, smallint, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { jsonb } from './jsonb';
 import { projects } from './projects';
-
-/**
- * Defining types
- */
 
 export namespace Job {
   export type Row = InferSelectModel<typeof jobs>;
@@ -26,10 +12,6 @@ export namespace Job {
   export type Status = InferEnum<typeof jobStatus>;
   export type ValidationScope = InferEnum<typeof validationScope>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const jobKind = pgEnum('job_kind', ['extract', 'generate', 'finalize', 'backfill', 'rebrand', 'reforge', 'publish', 'import']);
 export const jobStatus = pgEnum('job_status', ['pending', 'in_progress', 'done', 'failed']);

@@ -1,27 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { JudgeVerdict } from '@server/common';
 import { type Generation } from '@server/database';
 
 import { JudgeSeverity } from './enums';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class JudgeFinding {

@@ -1,30 +1,14 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { eq } from 'drizzle-orm';
 import { type HandlerMetadata } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { ContextService, type HttpRequest, Middleware, type RouteHandler } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * Object-level authorization for every project-scoped route (audit finding NF-BOLA-01). The class-level
  * `@Authenticated()` on each controller proves *who* the caller is; this guard proves the caller *owns*
  * the project the route addresses. It runs just after the package `AuthGuard` (lower weight, same hook,
@@ -64,7 +48,6 @@ export class ProjectOwnershipGuard {
     return handler as unknown as RouteHandler;
   }
 
-  /** The path segment that names a project — nested routes use `:projectId`; the top-level controller may use `:id`. */
   private resolveParam(path: string | undefined): string | undefined {
     if (typeof path !== 'string') return undefined;
     const segments = path.split('/');

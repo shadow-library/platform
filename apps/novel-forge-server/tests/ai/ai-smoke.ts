@@ -1,23 +1,4 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Logger } from '@shadow-library/common';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 Logger.attachTransport('console:pretty');
 const logger = Logger.getLogger('Scripts', 'AiSmoke');
@@ -68,8 +49,6 @@ function record(test: string, passed: boolean, detail?: string): void {
   console.log(`  ${icon} ${test}${detail ? `: ${detail}` : ''}`);
 }
 
-// ─── Test 1: foundation (bible role) ─────────────────────────────────────────
-
 try {
   const ctx = { projectId: BigInt(1), promptKey: 'bible:foundation', promptVersion: '1.0.0', role: 'bible' };
   const result = await router.structured(
@@ -81,8 +60,6 @@ try {
 } catch (err) {
   record('foundation structured output', false, String(err));
 }
-
-// ─── Test 2: title structured output ─────────────────────────────────────────
 
 try {
   const ctx = { projectId: BigInt(1), promptKey: 'title', promptVersion: '1.0.0', role: 'title' };
@@ -96,8 +73,6 @@ try {
   record('title structured output', false, String(err));
 }
 
-// ─── Test 3: judge structured output ─────────────────────────────────────────
-
 try {
   const ctx = { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' };
   const result = await router.structured(
@@ -110,8 +85,6 @@ try {
   record('judge structured output', false, String(err));
 }
 
-// ─── Test 4: chat (generation role) ──────────────────────────────────────────
-
 try {
   const { HumanMessage } = await import('@langchain/core/messages');
   const llm = router.chatFor('generation');
@@ -121,8 +94,6 @@ try {
 } catch (err) {
   record('generation chat', false, String(err));
 }
-
-// ─── Summary ──────────────────────────────────────────────────────────────────
 
 const passed = results.filter(r => r.passed).length;
 const total = results.length;

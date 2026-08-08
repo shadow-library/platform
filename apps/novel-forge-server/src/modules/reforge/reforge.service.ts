@@ -1,25 +1,11 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Reforge, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface ReforgeConfigUpdate {
   instructions?: string | null;
@@ -43,10 +29,6 @@ export interface ReforgeSummary {
   revision: number;
   updatedAt: Date;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class ReforgeService {
@@ -115,7 +97,6 @@ export class ReforgeService {
     return { reforge, sourceChapters: chapterCount?.count ?? 0, glossaryCount: glossaryCount?.count ?? 0, counts };
   }
 
-  /** Per-chapter status summaries for the UI list — bodies stay out, they're fetched per chapter. */
   async listReforges(projectId: bigint): Promise<ReforgeSummary[]> {
     const rows = await this.db.query.chapterReforges.findMany({
       where: eq(schema.chapterReforges.projectId, projectId),
@@ -141,7 +122,6 @@ export class ReforgeService {
     return reforge;
   }
 
-  /** The reforged manuscript; `attention` rows are included — flagged, not blocked (design §1). */
   async renderManuscript(projectId: bigint): Promise<string> {
     const reforges = await this.db.query.chapterReforges.findMany({
       where: and(eq(schema.chapterReforges.projectId, projectId), ne(schema.chapterReforges.status, 'failed')),

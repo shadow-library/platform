@@ -1,16 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import {
   CloneProjectBody,
   CostResponse,
@@ -26,14 +16,6 @@ import {
   UploadImageBody,
 } from './project.dto';
 import { ProjectService } from './project.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Authenticated()
 @HttpController('/api/v1/projects')

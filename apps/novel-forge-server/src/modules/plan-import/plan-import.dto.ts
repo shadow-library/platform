@@ -1,28 +1,10 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { EnumType, Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { EntitySignificance, EntityType } from '@server/common';
 import { type Knowledge } from '@server/database';
 
 import { EndingContractSchema, KnowledgeContractSchema } from '../ai/schemas';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 // `story_state` and `ai` are app-managed sections; an authored bundle may only carry canon sections.
 export const PLAN_BUNDLE_SECTIONS = ['project', 'world', 'power', 'plot', 'lore'] as const;
@@ -47,8 +29,11 @@ export class PlanBundleBibleDoc {
   @Field({ pattern: SLUG_PATTERN })
   slug: string;
 
-  // Open key/value frontmatter, same contract as UpsertBibleDocBody.
-  @Field(() => Object, { optional: true, additionalProperties: true })
+  @Field(() => Object, {
+    optional: true,
+    additionalProperties: true,
+    description: 'Arbitrary key/value frontmatter for the Bible document.',
+  })
   frontmatter?: Record<string, unknown>;
 
   @Field({ minLength: 1 })
@@ -123,8 +108,7 @@ export class PlanBundleVolume {
   @Field({ minLength: 1 })
   payoff: string;
 
-  // Chapter ranges never appear in a bundle — the approval pass derives them cumulatively.
-  @Field(() => Integer, { minimum: 1 })
+  @Field(() => Integer, { minimum: 1, description: 'Number of chapters in this volume; approval derives chapter ranges cumulatively.' })
   targetChapterCount: number;
 
   @Field(() => [String], { optional: true })
@@ -205,13 +189,13 @@ export class PlanBundleBrief {
   @Field({ optional: true })
   handoffBeat?: string;
 
-  // Required: contract-less briefs defeat the serial-pacing machinery the authoring skill feeds.
-  @Field(() => EndingContractSchema)
+  @Field(() => EndingContractSchema, { description: 'Required pacing and ending constraints for the chapter.' })
   endingContract: EndingContractSchema;
 
-  // Optional: the epistemic contract (character-knowledge design §3) — omitting it leaves the
-  // chapter unfiltered, exactly like a hand-authored brief without one.
-  @Field(() => KnowledgeContractSchema, { optional: true })
+  @Field(() => KnowledgeContractSchema, {
+    optional: true,
+    description: 'Optional character-knowledge constraints; omission leaves the chapter unfiltered.',
+  })
   knowledgeContract?: KnowledgeContractSchema;
 }
 
@@ -229,8 +213,7 @@ export class PlanBundle {
   @Field(() => [PlanBundleEntity], { optional: true })
   entities?: PlanBundleEntity[];
 
-  // Bundle v2 — canon facts feeding the character-knowledge ledger; ignored-free: v1 bundles simply omit it.
-  @Field(() => [PlanBundleFact], { optional: true })
+  @Field(() => [PlanBundleFact], { optional: true, description: 'Canon facts used to populate the character-knowledge ledger.' })
   facts?: PlanBundleFact[];
 
   @Field(() => [PlanBundleVolume], { optional: true })

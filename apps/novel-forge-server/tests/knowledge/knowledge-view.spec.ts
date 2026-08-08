@@ -1,15 +1,5 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import {
   type FactLike,
   parseKnowledgeContract,
@@ -20,14 +10,6 @@ import {
   scanKnowledgeLeaks,
   splitKnowledgeView,
 } from '@modules/bible/fact/knowledge-view';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const facts: FactLike[] = [
   {

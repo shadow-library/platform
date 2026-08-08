@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { computeContentHash } from '@server/common';
-
-/**
- * Declaring the constants
- */
 
 describe('computeContentHash', () => {
   it('should return a stable sha256 hex digest', () => {

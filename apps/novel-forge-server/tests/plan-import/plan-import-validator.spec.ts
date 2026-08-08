@@ -1,25 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { type PlanBundle, type PlanBundleArc, type PlanBundleBrief, type PlanBundleVolume } from '@modules/plan-import/plan-import.dto';
 import { validatePlanBundle } from '@modules/plan-import/plan-import.validator';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const NO_ENTITIES: ReadonlySet<string> = new Set();
 

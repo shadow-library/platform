@@ -1,32 +1,14 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
-/**
- * Importing user defined packages
- */
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
 import { TelemetryHandler } from '@modules/ai/telemetry.handler';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 const dbName = `${baseConnectionString.split('/').pop()}_router_cache`;
@@ -87,10 +69,10 @@ describe.if(pgAvailable)('ModelRouterService cache + resilience', () => {
 
     await router.structured<JudgeOutput>(judgePrompt(), { prose: 'same' }, ctx);
     await router.structured<JudgeOutput>(judgePrompt(), { prose: 'same' }, ctx);
-    expect(calls).toBe(1); // second call is a cache hit
+    expect(calls).toBe(1);
 
     await router.structured<JudgeOutput>(judgePrompt(), { prose: 'different' }, ctx);
-    expect(calls).toBe(2); // different input misses the cache
+    expect(calls).toBe(2);
 
     const rows = await db.query.llmCache.findMany({ where: eq(schema.llmCache.projectId, projectId) });
     expect(rows).toHaveLength(2);

@@ -1,23 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Authenticated } from '@shadow-library/auth/module';
 import { Body, HttpController, HttpMethod, HttpRoute, HttpStatus, RespondFor, type RouteOptions } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { JobExecutor } from '../jobs/job.executor';
 import { ImportNovelBody, ImportNovelResponse } from './novel-import.dto';
 import { NovelImportService } from './novel-import.service';
-
-/**
- * Defining types
- */
 
 // `RouteOptions` only declares `method`/`path`, but `@shadow-library/fastify` forwards every extra key
 // on the object straight through to Fastify's native `instance.route(...)` (verified in
@@ -27,10 +13,6 @@ import { NovelImportService } from './novel-import.service';
 interface RouteOptionsWithBodyLimit extends RouteOptions {
   bodyLimit?: number;
 }
-
-/**
- * Declaring the constants
- */
 
 // A whole novel plus an optional base64 cover in one JSON body — realistically a few MB, but given
 // headroom for large multi-hundred-chapter bundles. Scoped to this one route only: every other write
@@ -53,7 +35,6 @@ export class NovelImportController {
   @RespondFor(202, ImportNovelResponse)
   async importNovel(@Body() body: ImportNovelBody): Promise<ImportNovelResponse> {
     const response = await this.novelImportService.import(body);
-    // Fire-and-forget, exactly like every other job-enqueuing endpoint (PipelineController, RebrandController).
     this.jobExecutor.dispatch(response.jobId).catch(() => undefined);
     return response;
   }

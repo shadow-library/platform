@@ -1,10 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it, mock } from 'bun:test';
 
 import { ChatAnthropic } from '@langchain/anthropic';
@@ -12,22 +5,11 @@ import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatXAI } from '@langchain/xai';
 
-/**
- * Importing user defined packages
- */
 import { LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, ROLE_GROUP } from '@modules/ai/defaults';
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { MODEL_REGISTRY } from '@modules/ai/models';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
 import { Config } from '@shadow-library/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 // Minimal DatabaseService stub: cache always misses, cache writes are no-ops.
 function stubDatabaseService(): never {

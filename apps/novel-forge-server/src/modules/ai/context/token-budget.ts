@@ -1,23 +1,4 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { getEncoding } from 'js-tiktoken';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 // Shared encoder instance — o200k_base for consistency across all token counting.
 const enc = getEncoding('o200k_base');
@@ -43,7 +24,6 @@ export function truncateAtParagraph(text: string, maxTokens: number): { text: st
       accumulated += separator + para;
       usedTokens += separatorTokens + paraTokens;
     } else if (accumulated === '') {
-      // Even the first paragraph exceeds maxTokens — truncate at word boundary.
       const words = para.split(/\s+/);
       let wordAccumulated = '';
       for (const word of words) {
@@ -53,7 +33,6 @@ export function truncateAtParagraph(text: string, maxTokens: number): { text: st
       }
       return { text: wordAccumulated, truncated: true };
     } else {
-      // First fit failure — stop here.
       return { text: accumulated, truncated: true };
     }
   }
@@ -80,7 +59,6 @@ export function truncateAtParagraphTail(text: string, maxTokens: number): { text
       accumulated = para + separator + accumulated;
       usedTokens += separatorTokens + paraTokens;
     } else if (accumulated === '') {
-      // Even the last paragraph exceeds maxTokens — truncate at word boundary, keeping the tail end.
       const words = para.split(/\s+/);
       let wordAccumulated = '';
       for (let w = words.length - 1; w >= 0; w--) {
@@ -91,7 +69,6 @@ export function truncateAtParagraphTail(text: string, maxTokens: number): { text
       }
       return { text: wordAccumulated, truncated: true };
     } else {
-      // First fit failure — stop here.
       return { text: accumulated, truncated: true };
     }
   }

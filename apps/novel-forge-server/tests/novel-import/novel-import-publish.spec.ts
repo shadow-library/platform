@@ -1,21 +1,13 @@
 /**
- * Importing packages with side effects
- *
  * The test IdP must be evaluated first: it stands up the mock issuer the push client's AuthClient mints
  * its `web-novel:publish` tokens against — same ordering requirement as publish-runner.spec.ts.
  */
 import { APP_ID, CLIENT_SECRET, testIdP } from '@tests/test-idp';
 
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AuthClient } from '@shadow-library/auth';
 
-/**
- * Importing user defined packages
- */
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { type NovelBundle } from '@modules/novel-import/novel-import.dto';
 import { PublicationAccessService } from '@modules/publishing/publication-access.service';
@@ -26,14 +18,6 @@ import { WikiPublishingService } from '@modules/publishing/wiki-publishing.servi
 import { TestEnvironment } from '@tests/test-environment';
 
 import { MockReaderService } from '../publishing/mock-reader';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const pgAvailable = await (async () => {
   try {

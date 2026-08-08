@@ -1,17 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { and, desc, eq, lt, ne, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Rebrand } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -24,10 +14,6 @@ import { type RebrandAuditOutput, type RebrandConvertOutput } from '../schemas';
 import { type TelemetryContext } from '../telemetry.handler';
 
 // Direct file import of DI-free pure functions — never the rebrand barrel, whose service imports this module.
-
-/**
- * Defining types
- */
 
 export interface RebrandGraphServices {
   db: PrimaryDatabase;
@@ -69,10 +55,6 @@ const ChapterRebrandAnnotation = Annotation.Root({
 
 type RebrandState = typeof ChapterRebrandAnnotation.State;
 
-/**
- * Declaring the constants
- */
-
 const logger = Logger.getLogger(APP_NAME, 'chapter-rebrand.graph');
 
 /** Clean → persist; dirty on the first attempt → one repair pass; still dirty → persist as attention. */
@@ -93,7 +75,6 @@ export function createChapterRebrandGraph(services: RebrandGraphServices): Retur
 function buildChapterRebrandGraph(services: RebrandGraphServices) {
   const { db, contextAssembler, modelRouter, checkpointer } = services;
 
-  // ─── loadChapter ──────────────────────────────────────────────────────────────
   async function loadChapter(state: RebrandState) {
     const projectId = BigInt(state.projectId);
     const [chapter, rebrand, glossaryRows, previous] = await Promise.all([
@@ -131,7 +112,6 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     };
   }
 
-  // ─── assembleContext ─────────────────────────────────────────────────────────
   async function assembleContext(state: RebrandState) {
     const projectId = BigInt(state.projectId);
     const glossarySlice = renderGlossarySlice(selectGlossarySlice(state.chapterProse, state.glossary));
@@ -149,7 +129,6 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     return { contextPack: pack.rendered, glossarySlice };
   }
 
-  // ─── convert (also the repair pass) ──────────────────────────────────────────
   async function convert(state: RebrandState) {
     const projectId = BigInt(state.projectId);
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
@@ -182,7 +161,6 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     return { converted: result };
   }
 
-  // ─── residueScan (deterministic, free — runs on every attempt) ───────────────
   function residueScan(state: RebrandState) {
     if (!state.converted) return { residueIssues: [] };
     const combined = [...state.glossary, ...(state.converted.discoveredNames ?? [])];
@@ -191,7 +169,6 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     return { residueIssues };
   }
 
-  // ─── audit ────────────────────────────────────────────────────────────────────
   async function audit(state: RebrandState) {
     if (!state.converted || state.settings.auditEnabled === false) return { auditIssues: [] };
 
@@ -213,14 +190,12 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     return { auditIssues };
   }
 
-  // ─── prepareRepair ────────────────────────────────────────────────────────────
   function prepareRepair(state: RebrandState) {
     const issues: ConversionIssue[] = [...state.residueIssues, ...state.auditIssues];
     logger.debug('rebrand repair pass', { chapter: state.chapter, issues: issues.length });
     return { attempt: state.attempt + 1, repairNotes: renderIssues(issues) };
   }
 
-  // ─── persistConversion ───────────────────────────────────────────────────────
   async function persistConversion(state: RebrandState) {
     if (!state.converted) throw AppError.internal('[persistConversion] No converted output to persist');
     const projectId = BigInt(state.projectId);
@@ -268,7 +243,6 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     return { outcome: status };
   }
 
-  // ─── mergeGlossary ───────────────────────────────────────────────────────────
   // Runs even for attention rows — later chapters need the discovered names either way. Conflicts
   // keep the existing mapping: a name is never re-mapped once made (design §2).
   async function mergeGlossary(state: RebrandState) {

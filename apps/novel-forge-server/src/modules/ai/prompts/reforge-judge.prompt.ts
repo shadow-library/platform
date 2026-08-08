@@ -1,26 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-/**
- * Importing user defined packages
- */
 import { type ReforgeJudgeOutput, ReforgeJudgeSchema } from '../schemas/reforge.schema';
 import { type PromptModule } from './types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const system =
   'You audit one re-authored chapter for fidelity to its source outline. You receive the faithful OUTLINE the chapter was written from, the WORLD NOTES, the GLOSSARY slice, and the written chapter. Report ONLY these violations: (a) a MAJOR outline beat missing from the chapter (type `missing_beat`) — but a beat the AUTHOR INSTRUCTIONS declared removed is NOT missing, so do not flag it; (b) a major beat, plot turn, or character present in the chapter but absent from the outline (type `invented_beat`); (c) naming inconsistency against the glossary or world notes (type `naming`); (d) leftover nationalism, discrimination, or references to real-world countries/cultures (types `nationalism`, `discrimination`, `real_world_reference`).\n\n' +

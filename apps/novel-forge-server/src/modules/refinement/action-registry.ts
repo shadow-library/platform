@@ -1,20 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { type ActionOp, type ActionType } from './change-set';
-
-/**
- * Defining types
- */
 
 export interface ActionExecutionResult {
   summary: string;
@@ -30,10 +16,6 @@ export interface ActionExecutionContext {
 }
 
 export type ActionExecutor = (projectId: bigint, action: ActionOp, ctx: ActionExecutionContext) => Promise<ActionExecutionResult>;
-
-/**
- * Declaring the constants
- */
 
 /**
  * Maps action ops to the service calls that perform them. The registry lives here (dependency-free)

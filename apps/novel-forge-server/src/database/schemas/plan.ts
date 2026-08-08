@@ -1,32 +1,14 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
 import { bigint, bigserial, check, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { jsonb } from './jsonb';
 import { projects } from './projects';
-
-/**
- * Defining types
- */
 
 export namespace Plan {
   export type Volume = InferSelectModel<typeof volumes>;
   export type Arc = InferSelectModel<typeof arcs>;
   export type Status = InferEnum<typeof planStatus>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const planStatus = pgEnum('plan_status', ['draft', 'approved', 'source']);
 

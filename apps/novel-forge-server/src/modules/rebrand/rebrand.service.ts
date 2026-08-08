@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Rebrand, schema } from '@server/database';
@@ -23,10 +13,6 @@ import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { PROMPT_REGISTRY } from '../ai/prompts';
 import { type RebrandGlossarySeedOutput } from '../ai/schemas';
-
-/**
- * Defining types
- */
 
 export interface RebrandConfigUpdate {
   directives?: string | null;
@@ -50,10 +36,6 @@ export interface SeedGlossaryResult {
   seeded: boolean;
   mappings: number;
 }
-
-/**
- * Declaring the constants
- */
 
 const OPENING_CHAPTER_COUNT = 3;
 const OPENING_CHAPTER_TOKENS = 1_500;
@@ -132,7 +114,6 @@ export class RebrandService {
     return this.db.query.rebrandGlossary.findMany({ where, orderBy: [asc(schema.rebrandGlossary.sourceName)], limit, offset });
   }
 
-  /** Per-chapter status summaries for the UI list — bodies stay out, they're fetched per chapter. */
   async listConversions(
     projectId: bigint,
   ): Promise<{ chapter: number; title: string | null; status: Rebrand.ConversionStatus; issueCount: number; revision: number; updatedAt: Date }[]> {
@@ -159,7 +140,6 @@ export class RebrandService {
     return conversion;
   }
 
-  /** The converted manuscript; `attention` rows are included — flagged, not blocked (design §1). */
   async renderManuscript(projectId: bigint): Promise<string> {
     const conversions = await this.db.query.chapterConversions.findMany({
       where: and(eq(schema.chapterConversions.projectId, projectId), ne(schema.chapterConversions.status, 'failed')),

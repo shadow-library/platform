@@ -1,26 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it, mock } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { runToolLoop } from '@modules/ai/tools/tool-loop';
 import { ToolRegistryService } from '@modules/ai/tools/tool-registry.service';
 import { type ToolContext } from '@modules/ai/tools/types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const ctx: ToolContext = {
   chapter: 1,
@@ -43,8 +25,6 @@ const ctx: ToolContext = {
   } as never,
   runId: 'test-run',
 };
-
-// ─── Test 1: forNode returns only tools allowed for that node ────────────────
 
 describe('ToolRegistryService.forNode', () => {
   const registry = new ToolRegistryService();
@@ -73,8 +53,6 @@ describe('ToolRegistryService.forNode', () => {
   });
 });
 
-// ─── Test 2: get_entity handler returns 'Entity not found' for missing entity ─
-
 describe('get_entity handler', () => {
   const registry = new ToolRegistryService();
 
@@ -87,12 +65,10 @@ describe('get_entity handler', () => {
   });
 });
 
-// ─── Test 3: tool truncates long results ─────────────────────────────────────
 // Truncation is applied in the forNode wrapper (DynamicStructuredTool func), not the raw handler.
 
 describe('tool truncation', () => {
   it('truncates result if it exceeds tokensBudget * 4 chars via forNode wrapper', async () => {
-    // tokensBudget for search_lore = 4000, threshold = 4000 * 4 = 16000 chars
     const longText = 'A'.repeat(20000);
     const richCtx: ToolContext = {
       ...ctx,
@@ -109,18 +85,14 @@ describe('tool truncation', () => {
 
     const result = await lcTool.invoke({ query: 'test' });
     const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-    expect(resultStr.length).toBeLessThanOrEqual(4000 * 4 + 20); // budget * 4 chars + truncation suffix
+    expect(resultStr.length).toBeLessThanOrEqual(4000 * 4 + 20);
     expect(resultStr).toContain('[truncated]');
   });
 });
 
-// ─── Test 4: compile-time assertion — ReadonlyDb has no .insert ──────────────
-
 // @ts-expect-error — insert is not in ReadonlyDb (Pick<PrimaryDatabase, 'select'|'query'>)
 const _badHandler = (_: unknown, toolCtx: ToolContext) => toolCtx.db.insert;
 void _badHandler;
-
-// ─── Test 5: tool loop respects max rounds ───────────────────────────────────
 
 describe('runToolLoop maxRounds', () => {
   it('invokes model at most maxRounds times when model always returns tool calls', async () => {
@@ -155,16 +127,11 @@ describe('runToolLoop maxRounds', () => {
     const maxRounds = 3;
     const result = await runToolLoop(mockModel, tools, rawTools, [{ content: 'question' } as never], ctx, fullDb, { maxRounds });
 
-    // Bound model called maxRounds times (once per round)
     expect(invokeCount.bound).toBe(maxRounds);
-    // Final unbound invoke called once after exhaustion
     expect(finalInvoke).toHaveBeenCalledTimes(1);
-    // toolCallCount = maxRounds * 1 tool call per round
     expect(result.toolCallCount).toBe(maxRounds);
   });
 });
-
-// ─── Test 6: audit row written per tool call ─────────────────────────────────
 
 describe('runToolLoop audit', () => {
   it('writes an audit row to fullDb for each tool call', async () => {
@@ -182,7 +149,6 @@ describe('runToolLoop audit', () => {
             tool_calls: [{ args: { query: 'test' }, id: 'tc-1', name: 'search_lore', type: 'tool_call' }],
           };
         }
-        // Second call: no tool calls → loop ends
         return { content: 'done', tool_calls: [] };
       }),
     };
@@ -200,7 +166,6 @@ describe('runToolLoop audit', () => {
     await runToolLoop(mockModel, tools, rawTools, [{ content: 'go' } as never], ctx, fullDb);
 
     expect(insertMock).toHaveBeenCalled();
-    // The insert was called with the toolCalls table reference
     expect(valuesMock).toHaveBeenCalledTimes(1);
   });
 });

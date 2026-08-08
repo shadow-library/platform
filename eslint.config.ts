@@ -190,7 +190,13 @@ export default defineConfig([
 
   /** These apps keep their established import order after organizational banner comments are removed. */
   {
-    files: ['apps/novel-forge-web/**/*.{ts,tsx}', 'apps/pulse-web/**/*.{ts,tsx}', 'apps/web-novel-server/**/*.{ts,tsx}', 'apps/web-novel-web/**/*.{ts,tsx}'],
+    files: [
+      'apps/novel-forge-server/**/*.{ts,tsx}',
+      'apps/novel-forge-web/**/*.{ts,tsx}',
+      'apps/pulse-web/**/*.{ts,tsx}',
+      'apps/web-novel-server/**/*.{ts,tsx}',
+      'apps/web-novel-web/**/*.{ts,tsx}',
+    ],
     rules: { 'perfectionist/sort-imports': 'off' },
   },
 

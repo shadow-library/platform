@@ -1,29 +1,11 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-/**
- * Importing user defined packages
- */
 import { ChatMode, ChatScope, ChatSessionStatus, SortByTime } from '@server/common';
 import { type Refinement } from '@server/database';
 
 import { AppliedArtifactItem, OpResultItem, ProposalResponse } from './refinement.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class ChatProjectParams {
@@ -40,7 +22,10 @@ export class ChatSessionParams {
 
   // A pattern, not `format: 'uuid'` — fastify's route schema compiler has no uuid format registered
   // and fails to build the route with one.
-  @Field({ pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' })
+  @Field({
+    pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    description: 'Chat session UUID.',
+  })
   sessionId: string;
 }
 
@@ -70,11 +55,10 @@ export class UpdateChatSessionBody {
 
 @Schema()
 export class UpdateSessionModelBody {
-  // Both null (or omitted) clears the override so the session falls back to the project/profile default.
-  @Field({ optional: true, nullable: true })
+  @Field({ optional: true, nullable: true, description: 'Model provider override; clear both override fields to use the project or profile default.' })
   provider?: string | null;
 
-  @Field({ optional: true, nullable: true })
+  @Field({ optional: true, nullable: true, description: 'Model name override; clear both override fields to use the project or profile default.' })
   model?: string | null;
 }
 
@@ -182,24 +166,21 @@ export class ListChatMessagesResponse {
   @Field(() => [ChatMessageResponse])
   messages: ChatMessageResponse[];
 
-  // True while a chat-turn is still running for this session — the signal any tab (a refresh, a
-  // second tab) uses to show that Forge is working, since the turn persists the user message before
-  // the model call. Clears once the reply lands or the run fails.
-  @Field()
+  @Field({ description: 'Whether a chat turn is currently running for this session.' })
   pendingTurn: boolean;
 }
 
 @Schema()
 export class ChatTurnBody {
-  // Generous on purpose: authors paste whole premises, chapters, and reference docs into the hub
-  // (~200k chars ≈ 50k tokens). Compaction and the pack budgets handle the size downstream; the
-  // 12MB fastify bodyLimit is the real transport ceiling.
-  @Field({ minLength: 1, maxLength: 200_000 })
+  @Field({
+    minLength: 1,
+    maxLength: 200_000,
+    description: 'Chat content; accepts long premises, chapters, and reference documents up to 200,000 characters.',
+  })
   content: string;
 }
 
-// The in-turn apply outcome of an auto-mode turn (chat-hub design §6 step 6).
-@Schema()
+@Schema({ description: 'Proposal application outcome returned as part of an automatic-mode turn.' })
 export class TurnAppliedResult {
   @Field(() => [AppliedArtifactItem])
   applied: AppliedArtifactItem[];

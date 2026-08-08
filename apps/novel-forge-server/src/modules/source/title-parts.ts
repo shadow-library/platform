@@ -1,19 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export interface TitleParts {
   /** Title with the chapter prefix and part tokens stripped — display casing preserved. */
   base: string;
@@ -57,10 +41,6 @@ interface GroupDraft {
   lastPart: number | null;
   partTotal: number | null;
 }
-
-/**
- * Declaring the constants
- */
 
 // A translator part is rarely a full chapter; below this an untitled chapter is suspicious enough
 // to flag for the AI boundary check instead of silently staying split.

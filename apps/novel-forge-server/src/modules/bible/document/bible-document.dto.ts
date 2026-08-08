@@ -1,26 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { BibleSection } from '@server/common';
 import { type Bible } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class BibleDocProjectParams {
@@ -44,9 +26,7 @@ export class BibleDocParams {
 
 @Schema()
 export class UpsertBibleDocBody {
-  // Author-authored YAML frontmatter: an open key/value map with no fixed schema (keys vary per
-  // document and section), so it stays an object with `additionalProperties` to keep every key.
-  @Field(() => Object, { optional: true, additionalProperties: true })
+  @Field(() => Object, { optional: true, additionalProperties: true, description: 'Author-authored YAML frontmatter with document-specific keys.' })
   frontmatter?: Record<string, unknown>;
 
   @Field({ optional: true })
@@ -85,9 +65,7 @@ export class BibleDocResponse {
   @Field()
   slug: string;
 
-  // Open YAML frontmatter (see UpsertBibleDocBody). `additionalProperties` is required here — without
-  // it the response serialiser strips every nested key and returns `{}`.
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true, description: 'Author-authored YAML frontmatter with document-specific keys.' })
   frontmatter?: Record<string, unknown> | null;
 
   @Field({ optional: true, nullable: true })

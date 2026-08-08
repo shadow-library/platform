@@ -1,17 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { getChapterSummariesTool } from './tools/get-chapter-summaries.tool';
 import { getEntityTool } from './tools/get-entity.tool';
 import { getPlotThreadsTool } from './tools/get-plot-threads.tool';
@@ -20,19 +10,10 @@ import { searchLoreTool } from './tools/search-lore.tool';
 import { searchProseTool } from './tools/search-prose.tool';
 import { type RegisteredTool, type ToolContext } from './types';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
 const ALL_TOOLS: RegisteredTool[] = [searchLoreTool, getEntityTool, getChapterSummariesTool, searchProseTool, getWorldFactsTool, getPlotThreadsTool];
 
 @Injectable()
 export class ToolRegistryService {
-  // Returns DynamicStructuredTool[] for the given node — only tools with that node in allowedNodes.
   // The ctx is captured in each tool's func closure.
   forNode(nodeName: string, ctx: ToolContext): DynamicStructuredTool[] {
     return ALL_TOOLS.filter(t => t.allowedNodes.includes(nodeName)).map(
@@ -53,7 +34,6 @@ export class ToolRegistryService {
     );
   }
 
-  // Returns raw RegisteredTool definitions for the given node (used by runToolLoop).
   getRaw(nodeName: string): RegisteredTool[] {
     return ALL_TOOLS.filter(t => t.allowedNodes.includes(nodeName));
   }

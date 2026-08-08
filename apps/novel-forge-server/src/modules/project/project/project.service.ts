@@ -1,19 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Bible, type Chapter, type Knowledge, type Plan, type PrimaryDatabase, type Project, schema } from '@server/database';
@@ -28,14 +18,6 @@ import {
   type ResetResponse,
   type UpdateProjectBody,
 } from './project.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const BIBLE_SECTIONS: Bible.Section[] = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
 
@@ -52,8 +34,6 @@ export class ProjectService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  // The single owner of anything created in this request: the authenticated principal's identity user id.
-  // Project ownership is enforced everywhere else by `ProjectOwnershipGuard`; here it is stamped on write.
   private ownerId(): bigint {
     return BigInt(this.context.getAuthPrincipal().sub);
   }
@@ -103,7 +83,6 @@ export class ProjectService {
       defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' },
     });
 
-    // A caller only ever sees the projects they own (NF-BOLA-01); an optional kind filter narrows within that.
     const owner = eq(schema.projects.ownerId, this.ownerId());
     const where = filter.kind ? and(owner, eq(schema.projects.kind, filter.kind)) : owner;
     const column = query.sortBy === 'createdAt' ? schema.projects.createdAt : schema.projects.updatedAt;

@@ -1,24 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { createTestIdP } from '@shadow-library/auth/testing';
 import { Config } from '@shadow-library/common';
 
 /**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * One in-process mock identity provider for the whole test run. This module MUST be evaluated before
  * `@server/app.module`: `AuthModule.forRoot()` resolves the issuer/app-id/credential at import time
  * and derives everything else (audience, redirect URIs, granted scopes) from the mock's

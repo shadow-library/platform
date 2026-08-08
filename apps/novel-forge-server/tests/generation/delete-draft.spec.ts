@@ -1,27 +1,13 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { and, asc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
-/**
- * Importing user defined packages
- */
 import { ChapterImageService } from '@modules/generation/chapter-image.service';
 import { GenerationService } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
-
-/**
- * Declaring the constants
- */
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 const dbName = `${baseConnectionString.split('/').pop()}_delete_draft`;
@@ -84,7 +70,7 @@ describe.if(pgAvailable)('GenerationService.deleteDraft', () => {
 
     const rows = await chaptersOf(projectId);
     expect(rows.map(r => r.chapter)).toEqual([1, 2, 3]);
-    expect(rows.map(r => r.body)).toEqual(['A', 'C', 'D']); // B removed; C and D slid down one
+    expect(rows.map(r => r.body)).toEqual(['A', 'C', 'D']);
   });
 
   it('shifts the continuity review alongside its chapter', async () => {
@@ -94,7 +80,7 @@ describe.if(pgAvailable)('GenerationService.deleteDraft', () => {
     await service.deleteDraft(projectId, 1);
 
     const proposal = await db.query.continuityProposals.findFirst({ where: and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, 2)) });
-    expect(proposal?.proposal).toEqual({ note: 'ch3' } as never); // the ch3 review followed C down to chapter 2
+    expect(proposal?.proposal).toEqual({ note: 'ch3' } as never);
   });
 
   it('throws when the chapter does not exist', async () => {

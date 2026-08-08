@@ -1,22 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { type APIResponse, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
-
-/**
- * Defining types
- */
 
 export interface NovelPushBody {
   title: string;
@@ -80,10 +66,6 @@ export interface WikiManifestItem {
   revision: number;
   contentHash: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /** Identity service name of the reader — resolves via `SERVICE_URL_WEB_NOVEL_SERVER` or in-cluster svc DNS */
 export const READER_SERVICE = 'web-novel-server';

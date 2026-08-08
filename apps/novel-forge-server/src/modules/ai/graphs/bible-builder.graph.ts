@@ -1,17 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { eq, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type Bible, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -23,10 +13,6 @@ import { type IndexingService } from '../retrieval/indexing.service';
 import { type BibleStageOutput } from '../schemas';
 import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
-
-/**
- * Defining types
- */
 
 export interface BibleBuilderServices {
   db: PrimaryDatabase;
@@ -50,13 +36,8 @@ const BibleBuilderAnnotation = Annotation.Root({
 
 type BibleBuilderState = typeof BibleBuilderAnnotation.State;
 
-/**
- * Declaring the constants
- */
-
 const logger = Logger.getLogger(APP_NAME, 'bible-builder.graph');
 
-// Map bible stage names to valid bibleSection enum values.
 const STAGE_SECTION_MAP: Record<string, Bible.Section> = {
   foundation: 'project',
   worldAndPower: 'world',
@@ -96,7 +77,6 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
 
     if (!section || !slug) throw AppError.internal(`[bible-builder] Unknown stage: ${stageName}`);
 
-    // Skip if already exists and force=false.
     if (!state.force) {
       const existing = await db.query.bibleDocuments.findFirst({
         where: sql`${schema.bibleDocuments.projectId} = ${projectId} AND ${schema.bibleDocuments.section} = ${section} AND ${schema.bibleDocuments.slug} = ${slug}`,
@@ -156,8 +136,6 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
     };
   }
 
-  // ─── stage nodes ──────────────────────────────────────────────────────────────
-
   async function foundation(state: BibleBuilderState) {
     return runStage(state, 'foundation', { projectBrief: state.brief });
   }
@@ -211,7 +189,6 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
     return runStage(state, 'volumes', { projectBrief: state.brief, foundation: foundationBody ?? '', characters: charsBody ?? '', plot: plotBody ?? '' });
   }
 
-  // ─── indexLore ───────────────────────────────────────────────────────────────
   async function indexLore(state: BibleBuilderState) {
     const projectId = BigInt(state.projectId);
     const docs = await db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId) });

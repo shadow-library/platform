@@ -1,27 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-/**
- * Importing user defined packages
- */
 import { renderOpVocabulary, validateChangeSet } from '../../refinement/change-set';
 import { type ChapterExtractOutput, ChapterExtractSchema } from '../schemas/chapter-extract.schema';
 import { type PromptModule } from './types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const ALLOWED_OPS = ['entity.upsert', 'entity.remove', 'bible_document.upsert', 'bible_document.remove'] as const;
 

@@ -1,19 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
@@ -24,14 +14,6 @@ import { ProposalApplyService } from '@modules/refinement/proposal-apply.service
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { type PrimaryDatabase, schema } from '@server/database';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 const dbName = `${baseConnectionString.split('/').pop()}_chat_turn`;

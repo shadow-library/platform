@@ -1,25 +1,11 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Generation, type PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 type UploadMime = 'image/png' | 'image/jpeg' | 'image/webp';
 
@@ -27,10 +13,6 @@ type UploadMime = 'image/png' | 'image/jpeg' | 'image/webp';
 // from the server's runtime `storage.public-origin` so the origin is never baked into the client bundle.
 // The ref stays on the type for internal callers; only `imageUrl` is declared on the response DTO.
 export type PresentedChapterImage = Generation.ChapterImage & { imageUrl: string };
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class ChapterImageService {

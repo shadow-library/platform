@@ -1,23 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
 export * from './enums';
 export * from './extraction.schema';
 export * from './generation.schema';

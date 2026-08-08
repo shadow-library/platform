@@ -1,25 +1,11 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
-/**
- * Importing user defined packages
- */
 import { EntityService } from '@modules/bible/entity/entity.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
-
-/**
- * Declaring the constants
- */
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 const dbName = `${baseConnectionString.split('/').pop()}_entity_image`;

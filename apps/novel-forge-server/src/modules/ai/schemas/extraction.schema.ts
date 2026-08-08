@@ -1,25 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { EntityType, MysteryStatus, ThreadStatus } from '@server/common';
 import { type Knowledge, type Story } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class ExtractionEntity {

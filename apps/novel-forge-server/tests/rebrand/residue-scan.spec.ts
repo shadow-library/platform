@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { type GlossaryLike, renderGlossarySlice, scanResidue, selectGlossarySlice } from '@modules/rebrand';
-
-/**
- * Declaring the constants
- */
 
 const glossary: GlossaryLike[] = [
   { sourceName: 'Ye Fan', variants: ['Yefan', 'Ye Fann'], replacement: 'Evan Vale', category: 'character' },

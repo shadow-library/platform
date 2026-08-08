@@ -1,27 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-/**
- * Importing user defined packages
- */
 import { ContentMode, ProjectKind, SortByTime } from '@server/common';
 import { type Project } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class ProjectParams {
@@ -41,19 +23,14 @@ export class CreateProjectBody {
   @Field({ optional: true })
   title?: string;
 
-  // Author instructions for how the AI writes each chapter (voice, craft, length). Left unset, the
-  // project falls back to DEFAULT_WRITING_INSTRUCTIONS.
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'Instructions for chapter voice, craft, and length; omission uses the application default.' })
   instructions?: string;
 
   @Field(() => ContentMode, { optional: true })
   contentMode?: Project.ContentMode;
 }
 
-// The project `config` blob. Today it carries only per-role model overrides; kept as a typed schema
-// (rather than a freeform object) so the generated client sees the real shape. Mirrors the internal
-// `ResolvedModel` / `AiRole` contract in `ai/defaults.ts` — keep the two in sync.
-@Schema()
+@Schema({ description: 'Provider and model reference used for a project-level AI role override.' })
 export class ProjectModelRef {
   @Field()
   provider: string;
@@ -62,10 +39,8 @@ export class ProjectModelRef {
   model: string;
 }
 
-// A per-role model-override map. Enumerated rather than a `Record` so the generated OpenAPI carries a
-// resolvable `$ref` for each value (an `additionalProperties`-schema map emits an unnormalised ref that
-// breaks client codegen). One optional field per `AiRole` (see `ai/defaults.ts`) — keep the two in sync.
-@Schema()
+// Enumerated fields avoid an unnormalised additionalProperties ref that breaks client code generation; keep these synchronized with AiRole.
+@Schema({ description: 'Optional provider and model overrides keyed by AI role.' })
 export class ProjectModelOverrides {
   @Field(() => ProjectModelRef, { optional: true })
   extraction?: ProjectModelRef;
@@ -148,10 +123,11 @@ export class ProjectResponse {
   @Field({ optional: true, nullable: true })
   title?: string | null;
 
-  // Absolute public object-storage URL for the cover, resolved from the server's runtime
-  // `storage.public-origin`. Sending the URL rather than the stored ref keeps the origin out of the
-  // client bundle, so one web build serves every deployment. Absent when the project has no cover.
-  @Field({ optional: true, nullable: true })
+  @Field({
+    optional: true,
+    nullable: true,
+    description: 'Absolute public cover URL resolved by the server; absent when the project has no cover.',
+  })
   coverUrl?: string | null;
 
   @Field(() => ContentMode)
@@ -166,10 +142,7 @@ export class ProjectResponse {
   @Field({ optional: true, nullable: true })
   brief?: string | null;
 
-  // Effective chapter-writing instructions — the stored value, or DEFAULT_WRITING_INSTRUCTIONS when the
-  // project has not overridden it (the service fills the default in `present`), so the settings form is
-  // always pre-populated.
-  @Field({ optional: true, nullable: true })
+  @Field({ optional: true, nullable: true, description: 'Effective chapter-writing instructions, including the application default.' })
   instructions?: string | null;
 
   @Field(() => Integer, { optional: true, nullable: true })
@@ -187,8 +160,7 @@ export class UploadImageBody {
   @Field(() => String, { enum: ['image/png', 'image/jpeg', 'image/webp'] })
   mime: 'image/png' | 'image/jpeg' | 'image/webp';
 
-  // Base64-encoded image bytes, without the `data:` URL prefix.
-  @Field()
+  @Field({ description: 'Base64-encoded image bytes without a data URL prefix.' })
   image: string;
 }
 
@@ -206,8 +178,7 @@ export class UpdateProjectBody {
   @Field({ optional: true })
   brief?: string;
 
-  // Author chapter-writing instructions; send empty string to clear back to the default.
-  @Field({ optional: true, nullable: true })
+  @Field({ optional: true, nullable: true, description: 'Chapter-writing instructions; send an empty string to restore the application default.' })
   instructions?: string | null;
 }
 

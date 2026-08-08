@@ -1,23 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
 export * from './foundation.prompt';
 export * from './world-power.prompt';
 export * from './factions-locations.prompt';

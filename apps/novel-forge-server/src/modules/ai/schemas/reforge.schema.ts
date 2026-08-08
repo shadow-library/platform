@@ -1,25 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { ReforgeJudgeIssueType, ReforgeJudgeVerdict } from './enums';
 import { RebrandCarryState, RebrandMapping } from './rebrand.schema';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class ReforgeBeat {

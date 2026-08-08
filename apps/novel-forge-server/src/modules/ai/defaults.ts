@@ -1,19 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type AiRole =
   | 'extraction'
   | 'generation'
@@ -47,10 +31,6 @@ export interface AiProfile {
   roleOverrides?: Partial<Record<AiRole, ResolvedModel>>;
   forceProvider?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 export type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image' | 'embedding';
 

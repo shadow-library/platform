@@ -1,27 +1,13 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import { EmbeddingService } from './embedding.service';
-
-/**
- * Defining types
- */
 
 export interface RetrievalHit {
   text: string;
@@ -32,10 +18,6 @@ export interface RetrievalHit {
     refKey?: string;
   };
 }
-
-/**
- * Declaring the constants
- */
 
 const DEFAULT_PROSE_K = 5;
 const DEFAULT_LORE_K = 6;

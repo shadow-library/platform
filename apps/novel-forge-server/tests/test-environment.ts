@@ -1,15 +1,10 @@
 /**
- * Importing packages with side effects
- *
  * The test IdP must be evaluated (and its issuer seeded into the config cache) before anything
  * touches the app module graph, so its import lives up here rather than with the other user
  * imports.
  */
 import './test-idp';
 
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, beforeEach } from 'bun:test';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,25 +16,14 @@ import { Config, Logger } from '@shadow-library/common';
 import { type FastifyRouter } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
-
-/**
- * Defining types
- */
 
 export interface GetRouterOptions {
   /** Pass `false` to get the raw router without the default bearer token — for testing the auth surface itself */
   authenticated?: boolean;
 }
-
-/**
- * Declaring the constants
- */
 
 Logger.attachTransport('file:json');
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';

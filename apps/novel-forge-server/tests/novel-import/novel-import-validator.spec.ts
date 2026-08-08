@@ -1,25 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { type NovelBundle } from '@modules/novel-import/novel-import.dto';
 import { validateNovelBundle } from '@modules/novel-import/novel-import.validator';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 function buildBundle(): NovelBundle {
   return {

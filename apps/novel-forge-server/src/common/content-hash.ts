@@ -1,23 +1,4 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 // Key order must not affect the hash: proposals capture a baseline hash that is later recomputed
 // from a freshly loaded row, where property order is not guaranteed to match the original.

@@ -1,54 +1,18 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, countDistinct, desc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface ConsolidateResult {
   significanceUpdated: number;
   relationshipsPromoted: number;
 }
 
-/**
- * Declaring the constants
- */
-
-/**
- * An entity is promoted to "major" significance once it appears in this many
- * distinct chapters. Below the threshold it remains "minor".
- */
 const SIGNIFICANCE_MIN_CHAPTERS = 3;
 
-/**
- * A relationship observation is promoted to a canonical entity_relationship
- * once the same (entityId, targetKey, kind) triple is observed in this many
- * distinct chapters.
- */
 const RELATIONSHIP_MIN_CHAPTERS = 3;
 
-/**
- * Deterministic, LLM-free consolidation pass.
- *
- * Two operations:
- *  1. Significance recalculation — count distinct appearance chapters per
- *     entity and flip significance between "major" / "minor".
- *  2. Relationship promotion — move observations that exceed the threshold
- *     into the canonical entity_relationships table.
- */
 @Injectable()
 export class ConsolidateService {
   private readonly db: PrimaryDatabase;
@@ -62,8 +26,6 @@ export class ConsolidateService {
 
     return { significanceUpdated, relationshipsPromoted };
   }
-
-  // ─── Private helpers ─────────────────────────────────────────────────────────
 
   private async recalculateSignificance(projectId: bigint): Promise<number> {
     const rows = await this.db
@@ -98,7 +60,6 @@ export class ConsolidateService {
     for (const row of rows) {
       if (row.count < RELATIONSHIP_MIN_CHAPTERS) continue;
 
-      // Use the most recent observation's note and chapter for the canonical record.
       const latest = await this.db.query.relationshipObservations.findFirst({
         where: and(
           eq(schema.relationshipObservations.entityId, row.entityId),

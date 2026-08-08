@@ -1,22 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, eq, inArray, lt } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 /** A brief's epistemic contract (character-knowledge design §3): who bounds the chapter, who learns what. */
 export interface KnowledgeReveal {
@@ -52,10 +38,6 @@ export interface KnowledgeLeakIssue {
 
 /** The narrow database surface the loaders need — satisfied by both the client and a transaction. */
 type KnowledgeDb = Pick<PrimaryDatabase, 'query' | 'insert'>;
-
-/**
- * Declaring the constants
- */
 
 const logger = Logger.getLogger(APP_NAME, 'knowledge-view');
 

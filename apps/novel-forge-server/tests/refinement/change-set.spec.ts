@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { ACTION_TYPES, type ChangeOp, changeSetRefs, isActionOp, renderActionVocabulary, validateChangeSet } from '@modules/refinement';
-
-/**
- * Declaring the constants
- */
 
 const validOps: ChangeOp[] = [
   { op: 'premise.update', premise: 'a cultivator returns from death', themes: ['revenge'] },

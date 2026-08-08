@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { and, eq } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -27,10 +17,6 @@ import { type TelemetryHandler } from '../telemetry.handler';
 import { runToolLoop } from '../tools/tool-loop';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
 import { type ToolContext } from '../tools/types';
-
-/**
- * Defining types
- */
 
 export interface ValidationServices {
   db: PrimaryDatabase;
@@ -57,10 +43,6 @@ const NovelValidationAnnotation = Annotation.Root({
 });
 
 type ValidationState = typeof NovelValidationAnnotation.State;
-
-/**
- * Declaring the constants
- */
 
 const DEFAULT_WINDOW_SIZE = 20;
 const logger = Logger.getLogger(APP_NAME, 'novel-validation.graph');
@@ -105,11 +87,9 @@ function tryParseValidation(raw: string): ValidationOutput | null {
 export function createNovelValidationGraph(services: ValidationServices) {
   const { db, contextAssembler, modelRouter, toolRegistry, checkpointer } = services;
 
-  // ─── planWindows ──────────────────────────────────────────────────────────────
   async function planWindows(state: ValidationState) {
     const projectId = BigInt(state.projectId);
 
-    // Fetch all finalized chapters.
     const chapterRows = await db.query.chapters.findMany({
       where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')),
       orderBy: schema.chapters.number,
@@ -118,7 +98,6 @@ export function createNovelValidationGraph(services: ValidationServices) {
 
     if (chapterRows.length === 0) return { windows: [] };
 
-    // Fetch volumes for window sizing.
     const volumeRows = await db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal });
 
     const windows: WindowSpec[] = [];
@@ -127,7 +106,6 @@ export function createNovelValidationGraph(services: ValidationServices) {
     const maxCh = chapterNums[chapterNums.length - 1] ?? 1;
 
     if (volumeRows.length > 0) {
-      // Use volume boundaries as windows.
       for (const vol of volumeRows) {
         const from = vol.startChapter ?? minCh;
         const to = vol.endChapter ?? maxCh;
@@ -144,7 +122,6 @@ export function createNovelValidationGraph(services: ValidationServices) {
     return { windows };
   }
 
-  // ─── validateWindows ─────────────────────────────────────────────────────────
   async function validateWindows(state: ValidationState) {
     const projectId = BigInt(state.projectId);
     const allFindings: ValidationOutput[] = [];
@@ -186,7 +163,6 @@ export function createNovelValidationGraph(services: ValidationServices) {
     return { windowFindings: allFindings };
   }
 
-  // ─── mergeFindings ────────────────────────────────────────────────────────────
   async function mergeFindings(state: ValidationState) {
     const seen = new Set<string>();
     const deduplicated: ValidationOutput['issues'] = [];
@@ -201,7 +177,6 @@ export function createNovelValidationGraph(services: ValidationServices) {
       }
     }
 
-    // Sort: errors first.
     deduplicated.sort((a, b) => (a.severity === 'error' && b.severity !== 'error' ? -1 : b.severity === 'error' && a.severity !== 'error' ? 1 : 0));
 
     const summary =
@@ -220,7 +195,6 @@ export function createNovelValidationGraph(services: ValidationServices) {
     return { report };
   }
 
-  // ─── persistReport ────────────────────────────────────────────────────────────
   async function persistReport(state: ValidationState) {
     const projectId = BigInt(state.projectId);
     const report = state.report as ValidationOutput | null;

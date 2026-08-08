@@ -1,24 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { ValidationSeverity } from './enums';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class ValidationIssueSchema {

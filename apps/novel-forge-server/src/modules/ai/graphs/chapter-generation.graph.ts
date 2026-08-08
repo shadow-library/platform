@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { and, eq, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -28,10 +18,6 @@ import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handl
 import { runToolLoop } from '../tools/tool-loop';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
 import { type ToolContext } from '../tools/types';
-
-/**
- * Defining types
- */
 
 export interface GraphServices {
   db: PrimaryDatabase;
@@ -73,10 +59,6 @@ const ChapterGenAnnotation = Annotation.Root({
 
 type ChapterGenState = typeof ChapterGenAnnotation.State;
 export type JudgeFinding = JudgeOutput['findings'][number];
-
-/**
- * Declaring the constants
- */
 
 const logger = Logger.getLogger(APP_NAME, 'chapter-generation.graph');
 
@@ -170,7 +152,6 @@ function tryParseJson(raw: string): unknown {
 export function createChapterGenerationGraph(services: GraphServices) {
   const { db, contextAssembler, modelRouter, toolRegistry, checkpointer } = services;
 
-  // ─── assembleContext ──────────────────────────────────────────────────────────
   async function assembleContext(state: ChapterGenState) {
     const pack = await contextAssembler.forChapter(BigInt(state.projectId), state.chapter);
     // Link the pack to the run row so the run detail can show the prompt anatomy behind the tokens.
@@ -178,7 +159,6 @@ export function createChapterGenerationGraph(services: GraphServices) {
     return { contextPackId: pack.id ? String(pack.id) : null };
   }
 
-  // ─── draftChapter ─────────────────────────────────────────────────────────────
   async function draftChapter(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
     const [brief, projectRow] = await Promise.all([
@@ -186,7 +166,6 @@ export function createChapterGenerationGraph(services: GraphServices) {
       db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
 
-    // Fetch context pack rendered text for the prompt.
     let renderedPack = '';
     if (state.contextPackId) {
       const pack = await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) });
@@ -225,7 +204,6 @@ export function createChapterGenerationGraph(services: GraphServices) {
     };
   }
 
-  // ─── persistDraft ─────────────────────────────────────────────────────────────
   async function persistDraft(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
     const source = state.attempt === 0 ? 'generated' : state.repairMode === 'patch' ? 'patched' : 'rewritten';
@@ -282,7 +260,6 @@ export function createChapterGenerationGraph(services: GraphServices) {
     return { draftId: String(draft.id) };
   }
 
-  // ─── judge ────────────────────────────────────────────────────────────────────
   async function judge(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
     const [projectRow, brief] = await Promise.all([
@@ -361,7 +338,6 @@ export function createChapterGenerationGraph(services: GraphServices) {
       knowledgeCompliant: knowledge.knowledgeCompliant,
     });
 
-    // Update draft with judge result.
     if (state.draftId) {
       const reviewStatus = verdict === 'consistent' ? 'needs_review' : 'contradiction';
       const judgeNote = findings.map(f => `[${f.severity}] ${f.text}`).join('\n');
@@ -374,7 +350,6 @@ export function createChapterGenerationGraph(services: GraphServices) {
     return { verdict, findings, endingCompliant, knowledgeCompliant: knowledge.knowledgeCompliant };
   }
 
-  // ─── repairPatch ──────────────────────────────────────────────────────────────
   async function repairPatch(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
@@ -422,7 +397,6 @@ export function createChapterGenerationGraph(services: GraphServices) {
     return { repairMode: 'rewrite' as const, patchApplied: false };
   }
 
-  // ─── repairRewrite ────────────────────────────────────────────────────────────
   async function repairRewrite(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
     const [brief, projectRow] = await Promise.all([
@@ -466,7 +440,6 @@ export function createChapterGenerationGraph(services: GraphServices) {
     };
   }
 
-  // ─── terminal nodes ───────────────────────────────────────────────────────────
   async function accept(state: ChapterGenState) {
     if (state.draftId) {
       await db

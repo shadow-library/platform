@@ -1,24 +1,10 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { describe, expect, it } from 'bun:test';
 import { unzipSync } from 'fflate';
 
-/**
- * Importing user defined packages
- */
 import { NovelPackageService } from '@modules/export';
 import * as schema from '@server/database/schemas';
 import { TestEnvironment } from '@tests/test-environment';
-
-/**
- * Defining types
- */
 
 interface Manifest {
   schemaVersion: number;
@@ -27,10 +13,6 @@ interface Manifest {
   description?: string;
   chapters: { title: string; file: string }[];
 }
-
-/**
- * Declaring the constants
- */
 
 const pgAvailable = await (async () => {
   try {
@@ -86,7 +68,6 @@ describe.if(pgAvailable)('Novel package export', () => {
       { title: 'Awakening', file: 'chapters/0001.md' },
       { title: 'The Road', file: 'chapters/0002.md' },
     ]);
-    // Every manifest chapter file exists in the archive with its prose.
     expect(entries['chapters/0001.md']).toBe('The gate opened.');
     expect(entries['chapters/0002.md']).toBe('They marched east.');
   });

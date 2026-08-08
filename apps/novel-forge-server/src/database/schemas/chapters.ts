@@ -1,22 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { jsonb } from './jsonb';
 import { contentGenerator, projects } from './projects';
-
-/**
- * Defining types
- */
 
 export namespace Chapter {
   export type Row = InferSelectModel<typeof chapters>;
@@ -29,10 +15,6 @@ export namespace Chapter {
     words: number;
   }
 }
-
-/**
- * Declaring the constants
- */
 
 export const chapterStatus = pgEnum('chapter_status', ['done', 'failed', 'skipped']);
 

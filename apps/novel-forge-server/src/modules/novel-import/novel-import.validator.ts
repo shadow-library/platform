@@ -1,19 +1,4 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type NovelBundle } from './novel-import.dto';
-
-/**
- * Defining types
- */
 
 export interface BundleIssue {
   field: string;
@@ -32,10 +17,6 @@ export interface BundleValidation {
   /** Present (possibly empty) even when `issues` is non-empty, so callers can still inspect the shape. */
   chapters: FlattenedChapter[];
 }
-
-/**
- * Declaring the constants
- */
 
 // Sanity ceiling on chapter text + (estimated) decoded asset bytes, independent of the HTTP transport
 // body limit (see `dynamic.modules.ts`) — catches a pathological bundle with a clear field error

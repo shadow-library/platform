@@ -1,10 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { eq } from 'drizzle-orm';
@@ -12,16 +5,9 @@ import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
-
-/**
- * Defining types
- */
 
 interface IllustrationSession {
   sessionId: string;
@@ -32,10 +18,6 @@ interface IllustrationSession {
   status: 'active' | 'saved' | 'cancelled';
   createdAt: Date;
 }
-
-/**
- * Declaring the constants
- */
 
 const SESSION_TTL_MS = 60 * 60 * 1000;
 

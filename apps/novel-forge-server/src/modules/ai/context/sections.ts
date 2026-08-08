@@ -1,19 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type ContextTier = 'canonical' | 'approved_intent' | 'working';
 export type ContextPurpose =
   'generation' | 'revision' | 'validation' | 'outline' | 'chat' | 'chat_hub' | 'arc_plan' | 'premise' | 'audit' | 'rebrand_seed' | 'rebrand' | 'reforge_outline' | 'reforge';
@@ -45,10 +29,6 @@ export interface AssembledPack {
   renderedVolatile: string;
   rendered: string;
 }
-
-/**
- * Declaring the constants
- */
 
 // Section labels are part of the prompt contract — never change their text.
 export const SECTION_LABELS: Record<string, string> = {

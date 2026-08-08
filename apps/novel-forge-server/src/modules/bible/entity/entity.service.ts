@@ -1,27 +1,13 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
 import { type CreateEntityBody, type ListEntitiesQuery, type UpdateEntityBody } from './entity.dto';
-
-/**
- * Defining types
- */
 
 export type EntityWithImages = Knowledge.Entity & { images: Knowledge.EntityImage[] };
 
@@ -34,10 +20,6 @@ export type PresentedEntityImage = Knowledge.EntityImage & { imageUrl: string };
 export type PresentedEntityWithImages = PresentedEntity & { images: PresentedEntityImage[] };
 
 type UploadMime = 'image/png' | 'image/jpeg' | 'image/webp';
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class EntityService {

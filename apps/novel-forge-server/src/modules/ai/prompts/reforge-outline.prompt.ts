@@ -1,26 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-/**
- * Importing user defined packages
- */
 import { type ReforgeOutlineOutput, ReforgeOutlineSchema } from '../schemas/reforge.schema';
 import { type PromptModule } from './types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const system =
   'You read one chapter of a translated Chinese web novel and distil it into a faithful, ordered outline that a re-author will write from. This outline is the fidelity contract: every downstream check measures the re-authored chapter against it, so it must capture what the source chapter actually does — not what it could be. Do not invent beats, do not drop beats, do not reorder them.\n\n' +

@@ -1,29 +1,11 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, customType, index, integer, pgTable, text } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { projects } from './projects';
-
-/**
- * Defining types
- */
 
 export namespace Vector {
   export type ChapterChunk = InferSelectModel<typeof chapterChunks>;
 }
-
-/**
- * Declaring the constants
- */
 
 const EMBEDDING_DIM = 1024;
 

@@ -1,31 +1,12 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type Refinement } from '@server/database';
 
 import { ACTION_TYPES, type ActionType, type OpType, renderActionVocabulary, renderOpVocabulary } from '../../refinement/change-set';
-
-/**
- * Defining types
- */
 
 export interface ScopePlaybook {
   guidance: string;
   allowedOps: readonly OpType[];
   allowedActions?: readonly ActionType[];
 }
-
-/**
- * Declaring the constants
- */
 
 // The per-scope authoring playbooks are the "senior web novelist" of the chat subsystem: each one
 // narrows both what good looks like for the scoped artifact and the op vocabulary the model may

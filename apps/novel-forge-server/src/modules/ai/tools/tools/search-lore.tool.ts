@@ -1,24 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { z } from 'zod';
 
-/**
- * Importing user defined packages
- */
 import { type RegisteredTool } from '../types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const inputSchema = z.object({
   kinds: z.array(z.string()).optional(),

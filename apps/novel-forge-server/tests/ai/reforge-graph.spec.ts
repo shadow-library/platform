@@ -1,10 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { randomUUID } from 'node:crypto';
@@ -12,26 +5,15 @@ import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
-/**
- * Importing user defined packages
- */
 import { createChapterReforgeGraph, routeAfterFidelityJudge } from '@modules/ai/graphs/chapter-reforge.graph';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
-/**
- * Defining types
- */
-
 interface ScriptedCall {
   key: string;
   inputs: Record<string, unknown>;
 }
-
-/**
- * Declaring the constants
- */
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 const dbName = `${baseConnectionString.split('/').pop()}_reforge_graph`;

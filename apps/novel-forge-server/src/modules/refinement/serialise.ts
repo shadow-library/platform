@@ -1,25 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type Refinement } from '@server/database';
 
 import { type ProposalResponse } from './refinement.dto';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * Response serialisation helpers for the refinement module. The response schema serialises a `bigint`
  * field typed as `@Field(() => String)` by coercing it to a string — but only on the non-nullable
  * path. A nullable bigint-as-string field (a chat message's `proposalId`, a proposal's `messageId`)
@@ -28,7 +11,6 @@ import { type ProposalResponse } from './refinement.dto';
  * contract (`string | null`) intact.
  */
 
-/** Coerce a chat message's nullable `proposalId` bigint to the wire's `string | null`. */
 export function serialiseMessage<T extends { proposalId?: bigint | null }>(message: T): T {
   return { ...message, proposalId: message.proposalId == null ? null : (String(message.proposalId) as unknown as bigint) };
 }

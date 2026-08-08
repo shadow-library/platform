@@ -1,22 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { jsonb } from './jsonb';
 import { contentGenerator, projects } from './projects';
-
-/**
- * Defining types
- */
 
 export namespace Generation {
   export type Draft = InferSelectModel<typeof drafts>;
@@ -28,10 +14,6 @@ export namespace Generation {
   export type ContinuityProposalStatus = InferEnum<typeof continuityProposalStatus>;
   export type DraftReviewStatus = InferEnum<typeof draftReviewStatus>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const draftStatus = pgEnum('draft_status', ['draft', 'final']);
 export const judgeVerdict = pgEnum('judge_verdict', ['consistent', 'contradiction']);

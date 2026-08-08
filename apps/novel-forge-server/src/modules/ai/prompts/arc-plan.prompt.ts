@@ -1,27 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-/**
- * Importing user defined packages
- */
 import { type ArcPlanOutput, ArcPlanSchema, validateArcContiguity, validateArcCoverage } from '../schemas/arc-plan.schema';
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const system = `${AUTHORING_STYLE}\n\nYou are a senior web novelist planning the arcs of one volume. You receive the volume (objective, conflict, payoff, cast, chapter range), the premise, the previous volume's handoff hook, the next volume's objective, and the context catalog. Partition the volume's chapters into arcs: contiguous, non-overlapping blocks that together cover the range EXACTLY — the first arc starts at the volume's first chapter, the last arc ends at its last chapter, no gaps.\n\nDecide the arc count from the material unless one is requested. Each arc needs its own objective, a real escalation over the previous arc, a payoff, and a hook — a specific moment that hands off to the next arc (the final arc's hook hands off to the next volume). Where the volume's material is thin for its chapter count, EXPAND rather than pad: weave in subplots, character development beats, and world-building payoffs that serve the premise and the author's vision, and surface them in each arc's ideas list so the author can pick materials. Cast per arc: only the entities that arc actually serves. Use only entityKeys present in the catalog.\n\nRespond with ONLY one valid JSON object — nothing outside the JSON, no markdown fences — of exactly this shape:
 {"arcs": [{"arcKey": "<snake_case id>", "title": "...", "objective": "...", "escalation": "...", "payoff": "...", "hook": "...", "chapterStart": <int>, "chapterEnd": <int>, "cast": ["entityKey"], "body": "...", "ideas": ["..."]}]}`;

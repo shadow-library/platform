@@ -1,17 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { and, eq, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -23,10 +13,6 @@ import { type IndexingService } from '../retrieval/indexing.service';
 import { type ExtractionOutput } from '../schemas';
 import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
-
-/**
- * Defining types
- */
 
 export interface ExtractionServices {
   db: PrimaryDatabase;
@@ -51,10 +37,6 @@ const SourceExtractionAnnotation = Annotation.Root({
 
 type ExtractionState = typeof SourceExtractionAnnotation.State;
 
-/**
- * Declaring the constants
- */
-
 const logger = Logger.getLogger(APP_NAME, 'source-extraction.graph');
 
 export function createSourceExtractionGraph(services: ExtractionServices): ReturnType<typeof buildSourceExtractionGraph> {
@@ -64,7 +46,6 @@ export function createSourceExtractionGraph(services: ExtractionServices): Retur
 function buildSourceExtractionGraph(services: ExtractionServices) {
   const { db, modelRouter, indexingService, checkpointer } = services;
 
-  // ─── loadChapter ──────────────────────────────────────────────────────────────
   async function loadChapter(state: ExtractionState) {
     const projectId = BigInt(state.projectId);
     const ch = await db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter)) });
@@ -75,7 +56,6 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
     return { chapterId: String(ch.id), chapterContent: ch.content ?? '', chapterGenerator: ch.generator };
   }
 
-  // ─── extractKnowledge ────────────────────────────────────────────────────────
   async function extractKnowledge(state: ExtractionState) {
     const projectId = BigInt(state.projectId);
     const entityRows = await db.query.entities.findMany({
@@ -109,7 +89,6 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
     return { extracted: result };
   }
 
-  // ─── persistKnowledge ────────────────────────────────────────────────────────
   async function persistKnowledge(state: ExtractionState) {
     if (!state.extracted) return {};
 
@@ -197,7 +176,6 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
         .catch(err => logger.warn('beat upsert error', { err, beatKey: b.beatKey }));
     }
 
-    // Upsert plot threads.
     for (const t of extracted.plotThreads) {
       await db
         .insert(schema.plotThreads)
@@ -236,7 +214,6 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
         .catch(err => logger.warn('worldFact upsert error', { err, key: f.key }));
     }
 
-    // Upsert mysteries.
     for (const m of extracted.mysteries) {
       await db
         .insert(schema.mysteries)
@@ -262,7 +239,6 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
         .catch(err => logger.warn('mystery upsert error', { err, mysteryKey: m.mysteryKey }));
     }
 
-    // Update chapter summary.
     if (extracted.chapterSummary && state.chapterId) {
       await db
         .update(schema.chapters)
@@ -273,7 +249,6 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
     return {};
   }
 
-  // ─── embedProse ───────────────────────────────────────────────────────────────
   async function embedProse(state: ExtractionState) {
     const projectId = BigInt(state.projectId);
     try {

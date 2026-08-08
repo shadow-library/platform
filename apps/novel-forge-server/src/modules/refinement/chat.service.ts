@@ -1,10 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
@@ -14,9 +7,6 @@ import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
@@ -33,10 +23,6 @@ import { type ToolContext, ToolRegistryService } from '../ai/tools';
 import { type ChangeOp } from './change-set';
 import { type ApplyResult, ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
-
-/**
- * Defining types
- */
 
 export interface CreateSessionInput {
   scopeType: Refinement.ChatScope;
@@ -62,10 +48,6 @@ interface SessionListFilter {
   sortBy?: string;
   sortOrder?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 // Compaction thresholds (design §5.4): fold history once the verbatim window outgrows its token
 // budget or trails the watermark by more than MAX_VERBATIM_TURNS messages; the newest
@@ -125,7 +107,6 @@ export class ChatService {
     return session;
   }
 
-  /** Updates the session's mode and/or title — the mode switch is the manual ⇄ auto toggle (chat-hub design §6.2). */
   async updateSession(projectId: bigint, sessionId: string, update: { mode?: Refinement.ChatMode; title?: string }): Promise<Refinement.ChatSession> {
     const session = await this.getSession(projectId, sessionId);
     const set: Record<string, unknown> = { updatedAt: new Date() };
@@ -136,7 +117,6 @@ export class ChatService {
     return updated;
   }
 
-  /** Resolves and verifies the scope target; the ref grammar is the artifact-ref grammar of the proposals. */
   private async validateScopeRef(projectId: bigint, scopeType: Refinement.ChatScope, scopeRef: string | null): Promise<string | null> {
     const value = scopeRef?.includes(':') ? (scopeRef.split(':')[1] ?? '') : '';
     switch (scopeType) {
@@ -220,7 +200,6 @@ export class ChatService {
     return session;
   }
 
-  /** Sets (or clears, with nulls) the per-session model override used for every turn in this chat. */
   async updateSessionModel(projectId: bigint, sessionId: string, provider: string | null, model: string | null): Promise<Refinement.ChatSession> {
     const session = await this.getSession(projectId, sessionId);
     const [updated] = await this.db
@@ -412,7 +391,6 @@ export class ChatService {
     return this.modelRouter.resolveModel(SCOPE_CHAT_ROLE[session.scopeType], project);
   }
 
-  /** Persists the user's message at the start of a turn so the exchange is recoverable while the model runs. */
   private async persistUserMessage(projectId: bigint, session: Refinement.ChatSession, content: string, runId: string): Promise<Refinement.ChatMessage> {
     const lastOrdinal = await this.latestOrdinal(session.id);
     const [userMessage] = await this.db
@@ -423,7 +401,6 @@ export class ChatService {
     return userMessage;
   }
 
-  /** Persists the assistant reply (following the already-stored user message) and stages any change-set it proposed. */
   private async persistAssistantTurn(
     projectId: bigint,
     session: Refinement.ChatSession,

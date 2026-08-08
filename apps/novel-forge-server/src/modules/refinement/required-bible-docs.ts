@@ -1,28 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export interface RequiredBibleDoc {
   section: string;
   slug: string;
   purpose: string;
 }
-
-/**
- * Declaring the constants
- */
 
 // The manifest of what a serialized web novel's bible needs (design §7). All slugs live under the
 // existing bible_section enum — the audit model judges each entry against the project's actual

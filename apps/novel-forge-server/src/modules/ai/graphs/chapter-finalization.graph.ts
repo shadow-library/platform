@@ -1,17 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { and, eq, ne, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -23,10 +13,6 @@ import { type IndexingService } from '../retrieval/indexing.service';
 import { type ContinuityOutput } from '../schemas';
 import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
-
-/**
- * Defining types
- */
 
 export interface FinalizationServices {
   db: PrimaryDatabase;
@@ -54,17 +40,12 @@ const ChapterFinalizationAnnotation = Annotation.Root({
 
 type FinalizationState = typeof ChapterFinalizationAnnotation.State;
 
-/**
- * Declaring the constants
- */
-
 const logger = Logger.getLogger(APP_NAME, 'chapter-finalization.graph');
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function createChapterFinalizationGraph(services: FinalizationServices) {
   const { db, modelRouter, indexingService, checkpointer } = services;
 
-  // ─── guard ────────────────────────────────────────────────────────────────────
   async function guard(state: FinalizationState) {
     const projectId = BigInt(state.projectId);
     const [draftRow, projectRow] = await Promise.all([
@@ -84,7 +65,6 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     return {};
   }
 
-  // ─── commitProse ──────────────────────────────────────────────────────────────
   async function commitProse(state: FinalizationState) {
     const projectId = BigInt(state.projectId);
     logger.debug('finalization commitProse', { runId: state.runId, chapter: state.chapter, proseLength: state.prose.length });
@@ -122,7 +102,6 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
           setWhere: ne(schema.chapters.locked, true),
         });
 
-      // Mark draft as final.
       if (state.draftId) {
         await tx
           .update(schema.drafts)
@@ -134,14 +113,12 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     return {};
   }
 
-  // ─── extractContinuity ────────────────────────────────────────────────────────
   async function extractContinuity(state: FinalizationState) {
     // grok chapters skip continuity extraction.
     if (state.generator === 'grok') return { continuityDelta: null };
 
     const projectId = BigInt(state.projectId);
 
-    // Build entity roster for the prompt.
     const entityRows = await db.query.entities.findMany({
       where: eq(schema.entities.projectId, projectId),
       with: { aliases: true },
@@ -172,7 +149,6 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     return { continuityDelta: delta };
   }
 
-  // ─── applyContinuity ──────────────────────────────────────────────────────────
   async function applyContinuity(state: FinalizationState) {
     if (!state.continuityDelta) return {};
 
@@ -194,7 +170,6 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
         }
       }
 
-      // Insert new entities.
       for (const ne of delta.newEntities ?? []) {
         const [entity] = await tx
           .insert(schema.entities)
@@ -218,7 +193,6 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
         }
       }
 
-      // Upsert plot threads.
       for (const t of delta.threads ?? []) {
         await tx
           .insert(schema.plotThreads)
@@ -242,7 +216,6 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
           });
       }
 
-      // Upsert mysteries.
       for (const m of delta.mysteries ?? []) {
         await tx
           .insert(schema.mysteries)
@@ -266,7 +239,6 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
           });
       }
 
-      // Mark proposal applied — inside the same transaction as the mutations it records.
       await tx
         .update(schema.continuityProposals)
         .set({ status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
@@ -276,7 +248,6 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     return {};
   }
 
-  // ─── updateIndexes ────────────────────────────────────────────────────────────
   async function updateIndexes(state: FinalizationState) {
     const projectId = BigInt(state.projectId);
 
@@ -303,7 +274,6 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     return {};
   }
 
-  // ─── advanceCursor ────────────────────────────────────────────────────────────
   async function advanceCursor(state: FinalizationState) {
     const projectId = BigInt(state.projectId);
     const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
@@ -312,7 +282,6 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     if (state.chapter > currentChapter) {
       const updateData: Record<string, unknown> = { storyCurrentChapter: state.chapter, updatedAt: new Date() };
 
-      // Check if this chapter is in a new volume.
       const volume = await db.query.volumes.findFirst({
         where: and(
           eq(schema.volumes.projectId, projectId),

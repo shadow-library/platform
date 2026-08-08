@@ -1,25 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { IllustrationModule } from '@modules/illustration/illustration.module';
 import { IllustrationService } from '@modules/illustration/illustration.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 // Object storage itself (content-addressing, public URLs, the local/S3 providers) is exercised in
 // `@shadow-library/modules`' storage-module suite; here we only assert the illustration wiring survives.

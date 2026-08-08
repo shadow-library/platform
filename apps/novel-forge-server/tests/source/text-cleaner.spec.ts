@@ -1,29 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { ConsolidateService } from '@modules/extraction/consolidate.service';
 import { SkeletonService } from '@modules/planning/skeleton.service';
 import { AssetService } from '@modules/source/asset.service';
 import { cleanHtml } from '@modules/source/text-cleaner';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-// ─── cleanHtml ───────────────────────────────────────────────────────────────
 
 describe('cleanHtml', () => {
   it('strips script tags and their content', () => {
@@ -60,7 +40,6 @@ describe('cleanHtml', () => {
 
   it('collapses 3+ blank lines to 2', () => {
     const html = '<p>A</p><p>B</p><p>C</p>';
-    // Insert extra newlines artificially.
     const padded = '\n\n\n\n' + html + '\n\n\n\n';
     const result = cleanHtml(padded);
     expect(result).not.toMatch(/\n{3,}/);
@@ -91,17 +70,12 @@ describe('cleanHtml', () => {
   });
 });
 
-// ─── ConsolidateService ───────────────────────────────────────────────────────
-
 describe('ConsolidateService', () => {
   it('class is defined and instantiable', () => {
     expect(ConsolidateService).toBeDefined();
-    // Verify it's a constructor function (class).
     expect(typeof ConsolidateService).toBe('function');
   });
 });
-
-// ─── SkeletonService ─────────────────────────────────────────────────────────
 
 describe('SkeletonService', () => {
   it('class is defined', () => {
@@ -110,11 +84,8 @@ describe('SkeletonService', () => {
   });
 });
 
-// ─── AssetService ─────────────────────────────────────────────────────────────
-
 describe('AssetService', () => {
   it('renders entity and world-fact sections in Markdown format', async () => {
-    // Fake DatabaseService with a mock postgres client.
     const fakeDb = {
       query: {
         entities: {
@@ -135,7 +106,6 @@ describe('AssetService', () => {
       getPostgresClient: () => fakeDb,
     };
 
-    // Instantiate without DI by passing the fake service.
     const service = new AssetService(fakeDbService as never);
     const markdown = await service.render(1n);
 

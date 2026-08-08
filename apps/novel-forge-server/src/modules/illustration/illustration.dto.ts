@@ -1,20 +1,5 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 @Schema()
 export class IllustrationParams {
@@ -56,10 +41,6 @@ export class CancelIllustrationBody {
   sessionId: string;
 }
 
-/**
- * Declaring the constants
- */
-
 @Schema()
 export class StartIllustrationResponse {
   @Field()
@@ -80,8 +61,7 @@ export class SaveIllustrationResponse {
   @Field()
   saved: boolean;
 
-  // Absolute public object-storage URL, resolved server-side from the runtime `storage.public-origin`.
-  @Field()
+  @Field({ description: 'Absolute public object-storage URL resolved using the server runtime configuration.' })
   imageUrl: string;
 }
 

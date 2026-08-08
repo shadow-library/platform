@@ -1,27 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, OmitType, PartialType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-/**
- * Importing user defined packages
- */
 import { PlanStatus, SortByTime } from '@server/common';
 import { type Plan } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class VolumeProjectParams {
@@ -72,8 +54,7 @@ export class CreateVolumeBody {
   @Field(() => PlanStatus, { optional: true })
   status?: Plan.Status;
 
-  // The volume's cast — the entity keys of the characters it features (see `VolumeUpsertOp.cast`).
-  @Field(() => [String], { optional: true })
+  @Field(() => [String], { optional: true, description: 'Entity keys for the characters featured in this volume.' })
   cast?: string[];
 
   @Field({ optional: true })
@@ -124,8 +105,7 @@ export class VolumeResponse {
   @Field(() => PlanStatus)
   status: Plan.Status;
 
-  // Entity keys of the characters this volume features (see the body DTO).
-  @Field(() => [String], { optional: true, nullable: true })
+  @Field(() => [String], { optional: true, nullable: true, description: 'Entity keys for the characters featured in this volume.' })
   cast?: string[] | null;
 
   @Field({ optional: true, nullable: true })

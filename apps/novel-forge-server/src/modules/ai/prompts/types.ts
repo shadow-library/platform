@@ -1,22 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { type BaseMessage } from '@langchain/core/messages';
 import { type ChatPromptTemplate } from '@langchain/core/prompts';
 import { type SchemaClass } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { type AiRole } from '../defaults';
-
-/**
- * Defining types
- */
 
 export type PromptKey =
   | 'extraction'
@@ -70,7 +56,3 @@ export interface PromptModule<TOut> {
   postValidate?: (data: TOut) => string[];
   fewShots?: BaseMessage[];
 }
-
-/**
- * Declaring the constants
- */

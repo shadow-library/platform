@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, eq, isNotNull, lt, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Chapter, type PrimaryDatabase, type Project, schema } from '@server/database';
@@ -22,10 +12,6 @@ import { ModelRouterService, type ProjectConfig } from '../ai/model-router.servi
 import { PROMPT_REGISTRY } from '../ai/prompts';
 import { type RecombineOutput } from '../ai/schemas';
 import { type AmbiguousBoundary, applyBoundaryMerges, buildGroupingPlan, type ChapterLike, type RecombinePlan } from './title-parts';
-
-/**
- * Defining types
- */
 
 export interface RecombineOptions {
   dryRun?: boolean;
@@ -49,10 +35,6 @@ export interface RecombineResult {
 interface LoadedChapter extends ChapterLike {
   row: Chapter.Row;
 }
-
-/**
- * Declaring the constants
- */
 
 const MAX_BOUNDARIES_PER_CALL = 50;
 const EXCERPT_CHARS = 300;

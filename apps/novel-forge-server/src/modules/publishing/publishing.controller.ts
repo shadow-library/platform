@@ -1,17 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Authenticated } from '@shadow-library/auth/module';
 import { Config } from '@shadow-library/common';
 import { Body, ContextService, Delete, Get, HttpController, HttpStatus, Params, Post, Put, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { PublicationAccessService } from './publication-access.service';
@@ -29,14 +19,6 @@ import {
   ReconcileResponse,
 } from './publishing.dto';
 import { PublishingService } from './publishing.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId')

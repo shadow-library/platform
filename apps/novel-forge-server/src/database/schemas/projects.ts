@@ -1,21 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { AnyPgColumn, bigint, bigserial, integer, pgEnum, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { jsonb } from './jsonb';
-
-/**
- * Defining types
- */
 
 // Per-role model overrides persisted in `projects.config` (jsonb). Mirrors the wire `ProjectConfig`/
 // `ProjectModelOverrides` in project.dto (enumerated, not an index signature, so it round-trips in both
@@ -64,10 +50,6 @@ export namespace Project {
   export type ContentMode = InferEnum<typeof contentMode>;
   export type ContentGenerator = InferEnum<typeof contentGenerator>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const projectKind = pgEnum('project_kind', ['source', 'new_novel']);
 export const contentMode = pgEnum('content_mode', ['standard', 'grok_only']);

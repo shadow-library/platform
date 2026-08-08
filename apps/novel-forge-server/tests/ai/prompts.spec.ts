@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { buildChatRefinePrompt, PROMPT_REGISTRY, SCOPE_PLAYBOOKS } from '@modules/ai/prompts';
 import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
 import {
@@ -23,10 +17,6 @@ import {
   validatePlanContiguity,
 } from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
-
-/**
- * Declaring the constants
- */
 
 describe('Prompt modules', () => {
   describe('AUTHORING_STYLE invariant', () => {

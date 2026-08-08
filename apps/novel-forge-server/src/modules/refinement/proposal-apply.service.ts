@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, desc, eq, gt, gte, inArray, lte, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { arcContentHash, briefContentHash, computeBibleDocHash, volumeContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
@@ -40,10 +30,6 @@ import {
   type VolumeRemoveOp,
   type VolumeUpsertOp,
 } from './change-set';
-
-/**
- * Defining types
- */
 
 export interface AppliedArtifact {
   artifactRef: string;
@@ -98,10 +84,6 @@ interface ApplyContext {
 type TxResult =
   | { outcome: 'applied'; proposal: Refinement.Proposal; applied: AppliedArtifact[]; staleMarked: string[]; opResults: OpResult[] }
   | { outcome: 'conflicted'; proposal: Refinement.Proposal };
-
-/**
- * Declaring the constants
- */
 
 const STALE_VOLUME_CHANGED = 'volume_changed';
 const STALE_RANGE_SHIFTED = 'volume_range_shifted';

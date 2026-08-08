@@ -1,30 +1,12 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { describe, expect, it } from 'bun:test';
 import { asc, eq } from 'drizzle-orm';
 import { StorageService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { type NovelBundle } from '@modules/novel-import/novel-import.dto';
 import * as schema from '@server/database/schemas';
 import { TestEnvironment } from '@tests/test-environment';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const pgAvailable = await (async () => {
   try {

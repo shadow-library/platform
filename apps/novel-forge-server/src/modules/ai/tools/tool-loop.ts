@@ -1,10 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { type BaseChatModel } from '@langchain/core/language_models/chat_models';
@@ -12,18 +5,11 @@ import { AIMessage, type BaseMessage, HumanMessage, ToolMessage } from '@langcha
 import { type DynamicStructuredTool } from '@langchain/core/tools';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import { type RegisteredTool, type ToolContext } from './types';
-
-/**
- * Defining types
- */
 
 export interface ToolLoopOptions {
   maxRounds?: number;
@@ -36,10 +22,6 @@ export interface ToolLoopResult {
 
 // ToolCapableModel narrows BaseChatModel to those that implement bindTools.
 type ToolCapableModel = BaseChatModel & Required<Pick<BaseChatModel, 'bindTools'>>;
-
-/**
- * Declaring the constants
- */
 
 const logger = Logger.getLogger(APP_NAME, 'runToolLoop');
 

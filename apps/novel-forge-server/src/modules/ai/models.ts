@@ -1,19 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type ModelKind = 'llm' | 'embedding' | 'image';
 export type ModelProvider = 'anthropic' | 'openai' | 'xai' | 'ollama';
 
@@ -27,10 +11,6 @@ export interface ModelEntry {
   supportsTools?: boolean;
   supportsStructuredOutput?: boolean;
 }
-
-/**
- * Declaring the constants
- */
 
 // All supported models. New entries land here; the router validates against this registry.
 export const MODEL_REGISTRY: ModelEntry[] = [

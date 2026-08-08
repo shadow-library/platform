@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type Job, type PrimaryDatabase, type Rebrand, type Reforge, schema } from '@server/database';
 
@@ -23,10 +13,6 @@ import { RebrandService } from '../rebrand/rebrand.service';
 import { RecombineService } from '../source/recombine.service';
 import { ConcurrencyController } from './concurrency.controller';
 import { JobService } from './job.service';
-
-/**
- * Defining types
- */
 
 interface GeneratePayload {
   chapters: number[];
@@ -59,10 +45,6 @@ interface ImportPayload {
   chapters: { title: string; content: string }[];
   cover?: { mimeType: string; dataBase64: string };
 }
-
-/**
- * Declaring the constants
- */
 
 const IMPORT_BATCH_SIZE = 25;
 
@@ -114,13 +96,11 @@ export class JobExecutor {
     }
 
     const projectId = job.projectId;
-    // A10 will add Ollama detection; for now all jobs use remote LLM concurrency.
     const isLocal = false;
     const key = this.concurrency.lockKey(projectId, isLocal);
     this.logger.debug('dispatch: awaiting concurrency lock', { jobId, kind: job.kind, projectId, lockKey: key });
 
     await this.concurrency.run(key, async () => {
-      // Claim the job atomically; if another worker beat us to it inside the lock, stand down.
       const claimed = await this.jobService.start(jobId);
       if (!claimed) {
         this.logger.warn('dispatch: job already claimed by another worker', { jobId });
@@ -202,7 +182,6 @@ export class JobExecutor {
     this.logger.info('runBackfill: done', { jobId: job.id, projectId: job.projectId });
   }
 
-  // ─── Rebrand (rebrand design §6) ──────────────────────────────────────────────
   // Three phases, each derived from data — never from rebrands.status, which is advisory display
   // state updated at phase boundaries. Resume recomputes everything, so a crashed job re-posts clean.
   private async runRebrand(job: Job.Row): Promise<void> {
@@ -211,8 +190,6 @@ export class JobExecutor {
     this.logger.info('runRebrand: starting', { jobId: job.id, projectId, force: payload.force, limit: payload.limit, chapters: payload.chapters });
 
     try {
-      // Phase 1: a source project's chapters are supplied externally before the pipeline runs —
-      // verify they exist rather than acquiring them ourselves.
       const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
       if (!project) throw AppError.internal(`project ${projectId} not found`);
       const chapterCount = await this.db.$count(schema.chapters, eq(schema.chapters.projectId, projectId));
@@ -225,13 +202,11 @@ export class JobExecutor {
       await this.jobService.progress(job.id, { done: 0, total: 0, current: 'merging parts', phase: 'recombining' });
       await this.recombineService.autoRecombine(projectId);
 
-      // Phase 2: glossary seed (idempotent inside the service — resume never re-seeds or re-bills).
       this.logger.info('runRebrand: phase 2 — glossary seed', { jobId: job.id, projectId });
       await this.setRebrandStatus(projectId, 'glossary');
       await this.jobService.progress(job.id, { done: 0, total: 0, current: 'glossary', phase: 'glossary' });
       await this.rebrandService.seedGlossary(projectId, job.id);
 
-      // Phase 3: convert pending chapters ascending.
       await this.setRebrandStatus(projectId, 'converting');
       const targets = await this.selectRebrandChapters(projectId, payload);
       const total = targets.length;
@@ -261,7 +236,6 @@ export class JobExecutor {
     }
   }
 
-  // ─── Reforge (reforge design §7) ──────────────────────────────────────────────
   // Three phases, each derived from data — never from reforges.status, which is advisory display
   // state. Reuses the rebrand recombine/seed backbone verbatim, then re-authors each chapter through
   // the reforge graph. Per-chapter failures flag-and-continue, identical to runRebrand.
@@ -271,8 +245,6 @@ export class JobExecutor {
     this.logger.info('runReforge: starting', { jobId: job.id, projectId, force: payload.force, limit: payload.limit, chapters: payload.chapters });
 
     try {
-      // Phase 1: a source project's chapters are supplied externally before the pipeline runs —
-      // verify they exist rather than acquiring them ourselves.
       const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
       if (!project) throw AppError.internal(`project ${projectId} not found`);
       const chapterCount = await this.db.$count(schema.chapters, eq(schema.chapters.projectId, projectId));
@@ -292,7 +264,6 @@ export class JobExecutor {
       await this.jobService.progress(job.id, { done: 0, total: 0, current: 'glossary', phase: 'glossary' });
       await this.rebrandService.seedGlossary(projectId, job.id);
 
-      // Phase 3: reforge pending chapters ascending.
       await this.setReforgeStatus(projectId, 'reforging');
       const targets = await this.selectReforgeChapters(projectId, payload);
       const total = targets.length;
@@ -322,7 +293,6 @@ export class JobExecutor {
     }
   }
 
-  // ─── Publish (reader-publish design §5–6) ─────────────────────────────────────
   // One convergence pass over the publication ledger: novel metadata, due/drifted chapter PUTs,
   // ledgered-unpublish DELETEs. Per-row failures land on the ledger rows (the row is the outbox);
   // the job fails on any of them so the janitor sweep keeps retrying until the reader converges.
@@ -343,7 +313,6 @@ export class JobExecutor {
     if (failed > 0) throw AppError.internal(`publish convergence incomplete: ${failed} push(es) failed — see the publication ledger`);
   }
 
-  // ─── Novel import (novel-import-format.md) ────────────────────────────────────
   // The project row already exists (created transactionally with this job by NovelImportService); this
   // job only writes chapters, the cover, and — for `source` mode — triggers the same auto-recombine
   // hook that used to run on ingest completion. A mid-batch failure leaves the project and whatever

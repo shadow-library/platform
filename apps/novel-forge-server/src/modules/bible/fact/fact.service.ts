@@ -1,27 +1,13 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
 import { type RevealFactBody, type UpsertFactBody } from './fact.dto';
-
-/**
- * Defining types
- */
 
 export interface KnowledgeEntry {
   entityKey: string;
@@ -37,10 +23,6 @@ export interface FactWithKnowledge extends Knowledge.CanonFact {
 }
 
 type FactRowWithLedger = Knowledge.CanonFact & { knowledge: (Knowledge.CharacterKnowledge & { entity: { entityKey: string; name: string } })[] };
-
-/**
- * Declaring the constants
- */
 
 const LEDGER_RELATION = { knowledge: { with: { entity: { columns: { entityKey: true, name: true } } } } } as const;
 

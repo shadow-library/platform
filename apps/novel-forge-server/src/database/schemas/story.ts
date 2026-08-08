@@ -1,22 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { jsonb } from './jsonb';
 import { projects } from './projects';
-
-/**
- * Defining types
- */
 
 export namespace Story {
   export type Beat = InferSelectModel<typeof beats>;
@@ -28,10 +14,6 @@ export namespace Story {
   export type ThreadStatus = InferEnum<typeof threadStatus>;
   export type MysteryStatus = InferEnum<typeof mysteryStatus>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const threadStatus = pgEnum('thread_status', ['open', 'closed']);
 export const mysteryStatus = pgEnum('mystery_status', ['open', 'resolved']);

@@ -1,19 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export interface BriefBodyInput {
   objective: string;
   events: string[];
@@ -21,10 +5,6 @@ export interface BriefBodyInput {
   startsFromPreviousChapter?: boolean;
   handoffBeat?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 // Folds outline-time continuation decisions into the stored brief body so the drafter — which only
 // ever reads `chapterBrief` as plain text — actually sees them. Shared by the outline flow and the

@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { applyBoundaryMerges, buildGroupingPlan, type ChapterLike, parseTitleParts } from '@modules/source';
-
-/**
- * Declaring the constants
- */
 
 function ch(number: number, title: string | null, words = 2000): ChapterLike {
   return { number, title, words };

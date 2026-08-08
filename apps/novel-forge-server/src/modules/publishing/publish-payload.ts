@@ -1,20 +1,5 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { computeContentHash } from '@server/common';
 import { type Chapter } from '@server/database';
-
-/**
- * Defining types
- */
 
 /** The complete reader-facing chapter payload — nothing forge-internal may ever be added here (reader-publish design §4, hard rule 7) */
 export interface ReaderChapterPayload {
@@ -24,10 +9,6 @@ export interface ReaderChapterPayload {
   wordCount: number;
   contentHash: string;
 }
-
-/**
- * Declaring the constants
- */
 
 function countWords(content: string): number {
   return content.split(/\s+/).filter(Boolean).length;

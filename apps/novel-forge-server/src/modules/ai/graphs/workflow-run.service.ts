@@ -1,19 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -30,10 +20,6 @@ import { createChapterRebrandGraph, type RebrandGraphServices } from './chapter-
 import { createChapterReforgeGraph, type ReforgeGraphServices } from './chapter-reforge.graph';
 import { createNovelValidationGraph, type ValidationServices } from './novel-validation.graph';
 import { createSourceExtractionGraph, type ExtractionServices } from './source-extraction.graph';
-
-/**
- * Defining types
- */
 
 export interface ChapterGenerationInput {
   projectId: bigint;
@@ -92,10 +78,6 @@ export interface WorkflowRunResult {
   outcome: string;
   status: string;
 }
-
-/**
- * Declaring the constants
- */
 
 // LangGraph's PostgresSaver opens its own raw connection pool and needs a plain connection string,
 // which the injected DatabaseService does not expose. Read the same canonical env key the
@@ -362,7 +344,6 @@ export class WorkflowRunService {
       const outcome = (rawState as unknown as { outcome?: string | null }).outcome ?? 'completed';
       nodeTrace.push('planWindows', 'validateWindows', 'mergeFindings', 'persistReport');
 
-      // Store validation report as the run outcome.
       await this.completeRun(runId, outcome, 'completed', nodeTrace);
       return { runId, outcome, status: 'completed' };
     } catch (err) {

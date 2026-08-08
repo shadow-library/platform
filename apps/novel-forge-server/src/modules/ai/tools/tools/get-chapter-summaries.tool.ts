@@ -1,27 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, between, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
-/**
- * Importing user defined packages
- */
 import * as schema from '@server/database/schemas';
 
 import { type RegisteredTool } from '../types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const inputSchema = z
   .object({

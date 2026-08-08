@@ -1,27 +1,13 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, ValidationError } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type ImportNovelBody, type ImportNovelResponse } from './novel-import.dto';
 import { validateNovelBundle } from './novel-import.validator';
-
-/**
- * Defining types
- */
 
 // Persisted verbatim on `jobs.payload` — the transaction that creates the project is the only place
 // the bundle's chapter text and cover asset are ever staged, so the executor rereads them from here
@@ -31,10 +17,6 @@ export interface ImportJobPayload {
   chapters: { title: string; content: string }[];
   cover?: { mimeType: string; dataBase64: string };
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class NovelImportService {

@@ -1,31 +1,13 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { computeBibleDocHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Bible, type PrimaryDatabase, schema } from '@server/database';
 
 import { type UpsertBibleDocBody } from './bible-document.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class BibleDocumentService {

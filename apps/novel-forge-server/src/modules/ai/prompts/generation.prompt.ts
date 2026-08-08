@@ -1,25 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-/**
- * Importing user defined packages
- */
 import { type GenerationOutput, GenerationSchema } from '../schemas/generation.schema';
 import { type PromptModule } from './types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 // The chapter-writing craft rules (voice, pacing, length) are NOT hardcoded here — they arrive in the
 // context pack's `writing_style` section, sourced from the project's editable `instructions` (default:

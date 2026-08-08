@@ -1,28 +1,10 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Module } from '@shadow-library/app';
 import { FastifyModule } from '@shadow-library/fastify';
 import { DatabaseModule } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { JobsModule } from '../jobs/jobs.module';
 import { NovelImportController } from './novel-import.controller';
 import { NovelImportService } from './novel-import.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 // JobsModule is imported here (for JobExecutor, used to fire-and-forget dispatch) rather than the
 // other way around: JobExecutor.runImport needs nothing from this module — it inserts chapters and the

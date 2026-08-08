@@ -1,21 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { GenerationModule, GenerationService } from '@modules/generation';
 import { AppErrorCode } from '@server/classes';
-
-/**
- * Declaring the constants
- */
 
 describe('GenerationModule error codes', () => {
   it('defines DRF_001 (draft not found)', () => {

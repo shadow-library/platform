@@ -1,23 +1,4 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { EnumType, Field, Integer, Schema } from '@shadow-library/class-schema';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 // A hand-authored bundle picks one of two outcomes (novel-import-format.md §1): `source` lands the
 // chapters as raw source material feeding the existing extract/consolidate/rebrand/reforge pipeline;
@@ -27,7 +8,6 @@ export const NovelImportMode = EnumType.create('NovelImportMode', [...NOVEL_IMPO
 export type NovelImportModeValue = (typeof NOVEL_IMPORT_MODES)[number];
 
 const SLUG_PATTERN = '^[a-z0-9][a-z0-9-]*$';
-// Same whitelist `UploadImageBody`/`UpsertEntityImage` already validate covers and portraits against.
 const IMAGE_MIME_WHITELIST = ['image/png', 'image/jpeg', 'image/webp'] as const;
 
 // Column-aligned caps: `novel.title` writes to BOTH `projects.name` (varchar 255) and `projects.title`
@@ -39,23 +19,19 @@ const CHAPTER_TITLE_MAX_LENGTH = 500;
 
 @Schema()
 export class NovelImportAsset {
-  // Referenced by `novel.cover` — unique within the bundle (checked by `validateNovelBundle`).
-  @Field({ pattern: SLUG_PATTERN })
+  @Field({ pattern: SLUG_PATTERN, description: 'Asset name referenced by novel.cover; it must be unique within the bundle.' })
   name: string;
 
   @Field(() => String, { enum: [...IMAGE_MIME_WHITELIST] })
   mimeType: string;
 
-  // Base64-encoded bytes, without a `data:` URL prefix — same convention as `UploadImageBody.image`.
-  @Field({ minLength: 1 })
+  @Field({ minLength: 1, description: 'Base64-encoded bytes without a data URL prefix.' })
   dataBase64: string;
 }
 
 @Schema()
 export class NovelImportChapter {
-  // Aligned to `chapters.title` (varchar 500) — a title beyond this would fail the insert mid-job
-  // instead of rejecting the bundle upfront.
-  @Field({ minLength: 1, maxLength: CHAPTER_TITLE_MAX_LENGTH })
+  @Field({ minLength: 1, maxLength: CHAPTER_TITLE_MAX_LENGTH, description: 'Chapter title, limited to the database column capacity.' })
   title: string;
 
   @Field({ minLength: 1 })
@@ -64,9 +40,10 @@ export class NovelImportChapter {
 
 @Schema()
 export class NovelImportVolume {
-  // Unique and contiguous from 1 across the bundle (checked by `validateNovelBundle`) — volumes are
-  // purely an authoring/ordering construct; nothing in the database stores them.
-  @Field(() => Integer, { minimum: 1 })
+  @Field(() => Integer, {
+    minimum: 1,
+    description: 'One-based volume position; ordinals must be unique and contiguous across the bundle.',
+  })
   ordinal: number;
 
   @Field({ optional: true })
@@ -78,34 +55,22 @@ export class NovelImportVolume {
 
 @Schema()
 export class NovelImportMeta {
-  // Aligned to `projects.name` (varchar 255) — the tighter of the two columns this writes to.
-  @Field({ minLength: 1, maxLength: PROJECT_TITLE_MAX_LENGTH })
+  @Field({ minLength: 1, maxLength: PROJECT_TITLE_MAX_LENGTH, description: 'Novel title, limited to the project name column capacity.' })
   title: string;
 
-  // Maps to `projects.brief` — the same "overview" field the app's own premise/refinement flow reads
-  // (`refine.service.ts`: `project.brief ?? project.premise`) and the export package renders as the
-  // novel's description.
-  @Field({ minLength: 1 })
+  @Field({ minLength: 1, description: "Novel overview used as the project's brief and exported description." })
   synopsis: string;
 
-  // Accepted for authoring completeness; the `projects` table has no evidenced genre column today
-  // (the AI premise pipeline's own `genre` field is likewise never persisted), so it is validated but
-  // not written anywhere yet — see novel-import-format.md.
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'Optional authoring metadata; accepted but not currently persisted.' })
   genre?: string;
 
-  // Maps to `projects.themes` — the same jsonb array `NovelPackageService` reads back out as `tags`.
-  @Field(() => [String], { optional: true })
+  @Field(() => [String], { optional: true, description: 'Novel tags stored as project themes.' })
   tags?: string[];
 
-  // The `name` of an entry in `assets` — stored through the same `StorageService` path
-  // `ProjectService.setCover` uses, so it resolves at `projects.coverImagePath`.
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'Name of the bundle asset to use as the novel cover.' })
   cover?: string;
 
-  // Author chapter-writing instructions; maps to `projects.instructions`. Omitted falls back to the
-  // app's `DEFAULT_WRITING_INSTRUCTIONS`, identical to a project created without instructions.
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'Chapter-writing instructions; omission uses the application default.' })
   instructions?: string;
 }
 
@@ -123,9 +88,10 @@ export class NovelBundle {
   @Field(() => NovelImportMeta)
   novel: NovelImportMeta;
 
-  // Ordered groups; global chapter numbers are DERIVED by flattening volumes in ordinal order — the
-  // bundle never carries explicit chapter numbers (novel-import-format.md §3).
-  @Field(() => [NovelImportVolume], { minItems: 1 })
+  @Field(() => [NovelImportVolume], {
+    minItems: 1,
+    description: 'Ordered volume groups; global chapter numbers are derived by flattening them in ordinal order.',
+  })
   volumes: NovelImportVolume[];
 
   @Field(() => [NovelImportAsset], { optional: true })

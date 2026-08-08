@@ -1,25 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { JobKind, JobStatus } from '@server/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class JobIdParams {
@@ -57,12 +39,20 @@ export class JobResponse {
   @Field({ optional: true, nullable: true })
   lastError?: string | null;
 
-  // Job input and progress snapshots: their shape depends on the job kind (generate, extract, plan, …),
-  // so both stay open objects with `additionalProperties` to keep every nested key through serialisation.
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  @Field(() => Object, {
+    optional: true,
+    nullable: true,
+    additionalProperties: true,
+    description: 'Job input whose fields depend on the job kind.',
+  })
   payload?: unknown;
 
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  @Field(() => Object, {
+    optional: true,
+    nullable: true,
+    additionalProperties: true,
+    description: 'Current progress snapshot whose fields depend on the job kind.',
+  })
   progress?: unknown;
 
   @Field(() => String, { optional: true, nullable: true, format: 'date-time' })

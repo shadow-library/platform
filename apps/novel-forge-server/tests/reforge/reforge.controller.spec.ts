@@ -1,27 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { JobExecutor } from '@modules/jobs/job.executor';
 import * as schema from '@server/database/schemas';
 import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const pgAvailable = await (async () => {
   try {

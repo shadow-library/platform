@@ -1,29 +1,11 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Authenticated } from '@shadow-library/auth/module';
 import { ContextService, Get, HttpController, Params, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 
 import { redactJobForResponse } from './job-response';
 import { JobService } from './job.service';
 import { JobIdParams, JobResponse } from './jobs.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Authenticated()
 @HttpController('/api/v1/jobs')

@@ -1,23 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
 // Real-world nation/ethnicity terms that must never survive conversion (rebrand design §2). Matched
 // case-insensitively on word boundaries, so common-word collisions need care: single-word dynasty
 // names ("Han", "Tang", "Ming") are left out because they collide with ordinary names and words —

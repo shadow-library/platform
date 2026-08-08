@@ -1,31 +1,13 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, eq, ne } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { volumeContentHash } from '@server/common';
 import { type PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface ApprovePlanResult {
   volumesApproved: number;
   approved: boolean;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Approves the volume plan and lays out chapter ranges as cumulative `targetChapterCount` sums in

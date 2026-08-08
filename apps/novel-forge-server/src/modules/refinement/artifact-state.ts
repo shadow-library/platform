@@ -1,21 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, eq, inArray } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { computeContentHash } from '@server/common';
 import { type Bible, type PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface ArtifactState {
   exists: boolean;
@@ -32,10 +18,6 @@ interface ParsedRefs {
   drafts: number[];
   entityKeys: string[];
 }
-
-/**
- * Declaring the constants
- */
 
 const MISSING: ArtifactState = { exists: false, revision: null, contentHash: null };
 

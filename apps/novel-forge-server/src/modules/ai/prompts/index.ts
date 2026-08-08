@@ -1,14 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { arcPlanPrompt } from './arc-plan.prompt';
 import { bibleAuditPrompt } from './bible-audit.prompt';
 import { charactersPrompt } from './bible-builder/characters.prompt';
@@ -42,14 +31,6 @@ import { skeletonPrompt } from './skeleton.prompt';
 import { titlePrompt } from './title.prompt';
 import { type PromptKey, type PromptModule } from './types';
 import { validationPrompt } from './validation.prompt';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   extraction: extractionPrompt as PromptModule<unknown>,

@@ -1,22 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, index, integer, pgEnum, pgTable, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { jsonb } from './jsonb';
 import { projects } from './projects';
-
-/**
- * Defining types
- */
 
 export namespace Reforge {
   export type Row = InferSelectModel<typeof reforges>;
@@ -33,10 +19,6 @@ export namespace Reforge {
     targetWords?: number;
   }
 }
-
-/**
- * Declaring the constants
- */
 
 // Advisory display state only — resume logic derives the real phase from the shared rebrand world
 // notes and the chapter_reforges rows, so a stale status can never corrupt a run.

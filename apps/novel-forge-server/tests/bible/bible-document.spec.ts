@@ -1,30 +1,12 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
-/**
- * Importing user defined packages
- */
 import { BibleDocumentService } from '@modules/bible/document/bible-document.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 const dbName = `${baseConnectionString.split('/').pop()}_bible_doc`;
@@ -74,7 +56,7 @@ describe.if(pgAvailable)('BibleDocumentService versioning + invalidation', () =>
     const v1 = await service.upsert(projectId, 'world', 'magic', { body: 'Fire magic exists.' });
     expect(v1.revision).toBe(1);
     expect(v1.contentHash).toBeTruthy();
-    expect(await chapterFlag(projectId)).toBe(true); // new canon invalidates existing chapters
+    expect(await chapterFlag(projectId)).toBe(true);
 
     // Reset the flag, then re-upsert identical content: no revision bump, no re-invalidation.
     await db.update(schema.chapters).set({ needsRevalidation: false }).where(eq(schema.chapters.projectId, projectId));

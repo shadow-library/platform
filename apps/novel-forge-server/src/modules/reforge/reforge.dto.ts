@@ -1,25 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { ReforgeChapterStatus, ReforgeFidelity, ReforgeStatus } from '@server/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class ReforgeParams {
@@ -82,9 +64,7 @@ export class ReforgeResponse {
   @Field(() => ReforgeFidelity)
   fidelity: string;
 
-  // Settings mirror ReforgeSettingsBody but ride out as an open jsonb blob (nullable class refs
-  // don't serialise; same treatment as jobs.payload).
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true, description: 'Settings used for this reforge run.' })
   settings?: ReforgeSettingsBody | null;
 
   @Field({ optional: true, nullable: true })
@@ -120,14 +100,16 @@ export class ReforgeStatusResponse {
   @Field(() => ReforgeCountsResponse)
   counts: ReforgeCountsResponse;
 
-  // The latest reforge job, if any — shape mirrors JobResponse but stays open for the progress blob.
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  @Field(() => Object, {
+    optional: true,
+    nullable: true,
+    additionalProperties: true,
+    description: 'Latest reforge job, including its job-specific progress fields.',
+  })
   job?: unknown;
 }
 
-// A model-reported audit-trail entry (issue) — an open shape whose keys vary by source;
-// `additionalProperties` keeps every nested key through serialisation.
-@Schema({ additionalProperties: true })
+@Schema({ additionalProperties: true, description: 'Model-reported audit issue whose fields vary by source.' })
 export class ReforgeDetailItem {
   @Field({ optional: true })
   detail?: string;
@@ -147,15 +129,18 @@ export class ReforgeChapterResponse {
   @Field({ optional: true, nullable: true })
   summary?: string | null;
 
-  // The faithful outline the writer worked from, the applied changes, and the judge verdict — all open
-  // model-produced jsonb blobs, so they ride out with additionalProperties.
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  @Field(() => Object, {
+    optional: true,
+    nullable: true,
+    additionalProperties: true,
+    description: 'Faithful outline used by the reforge writer.',
+  })
   sourceBeats?: unknown;
 
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true, description: 'Changes applied by the reforge writer.' })
   changes?: unknown;
 
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true, description: 'Fidelity assessment for the reforge output.' })
   fidelity?: unknown;
 
   @Field(() => [ReforgeDetailItem], { optional: true, nullable: true })

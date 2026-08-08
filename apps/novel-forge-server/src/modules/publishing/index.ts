@@ -1,23 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
 export * from './publish-payload';
 export * from './wiki-projection';
 export * from './wiki-publishing.service';

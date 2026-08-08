@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
@@ -20,10 +10,6 @@ import { type PrimaryDatabase, type Refinement, schema } from '@server/database'
 import { loadArtifactStates } from './artifact-state';
 import { type ChangeOp, changeSetRefs, type OpType, validateChangeSet } from './change-set';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
-
-/**
- * Defining types
- */
 
 export interface ChangeItem {
   id: bigint;
@@ -52,10 +38,6 @@ export interface CreateProposalInput {
   model?: string | null;
   runId?: string | null;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class ProposalService {

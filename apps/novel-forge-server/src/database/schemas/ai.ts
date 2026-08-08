@@ -1,23 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, customType, index, integer, numeric, pgEnum, pgTable, smallint, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { drafts } from './generation';
 import { jsonb } from './jsonb';
 import { projects } from './projects';
-
-/**
- * Defining types
- */
 
 export namespace Ai {
   export type WorkflowRun = InferSelectModel<typeof workflowRuns>;
@@ -35,10 +21,6 @@ export namespace Ai {
   export type UserFeedbackArtifactType = InferEnum<typeof userFeedbackArtifactType>;
   export type UserFeedbackDisposition = InferEnum<typeof userFeedbackDisposition>;
 }
-
-/**
- * Declaring the constants
- */
 
 const EMBEDDING_DIM = 1024;
 

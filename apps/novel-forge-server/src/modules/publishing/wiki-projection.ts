@@ -1,20 +1,5 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { computeContentHash } from '@server/common';
 import { type Knowledge } from '@server/database';
-
-/**
- * Defining types
- */
 
 /** The reader wiki-entry types, matching web-novel-server's ingest contract (a superset-equal of forge's `entity_type`). */
 export type WikiEntryType = Knowledge.EntityType;
@@ -96,10 +81,6 @@ export interface BuildWikiProjectionsInput {
   /** Forge chapter number → reader `publishedOrdinal`, for **published** chapters only (scheduled/failed/unpublished excluded). */
   ordinalByChapter: Map<number, number>;
 }
-
-/**
- * Declaring the constants
- */
 
 /** The reader's wiki entry-key route pattern; a key that cannot satisfy it can never be pushed, so it is skipped. */
 const ENTRY_KEY_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;

@@ -1,24 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { EndingContractSchema } from './ending-contract.schema';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class ChapterBriefSchema {

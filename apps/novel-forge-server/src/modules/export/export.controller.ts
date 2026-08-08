@@ -1,27 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { type FastifyReply } from 'fastify';
 import { Authenticated } from '@shadow-library/auth/module';
 import { Get, HttpController, Params, Res } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { ExportParams } from './export.dto';
 import { NovelPackageService } from './novel-package.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/export')

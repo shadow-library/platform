@@ -1,28 +1,12 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { schema } from '@server/database';
 import { TestEnvironment } from '@tests/test-environment';
 import { issueTestToken } from '@tests/test-idp';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- *
  * Regression coverage for the object-level authorization findings (NF-BOLA-01/02). Alice and Bob are
  * two distinct identity users; the guard must keep Bob out of everything Alice owns while never blocking
  * Alice from her own project. Every test seeds its own projects because `TestEnvironment` recreates the

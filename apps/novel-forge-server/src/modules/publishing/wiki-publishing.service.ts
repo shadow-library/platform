@@ -1,30 +1,12 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { asc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Publishing, schema } from '@server/database';
 
 import { buildWikiProjections, type WikiEntryProjection } from './wiki-projection';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * Loads the domain data a wiki projection needs and keeps the `wiki_publications` ledger in step with it.

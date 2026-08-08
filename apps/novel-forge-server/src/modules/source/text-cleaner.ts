@@ -1,23 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
 /** Strip a block-level element (tag + all its nested content) from the HTML string. */
 function stripElement(html: string, tag: string): string {
   const open = new RegExp(`<${tag}[\\s\\S]*?>`, 'gi');
@@ -73,13 +53,11 @@ function stripElement(html: string, tag: string): string {
 export function cleanHtml(html: string): string {
   if (!html) return '';
 
-  // ─── Strip unwanted block elements ──────────────────────────────────────────
   let text = html;
   for (const tag of ['script', 'style', 'nav', 'footer', 'header', 'aside']) {
     text = stripElement(text, tag);
   }
 
-  // ─── Block headings → Markdown headings ─────────────────────────────────────
   text = text
     .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, '\n\n# $1\n\n')
     .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, '\n\n## $1\n\n')
@@ -88,26 +66,21 @@ export function cleanHtml(html: string): string {
     .replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, '\n\n##### $1\n\n')
     .replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, '\n\n###### $1\n\n');
 
-  // ─── Inline formatting ───────────────────────────────────────────────────────
   text = text
     .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '**$1**')
     .replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, '**$1**')
     .replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '*$1*')
     .replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, '*$1*');
 
-  // ─── Links: keep visible text, drop href ────────────────────────────────────
   text = text.replace(/<a[^>]*>([\s\S]*?)<\/a>/gi, '$1');
 
-  // ─── Paragraph / line-break handling ────────────────────────────────────────
   text = text
     .replace(/<p[^>]*>/gi, '\n\n')
     .replace(/<\/p>/gi, '\n\n')
     .replace(/<br\s*\/?>/gi, '\n');
 
-  // ─── Strip all remaining HTML tags ──────────────────────────────────────────
   text = text.replace(/<[^>]+>/g, '');
 
-  // ─── HTML entity decoding ────────────────────────────────────────────────────
   text = text
     .replace(/&amp;/gi, '&')
     .replace(/&lt;/gi, '<')
@@ -125,7 +98,6 @@ export function cleanHtml(html: string): string {
     // Numeric entities: &#NNN; (decimal)
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)));
 
-  // ─── Normalise whitespace ────────────────────────────────────────────────────
   // Collapse 3+ consecutive blank lines to exactly 2.
   text = text.replace(/\n{3,}/g, '\n\n').trim();
 

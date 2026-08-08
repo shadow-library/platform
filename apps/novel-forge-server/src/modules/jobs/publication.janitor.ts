@@ -1,32 +1,14 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, eq, isNull, lte, notLike, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { STALE_ERROR_PREFIX } from '../publishing/publish-runner';
 import { JobExecutor } from './job.executor';
 import { JobService } from './job.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /** Sweep cadence — also the precision of `scheduledAt` releases and the base retry interval for failed pushes */
 export const PUBLISH_SWEEP_INTERVAL_MS = 60_000;

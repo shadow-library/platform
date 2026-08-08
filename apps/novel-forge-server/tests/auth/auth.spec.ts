@@ -1,30 +1,14 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { TestEnvironment } from '@tests/test-environment';
 import { AUTH_AUDIENCE, CALLBACK_URI, issueTestToken, TEST_USER, testIdP } from '@tests/test-idp';
-
-/**
- * Defining types
- */
 
 interface ResponseWithCookies {
   cookies: { name: string; value: string }[];
 }
 
 /**
- * Declaring the constants
- *
  * The SDK mounts the browser surface under `/api/auth` and manages the opaque app-session cookie
  * itself (default `__Host-shadow-session`, with the transient login state in `<name>-login`). There
  * is no sealed token and no bearer-promotion middleware — the guard consumes the handle cookie

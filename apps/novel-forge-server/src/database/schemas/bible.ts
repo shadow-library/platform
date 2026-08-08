@@ -1,31 +1,13 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { jsonb } from './jsonb';
 import { projects } from './projects';
-
-/**
- * Defining types
- */
 
 export namespace Bible {
   export type Document = InferSelectModel<typeof bibleDocuments>;
   export type Section = InferEnum<typeof bibleSection>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const bibleSection = pgEnum('bible_section', ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore']);
 

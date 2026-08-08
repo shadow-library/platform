@@ -1,24 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { buildWikiProjections, type BuildWikiProjectionsInput, type WikiEntityInput, type WikiFactInput } from '@modules/publishing/wiki-projection';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 function entity(overrides: Partial<WikiEntityInput> = {}): WikiEntityInput {
   return {

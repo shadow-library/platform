@@ -1,16 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type Refinement } from '@server/database';
 
@@ -19,14 +9,6 @@ import { VolumeService } from '../bible/volume/volume.service';
 import { GenerationService } from '../generation/generation.service';
 import { type ActionExecutionContext, type ActionExecutionResult, ActionExecutorRegistry, ProposalApplyService } from '../refinement';
 import { RefineService } from '../refinement/refine.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * Wires every chat action to the service that performs it (chat-hub design §5.3). Lives outside the

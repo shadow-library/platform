@@ -1,16 +1,5 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
-
-/**
- * Importing user defined packages
- */
 
 import { ProposalResponse } from '../refinement/refinement.dto';
 import { serialiseProposal } from '../refinement/serialise';
@@ -63,20 +52,10 @@ import {
 } from './generation.dto';
 import { GenerationService } from './generation.service';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId')
 export class GenerationController {
   constructor(private readonly generationService: GenerationService) {}
-
-  // ─── Planning ───────────────────────────────────────────────────────────────
 
   @Post('/seed-from-brief')
   @RespondFor(200, WorkflowRunResponse)
@@ -95,8 +74,6 @@ export class GenerationController {
   approvePlan(@Params() params: ProjectParams): Promise<ApprovePlanResponse> {
     return this.generationService.approvePlan(params.projectId);
   }
-
-  // ─── Outlines / Briefs ──────────────────────────────────────────────────────
 
   @Post('/outline')
   @RespondFor(200, OutlineResponse)
@@ -128,8 +105,6 @@ export class GenerationController {
   updateBrief(@Params() params: ChapterParams, @Body() body: UpdateBriefBody): Promise<BriefResponse> {
     return this.generationService.updateBrief(params.projectId, params.n, body);
   }
-
-  // ─── Generation + Drafts ────────────────────────────────────────────────────
 
   @Post('/generate')
   @HttpStatus(202)
@@ -220,15 +195,11 @@ export class GenerationController {
     return this.generationService.importDraft(params.projectId, params.n, body);
   }
 
-  // ─── Finalize ───────────────────────────────────────────────────────────────
-
   @Post('/finalize')
   @RespondFor(200, WorkflowRunResponse)
   finalizeChapters(@Params() params: ProjectParams, @Body() body: FinalizeBody): Promise<WorkflowRunResponse> {
     return this.generationService.finalize(params.projectId, body);
   }
-
-  // ─── Grok interlude ─────────────────────────────────────────────────────────
 
   @Post('/chapters/:n/generate-grok')
   @RespondFor(200, DraftResponse)
@@ -272,8 +243,6 @@ export class GenerationController {
     return this.generationService.discardContinuityProposal(params.projectId, params.n);
   }
 
-  // ─── Validation / Review ────────────────────────────────────────────────────
-
   @Post('/validate')
   @RespondFor(200, WorkflowRunResponse)
   validateContinuity(@Params() params: ProjectParams): Promise<WorkflowRunResponse> {
@@ -285,8 +254,6 @@ export class GenerationController {
   reviewChapter(@Params() params: ChapterParams): Promise<ChapterReviewResponse> {
     return this.generationService.reviewChapter(params.projectId, params.n);
   }
-
-  // ─── Human review queue / runs ───────────────────────────────────────────────
 
   @Get('/review-queue')
   @RespondFor(200, ReviewQueueResponse)
@@ -325,23 +292,17 @@ export class GenerationController {
     return this.generationService.getAiUsage(params.projectId);
   }
 
-  // ─── Search ─────────────────────────────────────────────────────────────────
-
   @Get('/search')
   @RespondFor(200, SearchResponse)
   searchProse(@Params() params: ProjectParams, @Query() query: SearchQuery): Promise<SearchResponse> {
     return this.generationService.search(params.projectId, query);
   }
 
-  // ─── Manuscript ─────────────────────────────────────────────────────────────
-
   @Get('/manuscript')
   @RespondFor(200, MarkdownResponse)
   getManuscript(@Params() params: ProjectParams): Promise<MarkdownResponse> {
     return this.generationService.getManuscript(params.projectId);
   }
-
-  // ─── Backfill ───────────────────────────────────────────────────────────────
 
   @Post('/backfill')
   @HttpStatus(202)

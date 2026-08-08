@@ -1,22 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { jsonb } from './jsonb';
 import { projects } from './projects';
-
-/**
- * Defining types
- */
 
 export namespace Publishing {
   export type Publication = InferSelectModel<typeof publications>;
@@ -29,10 +15,6 @@ export namespace Publishing {
   export type Visibility = InferEnum<typeof publicationVisibility>;
   export type GrantState = InferEnum<typeof publicationGrantState>;
 }
-
-/**
- * Declaring the constants
- */
 
 export const publicationStatus = pgEnum('publication_status', ['draft', 'live', 'retired']);
 export const chapterPublicationStatus = pgEnum('chapter_publication_status', ['scheduled', 'published', 'failed', 'unpublished']);
@@ -69,8 +51,6 @@ export const publications = pgTable('publications', {
   title: varchar('title', { length: 256 }).notNull(),
   blurb: text('blurb'),
   coverPath: varchar('cover_path', { length: 512 }),
-  // Reader-facing genre list — carried because the reader's novel upsert accepts it; jsonb like every
-  // other string-list column in this schema.
   genres: jsonb('genres').$type<string[]>(),
   status: publicationStatus('status').notNull().default('draft'),
   visibility: publicationVisibility('visibility').notNull().default('PUBLIC'),

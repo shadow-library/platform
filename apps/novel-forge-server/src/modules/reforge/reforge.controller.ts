@@ -1,16 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, HttpStatus, Params, Post, Put, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { JobEnqueueResponse } from '../pipeline/pipeline.dto';
@@ -26,14 +16,6 @@ import {
   ReforgeStatusResponse,
 } from './reforge.dto';
 import { ReforgeService } from './reforge.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/reforge')

@@ -1,10 +1,3 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { ChatAnthropic } from '@langchain/anthropic';
@@ -19,9 +12,6 @@ import { type SchemaClass } from '@shadow-library/class-schema';
 import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
@@ -33,18 +23,10 @@ import { type PromptModule } from './prompts/types';
 import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toJsonSchemaFormat } from './schemas/validate';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 
-/**
- * Defining types
- */
-
 export interface ProjectConfig {
   contentMode?: string;
   config?: { models?: Partial<Record<AiRole, ResolvedModel>> } | null;
 }
-
-/**
- * Declaring the constants
- */
 
 // Deterministic verification/extraction roles: identical input must yield identical output, so their
 // results are safe to cache. Creative roles (generation, revision, plan, outline, chat…) are never
@@ -126,16 +108,12 @@ export class ModelRouterService {
   }
 
   resolveModel(role: AiRole, project?: ProjectConfig): ResolvedModel {
-    // 1. grok_only forces xAI on every role
     if (project?.contentMode === 'grok_only') return { provider: 'xai', model: Config.get('ai.grok.llm.model') };
-    // 2. per-project config override (stored per fine-grained role; the settings UI writes one value
-    //    across every role in a group, so a group's members resolve identically).
+    // The settings UI writes one selection across every role in a group, so group members resolve identically.
     const models = project?.config?.models as Record<string, ResolvedModel> | undefined;
     const projectModel = models?.[role];
     if (projectModel) return projectModel;
-    // 3. refinement chat is its own dial but, left unset, follows the author's planning selection
     if (role === 'chat' && models?.['plan']) return models['plan'];
-    // 4. AI_PROFILE defaults
     return getProfileDefaults()[role] ?? { provider: 'xai', model: Config.get('ai.grok.llm.model') };
   }
 
@@ -205,7 +183,6 @@ export class ModelRouterService {
       input,
     });
 
-    // ─── Cache read-through (deterministic roles only) ────────────────────────
     const requestHash = CACHEABLE_ROLES.has(role) ? this.hashRequest(resolved, promptModule, input) : null;
     if (requestHash) {
       const cached = await this.db.query.llmCache.findFirst({ where: eq(schema.llmCache.requestHash, requestHash) });
@@ -219,7 +196,6 @@ export class ModelRouterService {
       }
     }
 
-    // ─── Attempt 1: invoke ───────────────────────────────────────────────────
     const rawOutput1 = await this.invokeResilient(llm, messages, this.invokeConfig(ctx, resolved, 0), role);
     const parsed1 = this.parseOutput(promptModule, tryParseJson(rawOutput1));
     if (parsed1.success) {
@@ -231,7 +207,6 @@ export class ModelRouterService {
     this.logger.warn('Attempt 1 parse failed — repairing', { role, issues: parsed1.issues.length });
     this.logger.debug('Attempt 1 raw output and issues', { role, runId: ctx.runId, rawOutput: rawOutput1, issues: renderSchemaIssues(parsed1.issues) });
 
-    // ─── Attempt 2: repair — continue the conversation with the actual issues ──
     const repairMessages: BaseMessage[] = [
       ...messages,
       new AIMessage(rawOutput1),
@@ -248,7 +223,6 @@ export class ModelRouterService {
       return parsed2.data;
     }
 
-    // ─── Attempt 3: tolerant extraction ──────────────────────────────────────
     this.logger.warn('Repair parse failed — trying tolerant extraction', { role });
     this.logger.debug('Repair raw output and issues', { role, runId: ctx.runId, rawOutput: rawOutput2, issues: renderSchemaIssues(parsed2.issues) });
     const extracted = extractJsonBlock(rawOutput2);
@@ -261,7 +235,6 @@ export class ModelRouterService {
       }
     }
 
-    // ─── Fail ────────────────────────────────────────────────────────────────
     this.logger.error('All parse attempts failed', { role, runId: ctx.runId, rawOutput1: rawOutput1.slice(0, 200) });
     // Full outputs only on debug (dev) — an operator can read the exact prose the model returned.
     this.logger.debug('All parse attempts failed — full raw outputs', { role, runId: ctx.runId, rawOutput1, rawOutput2 });

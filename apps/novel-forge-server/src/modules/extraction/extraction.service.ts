@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
@@ -24,10 +14,6 @@ import { type TelemetryContext } from '../ai/telemetry.handler';
 import { ConsolidateService } from './consolidate.service';
 import { KnowledgeRepository } from './knowledge.repository';
 
-/**
- * Defining types
- */
-
 export interface ExtractBatchOptions {
   limit?: number;
 }
@@ -35,10 +21,6 @@ export interface ExtractBatchOptions {
 export interface ExtractBatchResult {
   done: number;
 }
-
-/**
- * Declaring the constants
- */
 
 const DEFAULT_EXTRACT_LIMIT = 5;
 
@@ -66,14 +48,12 @@ export class ExtractionService {
 
   async extractChapter(projectId: bigint, chapterNumber: number): Promise<void> {
     this.logger.debug('extractChapter: starting', { projectId, chapterNumber });
-    // 1. Load chapter content.
     const chapter = await this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapterNumber)) });
     if (!chapter?.content) {
       this.logger.warn('extractChapter: chapter not found or empty', { projectId, chapterNumber });
       return;
     }
 
-    // 2. Build entity roster: at most 200 entities (key + type + name).
     const entityRows = await this.db.query.entities.findMany({
       where: eq(schema.entities.projectId, projectId),
       columns: { entityKey: true, type: true, name: true },
@@ -92,7 +72,6 @@ export class ExtractionService {
       role: 'extraction',
     };
 
-    // 3. Call LLM for structured extraction.
     const result = (await this.modelRouter.structured(
       PROMPT_REGISTRY.extraction,
       { chapterProse: chapter.content, entityRoster, contextPack: '', chapterNumber },
@@ -111,7 +90,6 @@ export class ExtractionService {
       mysteries: result.mysteries.length,
     });
 
-    // 4. Persist extracted knowledge using KnowledgeRepository.
     for (const e of result.entities) {
       const entity = await this.knowledgeRepository.upsertEntity(projectId, {
         entityKey: e.entityKey,
@@ -169,7 +147,6 @@ export class ExtractionService {
         knownTo: m.knownTo,
       });
 
-    // 5. Update chapter summary.
     if (result.chapterSummary) {
       await this.db
         .update(schema.chapters)
@@ -177,14 +154,12 @@ export class ExtractionService {
         .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapterNumber)));
     }
 
-    // 6. Best-effort embed.
     try {
       await this.indexingService.addProse(projectId, chapterNumber, chapter.content, chapter.generator);
     } catch (err) {
       this.logger.warn('extractChapter: addProse failed (non-fatal)', { err });
     }
 
-    // 7. Auto-consolidate after each chapter to keep significance + relationships current.
     await this.consolidateService.consolidate(projectId);
     this.logger.debug('extractChapter: done', { projectId, chapterNumber });
   }
@@ -192,7 +167,6 @@ export class ExtractionService {
   async extractBatch(projectId: bigint, options: ExtractBatchOptions = {}): Promise<ExtractBatchResult> {
     const limit = options.limit ?? DEFAULT_EXTRACT_LIMIT;
 
-    // Find source chapters that are scraped (status=done) but not yet summarised (summary null).
     const chapters = await this.db.query.chapters.findMany({
       where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), isNull(schema.chapters.summary)),
       columns: { number: true },

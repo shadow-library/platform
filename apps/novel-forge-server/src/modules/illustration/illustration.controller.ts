@@ -1,16 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Authenticated } from '@shadow-library/auth/module';
 import { Body, HttpController, Params, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import {
   CancelIllustrationBody,
   CancelIllustrationResponse,
@@ -23,14 +13,6 @@ import {
   StartIllustrationResponse,
 } from './illustration.dto';
 import { IllustrationService } from './illustration.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/entities/:entityKey/illustration')

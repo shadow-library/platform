@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { volumeContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
@@ -20,14 +10,6 @@ import { type Plan, type PrimaryDatabase, schema } from '@server/database';
 
 import { approveVolumePlan } from './volume.approve';
 import { type ApprovePlanResponse, type CreateVolumeBody, type ListVolumesQuery, type UpdateVolumeBody } from './volume.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class VolumeService {

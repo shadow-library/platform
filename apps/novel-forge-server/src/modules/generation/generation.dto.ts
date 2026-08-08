@@ -1,30 +1,10 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { DraftReviewStatus, DraftRevisionSource, DraftStatus, JobKind, JobStatus, PlanStatus, UserFeedbackDisposition, WorkflowRunStatus } from '@server/common';
 import { type Ai, type Generation } from '@server/database';
 
 import { KnowledgeContractSchema } from '../ai/schemas';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-// ─── Shared param schemas ─────────────────────────────────────────────────────
 
 @Schema()
 export class ProjectParams {
@@ -96,8 +76,6 @@ export class RunCallParams {
   callId: bigint;
 }
 
-// ─── Request bodies ───────────────────────────────────────────────────────────
-
 @Schema()
 export class SeedFromBriefBody {
   @Field()
@@ -139,9 +117,7 @@ export class UpdateBriefBody {
   @Field()
   body: string;
 
-  // Omitted → unchanged; the in-app path for adopting knowledge contracts on projects whose
-  // prose already blocks an overwrite re-import (character-knowledge design §3).
-  @Field(() => KnowledgeContractSchema, { optional: true })
+  @Field(() => KnowledgeContractSchema, { optional: true, description: 'Replacement knowledge contract. Omit to leave the existing contract unchanged.' })
   knowledgeContract?: KnowledgeContractSchema;
 }
 
@@ -171,9 +147,7 @@ export class UpdateDraftBody {
   @Field({ optional: true })
   summary?: string;
 
-  // Opaque draft state snapshot produced by the generation graph; its keys vary by workflow, so it
-  // stays an open object with `additionalProperties` to preserve them.
-  @Field(() => Object, { optional: true, additionalProperties: true })
+  @Field(() => Object, { optional: true, additionalProperties: true, description: 'Opaque workflow-specific draft state produced by the generation graph.' })
   state?: Record<string, unknown>;
 }
 
@@ -227,9 +201,7 @@ export class GenerateGrokBody {
 
 @Schema()
 export class UpdateContinuityBody {
-  // A continuity proposal blob whose shape is set by the continuity model (findings + suggested edits);
-  // kept as an open object with `additionalProperties` so its nested keys survive.
-  @Field(() => Object, { additionalProperties: true })
+  @Field(() => Object, { additionalProperties: true, description: 'Continuity findings and suggested edits produced by the continuity model.' })
   proposal: Record<string, unknown>;
 }
 
@@ -244,8 +216,6 @@ export class SearchQuery {
   @Field(() => Integer, { optional: true })
   k?: number;
 }
-
-// ─── Response schemas ─────────────────────────────────────────────────────────
 
 @Schema()
 export class WorkflowRunResponse {
@@ -330,8 +300,7 @@ export class BriefResponse {
   @Field()
   body: string;
 
-  // The retrieval refs a draft was built from — a list of artifact keys (see `BriefUpdateOp.contextRefs`).
-  @Field(() => [String], { optional: true, nullable: true })
+  @Field(() => [String], { optional: true, nullable: true, description: 'Artifact keys for the retrieval context used to build this draft.' })
   contextRefs?: string[] | null;
 
   @Field(() => String, { format: 'date-time' })
@@ -341,8 +310,7 @@ export class BriefResponse {
   updatedAt: Date;
 }
 
-// A brief's identity + freshness, without its body — what the plan hierarchy lists per chapter.
-@Schema()
+@Schema({ description: "A brief's identity and freshness without its body." })
 export class BriefSummaryResponse {
   @Field(() => Integer)
   chapter: number;
@@ -498,9 +466,7 @@ export class RunModelCallResponse {
   createdAt: Date;
 }
 
-// A read-only lookup the model made mid-run (chat lookups, judge/validation tools) — args in full,
-// result as a digest; the tokens the lookups added ride in the following model call's input.
-@Schema()
+@Schema({ description: 'A read-only lookup performed by a model during a run.' })
 export class RunToolCallResponse {
   @Field(() => String)
   id: bigint;
@@ -545,9 +511,7 @@ export class RunContextSectionItem {
   truncated: boolean;
 }
 
-// The prompt anatomy: where a run's input tokens actually come from — the assembled context pack's
-// sections, not the user's message. This is the data for optimising token usage per purpose.
-@Schema()
+@Schema({ description: "The context sections that contributed to a run's prompt token usage." })
 export class RunContextPackResponse {
   @Field()
   id: string;
@@ -567,8 +531,7 @@ export class RunContextPackResponse {
 
 @Schema()
 export class RunContextResponse extends RunContextPackResponse {
-  // The exact rendered text that fed the prompt (stable + volatile, in order).
-  @Field()
+  @Field({ description: 'The exact stable and volatile context text supplied to the prompt, in order.' })
   rendered: string;
 }
 
@@ -604,9 +567,7 @@ export class WorkflowRunDetailResponse {
   @Field({ optional: true, nullable: true })
   outcome?: string | null;
 
-  // `additionalProperties: true` keeps the nested run input/error intact; without it the response
-  // serialiser strips every nested key and returns `{}` (an empty, useless "context input").
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true, description: 'Workflow-specific input captured for this run.' })
   input?: Record<string, unknown> | null;
 
   @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
@@ -615,17 +576,13 @@ export class WorkflowRunDetailResponse {
   @Field(() => [String], { optional: true, nullable: true })
   nodeTrace?: string[] | null;
 
-  // Present only on the run-detail endpoint (the list omits it): every model call this run made.
-  @Field(() => [RunModelCallResponse], { optional: true })
+  @Field(() => [RunModelCallResponse], { optional: true, description: 'Model calls made by this run. Included only by the run-detail endpoint.' })
   modelCalls?: RunModelCallResponse[];
 
-  // Present only on the run-detail endpoint: every tool lookup the run's model calls performed.
-  @Field(() => [RunToolCallResponse], { optional: true })
+  @Field(() => [RunToolCallResponse], { optional: true, description: 'Tool lookups performed by this run. Included only by the run-detail endpoint.' })
   toolCalls?: RunToolCallResponse[];
 
-  // Present only on the run-detail endpoint, when the run linked its pack: the prompt anatomy.
-  // Optional, never null — the route serialiser cannot build nullable nested-object fields.
-  @Field(() => RunContextPackResponse, { optional: true })
+  @Field(() => RunContextPackResponse, { optional: true, description: 'Prompt context breakdown. Included only by the run-detail endpoint when linked.' })
   contextPack?: RunContextPackResponse;
 
   @Field(() => String, { format: 'date-time' })
@@ -634,8 +591,6 @@ export class WorkflowRunDetailResponse {
   @Field(() => String, { format: 'date-time', optional: true, nullable: true })
   endedAt?: Date | null;
 }
-
-// ─── Additional response schemas ──────────────────────────────────────────────
 
 @Schema()
 export class JobEnqueueResponse {
@@ -778,17 +733,12 @@ export class ListWorkflowRunResponse {
   items: WorkflowRunDetailResponse[];
 }
 
-// A per-role model-call-count map: keys are the open `AiRole` vocabulary, values are integers.
-// `patternProperties` types the values (the normaliser rewrites refs under patternProperties, unlike
-// `additionalProperties`), while still allowing any role key.
-@Schema({ patternProperties: { '^[a-z_]+$': Integer } })
+@Schema({ description: 'Model call counts keyed by AI role.', patternProperties: { '^[a-z_]+$': Integer } })
 export class RoleCallCounts {}
 
-// Per-role usage row: `role` is the open AiRole vocabulary (may contain `:`/`-`, e.g. `bible:plot`),
-// so it stays a plain string rather than a pattern-keyed map.
 @Schema()
 export class RoleUsage {
-  @Field()
+  @Field({ description: "An AI role identifier, including scoped roles such as 'bible:plot'." })
   role: string;
 
   @Field(() => Integer)
@@ -818,8 +768,7 @@ export class AiUsageResponse {
   @Field(() => RoleCallCounts)
   callsPerRole: RoleCallCounts;
 
-  // Per-role breakdown (calls + tokens + cost), sorted by total tokens descending.
-  @Field(() => [RoleUsage])
+  @Field(() => [RoleUsage], { description: 'Per-role usage sorted by total token count in descending order.' })
   roles: RoleUsage[];
 }
 
@@ -831,9 +780,7 @@ export class SearchHitResponse {
   @Field()
   score: number;
 
-  // Per-hit vector metadata (source refs, chunk info) — an open map from the index, so it keeps
-  // `additionalProperties` to preserve every key through serialisation.
-  @Field(() => Object, { additionalProperties: true })
+  @Field(() => Object, { additionalProperties: true, description: 'Index-specific vector metadata, including source references and chunk information.' })
   metadata: Record<string, unknown>;
 }
 
@@ -866,8 +813,7 @@ export class GenerationJobItem {
   @Field({ optional: true, nullable: true })
   lastError?: string | null;
 
-  // `additionalProperties: true` keeps the nested keys; without it the serialiser strips them to `{}`.
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true, description: 'Event-specific payload.' })
   payload?: unknown;
 
   @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
@@ -885,8 +831,6 @@ export class ListGenerationJobResponse {
   @Field(() => [GenerationJobItem])
   items: GenerationJobItem[];
 }
-
-// ─── Chapter scene images ─────────────────────────────────────────────────────
 
 @Schema()
 export class ChapterImageParams {
@@ -907,8 +851,7 @@ export class AddChapterImageBody {
   @Field(() => String, { enum: ['image/png', 'image/jpeg', 'image/webp'] })
   mime: 'image/png' | 'image/jpeg' | 'image/webp';
 
-  // Base64-encoded image bytes, without the `data:` URL prefix.
-  @Field()
+  @Field({ description: 'Base64-encoded image bytes without a data URL prefix.' })
   image: string;
 
   @Field({ optional: true })
@@ -926,8 +869,7 @@ export class ChapterImageResponse {
   @Field(() => Integer)
   chapter: number;
 
-  // Absolute public object-storage URL, resolved server-side from the runtime `storage.public-origin`.
-  @Field()
+  @Field({ description: 'Absolute public URL for the stored scene image.' })
   imageUrl: string;
 
   @Field({ optional: true, nullable: true })

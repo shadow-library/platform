@@ -1,29 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it, mock } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler, FULL_CAST_MAX, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-// ─── token-budget / countTokens ─────────────────────────────────────────────
 
 describe('countTokens', () => {
   it('returns a positive integer for a non-empty string', () => {
@@ -37,8 +17,6 @@ describe('countTokens', () => {
   });
 });
 
-// ─── token-budget / truncateAtParagraph ─────────────────────────────────────
-
 describe('truncateAtParagraph', () => {
   it('keeps paragraphs that fit and drops those that exceed maxTokens', () => {
     // Three paragraphs; para1 + para2 fit together, para3 would exceed.
@@ -47,11 +25,9 @@ describe('truncateAtParagraph', () => {
     const para3 = 'Gamma paragraph with some words here as well, bringing the total over budget.';
     const text = [para1, para2, para3].join('\n\n');
 
-    // Measure tokens for para1 + para2 combined (with separator).
     const twoParasTokens = countTokens(`${para1}\n\n${para2}`);
     const threeParasTokens = countTokens(text);
 
-    // Budget: enough for two but not three.
     const maxTokens = twoParasTokens + Math.floor((threeParasTokens - twoParasTokens) / 2);
 
     const { text: result, truncated } = truncateAtParagraph(text, maxTokens);
@@ -73,8 +49,6 @@ describe('truncateAtParagraph', () => {
   });
 });
 
-// ─── token-budget / truncateAtParagraphTail ─────────────────────────────────
-
 describe('truncateAtParagraphTail', () => {
   it('keeps paragraphs that fit and drops those that exceed maxTokens, from the front', () => {
     // Three paragraphs; para2 + para3 fit together, para1 would exceed — the TAIL is kept.
@@ -86,7 +60,6 @@ describe('truncateAtParagraphTail', () => {
     const twoParasTokens = countTokens(`${para2}\n\n${para3}`);
     const threeParasTokens = countTokens(text);
 
-    // Budget: enough for two but not three.
     const maxTokens = twoParasTokens + Math.floor((threeParasTokens - twoParasTokens) / 2);
 
     const { text: result, truncated } = truncateAtParagraphTail(text, maxTokens);
@@ -107,8 +80,6 @@ describe('truncateAtParagraphTail', () => {
     expect(truncated).toBe(false);
   });
 });
-
-// ─── token-budget / applyBudget ─────────────────────────────────────────────
 
 describe('applyBudget', () => {
   it('greedily keeps sections that fit and skips ones that overflow', () => {
@@ -138,8 +109,6 @@ describe('applyBudget', () => {
     expect(applyBudget(sections, 100)).toHaveLength(2);
   });
 });
-
-// ─── ContextAssembler (unit, stubbed DB) ────────────────────────────────────
 
 function makeDbStub(overrides: Record<string, unknown> = {}) {
   const defaultQuery = {
@@ -178,8 +147,6 @@ function makeAssembler(dbOverrides: Record<string, unknown> = {}, catalogText = 
   return new ContextAssembler(fakeDatabaseService, fakeCatalog);
 }
 
-// ─── Test 4: grok-adjacency rule ─────────────────────────────────────────────
-
 describe('ContextAssembler.forChapter — grok-adjacency', () => {
   it('prev_ending section contains "Summary:" when prev chapter generator is grok', async () => {
     const prevChapter = { number: 4, generator: 'grok', status: 'done', summary: 'Iron treaty signed', content: 'Long prose...', title: 'Ch4' };
@@ -214,8 +181,6 @@ describe('ContextAssembler.forChapter — grok-adjacency', () => {
     expect(prevEndingSection?.rendered).not.toContain('Long prose...');
   });
 });
-
-// ─── Test 4b: prev_ending keeps the tail, not the opening, of a standard chapter ─
 
 describe('ContextAssembler.forChapter — prev_ending tail truncation', () => {
   it('keeps the END of the previous chapter, not its opening, when content exceeds PREV_ENDING_TAIL', async () => {
@@ -253,8 +218,6 @@ describe('ContextAssembler.forChapter — prev_ending tail truncation', () => {
   });
 });
 
-// ─── Test 5: forOutline — retrieval absent degrades gracefully ───────────────
-
 describe('ContextAssembler.forOutline — retrieval absent', () => {
   it('returns pack with no lore_retrieved or prose_retrieved sections', async () => {
     const assembler = makeAssembler({}, 'catalog text');
@@ -265,8 +228,6 @@ describe('ContextAssembler.forOutline — retrieval absent', () => {
     expect(sectionKeys).not.toContain('prose_retrieved');
   });
 });
-
-// ─── Test 6: forChapter — no brief ───────────────────────────────────────────
 
 describe('ContextAssembler.forChapter — no brief', () => {
   it('assembles a pack without brief section when no brief exists', async () => {
@@ -291,7 +252,6 @@ describe('ContextAssembler.forChapter — no brief', () => {
 
     const sectionKeys = pack.sections.map(s => s.key);
     expect(sectionKeys).not.toContain('brief');
-    // Pack still assembled (writing_style present from project.instructions)
     expect(sectionKeys).toContain('writing_style');
   });
 
@@ -323,11 +283,8 @@ describe('ContextAssembler.forChapter — no brief', () => {
   });
 });
 
-// ─── Test 7: FULL_CAST_MAX — excess entity refs move to end ──────────────────
-
 describe('ContextAssembler.forChapter — FULL_CAST_MAX', () => {
   it(`moves entity refs beyond FULL_CAST_MAX (${FULL_CAST_MAX}) to end of section list`, async () => {
-    // Build 7 entity refs; the 6th and 7th should appear after memory/writing_style.
     const entityRefs = Array.from({ length: 7 }, (_, i) => `entity:ent${i}`);
 
     const entityRows = entityRefs.map((ref, i) => ({
@@ -363,22 +320,18 @@ describe('ContextAssembler.forChapter — FULL_CAST_MAX', () => {
     const sectionKeys = pack.sections.map(s => s.key);
     const entitySectionKeys = sectionKeys.filter(k => k.startsWith('ref:entity:'));
 
-    // All 7 entity refs should be present.
     expect(entitySectionKeys.length).toBe(7);
 
-    // The first FULL_CAST_MAX entity sections appear before memory and writing_style.
     const memoryIdx = sectionKeys.indexOf('memory');
     const writingStyleIdx = sectionKeys.indexOf('writing_style');
     const lastPriorityIdx = Math.max(memoryIdx !== -1 ? memoryIdx : 0, writingStyleIdx !== -1 ? writingStyleIdx : 0);
 
-    // Excess entities (ent5, ent6) should appear after memory or writing_style.
     const excessKeys = ['ref:entity:ent5', 'ref:entity:ent6'];
     for (const key of excessKeys) {
       const idx = sectionKeys.indexOf(key);
       expect(idx).toBeGreaterThan(lastPriorityIdx);
     }
 
-    // Priority entities (ent0..ent4) should appear before memory/writing_style.
     const priorityKeys = ['ref:entity:ent0', 'ref:entity:ent1', 'ref:entity:ent2', 'ref:entity:ent3', 'ref:entity:ent4'];
     for (const key of priorityKeys) {
       const idx = sectionKeys.indexOf(key);
@@ -387,8 +340,6 @@ describe('ContextAssembler.forChapter — FULL_CAST_MAX', () => {
   });
 });
 
-// ─── Test (acceptance): memory budget trimming ───────────────────────────────
-
 describe('ContextAssembler — memory budget trimming', () => {
   it('applies budget and excludes sections that would overflow', async () => {
     const dbOverrides = {
@@ -396,7 +347,6 @@ describe('ContextAssembler — memory budget trimming', () => {
         projects: {
           findFirst: mock(async () => ({
             id: 1n,
-            // Very long instructions to consume budget
             instructions: 'A'.repeat(5000),
             contentMode: 'standard',
           })),
@@ -415,18 +365,14 @@ describe('ContextAssembler — memory budget trimming', () => {
     };
 
     const assembler = makeAssembler(dbOverrides);
-    // Tight budget that only allows a couple of small sections.
     const pack = await assembler.forChapter(1n, 1, { dryRun: true, budgetTokens: 100 });
 
-    // Budget trimming works: not all sections are included when budget is tight.
     // usedTokens may exceed budgetTokens only when the first section is force-included
     // to guarantee a non-empty context pack (at-least-one guarantee in applyBudget).
     expect(pack.sections.length).toBeLessThan(3);
     expect(pack.sections.length).toBeGreaterThan(0);
   }, 15_000); // consistently ~5.4s on GitHub Actions' 2-vCPU runners, just over the 5s default — CI-speed headroom, not a functional change
 });
-
-// ─── forRebrand / forRebrandSeed — rebrand packs (rebrand design §5) ─────────
 
 describe('ContextAssembler.forRebrand', () => {
   const input = {
@@ -488,8 +434,6 @@ describe('ContextAssembler.forRebrandSeed', () => {
     expect(pack.rendered).toContain('geography/capital: the Jade Capital');
   });
 });
-
-// ─── forReforgeOutline / forReforge — reforge packs (reforge design §5) ──────
 
 describe('ContextAssembler.forReforgeOutline', () => {
   it('puts world notes in the stable segment and the glossary slice in the volatile tail', async () => {
@@ -559,8 +503,6 @@ describe('ContextAssembler.forReforge', () => {
     expect(pack.sections.map(s => s.key)).toEqual(['world_notes', 'glossary_slice']);
   });
 });
-
-// ─── forChapter — knowledge sections (character-knowledge design §5) ─────────
 
 describe('ContextAssembler.forChapter — knowledge sections', () => {
   const facts = [

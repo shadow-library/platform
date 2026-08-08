@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Publishing, schema } from '@server/database';
@@ -32,10 +22,6 @@ import {
 } from './reader-push.client';
 import { type WikiEntryProjection } from './wiki-projection';
 import { WikiPublishingService } from './wiki-publishing.service';
-
-/**
- * Defining types
- */
 
 export interface ConvergeOptions {
   /** Reconcile mode: manifest-diff every ledger row (drift healing / rebuild), not just the due ones */
@@ -73,10 +59,6 @@ export interface ConvergeResult {
   /** The wiki convergence outcome — derived projections pushed one-way alongside the chapters */
   wiki: WikiConvergeResult;
 }
-
-/**
- * Declaring the constants
- */
 
 /** Failed rows carrying this prefix are revision conflicts — retried only by explicit reconcile/republish, never by the sweep */
 export const STALE_ERROR_PREFIX = 'stale revision:';

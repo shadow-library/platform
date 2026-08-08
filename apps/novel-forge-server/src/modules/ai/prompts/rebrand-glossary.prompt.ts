@@ -1,26 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-/**
- * Importing user defined packages
- */
 import { type RebrandGlossarySeedOutput, RebrandGlossarySeedSchema } from '../schemas/rebrand.schema';
 import { type PromptModule } from './types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const system =
   'You design the rename bible for moving a translated Chinese web novel into a fictional alternate world. You receive the project overview (title, premise, known entities and world facts) and the opening chapters. Produce two things.\n\n' +

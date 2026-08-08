@@ -1,25 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { RebrandConversionStatus, RebrandGlossaryCategory, RebrandStatus } from '@server/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class RebrandParams {
@@ -91,9 +73,7 @@ export class RebrandResponse {
   @Field({ optional: true, nullable: true })
   worldNotes?: string | null;
 
-  // Settings mirror RebrandSettingsBody but ride out as an open jsonb blob (nullable class refs
-  // don't serialise; same treatment as jobs.payload).
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true, description: 'Settings used for this rebrand run.' })
   settings?: RebrandSettingsBody | null;
 
   @Field({ optional: true, nullable: true })
@@ -129,8 +109,12 @@ export class RebrandStatusResponse {
   @Field(() => ConversionCountsResponse)
   counts: ConversionCountsResponse;
 
-  // The latest rebrand job, if any — shape mirrors JobResponse but stays open for the progress blob.
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  @Field(() => Object, {
+    optional: true,
+    nullable: true,
+    additionalProperties: true,
+    description: 'Latest rebrand job, including its job-specific progress fields.',
+  })
   job?: unknown;
 }
 
@@ -161,9 +145,7 @@ export class GlossaryListResponse {
   items: GlossaryEntryResponse[];
 }
 
-// A model-reported audit-trail entry (fix, added scene, or issue) — an open shape whose keys vary by
-// source; `additionalProperties` keeps every nested key through serialisation.
-@Schema({ additionalProperties: true })
+@Schema({ additionalProperties: true, description: 'Model-reported audit entry whose fields vary by source.' })
 export class ConversionDetailItem {
   @Field({ optional: true })
   detail?: string;

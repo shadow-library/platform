@@ -1,16 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import {
   AuditBibleResponse,
   ContextPreviewQuery,
@@ -24,14 +14,6 @@ import {
 } from './refine.dto';
 import { RefineService } from './refine.service';
 import { serialiseProposal } from './serialise';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId')

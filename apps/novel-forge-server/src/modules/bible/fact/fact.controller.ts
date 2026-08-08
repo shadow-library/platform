@@ -1,26 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Put, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { FactKeyParams, FactKnowledgeParams, FactProjectParams, FactResponse, ListFactsResponse, RevealFactBody, UpsertFactBody } from './fact.dto';
 import { FactService } from './fact.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/facts')

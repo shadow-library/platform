@@ -1,26 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-/**
- * Importing user defined packages
- */
 import { type RebrandAuditOutput, RebrandAuditSchema } from '../schemas/rebrand.schema';
 import { type PromptModule } from './types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const system =
   'You audit one converted chapter of a novel that was moved into a fictional alternate world. You receive the world notes, the glossary slice used for the conversion, and the converted prose. Report ONLY violations of these three rules: (a) leftover nationalism or discrimination based on country, ethnicity, or skin color; (b) references to real-world countries, nationalities, cultures, or their unmistakable stand-ins; (c) naming inconsistency against the glossary slice or world notes (a mapped source name still present, a replacement rendered differently, an invented name that clashes with the stated naming conventions). Do not critique prose quality, pacing, or story choices — they are out of scope. When none of the three rules is violated, the verdict is clean and issues is empty.\n\n' +

@@ -1,26 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { type JudgeFinding, mergeKnowledgeCompliance, routeAfterJudge, routeAfterPatch, sameFinding } from '@modules/ai/graphs/chapter-generation.graph';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-// ─── sameFinding helper ───────────────────────────────────────────────────────
 
 describe('sameFinding', () => {
   it('returns false when previousFindings is empty', () => {
@@ -56,8 +36,6 @@ describe('sameFinding', () => {
     expect(sameFinding([], [])).toBe(false);
   });
 });
-
-// ─── routeAfterJudge ─────────────────────────────────────────────────────────
 
 describe('routeAfterJudge', () => {
   it('routes to accept when verdict is consistent', () => {
@@ -139,8 +117,6 @@ describe('routeAfterJudge', () => {
   });
 });
 
-// ─── mergeKnowledgeCompliance ────────────────────────────────────────────────
-
 describe('mergeKnowledgeCompliance', () => {
   it('is compliant when neither the pre-scan nor the judge found leaks', () => {
     expect(mergeKnowledgeCompliance({ compliant: true, issues: [] }, [])).toEqual({ knowledgeCompliant: true, findings: [] });
@@ -162,8 +138,6 @@ describe('mergeKnowledgeCompliance', () => {
     expect(result.findings[1]?.text).toBe('knowledge leak: [motive_debt] Amara acts on the debt she cannot know about');
   });
 });
-
-// ─── routeAfterPatch ─────────────────────────────────────────────────────────
 
 describe('routeAfterPatch', () => {
   it('routes to persistDraft when patch was applied', () => {

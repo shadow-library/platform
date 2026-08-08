@@ -1,24 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { type BaseMessage } from '@langchain/core/messages';
 
-/**
- * Importing user defined packages
- */
 import { countTokens } from './context/token-budget';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 // Anthropic ignores cache_control on blocks below its minimum cacheable size, so marking smaller
 // blocks would only burn one of the four allowed breakpoints.

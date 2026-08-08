@@ -1,27 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-/**
- * Importing user defined packages
- */
 import { ChatScope, RefinementKind, RefinementProposalStatus, SortByTime } from '@server/common';
 import { type Refinement } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class ProposalProjectParams {
@@ -58,31 +40,23 @@ export class ListProposalsQuery extends PaginationQuery(SortByTime) {
 
 @Schema()
 export class ApplyProposalBody {
-  // Cherry-pick selection: apply only these change-set indexes and record the rest as declined
-  // (chat-hub design §5.1). Absent → apply every op.
-  @Field(() => [Integer], { optional: true })
+  @Field(() => [Integer], { optional: true, description: 'Change-set indexes to apply; omission applies every operation.' })
   opIndexes?: number[];
 }
 
 @Schema({ minProperties: 1 })
 export class UpdateProposalBody {
-  // A discriminated union of ~10 op shapes (see `change-set.ts`), each keyed by `op`. It's kept as an
-  // open `ChangeOpItem` array rather than a modelled union because the ops are validated structurally
-  // server-side (`validateChangeSet`) and the client renders them generically — `additionalProperties`
-  // preserves each op's fields on the wire.
-  @Field(() => [ChangeOpItem])
+  @Field(() => [ChangeOpItem], { description: 'Replacement change-set operations, each discriminated by its op field.' })
   changeSet: Record<string, unknown>[];
 }
 
-// A change-set operation on the wire: op plus whatever fields that op carries (validated server-side).
-@Schema({ additionalProperties: true })
+@Schema({ additionalProperties: true, description: 'Change-set operation whose remaining fields depend on its server-validated op value.' })
 export class ChangeOpItem {
   @Field()
   op: string;
 }
 
-// One op's apply-time disposition; `result` is an open action-outcome blob (jobId/runId/proposalId).
-@Schema({ additionalProperties: true })
+@Schema({ additionalProperties: true, description: 'Apply-time disposition for one operation, optionally including a job, run, or proposal result.' })
 export class OpResultItem {
   @Field(() => Integer)
   index: number;
@@ -126,27 +100,20 @@ export class ProposalResponse {
   @Field({ optional: true, nullable: true })
   summary?: string | null;
 
-  // Loose-object items keep the nested op fields intact; a bare `[Object]` makes the response
-  // serialiser strip every nested key and the review UI would render empty change-sets.
-  @Field(() => [ChangeOpItem])
+  // A bare Object array makes the response serialiser strip nested operation fields.
+  @Field(() => [ChangeOpItem], { description: 'Proposed operations, each discriminated by its op field.' })
   changeSet: Record<string, unknown>[];
 
-  // Snapshot of the artifacts the change-set was drafted against (keyed by artifact ref) — an open map
-  // whose shape follows those refs, so it keeps `additionalProperties` to preserve every key.
-  @Field(() => Object, { additionalProperties: true })
+  @Field(() => Object, { additionalProperties: true, description: 'Artifact snapshots keyed by the references the change-set was drafted against.' })
   baseline: Record<string, unknown>;
 
   @Field()
   autoApplied: boolean;
 
-  // Computed at serialisation: applied AND carrying inverse ops — proposals applied before inverse
-  // capture existed (or action-only ones) cannot be undone, so the UI must not offer a revert.
-  @Field()
+  @Field({ description: 'Whether this proposal has been applied and carries inverse operations, allowing it to be reverted.' })
   revertible: boolean;
 
-  // Per-op dispositions recorded at apply time — applied/declined/failed (+ action results). Open
-  // objects so the action `result` payloads survive serialisation.
-  @Field(() => [OpResultItem], { optional: true, nullable: true })
+  @Field(() => [OpResultItem], { optional: true, nullable: true, description: 'Apply-time result for each operation.' })
   opResults?: Record<string, unknown>[] | null;
 
   @Field({ optional: true, nullable: true })
@@ -161,9 +128,12 @@ export class ProposalResponse {
   @Field(() => String, { format: 'date-time', optional: true, nullable: true })
   revertedAt?: Date | null;
 
-  // Failure detail recorded when an apply fails — an open, error-source-specific blob, so it keeps
-  // `additionalProperties` to preserve its nested keys.
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  @Field(() => Object, {
+    optional: true,
+    nullable: true,
+    additionalProperties: true,
+    description: 'Error-source-specific failure details recorded when proposal application fails.',
+  })
   error?: Record<string, unknown> | null;
 
   @Field(() => String, { format: 'date-time' })
@@ -259,9 +229,10 @@ export class ListChangesResponse extends Paginated(ChangeItemResponse) {}
 
 @Schema()
 export class RollbackBody {
-  // The anchor: the newest applied proposal to KEEP — everything applied after it is reverted,
-  // newest first (chat-hub design §5.5).
-  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Field(() => String, {
+    pattern: '^[0-9]+$',
+    description: 'Newest applied proposal to keep; every later proposal is reverted newest first.',
+  })
   @Transform('bigint:parse')
   afterProposalId: bigint;
 }

@@ -1,30 +1,10 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it, mock } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { chunkText } from '@modules/ai/retrieval/chunker';
 import { EmbeddingService } from '@modules/ai/retrieval/embedding.service';
 import { RetrievalService } from '@modules/ai/retrieval/retrieval.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-// ─── chunkText ───────────────────────────────────────────────────────────────
 
 describe('chunkText', () => {
   it('returns at least one chunk for empty input', () => {
@@ -49,7 +29,6 @@ describe('chunkText', () => {
     const chunks = chunkText(text, 2000);
     expect(chunks.length).toBeGreaterThanOrEqual(2);
 
-    // chunkIdx values are sequential starting from 0.
     for (let i = 0; i < chunks.length; i++) {
       expect(chunks[i]?.chunkIdx).toBe(i);
     }
@@ -60,14 +39,10 @@ describe('chunkText', () => {
     const text = paras.join('\n\n');
     const chunks = chunkText(text, 2000);
 
-    // All text is preserved when chunks are concatenated.
     const allText = chunks.map(c => c.text).join('');
-    // Remove paragraph separators from original and compare lengths.
     expect(allText.replace(/\s+/g, '')).toBe(text.replace(/\s+/g, ''));
   });
 });
-
-// ─── RetrievalService — grok_only returns [] ─────────────────────────────────
 
 describe('RetrievalService — grok_only project', () => {
   it('searchProse returns [] without calling embed for grok_only projects', async () => {
@@ -88,7 +63,6 @@ describe('RetrievalService — grok_only project', () => {
     const hits = await retrieval.searchProse(BigInt(1), 'test query');
 
     expect(hits).toEqual([]);
-    // embed should never have been called since grok_only short-circuits.
     expect(embedSpy).not.toHaveBeenCalled();
   });
 
@@ -114,16 +88,12 @@ describe('RetrievalService — grok_only project', () => {
   });
 });
 
-// ─── Backfill — skipped in CI (needs PG + Ollama) ────────────────────────────
-
 describe.skip('IndexingService.backfill (rung-3, requires PG + Ollama)', () => {
   it('backfills missing chapter chunks and reports indexed/skipped counts', async () => {
     // Full integration test: requires a live Postgres instance and a running Ollama server.
     // Run manually as part of the A10 local-LLM test suite.
   });
 });
-
-// ─── ContextAssembler — retrieval absent degrades gracefully ─────────────────
 
 function makeDbStubForOutline() {
   return {
@@ -149,7 +119,6 @@ describe('ContextAssembler.forOutline — no RetrievalService injected', () => {
     const fakeDatabaseService = { getPostgresClient: () => db } as never;
     const fakeCatalog = { render: mock(async () => '') } as unknown as CatalogService;
 
-    // Construct WITHOUT RetrievalService — third param omitted.
     const assembler = new ContextAssembler(fakeDatabaseService, fakeCatalog);
     const pack = await assembler.forOutline(1n, 3, { budgetTokens: 100_000 });
 

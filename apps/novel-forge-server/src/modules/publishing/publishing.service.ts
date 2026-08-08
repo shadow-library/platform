@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, asc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Publishing, schema } from '@server/database';
@@ -20,18 +10,10 @@ import { type PrimaryDatabase, type Publishing, schema } from '@server/database'
 import { renderChapterPayload } from './publish-payload';
 import { type PublishChapterBody, type PublishNovelBody } from './publishing.dto';
 
-/**
- * Defining types
- */
-
 export interface PublicationsLedger {
   publication: Publishing.Publication | null;
   chapters: Publishing.ChapterPublication[];
 }
-
-/**
- * Declaring the constants
- */
 
 function slugify(title: string): string {
   return (
@@ -185,7 +167,6 @@ export class PublishingService {
     return updated;
   }
 
-  /** The publication ledger for the UI: the novel record (if any) plus every chapter row in reader order */
   async listPublications(projectId: bigint): Promise<PublicationsLedger> {
     const publication = await this.db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId) });
     const chapters = await this.loadLedger(projectId);

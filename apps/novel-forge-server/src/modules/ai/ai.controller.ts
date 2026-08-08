@@ -1,27 +1,9 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Authenticated } from '@shadow-library/auth/module';
 import { Get, HttpController, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AiModelOption, AiModelsResponse } from './ai.dto';
 import { getGroupDefaults } from './defaults';
 import { MODEL_REGISTRY } from './models';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Authenticated()
 @HttpController('/api/v1/ai')

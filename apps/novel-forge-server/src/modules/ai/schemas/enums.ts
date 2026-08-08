@@ -1,23 +1,4 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { EnumType } from '@shadow-library/class-schema';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 // Enum vocabularies specific to AI structured output — no matching DB enum exists for these, unlike
 // entity/thread/mystery/judge-verdict status which reuse `@server/common`'s DB-backed EnumTypes.

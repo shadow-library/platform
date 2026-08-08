@@ -1,19 +1,4 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type PlanBundle, type PlanBundleArc } from './plan-import.dto';
-
-/**
- * Defining types
- */
 
 export interface BundleIssue {
   field: string;
@@ -33,10 +18,6 @@ export interface BundleValidation {
   /** volumeKeys that carry arcs, for the approval pass. */
   arcVolumeKeys: string[];
 }
-
-/**
- * Declaring the constants
- */
 
 function findDuplicates(keys: string[]): string[] {
   const seen = new Set<string>();

@@ -1,30 +1,10 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { CheckpointJanitor } from '@modules/jobs/checkpoint.janitor';
 import { ConcurrencyController } from '@modules/jobs/concurrency.controller';
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { JobService } from '@modules/jobs/job.service';
 import { JobsModule } from '@modules/jobs/jobs.module';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-// ─── ConcurrencyController ────────────────────────────────────────────────────
 
 describe('ConcurrencyController', () => {
   it('serializes concurrent calls with the same key', async () => {
@@ -115,8 +95,6 @@ describe('ConcurrencyController', () => {
   });
 });
 
-// ─── JobService smoke test ────────────────────────────────────────────────────
-
 describe('JobService', () => {
   it('exposes all required instance methods', () => {
     expect(typeof JobService.prototype.enqueue).toBe('function');
@@ -131,15 +109,11 @@ describe('JobService', () => {
   });
 });
 
-// ─── JobExecutor smoke test ───────────────────────────────────────────────────
-
 describe('JobExecutor', () => {
   it('exposes dispatch method', () => {
     expect(typeof JobExecutor.prototype.dispatch).toBe('function');
   });
 });
-
-// ─── CheckpointJanitor smoke test ────────────────────────────────────────────
 
 describe('CheckpointJanitor', () => {
   it('exposes purge and onModuleInit methods', () => {
@@ -147,8 +121,6 @@ describe('CheckpointJanitor', () => {
     expect(typeof CheckpointJanitor.prototype.onModuleInit).toBe('function');
   });
 });
-
-// ─── JobsModule smoke test ────────────────────────────────────────────────────
 
 describe('JobsModule', () => {
   it('is a constructable class', () => {

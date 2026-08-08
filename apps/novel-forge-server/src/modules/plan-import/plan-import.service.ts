@@ -1,18 +1,8 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { and, eq, inArray, isNotNull, notInArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, ValidationError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { arcContentHash, briefContentHash, computeBibleDocHash, renderBriefBody, volumeContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
@@ -22,15 +12,7 @@ import { approveVolumePlan } from '../bible/volume/volume.approve';
 import { type CollectionResult, type ImportPlanBody, type ImportPlanResponse, PLAN_BUNDLE_SECTIONS, type PlanBundle, type PlanBundleSectionValue } from './plan-import.dto';
 import { validatePlanBundle } from './plan-import.validator';
 
-/**
- * Defining types
- */
-
 type CollectionName = 'bible' | 'entities' | 'facts' | 'volumes' | 'arcs' | 'briefs';
-
-/**
- * Declaring the constants
- */
 
 const BUNDLE_FORMAT = 'novel-forge-plan';
 // v2 added the optional `facts` collection and brief `knowledgeContract`; v1 bundles remain valid.

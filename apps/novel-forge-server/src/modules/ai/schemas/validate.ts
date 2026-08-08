@@ -1,21 +1,6 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import Ajv, { type ValidateFunction } from 'ajv';
 import { ClassSchema, type SchemaClass } from '@shadow-library/class-schema';
 import { AppError } from '@shadow-library/common';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface SchemaIssue {
   path: (string | number)[];
@@ -23,10 +8,6 @@ export interface SchemaIssue {
 }
 
 export type SchemaParseResult<T> = { success: true; data: T } | { success: false; issues: SchemaIssue[] };
-
-/**
- * Declaring the constants
- */
 
 const ajv = new Ajv({ allErrors: true, strict: true });
 const compiledCache = new Map<string, ValidateFunction>();

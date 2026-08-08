@@ -1,31 +1,13 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Module } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { resolveAuthClientConfig } from '@shadow-library/auth/module';
 import { DatabaseModule } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { PublicationAccessService } from './publication-access.service';
 import { PublishRunner } from './publish-runner';
 import { PublishingService } from './publishing.service';
 import { ReaderPushClient } from './reader-push.client';
 import { WikiPublishingService } from './wiki-publishing.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 // The reader-push client injects an AuthClient built from the SDK's own config resolver — the same
 // `AUTH_ISSUER`/`AUTH_APP_ID`/credential the guard's client uses, so it discovers the same
