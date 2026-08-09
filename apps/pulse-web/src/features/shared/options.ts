@@ -41,6 +41,7 @@ export const PROVIDER_OPTIONS: { value: NotificationServiceProvider; label: stri
   { value: 'TWILIO', label: 'Twilio' },
   { value: 'FIREBASE', label: 'Firebase' },
   { value: 'AWS_SES', label: 'AWS SES' },
+  { value: 'RESEND', label: 'Resend' },
 ];
 
 export const ALL = 'ALL';

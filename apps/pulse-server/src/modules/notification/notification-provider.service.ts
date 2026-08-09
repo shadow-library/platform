@@ -1,28 +1,24 @@
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
 
 import { buildRenderGlobals, type RenderBundle, TemplateEngineService } from '@modules/template';
-import { APP_NAME } from '@server/constants';
 import { Configuration, Notification } from '@server/database';
 
-import { DevNotificationProvider, EmailAddress, NotificationOpResult, SendEmailConfig, SendPushNotificationConfig, SendSMSConfig } from './providers';
+import { DevNotificationProvider, EmailAddress, NotificationOpResult, ResendNotificationProvider, SendEmailConfig, SendPushNotificationConfig, SendSMSConfig } from './providers';
 
 @Injectable()
 export class NotificationProviderService {
-  private readonly logger = Logger.getLogger(APP_NAME, NotificationProviderService.name);
-
   constructor(
     private readonly devProvider: DevNotificationProvider,
+    private readonly resendProvider: ResendNotificationProvider,
     private readonly engine: TemplateEngineService,
   ) {}
 
   private parseEmailAddress(email: string): EmailAddress {
     const emailRegex = /^(.*?)(?:\s*<(.+?)>)?$/;
     const match = email.match(emailRegex);
-    if (match && match.length === 3) {
+    if (match?.[2]) {
       const name = match[1]?.trim();
-      const email = match[2]?.trim();
-      return { name, email: email as string };
+      return { name, email: match[2].trim() };
     }
 
     return { email };
@@ -46,6 +42,7 @@ export class NotificationProviderService {
     const config: SendEmailConfig = { to: [toEmail], from: fromEmail, subject: subject ?? '', body, notificationId: notificationJob.id, payload: this.rawPayload(notificationJob) };
 
     if (senderEndpoint.provider === 'DEV') return this.devProvider.sendEmail(config);
+    else if (senderEndpoint.provider === 'RESEND') return this.resendProvider.sendEmail(config);
     else return { success: false, retriable: false, error: new Error('Not implemented') };
   }
 

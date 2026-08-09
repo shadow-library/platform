@@ -56,6 +56,34 @@ describe('Sender Endpoint', () => {
       });
     });
 
+    it('should create a Resend email endpoint', async () => {
+      const body = {
+        channel: 'EMAIL',
+        provider: 'RESEND',
+        identifier: 'Shadow <no-reply@shadow.test>',
+      };
+
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles/2/endpoints').body(body);
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json()).toMatchObject({ senderProfileId: '2', ...body, weight: 1, isActive: true });
+
+      const listResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/2/endpoints?provider=RESEND');
+      expect(listResponse.statusCode).toBe(200);
+      expect(listResponse.json()).toMatchObject({ total: 1, items: [expect.objectContaining(body)] });
+    });
+
+    it('should reject a Resend endpoint for a non-email channel', async () => {
+      const response = await testEnv
+        .getRouter()
+        .mockRequest()
+        .headers(testEnv.authHeaders())
+        .post('/api/v1/sender-profiles/2/endpoints')
+        .body({ channel: 'SMS', provider: 'RESEND', identifier: '+15559990001' });
+
+      expect(response.statusCode).toBe(422);
+    });
+
     it('should create a sender endpoint with isActive set to false', async () => {
       const body = {
         channel: 'PUSH',

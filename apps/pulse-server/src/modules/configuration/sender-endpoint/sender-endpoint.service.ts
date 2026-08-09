@@ -2,7 +2,7 @@ import assert from 'node:assert';
 
 import { and, asc, desc, eq, InferInsertModel } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
+import { Logger, OffsetPagination, OffsetPaginationResult, utils, ValidationError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
@@ -32,6 +32,7 @@ export class SenderEndpointService {
   async createSenderEndpoint(profileId: bigint, data: Omit<CreateSenderEndpoint, 'senderProfileId'>): Promise<Configuration.SenderEndpoint> {
     const profile = await this.db.query.senderProfiles.findFirst({ where: eq(schema.senderProfiles.id, profileId) });
     if (!profile) throw AppErrorCode.SND_PRF_001.create();
+    if (data.provider === 'RESEND' && data.channel !== 'EMAIL') throw new ValidationError('provider', 'RESEND is only supported for the EMAIL channel');
 
     const [senderEndpoint] = await this.db
       .insert(schema.senderEndpoints)

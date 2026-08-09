@@ -15,6 +15,13 @@
       "when": 1786259183009,
       "tag": "0001_cultured_warstar",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786286759897,
+      "tag": "0002_glossy_justin_hammer",
+      "breakpoints": true
     }
   ]
 }

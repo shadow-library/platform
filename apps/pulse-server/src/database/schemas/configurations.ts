@@ -12,7 +12,7 @@ export namespace Configuration {
   export type ServiceProvider = InferEnum<typeof notificationServiceProviders>;
 }
 
-export const notificationServiceProviders = pgEnum('notification_service_providers', ['DEV', 'SENDGRID', 'TWILIO', 'FIREBASE', 'AWS_SES']);
+export const notificationServiceProviders = pgEnum('notification_service_providers', ['DEV', 'SENDGRID', 'TWILIO', 'FIREBASE', 'AWS_SES', 'RESEND']);
 
 export const senderProfiles = pgTable('sender_profiles', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),

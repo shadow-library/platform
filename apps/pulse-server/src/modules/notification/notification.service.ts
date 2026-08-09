@@ -139,6 +139,11 @@ export class NotificationService {
     return new Date(Date.now() + totalDelaySeconds * 1000);
   }
 
+  private getJobStatus(result: NotificationOpResult, attempt: number): Notification.Status {
+    if (result.success) return 'SENT';
+    return !result.retriable || attempt >= MAX_ATTEMPTS ? 'PERMANENTLY_FAILED' : 'FAILED';
+  }
+
   /**
    * Executes a single job end-to-end: re-resolves the render bundle from the pinned version (so a retry re-renders
    * identical content), selects a vendor via the routing rules, renders + hands off to the provider, and records the
@@ -175,15 +180,15 @@ export class NotificationService {
       else if (notificationJob.channel === 'EMAIL') result = await this.notificationProviderService.sendEmail(notificationJob, senderEndpoint, bundle);
       else result = await this.notificationProviderService.sendPushNotification(notificationJob, senderEndpoint, bundle);
 
-      let status: Notification.Status = result.success ? 'SENT' : 'FAILED';
-      if (!result.success && attempt >= MAX_ATTEMPTS) status = 'PERMANENTLY_FAILED';
+      const status = this.getJobStatus(result, attempt);
       const updateResult = await this.db
         .update(schema.notificationJobs)
         .set({
           status,
           attempt: sql`${schema.notificationJobs.attempt} + 1`,
+          lastError: result.success ? null : result.error.name,
           lastAttemptedAt: new Date(),
-          nextAttemptAt: result.success ? null : this.getNextAttemptAt(template.messageType, notificationJob.priority, notificationJob.attempt + 1),
+          nextAttemptAt: status === 'FAILED' ? this.getNextAttemptAt(template.messageType, notificationJob.priority, notificationJob.attempt + 1) : null,
         })
         .where(eq(schema.notificationJobs.id, notificationJob.id))
         .returning({ id: schema.notificationJobs.id, status: schema.notificationJobs.status });

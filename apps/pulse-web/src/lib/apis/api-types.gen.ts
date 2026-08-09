@@ -679,7 +679,7 @@ export interface components {
     /** @enum {string} */
     NotificationChannel: 'EMAIL' | 'SMS' | 'PUSH';
     /** @enum {string} */
-    NotificationServiceProvider: 'DEV' | 'SENDGRID' | 'TWILIO' | 'FIREBASE' | 'AWS_SES';
+    NotificationServiceProvider: 'DEV' | 'SENDGRID' | 'TWILIO' | 'FIREBASE' | 'AWS_SES' | 'RESEND';
     SenderEndpointResponse: {
       channel: components['schemas']['NotificationChannel'];
       provider: components['schemas']['NotificationServiceProvider'];
