@@ -36,7 +36,7 @@ export default function Dashboard(): ReactElement {
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <h1 className={styles.title}>Delivery health</h1>
-        <p className={styles.subtitle}>At-a-glance delivery for today, and the 14-day trend across all channels.</p>
+        <p className={styles.subtitle}>At-a-glance delivery for today, and the {trend.stats.length}-day trend across all channels.</p>
       </header>
 
       <div className={styles.sectionHead}>
