@@ -804,6 +804,7 @@ export interface components {
       priority?: components['schemas']['Priority'];
       description?: string;
       category?: string;
+      /** @description Producer-to-template variable contract. Trusted operators author this object and it is stored without structural coercion. */
       variableSchema?: {
         [key: string]: unknown;
       };
@@ -867,6 +868,7 @@ export interface components {
       priority?: components['schemas']['Priority'];
       description?: string;
       category?: string;
+      /** @description Producer-to-template variable contract. Trusted operators author this object and it is stored without structural coercion. */
       variableSchema?: {
         [key: string]: unknown;
       };
