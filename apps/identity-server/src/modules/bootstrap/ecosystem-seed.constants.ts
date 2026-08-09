@@ -99,7 +99,7 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
   applications: [
     {
       name: 'pulse',
-      displayName: 'Shadow Pulse',
+      displayName: 'Pulse',
       description: 'Centralised multi-channel notification platform for the Shadow ecosystem',
       resourceName: 'Pulse notification API',
       logo: true,
@@ -138,7 +138,7 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
     },
     {
       name: 'web-novel',
-      displayName: 'Web Novel Reader',
+      displayName: 'Web Novel',
       description: 'Reader-facing web novel catalogue for the Shadow ecosystem',
       resourceName: 'Web Novel Reader API',
       scopes: [
