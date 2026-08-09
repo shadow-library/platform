@@ -1,8 +1,9 @@
-import { queryOptions, useMutation, type UseMutationResult, useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
 import { type JsonObject } from '@/types';
 
 import {
+  type AuthMethodsResponse,
   type ChallengeMethod,
   type ChallengeMethodMetadata,
   type ChallengeResendResponse,
@@ -11,6 +12,8 @@ import {
   type ConsentPromptResponse,
   type ConsentScopeDto,
   type FederatedLoginOptionDto,
+  type SocialLoginStartResponse,
+  type SocialProviderOptionDto,
 } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
@@ -21,7 +24,9 @@ import { type ApiError, APIRequest } from './transport';
  * envelopes, so those statuses are `modeled` on the request and resolve to a `FlowState`, not a throw.
  */
 
-export type { ChallengeMethod, ChallengeMethodMetadata, ConsentDecisionBody };
+export type { AuthMethodsResponse, ChallengeMethod, ChallengeMethodMetadata, ConsentDecisionBody, SocialLoginStartResponse };
+export type SocialProviderOption = SocialProviderOptionDto;
+export type SocialProvider = SocialProviderOptionDto['provider'];
 export type ChallengeMethodName = ChallengeMethod['name'];
 export type FederatedLoginOption = FederatedLoginOptionDto;
 export type ResendResult = ChallengeResendResponse;
@@ -141,7 +146,27 @@ export const authApi = {
   consentDecide(body: ConsentDecisionBody): Promise<ConsentDecision> {
     return APIRequest.post('/auth/consent').body(body).execute<ConsentDecision>();
   },
+
+  /** Starts a social sign-in; the caller navigates to `authorizationUrl` and comes back through the federated callback. */
+  socialStart(provider: SocialProvider, deviceId?: string, returnTo?: string): Promise<SocialLoginStartResponse> {
+    return APIRequest.post(`/auth/social/${provider}/start`).body({ deviceId, returnTo }).execute<SocialLoginStartResponse>();
+  },
+
+  /** Rehydrates a flow the federated callback handed back through a redirect rather than a response body. */
+  flowStatus(flowId: string): Promise<FlowState> {
+    return APIRequest.get(`/auth/flow/${flowId}`).execute<FlowState>();
+  },
 };
+
+export const authMethodsQueryOptions = () =>
+  queryOptions<AuthMethodsResponse, ApiError>({
+    queryKey: ['auth', 'methods'] as const,
+    queryFn: ({ signal }) => APIRequest.get('/auth/methods').signal(signal).execute<AuthMethodsResponse>(),
+  });
+
+export function useAuthMethodsQuery(): UseQueryResult<AuthMethodsResponse, ApiError> {
+  return useQuery(authMethodsQueryOptions());
+}
 
 export function useSignoutMutation(): UseMutationResult<undefined, ApiError, undefined> {
   const queryClient = useQueryClient();

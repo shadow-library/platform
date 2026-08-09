@@ -3,7 +3,7 @@ import { type ReactNode, useEffect } from 'react';
 import { Button, Spinner } from '@shadow-library/ui';
 import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 
-import { ArrowLeftIcon, BrandGlyph, GridIcon, LayersIcon, LinkIcon, ShieldCheckIcon, UserIcon, UsersIcon, WebhookIcon } from '@/components/icons';
+import { ArrowLeftIcon, BrandGlyph, GridIcon, KeyRoundIcon, LayersIcon, LinkIcon, ShieldCheckIcon, UserIcon, UsersIcon, WebhookIcon } from '@/components/icons';
 import { ThemeToggle } from '@/components/si';
 import { useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
@@ -24,6 +24,7 @@ const NAV: NavConfig = {
     {
       label: 'Access',
       items: [
+        { to: '/console/authentication', label: 'Authentication', icon: <KeyRoundIcon size={18} /> },
         { to: '/console/roles', label: 'Roles & permissions', icon: <ShieldCheckIcon size={18} /> },
         { to: '/console/webhooks', label: 'Webhooks', icon: <WebhookIcon size={18} /> },
       ],

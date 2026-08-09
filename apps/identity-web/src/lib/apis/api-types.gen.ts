@@ -1045,6 +1045,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/auth/methods': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Auth Methods */
+    get: operations['get_api_v1_auth_methods'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/social/{provider}/start': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start Social Login */
+    post: operations['post_api_v1_auth_social_provider_start'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/flow/{flowId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Flow */
+    get: operations['get_api_v1_auth_flow_flowId'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/me/sessions': {
     parameters: {
       query?: never;
@@ -1822,6 +1873,76 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/auth-modes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Auth Modes */
+    get: operations['get_api_v1_admin_auth_modes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/auth-modes/{method}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Set Auth Mode */
+    put: operations['put_api_v1_admin_auth_modes_method'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/identity-providers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Global Identity Providers */
+    get: operations['get_api_v1_admin_identity_providers'];
+    put?: never;
+    /** Create Global Identity Provider */
+    post: operations['post_api_v1_admin_identity_providers'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/identity-providers/{identityProviderId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete Global Identity Provider */
+    delete: operations['delete_api_v1_admin_identity_providers_identityProviderId'];
+    options?: never;
+    head?: never;
+    /** Update Global Identity Provider */
+    patch: operations['patch_api_v1_admin_identity_providers_identityProviderId'];
+    trace?: never;
+  };
   '/api/v1/admin/clients': {
     parameters: {
       query?: never;
@@ -2364,6 +2485,7 @@ export interface components {
     };
     PolicyItem: {
       key: string;
+      /** @description The setting's display name; description contains its explanatory text. */
       label: string;
       description: string;
       type: string;
@@ -2371,9 +2493,11 @@ export interface components {
       min?: number;
       max?: number;
       effectiveValue?: number;
+      /** @description Absent when the organisation inherits the platform default. */
       configuredValue?: number;
       defaultEnabled?: boolean;
       effectiveEnabled?: boolean;
+      /** @description Absent when the organisation inherits the platform default. */
       configuredEnabled?: boolean;
     };
     SetPolicyBody: {
@@ -2400,7 +2524,9 @@ export interface components {
       code_challenge_methods_supported: string[];
       backchannel_logout_supported: boolean;
       backchannel_logout_session_supported: boolean;
+      /** @description Global first-party endpoint derived by services rather than configured independently. */
       step_up_endpoint: string;
+      /** @description Global first-party endpoint derived by services rather than configured independently. */
       app_session_endpoint: string;
     };
     TokenRequestBody: {
@@ -2415,9 +2541,13 @@ export interface components {
       client_secret?: string;
       client_assertion_type?: string;
       client_assertion?: string;
+      /** @description RFC 8693 subject token being delegated during token exchange. */
       subject_token?: string;
+      /** @description RFC 8693 type of the delegated subject token. */
       subject_token_type?: string;
+      /** @description RFC 8693 token type requested from the exchange. */
       requested_token_type?: string;
+      /** @description Accepted only to reject it; the actor is always the authenticated caller. */
       actor_token?: string;
     };
     TokenResponse: {
@@ -2427,12 +2557,15 @@ export interface components {
       scope: string;
       id_token?: string;
       refresh_token?: string;
+      /** @description RFC 8693 issued token type; present only on token-exchange responses. */
       issued_token_type?: string;
     };
     UserInfoResponse: {
       sub: string;
+      /** @description Released for every valid token without requiring the email scope for backward compatibility. */
       email?: string;
       email_verified?: boolean;
+      /** @description Presentable name composed from the preferred display name or legal name parts. */
       name?: string;
       given_name?: string;
       family_name?: string;
@@ -2458,6 +2591,7 @@ export interface components {
     };
     ConsentPromptResponse: {
       clientName: string;
+      /** @description Whether active consent already covers every requested scope, allowing the UI to skip the prompt. */
       isFirstParty: boolean;
       alreadyGranted: boolean;
       scopes: components['schemas']['ConsentScopeDto'][];
@@ -2472,12 +2606,14 @@ export interface components {
       scopeNames: string[];
       /** @enum {string} */
       decision: 'APPROVE' | 'DENY';
+      /** @description Required for DENY so the server can validate the URI and construct the error redirect. */
       redirectUri?: string;
       state?: string;
     };
     ConsentDecisionResponse: {
       /** @enum {string} */
       decision: 'APPROVE' | 'DENY';
+      /** @description For DENY decisions, the validated client redirect carrying error=access_denied. */
       redirectTo?: string;
     };
     ConsentRecordsResponse: {
@@ -2486,6 +2622,7 @@ export interface components {
     ConsentRecordDto: {
       clientId: string;
       clientName: string;
+      /** @description User-facing name of the application to which the client belongs. */
       applicationName: string;
       scopeNames: string[];
       /** @enum {string} */
@@ -2496,13 +2633,18 @@ export interface components {
       success: boolean;
     };
     ApplicationSelfResponse: {
+      /** @description Application identifier used by SDK consumers as AUTH_APP_ID. */
       appId: string;
+      /** @description Application display name for consumer-facing labels. */
       name?: string;
       isFirstParty: boolean;
+      /** @description Application API audience; absent only when its API resource has not yet been provisioned. */
       audience?: string;
       redirectUris: string[];
       scopes: string[];
+      /** @description Scopes minted only into stepped-up tokens, listed separately so clients can request them intentionally. */
       sensitiveScopes: string[];
+      /** @description Grants on other applications that form the ceiling for delegated calls. */
       grants: components['schemas']['ApplicationGrantItem'][];
       accessTokenTtl: number;
     };
@@ -2517,6 +2659,7 @@ export interface components {
       email?: string;
       /** @enum {string} */
       aal: 'AAL1' | 'AAL2';
+      /** @description Whether the session is currently within its step-up elevation window. */
       elevated: boolean;
       elevatedUntil?: string;
     };
@@ -2525,6 +2668,7 @@ export interface components {
       lastName?: string;
     };
     ChangePasswordBody: {
+      /** @description Re-proves the account before credential rotation; a session cookie alone cannot change the password. */
       currentPassword: string;
       newPassword: string;
     };
@@ -2542,6 +2686,7 @@ export interface components {
       isActive: boolean;
       homePageUrl?: string;
       logoUrl?: string;
+      /** @description Present only after the user has opened the application; omitted for accessible but unused applications. */
       firstUsedAt?: string;
       lastUsedAt?: string;
     };
@@ -2563,7 +2708,10 @@ export interface components {
     };
     UpdateOrganisationBody: {
       name?: string;
-      /** @enum {string} */
+      /**
+       * @description ASSIGNED_ONLY limits members to explicitly assigned applications; changing this is owner-only and requires step-up authentication.
+       * @enum {string}
+       */
       appAccessMode?: 'ALL_APPS' | 'ASSIGNED_ONLY';
     };
     OrganisationActionResponse: {
@@ -2591,6 +2739,7 @@ export interface components {
       /** @enum {string} */
       status: 'ACTIVE' | 'SUSPENDED' | 'BLOCKED';
       reason?: string;
+      /** @description ISO-8601 suspension expiry; accepted only when the status is SUSPENDED. */
       until?: string;
     };
     InvitationsResponse: {
@@ -2623,9 +2772,11 @@ export interface components {
       homePageUrl?: string;
       /** @enum {string} */
       visibility: 'PUBLIC' | 'RESTRICTED' | 'INTERNAL';
+      /** @description Whether the organisation added the application to its allowlist; chiefly relevant in ASSIGNED_ONLY mode. */
       assigned: boolean;
     };
     AssignApplicationBody: {
+      /** @description Application to add to the organisation allowlist; it must be reachable by the organisation members. */
       applicationId: string;
     };
     MyOrganisationsResponse: {
@@ -2680,6 +2831,7 @@ export interface components {
     CatalogSyncBody: {
       permissions: components['schemas']['CatalogPermission'][];
       roles: components['schemas']['CatalogRole'][];
+      /** @description Overrides the guardrail that rejects a manifest deleting more than half of the catalog. */
       force?: boolean;
     };
     CatalogPermission: {
@@ -2689,7 +2841,9 @@ export interface components {
     CatalogRole: {
       name: string;
       description?: string;
+      /** @description Permission names carried by this role; each name must also appear in the catalog permissions. */
       permissions: string[];
+      /** @description When true, every signed-in application user implicitly holds this role without an assignment. */
       default?: boolean;
     };
     CatalogSyncResponse: {
@@ -2713,6 +2867,7 @@ export interface components {
       redirectUri: string;
     };
     AppSessionResponse: {
+      /** @description Opaque handle returned once for the application to store as a cookie on its own domain. */
       sessionHandle: string;
       userId: string;
       expiresAt: string;
@@ -2720,8 +2875,11 @@ export interface components {
     };
     MintAppTokenBody: {
       sessionHandle: string;
+      /** @description RFC 8707 target API; omitted to address the identity service itself. */
       resource?: string;
+      /** @description Narrows the token to a subset of the session's consented scope; omitted to use the full scope. */
       scope?: string;
+      /** @description Requires an existing step-up grant bound to this exact resource. */
       elevated?: boolean;
     };
     AppTokenResponse: {
@@ -2751,6 +2909,7 @@ export interface components {
       name: string;
       /** @enum {string} */
       type: 'PERSONAL' | 'TEAM';
+      /** @description Whether the session is currently acting in this organisation. */
       active: boolean;
     };
     SwitchOrganisationBody: {
@@ -2758,6 +2917,7 @@ export interface components {
       organisationId: string;
     };
     SwitchOrganisationResponse: {
+      /** @description Rotated handle that replaces the previous handle, which is invalid as soon as this response is issued. */
       sessionHandle: string;
       organisationId: string;
       expiresAt: string;
@@ -2766,8 +2926,10 @@ export interface components {
       success: boolean;
     };
     LoginInitBody: {
+      /** @description Email address, E.164 phone number, or username. */
       identifier: string;
       deviceId?: string;
+      /** @description Post-login destination; must be a relative path or a URL on this origin. */
       returnTo?: string;
     };
     LoginInitResponse: {
@@ -2778,10 +2940,12 @@ export interface components {
     };
     FederatedLoginOptionDto: {
       authorizationUrl: string;
+      /** @description True when the organisation requires federated sign-in and local credential steps are unavailable. */
       enforced: boolean;
     };
     LoginResetPasswordBody: {
       flowId: string;
+      /** @description Re-proves the credential accepted by the password step before it is rotated. */
       currentPassword: string;
       newPassword: string;
     };
@@ -2831,7 +2995,9 @@ export interface components {
       flowId: string;
       password?: string;
       code?: string;
+      /** @description Single-use MFA bypass code accepted when a second factor is required. */
       recoveryCode?: string;
+      /** @description Passkey assertion used as either the first factor or the MFA step. */
       webauthn?: components['schemas']['WebauthnAssertion'];
     };
     WebauthnAssertion: {
@@ -2877,6 +3043,7 @@ export interface components {
       flowId: string;
     };
     WebauthnOptionsBody: {
+      /** @description Absent for a usernameless discoverable-credential login; present for a flow's MFA step. */
       flowId?: string;
       deviceId?: string;
     };
@@ -2896,6 +3063,29 @@ export interface components {
       type: string;
       transports?: string[];
     };
+    AuthMethodsResponse: {
+      password: boolean;
+      passkey: boolean;
+      emailOtp: boolean;
+      smsOtp: boolean;
+      /** @description Social providers an operator has configured and enabled; render one sign-in button per entry. */
+      social: components['schemas']['SocialProviderOptionDto'][];
+    };
+    SocialProviderOptionDto: {
+      /** @enum {string} */
+      provider: 'GOOGLE' | 'MICROSOFT';
+      label: string;
+    };
+    SocialLoginStartBody: {
+      deviceId?: string;
+      /** @description Post-login destination; must be a relative path or a URL on this origin. */
+      returnTo?: string;
+    };
+    SocialLoginStartResponse: {
+      flowId: string;
+      /** @description Upstream authorization endpoint the browser must be sent to; it already carries state, nonce and the PKCE challenge. */
+      authorizationUrl: string;
+    };
     MeSessionsResponse: {
       sessions: components['schemas']['MeSessionItem'][];
     };
@@ -2909,6 +3099,7 @@ export interface components {
       ipCountry?: string;
       userAgent?: string;
       deviceName?: string;
+      /** @description Whether this is the session making the request. */
       isCurrent: boolean;
     };
     SessionsRevokedResponse: {
@@ -2916,6 +3107,7 @@ export interface components {
     };
     MfaEnrollmentsResponse: {
       enrollments: components['schemas']['MfaEnrollmentItem'][];
+      /** @description Unused single-use recovery codes remaining in the current batch. */
       recoveryCodesRemaining: number;
     };
     MfaEnrollmentItem: {
@@ -2924,10 +3116,13 @@ export interface components {
       label: string;
       createdAt: string;
       lastUsedAt?: string;
+      /** @description Present for WEBAUTHN entries; use this value when deleting the credential. */
       credentialId?: string;
     };
     TotpEnrollResponse: {
+      /** @description Base32 seed for manual entry into an authenticator app; returned exactly once. */
       secret: string;
+      /** @description otpauth:// provisioning URI, typically rendered as a QR code. */
       uri: string;
     };
     TotpCodeBody: {
@@ -2935,24 +3130,32 @@ export interface components {
     };
     TotpActivateResponse: {
       success: boolean;
+      /** @description Present only when activation creates the account's first recovery-code batch. */
       recoveryCodes?: string[];
     };
     RecoveryCodesResponse: {
+      /** @description Recovery codes shown exactly once; only hashes are retained server-side. */
       recoveryCodes: string[];
     };
     OperationSuccessResponse: {
       success: boolean;
     };
     StepUpMethodsResponse: {
+      /** @description Methods available for elevation; an empty array means the account must enroll a factor first. */
       methods: string[];
     };
     StepUpIntentResponse: {
+      /** @description Application label for a hosted step-up prompt; absent for an unknown or inactive client to avoid exposing a probe result. */
       applicationName?: string;
     };
     StepUpBody: {
+      /** @description Application client for which the step-up is performed; only a claim naming the same client and resource may spend the window. */
       clientId?: string;
+      /** @description Target resource for which the step-up is performed; omitting the client and resource opens a window usable only by the identity console. */
       resource?: string;
+      /** @description Six-digit TOTP code required when the account has a second factor. */
       code?: string;
+      /** @description Account password, accepted only when no second factor is enrolled. */
       password?: string;
     };
     StepUpResponse: {
@@ -3009,9 +3212,11 @@ export interface components {
     };
     WebauthnRegisterResponse: {
       success: boolean;
+      /** @description Present only when registration creates the account's first recovery-code batch. */
       recoveryCodes?: string[];
     };
     WebauthnStepUpOptionsResponse: {
+      /** @description Assertion options for the session-scoped passkey step-up ceremony; no flow identifier is exposed. */
       options: components['schemas']['WebauthnAuthenticationOptions'];
     };
     WebauthnStepUpBody: {
@@ -3021,7 +3226,9 @@ export interface components {
       type: 'public-key';
       response: components['schemas']['WebauthnAssertionData'];
       authenticatorAttachment?: string;
+      /** @description Application client for which the step-up assertion is performed. */
       clientId?: string;
+      /** @description Target resource for which the step-up assertion is performed. */
       resource?: string;
     };
     IdentityProviderListResponse: {
@@ -3065,6 +3272,7 @@ export interface components {
       email: string;
     };
     AddContactResponse: {
+      /** @description Opaque handle for the pending verification; return it with the OTP. */
       verificationId: string;
     };
     VerifyContactBody: {
@@ -3078,6 +3286,7 @@ export interface components {
       email: string;
     };
     AddPhoneBody: {
+      /** @description Phone number in E.164 format, including the leading +. */
       phone: string;
     };
     RemovePhoneBody: {
@@ -3090,6 +3299,7 @@ export interface components {
       users: components['schemas']['ResolvedUserItem'][];
     };
     ResolvedUserItem: {
+      /** @description Echoed exactly as submitted so a case-insensitive match aligns with the caller's input. */
       email: string;
       userId: string;
     };
@@ -3101,6 +3311,7 @@ export interface components {
     };
     DirectoryUserItem: {
       userId: string;
+      /** @description User-selected display name; absent when none has been set. */
       displayName?: string;
       firstName?: string;
       lastName?: string;
@@ -3109,6 +3320,7 @@ export interface components {
       member: boolean;
     };
     AdminContextResponse: {
+      /** @description Admin permissions held by the caller in the platform organisation; an empty array means the caller is not staff. */
       permissions: string[];
     };
     /** @enum {string} */
@@ -3136,7 +3348,9 @@ export interface components {
       username?: string;
       /** @enum {string} */
       status: 'ACTIVE' | 'INACTIVE' | 'DISABLED' | 'BLOCKED' | 'SUSPENDED' | 'CLOSED';
+      /** @description Reason the account left ACTIVE status. */
       statusReason?: string;
+      /** @description ISO-8601 instant when a temporary suspension ends. */
       statusUntil?: string;
       /** @enum {string} */
       lockMode: 'NONE' | 'OTP_ONLY' | 'FULL';
@@ -3161,13 +3375,16 @@ export interface components {
     LockUserBody: {
       /** @enum {string} */
       mode: 'OTP_ONLY' | 'FULL';
+      /** @description ISO-8601 expiry; omitted to keep the account locked until explicitly unlocked. */
       until?: string;
     };
     AdminActionResponse: {
       success: boolean;
     };
     SuspendUserBody: {
+      /** @description Reason recorded on the account and in the audit chain so later administrators can understand the suspension. */
       reason?: string;
+      /** @description ISO-8601 instant when the suspension ends; omitted to suspend until an administrator lifts it. */
       until?: string;
     };
     BlockUserBody: {
@@ -3199,6 +3416,7 @@ export interface components {
       createdAt: string;
     };
     CreateApplicationBody: {
+      /** @description Stable, immutable machine identifier used for internal addressing; human-facing text belongs in displayName and the DNS label in subDomain. */
       name: string;
       subDomain: string;
       displayName?: string;
@@ -3206,12 +3424,16 @@ export interface components {
       homePageUrl?: string;
       logoUrl?: string;
       isActive?: boolean;
+      /** @description Public browser origins for the application; each becomes an /api/auth/callback redirect URI. */
       publicUrls?: string[];
     };
     CreateApplicationResponse: {
       id: number;
+      /** @description Provisioned client identifier for the application's identity. */
       clientId: string;
+      /** @description Derived api://<app> audience provisioned for the application. */
       audience: string;
+      /** @description Provisioned client secret, returned exactly once. */
       clientSecret?: string;
     };
     ApplicationDetailResponse: {
@@ -3227,6 +3449,7 @@ export interface components {
       homePageUrl?: string;
       logoUrl?: string;
       roles: components['schemas']['ApplicationRoleItem'][];
+      /** @description Public browser origins; each yields an /api/auth/callback redirect URI on the application's relying-party clients. */
       publicUrls: string[];
       updatedAt: string;
     };
@@ -3242,8 +3465,12 @@ export interface components {
       homePageUrl?: string;
       logoUrl?: string;
       isActive?: boolean;
-      /** @enum {string} */
+      /**
+       * @description Controls how widely the application may be granted; changing it re-resolves every organisation's grant set.
+       * @enum {string}
+       */
       visibility?: 'PUBLIC' | 'RESTRICTED' | 'INTERNAL';
+      /** @description Public browser origins for the application; each becomes an /api/auth/callback redirect URI. */
       publicUrls?: string[];
     };
     ApplicationMemberListResponse: {
@@ -3269,7 +3496,63 @@ export interface components {
       assignedBy?: string;
     };
     ReleaseApplicationBody: {
+      /** @description Team organisation to which the restricted application is released. */
       organisationId: string;
+    };
+    AuthModeListResponse: {
+      items: components['schemas']['AuthModeItem'][];
+    };
+    AuthModeItem: {
+      /** @enum {string} */
+      method: 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP' | 'GOOGLE' | 'MICROSOFT';
+      label: string;
+      description: string;
+      /** @enum {string} */
+      kind: 'BUILT_IN' | 'SOCIAL';
+      enabled: boolean;
+      /** @description False when a social method still needs its upstream client id and secret; enabling it before then is refused. */
+      configured: boolean;
+      provider?: components['schemas']['GlobalIdentityProviderItem'];
+    };
+    GlobalIdentityProviderItem: {
+      id: string;
+      /** @enum {string} */
+      kind: 'GOOGLE' | 'MICROSOFT';
+      name: string;
+      issuer: string;
+      clientId: string;
+      scopes: string;
+      allowSignUp: boolean;
+      isActive: boolean;
+      createdAt: string;
+    };
+    SetAuthModeBody: {
+      /** @description Whether members may use this sign-in method. A social method must be configured before it can be turned on. */
+      enabled: boolean;
+    };
+    GlobalIdentityProviderListResponse: {
+      items: components['schemas']['GlobalIdentityProviderItem'][];
+    };
+    CreateGlobalIdentityProviderBody: {
+      /** @enum {string} */
+      kind: 'GOOGLE' | 'MICROSOFT';
+      name: string;
+      /** @description Issuer url whose discovery document is fetched. Google is https://accounts.google.com; Microsoft must be a single tenant, https://login.microsoftonline.com/<tenant-id>/v2.0. */
+      issuer: string;
+      clientId: string;
+      clientSecret: string;
+      scopes?: string;
+      /** @description Whether an upstream account with no local match may create one. Turn it off to make the provider link-only. */
+      allowSignUp?: boolean;
+    };
+    UpdateGlobalIdentityProviderBody: {
+      name?: string;
+      clientId?: string;
+      /** @description Omit to keep the stored secret; it is never returned. */
+      clientSecret?: string;
+      scopes?: string;
+      allowSignUp?: boolean;
+      isActive?: boolean;
     };
     ClientListResponse: {
       items: components['schemas']['ClientSummaryItem'][];
@@ -3284,6 +3567,7 @@ export interface components {
       applicationId: number;
     };
     RegisterClientBody: {
+      /** @description Admin-chosen immutable client identifier embedded in tokens and configuration. */
       clientId: string;
       applicationId: number;
       name: string;
@@ -3293,13 +3577,19 @@ export interface components {
       redirectUris?: string[];
       grantTypes: string[];
       accessTokenTtl?: number;
+      /** @description OIDC back-channel logout endpoint to which logout tokens are posted on session termination. */
       backchannelLogoutUri?: string;
+      /** @description Kubernetes service-account subjects or namespace-scoped patterns allowed to authenticate this client. */
       workloadSubjects?: string[];
-      /** @enum {string} */
+      /**
+       * @description Confidential-client authentication method; workload_identity binds Kubernetes service accounts without a secret, while client_secret mints a rotatable secret. Ignored for public clients.
+       * @enum {string}
+       */
       authMethod?: 'client_secret' | 'workload_identity';
     };
     RegisterClientResponse: {
       clientId: string;
+      /** @description Client secret returned exactly once; only its Argon2id hash is stored. */
       secret?: string;
     };
     ClientDetailResponse: {
@@ -3314,9 +3604,14 @@ export interface components {
       scopes: string[];
       grantTypes: string[];
       accessTokenTtl: number;
-      /** @enum {string} */
+      /**
+       * @description Client authentication method: none for public PKCE clients, client_secret, or workload_identity for Kubernetes service accounts.
+       * @enum {string}
+       */
       authMethod: 'none' | 'client_secret' | 'workload_identity';
+      /** @description Kubernetes service-account subjects or patterns; present only for workload_identity clients. */
       workloadSubjects?: string[];
+      /** @description OIDC back-channel logout endpoint to which logout tokens are posted on session termination. */
       backchannelLogoutUri?: string;
       createdAt: string;
     };
@@ -3324,10 +3619,13 @@ export interface components {
       name?: string;
       isActive?: boolean;
       redirectUris?: string[];
+      /** @description OIDC back-channel logout endpoint to which logout tokens are posted on session termination. */
       backchannelLogoutUri?: string;
+      /** @description Replaces the full set of Kubernetes service-account subjects or patterns; pass an empty array to remove all bindings. */
       workloadSubjects?: string[];
     };
     RotateSecretResponse: {
+      /** @description Replacement client secret, shown exactly once. */
       secret: string;
       previousSecretsExpireAt: string;
     };
@@ -3349,7 +3647,10 @@ export interface components {
       name: string;
       description?: string;
       isSensitive: boolean;
-      /** @enum {string} */
+      /**
+       * @description Principal kind that may hold this scope: USER, SERVICE for machine-to-machine access, or BOTH.
+       * @enum {string}
+       */
       principalType: 'USER' | 'SERVICE' | 'BOTH';
     };
     CreateResourceBody: {
@@ -3364,7 +3665,10 @@ export interface components {
       name: string;
       description?: string;
       isSensitive?: boolean;
-      /** @enum {string} */
+      /**
+       * @description Principal kind that may hold this scope: USER, SERVICE for machine-to-machine access, or BOTH. Defaults to BOTH.
+       * @enum {string}
+       */
       principalType?: 'USER' | 'SERVICE' | 'BOTH';
     };
     PermissionListResponse: {
@@ -3376,10 +3680,14 @@ export interface components {
       description?: string;
     };
     RoleAssignmentBody: {
-      /** @enum {string} */
+      /**
+       * @description ORGANISATION creates an organisation-wide tier grant whose principal and assignment scope are the same organisation.
+       * @enum {string}
+       */
       principalType: 'USER' | 'SERVICE_ACCOUNT' | 'ORGANISATION';
       principalId: string;
       roleId: number;
+      /** @description Ignored for ORGANISATION grants, whose scope is derived from principalId. */
       organisationId: string;
     };
     AssignmentListResponse: {
@@ -3387,7 +3695,10 @@ export interface components {
     };
     RoleAssignmentItem: {
       id: string;
-      /** @enum {string} */
+      /**
+       * @description Read-only projection of the stored assignment, including organisation principals.
+       * @enum {string}
+       */
       principalType: 'USER' | 'SERVICE_ACCOUNT' | 'ORGANISATION';
       principalId: string;
       roleId: number;
@@ -3414,6 +3725,7 @@ export interface components {
       entityId: string;
       name: string;
       acsUrl: string;
+      /** @description Links the service provider to an application and enforces that application access gate before issuing assertions. */
       applicationId?: number;
       /** @enum {string} */
       nameIdFormat?: 'EMAIL' | 'PERSISTENT';
@@ -3423,6 +3735,7 @@ export interface components {
     UpdateServiceProviderBody: {
       name?: string;
       acsUrl?: string;
+      /** @description Links the service provider to the application whose access gate it enforces; null removes the link. */
       applicationId?: number | null;
       /** @enum {string} */
       nameIdFormat?: 'EMAIL' | 'PERSISTENT';
@@ -3441,6 +3754,7 @@ export interface components {
       createdAt: string;
     };
     CreateGroupMappingBody: {
+      /** @description SCIM group whose members inherit the role; the group organisation scopes the derived assignments. */
       groupId: string;
       roleId: number;
     };
@@ -3456,9 +3770,13 @@ export interface components {
       createdAt: string;
     };
     CreateServiceAccessBody: {
+      /** @description Application whose routes the rule opens. */
       applicationId: number;
+      /** @description Service client allowed to call the routes. */
       callerClientId: string;
+      /** @description HTTP method covered by the rule, or * for all methods. */
       method: string;
+      /** @description Route path covered by the rule; a trailing * matches any suffix. */
       pathPattern: string;
     };
     WebhookListResponse: {
@@ -3479,6 +3797,7 @@ export interface components {
     };
     CreatedWebhookResponse: {
       webhook: components['schemas']['WebhookItem'];
+      /** @description Webhook signing secret, shown exactly once. */
       secret: string;
     };
     UpdateWebhookBody: {
@@ -4022,6 +4341,7 @@ export interface operations {
     parameters: {
       query: {
         clientId: string;
+        /** @description Space-delimited scope string exactly as supplied on the authorization request. */
         scope: string;
       };
       header?: never;
@@ -4144,6 +4464,7 @@ export interface operations {
       query?: never;
       header?: never;
       path: {
+        /** @description Admin-chosen client identifier slug; legacy lowercase UUIDs are also accepted. */
         clientId: string;
       };
       cookie?: never;
@@ -5698,6 +6019,7 @@ export interface operations {
   get_saml2_sso: {
     parameters: {
       query: {
+        /** @description SAML 2.0 binding wire parameter; the uppercase name is required by the protocol. */
         SAMLRequest: string;
         RelayState?: string;
       };
@@ -6369,6 +6691,128 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['WebauthnChallengeResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_auth_methods: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuthMethodsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_auth_social_provider_start: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        provider: 'GOOGLE' | 'MICROSOFT';
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SocialLoginStartBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SocialLoginStartResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_auth_flow_flowId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        flowId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FlowStatusResponse'];
         };
       };
       /** @description Default Response */
@@ -8697,9 +9141,256 @@ export interface operations {
       };
     };
   };
+  get_api_v1_admin_auth_modes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuthModeListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_admin_auth_modes_method: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        method: 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP' | 'GOOGLE' | 'MICROSOFT';
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetAuthModeBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_admin_identity_providers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GlobalIdentityProviderListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_admin_identity_providers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateGlobalIdentityProviderBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GlobalIdentityProviderItem'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_admin_identity_providers_identityProviderId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        identityProviderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_admin_identity_providers_identityProviderId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        identityProviderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateGlobalIdentityProviderBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GlobalIdentityProviderItem'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_admin_clients: {
     parameters: {
       query?: {
+        /** @description Restricts the listing to one application's clients. */
         applicationId?: number | string;
       };
       header?: never;
@@ -10654,6 +11345,10 @@ export type WebauthnOptionsBody = components['schemas']['WebauthnOptionsBody'];
 export type WebauthnChallengeResponse = components['schemas']['WebauthnChallengeResponse'];
 export type WebauthnAuthenticationOptions = components['schemas']['WebauthnAuthenticationOptions'];
 export type WebauthnCredentialDescriptor = components['schemas']['WebauthnCredentialDescriptor'];
+export type AuthMethodsResponse = components['schemas']['AuthMethodsResponse'];
+export type SocialProviderOptionDto = components['schemas']['SocialProviderOptionDto'];
+export type SocialLoginStartBody = components['schemas']['SocialLoginStartBody'];
+export type SocialLoginStartResponse = components['schemas']['SocialLoginStartResponse'];
 export type MeSessionsResponse = components['schemas']['MeSessionsResponse'];
 export type MeSessionItem = components['schemas']['MeSessionItem'];
 export type SessionsRevokedResponse = components['schemas']['SessionsRevokedResponse'];
@@ -10725,6 +11420,13 @@ export type ApplicationMemberItem = components['schemas']['ApplicationMemberItem
 export type ApplicationOrganisationListResponse = components['schemas']['ApplicationOrganisationListResponse'];
 export type ApplicationOrganisationItem = components['schemas']['ApplicationOrganisationItem'];
 export type ReleaseApplicationBody = components['schemas']['ReleaseApplicationBody'];
+export type AuthModeListResponse = components['schemas']['AuthModeListResponse'];
+export type AuthModeItem = components['schemas']['AuthModeItem'];
+export type GlobalIdentityProviderItem = components['schemas']['GlobalIdentityProviderItem'];
+export type SetAuthModeBody = components['schemas']['SetAuthModeBody'];
+export type GlobalIdentityProviderListResponse = components['schemas']['GlobalIdentityProviderListResponse'];
+export type CreateGlobalIdentityProviderBody = components['schemas']['CreateGlobalIdentityProviderBody'];
+export type UpdateGlobalIdentityProviderBody = components['schemas']['UpdateGlobalIdentityProviderBody'];
 export type ClientListResponse = components['schemas']['ClientListResponse'];
 export type ClientSummaryItem = components['schemas']['ClientSummaryItem'];
 export type RegisterClientBody = components['schemas']['RegisterClientBody'];
@@ -10773,6 +11475,7 @@ export type ListDomainsPathParams = Exclude<paths['/api/v1/organisations/{organi
 export type HandleSamlSsoQueryParams = Exclude<paths['/saml2/sso']['get']['parameters']['query'], undefined>;
 export type ResumeSamlSsoQueryParams = Exclude<paths['/saml2/sso/resume']['get']['parameters']['query'], undefined>;
 export type ChallengeMethodsQueryParams = Exclude<paths['/api/v1/auth/challenge/methods']['get']['parameters']['query'], undefined>;
+export type GetFlowPathParams = Exclude<paths['/api/v1/auth/flow/{flowId}']['get']['parameters']['path'], undefined>;
 export type HandleFederatedCallbackQueryParams = Exclude<paths['/api/v1/auth/federated/callback']['get']['parameters']['query'], undefined>;
 export type ResolveStepUpIntentQueryParams = Exclude<paths['/api/v1/me/mfa/step-up/intent']['get']['parameters']['query'], undefined>;
 export type ListIdentityProvidersPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/identity-providers']['get']['parameters']['path'], undefined>;

@@ -2,15 +2,17 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, FormField, Input, Spinner } from '@shadow-library/ui';
 
-import { ExternalLinkIcon, KeyIcon } from '@/components/icons';
+import { ExternalLinkIcon, GlobeIcon, KeyIcon } from '@/components/icons';
 import { assertPasskey, AuthCard, AuthMedallion, AuthScreen, IdentifierChip, MfaLockedCard, MfaStep, OtpEntry, StepHeader, useFlow } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
-import { authApi, type FlowState } from '@/lib/apis';
+import { authApi, type FlowState, type SocialProvider, useAuthMethodsQuery } from '@/lib/apis';
 import { useDeviceId } from '@/lib/hooks';
 
 interface LoginSearch {
   returnTo?: string;
   client?: string;
+  /** Set by the federated callback when it hands a part-finished flow back through a redirect. */
+  flowId?: string;
 }
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -32,6 +34,7 @@ export const Route = createFileRoute('/_auth/login')({
   validateSearch: (search: Record<string, unknown>): LoginSearch => ({
     returnTo: typeof search.returnTo === 'string' ? search.returnTo : undefined,
     client: typeof search.client === 'string' ? search.client : undefined,
+    flowId: typeof search.flow_id === 'string' ? search.flow_id : undefined,
   }),
   component: LoginPage,
 });
@@ -41,6 +44,7 @@ function LoginPage(): React.JSX.Element {
   const navigate = useNavigate();
   const deviceId = useDeviceId();
   const { flow, busy, error, dead, deadReason, run, reset, setError } = useFlow();
+  const methods = useAuthMethodsQuery();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -52,6 +56,17 @@ function LoginPage(): React.JSX.Element {
   const resendTimer = useRef<ReturnType<typeof setInterval>>(undefined);
 
   useEffect(() => () => clearInterval(resendTimer.current), []);
+
+  /**
+   * Coming back from a social provider, the callback redirects here with the flow id rather than answering
+   * the request that started it, so the step has to be read back from the server — the redirect's own
+   * `status` param is attacker-controllable and is deliberately ignored.
+   */
+  useEffect(() => {
+    const resumeId = search.flowId;
+    if (!resumeId || flow) return;
+    void run(() => authApi.flowStatus(resumeId));
+  }, [search.flowId, flow, run]);
 
   /** Returns to the identifier step, wiping any secret typed into a prior step so a changed identifier never inherits a stale password or code. */
   const restart = (): void => {
@@ -117,6 +132,16 @@ function LoginPage(): React.JSX.Element {
   const resend = async (flowId: string, method: 'EMAIL_OTP' | 'SMS_OTP'): Promise<void> => {
     startResendCooldown();
     await authApi.challengeResend(flowId, method).catch(() => undefined);
+  };
+
+  const startSocial = async (provider: SocialProvider): Promise<void> => {
+    setError(null);
+    try {
+      const started = await authApi.socialStart(provider, deviceId, search.returnTo);
+      window.location.assign(started.authorizationUrl);
+    } catch {
+      setError('Couldn’t reach that provider. Try another method.');
+    }
   };
 
   const footer = (
@@ -189,12 +214,22 @@ function LoginPage(): React.JSX.Element {
             Continue
           </Button>
           <div className={parts.orDivider}>OR</div>
-          <Button variant="secondary" fullWidth onClick={() => runPasskey()}>
-            <span className={parts.btnIcon}>
-              <KeyIcon size={17} />
-              Sign in with a passkey
-            </span>
-          </Button>
+          {methods.data?.passkey !== false && (
+            <Button variant="secondary" fullWidth onClick={() => runPasskey()}>
+              <span className={parts.btnIcon}>
+                <KeyIcon size={17} />
+                Sign in with a passkey
+              </span>
+            </Button>
+          )}
+          {(methods.data?.social ?? []).map(option => (
+            <Button key={option.provider} variant="secondary" fullWidth onClick={() => void startSocial(option.provider)}>
+              <span className={parts.btnIcon}>
+                <GlobeIcon size={17} />
+                Continue with {option.label}
+              </span>
+            </Button>
+          ))}
           <p className={parts.otpNote}>
             New here? <Link to="/register">Create an account</Link>
           </p>

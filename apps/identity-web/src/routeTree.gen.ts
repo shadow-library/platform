@@ -18,6 +18,7 @@ import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as ConsoleWebhooksRouteImport } from './routes/console/webhooks'
 import { Route as ConsoleSamlRouteImport } from './routes/console/saml'
 import { Route as ConsoleRolesRouteImport } from './routes/console/roles'
+import { Route as ConsoleAuthenticationRouteImport } from './routes/console/authentication'
 import { Route as PortalApplicationsRouteImport } from './routes/_portal/applications'
 import { Route as AuthStepUpRouteImport } from './routes/_auth/step-up'
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
@@ -86,6 +87,11 @@ const ConsoleSamlRoute = ConsoleSamlRouteImport.update({
 const ConsoleRolesRoute = ConsoleRolesRouteImport.update({
   id: '/roles',
   path: '/roles',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ConsoleAuthenticationRoute = ConsoleAuthenticationRouteImport.update({
+  id: '/authentication',
+  path: '/authentication',
   getParentRoute: () => ConsoleRoute,
 } as any)
 const PortalApplicationsRoute = PortalApplicationsRouteImport.update({
@@ -240,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof AuthRegisterRoute
   '/step-up': typeof AuthStepUpRoute
   '/applications': typeof PortalApplicationsRoute
+  '/console/authentication': typeof ConsoleAuthenticationRoute
   '/console/roles': typeof ConsoleRolesRoute
   '/console/saml': typeof ConsoleSamlRoute
   '/console/webhooks': typeof ConsoleWebhooksRoute
@@ -274,6 +281,7 @@ export interface FileRoutesByTo {
   '/register': typeof AuthRegisterRoute
   '/step-up': typeof AuthStepUpRoute
   '/applications': typeof PortalApplicationsRoute
+  '/console/authentication': typeof ConsoleAuthenticationRoute
   '/console/roles': typeof ConsoleRolesRoute
   '/console/saml': typeof ConsoleSamlRoute
   '/console/webhooks': typeof ConsoleWebhooksRoute
@@ -311,6 +319,7 @@ export interface FileRoutesById {
   '/_auth/register': typeof AuthRegisterRoute
   '/_auth/step-up': typeof AuthStepUpRoute
   '/_portal/applications': typeof PortalApplicationsRoute
+  '/console/authentication': typeof ConsoleAuthenticationRoute
   '/console/roles': typeof ConsoleRolesRoute
   '/console/saml': typeof ConsoleSamlRoute
   '/console/webhooks': typeof ConsoleWebhooksRoute
@@ -348,6 +357,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/step-up'
     | '/applications'
+    | '/console/authentication'
     | '/console/roles'
     | '/console/saml'
     | '/console/webhooks'
@@ -382,6 +392,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/step-up'
     | '/applications'
+    | '/console/authentication'
     | '/console/roles'
     | '/console/saml'
     | '/console/webhooks'
@@ -418,6 +429,7 @@ export interface FileRouteTypes {
     | '/_auth/register'
     | '/_auth/step-up'
     | '/_portal/applications'
+    | '/console/authentication'
     | '/console/roles'
     | '/console/saml'
     | '/console/webhooks'
@@ -515,6 +527,13 @@ declare module '@tanstack/react-router' {
       path: '/roles'
       fullPath: '/console/roles'
       preLoaderRoute: typeof ConsoleRolesRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/console/authentication': {
+      id: '/console/authentication'
+      path: '/authentication'
+      fullPath: '/console/authentication'
+      preLoaderRoute: typeof ConsoleAuthenticationRouteImport
       parentRoute: typeof ConsoleRoute
     }
     '/_portal/applications': {
@@ -780,6 +799,7 @@ const PortalRouteWithChildren =
   PortalRoute._addFileChildren(PortalRouteChildren)
 
 interface ConsoleRouteChildren {
+  ConsoleAuthenticationRoute: typeof ConsoleAuthenticationRoute
   ConsoleRolesRoute: typeof ConsoleRolesRoute
   ConsoleSamlRoute: typeof ConsoleSamlRoute
   ConsoleWebhooksRoute: typeof ConsoleWebhooksRoute
@@ -791,6 +811,7 @@ interface ConsoleRouteChildren {
 }
 
 const ConsoleRouteChildren: ConsoleRouteChildren = {
+  ConsoleAuthenticationRoute: ConsoleAuthenticationRoute,
   ConsoleRolesRoute: ConsoleRolesRoute,
   ConsoleSamlRoute: ConsoleSamlRoute,
   ConsoleWebhooksRoute: ConsoleWebhooksRoute,

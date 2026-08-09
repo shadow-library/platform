@@ -21,8 +21,6 @@ export interface FlowActions {
   run(action: () => Promise<FlowState>): Promise<FlowState | null>;
   reset(): void;
   setError(message: string | null): void;
-  /** Adopts a flow born elsewhere (a federated callback redirect carries flowId + status). */
-  hydrate(state: FlowState): void;
 }
 
 const RETRY_MESSAGE = (seconds?: number): string => (seconds ? `Too many attempts — try again in ${seconds}s.` : 'Too many attempts — try again shortly.');
@@ -95,10 +93,5 @@ export function useFlow(): FlowUiState & FlowActions {
     setDeadReason(null);
   }, []);
 
-  const hydrate = useCallback((state: FlowState) => {
-    previousFlow.current = state;
-    setFlow(state);
-  }, []);
-
-  return { flow, busy, error, dead, deadReason, run, reset, setError, hydrate };
+  return { flow, busy, error, dead, deadReason, run, reset, setError };
 }
