@@ -1,0 +1,1 @@
+CREATE INDEX "notification_jobs_created_at_channel_status_idx" ON "notification_jobs" USING btree ("created_at","channel","status");

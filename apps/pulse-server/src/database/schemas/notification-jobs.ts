@@ -44,7 +44,10 @@ export const notificationJobs = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  t => [index('notification_jobs_status_priority_next_attempt_at_idx').on(t.status, t.priority, t.nextAttemptAt)],
+  t => [
+    index('notification_jobs_status_priority_next_attempt_at_idx').on(t.status, t.priority, t.nextAttemptAt),
+    index('notification_jobs_created_at_channel_status_idx').on(t.createdAt, t.channel, t.status),
+  ],
 );
 
 export const notificationMessages = pgTable(
