@@ -195,8 +195,14 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly FED_001 = AppErrorCode.validation('FED_001', 'Invalid identity provider configuration', 400);
   /** The identity provider registration does not exist in this organisation */
   static readonly FED_002 = AppErrorCode.notFound('FED_002', 'Identity provider not found');
-  /** An organisation may configure only one identity provider */
+  /** An organisation may configure only one identity provider, and the platform one of each social provider */
   static readonly FED_003 = AppErrorCode.conflict('FED_003', 'An identity provider is already configured');
+  /** The sign-in method cannot be enabled until its provider settings are supplied */
+  static readonly FED_004 = AppErrorCode.conflict('FED_004', 'Sign-in method is not configured', 409);
+  /** A multi-tenant microsoft issuer cannot be verified; the tenant-scoped issuer is required */
+  static readonly FED_005 = AppErrorCode.validation('FED_005', 'Microsoft sign-in requires a tenant-scoped issuer', 400);
+  /** The upstream account is unknown here and the provider does not permit new accounts */
+  static readonly FED_006 = AppErrorCode.forbidden('FED_006', 'Sign-up through this provider is not allowed');
 
   /*!
    * SAML Error Codes

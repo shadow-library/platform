@@ -1,5 +1,6 @@
 export * from './app-sessions.schema';
 export * from './audit.schema';
+export * from './auth-mode.schema';
 export * from './auth-tokens.schemas';
 export * from './authz.schema';
 export * from './challenges.schema';

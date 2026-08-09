@@ -17,8 +17,10 @@ import { UserEmailService, UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { User, UserSession } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
+import { AuthModeService } from '@server/modules/system/auth-mode';
 
-import { AuthFlowContext, AuthFlowService, DeviceContext, FederatedFlowState } from './auth-flow.service';
+import { AuthFlowContext, AuthFlowService, DeviceContext, FederatedFlowState, sanitizeReturnTo } from './auth-flow.service';
+import { OTP_RESEND_BUDGET } from './challenge-flow.service';
 import { ChallengeService } from './challenge.service';
 import { FlowStepResult } from './flow.types';
 import { SignInEventService } from './sign-in-event.service';
@@ -64,11 +66,12 @@ const AWAITING_TOTP = 'AWAITING_TOTP';
 const AWAITING_MFA_WEBAUTHN = 'AWAITING_MFA_WEBAUTHN';
 const AWAITING_WEBAUTHN = 'AWAITING_WEBAUTHN';
 const AWAITING_FEDERATED = 'AWAITING_FEDERATED';
+const AWAITING_SMS_OTP = 'AWAITING_SMS_OTP';
 const AWAITING_LINK_OTP = 'AWAITING_LINK_OTP';
 const AWAITING_PASSWORD_RESET = 'AWAITING_PASSWORD_RESET';
 const MFA_STATUSES = [AWAITING_TOTP, AWAITING_MFA_WEBAUTHN];
 const OTP_STATUSES = ['AWAITING_EMAIL_OTP', 'AWAITING_SMS_OTP'];
-const LINK_OTP_TEMPLATE = 'auth.login.otp';
+const LOGIN_OTP_TEMPLATE = 'auth.login.otp';
 const PASSWORD_CHANGED_TEMPLATE = 'auth.password.changed';
 
 @Injectable()
@@ -97,6 +100,7 @@ export class LoginService {
     private readonly federatedIdentityService: FederatedIdentityService,
     private readonly organisationService: OrganisationService,
     private readonly policyDecisionService: PolicyDecisionService,
+    private readonly authModeService: AuthModeService,
   ) {}
 
   async init(input: LoginInitInput): Promise<LoginInitResult> {
@@ -115,6 +119,10 @@ export class LoginService {
       if (enforced) status = AWAITING_FEDERATED;
     }
 
+    /** A phone identifier has no password step to fall back on that the member expects, so an enabled mobile mode becomes the first challenge — enforced federation still outranks it. */
+    const smsFirst = status === AWAITING_PASSWORD && input.identifier.startsWith('+') && (await this.authModeService.isEnabled('SMS_OTP'));
+    if (smsFirst) status = AWAITING_SMS_OTP;
+
     const flow = await this.authFlowService.create('LOGIN', status, {
       identifier: input.identifier,
       userId: user.id.toString(),
@@ -122,7 +130,10 @@ export class LoginService {
       device: input.device,
       returnTo: this.sanitizeReturnTo(input.returnTo),
       federated,
+      resendsLeft: smsFirst ? OTP_RESEND_BUDGET : undefined,
+      lastOtpSentAt: smsFirst ? Date.now() : undefined,
     });
+    if (smsFirst) await this.challengeService.issue({ flowId: flow.flowId, type: 'SMS_OTP', target: input.identifier, userId: user.id, templateKey: LOGIN_OTP_TEMPLATE });
 
     const result: LoginInitResult = { flowId: flow.flowId, status: flow.status, hasAlternativeMethods: true };
     if (provider && federated) {
@@ -136,9 +147,7 @@ export class LoginService {
   }
 
   private sanitizeReturnTo(returnTo: string | undefined): string | undefined {
-    if (!returnTo) return undefined;
-    if (returnTo.startsWith('/') && !returnTo.startsWith('//')) return returnTo;
-    return returnTo.startsWith(`${this.issuer}/`) ? returnTo : undefined;
+    return sanitizeReturnTo(returnTo, this.issuer);
   }
 
   private async isPlatformAdmin(userId: bigint): Promise<boolean> {
@@ -265,9 +274,12 @@ export class LoginService {
         identifier: identity.email,
         federated: { ...federated, pendingSubject: identity.subject },
       });
-      await this.challengeService.issue({ flowId: flow.flowId, type: 'EMAIL_OTP', target: identity.email, userId: existing.id, templateKey: LINK_OTP_TEMPLATE });
+      await this.challengeService.issue({ flowId: flow.flowId, type: 'EMAIL_OTP', target: identity.email, userId: existing.id, templateKey: LOGIN_OTP_TEMPLATE });
       return { outcome: 'CONTINUE', flowId: flow.flowId, status: next.status };
     }
+
+    const provider = await this.identityProviderService.getById(federated.identityProviderId);
+    if (provider && !provider.allowSignUp) throw AppErrorCode.FED_006.create();
 
     const created = await this.userService.createProvisionedUser({ email: identity.email, emailVerified: true, status: 'ACTIVE' });
     await this.joinProviderOrganisation(federated.identityProviderId, created.id);
@@ -301,7 +313,7 @@ export class LoginService {
 
   private async joinProviderOrganisation(identityProviderId: string, userId: bigint): Promise<void> {
     const provider = await this.identityProviderService.getById(identityProviderId);
-    if (provider) await this.organisationService.ensureMember(provider.organisationId, userId, 'MEMBER');
+    if (provider?.organisationId) await this.organisationService.ensureMember(provider.organisationId, userId, 'MEMBER');
   }
 
   private isOtpLocked(user: User): boolean {

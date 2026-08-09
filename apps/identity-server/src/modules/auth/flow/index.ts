@@ -1,4 +1,7 @@
 export * from './auth-flow.module';
+export * from './auth-methods.controller';
+export * from './auth-methods.dto';
+export * from './social-login.service';
 export * from './auth-flow.service';
 export * from './auth.controller';
 export * from './auth.dto';

@@ -12,8 +12,10 @@ import { AuditModule } from '@server/modules/infrastructure/audit';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 import { NotificationModule } from '@server/modules/infrastructure/notification';
 import { SecurityModule } from '@server/modules/infrastructure/security';
+import { AuthModeModule } from '@server/modules/system/auth-mode';
 
 import { AuthFlowService } from './auth-flow.service';
+import { AuthMethodsController } from './auth-methods.controller';
 import { AuthController } from './auth.controller';
 import { ChallengeFlowService } from './challenge-flow.service';
 import { ChallengeService } from './challenge.service';
@@ -24,6 +26,7 @@ import { MeSessionsService } from './me-sessions.service';
 import { RecoveryService } from './recovery.service';
 import { RegistrationService } from './registration.service';
 import { SignInEventService } from './sign-in-event.service';
+import { SocialLoginService } from './social-login.service';
 import { SuspiciousLoginService } from './suspicious-login.service';
 
 @Module({
@@ -40,8 +43,9 @@ import { SuspiciousLoginService } from './suspicious-login.service';
     FederationModule,
     AuthzModule,
     OrganisationModule,
+    AuthModeModule,
   ],
-  controllers: [AuthController, MeSessionsController, FederatedController],
+  controllers: [AuthController, AuthMethodsController, MeSessionsController, FederatedController],
   providers: [
     AuthFlowService,
     SignInEventService,
@@ -52,7 +56,18 @@ import { SuspiciousLoginService } from './suspicious-login.service';
     RegistrationService,
     RecoveryService,
     MeSessionsService,
+    SocialLoginService,
   ],
-  exports: [AuthFlowService, SignInEventService, ChallengeService, ChallengeFlowService, SuspiciousLoginService, LoginService, RegistrationService, RecoveryService],
+  exports: [
+    AuthFlowService,
+    SignInEventService,
+    ChallengeService,
+    ChallengeFlowService,
+    SuspiciousLoginService,
+    LoginService,
+    RegistrationService,
+    RecoveryService,
+    SocialLoginService,
+  ],
 })
 export class AuthFlowModule {}

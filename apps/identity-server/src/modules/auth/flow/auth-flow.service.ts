@@ -41,6 +41,13 @@ export interface AuthFlowContext {
   createdAt: number;
 }
 
+/** Same-origin destinations only: a root-relative path (never protocol-relative) or an absolute url under the issuer. */
+export const sanitizeReturnTo = (returnTo: string | undefined, issuer: string): string | undefined => {
+  if (!returnTo) return undefined;
+  if (returnTo.startsWith('/') && !returnTo.startsWith('//')) return returnTo;
+  return returnTo.startsWith(`${issuer}/`) ? returnTo : undefined;
+};
+
 @Injectable()
 export class AuthFlowService {
   private readonly redis: Redis;

@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
@@ -25,6 +25,11 @@ export interface CreateIdentityProvider {
   enforced?: boolean;
 }
 
+export interface CreateGlobalIdentityProvider extends CreateIdentityProvider {
+  kind: SocialProviderKind;
+  allowSignUp?: boolean;
+}
+
 export interface UpdateIdentityProvider {
   name?: string;
   clientId?: string;
@@ -33,6 +38,15 @@ export interface UpdateIdentityProvider {
   enforced?: boolean;
   isActive?: boolean;
 }
+
+export interface UpdateGlobalIdentityProvider extends Omit<UpdateIdentityProvider, 'enforced'> {
+  allowSignUp?: boolean;
+}
+
+export type SocialProviderKind = Exclude<IdentityProvider.Kind, 'OIDC'>;
+
+/** Microsoft's multi-tenant issuers publish `.../{tenantid}/v2.0` verbatim, so neither discovery nor an `iss` claim can ever match one. */
+const MICROSOFT_TENANT_ISSUER = /^https:\/\/login\.microsoftonline\.com\/[0-9a-fA-F-]{36}\/v2\.0$/;
 
 interface DiscoveryDocument {
   issuer?: string;
@@ -49,7 +63,7 @@ export class IdentityProviderService {
   private readonly db: PrimaryDatabase;
 
   constructor(
-    databaseService: DatabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly keyProvider: KeyProvider,
     private readonly targetGuard: WebhookTargetGuard,
     private readonly auditService: AuditService,
@@ -109,12 +123,29 @@ export class IdentityProviderService {
     const existing = await this.db.query.identityProviders.findFirst({ where: eq(schema.identityProviders.organisationId, organisationId) });
     if (existing) throw AppErrorCode.FED_003.create();
 
+    const provider = await this.insert({ organisationId, kind: 'OIDC', enforced: input.enforced ?? false }, input);
+    this.logger.info('identity provider configured', { organisationId: organisationId.toString(), issuer: provider.issuer });
+    return provider;
+  }
+
+  async createGlobal(input: CreateGlobalIdentityProvider): Promise<IdentityProvider> {
+    if (input.kind === 'MICROSOFT' && !MICROSOFT_TENANT_ISSUER.test(input.issuer.replace(/\/$/, ''))) throw AppErrorCode.FED_005.create();
+
+    const provider = await this.insert({ organisationId: null, kind: input.kind, allowSignUp: input.allowSignUp ?? true }, input);
+    this.logger.info('social identity provider configured', { kind: provider.kind, issuer: provider.issuer });
+    return provider;
+  }
+
+  private async insert(
+    scope: Pick<typeof schema.identityProviders.$inferInsert, 'organisationId' | 'kind' | 'enforced' | 'allowSignUp'>,
+    input: CreateIdentityProvider,
+  ): Promise<IdentityProvider> {
     const endpoints = await this.discover(input.issuer);
     const secret = this.keyProvider.encrypt(Buffer.from(input.clientSecret));
-    const provider = await this.db
+    return this.db
       .insert(schema.identityProviders)
       .values({
-        organisationId,
+        ...scope,
         name: input.name,
         issuer: input.issuer.replace(/\/$/, ''),
         clientId: input.clientId,
@@ -123,13 +154,11 @@ export class IdentityProviderService {
         clientSecretAuthTag: secret.authTag,
         kekVersion: secret.kekVersion,
         scopes: input.scopes ?? 'openid email profile',
-        enforced: input.enforced ?? false,
         ...endpoints,
       })
       .returning()
-      .then(([row]) => row ?? throwError(AppError.internal('Identity provider creation failed')));
-    this.logger.info('identity provider configured', { organisationId: organisationId.toString(), issuer: provider.issuer });
-    return provider;
+      .then(([row]) => row ?? throwError(AppError.internal('Identity provider creation failed')))
+      .catch(error => this.databaseService.translateError(error));
   }
 
   async update(organisationId: bigint, id: string, patch: UpdateIdentityProvider): Promise<IdentityProvider> {
@@ -155,6 +184,36 @@ export class IdentityProviderService {
       .where(and(eq(schema.identityProviders.id, id), eq(schema.identityProviders.organisationId, organisationId)))
       .returning({ id: schema.identityProviders.id });
     if (removed.length === 0) throw AppErrorCode.FED_002.create();
+  }
+
+  async updateGlobal(id: string, patch: UpdateGlobalIdentityProvider): Promise<IdentityProvider> {
+    const secret = patch.clientSecret === undefined ? {} : this.toSecretColumns(patch.clientSecret);
+    const [updated] = await this.db
+      .update(schema.identityProviders)
+      .set({ name: patch.name, clientId: patch.clientId, scopes: patch.scopes, allowSignUp: patch.allowSignUp, isActive: patch.isActive, ...secret, updatedAt: new Date() })
+      .where(and(eq(schema.identityProviders.id, id), isNull(schema.identityProviders.organisationId)))
+      .returning();
+    if (!updated) throw AppErrorCode.FED_002.create();
+    return updated;
+  }
+
+  async removeGlobal(id: string): Promise<void> {
+    const removed = await this.db
+      .delete(schema.identityProviders)
+      .where(and(eq(schema.identityProviders.id, id), isNull(schema.identityProviders.organisationId)))
+      .returning({ id: schema.identityProviders.id });
+    if (removed.length === 0) throw AppErrorCode.FED_002.create();
+  }
+
+  listGlobal(): Promise<IdentityProvider[]> {
+    return this.db.query.identityProviders.findMany({ where: isNull(schema.identityProviders.organisationId) });
+  }
+
+  async getGlobal(kind: SocialProviderKind): Promise<IdentityProvider | null> {
+    const provider = await this.db.query.identityProviders.findFirst({
+      where: and(isNull(schema.identityProviders.organisationId), eq(schema.identityProviders.kind, kind)),
+    });
+    return provider ?? null;
   }
 
   async getForOrganisation(organisationId: bigint): Promise<IdentityProvider | null> {

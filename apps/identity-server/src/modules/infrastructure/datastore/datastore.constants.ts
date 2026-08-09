@@ -7,4 +7,6 @@ export const constraintErrorMap: Record<string, AppError> = {
   users_username_unique: AppErrorCode.USR_002.create(),
   user_emails_verified_email_unique: AppErrorCode.USR_003.create(),
   user_phones_verified_phone_unique: AppErrorCode.USR_004.create(),
+  identity_providers_organisation_unique: AppErrorCode.FED_003.create(),
+  identity_providers_global_kind_unique: AppErrorCode.FED_003.create(),
 };

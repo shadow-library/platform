@@ -77,6 +77,8 @@ export class UpstreamOidcService {
     url.searchParams.set('nonce', request.nonce);
     url.searchParams.set('code_challenge', request.codeChallenge);
     url.searchParams.set('code_challenge_method', 'S256');
+    /** Social sign-in is a deliberate act; without this a signed-in browser is bounced straight back with whichever account it happens to hold. */
+    if (provider.kind !== 'OIDC') url.searchParams.set('prompt', 'select_account');
     return url.toString();
   }
 
@@ -132,10 +134,28 @@ export class UpstreamOidcService {
     if (typeof claims['exp'] !== 'number' || claims['exp'] <= now - CLOCK_SKEW_SECONDS) throw new FederationError('id token expired');
     if (claims['nonce'] !== nonce) throw new FederationError('nonce mismatch');
     if (typeof claims['sub'] !== 'string' || !claims['sub']) throw new FederationError('missing subject');
-    if (typeof claims['email'] !== 'string' || !claims['email'].includes('@')) throw new FederationError('missing email claim');
-    if (claims['email_verified'] !== true) throw new FederationError('upstream email is not verified');
 
-    return { subject: claims['sub'], email: claims['email'].toLowerCase() };
+    return { subject: claims['sub'], email: this.resolveEmail(provider, claims) };
+  }
+
+  /**
+   * Entra ID emits neither `email_verified` nor, for many account types, `email` — the address travels as
+   * `preferred_username`. Trusting it is sound only because a Microsoft provider is pinned to one tenant's
+   * issuer at registration time, so the tenant that signed the token also owns the mail namespace it
+   * asserts. Every other upstream must still prove the address is verified.
+   */
+  private resolveEmail(provider: IdentityProvider, claims: Record<string, unknown>): string {
+    const candidate = typeof claims['email'] === 'string' && claims['email'].includes('@') ? claims['email'] : undefined;
+    if (provider.kind === 'MICROSOFT') {
+      const fallback = typeof claims['preferred_username'] === 'string' && claims['preferred_username'].includes('@') ? claims['preferred_username'] : undefined;
+      const email = candidate ?? fallback;
+      if (!email) throw new FederationError('token carried no email or preferred_username claim');
+      return email.toLowerCase();
+    }
+
+    if (!candidate) throw new FederationError('missing email claim');
+    if (claims['email_verified'] !== true) throw new FederationError('upstream email is not verified');
+    return candidate.toLowerCase();
   }
 
   private async resolveKey(provider: IdentityProvider, kid: string | undefined): Promise<KeyObject | null> {

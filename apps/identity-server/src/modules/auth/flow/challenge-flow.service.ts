@@ -4,6 +4,7 @@ import { Config, utils } from '@shadow-library/common';
 import { AppErrorCode } from '@server/classes';
 import { UserEmailService } from '@server/modules/identity/user';
 import { VerificationChallenge } from '@server/modules/infrastructure/datastore';
+import { AuthModeService } from '@server/modules/system/auth-mode';
 
 import { AuthFlowContext, AuthFlowService } from './auth-flow.service';
 import { ChallengeService } from './challenge.service';
@@ -52,13 +53,16 @@ export class ChallengeFlowService {
     private readonly authFlowService: AuthFlowService,
     private readonly challengeService: ChallengeService,
     private readonly userEmailService: UserEmailService,
+    private readonly authModeService: AuthModeService,
   ) {}
 
   async listMethods(flowId: string): Promise<ChallengeMethodDescriptor[]> {
     const flow = await this.requireLoginFlow(flowId);
     const methods: ChallengeMethodDescriptor[] = [{ name: 'PASSWORD' }, { name: 'WEBAUTHN' }];
     if (this.isEmailIdentifier(flow.identifier)) methods.push({ name: 'EMAIL_OTP', metadata: { maskedEmail: utils.string.maskEmail(flow.identifier) } });
-    if (this.isPhoneIdentifier(flow.identifier)) methods.push({ name: 'SMS_OTP', metadata: { maskedPhone: this.maskPhone(flow.identifier) } });
+    if (this.isPhoneIdentifier(flow.identifier) && (await this.authModeService.isEnabled('SMS_OTP'))) {
+      methods.push({ name: 'SMS_OTP', metadata: { maskedPhone: this.maskPhone(flow.identifier) } });
+    }
     return methods;
   }
 
@@ -76,7 +80,8 @@ export class ChallengeFlowService {
       return { flowId, status: next.status };
     }
 
-    const available = method === 'EMAIL_OTP' ? this.isEmailIdentifier(flow.identifier) : this.isPhoneIdentifier(flow.identifier);
+    const available =
+      method === 'EMAIL_OTP' ? this.isEmailIdentifier(flow.identifier) : this.isPhoneIdentifier(flow.identifier) && (await this.authModeService.isEnabled('SMS_OTP'));
     if (!available) throw AppErrorCode.AUTH_002.create();
 
     const status = method === 'EMAIL_OTP' ? 'AWAITING_EMAIL_OTP' : 'AWAITING_SMS_OTP';
