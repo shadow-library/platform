@@ -1,5 +1,6 @@
 import { Module } from '@shadow-library/app';
 
+import { FederationModule } from '@server/modules/auth/federation';
 import { MfaModule } from '@server/modules/auth/mfa';
 import { OAuthModule } from '@server/modules/auth/oauth';
 import { SamlModule } from '@server/modules/auth/saml';
@@ -13,9 +14,11 @@ import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 import { WebhookModule } from '@server/modules/infrastructure/webhook';
 import { ScimModule } from '@server/modules/scim';
 import { ApplicationModule } from '@server/modules/system/application';
+import { AuthModeModule } from '@server/modules/system/auth-mode';
 
 import { AdminAccessService } from './admin-access.service';
 import { AdminApplicationController } from './admin-application.controller';
+import { AdminAuthModeController } from './admin-auth-mode.controller';
 import { AdminClientController } from './admin-client.controller';
 import { AdminContextController } from './admin-context.controller';
 import { AdminResourceController } from './admin-resource.controller';
@@ -42,11 +45,14 @@ import { AdminWebhookController } from './admin-webhook.controller';
     ApplicationModule,
     WebhookModule,
     ScimModule,
+    FederationModule,
+    AuthModeModule,
   ],
   controllers: [
     AdminContextController,
     AdminUserController,
     AdminApplicationController,
+    AdminAuthModeController,
     AdminClientController,
     AdminResourceController,
     AdminRoleController,
