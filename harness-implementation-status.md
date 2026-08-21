@@ -5,9 +5,9 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 
 ## Summary
 
-- Completed: 6
+- Completed: 7
 - In Progress: 0
-- Pending: 3
+- Pending: 2
 - Blocked: 0
 
 ## Tasks
@@ -20,7 +20,7 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 | P0-04 | P0       | Generation gates: reject stale briefs, error on briefless fallback                                            | COMPLETED | —            | 3415ff30 |
 | P0-05 | P0       | Batch adjacency: draft-tail fallback for N+1, halt batch on non-clean outcome                                 | COMPLETED | —            | 523abe4f |
 | P0-06 | P0       | Style/ending-contract constants: replace `DEFAULT_WRITING_INSTRUCTIONS`, widen `HookType`, single word target | COMPLETED | —            | df2c0bb0 |
-| P0-07 | P0       | Chapter-context correctness: add arc section, drop duplicated brief, record budget evictions                  | PENDING   | —            | —        |
+| P0-07 | P0       | Chapter-context correctness: add arc section, drop duplicated brief, record budget evictions                  | COMPLETED | —            | be404dd8 |
 | P0-08 | P0       | Extract-job payload mismatch fix (resolve chapter numbers server-side at enqueue)                             | PENDING   | —            | —        |
 | P0-09 | P0       | Outline invariant enforcement (coverage/uniqueness/chaining via factory closure + catalog ref check)          | PENDING   | —            | —        |
 
@@ -160,16 +160,37 @@ previousFindings: state.findings`, mirroring `repairRewrite`'s existing bookkeep
   history.
 - Commit: df2c0bb0
 
-## Pending
-
 ### P0-07 — Chapter-context correctness
 
-- Affected area: `src/modules/ai/context/context-assembler.service.ts`, `src/modules/ai/context/token-budget.ts`, `src/modules/ai/context/sections.ts`
-- Acceptance criteria:
-  - New `arc_objective` context section (objective/escalation/hook of the chapter's arc) added to `forChapter`.
-  - Duplicated brief pack section removed; template var (`chapterBrief`) remains the single authority, still used by `repairRewrite`.
-  - `applyBudget` returns `{ fitting, omitted }`; `omitted` persisted into the context pack JSON with reasons.
-  - Tests: pack includes current arc objective; brief not duplicated; budget-evicted sections recorded.
+- What changed: `forChapter` now looks up the chapter's covering arc via `brief.arcKey` and, when
+  present with non-empty content, pushes a new `arc_objective` section (objective + escalation +
+  hook joined, tier `approved_intent`) — degrades cleanly to no section for arc-less volumes. The
+  duplicated `brief` pack section is removed; the `chapterBrief` template var (also read by
+  `repairRewrite`) is untouched and remains the single authority. `applyBudget`
+  (`token-budget.ts`) now returns `{ fitting, omitted }` instead of silently dropping sections that
+  don't fit — `omitted: Array<{ key, reason: 'budget' | 'unresolved' }>` is persisted on the
+  `context_packs` row (new nullable `omitted` jsonb column, additive migration) and surfaced through
+  `ContextPreviewResponse.omitted` on the refinement context-preview endpoint. `unresolvedRefs`
+  (refs that never resolved to a section) stays a separate, parallel mechanism — folding it in would
+  require it to carry token/section shape it doesn't have and would break its existing API contract;
+  `reason: 'unresolved'` is reserved in the type for a future producer but nothing populates it yet.
+  `novel-forge-web`'s `api-types.gen.ts` was regenerated for the new field per the server↔web
+  contract rule (using the hermetic single-app compose pattern, not `--all`, to avoid dragging in
+  unrelated web apps); the regen also picked up ~100 lines of pre-existing JSDoc-description drift
+  accumulated since the file's last refresh (last regenerated at an unrelated earlier commit) —
+  unavoidable since the generator has no incremental mode, not new scope creep from this task.
+- Tests: `tests/ai/context-assembler.spec.ts` (arc_objective present/absent cases, budget-omission
+  case, updated `applyBudget` shape), `tests/ai/hardening.spec.ts` (updated `applyBudget` edge cases
+  - omission assertions).
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` and `bun scripts/verify.ts
+apps/novel-forge-web` — both green (novel-forge-server: 564 pass, 10 skip, 0 fail). Also verified
+  `bun scripts/gen-api-types.ts apps/novel-forge-web --check` passes post-regen.
+- Note: during this task a sub-agent deliberately avoided Serena's symbolic-edit tools (per an
+  added safety instruction, following the P0-06 main-checkout corruption incident) and used plain
+  Read/Edit instead; confirmed no main-checkout writes occurred.
+- Commit: be404dd8
+
+## Pending
 
 ### P0-08 — Extract-job payload
 
