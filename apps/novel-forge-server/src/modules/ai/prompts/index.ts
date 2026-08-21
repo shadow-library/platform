@@ -72,3 +72,4 @@ export * from './authoring-preamble';
 export * from './scope-playbooks';
 export { buildChatRefinePrompt } from './chat-refine.prompt';
 export { buildArcPlanPrompt } from './arc-plan.prompt';
+export { buildOutlinePrompt } from './outline.prompt';

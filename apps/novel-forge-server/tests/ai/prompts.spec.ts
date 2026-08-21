@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { buildChatRefinePrompt, PROMPT_REGISTRY, SCOPE_PLAYBOOKS } from '@modules/ai/prompts';
+import { buildChatRefinePrompt, buildOutlinePrompt, PROMPT_REGISTRY, SCOPE_PLAYBOOKS } from '@modules/ai/prompts';
 import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
 import {
   ChatRefineSchema,
@@ -15,6 +15,7 @@ import {
   ReforgeOutlineSchema,
   ReforgeWriteSchema,
   validateArcCoverage,
+  validateOutlineCoverage,
   validatePlanContiguity,
 } from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
@@ -191,6 +192,59 @@ describe('Prompt modules', () => {
       expect(validateArcCoverage([arc('a1', 1, 5), arc('a2', 7, 12)], 1, 12)[0]).toMatch(/must start at chapter 6/);
       expect(validateArcCoverage([arc('a1', 2, 12)], 1, 12)[0]).toMatch(/must start at chapter 1/);
       expect(validateArcCoverage([arc('a1', 1, 11)], 1, 12)[0]).toMatch(/must end at chapter 12/);
+    });
+  });
+
+  describe('outline prompt invariants', () => {
+    const brief = (chapter: number, overrides: Partial<{ continuesIntoNextChapter: boolean; startsFromPreviousChapter: boolean }> = {}) => ({
+      chapter,
+      volumeKey: 'vol_01',
+      title: 't',
+      objective: 'o',
+      events: ['e'],
+      requiredContext: [],
+      endingContract: { hookType: 'cliffhanger' as const, emotionalBeat: 'b', openQuestion: 'q', handoffState: 'h', mustNotResolve: [] },
+      continuesIntoNextChapter: false,
+      startsFromPreviousChapter: false,
+      ...overrides,
+    });
+
+    it('accepts a contiguous outline covering the exact span with no chaining', () => {
+      expect(validateOutlineCoverage([brief(5), brief(6), brief(7)], 5, 7)).toEqual([]);
+    });
+
+    it('rejects outlines with coverage gaps', () => {
+      const errors = validateOutlineCoverage([brief(5), brief(7)], 5, 7);
+      expect(errors).toContain('chapter 6 is missing from the outline');
+    });
+
+    it('rejects chapters outside the requested span', () => {
+      const errors = validateOutlineCoverage([brief(5), brief(6), brief(8)], 5, 7);
+      expect(errors.some(e => e.includes('chapter 8 is outside the requested span'))).toBe(true);
+      expect(errors).toContain('chapter 7 is missing from the outline');
+    });
+
+    it('rejects duplicate chapter numbers', () => {
+      const errors = validateOutlineCoverage([brief(5), brief(6), brief(6)], 5, 6);
+      expect(errors).toContain('chapter 6 appears more than once in the outline');
+    });
+
+    it('rejects a continuesIntoNextChapter/startsFromPreviousChapter chain that does not match up', () => {
+      const missingHandoff = validateOutlineCoverage([brief(5, { continuesIntoNextChapter: true }), brief(6)], 5, 6);
+      expect(missingHandoff.some(e => e.includes('chapter 5 sets continuesIntoNextChapter'))).toBe(true);
+
+      const unclaimedStart = validateOutlineCoverage([brief(5), brief(6, { startsFromPreviousChapter: true })], 5, 6);
+      expect(unclaimedStart.some(e => e.includes('chapter 6 sets startsFromPreviousChapter'))).toBe(true);
+
+      const chained = validateOutlineCoverage([brief(5, { continuesIntoNextChapter: true }), brief(6, { startsFromPreviousChapter: true })], 5, 6);
+      expect(chained).toEqual([]);
+    });
+
+    it('buildOutlinePrompt closes over the requested span for postValidate', () => {
+      const prompt = buildOutlinePrompt(10, 12);
+      expect(prompt.key).toBe('outline');
+      expect(prompt.postValidate?.([brief(10), brief(11), brief(12)])).toEqual([]);
+      expect(prompt.postValidate?.([brief(10), brief(12)])[0]).toContain('chapter 11 is missing');
     });
   });
 

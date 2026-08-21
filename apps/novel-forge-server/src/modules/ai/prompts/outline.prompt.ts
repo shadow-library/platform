@@ -1,7 +1,7 @@
 import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-import { type OutlineOutput, OutlineSchema } from '../schemas/outline.schema';
+import { type OutlineOutput, OutlineSchema, validateOutlineCoverage } from '../schemas/outline.schema';
 import { AUTHORING_STYLE_PLANNING } from './authoring-preamble';
 import { type PromptModule } from './types';
 
@@ -27,3 +27,8 @@ export const outlinePrompt: PromptModule<OutlineOutput> = {
   // so the repair ladder retries instead of reporting success with zero briefs.
   postValidate: briefs => (briefs.length === 0 ? ['outline must contain at least one chapter brief'] : []),
 };
+
+/** Range-bound variant used by the outline call sites: exact coverage/chaining re-enters the repair ladder. */
+export function buildOutlinePrompt(startChapter: number, endChapter: number): PromptModule<OutlineOutput> {
+  return { ...outlinePrompt, postValidate: briefs => validateOutlineCoverage(briefs, startChapter, endChapter) };
+}

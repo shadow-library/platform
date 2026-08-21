@@ -13,7 +13,7 @@ import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { type ContextSection } from '../ai/context/sections';
 import { type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService } from '../ai/model-router.service';
-import { PROMPT_REGISTRY } from '../ai/prompts';
+import { buildOutlinePrompt, PROMPT_REGISTRY } from '../ai/prompts';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { RetrievalService } from '../ai/retrieval/retrieval.service';
 import { type ChapterExtractOutput } from '../ai/schemas/chapter-extract.schema';
@@ -227,14 +227,11 @@ export class GenerationService {
       )
       .join('\n\n');
 
-    const ctx = { projectId, promptKey: PROMPT_REGISTRY.outline.key, promptVersion: PROMPT_REGISTRY.outline.version, role: PROMPT_REGISTRY.outline.key };
-    const outlineOutput = await this.modelRouter.structured(
-      PROMPT_REGISTRY.outline,
-      { catalog, volumePlan, startChapter: start, endChapter: end, extraContext: body.context ?? '' },
-      ctx,
-    );
+    const prompt = buildOutlinePrompt(start, end);
+    const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
+    const outlineOutput = await this.modelRouter.structured(prompt, { catalog, volumePlan, startChapter: start, endChapter: end, extraContext: body.context ?? '' }, ctx);
 
-    const chapters = outlineOutput as {
+    const chapters = outlineOutput as unknown as {
       chapter: number;
       volumeKey: string;
       title: string;
@@ -247,6 +244,8 @@ export class GenerationService {
       handoffBeat?: string;
       endingContract?: Record<string, unknown>;
     }[];
+
+    await this.dropUnresolvedContextRefs(projectId, chapters);
 
     const upserted = await Promise.all(
       chapters.map(c => {
@@ -304,16 +303,17 @@ export class GenerationService {
       .filter(Boolean)
       .join('\n\n');
 
-    const ctx = { projectId, promptKey: PROMPT_REGISTRY.outline.key, promptVersion: PROMPT_REGISTRY.outline.version, role: PROMPT_REGISTRY.outline.key };
+    const prompt = buildOutlinePrompt(arc.chapterStart, arc.chapterEnd);
+    const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
     const outlineOutput = await this.modelRouter.structured(
-      PROMPT_REGISTRY.outline,
+      prompt,
       { catalog, volumePlan, startChapter: arc.chapterStart, endChapter: arc.chapterEnd, extraContext: body.context ?? '' },
       ctx,
       project as never,
     );
 
     const chapters = (
-      outlineOutput as {
+      outlineOutput as unknown as {
         chapter: number;
         volumeKey: string;
         title: string;
@@ -323,6 +323,8 @@ export class GenerationService {
         endingContract?: Record<string, unknown>;
       }[]
     ).filter(c => c.chapter >= (arc.chapterStart as number) && c.chapter <= (arc.chapterEnd as number));
+
+    await this.dropUnresolvedContextRefs(projectId, chapters);
 
     const upserted = await Promise.all(
       chapters.map(c => {
@@ -346,6 +348,24 @@ export class GenerationService {
     );
 
     return { briefs: upserted.filter(Boolean) as Generation.Brief[] };
+  }
+
+  /**
+   * Strips requiredContext refs the model invented — ones that don't resolve against the actual
+   * catalog — so an unresolvable ref never reaches a persisted brief. Repairs in place; does not
+   * fail the outline call over one bad ref.
+   */
+  private async dropUnresolvedContextRefs(projectId: bigint, briefs: { chapter: number; requiredContext: string[] }[]): Promise<void> {
+    await Promise.all(
+      briefs.map(async brief => {
+        if (brief.requiredContext.length === 0) return;
+        const { unresolved } = await this.contextAssembler.resolveRefs(projectId, brief.requiredContext);
+        if (unresolved.length === 0) return;
+        const unresolvedSet = new Set(unresolved);
+        brief.requiredContext = brief.requiredContext.filter(ref => !unresolvedSet.has(ref));
+        this.logger.warn('outline: dropped unresolved context refs', { projectId, chapter: brief.chapter, unresolved });
+      }),
+    );
   }
 
   listBriefs(projectId: bigint): Promise<Pick<Generation.Brief, 'chapter' | 'volumeKey' | 'arcKey' | 'title' | 'staleReason' | 'updatedAt'>[]> {
