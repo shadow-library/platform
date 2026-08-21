@@ -5,10 +5,14 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 
 ## Summary
 
-- Completed: 8
+- Completed: 9
 - In Progress: 0
-- Pending: 1
+- Pending: 0
 - Blocked: 0
+
+All nine P0 items from `harness-final-recommendation.md` §10 are complete. Per §14, the next step
+is running the before/after evaluation plan (blind paired comparison + deterministic metrics +
+process-invariant checks) before starting any P1 work — see §14 of the recommendation doc.
 
 ## Tasks
 
@@ -22,7 +26,7 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 | P0-06 | P0       | Style/ending-contract constants: replace `DEFAULT_WRITING_INSTRUCTIONS`, widen `HookType`, single word target | COMPLETED | —            | df2c0bb0 |
 | P0-07 | P0       | Chapter-context correctness: add arc section, drop duplicated brief, record budget evictions                  | COMPLETED | —            | be404dd8 |
 | P0-08 | P0       | Extract-job payload mismatch fix (resolve chapter numbers server-side at enqueue)                             | COMPLETED | —            | 088c0022 |
-| P0-09 | P0       | Outline invariant enforcement (coverage/uniqueness/chaining via factory closure + catalog ref check)          | PENDING   | —            | —        |
+| P0-09 | P0       | Outline invariant enforcement (coverage/uniqueness/chaining via factory closure + catalog ref check)          | COMPLETED | —            | 7fb3c080 |
 
 ## Completed
 
@@ -213,16 +217,38 @@ apps/novel-forge-web` — both green (novel-forge-server: 564 pass, 10 skip, 0 f
   green (567 pass, 10 skip, 0 fail).
 - Commit: 088c0022
 
-## Pending
-
 ### P0-09 — Outline invariant enforcement
 
-- Depends on: none strictly, but touches the same outline path as P0-04/P0-06 — sequence after those to reduce merge friction.
-- Affected area: `src/modules/ai/prompts/outline.prompt.ts`, `src/modules/generation/generation.service.ts`
-- Acceptance criteria:
-  - `buildOutlinePrompt(startChapter, endChapter)` factory (mirroring `buildArcPlanPrompt`) whose closure `postValidate` checks exact contiguous coverage, uniqueness, and `continuesIntoNextChapter` → `startsFromPreviousChapter` chaining.
-  - After `structured()` returns, service validates `requiredContext` refs against the catalog; unknown refs stripped/repaired and logged.
-  - Tests: rejects outlines with coverage gaps; rejects duplicate chapter numbers; drops refs missing from the catalog.
+- What changed: `outline.schema.ts` gained `validateOutlineCoverage(briefs, startChapter,
+endChapter): string[]`, mirroring `arc-plan.schema.ts`'s `validateArcCoverage` pattern exactly —
+  flags duplicate chapter numbers, out-of-range chapters, missing chapters within the span, and any
+  adjacent pair where `continuesIntoNextChapter`/`startsFromPreviousChapter` don't chain in both
+  directions. `outline.prompt.ts` gained `buildOutlinePrompt(startChapter, endChapter):
+PromptModule<OutlineOutput>`, an exact mirror of the existing `buildArcPlanPrompt` factory-closure
+  pattern (spreads the static `outlinePrompt` and swaps in a `postValidate` closing over the
+  requested span), exported from the prompts barrel alongside `buildArcPlanPrompt`.
+  `generation.service.ts`'s `outline()` and `outlineArc()` now build the prompt with the actual
+  requested span instead of using the static `PROMPT_REGISTRY.outline`, reusing the existing
+  structured-output repair loop as-is. After `structured()` succeeds, a new private
+  `dropUnresolvedContextRefs` calls the existing `ContextAssembler.resolveRefs` per brief, strips
+  any ref that doesn't resolve from that brief's `requiredContext` in place (never fails the whole
+  outline call over one bad ref), and logs what was dropped.
+- Tests: `tests/ai/prompts.spec.ts` (new describe block — accepts a valid contiguous span, rejects
+  coverage gaps, rejects out-of-range chapters, rejects duplicate chapter numbers, rejects both
+  directions of a broken chaining invariant, confirms `buildOutlinePrompt` closes over its span),
+  `tests/generation/outline-invariants.spec.ts` (new — end-to-end `outline()` with a mocked router
+  and `resolveRefs`, asserting an invented ref is stripped from the persisted brief while valid refs
+  survive; plus direct assertions on the coverage/duplicate/chaining rejections through the same
+  `postValidate` wiring the service uses).
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (577 pass, 10 skip, 0 fail). Fixed two issues surfaced by the coordinator's own verify pass
+  beyond what the sub-agent reported clean: a Prettier formatting nit and a `hookType: 'cliffhanger'`
+  string-literal-widening type error in the new test's shared `brief()` helper (needed `as const`).
+- Commit: 7fb3c080
+
+## Pending
+
+None.
 
 ## Blocked
 
