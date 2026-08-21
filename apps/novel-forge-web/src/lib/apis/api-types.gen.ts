@@ -2125,6 +2125,7 @@ export interface components {
       organisationId: string;
     };
     AiModelsResponse: {
+      /** @description The active server profile. Roles without an override inherit this profile's defaults. */
       profile: string;
       models: components['schemas']['AiModelOption'][];
       defaults: components['schemas']['AiRoleDefault'][];
@@ -2135,6 +2136,7 @@ export interface components {
       label: string;
       /** @enum {string} */
       kind: 'llm' | 'embedding' | 'image';
+      /** @description Whether the server can currently route requests to this model. */
       enabled: boolean;
       contextWindow?: number;
       inputPricePerMToken?: number;
@@ -2202,6 +2204,7 @@ export interface components {
       volumeKey?: null | string;
       title?: null | string;
       body: string;
+      /** @description Artifact keys for the retrieval context used to build this draft. */
       contextRefs?: null | string[];
       /** Format: date-time */
       createdAt: string;
@@ -2214,6 +2217,7 @@ export interface components {
     ListBriefSummaryResponse: {
       items: components['schemas']['BriefSummaryResponse'][];
     };
+    /** @description A brief's identity and freshness without its body. */
     BriefSummaryResponse: {
       chapter: number;
       volumeKey?: null | string;
@@ -2226,6 +2230,7 @@ export interface components {
     UpdateBriefBody: {
       title?: string;
       body: string;
+      /** @description Replacement knowledge contract. Omit to leave the existing contract unchanged. */
       knowledgeContract?: components['schemas']['KnowledgeContractSchema'];
     };
     KnowledgeContractSchema: {
@@ -2263,6 +2268,7 @@ export interface components {
       status: components['schemas']['JobStatus'];
       attempts: number;
       lastError?: null | string;
+      /** @description Event-specific payload. */
       payload?: null | {
         [key: string]: unknown;
       };
@@ -2311,6 +2317,7 @@ export interface components {
       title?: string;
       body: string;
       summary?: string;
+      /** @description Opaque workflow-specific draft state produced by the generation graph. */
       state?: {
         [key: string]: unknown;
       };
@@ -2405,12 +2412,16 @@ export interface components {
       kind: components['schemas']['RefinementKind'];
       status: components['schemas']['RefinementProposalStatus'];
       summary?: null | string;
+      /** @description Proposed operations, each discriminated by its op field. */
       changeSet: components['schemas']['ChangeOpItem'][];
+      /** @description Artifact snapshots keyed by the references the change-set was drafted against. */
       baseline: {
         [key: string]: unknown;
       };
       autoApplied: boolean;
+      /** @description Whether this proposal has been applied and carries inverse operations, allowing it to be reverted. */
       revertible: boolean;
+      /** @description Apply-time result for each operation. */
       opResults?: null | components['schemas']['OpResultItem'][];
       model?: null | string;
       runId?: null | string;
@@ -2418,6 +2429,7 @@ export interface components {
       appliedAt?: null | string;
       /** Format: date-time */
       revertedAt?: null | string;
+      /** @description Error-source-specific failure details recorded when proposal application fails. */
       error?: null | {
         [key: string]: unknown;
       };
@@ -2432,11 +2444,13 @@ export interface components {
     RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'arc_plan' | 'chapter_extract';
     /** @enum {string} */
     RefinementProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted' | 'reverted';
+    /** @description Change-set operation whose remaining fields depend on its server-validated op value. */
     ChangeOpItem: {
       op: string;
     } & {
       [key: string]: unknown;
     };
+    /** @description Apply-time disposition for one operation, optionally including a job, run, or proposal result. */
     OpResultItem: {
       index: number;
       status: string;
@@ -2448,6 +2462,7 @@ export interface components {
       [key: string]: unknown;
     };
     UpdateContinuityBody: {
+      /** @description Continuity findings and suggested edits produced by the continuity model. */
       proposal: {
         [key: string]: unknown;
       };
@@ -2472,6 +2487,7 @@ export interface components {
       target: string;
       status: components['schemas']['WorkflowRunStatus'];
       outcome?: null | string;
+      /** @description Workflow-specific input captured for this run. */
       input?: null | {
         [key: string]: unknown;
       };
@@ -2479,8 +2495,11 @@ export interface components {
         [key: string]: unknown;
       };
       nodeTrace?: null | string[];
+      /** @description Model calls made by this run. Included only by the run-detail endpoint. */
       modelCalls?: components['schemas']['RunModelCallResponse'][];
+      /** @description Tool lookups performed by this run. Included only by the run-detail endpoint. */
       toolCalls?: components['schemas']['RunToolCallResponse'][];
+      /** @description Prompt context breakdown. Included only by the run-detail endpoint when linked. */
       contextPack?: components['schemas']['RunContextPackResponse'];
       /** Format: date-time */
       startedAt: string;
@@ -2506,6 +2525,7 @@ export interface components {
       /** Format: date-time */
       createdAt: string;
     };
+    /** @description A read-only lookup performed by a model during a run. */
     RunToolCallResponse: {
       id: string;
       node?: null | string;
@@ -2519,6 +2539,7 @@ export interface components {
       /** Format: date-time */
       createdAt: string;
     };
+    /** @description The context sections that contributed to a run's prompt token usage. */
     RunContextPackResponse: {
       id: string;
       purpose: string;
@@ -2533,12 +2554,14 @@ export interface components {
       tokens: number;
       truncated: boolean;
     };
+    /** @description The context sections that contributed to a run's prompt token usage. */
     RunContextResponse: {
       id: string;
       purpose: string;
       budgetTokens?: null | number;
       usedTokens?: null | number;
       sections: components['schemas']['RunContextSectionItem'][];
+      /** @description The exact stable and volatile context text supplied to the prompt, in order. */
       rendered: string;
     };
     RunModelCallDetailResponse: {
@@ -2567,12 +2590,15 @@ export interface components {
       totalOutputTokens: number;
       totalCostUsd: number;
       callsPerRole: components['schemas']['RoleCallCounts'];
+      /** @description Per-role usage sorted by total token count in descending order. */
       roles: components['schemas']['RoleUsage'][];
     };
+    /** @description Model call counts keyed by AI role. */
     RoleCallCounts: {
       [key: string]: number;
     };
     RoleUsage: {
+      /** @description An AI role identifier, including scoped roles such as 'bible:plot'. */
       role: string;
       calls: number;
       inputTokens: number;
@@ -2585,6 +2611,7 @@ export interface components {
     SearchHitResponse: {
       text: string;
       score: number;
+      /** @description Index-specific vector metadata, including source references and chunk information. */
       metadata: {
         [key: string]: unknown;
       };
@@ -2596,6 +2623,7 @@ export interface components {
       id: string;
       projectId: string;
       chapter: number;
+      /** @description Absolute public URL for the stored scene image. */
       imageUrl: string;
       caption?: null | string;
       sortOrder: number;
@@ -2605,6 +2633,7 @@ export interface components {
     AddChapterImageBody: {
       /** @enum {string} */
       mime: 'image/png' | 'image/jpeg' | 'image/webp';
+      /** @description Base64-encoded image bytes without a data URL prefix. */
       image: string;
       caption?: string;
     };
@@ -2616,9 +2645,11 @@ export interface components {
       status: components['schemas']['JobStatus'];
       attempts: number;
       lastError?: null | string;
+      /** @description Job input whose fields depend on the job kind. */
       payload?: null | {
         [key: string]: unknown;
       };
+      /** @description Current progress snapshot whose fields depend on the job kind. */
       progress?: null | {
         [key: string]: unknown;
       };
@@ -2683,9 +2714,11 @@ export interface components {
       items: components['schemas']['ProposalResponse'][];
     };
     UpdateProposalBody: {
+      /** @description Replacement change-set operations, each discriminated by its op field. */
       changeSet: components['schemas']['ChangeOpItem'][];
     };
     ApplyProposalBody: {
+      /** @description Change-set indexes to apply; omission applies every operation. */
       opIndexes?: number[];
     };
     ApplyProposalResponse: {
@@ -2726,6 +2759,7 @@ export interface components {
       revertedAt?: null | string;
     };
     RollbackBody: {
+      /** @description Newest applied proposal to keep; every later proposal is reverted newest first. */
       afterProposalId: string;
     };
     RollbackResponse: {
@@ -2777,6 +2811,7 @@ export interface components {
     };
     ListChatMessagesResponse: {
       messages: components['schemas']['ChatMessageResponse'][];
+      /** @description Whether a chat turn is currently running for this session. */
       pendingTurn: boolean;
     };
     ChatMessageResponse: {
@@ -2793,6 +2828,7 @@ export interface components {
       createdAt: string;
     };
     ChatTurnBody: {
+      /** @description Chat content; accepts long premises, chapters, and reference documents up to 200,000 characters. */
       content: string;
     };
     ChatTurnResponse: {
@@ -2805,6 +2841,7 @@ export interface components {
       applyNote?: string;
       runId: string;
     };
+    /** @description Proposal application outcome returned as part of an automatic-mode turn. */
     TurnAppliedResult: {
       applied: components['schemas']['AppliedArtifactItem'][];
       staleMarked: string[];
@@ -2815,7 +2852,9 @@ export interface components {
       title?: string;
     };
     UpdateSessionModelBody: {
+      /** @description Model provider override; clear both override fields to use the project or profile default. */
       provider?: string | null;
+      /** @description Model name override; clear both override fields to use the project or profile default. */
       model?: string | null;
     };
     EnhancePremiseBody: {
@@ -2875,6 +2914,7 @@ export interface components {
       usedTokens: number;
       sections: components['schemas']['ContextSectionPreview'][];
       unresolvedRefs: string[];
+      omitted: components['schemas']['OmittedSectionPreview'][];
       renderedStable: string;
       renderedVolatile: string;
       rendered: string;
@@ -2885,6 +2925,11 @@ export interface components {
       segment: string;
       tokens: number;
       truncated: boolean;
+    };
+    OmittedSectionPreview: {
+      key: string;
+      /** @description why the section did not reach the model: 'budget' (evicted) or 'unresolved' (ref never resolved) */
+      reason: string;
     };
     CreateEntityBody: {
       entityKey: string;
@@ -2918,7 +2963,9 @@ export interface components {
       notes?: null | string;
       motivation?: null | string;
       body?: null | string;
+      /** @description Absolute public URL for the portrait, or null when the entity has no portrait. */
       imageUrl?: null | string;
+      /** @description The entity's additional reference images. Included by the single-entity endpoint. */
       images?: components['schemas']['EntityImageResponse'][];
       /** Format: date-time */
       createdAt: string;
@@ -2927,6 +2974,7 @@ export interface components {
     };
     EntityImageResponse: {
       id: string;
+      /** @description Absolute public URL for the stored image. */
       imageUrl: string;
       caption?: null | string;
       sortOrder: number;
@@ -2950,11 +2998,13 @@ export interface components {
     UploadImageBody: {
       /** @enum {string} */
       mime: 'image/png' | 'image/jpeg' | 'image/webp';
+      /** @description Base64-encoded image bytes without a data URL prefix. */
       image: string;
     };
     AddEntityImageBody: {
       /** @enum {string} */
       mime: 'image/png' | 'image/jpeg' | 'image/webp';
+      /** @description Base64-encoded image bytes without a data URL prefix. */
       image: string;
       caption?: string;
     };
@@ -2973,6 +3023,7 @@ export interface components {
       endChapter?: number;
       targetChapterCount?: number;
       status?: components['schemas']['PlanStatus'];
+      /** @description Entity keys for the characters featured in this volume. */
       cast?: string[];
       body?: string;
     };
@@ -2991,6 +3042,7 @@ export interface components {
       revision: number;
       staleReason?: null | string;
       status: components['schemas']['PlanStatus'];
+      /** @description Entity keys for the characters featured in this volume. */
       cast?: null | string[];
       body?: null | string;
       /** Format: date-time */
@@ -3014,6 +3066,7 @@ export interface components {
       endChapter?: number;
       targetChapterCount?: number;
       status?: components['schemas']['PlanStatus'];
+      /** @description Entity keys for the characters featured in this volume. */
       cast?: string[];
       body?: string;
     };
@@ -3076,6 +3129,7 @@ export interface components {
       projectId: string;
       section: components['schemas']['BibleSection'];
       slug: string;
+      /** @description Author-authored YAML frontmatter with document-specific keys. */
       frontmatter?: null | {
         [key: string]: unknown;
       };
@@ -3086,6 +3140,7 @@ export interface components {
       updatedAt: string;
     };
     UpsertBibleDocBody: {
+      /** @description Author-authored YAML frontmatter with document-specific keys. */
       frontmatter?: {
         [key: string]: unknown;
       };
@@ -3152,6 +3207,7 @@ export interface components {
     };
     SaveIllustrationResponse: {
       saved: boolean;
+      /** @description Absolute public object-storage URL resolved using the server runtime configuration. */
       imageUrl: string;
     };
     CancelIllustrationBody: {
@@ -3170,32 +3226,43 @@ export interface components {
       schemaVersion: 1;
       mode: components['schemas']['NovelImportMode'];
       novel: components['schemas']['NovelImportMeta'];
+      /** @description Ordered volume groups; global chapter numbers are derived by flattening them in ordinal order. */
       volumes: components['schemas']['NovelImportVolume'][];
       assets?: components['schemas']['NovelImportAsset'][];
     };
     /** @enum {string} */
     NovelImportMode: 'final' | 'source';
     NovelImportMeta: {
+      /** @description Novel title, limited to the project name column capacity. */
       title: string;
+      /** @description Novel overview used as the project's brief and exported description. */
       synopsis: string;
+      /** @description Optional authoring metadata; accepted but not currently persisted. */
       genre?: string;
+      /** @description Novel tags stored as project themes. */
       tags?: string[];
+      /** @description Name of the bundle asset to use as the novel cover. */
       cover?: string;
+      /** @description Chapter-writing instructions; omission uses the application default. */
       instructions?: string;
     };
     NovelImportVolume: {
+      /** @description One-based volume position; ordinals must be unique and contiguous across the bundle. */
       ordinal: number;
       title?: string;
       chapters: components['schemas']['NovelImportChapter'][];
     };
     NovelImportChapter: {
+      /** @description Chapter title, limited to the database column capacity. */
       title: string;
       content: string;
     };
     NovelImportAsset: {
+      /** @description Asset name referenced by novel.cover; it must be unique within the bundle. */
       name: string;
       /** @enum {string} */
       mimeType: 'image/png' | 'image/jpeg' | 'image/webp';
+      /** @description Base64-encoded bytes without a data URL prefix. */
       dataBase64: string;
     };
     ImportNovelResponse: {
@@ -3240,6 +3307,7 @@ export interface components {
       markdown: string;
     };
     SkeletonResponse: {
+      /** @description Source-derived character arcs keyed by the model's unrestricted character identifiers. */
       characterArcs: {
         [key: string]: unknown;
       };
@@ -3258,6 +3326,7 @@ export interface components {
       status: components['schemas']['RebrandStatus'];
       directives?: null | string;
       worldNotes?: null | string;
+      /** @description Settings used for this rebrand run. */
       settings?: null | {
         [key: string]: unknown;
       };
@@ -3276,6 +3345,7 @@ export interface components {
       sourceChapters: number;
       glossaryCount: number;
       counts: components['schemas']['ConversionCountsResponse'];
+      /** @description Latest rebrand job, including its job-specific progress fields. */
       job?: null | {
         [key: string]: unknown;
       };
@@ -3325,6 +3395,7 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
+    /** @description Model-reported audit entry whose fields vary by source. */
     ConversionDetailItem: {
       detail?: string;
     } & {
@@ -3349,6 +3420,7 @@ export interface components {
       status: components['schemas']['ReforgeStatus'];
       instructions?: null | string;
       fidelity: components['schemas']['ReforgeFidelity'];
+      /** @description Settings used for this reforge run. */
       settings?: null | {
         [key: string]: unknown;
       };
@@ -3367,6 +3439,7 @@ export interface components {
       sourceChapters: number;
       glossaryCount: number;
       counts: components['schemas']['ReforgeCountsResponse'];
+      /** @description Latest reforge job, including its job-specific progress fields. */
       job?: null | {
         [key: string]: unknown;
       };
@@ -3396,12 +3469,15 @@ export interface components {
       title?: null | string;
       body: string;
       summary?: null | string;
+      /** @description Faithful outline used by the reforge writer. */
       sourceBeats?: null | {
         [key: string]: unknown;
       };
+      /** @description Changes applied by the reforge writer. */
       changes?: null | {
         [key: string]: unknown;
       };
+      /** @description Fidelity assessment for the reforge output. */
       fidelity?: null | {
         [key: string]: unknown;
       };
@@ -3412,6 +3488,7 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
+    /** @description Model-reported audit issue whose fields vary by source. */
     ReforgeDetailItem: {
       detail?: string;
     } & {
@@ -3421,12 +3498,16 @@ export interface components {
       markdown: string;
     };
     PublishNovelBody: {
+      /** @description Immutable reader URL slug set on first publish; omission derives it from the title and later values are ignored. */
       novelSlug?: string;
       title?: string;
       blurb?: string | null;
       coverPath?: string | null;
       genres?: string[];
-      /** @enum {string} */
+      /**
+       * @description Publication status; omission defaults to 'live'.
+       * @enum {string}
+       */
       status?: 'live' | 'retired';
     };
     PublicationResponse: {
@@ -3444,6 +3525,7 @@ export interface components {
     /** @enum {string} */
     PublicationStatus: 'draft' | 'live' | 'retired';
     PublishChapterBody: {
+      /** @description ISO 8601 release time; omission publishes immediately. */
       scheduledAt?: string;
     };
     ChapterPublicationResponse: {
@@ -3475,11 +3557,13 @@ export interface components {
     PublicationVisibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
     AccessGrantItem: {
       email: string;
+      /** @description Verified account subject; absent addresses convey no access and are not pushed to the reader. */
       subjectId?: null | string;
       state: components['schemas']['PublicationGrantState'];
     };
     /** @enum {string} */
     PublicationGrantState: 'resolved' | 'pending';
+    /** @description Full replacement for a publication access policy and its restricted-tier grants. */
     PublicationAccessBody: {
       visibility: components['schemas']['PublicationVisibility'];
       grants?: components['schemas']['AccessGrantInput'][];
@@ -3488,6 +3572,7 @@ export interface components {
       email: string;
     };
     PublicationsLedgerResponse: {
+      /** @description Publication details; omitted until the project is first published. */
       publication?: components['schemas']['PublicationResponse'];
       chapters: components['schemas']['ChapterPublicationResponse'][];
     };
@@ -3500,6 +3585,7 @@ export interface components {
       deleted: number[];
       skipped: number[];
       failed: components['schemas']['ReconcileFailureItem'][];
+      /** @description Reader chapter ordinals absent from the ledger; reported but never automatically deleted. */
       unknownOrdinals: number[];
       wiki: components['schemas']['WikiReconcileResult'];
     };
@@ -3512,6 +3598,7 @@ export interface components {
       deleted: string[];
       skipped: string[];
       failed: components['schemas']['WikiReconcileFailureItem'][];
+      /** @description Reader wiki entries absent from the ledger; reported but never automatically deleted. */
       unknownEntries: string[];
     };
     WikiReconcileFailureItem: {
@@ -3528,6 +3615,7 @@ export interface components {
       version: number;
       bible?: components['schemas']['PlanBundleBibleDoc'][];
       entities?: components['schemas']['PlanBundleEntity'][];
+      /** @description Canon facts used to populate the character-knowledge ledger. */
       facts?: components['schemas']['PlanBundleFact'][];
       volumes?: components['schemas']['PlanBundleVolume'][];
       arcs?: components['schemas']['PlanBundleArc'][];
@@ -3536,6 +3624,7 @@ export interface components {
     PlanBundleBibleDoc: {
       section: components['schemas']['PlanBundleSection'];
       slug: string;
+      /** @description Arbitrary key/value frontmatter for the Bible document. */
       frontmatter?: {
         [key: string]: unknown;
       };
@@ -3568,6 +3657,7 @@ export interface components {
       objective: string;
       conflict: string;
       payoff: string;
+      /** @description Number of chapters in this volume; approval derives chapter ranges cumulatively. */
       targetChapterCount: number;
       cast?: string[];
       body?: string;
@@ -3597,7 +3687,9 @@ export interface components {
       continuesIntoNextChapter?: boolean;
       startsFromPreviousChapter?: boolean;
       handoffBeat?: string;
+      /** @description Required pacing and ending constraints for the chapter. */
       endingContract: components['schemas']['EndingContractSchema'];
+      /** @description Optional character-knowledge constraints; omission leaves the chapter unfiltered. */
       knowledgeContract?: components['schemas']['KnowledgeContractSchema'];
     };
     EndingContractSchema: {
@@ -3613,7 +3705,7 @@ export interface components {
       mustNotResolve?: string[];
     };
     /** @enum {string} */
-    HookType: 'cliffhanger' | 'revelation' | 'quiet_dread' | 'promise' | 'turn';
+    HookType: 'cliffhanger' | 'revelation' | 'quiet_dread' | 'promise' | 'turn' | 'closure_with_momentum' | 'earned_rest';
     ImportPlanResponse: {
       results: components['schemas']['ImportResults'];
       approval?: components['schemas']['ApprovalResult'];
@@ -3641,6 +3733,7 @@ export interface components {
       name: string;
       kind: components['schemas']['ProjectKind'];
       title?: string;
+      /** @description Instructions for chapter voice, craft, and length; omission uses the application default. */
       instructions?: string;
       contentMode?: components['schemas']['ContentMode'];
     };
@@ -3653,10 +3746,12 @@ export interface components {
       name: string;
       kind: components['schemas']['ProjectKind'];
       title?: null | string;
+      /** @description Absolute public cover URL resolved by the server; absent when the project has no cover. */
       coverUrl?: null | string;
       contentMode: components['schemas']['ContentMode'];
       config?: components['schemas']['ProjectConfig'];
       brief?: null | string;
+      /** @description Effective chapter-writing instructions, including the application default. */
       instructions?: null | string;
       storyCurrentChapter?: null | number;
       /** Format: date-time */
@@ -3667,6 +3762,7 @@ export interface components {
     ProjectConfig: {
       models?: components['schemas']['ProjectModelOverrides'];
     };
+    /** @description Optional provider and model overrides keyed by AI role. */
     ProjectModelOverrides: {
       extraction?: components['schemas']['ProjectModelRef'];
       generation?: components['schemas']['ProjectModelRef'];
@@ -3689,6 +3785,7 @@ export interface components {
       embedding?: components['schemas']['ProjectModelRef'];
       image?: components['schemas']['ProjectModelRef'];
     };
+    /** @description Provider and model reference used for a project-level AI role override. */
     ProjectModelRef: {
       provider: string;
       model: string;
@@ -3713,6 +3810,7 @@ export interface components {
       config?: components['schemas']['ProjectConfig'];
       contentMode?: components['schemas']['ContentMode'];
       brief?: string;
+      /** @description Chapter-writing instructions; send an empty string to restore the application default. */
       instructions?: string | null;
     };
     CloneProjectBody: {
@@ -3736,6 +3834,7 @@ export interface components {
     UploadImageBody1: {
       /** @enum {string} */
       mime: 'image/png' | 'image/jpeg' | 'image/webp';
+      /** @description Base64-encoded image bytes without a data URL prefix. */
       image: string;
     };
   };
@@ -6597,6 +6696,7 @@ export interface operations {
       header?: never;
       path: {
         projectId: string;
+        /** @description Chat session UUID. */
         sessionId: string;
       };
       cookie?: never;
@@ -6638,6 +6738,7 @@ export interface operations {
       header?: never;
       path: {
         projectId: string;
+        /** @description Chat session UUID. */
         sessionId: string;
       };
       cookie?: never;
@@ -6679,6 +6780,7 @@ export interface operations {
       header?: never;
       path: {
         projectId: string;
+        /** @description Chat session UUID. */
         sessionId: string;
       };
       cookie?: never;
@@ -6728,6 +6830,7 @@ export interface operations {
       header?: never;
       path: {
         projectId: string;
+        /** @description Chat session UUID. */
         sessionId: string;
       };
       cookie?: never;
@@ -6769,6 +6872,7 @@ export interface operations {
       header?: never;
       path: {
         projectId: string;
+        /** @description Chat session UUID. */
         sessionId: string;
       };
       cookie?: never;
@@ -6814,6 +6918,7 @@ export interface operations {
       header?: never;
       path: {
         projectId: string;
+        /** @description Chat session UUID. */
         sessionId: string;
       };
       cookie?: never;
@@ -6859,6 +6964,7 @@ export interface operations {
       header?: never;
       path: {
         projectId: string;
+        /** @description Chat session UUID. */
         sessionId: string;
       };
       cookie?: never;
@@ -6900,6 +7006,7 @@ export interface operations {
       header?: never;
       path: {
         projectId: string;
+        /** @description Chat session UUID. */
         sessionId: string;
       };
       cookie?: never;
@@ -10252,6 +10359,7 @@ export type PlanArcsResponse = components['schemas']['PlanArcsResponse'];
 export type PlannedArcItem = components['schemas']['PlannedArcItem'];
 export type ContextPreviewResponse = components['schemas']['ContextPreviewResponse'];
 export type ContextSectionPreview = components['schemas']['ContextSectionPreview'];
+export type OmittedSectionPreview = components['schemas']['OmittedSectionPreview'];
 export type CreateEntityBody = components['schemas']['CreateEntityBody'];
 export type EntityType = components['schemas']['EntityType'];
 export type EntitySignificance = components['schemas']['EntitySignificance'];

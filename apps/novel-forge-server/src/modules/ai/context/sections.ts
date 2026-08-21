@@ -17,6 +17,11 @@ export interface ContextSection {
   rendered: string;
 }
 
+export interface OmittedSection {
+  key: string;
+  reason: 'budget' | 'unresolved';
+}
+
 export interface AssembledPack {
   projectId: bigint;
   purpose: ContextPurpose;
@@ -25,6 +30,7 @@ export interface AssembledPack {
   usedTokens: number;
   sections: ContextSection[];
   unresolvedRefs: string[];
+  omitted: OmittedSection[];
   renderedStable: string;
   renderedVolatile: string;
   rendered: string;
@@ -36,6 +42,7 @@ export const SECTION_LABELS: Record<string, string> = {
   continuation_state: '## CONTINUATION STATE',
   brief: '## CHAPTER BRIEF',
   volume_objective: '## VOLUME OBJECTIVE',
+  arc_objective: '## ARC OBJECTIVE',
   memory: '## RECENT SUMMARIES',
   writing_style: '## WRITING STYLE',
   catalog: '## CANON CATALOG',

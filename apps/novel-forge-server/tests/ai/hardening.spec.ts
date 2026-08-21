@@ -14,6 +14,7 @@ function makeDbStub() {
       briefs: { findFirst: noRow },
       chapters: { findFirst: noRow, findMany: noRows },
       volumes: { findFirst: noRow, findMany: noRows },
+      arcs: { findFirst: noRow, findMany: noRows },
       drafts: { findFirst: noRow },
       entities: { findMany: noRows },
       worldFacts: { findMany: noRows },
@@ -48,9 +49,10 @@ describe('applyBudget — edge cases', () => {
   it('force-includes the first section when it alone exceeds the budget (at-least-one guarantee)', () => {
     // Single section with 200 tokens, budget of 10 — must still be included.
     const sections = [{ tokens: 200, key: 'only' }];
-    const result = applyBudget(sections, 10);
-    expect(result).toHaveLength(1);
-    expect(result[0]?.key).toBe('only');
+    const { fitting, omitted } = applyBudget(sections, 10);
+    expect(fitting).toHaveLength(1);
+    expect(fitting[0]?.key).toBe('only');
+    expect(omitted).toHaveLength(0);
   });
 
   it('force-includes the first of multiple sections when none fit', () => {
@@ -58,14 +60,15 @@ describe('applyBudget — edge cases', () => {
       { tokens: 100, key: 'alpha' },
       { tokens: 100, key: 'beta' },
     ];
-    const result = applyBudget(sections, 5);
+    const { fitting, omitted } = applyBudget(sections, 5);
     // Only first is force-included; the rest still cannot fit.
-    expect(result[0]?.key).toBe('alpha');
-    expect(result.every(s => s.key !== 'beta')).toBe(true);
+    expect(fitting[0]?.key).toBe('alpha');
+    expect(fitting.every(s => s.key !== 'beta')).toBe(true);
+    expect(omitted).toEqual([{ key: 'beta', reason: 'budget' }]);
   });
 
   it('returns empty array when sections list is empty', () => {
-    expect(applyBudget([], 1000)).toHaveLength(0);
+    expect(applyBudget([], 1000).fitting).toHaveLength(0);
   });
 });
 

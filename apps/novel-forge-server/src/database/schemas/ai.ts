@@ -136,6 +136,7 @@ export const contextPacks = pgTable(
     usedTokens: integer('used_tokens'),
     sections: jsonb('sections'),
     unresolvedRefs: jsonb('unresolved_refs'),
+    omitted: jsonb('omitted'),
     rendered: text('rendered'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },

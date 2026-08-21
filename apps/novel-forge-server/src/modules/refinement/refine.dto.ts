@@ -183,6 +183,15 @@ export class ContextSectionPreview {
 }
 
 @Schema()
+export class OmittedSectionPreview {
+  @Field()
+  key: string;
+
+  @Field({ description: "why the section did not reach the model: 'budget' (evicted) or 'unresolved' (ref never resolved)" })
+  reason: string;
+}
+
+@Schema()
 export class ContextPreviewResponse {
   @Field()
   purpose: string;
@@ -198,6 +207,9 @@ export class ContextPreviewResponse {
 
   @Field(() => [String])
   unresolvedRefs: string[];
+
+  @Field(() => [OmittedSectionPreview])
+  omitted: OmittedSectionPreview[];
 
   @Field()
   renderedStable: string;

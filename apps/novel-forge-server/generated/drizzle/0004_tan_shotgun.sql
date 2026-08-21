@@ -1,0 +1,1 @@
+ALTER TABLE "context_packs" ADD COLUMN "omitted" jsonb;

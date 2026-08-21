@@ -29,6 +29,13 @@
       "when": 1787328908935,
       "tag": "0003_lumpy_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787336133064,
+      "tag": "0004_tan_shotgun",
+      "breakpoints": true
     }
   ]
 }

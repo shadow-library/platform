@@ -76,20 +76,37 @@ export function truncateAtParagraphTail(text: string, maxTokens: number): { text
   return { text: accumulated, truncated: false };
 }
 
-export function applyBudget<T extends { tokens: number }>(sections: T[], budgetTokens: number): T[] {
-  const result: T[] = [];
+export interface BudgetOmission {
+  key: string;
+  reason: 'budget' | 'unresolved';
+}
+
+export interface BudgetResult<T> {
+  fitting: T[];
+  omitted: BudgetOmission[];
+}
+
+export function applyBudget<T extends { key: string; tokens: number }>(sections: T[], budgetTokens: number): BudgetResult<T> {
+  const fitting: T[] = [];
+  const omitted: BudgetOmission[] = [];
   let used = 0;
   for (const section of sections) {
     if (used + section.tokens <= budgetTokens) {
-      result.push(section);
+      fitting.push(section);
       used += section.tokens;
+    } else {
+      omitted.push({ key: section.key, reason: 'budget' });
     }
   }
   // Guarantee at least one section so the LLM always has context to work with.
   // If nothing fit (budget > 0 but every section overshoots), force-include the first.
-  if (result.length === 0 && sections.length > 0 && budgetTokens > 0) {
+  if (fitting.length === 0 && sections.length > 0 && budgetTokens > 0) {
     const first = sections[0];
-    if (first !== undefined) result.push(first);
+    if (first !== undefined) {
+      fitting.push(first);
+      const idx = omitted.findIndex(o => o.key === first.key);
+      if (idx !== -1) omitted.splice(idx, 1);
+    }
   }
-  return result;
+  return { fitting, omitted };
 }

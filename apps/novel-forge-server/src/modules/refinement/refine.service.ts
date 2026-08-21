@@ -226,6 +226,7 @@ export class RefineService {
       usedTokens: pack.usedTokens,
       sections: pack.sections.map(s => ({ key: s.key, tier: s.tier, segment: s.segment, tokens: s.tokens, truncated: s.truncated })),
       unresolvedRefs: pack.unresolvedRefs,
+      omitted: pack.omitted,
       renderedStable: pack.renderedStable,
       renderedVolatile: pack.renderedVolatile,
       rendered: pack.rendered,

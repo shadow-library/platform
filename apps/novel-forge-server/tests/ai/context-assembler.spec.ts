@@ -86,27 +86,38 @@ describe('applyBudget', () => {
     // sections: [10, 20, 15], budget=25
     // s0=10 fits (used=10), s1=20 skips (10+20=30>25), s2=15 fits (10+15=25)
     const sections = [
-      { tokens: 10, label: 'a' },
-      { tokens: 20, label: 'b' },
-      { tokens: 15, label: 'c' },
+      { key: 'a', tokens: 10, label: 'a' },
+      { key: 'b', tokens: 20, label: 'b' },
+      { key: 'c', tokens: 15, label: 'c' },
     ];
-    const result = applyBudget(sections, 25);
-    expect(result.length).toBe(2);
-    expect(result[0]?.label).toBe('a');
-    expect(result[1]?.label).toBe('c');
+    const { fitting, omitted } = applyBudget(sections, 25);
+    expect(fitting.length).toBe(2);
+    expect(fitting[0]?.label).toBe('a');
+    expect(fitting[1]?.label).toBe('c');
+    expect(omitted).toEqual([{ key: 'b', reason: 'budget' }]);
   });
 
   it('returns empty array when budget is 0', () => {
-    const sections = [{ tokens: 5, label: 'x' }];
-    expect(applyBudget(sections, 0)).toHaveLength(0);
+    const sections = [{ key: 'x', tokens: 5, label: 'x' }];
+    expect(applyBudget(sections, 0).fitting).toHaveLength(0);
   });
 
   it('returns all sections when all fit within budget', () => {
     const sections = [
-      { tokens: 5, label: 'a' },
-      { tokens: 5, label: 'b' },
+      { key: 'a', tokens: 5, label: 'a' },
+      { key: 'b', tokens: 5, label: 'b' },
     ];
-    expect(applyBudget(sections, 100)).toHaveLength(2);
+    expect(applyBudget(sections, 100).fitting).toHaveLength(2);
+    expect(applyBudget(sections, 100).omitted).toHaveLength(0);
+  });
+
+  it('records omitted sections with reason "budget" when a section overflows', () => {
+    const sections = [
+      { key: 'fits', tokens: 5 },
+      { key: 'overflow', tokens: 50 },
+    ];
+    const { omitted } = applyBudget(sections, 10);
+    expect(omitted).toEqual([{ key: 'overflow', reason: 'budget' }]);
   });
 });
 
@@ -116,6 +127,7 @@ function makeDbStub(overrides: Record<string, unknown> = {}) {
     briefs: { findFirst: mock(async () => null) },
     chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
     volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+    arcs: { findFirst: mock(async () => null), findMany: mock(async () => []) },
     drafts: { findFirst: mock(async () => null) },
     entities: { findMany: mock(async () => []) },
     worldFacts: { findMany: mock(async () => []) },
@@ -340,6 +352,63 @@ describe('ContextAssembler.forChapter — no brief', () => {
   });
 });
 
+describe('ContextAssembler.forChapter — arc_objective', () => {
+  it('includes the arc_objective section when the brief has a covering arc', async () => {
+    const brief = { id: 1n, projectId: 1n, chapter: 5, body: 'Chapter body.', contextRefs: [], arcKey: 'arc1' };
+    const arc = { arcKey: 'arc1', volumeKey: 'v1', objective: 'Topple the treaty.', escalation: 'The spy is exposed.', hook: 'A ship burns in the harbor.' };
+    const dbOverrides = {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, instructions: null, contentMode: 'standard' })) },
+        briefs: { findFirst: mock(async () => brief) },
+        chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        arcs: { findFirst: mock(async () => arc), findMany: mock(async () => []) },
+        drafts: { findFirst: mock(async () => null) },
+        entities: { findMany: mock(async () => []) },
+        worldFacts: { findMany: mock(async () => []) },
+        plotThreads: { findMany: mock(async () => []) },
+        mysteries: { findMany: mock(async () => []) },
+        contextPacks: { findFirst: mock(async () => null) },
+        userFeedback: { findMany: mock(async () => []) },
+      },
+    };
+
+    const assembler = makeAssembler(dbOverrides);
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true });
+
+    const arcSection = pack.sections.find(s => s.key === 'arc_objective');
+    expect(arcSection).toBeDefined();
+    expect(arcSection?.rendered).toContain('Topple the treaty.');
+    expect(arcSection?.rendered).toContain('The spy is exposed.');
+    expect(arcSection?.rendered).toContain('A ship burns in the harbor.');
+    expect(arcSection?.sourceRefs).toEqual(['arc:arc1']);
+  });
+
+  it('omits the arc_objective section when the brief has no covering arc (arc-less volume)', async () => {
+    const brief = { id: 1n, projectId: 1n, chapter: 5, body: 'Chapter body.', contextRefs: [], arcKey: null };
+    const dbOverrides = {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, instructions: null, contentMode: 'standard' })) },
+        briefs: { findFirst: mock(async () => brief) },
+        chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        drafts: { findFirst: mock(async () => null) },
+        entities: { findMany: mock(async () => []) },
+        worldFacts: { findMany: mock(async () => []) },
+        plotThreads: { findMany: mock(async () => []) },
+        mysteries: { findMany: mock(async () => []) },
+        contextPacks: { findFirst: mock(async () => null) },
+        userFeedback: { findMany: mock(async () => []) },
+      },
+    };
+
+    const assembler = makeAssembler(dbOverrides);
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true });
+
+    expect(pack.sections.some(s => s.key === 'arc_objective')).toBe(false);
+  });
+});
+
 describe('ContextAssembler.forChapter — FULL_CAST_MAX', () => {
   it(`moves entity refs beyond FULL_CAST_MAX (${FULL_CAST_MAX}) to end of section list`, async () => {
     const entityRefs = Array.from({ length: 7 }, (_, i) => `entity:ent${i}`);
@@ -409,7 +478,7 @@ describe('ContextAssembler — memory budget trimming', () => {
           })),
         },
         briefs: { findFirst: mock(async () => ({ id: 1n, projectId: 1n, chapter: 1, body: 'B'.repeat(5000), contextRefs: [] })) },
-        chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        chapters: { findFirst: mock(async () => null), findMany: mock(async () => [{ number: 1, summary: 'A short prior chapter.' }]) },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         drafts: { findFirst: mock(async () => null) },
         entities: { findMany: mock(async () => []) },
@@ -428,6 +497,8 @@ describe('ContextAssembler — memory budget trimming', () => {
     // to guarantee a non-empty context pack (at-least-one guarantee in applyBudget).
     expect(pack.sections.length).toBeLessThan(3);
     expect(pack.sections.length).toBeGreaterThan(0);
+    expect(pack.omitted.length).toBeGreaterThan(0);
+    expect(pack.omitted.every(o => o.reason === 'budget')).toBe(true);
   }, 15_000); // consistently ~5.4s on GitHub Actions' 2-vCPU runners, just over the 5s default — CI-speed headroom, not a functional change
 });
 

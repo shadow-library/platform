@@ -268,6 +268,8 @@ export class ContextAssembler {
       this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter - 1)) }),
     ]);
 
+    const currentArc = brief?.arcKey ? await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, brief.arcKey)) }) : undefined;
+
     const sections: ContextSection[] = [];
 
     if (prevChapter) {
@@ -297,13 +299,14 @@ export class ContextAssembler {
       sections.push(makeSection('continuation_state', content, 'working', [`chapter:${chapter - 1}`]));
     }
 
-    if (brief) {
-      sections.push(makeSection('brief', brief.body, 'approved_intent', [`chapter:${chapter}`]));
-    }
-
     if (currentVolume) {
       const content = [currentVolume.objective, currentVolume.conflict].filter(Boolean).join('\n');
       sections.push(makeSection('volume_objective', content, 'approved_intent', [`volume:${currentVolume.volumeKey}`]));
+    }
+
+    if (currentArc) {
+      const content = [currentArc.objective, currentArc.escalation, currentArc.hook].filter(Boolean).join('\n');
+      if (content) sections.push(makeSection('arc_objective', content, 'approved_intent', [`arc:${currentArc.arcKey}`]));
     }
 
     // Only the POV cast's ledgered facts enter the drafting pack; still-hidden facts surface as behavioral
@@ -983,7 +986,7 @@ export class ContextAssembler {
     budgetTokens: number,
     dryRun?: boolean,
   ): Promise<AssembledPack & { id: bigint | null }> {
-    const fittingSections = applyBudget(sections, budgetTokens);
+    const { fitting: fittingSections, omitted } = applyBudget(sections, budgetTokens);
     // Stable sections render first so the prefix stays byte-identical across calls with unchanged
     // canon (the provider prompt-cache contract); callers list stable sections first, so for the
     // legacy all-volatile purposes this is a no-op.
@@ -999,7 +1002,7 @@ export class ContextAssembler {
     if (!dryRun) {
       const [inserted] = await this.db
         .insert(schema.contextPacks)
-        .values({ projectId, purpose, chapter, hash, budgetTokens, usedTokens, sections: fittingSections as never, unresolvedRefs, rendered })
+        .values({ projectId, purpose, chapter, hash, budgetTokens, usedTokens, sections: fittingSections as never, unresolvedRefs, omitted: omitted as never, rendered })
         .onConflictDoNothing()
         .returning({ id: schema.contextPacks.id });
 
@@ -1012,6 +1015,6 @@ export class ContextAssembler {
       }
     }
 
-    return { projectId, purpose, chapter, budgetTokens, usedTokens, sections: fittingSections, unresolvedRefs, renderedStable, renderedVolatile, rendered, id };
+    return { projectId, purpose, chapter, budgetTokens, usedTokens, sections: fittingSections, unresolvedRefs, omitted, renderedStable, renderedVolatile, rendered, id };
   }
 }
