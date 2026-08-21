@@ -5,9 +5,9 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 
 ## Summary
 
-- Completed: 2
+- Completed: 3
 - In Progress: 0
-- Pending: 7
+- Pending: 6
 - Blocked: 0
 
 ## Tasks
@@ -16,7 +16,7 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 | ----- | -------- | ------------------------------------------------------------------------------------------------------------- | --------- | ------------ | -------- |
 | P0-01 | P0       | Fail-closed judging + judge few-shot parity                                                                   | COMPLETED | —            | e9cee48e |
 | P0-02 | P0       | Novel-validation coverage + scoped `needsRevalidation` updates                                                | COMPLETED | —            | 8acad8ce |
-| P0-03 | P0       | Repair-ladder accounting (patch attempt budget + `sameFinding` tightening)                                    | PENDING   | —            | —        |
+| P0-03 | P0       | Repair-ladder accounting (patch attempt budget + `sameFinding` tightening)                                    | COMPLETED | —            | 0beb8aa8 |
 | P0-04 | P0       | Generation gates: reject stale briefs, error on briefless fallback                                            | PENDING   | —            | —        |
 | P0-05 | P0       | Batch adjacency: draft-tail fallback for N+1, halt batch on non-clean outcome                                 | PENDING   | —            | —        |
 | P0-06 | P0       | Style/ending-contract constants: replace `DEFAULT_WRITING_INSTRUCTIONS`, widen `HookType`, single word target | PENDING   | —            | —        |
@@ -62,15 +62,27 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
   green (547 pass, 10 skip, 0 fail).
 - Commit: 8acad8ce
 
-## Pending
-
 ### P0-03 — Repair-ladder accounting
 
-- Affected area: `src/modules/ai/graphs/chapter-generation.graph.ts`
-- Acceptance criteria:
-  - `attempt` increments in `repairPatch` as well as `repairRewrite`, so patch cycles are bounded by `maxFixes`.
-  - `sameFinding` uses normalized equality (or same category + same anchor span) instead of bidirectional substring containment.
-  - Tests: patch attempts count against `maxFixes`; overlapping finding text is not treated as the same finding.
+- What changed: `chapter-generation.graph.ts` — the successful-patch branch of `repairPatch`
+  (`if (allApplied) return {...}`) now also returns `attempt: state.attempt + 1,
+previousFindings: state.findings`, mirroring `repairRewrite`'s existing bookkeeping. This was the
+  only `repairPatch` branch that reaches `persistDraft` without going through `repairRewrite` (the
+  other two branches set `patchApplied: false` and route to `repairRewrite`, which already
+  increments `attempt` — so this was the one gap, and the only place that needed the fix). Both
+  repair paths now consume the shared `maxFixes` budget. `sameFinding` replaced its bidirectional
+  substring-containment check with exact equality on `severity` + normalized (trimmed, lowercased,
+  whitespace-collapsed) `text` — the only fields `JudgeFinding` carries — so two distinct but
+  textually overlapping findings no longer get misread as a repeat and abort the ladder early.
+- Tests: `tests/ai/workflow.spec.ts` (updated `sameFinding` unit tests: overlapping text no longer
+  matches, severity mismatch never matches), `tests/ai/repair-ladder.spec.ts` (new — graph-level
+  test asserting repeated successful patches still consume `maxFixes` and fall back to
+  `acceptAsIs`).
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (549 pass, 10 skip, 0 fail).
+- Commit: 0beb8aa8
+
+## Pending
 
 ### P0-04 — Generation gates: staleness + briefless
 
