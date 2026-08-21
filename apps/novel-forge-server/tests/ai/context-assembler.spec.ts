@@ -218,6 +218,63 @@ describe('ContextAssembler.forChapter — prev_ending tail truncation', () => {
   });
 });
 
+describe('ContextAssembler.forChapter — batch adjacency (unfinalized predecessor)', () => {
+  it('includes the previous draft tail, labeled as provisional, when chapter N-1 has no canonical row', async () => {
+    const prevDraft = { chapter: 4, state: { power: 50 }, body: 'The forge cooled as the last ember died.' };
+
+    const dbOverrides = {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, instructions: null, contentMode: 'standard' })) },
+        briefs: { findFirst: mock(async () => null) },
+        chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        drafts: { findFirst: mock(async () => prevDraft) },
+        entities: { findMany: mock(async () => []) },
+        worldFacts: { findMany: mock(async () => []) },
+        plotThreads: { findMany: mock(async () => []) },
+        mysteries: { findMany: mock(async () => []) },
+        contextPacks: { findFirst: mock(async () => null) },
+        userFeedback: { findMany: mock(async () => []) },
+      },
+    };
+
+    const assembler = makeAssembler(dbOverrides);
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true });
+
+    const prevEndingSection = pack.sections.find(s => s.key === 'prev_ending');
+    expect(prevEndingSection).toBeDefined();
+    expect(prevEndingSection?.tier).toBe('working');
+    expect(prevEndingSection?.rendered).toContain('[DRAFT — not yet canon]');
+    expect(prevEndingSection?.rendered).toContain('The forge cooled as the last ember died.');
+
+    const continuationSection = pack.sections.find(s => s.key === 'continuation_state');
+    expect(continuationSection).toBeDefined();
+  });
+
+  it('adds no prev_ending section when neither a canonical row nor a draft exists for N-1', async () => {
+    const dbOverrides = {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, instructions: null, contentMode: 'standard' })) },
+        briefs: { findFirst: mock(async () => null) },
+        chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        drafts: { findFirst: mock(async () => null) },
+        entities: { findMany: mock(async () => []) },
+        worldFacts: { findMany: mock(async () => []) },
+        plotThreads: { findMany: mock(async () => []) },
+        mysteries: { findMany: mock(async () => []) },
+        contextPacks: { findFirst: mock(async () => null) },
+        userFeedback: { findMany: mock(async () => []) },
+      },
+    };
+
+    const assembler = makeAssembler(dbOverrides);
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true });
+
+    expect(pack.sections.find(s => s.key === 'prev_ending')).toBeUndefined();
+  });
+});
+
 describe('ContextAssembler.forOutline — retrieval absent', () => {
   it('returns pack with no lore_retrieved or prose_retrieved sections', async () => {
     const assembler = makeAssembler({}, 'catalog text');

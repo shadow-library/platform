@@ -153,10 +153,19 @@ export class JobExecutor {
       await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'generating' });
       this.logger.debug('runGenerate: generating chapter', { jobId: job.id, chapter, index: i, total });
       const result = await this.workflowRunService.runChapterGeneration({ projectId: job.projectId, chapter, autoFix, maxFixes, guidance, jobId: job.id });
-      this.logger.debug('runGenerate: chapter finished', { jobId: job.id, chapter, status: result.status, runId: result.runId });
+      this.logger.debug('runGenerate: chapter finished', { jobId: job.id, chapter, status: result.status, outcome: result.outcome, runId: result.runId });
       // The run service swallows its own errors into a `failed` result; surface that as a job failure
       // instead of quietly marking the job done with no draft persisted.
       if (result.status === 'failed') throw AppError.internal(`chapter ${chapter} generation failed (run ${result.runId})`);
+
+      // Anything short of a clean accept flags the chapter for human review, so a batch halts here
+      // rather than drafting N+1 on top of an unreviewed, possibly-wrong predecessor.
+      if (result.outcome !== 'accepted') {
+        const skipped = chapters.slice(i + 1);
+        this.logger.warn('runGenerate: halting batch for review', { jobId: job.id, chapter, outcome: result.outcome, skipped });
+        await this.jobService.progress(job.id, { done: i + 1, total, current: String(chapter), phase: 'awaiting_review', skipped });
+        return;
+      }
     }
   }
 

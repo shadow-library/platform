@@ -11,6 +11,7 @@ export interface JobProgress {
   total: number;
   current: string;
   phase: string;
+  skipped?: number[];
 }
 
 @Injectable()

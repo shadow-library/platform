@@ -282,6 +282,13 @@ export class ContextAssembler {
         const raw = prevChapter.content ?? '';
         sections.push(makeSectionTail('prev_ending', raw, PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
       }
+    } else if (prevDraft?.body) {
+      // Chapter N-1 hasn't been finalized yet (mid-batch): the `chapters` row doesn't exist, so fall back
+      // to the just-drafted prose tail instead of leaving chapter N with only continuation-state fields.
+      const { text, truncated } = truncateAtParagraphTail(prevDraft.body, PREV_ENDING_TAIL);
+      const content = `[DRAFT — not yet canon]\n${text}`;
+      const rendered = renderSection('prev_ending', content);
+      sections.push({ key: 'prev_ending', tier: 'working', segment: 'volatile', tokens: countTokens(rendered), truncated, sourceRefs: [`chapter:${chapter - 1}`], rendered });
     }
 
     const prevState = prevDraft?.state;
