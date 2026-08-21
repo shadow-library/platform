@@ -52,6 +52,12 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PLN_002 = AppErrorCode.badRequest('PLN_002', 'Every volume needs a target chapter count (or an explicit chapter range) before the plan can be approved');
 
   /*!
+   * Brief Errors
+   */
+  static readonly BRF_001 = AppErrorCode.badRequest('BRF_001', 'No brief exists for the requested chapter(s) — outline the plan before generating');
+  static readonly BRF_002 = AppErrorCode.badRequest('BRF_002', 'Brief is stale for chapter(s) {chapters} — refresh the outline or clear staleness before generating');
+
+  /*!
    * Draft Errors
    */
   static readonly DRF_001 = AppErrorCode.notFound('DRF_001', 'Draft not found');

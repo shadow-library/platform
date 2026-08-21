@@ -185,4 +185,21 @@ describe.if(pgAvailable)('arc module & gates', () => {
     await arcService.approve(projectId, 'v1');
     expect(await codeOf(generationService.generate(projectId, {}))).toBe('NO_ERROR');
   });
+
+  it('rejects generation for stale briefs', async () => {
+    const projectId = await createProject();
+    await db.insert(schema.volumes).values({ projectId, volumeKey: 'v1', ordinal: 1, targetChapterCount: 5 });
+    await volumeService.approve(projectId);
+    await db.insert(schema.briefs).values({ projectId, chapter: 1, volumeKey: 'v1', body: 'brief one', staleReason: 'bible edit invalidated this brief' });
+
+    expect(await codeOf(generationService.generate(projectId, {}))).toBe('BRF_002');
+  });
+
+  it('errors instead of drafting without a brief', async () => {
+    const projectId = await createProject();
+    await db.insert(schema.volumes).values({ projectId, volumeKey: 'v1', ordinal: 1, targetChapterCount: 5 });
+    await volumeService.approve(projectId);
+
+    expect(await codeOf(generationService.generate(projectId, {}))).toBe('BRF_001');
+  });
 });

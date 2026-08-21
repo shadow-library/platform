@@ -404,8 +404,12 @@ export class GenerationService {
     const started = new Set(existingDrafts.map(d => d.chapter));
     const pending = allBriefs.map(b => b.chapter).filter(chapter => !started.has(chapter));
 
-    let chapters = pending.slice(0, limit);
-    if (chapters.length === 0 && allBriefs.length === 0) chapters = [approvedVolumes[0]?.startChapter ?? 1];
+    const chapters = pending.slice(0, limit);
+    if (chapters.length === 0 && allBriefs.length === 0) throw AppErrorCode.BRF_001.create();
+
+    const briefByChapter = new Map(allBriefs.map(brief => [brief.chapter, brief]));
+    const staleChapters = chapters.filter(chapter => briefByChapter.get(chapter)?.staleReason != null);
+    if (staleChapters.length > 0) throw AppErrorCode.BRF_002.create({ chapters: staleChapters.join(', ') });
 
     // Guard: when a chapter's volume has arcs, the covering arc must be approved (refinement design §4 gate 3).
     // Arc-less volumes (e.g. source-imported ones) keep the volume-scoped path.
