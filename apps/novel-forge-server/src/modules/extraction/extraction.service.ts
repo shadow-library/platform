@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -22,7 +22,7 @@ export interface ExtractBatchResult {
   done: number;
 }
 
-const DEFAULT_EXTRACT_LIMIT = 5;
+export const DEFAULT_EXTRACT_LIMIT = 5;
 
 /**
  * Direct extraction service — wraps KnowledgeRepository + ModelRouterService.
@@ -164,27 +164,37 @@ export class ExtractionService {
     this.logger.debug('extractChapter: done', { projectId, chapterNumber });
   }
 
-  async extractBatch(projectId: bigint, options: ExtractBatchOptions = {}): Promise<ExtractBatchResult> {
-    const limit = options.limit ?? DEFAULT_EXTRACT_LIMIT;
-
+  /**
+   * Finalized chapters (`status = 'done'`) that have never had knowledge extraction run — no chapter
+   * summary was ever written by the extraction pass. Ordered by chapter number ascending, capped at
+   * `limit`, for use as an enqueue-time backfill target list.
+   */
+  async resolvePendingChapters(projectId: bigint, limit: number): Promise<number[]> {
     const chapters = await this.db.query.chapters.findMany({
       where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), isNull(schema.chapters.summary)),
       columns: { number: true },
+      orderBy: [asc(schema.chapters.number)],
       limit,
     });
-    this.logger.info('extractBatch: starting', { projectId, pending: chapters.length, limit });
+    return chapters.map(ch => ch.number);
+  }
+
+  async extractBatch(projectId: bigint, options: ExtractBatchOptions = {}): Promise<ExtractBatchResult> {
+    const limit = options.limit ?? DEFAULT_EXTRACT_LIMIT;
+    const chapterNumbers = await this.resolvePendingChapters(projectId, limit);
+    this.logger.info('extractBatch: starting', { projectId, pending: chapterNumbers.length, limit });
 
     let done = 0;
-    for (const ch of chapters) {
+    for (const chapter of chapterNumbers) {
       try {
-        await this.extractChapter(projectId, ch.number);
+        await this.extractChapter(projectId, chapter);
         done++;
       } catch (err) {
-        this.logger.error('extractBatch: extractChapter failed', { projectId, chapter: ch.number, err });
+        this.logger.error('extractBatch: extractChapter failed', { projectId, chapter, err });
       }
     }
 
-    this.logger.info('extractBatch: complete', { projectId, done, attempted: chapters.length });
+    this.logger.info('extractBatch: complete', { projectId, done, attempted: chapterNumbers.length });
     return { done };
   }
 }

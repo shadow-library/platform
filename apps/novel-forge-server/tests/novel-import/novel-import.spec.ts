@@ -207,6 +207,12 @@ describe.if(pgAvailable)('POST /api/v1/import', () => {
       const extract = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/extract`).body({});
       expect(extract.statusCode).toBe(202);
       expect(extract.json()).toMatchObject({ kind: 'extract', status: 'pending' });
+
+      // P0-08: the enqueued payload must carry the real chapter numbers the executor destructures —
+      // never bare `{ limit }`, which the executor never reads.
+      const jobId = extract.json().jobId as string;
+      const jobRow = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
+      expect(jobRow?.payload).toEqual({ chapters: [1, 2] });
     } finally {
       (executor as unknown as { dispatch: typeof executor.dispatch }).dispatch = realDispatch;
     }

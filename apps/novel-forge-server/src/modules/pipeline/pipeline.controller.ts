@@ -2,6 +2,7 @@ import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, HttpStatus, Params, Post, RespondFor } from '@shadow-library/fastify';
 
 import { ConsolidateService } from '../extraction/consolidate.service';
+import { DEFAULT_EXTRACT_LIMIT, ExtractionService } from '../extraction/extraction.service';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { SkeletonService } from '../planning/skeleton.service';
@@ -15,18 +16,24 @@ export class PipelineController {
   constructor(
     private readonly jobService: JobService,
     private readonly jobExecutor: JobExecutor,
+    private readonly extractionService: ExtractionService,
     private readonly assetService: AssetService,
     private readonly consolidateService: ConsolidateService,
     private readonly skeletonService: SkeletonService,
     private readonly recombineService: RecombineService,
   ) {}
 
+  // Backfill tool: (re)runs continuity extraction over already-finalized chapters that have never been
+  // extracted, for imported/legacy novels whose chapters were never processed. Routine extraction on
+  // finalize is a separate, not-yet-built path — this endpoint stays manual/on-demand.
   @Post('/extract')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
   async extractKnowledge(@Params() params: PipelineProjectParams, @Body() body: ExtractBody): Promise<JobEnqueueResponse> {
     const { projectId } = params;
-    const payload = { limit: body.limit };
+    const limit = body.limit ?? DEFAULT_EXTRACT_LIMIT;
+    const chapters = await this.extractionService.resolvePendingChapters(projectId, limit);
+    const payload = { chapters };
     const target = `extract-${projectId}`;
     const jobId = await this.jobService.enqueue(projectId, 'extract', target, payload);
     this.jobExecutor.dispatch(jobId).catch(() => undefined);
