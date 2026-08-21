@@ -5,9 +5,9 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 
 ## Summary
 
-- Completed: 7
+- Completed: 8
 - In Progress: 0
-- Pending: 2
+- Pending: 1
 - Blocked: 0
 
 ## Tasks
@@ -21,7 +21,7 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 | P0-05 | P0       | Batch adjacency: draft-tail fallback for N+1, halt batch on non-clean outcome                                 | COMPLETED | —            | 523abe4f |
 | P0-06 | P0       | Style/ending-contract constants: replace `DEFAULT_WRITING_INSTRUCTIONS`, widen `HookType`, single word target | COMPLETED | —            | df2c0bb0 |
 | P0-07 | P0       | Chapter-context correctness: add arc section, drop duplicated brief, record budget evictions                  | COMPLETED | —            | be404dd8 |
-| P0-08 | P0       | Extract-job payload mismatch fix (resolve chapter numbers server-side at enqueue)                             | PENDING   | —            | —        |
+| P0-08 | P0       | Extract-job payload mismatch fix (resolve chapter numbers server-side at enqueue)                             | COMPLETED | —            | 088c0022 |
 | P0-09 | P0       | Outline invariant enforcement (coverage/uniqueness/chaining via factory closure + catalog ref check)          | PENDING   | —            | —        |
 
 ## Completed
@@ -190,15 +190,30 @@ apps/novel-forge-web` — both green (novel-forge-server: 564 pass, 10 skip, 0 f
   Read/Edit instead; confirmed no main-checkout writes occurred.
 - Commit: be404dd8
 
-## Pending
-
 ### P0-08 — Extract-job payload
 
-- Affected area: `src/modules/pipeline/pipeline.controller.ts` (+ DTO), `src/modules/jobs/job.executor.ts`
-- Acceptance criteria:
-  - Controller resolves chapter numbers server-side at enqueue time (`limit` → first N canonical chapters without extraction) and enqueues `{ chapters }` matching what the executor destructures.
-  - Documented as a backfill tool (routine extraction moves into finalization under P1 — do not build that here).
-  - Tests: enqueues resolved chapter numbers; extraction actually runs via the pipeline endpoint.
+- What changed: `pipeline.controller.ts`'s `POST /extract` enqueued `{ limit: body.limit }`, but
+  `JobExecutor.runExtract`'s `ExtractPayload` destructures `{ chapters = [] }` — an unrelated field
+  the controller never provided, so the executor's loop always ran zero iterations and the job
+  reported success having extracted nothing. `job.executor.ts` needed no change — `chapters` was
+  already the field it expected; only the controller's enqueue payload was wrong. Fixed by resolving
+  the pending-chapter list server-side at enqueue time via a new
+  `ExtractionService.resolvePendingChapters(projectId, limit)` (finalized chapters — `status='done'`
+  — with no extraction yet — `summary IS NULL`, the same predicate the existing but never-wired
+  `extractBatch` already used — ordered by chapter number ascending, capped at `limit`), which
+  `extractBatch` itself now also reuses. The controller enqueues `{ chapters }` matching what the
+  executor destructures. Documented in a comment as a manual backfill tool for imported/legacy
+  novels; routine extraction-on-finalize stays a separate, not-yet-built path. No DTO shape changed,
+  so no `novel-forge-web` api-types regeneration was needed.
+- Tests: `tests/novel-import/novel-import.spec.ts` (extended — asserts the enqueued job row's
+  payload is `{ chapters: [1, 2] }`, not `{ limit }`), `tests/jobs/job-executor-extract.spec.ts`
+  (new — processes every resolved chapter; does nothing on an empty payload, the exact bug this
+  guards against; throws/halts on a failed chapter).
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (567 pass, 10 skip, 0 fail).
+- Commit: 088c0022
+
+## Pending
 
 ### P0-09 — Outline invariant enforcement
 
