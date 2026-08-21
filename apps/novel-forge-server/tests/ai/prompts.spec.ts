@@ -4,6 +4,7 @@ import { buildChatRefinePrompt, PROMPT_REGISTRY, SCOPE_PLAYBOOKS } from '@module
 import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
 import {
   ChatRefineSchema,
+  EndingContractSchema,
   ExtractionSchema,
   FixSchema,
   JudgeSchema,
@@ -43,6 +44,26 @@ describe('Prompt modules', () => {
       for (const p of analytical) {
         expect(p.system).not.toContain(AUTHORING_STYLE.slice(0, 40));
       }
+    });
+  });
+
+  describe('EndingContractSchema', () => {
+    const base = { emotionalBeat: 'dread', openQuestion: 'who?', handoffState: 'cornered on the roof' };
+
+    it('accepts the tension-shaped hook types', () => {
+      for (const hookType of ['cliffhanger', 'revelation', 'quiet_dread', 'promise', 'turn']) {
+        expect(parseSchema(EndingContractSchema, { ...base, hookType }).success).toBe(true);
+      }
+    });
+
+    it('accepts the closure hook types', () => {
+      for (const hookType of ['closure_with_momentum', 'earned_rest']) {
+        expect(parseSchema(EndingContractSchema, { ...base, hookType }).success).toBe(true);
+      }
+    });
+
+    it('rejects an unknown hook type', () => {
+      expect(parseSchema(EndingContractSchema, { ...base, hookType: 'happy_end' }).success).toBe(false);
     });
   });
 

@@ -332,11 +332,11 @@ describe('ContextAssembler.forChapter — no brief', () => {
     const assembler = makeAssembler(dbOverrides);
     const pack = await assembler.forChapter(1n, 1, { dryRun: true });
 
-    // The chapter generator must always be told how to write — the default carries the length rule.
+    // The chapter generator must always be told how to write, even absent a project override.
     const writingStyle = pack.sections.find(s => s.key === 'writing_style');
     expect(writingStyle).toBeDefined();
     expect(writingStyle?.rendered).toContain(DEFAULT_WRITING_INSTRUCTIONS.slice(0, 40));
-    expect(writingStyle?.rendered).toContain('2000 and 3000 words');
+    expect(writingStyle?.rendered).toContain('Pacing and endings');
   });
 });
 

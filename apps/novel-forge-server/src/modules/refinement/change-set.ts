@@ -1,7 +1,7 @@
 import { type Bible } from '@server/database';
 
 export interface EndingContract {
-  hookType: 'cliffhanger' | 'revelation' | 'quiet_dread' | 'promise' | 'turn';
+  hookType: 'cliffhanger' | 'revelation' | 'quiet_dread' | 'promise' | 'turn' | 'closure_with_momentum' | 'earned_rest';
   emotionalBeat: string;
   openQuestion: string;
   handoffState: string;
@@ -225,7 +225,7 @@ interface OpSpec {
   optional: Record<string, FieldKind>;
 }
 
-const HOOK_TYPES = ['cliffhanger', 'revelation', 'quiet_dread', 'promise', 'turn'];
+const HOOK_TYPES = ['cliffhanger', 'revelation', 'quiet_dread', 'promise', 'turn', 'closure_with_momentum', 'earned_rest'];
 const BIBLE_SECTIONS = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
 const ENTITY_TYPES = ['character', 'faction', 'location', 'power_rule', 'item', 'concept'];
 

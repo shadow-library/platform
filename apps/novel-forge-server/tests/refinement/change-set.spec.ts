@@ -40,6 +40,12 @@ describe('validateChangeSet', () => {
     expect(errors[0]).toMatch(/not allowed for this scope/);
   });
 
+  it('should accept closure hook types on ending contracts', () => {
+    for (const hookType of ['closure_with_momentum', 'earned_rest']) {
+      expect(validateChangeSet([{ op: 'brief.update', chapter: 1, endingContract: { hookType, emotionalBeat: 'calm', openQuestion: 'x', handoffState: 'y' } }])).toEqual([]);
+    }
+  });
+
   it('should validate ending contracts and arc chapter ranges', () => {
     expect(
       validateChangeSet([{ op: 'brief.update', chapter: 1, endingContract: { hookType: 'happy_end', emotionalBeat: 'joy', openQuestion: 'x', handoffState: 'y' } }])[0],

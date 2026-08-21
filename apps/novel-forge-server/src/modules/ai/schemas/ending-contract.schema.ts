@@ -5,7 +5,7 @@ import { HookType } from './enums';
 @Schema()
 export class EndingContractSchema {
   @Field(() => HookType, { description: 'the kind of hook the closing scene must land on' })
-  hookType: 'cliffhanger' | 'revelation' | 'quiet_dread' | 'promise' | 'turn';
+  hookType: 'cliffhanger' | 'revelation' | 'quiet_dread' | 'promise' | 'turn' | 'closure_with_momentum' | 'earned_rest';
 
   @Field({ minLength: 1, description: 'what the reader should feel on the last line' })
   emotionalBeat: string;

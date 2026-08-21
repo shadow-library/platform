@@ -45,7 +45,8 @@ export class ChapterBriefSchema {
   handoffBeat?: string;
 
   @Field(() => EndingContractSchema, {
-    description: 'how the chapter must end — never conclusively unless it is the final chapter of its arc, and even then it hands off via the arc hook',
+    description:
+      'how the chapter must end — end in the contracted hookType; closure modes (closure_with_momentum, earned_rest) still hand off momentum rather than fully resolving the arc',
   })
   endingContract: EndingContractSchema;
 }
