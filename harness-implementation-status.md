@@ -5,9 +5,9 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 
 ## Summary
 
-- Completed: 5
+- Completed: 6
 - In Progress: 0
-- Pending: 4
+- Pending: 3
 - Blocked: 0
 
 ## Tasks
@@ -19,7 +19,7 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 | P0-03 | P0       | Repair-ladder accounting (patch attempt budget + `sameFinding` tightening)                                    | COMPLETED | —            | 0beb8aa8 |
 | P0-04 | P0       | Generation gates: reject stale briefs, error on briefless fallback                                            | COMPLETED | —            | 3415ff30 |
 | P0-05 | P0       | Batch adjacency: draft-tail fallback for N+1, halt batch on non-clean outcome                                 | COMPLETED | —            | 523abe4f |
-| P0-06 | P0       | Style/ending-contract constants: replace `DEFAULT_WRITING_INSTRUCTIONS`, widen `HookType`, single word target | PENDING   | —            | —        |
+| P0-06 | P0       | Style/ending-contract constants: replace `DEFAULT_WRITING_INSTRUCTIONS`, widen `HookType`, single word target | COMPLETED | —            | df2c0bb0 |
 | P0-07 | P0       | Chapter-context correctness: add arc section, drop duplicated brief, record budget evictions                  | PENDING   | —            | —        |
 | P0-08 | P0       | Extract-job payload mismatch fix (resolve chapter numbers server-side at enqueue)                             | PENDING   | —            | —        |
 | P0-09 | P0       | Outline invariant enforcement (coverage/uniqueness/chaining via factory closure + catalog ref check)          | PENDING   | —            | —        |
@@ -125,18 +125,42 @@ previousFindings: state.findings`, mirroring `repairRewrite`'s existing bookkeep
   green (557 pass, 10 skip, 0 fail).
 - Commit: 523abe4f
 
-## Pending
-
 ### P0-06 — Style and ending-contract constants
 
-- Affected area: `src/modules/ai/prompts/authoring-preamble.ts`, `src/modules/ai/schemas/enums.ts`, `ending-contract.schema.ts`, `outline.schema.ts`, `generation.prompt.ts`, `generation.schema.ts`; prompt goldens
-- Acceptance criteria:
-  - `DEFAULT_WRITING_INSTRUCTIONS` replaced with report §13 web-novel style spec + anti-monotone guard ("simple does not mean flat...").
-  - Prose-craft bullets stripped from the planning variant of `AUTHORING_STYLE` (used by bible/plan/outline/arc-plan prompts); POV/canon/originality rules kept.
-  - `HookType` widened with `closure_with_momentum` and `earned_rest`.
-  - "Never conclusively" wording reworded in both `outline.schema.ts` and `generation.prompt.ts` to allow contracted closure modes.
-  - Single word target stated once (pick 1,800–2,600, remove the conflicting/duplicated target).
-  - Golden prompt snapshots regenerated; test: ending contract accepts closure hook types.
+- What changed: `authoring-preamble.ts`'s `DEFAULT_WRITING_INSTRUCTIONS` replaced verbatim with the
+  approved web-novel style spec (Clarity/Paragraphs/Scenes/Description/Emotion/Dialogue/
+  Exposition/Pacing-and-endings/Originality) plus the anti-monotone guard line ("Simple does not
+  mean flat. Vary rhythm; let a strong moment land in a longer sentence."). Added a new
+  `AUTHORING_STYLE_PLANNING` constant (POV, voice, canon-consistency only — no prose-craft rules)
+  and switched every planning-time prompt (`plan`, `outline`, `arc-plan`, `new-novel`,
+  `premise-enhance`, `chat-refine`, all 6 `bible-builder/*` prompts) to it; `fix`, `revision`,
+  `reforge-write`, `rebrand-convert` keep the full `AUTHORING_STYLE`. `HookType` (`enums.ts`,
+  `ending-contract.schema.ts`) widened with `closure_with_momentum`/`earned_rest`; `change-set.ts`'s
+  independent `HOOK_TYPES` validation array (chat-hub proposals) widened too, since it would
+  otherwise silently reject the new closure hooks. "Never conclusively" reworded in
+  `outline.schema.ts`'s description and `outline.prompt.ts`/`generation.prompt.ts`'s prompt text to
+  respect the contracted mode instead of blanket-forbidding closure. The two conflicting word
+  targets (2000–3000 in the old instructions, 1800–2200 in `generation.schema.ts`'s description)
+  unified to a single **1,800–2,600** figure, stated in `generation.prompt.ts`'s system text
+  (prompt-visible — schema field descriptions are stripped before reaching the model, confirmed via
+  `validate.ts`). No file-based prompt goldens exist in this repo; "render goldens" are substring
+  assertions in `tests/ai/prompts.spec.ts`, which still pass since `AUTHORING_STYLE_PLANNING` shares
+  `AUTHORING_STYLE`'s header/first bullet. Per-project `instructions` override was verified
+  untouched and still wins over the default.
+- Tests: `tests/ai/prompts.spec.ts` (new `EndingContractSchema` describe block — accepts tension and
+  closure hooks, rejects unknown), `tests/refinement/change-set.spec.ts` (accepts closure hooks on
+  `brief.update`), `tests/ai/context-assembler.spec.ts` (updated stale word-count assertion).
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (561 pass, 10 skip, 0 fail).
+- Note: a Serena MCP symbolic-edit call from the sub-agent briefly wrote corrupted content into the
+  **main checkout** version of `authoring-preamble.ts` (not this worktree) before the sub-agent
+  caught it and switched to worktree-scoped edits for the rest of the task. The coordinator found
+  and discarded that unstaged main-checkout corruption via `git checkout --` before reviewing this
+  task's actual (correct) worktree diff. No corrupted content ever reached a commit or main's
+  history.
+- Commit: df2c0bb0
+
+## Pending
 
 ### P0-07 — Chapter-context correctness
 
