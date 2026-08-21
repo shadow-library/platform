@@ -20,10 +20,16 @@ describe('sameFinding', () => {
     expect(sameFinding(findings, previousFindings)).toBe(true);
   });
 
-  it('returns true when finding text is a substring of previousFinding', () => {
+  it('does not treat overlapping finding text as the same finding', () => {
     const findings: JudgeFinding[] = [{ severity: 'hard', text: 'iron covenant' }];
     const previousFindings: JudgeFinding[] = [{ severity: 'hard', text: 'the iron covenant contradicts chapter 3' }];
-    expect(sameFinding(findings, previousFindings)).toBe(true);
+    expect(sameFinding(findings, previousFindings)).toBe(false);
+  });
+
+  it('returns false when text matches but severity differs', () => {
+    const findings: JudgeFinding[] = [{ severity: 'soft', text: 'the iron covenant' }];
+    const previousFindings: JudgeFinding[] = [{ severity: 'hard', text: 'the iron covenant' }];
+    expect(sameFinding(findings, previousFindings)).toBe(false);
   });
 
   it('returns false when findings are unrelated', () => {

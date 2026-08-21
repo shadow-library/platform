@@ -64,16 +64,16 @@ const logger = Logger.getLogger(APP_NAME, 'chapter-generation.graph');
 
 // Normalize finding text for dedup comparison.
 function normalizeFinding(text: string): string {
-  return text.toLowerCase().trim();
+  return text.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
-// True if any finding in `findings` matches a finding in `previousFindings` (substring match on normalized text).
+// True if any finding in `findings` exactly matches (same severity, same normalized text) a finding in `previousFindings`.
 export function sameFinding(findings: JudgeFinding[], previousFindings: JudgeFinding[]): boolean {
   if (previousFindings.length === 0) return false;
   for (const f of findings) {
     const norm = normalizeFinding(f.text);
     for (const prev of previousFindings) {
-      if (normalizeFinding(prev.text).includes(norm) || norm.includes(normalizeFinding(prev.text))) return true;
+      if (f.severity === prev.severity && norm === normalizeFinding(prev.text)) return true;
     }
   }
   return false;
@@ -400,7 +400,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
         patched = patched.replace(patch.find, patch.replace);
       }
 
-      if (allApplied) return { prose: patched, repairMode: 'patch' as const, patchApplied: true };
+      if (allApplied) return { prose: patched, repairMode: 'patch' as const, patchApplied: true, attempt: state.attempt + 1, previousFindings: state.findings };
       logger.debug('generation repairPatch: a patch anchor was not uniquely found — falling back to rewrite', { runId: state.runId, chapter: state.chapter });
     }
 
