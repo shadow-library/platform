@@ -1,18 +1,222 @@
 # Harness Implementation Status
 
-Source spec: `harness-final-recommendation.md`, Section 10 (P0 Implementation Plan).
-Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is validated per §14.
+Source spec: `harness-final-recommendation.md`, Section 10 (P0 Implementation Plan) and Section 11
+(P1 Plan). P0 is complete and merged; P1 is broken down below per §14's evaluation-first ordering.
 
-## Summary
+## Summary — P0
 
 - Completed: 9
 - In Progress: 0
 - Pending: 0
 - Blocked: 0
 
-All nine P0 items from `harness-final-recommendation.md` §10 are complete. Per §14, the next step
-is running the before/after evaluation plan (blind paired comparison + deterministic metrics +
-process-invariant checks) before starting any P1 work — see §14 of the recommendation doc.
+All nine P0 items from `harness-final-recommendation.md` §10 are complete. Per §14, evaluation
+tooling (Track 2 deterministic metrics + Track 3 process invariants) is being built as reusable
+scripts; Track 1 (blind human paired comparison) is out of scope for automated execution and
+requires a human rater when a real generation pass is run. P1 tasks are broken down below so work
+can start once eval tooling lands, but — per §14 and §15 — a P0-vs-candidate run through Track 1–3
+should still happen before P1 changes ship to confirm no regression.
+
+## Summary — P1
+
+- Completed: 0
+- In Progress: 0
+- Pending: 15
+- Blocked: 0
+
+## P1 Tasks
+
+Source: `harness-final-recommendation.md` §11 (7 top-level items), decomposed into reviewable units
+matching P0's granularity. Each is small enough to implement/review/commit/merge independently, per
+the same one-task-at-a-time worktree workflow used for P0.
+
+| ID    | Priority | Task                                                                                                                                | Status  | Dependencies                                |
+| ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------- |
+| P1-01 | P1       | Bible-builder characters stage emits full entity `body` + initial `canon_facts` with `terms[]`                                      | PENDING | —                                           |
+| P1-02 | P1       | Bible-builder world/power stage emits structured `world_facts`                                                                      | PENDING | —                                           |
+| P1-03 | P1       | Add `bible_doc:`/`fact:` ref prefixes to `ContextAssembler.resolveRefs`                                                             | PENDING | P1-01, P1-02                                |
+| P1-04 | P1       | Volume planner (`plan()`) reads relevant bible documents, behind a rebuild flag                                                     | PENDING | P1-01, P1-02, P1-03                         |
+| P1-05 | P1       | Extend `ContinuitySchema` with `characterStates`/`knowledgeChanges` fields                                                          | PENDING | —                                           |
+| P1-06 | P1       | New `character_states` table (schema + migration)                                                                                   | PENDING | —                                           |
+| P1-07 | P1       | Finalization applies ALL extracted continuity fields transactionally; fixes `continuityApplied` dead-end (D7)                       | PENDING | P1-05, P1-06                                |
+| P1-08 | P1       | Retire source-extraction overlap; drop or explicitly mark unused `timeline_events`/`power_progressions`                             | PENDING | P1-07                                       |
+| P1-09 | P1       | Route `outlineArc` through `forOutline()`; deprecate/cap whole-book `outline()`                                                     | PENDING | —                                           |
+| P1-10 | P1       | Reconciliation trigger every k finalized chapters (default 5, configurable) or on staleness                                         | PENDING | P1-09                                       |
+| P1-11 | P1       | Volume-completion epitome write (or explicitly drop the `volumes.epitome` column)                                                   | PENDING | —                                           |
+| P1-12 | P1       | Outliner authors `knowledgeContract`; persist `pov`; wire mystery `truthFactKey`                                                    | PENDING | —                                           |
+| P1-13 | P1       | Prompt-cache the generation path: `asStable` sections, `cacheStrategy`, fix rebrand/reforge stable-var bug                          | PENDING | —                                           |
+| P1-14 | P1       | Deterministic draft checks as a graph node before `judge` (word bounds, duplicated paragraphs, n-grams, cliché counts, tag density) | PENDING | — (may reuse eval Track 2 metric functions) |
+| P1-15 | P1       | Judge gains a brief-fulfillment category (D33's accepted half)                                                                      | PENDING | —                                           |
+
+### P1-01 — Bible-builder characters stage: full entity `body` + initial `canon_facts`
+
+- Affected area: bible-builder characters-stage prompt + graph node, `entities`/`canon_facts` schemas.
+- Acceptance criteria:
+  - Characters stage writes full entity `body` (not just shallow rows) so entity cards stop being
+    starved for pure-AI-built projects (manual edits/plan-import already write `body` — this closes
+    the gap for the main AI-planned flow).
+  - Emits initial `canon_facts` rows, including hidden truths, with `terms[]` populated so the
+    deterministic knowledge leak scanner can see them.
+  - Behind a rebuild flag — existing projects are unaffected until they opt in.
+
+### P1-02 — Bible-builder world/power stage: structured `world_facts`
+
+- Affected area: bible-builder world/power-stage prompt + graph node, `world_facts` schema.
+- Acceptance criteria:
+  - World/power stage emits structured `world_facts` categories (not just prose), consistent with
+    what `context-assembler.service.ts` already knows how to render.
+  - Behind the same rebuild flag as P1-01.
+
+### P1-03 — `bible_doc:`/`fact:` ref prefixes
+
+- Affected area: `src/modules/ai/context/context-assembler.service.ts` (`resolveRefs`, currently six
+  prefixes only).
+- Acceptance criteria:
+  - Two new resolvable ref prefixes, `bible_doc:` and `fact:`, so canon written by P1-01/02 is
+    retrievable by the writer — today the bible is reachable only through lore embeddings the
+    drafting path never queries.
+  - Unknown/malformed refs of these prefixes fail closed into `unresolvedRefs`, consistent with
+    existing prefix handling.
+
+### P1-04 — Volume planner reads bible documents
+
+- Affected area: `plan.prompt.ts`, `generation.service.ts`'s `plan()`.
+- Acceptance criteria:
+  - `plan()` currently reads only `project.brief` + skeleton fields; it now also receives the
+    relevant bible documents the builder writes (structured canon from P1-01/02, resolved via
+    P1-03), so the planner is no longer blind to the bible it cost tokens to build.
+  - Does not change the volume/arc contract shape — content input only.
+
+### P1-05 — Extend `ContinuitySchema`
+
+- Affected area: `src/modules/ai/schemas/continuity.schema.ts` (or wherever the schema lives).
+- Acceptance criteria:
+  - Adds `characterStates: Array<{ entityKey, location?, conditions?, immediateGoal?, statusNote?, evidence }>`
+    and `knowledgeChanges: Array<{ entityKey, factKey, how }>` per §6 of the recommendation doc.
+  - `relationships` is already extracted today — no schema change needed there, only application
+    (P1-07).
+  - Prompt instructs "extract only what the prose establishes, with an evidence excerpt; empty
+    arrays are correct."
+
+### P1-06 — New `character_states` table
+
+- Affected area: `src/database/schemas/*.ts`, migration.
+- Acceptance criteria:
+  - New table per §6: `projectId`, `entityKey`, `location`, `conditions: string[]`, `immediateGoal`,
+    `statusNote` (one line, replaced not appended each update), `lastUpdatedChapter`.
+  - Additive migration only.
+
+### P1-07 — Finalization applies all extracted continuity fields transactionally
+
+- Affected area: `chapter-finalization.graph.ts`, `generation.service.ts`'s manual-apply path.
+- Acceptance criteria:
+  - One extraction call at finalization; ALL fields applied transactionally: entity appearances, new
+    entities, thread/mystery upserts (existing), `character_states` rows (P1-06), `entity_relationships`
+    rows (already extracted, now applied), knowledge changes → `character_knowledge`, chapter
+    summary/index updates (existing).
+  - Fixes the D7 bug: `chapters.continuityApplied` is set on the graph-finalized path too — the
+    manual-apply endpoint's `pending`-only guard (`generation.service.ts:872–876`) currently leaves
+    graph-finalized chapters permanently stuck at `continuityApplied = false` with no recovery.
+  - Low-confidence extractor rows route through the existing proposal-review flow instead of
+    auto-applying.
+  - Not persisted: timeline events, power progression, emotion/trust scores, before/after diffs,
+    repetition signatures (explicitly rejected in the recommendation doc).
+
+### P1-08 — Retire dead extraction paths
+
+- Affected area: `entity_relationships` writer wiring, `timeline_events`/`power_progressions` tables.
+- Acceptance criteria:
+  - The separate source-extraction graph (currently unreachable — its consolidation service's
+    upstream writer is never injected) is retired or repointed now that P1-07 covers relationship
+    application through the mainline finalization path.
+  - `timeline_events`/`power_progressions` (zero writers, grep-verified) are dropped with this P1
+    migration, or left with an explicit "unused" note if a live project turns out to depend on them
+    — do not wire them speculatively per the recommendation doc's explicit rejection.
+
+### P1-09 — Route `outlineArc` through `forOutline()`
+
+- Affected area: `generation.service.ts` (`outline()`/`outlineArc()` — already touched by P0-09,
+  now extended), `refine.service.ts` (`forOutline` currently dead outside preview/tests).
+- Acceptance criteria:
+  - `outlineArc` becomes the production outline path, routed through the already-complete
+    `forOutline()` pack (recent summaries + retrieval + catalog).
+  - Whole-book `outline()` is deprecated or capped — briefs exist only for the current arc; anything
+    beyond the next reconciliation point stays uncommitted, per the recommendation doc's planning
+    hierarchy (§4.B).
+  - Caveat inherited from the recommendation doc: `volumes.epitome` is never written (P1-11), so this
+    task buys recent summaries + retrieval, not volume memory, until P1-11 lands.
+
+### P1-10 — Reconciliation trigger
+
+- Affected area: finalization graph / a new trigger hook, config.
+- Acceptance criteria:
+  - After every k finalized chapters (default 5) or on refinement staleness, remaining chapters of
+    the _current_ arc are re-outlined (not the whole book).
+  - Cadence is a config knob, not a hardcoded constant — the recommendation doc calls the default a
+    guess to be tuned against usage.
+  - Gated on hand-edit markers so a human's manual brief edits aren't silently clobbered by
+    reconciliation.
+
+### P1-11 — Volume-completion epitome write
+
+- Affected area: bible/volume-completion hook, `volumes.epitome` column (exists, unused).
+- Acceptance criteria:
+  - Either: an epitome gets written when a volume completes, so `forOutline`'s existing epitome
+    support (currently inert) starts doing something — OR — the column is consciously dropped with
+    a documented decision, per the recommendation doc's explicit either/or framing. Pick one and
+    justify it in the commit/status entry; don't leave it half-done.
+
+### P1-12 — Outliner authors `knowledgeContract`
+
+- Affected area: `outline.schema.ts` (`ChapterBriefSchema`), `outline.prompt.ts`, mystery schema.
+- Acceptance criteria:
+  - `ChapterBriefSchema` gains a `knowledgeContract` field, catalog-driven fact keys, authored by the
+    outliner — this is the single gap keeping the epistemic ledger (canon_facts + character_knowledge)
+    dormant for AI-planned projects; only manual edits/plan-import currently arm it.
+  - `pov` is persisted instead of dropped at brief-body flattening (currently emitted by the model,
+    dropped at persist per `docs/plan-import-design.md:120`'s own acknowledgment).
+  - Mystery `truthFactKey` wired: a mystery's truth is a `canon_facts` row key, never duplicated
+    prose — one epistemic authority, matching the recommendation doc's correction to the original
+    report (hiddenness is derived per-chapter, not a `source` column).
+
+### P1-13 — Prompt caching for generation
+
+- Affected area: `context-assembler.service.ts` (`forChapter` stable/volatile split — machinery
+  already exists via `asStable`/`segment`), `generation.prompt.ts` (`cacheStrategy`), rebrand/reforge
+  `cacheStrategy` usage.
+- Acceptance criteria:
+  - Genuinely stable `forChapter` sections (style, volume objective, arc objective, resolved static
+    canon refs) marked `asStable`; `generation.prompt.ts` declares a `cacheStrategy`.
+  - Stable/volatile passed as separate template vars, following the pattern `chat.service.ts:280`
+    already uses — not the currently-joined blob.
+  - Fixes the existing rebrand/reforge bug: their `cacheStrategy` passes the _joined_ stable+volatile
+    blob as "stable", so per-chapter churn defeats the cache it declares — this task corrects that
+    alongside adding caching to generation itself.
+  - Cost lever, not quality lever — measure via existing telemetry (`model_calls` cost/latency)
+    rather than a new dashboard.
+
+### P1-14 — Deterministic draft checks
+
+- Affected area: new pure module + new graph node in `chapter-generation.graph.ts`, before `judge`.
+- Acceptance criteria:
+  - Word-count-out-of-bounds, duplicated paragraphs, repeated 5–8-grams vs. the last ~10 chapters,
+    cliché-phrase counts over a threshold, dialogue-tag-density outliers — all deterministic, no LLM
+    call.
+  - Hard bounds feed the existing patch ladder as findings; soft thresholds are logged and surfaced
+    at review, not auto-blocking.
+  - Consider reusing the metric-computation functions built for the §14 Track 2 evaluation script
+    (`tests/eval/deterministic-metrics.ts` or wherever it lands) rather than re-implementing n-gram/
+    cliché-counting logic a second time — check for that overlap before writing new code.
+
+### P1-15 — Judge brief-fulfillment category
+
+- Affected area: `judge.schema.ts`, `judge.prompt.ts`.
+- Acceptance criteria:
+  - Judge gains a brief-fulfillment verdict category, now that briefs are validated artifacts
+    (P0-09's coverage/uniqueness/chaining enforcement landed) rather than trusted-but-unverified
+    model output.
+  - Keeps the 4-anchored-category design (canon, ending, knowledge, now brief-fulfillment) — no
+    9-dimension evaluator, per the recommendation doc's explicit rejection of that report proposal.
 
 ## Tasks
 
