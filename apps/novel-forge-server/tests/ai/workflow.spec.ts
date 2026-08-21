@@ -115,6 +115,30 @@ describe('routeAfterJudge', () => {
   it('accepts a consistent verdict when the draft is knowledge-compliant', () => {
     expect(routeAfterJudge({ verdict: 'consistent', autoFix: true, attempt: 0, maxFixes: 3, findings: [], previousFindings: [], knowledgeCompliant: true })).toBe('accept');
   });
+
+  it('routes to awaitReview when the judge output was unparseable, regardless of autoFix', () => {
+    const state = {
+      verdict: 'evaluation_failed' as const,
+      attempt: 0,
+      maxFixes: 3,
+      findings: [{ severity: 'hard' as const, text: 'judge output unparseable' }],
+      previousFindings: [],
+    };
+    expect(routeAfterJudge({ ...state, autoFix: true })).toBe('awaitReview');
+    expect(routeAfterJudge({ ...state, autoFix: false })).toBe('awaitReview');
+  });
+
+  it('never routes an unparseable judge output to accept or acceptAsIs, even past maxFixes', () => {
+    const result = routeAfterJudge({
+      verdict: 'evaluation_failed',
+      autoFix: true,
+      attempt: 5,
+      maxFixes: 3,
+      findings: [{ severity: 'hard', text: 'judge output unparseable' }],
+      previousFindings: [],
+    });
+    expect(result).toBe('awaitReview');
+  });
 });
 
 describe('mergeKnowledgeCompliance', () => {

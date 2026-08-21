@@ -16,7 +16,7 @@ export namespace Generation {
 }
 
 export const draftStatus = pgEnum('draft_status', ['draft', 'final']);
-export const judgeVerdict = pgEnum('judge_verdict', ['consistent', 'contradiction']);
+export const judgeVerdict = pgEnum('judge_verdict', ['consistent', 'contradiction', 'evaluation_failed']);
 export const continuityProposalStatus = pgEnum('continuity_proposal_status', ['pending', 'applied', 'discarded']);
 export const draftReviewStatus = pgEnum('draft_review_status', ['generating', 'needs_review', 'contradiction', 'approved', 'final']);
 

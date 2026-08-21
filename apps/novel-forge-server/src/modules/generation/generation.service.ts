@@ -548,35 +548,48 @@ export class GenerationService {
     const judgeHumanMsg = new HumanMessage(`${pack.rendered}\n\nDraft chapter ${chapter}:\n${draft.body}`);
     const messages = [...(PROMPT_REGISTRY.judge.fewShots ?? []), judgeSystemMsg, judgeHumanMsg];
 
-    const { messages: resultMessages } = await runToolLoop(
-      model,
-      tools,
-      rawTools,
-      messages,
-      { chapter, db: this.db, node: 'judge', projectId, retrieval: this.retrievalService, runId },
-      this.db,
-      { maxRounds: 4 },
-    );
+    const runJudgeModel = async (): Promise<JudgeOutput | null> => {
+      const { messages: resultMessages } = await runToolLoop(
+        model,
+        tools,
+        rawTools,
+        messages,
+        { chapter, db: this.db, node: 'judge', projectId, retrieval: this.retrievalService, runId },
+        this.db,
+        { maxRounds: 4 },
+      );
+      const lastAi = [...resultMessages].reverse().find(m => m._getType() === 'ai');
+      const rawContent = lastAi ? (typeof lastAi.content === 'string' ? lastAi.content : JSON.stringify(lastAi.content)) : '{}';
+      const parsed = parseSchema<JudgeOutput>(JudgeSchema, this.tryParseJson(rawContent));
+      return parsed.success ? parsed.data : null;
+    };
 
-    const lastAi = [...resultMessages].reverse().find(m => m._getType() === 'ai');
-    const rawContent = lastAi ? (typeof lastAi.content === 'string' ? lastAi.content : JSON.stringify(lastAi.content)) : '{}';
-    const parsed = parseSchema<JudgeOutput>(JudgeSchema, this.tryParseJson(rawContent));
+    let judgeOutput = await runJudgeModel();
+    if (!judgeOutput) {
+      this.logger.warn('judgeDraft: judge output failed to parse — retrying once', { projectId, chapter });
+      judgeOutput = await runJudgeModel();
+    }
 
-    const judgeOutput = parsed.success ? parsed.data : { verdict: 'consistent' as const, findings: [] };
-    if (!parsed.success) this.logger.warn('judgeDraft: judge output failed to parse — defaulting to consistent', { projectId, chapter });
-    this.logger.info('judgeDraft: verdict', { projectId, chapter, verdict: judgeOutput.verdict, findings: judgeOutput.findings.length });
+    const evaluationFailed = !judgeOutput;
+    const verdict = judgeOutput?.verdict ?? 'evaluation_failed';
+    const findings = [...(judgeOutput?.findings ?? [])];
+    if (evaluationFailed) {
+      this.logger.warn('judgeDraft: judge output unparseable after retry — routing to human review', { projectId, chapter });
+      findings.push({ severity: 'hard', text: 'judge output unparseable' });
+    }
+    this.logger.info('judgeDraft: verdict', { projectId, chapter, verdict, findings: findings.length });
 
     await this.db
       .update(schema.drafts)
       .set({
-        judge: judgeOutput.verdict,
-        judgeNote: judgeOutput.findings.map(f => `[${f.severity}] ${f.text}`).join('\n') || null,
-        reviewStatus: judgeOutput.verdict === 'contradiction' ? 'contradiction' : 'needs_review',
+        judge: verdict,
+        judgeNote: findings.map(f => `[${f.severity}] ${f.text}`).join('\n') || null,
+        reviewStatus: verdict === 'consistent' ? 'needs_review' : 'contradiction',
         updatedAt: new Date(),
       })
       .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)));
 
-    return { verdict: judgeOutput.verdict, findings: judgeOutput.findings };
+    return { verdict, findings };
   }
 
   async feedbackDraft(projectId: bigint, chapter: number, body: FeedbackBody): Promise<Ai.UserFeedback> {

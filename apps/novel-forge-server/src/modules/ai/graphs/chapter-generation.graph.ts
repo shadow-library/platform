@@ -44,7 +44,7 @@ const ChapterGenAnnotation = Annotation.Root({
   title: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   summary: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   continuationState: Annotation<Record<string, string>>({ reducer: (_, n) => n, default: () => ({}) }),
-  verdict: Annotation<'consistent' | 'contradiction' | null>({ reducer: (_, n) => n, default: () => null }),
+  verdict: Annotation<'consistent' | 'contradiction' | 'evaluation_failed' | null>({ reducer: (_, n) => n, default: () => null }),
   endingCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
   knowledgeCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
   findings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
@@ -87,6 +87,7 @@ export function routeAfterJudge(
 ): string {
   const endingCompliant = state.endingCompliant !== false;
   const knowledgeCompliant = state.knowledgeCompliant !== false;
+  if (state.verdict === 'evaluation_failed') return 'awaitReview';
   if (state.verdict === 'consistent' && endingCompliant && knowledgeCompliant) return 'accept';
   if (!state.autoFix) return 'awaitReview';
   if (state.attempt >= state.maxFixes || sameFinding(state.findings, state.previousFindings)) return 'acceptAsIs';
@@ -305,18 +306,28 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const humanMsg = new HumanMessage(
       `Context:\n${renderedPack}\n\n---\nDraft prose to evaluate:\n${state.prose}${contractBlock}${knowledgeBlock}\n\nEvaluate this chapter draft for continuity and consistency with the established canon. Return a JSON object with verdict ("consistent" or "contradiction") and findings array.`,
     );
+    const judgeMessages = [...(PROMPT_REGISTRY.judge.fewShots ?? []), systemMsg, humanMsg];
 
-    const { messages } = await runToolLoop(model, tools, rawTools, [systemMsg, humanMsg], toolCtx, db as never);
+    async function runJudgeModel(): Promise<JudgeOutput | null> {
+      const { messages } = await runToolLoop(model, tools, rawTools, judgeMessages, toolCtx, db as never);
+      const lastAi = [...messages].reverse().find(m => m instanceof AIMessage || m._getType() === 'ai');
+      const rawContent = lastAi ? (typeof lastAi.content === 'string' ? lastAi.content : JSON.stringify(lastAi.content)) : '{}';
+      return parseJudgeOutput(rawContent);
+    }
 
-    // Parse last AI message content as JudgeOutput.
-    const lastAi = [...messages].reverse().find(m => m instanceof AIMessage || m._getType() === 'ai');
-    const rawContent = lastAi ? (typeof lastAi.content === 'string' ? lastAi.content : JSON.stringify(lastAi.content)) : '{}';
+    let judgeResult = await runJudgeModel();
+    if (!judgeResult) {
+      logger.warn('generation judge: could not parse judge output — retrying once', { runId: state.runId, chapter: state.chapter });
+      judgeResult = await runJudgeModel();
+    }
 
-    const judgeResult = parseJudgeOutput(rawContent);
-
-    const verdict = judgeResult?.verdict ?? 'consistent';
+    const evaluationFailed = !judgeResult;
+    const verdict = judgeResult?.verdict ?? 'evaluation_failed';
     const findings = [...(judgeResult?.findings ?? [])];
-    if (!judgeResult) logger.warn('generation judge: could not parse judge output — defaulting to consistent', { runId: state.runId, chapter: state.chapter });
+    if (evaluationFailed) {
+      logger.warn('generation judge: judge output unparseable after retry — routing to human review', { runId: state.runId, chapter: state.chapter });
+      findings.push({ severity: 'hard', text: 'judge output unparseable' });
+    }
 
     // Contract violations ride the repair ladder as soft findings — they never harden the verdict.
     const compliance = renderedContract ? judgeResult?.endingCompliance : undefined;
