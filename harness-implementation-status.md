@@ -5,9 +5,9 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 
 ## Summary
 
-- Completed: 1
+- Completed: 2
 - In Progress: 0
-- Pending: 8
+- Pending: 7
 - Blocked: 0
 
 ## Tasks
@@ -15,7 +15,7 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 | ID    | Priority | Task                                                                                                          | Status    | Dependencies | Commit   |
 | ----- | -------- | ------------------------------------------------------------------------------------------------------------- | --------- | ------------ | -------- |
 | P0-01 | P0       | Fail-closed judging + judge few-shot parity                                                                   | COMPLETED | —            | e9cee48e |
-| P0-02 | P0       | Novel-validation coverage + scoped `needsRevalidation` updates                                                | PENDING   | —            | —        |
+| P0-02 | P0       | Novel-validation coverage + scoped `needsRevalidation` updates                                                | COMPLETED | —            | 8acad8ce |
 | P0-03 | P0       | Repair-ladder accounting (patch attempt budget + `sameFinding` tightening)                                    | PENDING   | —            | —        |
 | P0-04 | P0       | Generation gates: reject stale briefs, error on briefless fallback                                            | PENDING   | —            | —        |
 | P0-05 | P0       | Batch adjacency: draft-tail fallback for N+1, halt batch on non-clean outcome                                 | PENDING   | —            | —        |
@@ -43,17 +43,26 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
   green (292 pass, 356 DB-gated skip, 0 fail).
 - Commit: e9cee48e
 
-## Pending
-
 ### P0-02 — Novel-validation coverage + scoped flag updates
 
-- Depends on: —
-- Affected area: `src/modules/ai/graphs/novel-validation.graph.ts` + its report schema/DTO
-- Acceptance criteria:
-  - Failed validation windows are tracked, not swallowed; report includes `windowsRequested/succeeded/failedRanges`.
-  - `needsRevalidation` updated only for chapters inside successfully validated windows (true for error chapters, false for covered clean chapters, untouched otherwise).
-  - All-failed run reports as "0% coverage", not "no issues found".
-  - Tests per doc: failed windows reported as uncovered; flag not cleared outside covered windows; flags set by refinement preserved when a window fails.
+- What changed: `novel-validation.graph.ts` now tracks per-window success/failure explicitly
+  (`succeededWindows`/`failedWindows` state fields) instead of silently dropping failed/unparseable
+  windows. The report gained `windowsRequested`, `windowsSucceeded`, `failedRanges` (additive on the
+  existing jsonb `payload`, no migration needed); an all-failed run now summarizes as "No windows
+  could be validated this run (0/N succeeded)" instead of the misleading "No issues found."
+  `persistReport` builds a `coveredChapters` set from only `succeededWindows` and touches
+  `needsRevalidation` exclusively for chapters in that set — chapters in a failed window or outside
+  any requested window are left completely untouched, so flags set by earlier bible
+  edits/proposals/imports survive a partial/flaky run. FIN_002's read-side logic in
+  `generation.service.ts` was not changed — only the correctness of the flag it reads.
+- Tests: `tests/ai/validation-persistence.spec.ts` — 3 new Postgres-gated tests: failed windows
+  reported as uncovered; `needsRevalidation` not cleared outside covered windows; flags preserved
+  when a window fails.
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (547 pass, 10 skip, 0 fail).
+- Commit: 8acad8ce
+
+## Pending
 
 ### P0-03 — Repair-ladder accounting
 
