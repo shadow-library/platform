@@ -5,9 +5,9 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 
 ## Summary
 
-- Completed: 4
+- Completed: 5
 - In Progress: 0
-- Pending: 5
+- Pending: 4
 - Blocked: 0
 
 ## Tasks
@@ -18,7 +18,7 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 | P0-02 | P0       | Novel-validation coverage + scoped `needsRevalidation` updates                                                | COMPLETED | —            | 8acad8ce |
 | P0-03 | P0       | Repair-ladder accounting (patch attempt budget + `sameFinding` tightening)                                    | COMPLETED | —            | 0beb8aa8 |
 | P0-04 | P0       | Generation gates: reject stale briefs, error on briefless fallback                                            | COMPLETED | —            | 3415ff30 |
-| P0-05 | P0       | Batch adjacency: draft-tail fallback for N+1, halt batch on non-clean outcome                                 | PENDING   | —            | —        |
+| P0-05 | P0       | Batch adjacency: draft-tail fallback for N+1, halt batch on non-clean outcome                                 | COMPLETED | —            | 523abe4f |
 | P0-06 | P0       | Style/ending-contract constants: replace `DEFAULT_WRITING_INSTRUCTIONS`, widen `HookType`, single word target | PENDING   | —            | —        |
 | P0-07 | P0       | Chapter-context correctness: add arc section, drop duplicated brief, record budget evictions                  | PENDING   | —            | —        |
 | P0-08 | P0       | Extract-job payload mismatch fix (resolve chapter numbers server-side at enqueue)                             | PENDING   | —            | —        |
@@ -100,15 +100,32 @@ previousFindings: state.findings`, mirroring `repairRewrite`'s existing bookkeep
   green (551 pass, 10 skip, 0 fail).
 - Commit: 3415ff30
 
-## Pending
-
 ### P0-05 — Batch adjacency
 
-- Affected area: `src/modules/ai/context/context-assembler.service.ts`, `src/modules/jobs/job.executor.ts`, `src/modules/ai/graphs/workflow-run.service.ts`
-- Acceptance criteria:
-  - `forChapter`: when chapter N−1 has no canonical row, fall back to the latest draft's prose tail (same ~500-token tail) labeled `[DRAFT — not yet canon]`, alongside existing continuation state.
-  - `runGenerate` halts the batch (remaining chapters marked skipped, job `awaiting_review`) when a chapter's outcome is not clean (`accepted_with_findings` / `awaiting_review` with blocking findings) — not only on `status === 'failed'`.
-  - Tests: previous draft tail included when predecessor unfinalized; batch halts when a chapter is accepted with findings.
+- What changed: `context-assembler.service.ts`'s `forChapter` — when chapter N−1 has no canonical
+  `chapters` row (mid-batch, unfinalized), it now falls back to the latest draft's prose tail (same
+  `truncateAtParagraphTail(..., PREV_ENDING_TAIL)` slicing the canonical path already uses),
+  prefixed with `[DRAFT — not yet canon]` and tagged `tier: 'working'`, added alongside the
+  existing `continuation_state` section. If neither a canonical row nor a draft exists, no
+  `prev_ending` section is added (unchanged first-chapter behavior). `job.executor.ts`'s
+  `runGenerate` now halts the batch — logs a warning, records `{ phase: 'awaiting_review', skipped:
+[...] }` via job progress, and returns — whenever a chapter's `WorkflowRunResult.outcome !==
+'accepted'` (covers `accepted_with_findings` and `awaiting_review`, on top of the pre-existing
+  `status === 'failed'` throw). `job.service.ts` gained an optional `skipped?: number[]` field on
+  the free-form `JobProgress` type to carry the un-run chapter numbers (the `jobs.status` enum has
+  no `awaiting_review` value and extending it would be a migration — out of scope; the progress
+  snapshot is the durable signal instead, consistent with how other job kinds already use
+  `phase`).
+- Tests: `tests/ai/context-assembler.spec.ts` (draft-tail fallback included and labeled
+  provisional; no section when neither canonical nor draft exists),
+  `tests/jobs/job-executor-generate.spec.ts` (new — clean batch drafts every chapter;
+  `accepted_with_findings` and `awaiting_review` both halt and record skipped chapters; `failed`
+  still throws).
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (557 pass, 10 skip, 0 fail).
+- Commit: 523abe4f
+
+## Pending
 
 ### P0-06 — Style and ending-contract constants
 
