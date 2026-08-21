@@ -8,6 +8,8 @@
     "dev": "bun run --watch src/main.ts",
     "ai:smoke": "bun run tests/ai/ai-smoke.ts",
     "ai:pull-models": "bun run tests/ai/ai-pull-models.ts",
+    "eval:metrics": "bun run tests/eval/deterministic-metrics.ts",
+    "eval:invariants": "bun run tests/eval/process-invariants.ts",
     "test:ai:local": "bun test tests/ai/local/",
     "test:ai:unit": "bun test tests/ai/prompts.spec.ts tests/ai/model-router.spec.ts tests/ai/context-assembler.spec.ts",
     "test:ai:graph": "bun test tests/ai/workflow.spec.ts",
