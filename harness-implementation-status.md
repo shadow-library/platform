@@ -5,9 +5,9 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 
 ## Summary
 
-- Completed: 3
+- Completed: 4
 - In Progress: 0
-- Pending: 6
+- Pending: 5
 - Blocked: 0
 
 ## Tasks
@@ -17,7 +17,7 @@ Only P0 items are tracked here for now; P1/P2 will be broken down once P0 is val
 | P0-01 | P0       | Fail-closed judging + judge few-shot parity                                                                   | COMPLETED | —            | e9cee48e |
 | P0-02 | P0       | Novel-validation coverage + scoped `needsRevalidation` updates                                                | COMPLETED | —            | 8acad8ce |
 | P0-03 | P0       | Repair-ladder accounting (patch attempt budget + `sameFinding` tightening)                                    | COMPLETED | —            | 0beb8aa8 |
-| P0-04 | P0       | Generation gates: reject stale briefs, error on briefless fallback                                            | PENDING   | —            | —        |
+| P0-04 | P0       | Generation gates: reject stale briefs, error on briefless fallback                                            | COMPLETED | —            | 3415ff30 |
 | P0-05 | P0       | Batch adjacency: draft-tail fallback for N+1, halt batch on non-clean outcome                                 | PENDING   | —            | —        |
 | P0-06 | P0       | Style/ending-contract constants: replace `DEFAULT_WRITING_INSTRUCTIONS`, widen `HookType`, single word target | PENDING   | —            | —        |
 | P0-07 | P0       | Chapter-context correctness: add arc section, drop duplicated brief, record budget evictions                  | PENDING   | —            | —        |
@@ -82,15 +82,25 @@ previousFindings: state.findings`, mirroring `repairRewrite`'s existing bookkeep
   green (549 pass, 10 skip, 0 fail).
 - Commit: 0beb8aa8
 
-## Pending
-
 ### P0-04 — Generation gates: staleness + briefless
 
-- Affected area: `src/modules/generation/generation.service.ts`, `src/classes/app-error-code.ts`
-- Acceptance criteria:
-  - `generate()` excludes briefs with `staleReason` set and fails with a new named error code identifying them.
-  - Briefless fallback path (silently drafting `[approvedVolumes[0]?.startChapter ?? 1]`) replaced with an explicit error instructing the caller to outline first.
-  - Tests: rejects generation for stale briefs; errors instead of drafting without a brief.
+- What changed: `generation.service.ts`'s `generate()` no longer silently falls back to drafting
+  `[approvedVolumes[0]?.startChapter ?? 1]` when no briefs exist — it now throws `BRF_001` ("No
+  brief exists for the requested chapter(s) — outline the plan before generating"). It also gates
+  on `briefs.staleReason`: any requested chapter whose brief has a non-null `staleReason` now
+  throws `BRF_002` ("Brief is stale for chapter(s) {chapters} — refresh the outline or clear
+  staleness before generating"), naming the offending chapter numbers via the existing
+  `{placeholder}` interpolation in `ErrorCode.create()`. Both are new `badRequest` codes in a
+  "Brief Errors" group in `app-error-code.ts`. No other `generate()` logic (arc-approval gate, job
+  dedup, contradiction guard, enqueue/dispatch) was touched.
+- Tests: `tests/bible/arc.spec.ts` — 2 new tests reusing the file's existing template-DB
+  `GenerationService` fixture: rejects generation for stale briefs (`BRF_002`); errors instead of
+  drafting without a brief (`BRF_001`).
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (551 pass, 10 skip, 0 fail).
+- Commit: 3415ff30
+
+## Pending
 
 ### P0-05 — Batch adjacency
 
