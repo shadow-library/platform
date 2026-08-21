@@ -33,12 +33,20 @@ interface WindowSpec {
   to: number;
 }
 
+export interface NovelValidationReport extends ValidationOutput {
+  windowsRequested: number;
+  windowsSucceeded: number;
+  failedRanges: WindowSpec[];
+}
+
 const NovelValidationAnnotation = Annotation.Root({
   projectId: Annotation<string>({ reducer: (_, n) => n, default: () => '0' }),
   runId: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   windows: Annotation<WindowSpec[]>({ reducer: (_, n) => n, default: () => [] }),
   windowFindings: Annotation<ValidationOutput[]>({ reducer: (_, n) => n, default: () => [] }),
-  report: Annotation<unknown>({ reducer: (_, n) => n, default: () => null }),
+  succeededWindows: Annotation<WindowSpec[]>({ reducer: (_, n) => n, default: () => [] }),
+  failedWindows: Annotation<WindowSpec[]>({ reducer: (_, n) => n, default: () => [] }),
+  report: Annotation<NovelValidationReport | null>({ reducer: (_, n) => n, default: () => null }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
 });
 
@@ -125,6 +133,8 @@ export function createNovelValidationGraph(services: ValidationServices) {
   async function validateWindows(state: ValidationState) {
     const projectId = BigInt(state.projectId);
     const allFindings: ValidationOutput[] = [];
+    const succeededWindows: WindowSpec[] = [];
+    const failedWindows: WindowSpec[] = [];
 
     for (const window of state.windows) {
       try {
@@ -154,13 +164,16 @@ export function createNovelValidationGraph(services: ValidationServices) {
         const lastAi = [...messages].reverse().find(m => m instanceof AIMessage || m._getType() === 'ai');
         const rawContent = lastAi ? (typeof lastAi.content === 'string' ? lastAi.content : JSON.stringify(lastAi.content)) : '{}';
         const findings = tryParseValidation(rawContent);
-        if (findings) allFindings.push(findings);
+        if (!findings) throw new Error(`unable to parse validation output for window ${window.from}-${window.to}`);
+        allFindings.push(findings);
+        succeededWindows.push(window);
       } catch (err) {
         logger.warn('validateWindows: window failed (non-fatal)', { err, window });
+        failedWindows.push(window);
       }
     }
 
-    return { windowFindings: allFindings };
+    return { windowFindings: allFindings, succeededWindows, failedWindows };
   }
 
   async function mergeFindings(state: ValidationState) {
@@ -179,16 +192,22 @@ export function createNovelValidationGraph(services: ValidationServices) {
 
     deduplicated.sort((a, b) => (a.severity === 'error' && b.severity !== 'error' ? -1 : b.severity === 'error' && a.severity !== 'error' ? 1 : 0));
 
+    const windowsRequested = state.windows.length;
+    const windowsSucceeded = state.succeededWindows.length;
+    const failedRanges = state.failedWindows.map(w => ({ from: w.from, to: w.to }));
+
     const summary =
       state.windowFindings
         .map(wf => wf.summary)
         .filter(Boolean)
-        .join(' | ') || 'No issues found.';
-    const report: ValidationOutput = { issues: deduplicated, summary };
+        .join(' | ') || (windowsRequested > 0 && windowsSucceeded === 0 ? `No windows could be validated this run (0/${windowsRequested} succeeded).` : 'No issues found.');
+    const report: NovelValidationReport = { issues: deduplicated, summary, windowsRequested, windowsSucceeded, failedRanges };
 
     logger.debug('validation mergeFindings', {
       runId: state.runId,
-      windows: state.windowFindings.length,
+      windowsRequested,
+      windowsSucceeded,
+      failedRanges: failedRanges.length,
       issues: deduplicated.length,
       errors: deduplicated.filter(i => i.severity === 'error').length,
     });
@@ -197,25 +216,41 @@ export function createNovelValidationGraph(services: ValidationServices) {
 
   async function persistReport(state: ValidationState) {
     const projectId = BigInt(state.projectId);
-    const report = state.report as ValidationOutput | null;
+    const report = state.report;
     const issues = report?.issues ?? [];
 
-    logger.info('validation persistReport', { runId: state.runId, issues: issues.length });
+    logger.info('validation persistReport', {
+      runId: state.runId,
+      issues: issues.length,
+      windowsRequested: report?.windowsRequested ?? 0,
+      windowsSucceeded: report?.windowsSucceeded ?? 0,
+    });
 
     // Durably record the report — the run outcome alone is not queryable canon.
-    await db
-      .insert(schema.validationReports)
-      .values({ projectId, scope: 'novel', chapter: null, issues: issues.length, summary: report?.summary ?? null, payload: (report ?? { issues: [], summary: '' }) as never });
+    await db.insert(schema.validationReports).values({
+      projectId,
+      scope: 'novel',
+      chapter: null,
+      issues: issues.length,
+      summary: report?.summary ?? null,
+      payload: (report ?? { issues: [], summary: '', windowsRequested: 0, windowsSucceeded: 0, failedRanges: [] }) as never,
+    });
 
-    // Validation is the authority on freshness: a finalized chapter with an unresolved error is flagged
-    // for re-validation; every other finalized chapter is marked clean.
-    const errorChapters = new Set(issues.filter(i => i.severity === 'error' && typeof i.chapter === 'number').map(i => i.chapter));
-    const finalized = await db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')), columns: { number: true } });
-    for (const ch of finalized) {
-      await db
-        .update(schema.chapters)
-        .set({ needsRevalidation: errorChapters.has(ch.number), updatedAt: new Date() })
-        .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, ch.number)));
+    // Only chapters inside a window that was actually, successfully validated this run may have
+    // needsRevalidation touched — a failed or unrequested window must leave an earlier flag alone.
+    const coveredChapters = new Set<number>();
+    for (const w of state.succeededWindows) for (let n = w.from; n <= w.to; n++) coveredChapters.add(n);
+
+    if (coveredChapters.size > 0) {
+      const errorChapters = new Set(issues.filter(i => i.severity === 'error' && typeof i.chapter === 'number').map(i => i.chapter));
+      const finalized = await db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')), columns: { number: true } });
+      for (const ch of finalized) {
+        if (!coveredChapters.has(ch.number)) continue;
+        await db
+          .update(schema.chapters)
+          .set({ needsRevalidation: errorChapters.has(ch.number), updatedAt: new Date() })
+          .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, ch.number)));
+      }
     }
 
     return { outcome: JSON.stringify(state.report) };
