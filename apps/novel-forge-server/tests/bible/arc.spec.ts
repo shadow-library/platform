@@ -4,6 +4,8 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AppError } from '@shadow-library/common';
 
+import { CatalogService } from '@modules/ai/context/catalog.service';
+import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { ArcService } from '@modules/bible/arc/arc.service';
 import { VolumeService } from '@modules/bible/volume/volume.service';
 import { GenerationService } from '@modules/generation/generation.service';
@@ -139,11 +141,13 @@ describe.if(pgAvailable)('arc module & gates', () => {
     const contract = { hookType: 'cliffhanger', emotionalBeat: 'dread', openQuestion: 'who?', handoffState: 'cornered' };
     const brief = (chapter: number) => ({ chapter, volumeKey: 'v1', title: `Ch ${chapter}`, objective: 'obj', events: ['e'], requiredContext: [], endingContract: contract });
     const structured = mock(async () => [brief(1), brief(2), brief(3), brief(99)]);
+    const databaseService = { getPostgresClient: () => db } as never;
+    const contextAssembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
     const outliner = new GenerationService(
-      { getPostgresClient: () => db } as never,
+      databaseService,
       {} as never,
       { structured } as never,
-      { catalog: async () => 'CATALOG' } as never,
+      contextAssembler,
       {} as never,
       {} as never,
       {} as never,
@@ -167,6 +171,45 @@ describe.if(pgAvailable)('arc module & gates', () => {
     const input = structured.mock.calls.at(-1)?.[1 as never] as unknown as Record<string, unknown>;
     expect(String(input['volumePlan'])).toContain('war horns');
     expect(String(input['volumePlan'])).toContain('Next arc intent');
+
+    // The outliner also carries the forOutline-assembled pack (volume objective + catalog) into `catalog`.
+    expect(String(input['catalog'])).toContain('survive');
+  });
+
+  it('carries recent finalized-chapter summaries from forOutline into the arc outline call', async () => {
+    const projectId = await createProject();
+    await db.insert(schema.volumes).values({ projectId, volumeKey: 'v1', ordinal: 1, targetChapterCount: 5, objective: 'survive' });
+    await volumeService.approve(projectId);
+    await arcService.upsert(projectId, 'v1_a0', { volumeKey: 'v1', ordinal: 0, chapterStart: 1, chapterEnd: 1 });
+    await arcService.upsert(projectId, 'v1_a1', { volumeKey: 'v1', ordinal: 1, chapterStart: 2, chapterEnd: 3 });
+    await arcService.upsert(projectId, 'v1_a2', { volumeKey: 'v1', ordinal: 2, chapterStart: 4, chapterEnd: 5 });
+    await arcService.approve(projectId, 'v1');
+    await db.insert(schema.chapters).values({ projectId, number: 1, title: 'Ch 1', status: 'done', summary: 'the beacon was lit at dusk' });
+
+    const contract = { hookType: 'cliffhanger', emotionalBeat: 'dread', openQuestion: 'who?', handoffState: 'cornered' };
+    const brief = (chapter: number) => ({ chapter, volumeKey: 'v1', title: `Ch ${chapter}`, objective: 'obj', events: ['e'], requiredContext: [], endingContract: contract });
+    const structured = mock(async () => [brief(2), brief(3)]);
+    const databaseService = { getPostgresClient: () => db } as never;
+    const contextAssembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
+    const outliner = new GenerationService(
+      databaseService,
+      {} as never,
+      { structured } as never,
+      contextAssembler,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await outliner.outlineArc(projectId, 'v1_a1', {});
+
+    const input = structured.mock.calls.at(-1)?.[1 as never] as unknown as Record<string, unknown>;
+    expect(String(input['catalog'])).toContain('the beacon was lit at dusk');
   });
 
   it('gates generation on arc approval only for volumes that have arcs (arc-less volumes keep the volume-scoped path)', async () => {

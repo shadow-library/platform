@@ -104,6 +104,13 @@ export interface JobEnqueueResult {
 
 const PLAN_BIBLE_DOC_TOKEN_CAP = 1_500;
 
+/**
+ * Whole-book `outline()` is the legacy planning path — arc-scoped `outlineArc` (gated on approved
+ * arcs) is the intended production path per the planning hierarchy. This cap keeps an omitted or
+ * oversized `count` from silently planning the entire unwritten novel in one model call.
+ */
+export const MAX_WHOLE_BOOK_OUTLINE_SPAN = 25;
+
 @Injectable()
 export class GenerationService {
   private readonly logger = Logger.getLogger(APP_NAME, GenerationService.name);
@@ -224,7 +231,11 @@ export class GenerationService {
     ]);
 
     const start = body.start ?? 1;
-    const count = body.count ?? volumes.reduce((acc, v) => acc + ((v.endChapter ?? 0) - (v.startChapter ?? 0) + 1), 0);
+    const requestedCount = body.count ?? volumes.reduce((acc, v) => acc + ((v.endChapter ?? 0) - (v.startChapter ?? 0) + 1), 0);
+    const count = Math.min(requestedCount, MAX_WHOLE_BOOK_OUTLINE_SPAN);
+    if (requestedCount > MAX_WHOLE_BOOK_OUTLINE_SPAN) {
+      this.logger.warn('outline: requested span exceeds the whole-book outline cap — clamping', { projectId, requestedCount, cap: MAX_WHOLE_BOOK_OUTLINE_SPAN });
+    }
     const end = start + count - 1;
 
     const relevantVolumes = volumes.filter(v => v.startChapter !== null && v.endChapter !== null && v.endChapter >= start && v.startChapter <= end);
@@ -298,9 +309,8 @@ export class GenerationService {
     if (!arc) throw AppErrorCode.ARC_001.create();
     if (arc.chapterStart === null || arc.chapterEnd === null) throw AppErrorCode.ARC_002.create();
 
-    const [catalog, volume, siblings, project] = await Promise.all([
-      this.contextAssembler.catalog(projectId),
-      this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, arc.volumeKey)) }),
+    const [contextPack, siblings, project] = await Promise.all([
+      this.contextAssembler.forOutline(projectId, arc.chapterStart),
       this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.volumeKey, arc.volumeKey)), orderBy: asc(schema.arcs.ordinal) }),
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
@@ -308,9 +318,11 @@ export class GenerationService {
     this.logger.info('outlineArc: generating briefs for arc', { projectId, arcKey, chapterStart: arc.chapterStart, chapterEnd: arc.chapterEnd });
 
     const nextArc = siblings.find(a => a.ordinal > arc.ordinal);
+    const catalog = contextPack.rendered;
+    // The volume objective/conflict/payoff is already covered by forOutline's `volume_objective`
+    // section above, so it is deliberately left out of this arc-specific block to avoid duplication.
     const volumePlan = [
       `## Arc: ${arc.title ?? arc.arcKey} (${arc.arcKey})\nChs ${arc.chapterStart}–${arc.chapterEnd}\nObjective: ${arc.objective ?? ''}\nEscalation: ${arc.escalation ?? ''}\nPayoff: ${arc.payoff ?? ''}\nArc hook (the final chapter's handoff): ${arc.hook ?? ''}`,
-      volume ? `## Volume: ${volume.title ?? volume.volumeKey}\nObjective: ${volume.objective ?? ''}\nConflict: ${volume.conflict ?? ''}\nPayoff: ${volume.payoff ?? ''}` : '',
       nextArc ? `## Next arc intent (contracts must chain into it): ${nextArc.objective ?? ''} (opens at ch ${nextArc.chapterStart ?? '?'})` : '',
       arc.body ? `## Arc material\n${arc.body}` : '',
     ]

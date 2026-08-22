@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
-import { GenerationService } from '@modules/generation/generation.service';
+import { GenerationService, MAX_WHOLE_BOOK_OUTLINE_SPAN } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -47,13 +47,13 @@ describe.if(pgAvailable)('outline invariant enforcement', () => {
 
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
-  async function createApprovedVolume(): Promise<bigint> {
+  async function createApprovedVolume(endChapter = 3): Promise<bigint> {
     const [project] = await db
       .insert(schema.projects)
       .values({ name: `outline-${Date.now()}-${Math.random()}`, kind: 'new_novel' })
       .returning();
     if (!project) throw new Error('failed to seed project');
-    await db.insert(schema.volumes).values({ projectId: project.id, volumeKey: 'v1', ordinal: 1, status: 'approved', startChapter: 1, endChapter: 3 });
+    await db.insert(schema.volumes).values({ projectId: project.id, volumeKey: 'v1', ordinal: 1, status: 'approved', startChapter: 1, endChapter });
     return project.id;
   }
 
@@ -69,6 +69,18 @@ describe.if(pgAvailable)('outline invariant enforcement', () => {
     } as never;
     const noop = {} as never;
     return new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop);
+  }
+
+  function buildSpanService(): { service: GenerationService; structured: ReturnType<typeof mock> } {
+    const databaseService = { getPostgresClient: () => db } as never;
+    const structured = mock(async (_prompt: unknown, vars: { startChapter: number; endChapter: number }) =>
+      Array.from({ length: vars.endChapter - vars.startChapter + 1 }, (_, i) => brief(vars.startChapter + i, [])),
+    );
+    const modelRouter = { structured } as never;
+    const contextAssembler = { catalog: async () => 'CATALOG', resolveRefs: async (_projectId: bigint, refs: string[]) => ({ resolved: [], unresolved: refs }) } as never;
+    const noop = {} as never;
+    const service = new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop);
+    return { service, structured };
   }
 
   it('drops refs missing from the catalog without failing the outline call', async () => {
@@ -105,5 +117,35 @@ describe.if(pgAvailable)('outline invariant enforcement', () => {
     const broken = [brief(1, [], { continuesIntoNextChapter: true }), brief(2, [])];
     const errors = prompt.postValidate?.(broken as never) ?? [];
     expect(errors.some(e => e.includes('chapter 1 sets continuesIntoNextChapter'))).toBe(true);
+  });
+
+  it('clamps a no-count whole-book outline to MAX_WHOLE_BOOK_OUTLINE_SPAN when the volumes sum to more', async () => {
+    const projectId = await createApprovedVolume(MAX_WHOLE_BOOK_OUTLINE_SPAN + 20);
+    const { service, structured } = buildSpanService();
+
+    await service.outline(projectId, {});
+
+    const vars = structured.mock.calls.at(-1)?.[1] as { startChapter: number; endChapter: number };
+    expect(vars.endChapter - vars.startChapter + 1).toBe(MAX_WHOLE_BOOK_OUTLINE_SPAN);
+  });
+
+  it('clamps an explicit count larger than MAX_WHOLE_BOOK_OUTLINE_SPAN the same way', async () => {
+    const projectId = await createApprovedVolume(MAX_WHOLE_BOOK_OUTLINE_SPAN + 20);
+    const { service, structured } = buildSpanService();
+
+    await service.outline(projectId, { count: MAX_WHOLE_BOOK_OUTLINE_SPAN + 50 });
+
+    const vars = structured.mock.calls.at(-1)?.[1] as { startChapter: number; endChapter: number };
+    expect(vars.endChapter - vars.startChapter + 1).toBe(MAX_WHOLE_BOOK_OUTLINE_SPAN);
+  });
+
+  it('leaves a small whole-book outline (well under the cap) unaffected', async () => {
+    const projectId = await createApprovedVolume(3);
+    const { service, structured } = buildSpanService();
+
+    await service.outline(projectId, {});
+
+    const vars = structured.mock.calls.at(-1)?.[1] as { startChapter: number; endChapter: number };
+    expect(vars).toMatchObject({ startChapter: 1, endChapter: 3 });
   });
 });
