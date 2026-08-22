@@ -19,10 +19,15 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 14
+- Completed: 15
 - In Progress: 0
-- Pending: 1
+- Pending: 0
 - Blocked: 0
+
+All fifteen P1 items from `harness-final-recommendation.md` §11 are complete. Per §14/§15, a
+P0-vs-candidate evaluation run through Track 1–3 (blind human paired comparison, deterministic
+metrics, process invariants) should happen next to confirm no regression before any further work
+builds on this baseline.
 
 ## P1 Tasks
 
@@ -46,7 +51,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | P1-12 | P1       | Outliner authors `knowledgeContract`; persist `pov`; wire mystery `truthFactKey`                                                    | COMPLETED | —                                           |
 | P1-13 | P1       | Prompt-cache the generation path: `asStable` sections, `cacheStrategy`, fix rebrand/reforge stable-var bug                          | COMPLETED | —                                           |
 | P1-14 | P1       | Deterministic draft checks as a graph node before `judge` (word bounds, duplicated paragraphs, n-grams, cliché counts, tag density) | COMPLETED | — (may reuse eval Track 2 metric functions) |
-| P1-15 | P1       | Judge gains a brief-fulfillment category (D33's accepted half)                                                                      | PENDING   | —                                           |
+| P1-15 | P1       | Judge gains a brief-fulfillment category (D33's accepted half)                                                                      | COMPLETED | —                                           |
 
 ### P1-01 — Bible-builder characters stage: full entity `body` + initial `canon_facts`
 
@@ -695,6 +700,47 @@ prior finished chapter's content).
     model output.
   - Keeps the 4-anchored-category design (canon, ending, knowledge, now brief-fulfillment) — no
     9-dimension evaluator, per the recommendation doc's explicit rejection of that report proposal.
+
+**What changed:**
+
+- `JudgeSchema` gains a new optional `briefCompliance?: BriefComplianceSchema` field
+  (`{ compliant: boolean; issues: string[] }`), mirroring `EndingComplianceSchema`'s exact shape and
+  decorator idiom. Kept optional for the same fail-open convention as the other two anchored
+  categories, even though brief-fulfillment is evaluated unconditionally (every chapter has a brief,
+  unlike the conditional ending-contract/forbidden-knowledge categories).
+- The judge node already fetched the chapter's brief (for ending/knowledge context) but never passed
+  its text to the model — `brief?.body` (the outliner's flattened objective+events prose) now reaches
+  the judge's human message via a new, unconditional `## BRIEF` block, alongside the existing
+  conditional `## ENDING CONTRACT`/`## FORBIDDEN KNOWLEDGE` blocks. The judge briefs table has no
+  separate `objective`/`events` columns — `renderBriefBody` already flattens them into `body` at
+  persist time, so the judge compares prose against that flattened text, not structured fields.
+- `judge.prompt.ts` (bumped `2.2.0` → `2.3.0`) gained an unconditional brief-fulfillment instruction
+  distinguishing genuine delivery from filler (skipped, deferred, summarized-away, or silently
+  replaced planned events) — "judge delivery, not wording." A new few-shot demonstrates a
+  canon-clean, contradiction-free chapter that still cuts away from its planned events, so the
+  "always emit briefCompliance" instruction has a concrete shape signal alongside the existing
+  ending/knowledge examples.
+- `routeAfterJudge` gains `briefCompliant` as a fifth required condition for the `accept` transition,
+  extending the exact pattern already used for `endingCompliant`/`knowledgeCompliant`/
+  `mechanicallyCompliant` (same `!== false` fail-open default, same soft-severity `brief:`-prefixed
+  findings merged into `judgeNote`, same repair-ladder routing on a non-compliant result) — a hard
+  brief-fulfillment gap now forces the patch ladder even when the judge's continuity verdict is
+  `consistent`.
+- Few-shots and the `evaluation_failed` verdict were already fully wired from earlier work (R-track
+  and P0) — confirmed, not touched.
+
+**Tests:** `tests/ai/brief-fulfillment-graph.spec.ts` (new, 5 real-Postgres graph tests) — an
+unfulfilled brief blocks `accept` despite a `consistent` verdict; routes into the repair ladder with
+`autoFix` on; a fulfilled brief still reaches `accept`; fails open (accepts) when the judge omits
+`briefCompliance` entirely; the brief body and a `## BRIEF` heading are confirmed present in what the
+judge model actually receives. `tests/ai/workflow.spec.ts` (two new `routeAfterJudge` unit cases),
+`tests/ai/prompts.spec.ts` (judge v2.3 prompt-structure and schema-optionality assertions).
+
+**Validation:** `bun scripts/verify.ts apps/novel-forge-server` — 716 pass, 0 fail, 10 skip.
+
+**Commit:** `8938c4c2`
+
+This closes out all 15 P1 tasks from `harness-final-recommendation.md` §11.
 
 ## Tasks
 
