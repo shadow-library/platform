@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 11
+- Completed: 12
 - In Progress: 0
-- Pending: 4
+- Pending: 3
 - Blocked: 0
 
 ## P1 Tasks
@@ -43,7 +43,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | P1-09 | P1       | Route `outlineArc` through `forOutline()`; deprecate/cap whole-book `outline()`                                                     | COMPLETED | —                                           |
 | P1-10 | P1       | Reconciliation trigger every k finalized chapters (default 5, configurable) or on staleness                                         | COMPLETED | P1-09                                       |
 | P1-11 | P1       | Volume-completion epitome write (or explicitly drop the `volumes.epitome` column)                                                   | COMPLETED | —                                           |
-| P1-12 | P1       | Outliner authors `knowledgeContract`; persist `pov`; wire mystery `truthFactKey`                                                    | PENDING   | —                                           |
+| P1-12 | P1       | Outliner authors `knowledgeContract`; persist `pov`; wire mystery `truthFactKey`                                                    | COMPLETED | —                                           |
 | P1-13 | P1       | Prompt-cache the generation path: `asStable` sections, `cacheStrategy`, fix rebrand/reforge stable-var bug                          | PENDING   | —                                           |
 | P1-14 | P1       | Deterministic draft checks as a graph node before `judge` (word bounds, duplicated paragraphs, n-grams, cliché counts, tag density) | PENDING   | — (may reuse eval Track 2 metric functions) |
 | P1-15 | P1       | Judge gains a brief-fulfillment category (D33's accepted half)                                                                      | PENDING   | —                                           |
@@ -503,6 +503,54 @@ gracefully with no chapter summaries in range; `finalize()` survives a model-cal
   - Mystery `truthFactKey` wired: a mystery's truth is a `canon_facts` row key, never duplicated
     prose — one epistemic authority, matching the recommendation doc's correction to the original
     report (hiddenness is derived per-chapter, not a `source` column).
+
+**What changed:**
+
+- `briefs.pov` (nullable varchar, new column) and `mysteries.truthFactKey` (nullable varchar, no FK —
+  matches the loose entity/fact-key convention used everywhere else in this schema) added via
+  migration `0008_curly_zemo.sql`.
+- `ChapterBriefSchema` gains an optional `knowledgeContract` field reusing the existing
+  `KnowledgeContractSchema` shape verbatim (`pov: string[]`, `learns: {entityKey, factKey}[]`) so
+  `parseKnowledgeContract`/CK3/CK4 accept it unchanged. `ChapterBriefSchema.pov` (singular narrator
+  entityKey) and `knowledgeContract.pov` (the array of entities whose ledgered knowledge bounds the
+  chapter) are kept as two distinct, already-coexisting concepts — not merged.
+- `CatalogService.render()` gained a CANON FACTS section listing every `canon_facts` row for the
+  project, including still-hidden ones, so the outliner can pick a real `factKey` instead of
+  inventing one and can decide _when_ a hidden truth should surface. Safe specifically because this
+  catalog reaches only planning contexts (`forOutline`, `forChatTurn`, `forArcPlanning`) —
+  `ContextAssembler.forChapter`, the prose-writing pack, never calls `CatalogService.render`, so a
+  still-hidden fact's text never reaches chapter generation. A dedicated test pins this boundary.
+- `outline.prompt.ts` (bumped `2.1.0` → `2.2.0`) instructs the model to author `knowledgeContract`
+  only when a chapter's events reveal something the catalog still marks unrevealed, using only
+  factKeys that appear verbatim in the catalog.
+- `GenerationService.outline()` and `outlineArc()` both now persist `pov` and `knowledgeContract`
+  from the model's output (previously both fields were silently dropped at persist time in both
+  paths). `outlineArc`'s new fields flow through the same `protectedBriefsInRange` guard from P1-10,
+  so a hand-edited or already-finalized chapter's `pov`/`knowledgeContract` still cannot be clobbered
+  by a re-outline.
+- Mystery `truthFactKey` is wired through continuity-extraction, not the outline schema — mysteries
+  are only ever authored there (`ContinuityMystery` → `applyContinuityDelta`'s upsert), never touched
+  by the outline model. Added `truthFactKey?: string` to `ContinuityMystery`, applied via the same
+  non-destructive `COALESCE(EXCLUDED.truth_fact_key, mysteries.truth_fact_key)` pattern already used
+  for `question`, so an extraction that omits it never nulls out a previously-recorded truth.
+- Deliberately not added: `pov` to `BRIEF_HASH_FIELDS` (`src/common/content-hash.ts`) — no in-scope
+  path lets a human edit `pov` directly today, so it cannot drift unnoticed; adding it now would
+  change every existing brief's content hash for no behavioral benefit. Flagged for whoever adds
+  `pov` to `updateBrief`/`brief.update` next.
+
+**Tests:** `tests/generation/knowledge-contract.spec.ts` (new, 8 cases) — arc-scoped and whole-book
+persistence of `pov`/`knowledgeContract`; both left null when the model omits them; hand-edited-brief
+protection extends to the new fields; a persisted contract round-trips through
+`parseKnowledgeContract`; CANON FACTS catalog rendering (revealed and hidden); the safety boundary —
+`forChapter`'s rendered pack contains neither the CANON FACTS header nor hidden fact text;
+`truthFactKey` persistence and non-destructive merge through `applyContinuityDelta`.
+`tests/ai/prompts.spec.ts` — outline v2.2 prompt-text assertions, schema round-trip (contract
+optional, `pov: []` rejected via existing `minItems: 1`), `ContinuityMystery.truthFactKey`
+optionality.
+
+**Validation:** `bun scripts/verify.ts apps/novel-forge-server` — 681 pass, 0 fail, 10 skip.
+
+**Commit:** `26c6b338`
 
 ### P1-13 — Prompt caching for generation
 
