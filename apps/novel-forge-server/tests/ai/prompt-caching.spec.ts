@@ -1,6 +1,7 @@
 import { describe, expect, it, mock } from 'bun:test';
 
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { convertMessagesToCompletionsMessageParams } from '@langchain/openai';
 
 import { countTokens } from '@modules/ai/context/token-budget';
 import { ModelRouterService } from '@modules/ai/model-router.service';
@@ -88,6 +89,22 @@ describe('ModelRouterService cacheStrategy integration', () => {
     expect(messages.every(m => typeof m.content === 'string')).toBe(true);
     expect(messages[0]?.getType()).toBe('system');
     expect(String(messages[1]?.content)).toContain(bigText.slice(0, 40));
+  });
+});
+
+// The breakpoints are only worth anything if they survive the hop to OpenRouter's OpenAI-compatible
+// chat-completions endpoint. @langchain/openai passes non-multimodal content parts through verbatim,
+// which is what carries `cache_control` onto the wire in the shape OpenRouter forwards to Anthropic.
+describe('cache_control wire shape through ChatOpenAI', () => {
+  it('survives the completions-params conversion as a text part carrying cache_control', () => {
+    const messages = [new SystemMessage(bigText), new HumanMessage(bigText), new HumanMessage(smallText)];
+    applyAnthropicCacheControl(messages);
+
+    const params = convertMessagesToCompletionsMessageParams({ messages, model: 'anthropic/claude-sonnet-5' });
+
+    expect(params[0]?.content).toEqual([{ type: 'text', text: bigText, cache_control: { type: 'ephemeral' } }]);
+    expect(params[1]?.content).toEqual([{ type: 'text', text: bigText, cache_control: { type: 'ephemeral' } }]);
+    expect(params[2]?.content).toBe(smallText);
   });
 });
 

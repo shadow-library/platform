@@ -102,15 +102,24 @@ export class TelemetryHandler extends BaseCallbackHandler {
     // LangChain normalises them onto the message's `usage_metadata`; Ollama reports raw `*_eval_count`
     // on the generation info. Fall through all three so local runs report real token usage too.
     const meta = generation as
-      { message?: { usage_metadata?: { input_tokens?: number; output_tokens?: number } }; generationInfo?: { prompt_eval_count?: number; eval_count?: number } } | undefined;
+      | {
+          message?: { usage_metadata?: { input_tokens?: number; output_tokens?: number; input_token_details?: { cache_read?: number } } };
+          generationInfo?: { prompt_eval_count?: number; eval_count?: number };
+        }
+      | undefined;
     // When no layer reports usage, fall back to tokenizer estimates so the run detail and usage
     // dashboards never show blank counts.
     const inputTokens: number =
       usage?.input_tokens ?? usage?.prompt_tokens ?? meta?.message?.usage_metadata?.input_tokens ?? meta?.generationInfo?.prompt_eval_count ?? call.promptTokensEstimate;
     const outputTokens: number =
       usage?.output_tokens ?? usage?.completion_tokens ?? meta?.message?.usage_metadata?.output_tokens ?? meta?.generationInfo?.eval_count ?? countTokens(rawOutput);
+    // OpenRouter reports cache reads as `usage.prompt_tokens_details.cached_tokens`, which
+    // @langchain/openai normalises onto `usage_metadata.input_token_details.cache_read`. This is the
+    // only signal that the injected Anthropic cache_control breakpoints are actually being hit.
+    const cachedInputTokens: number | null =
+      meta?.message?.usage_metadata?.input_token_details?.cache_read ?? usage?.prompt_tokens_details?.cached_tokens ?? usage?.cached_tokens ?? null;
 
-    this.logger.debug('LLM call completed', { runId, role: call.ctx.role, model: call.model, latencyMs, inputTokens, outputTokens, attempt: call.attempt });
+    this.logger.debug('LLM call completed', { runId, role: call.ctx.role, model: call.model, latencyMs, inputTokens, cachedInputTokens, outputTokens, attempt: call.attempt });
 
     try {
       await this.db.insert(schema.modelCalls).values({
@@ -124,6 +133,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
         promptVersion: call.ctx.promptVersion,
         status: 'ok',
         inputTokens: inputTokens ?? null,
+        cachedInputTokens,
         outputTokens: outputTokens ?? null,
         latencyMs,
         attempt: call.attempt,

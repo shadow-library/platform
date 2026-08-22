@@ -90,6 +90,7 @@ export const modelCalls = pgTable(
     promptVersion: varchar('prompt_version').notNull(),
     status: modelCallStatus('status').notNull(),
     inputTokens: integer('input_tokens'),
+    cachedInputTokens: integer('cached_input_tokens'),
     outputTokens: integer('output_tokens'),
     latencyMs: integer('latency_ms'),
     costUsd: numeric('cost_usd', { precision: 12, scale: 6 }),

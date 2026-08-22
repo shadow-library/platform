@@ -135,5 +135,69 @@ describe.if(pgAvailable)('TelemetryHandler attribution via metadata', () => {
     expect(row?.node).toBe('judge');
     expect(row?.role).toBe('judge');
     expect(row?.inputTokens).toBe(5);
+    expect(row?.cachedInputTokens).toBeNull();
+  });
+
+  it('records OpenRouter cache reads from the normalised usage_metadata', async () => {
+    const [project] = await db
+      .insert(schema.projects)
+      .values({ name: `telemetry-cached-${Date.now()}`, kind: 'new_novel' })
+      .returning();
+    if (!project) throw new Error('failed to seed project');
+
+    const handler = new TelemetryHandler({ getPostgresClient: () => db } as never);
+    const runId = 'lc-run-2';
+    const metadata = {
+      nfTelemetry: {
+        projectId: String(project.id),
+        runId: 'wf-run-10',
+        node: 'judge',
+        promptKey: 'judge',
+        promptVersion: '1.0.0',
+        role: 'judge',
+        provider: 'openrouter',
+        model: 'anthropic/claude-sonnet-5',
+        attempt: 0,
+      },
+    };
+
+    await handler.handleLLMStart({} as never, [], runId, undefined, undefined, undefined, metadata);
+    await handler.handleLLMEnd(
+      { generations: [[{ text: '{}', message: { usage_metadata: { input_tokens: 40, output_tokens: 9, input_token_details: { cache_read: 32 } } } }]], llmOutput: {} } as never,
+      runId,
+    );
+
+    const row = await db.query.modelCalls.findFirst({ where: eq(schema.modelCalls.projectId, project.id) });
+    expect(row?.inputTokens).toBe(40);
+    expect(row?.cachedInputTokens).toBe(32);
+  });
+
+  it('falls back to the raw OpenAI-compatible prompt_tokens_details shape', async () => {
+    const [project] = await db
+      .insert(schema.projects)
+      .values({ name: `telemetry-raw-${Date.now()}`, kind: 'new_novel' })
+      .returning();
+    if (!project) throw new Error('failed to seed project');
+
+    const handler = new TelemetryHandler({ getPostgresClient: () => db } as never);
+    const runId = 'lc-run-3';
+    await handler.handleLLMStart({} as never, [], runId, undefined, undefined, undefined, {
+      nfTelemetry: {
+        projectId: String(project.id),
+        promptKey: 'judge',
+        promptVersion: '1.0.0',
+        role: 'judge',
+        provider: 'openrouter',
+        model: 'anthropic/claude-sonnet-5',
+        attempt: 0,
+      },
+    });
+    await handler.handleLLMEnd(
+      { generations: [[{ text: '{}' }]], llmOutput: { usage: { prompt_tokens: 60, completion_tokens: 4, prompt_tokens_details: { cached_tokens: 48 } } } } as never,
+      runId,
+    );
+
+    const row = await db.query.modelCalls.findFirst({ where: eq(schema.modelCalls.projectId, project.id) });
+    expect(row?.cachedInputTokens).toBe(48);
   });
 });
