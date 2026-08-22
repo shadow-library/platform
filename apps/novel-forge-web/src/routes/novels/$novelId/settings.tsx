@@ -80,9 +80,8 @@ const ROLE_GROUPS: RoleGroup[] = [
 const ALL_ROLES = ROLE_GROUPS.flatMap(g => g.roles);
 
 const PROVIDER_GROUPS: ProviderGroup[] = [
-  { label: 'xAI · API key', providers: ['xai'] },
-  { label: 'Anthropic · API key', providers: ['anthropic'] },
-  { label: 'OpenAI · API key', providers: ['openai'] },
+  { label: 'OpenRouter · API key', providers: ['openrouter'] },
+  { label: 'Image vendors · API key', providers: ['xai', 'openai'] },
   { label: 'Ollama · local', providers: ['ollama'] },
 ];
 

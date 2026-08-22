@@ -45,10 +45,10 @@ export class IllustrationService {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     const isGrokOnly = project?.contentMode === 'grok_only';
 
-    // Deliberately not `ai.{xai,openai}.api.key`. Those hold the CLI gateway's bearer token whenever the
-    // matching `*.api.url` aims that provider at the gateway, while the URLs below are the vendors' own
-    // endpoints — reusing them here would post a host credential to a third party. No CLI backend
-    // generates images, so this path cannot route through the gateway and needs its own credential.
+    // Deliberately not `ai.openrouter.api.key`. That holds an OpenRouter (or in-cluster gateway) bearer
+    // token, while the URLs below are the vendors' own endpoints — reusing it here would post a host
+    // credential to a third party. Image generation never routes through the gateway, so it needs its
+    // own vendor credential.
     const apiKey = isGrokOnly ? Config.get('ai.xai.image.api.key') : Config.get('ai.openai.image.api.key');
     const url = isGrokOnly ? 'https://api.x.ai/v1/images/generations' : 'https://api.openai.com/v1/images/generations';
     const model = isGrokOnly ? Config.get('ai.grok.image.model') : 'gpt-image-1';

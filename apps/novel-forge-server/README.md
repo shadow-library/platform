@@ -8,26 +8,24 @@ conventions, and the source-of-truth design docs.
 All keys are declared in `src/bootstrap.ts`, except `APP_STAGE`, which `@shadow-library/common` declares for every app.
 Keys marked **required in prod** must be set when `APP_STAGE=prod`.
 
-| Env key                 | Default                  | Description                                  |
-| ----------------------- | ------------------------ | -------------------------------------------- |
-| `APP_STAGE`             | `prod`                   | Stage: `dev`, `staging`, or `prod`           |
-| `SERVER_PORT`           | `8080`                   | HTTP listen port                             |
-| `SERVER_HOST`           | `0.0.0.0`                | HTTP listen host                             |
-| `DATABASE_POSTGRES_URL` | —                        | PostgreSQL connection URL (required)         |
-| `AI_PROFILE`            | `production`             | `production` or `local-test` (Ollama-only)   |
-| `AI_ANTHROPIC_API_KEY`  | —                        | Anthropic API key                            |
-| `AI_ANTHROPIC_API_URL`  | —                        | Anthropic base URL (unset = vendor endpoint) |
-| `AI_OPENAI_API_KEY`     | —                        | OpenAI API key                               |
-| `AI_OPENAI_API_URL`     | —                        | OpenAI base URL (unset = vendor endpoint)    |
-| `AI_XAI_API_KEY`        | —                        | xAI API key                                  |
-| `AI_XAI_API_URL`        | —                        | xAI base URL (unset = vendor endpoint)       |
-| `AI_GROK_LLM_MODEL`     | `grok-3`                 | Default xAI LLM model                        |
-| `AI_GROK_IMAGE_MODEL`   | `grok-2-image`           | xAI image model                              |
-| `AI_OLLAMA_HOST`        | `http://localhost:11434` | Ollama server URL                            |
-| `AI_EMBEDDING_MODEL`    | `qwen3-embedding:8b`     | Embedding model for vector indexes           |
-| `AI_LANGSMITH_API_KEY`  | —                        | LangSmith API key (enables tracing when set) |
-| `STORAGE_DRIVER`        | `local`                  | Storage driver (`local` only currently)      |
-| `STORAGE_IMAGE_DIR`     | `./images`               | Directory for generated images               |
+| Env key                   | Default                        | Description                                  |
+| ------------------------- | ------------------------------ | -------------------------------------------- |
+| `APP_STAGE`               | `prod`                         | Stage: `dev`, `staging`, or `prod`           |
+| `SERVER_PORT`             | `8080`                         | HTTP listen port                             |
+| `SERVER_HOST`             | `0.0.0.0`                      | HTTP listen host                             |
+| `DATABASE_POSTGRES_URL`   | —                              | PostgreSQL connection URL (required)         |
+| `AI_PROFILE`              | `production`                   | `production` or `local-test` (Ollama-only)   |
+| `AI_OPENROUTER_API_KEY`   | —                              | OpenRouter key — every hosted chat model     |
+| `AI_OPENROUTER_API_URL`   | `https://openrouter.ai/api/v1` | OpenRouter base URL (or in-cluster gateway)  |
+| `AI_XAI_IMAGE_API_KEY`    | —                              | xAI key for image generation only            |
+| `AI_OPENAI_IMAGE_API_KEY` | —                              | OpenAI key for image generation only         |
+| `AI_GROK_LLM_MODEL`       | `x-ai/grok-3`                  | Grok model id used by `grok_only` projects   |
+| `AI_GROK_IMAGE_MODEL`     | `grok-2-image`                 | xAI image model                              |
+| `AI_OLLAMA_HOST`          | `http://localhost:11434`       | Ollama server URL                            |
+| `AI_EMBEDDING_MODEL`      | `qwen3-embedding:8b`           | Embedding model for vector indexes           |
+| `AI_LANGSMITH_API_KEY`    | —                              | LangSmith API key (enables tracing when set) |
+| `STORAGE_DRIVER`          | `local`                        | Storage driver (`local` only currently)      |
+| `STORAGE_IMAGE_DIR`       | `./images`                     | Directory for generated images               |
 
 ## AI-specific commands
 

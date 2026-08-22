@@ -1,9 +1,12 @@
 export type ModelKind = 'llm' | 'embedding' | 'image';
-export type ModelProvider = 'anthropic' | 'openai' | 'xai' | 'ollama';
+export type ModelProvider = 'openrouter' | 'ollama';
+// Image models never reach the router: IllustrationService posts to the vendor endpoint directly with
+// its own credential, so these name the vendor rather than a routed provider.
+export type ImageProvider = 'xai' | 'openai';
 
 export interface ModelEntry {
   id: string;
-  provider: ModelProvider;
+  provider: ModelProvider | ImageProvider;
   kind: ModelKind;
   contextWindow?: number;
   inputPricePerMToken?: number;
@@ -12,13 +15,23 @@ export interface ModelEntry {
   supportsStructuredOutput?: boolean;
 }
 
-// All supported models. New entries land here; the router validates against this registry.
+// All supported models. New entries land here; the router validates against this registry. Every LLM
+// id is an OpenRouter `vendor/model` slug — the gateway every hosted chat call goes through.
 export const MODEL_REGISTRY: ModelEntry[] = [
   // xAI / Grok LLMs
-  { id: 'grok-3', provider: 'xai', kind: 'llm', contextWindow: 131072, inputPricePerMToken: 3.0, outputPricePerMToken: 15.0, supportsTools: true, supportsStructuredOutput: true },
   {
-    id: 'grok-3-mini',
-    provider: 'xai',
+    id: 'x-ai/grok-3',
+    provider: 'openrouter',
+    kind: 'llm',
+    contextWindow: 131072,
+    inputPricePerMToken: 3.0,
+    outputPricePerMToken: 15.0,
+    supportsTools: true,
+    supportsStructuredOutput: true,
+  },
+  {
+    id: 'x-ai/grok-3-mini',
+    provider: 'openrouter',
     kind: 'llm',
     contextWindow: 131072,
     inputPricePerMToken: 0.3,
@@ -30,8 +43,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   { id: 'grok-2-image', provider: 'xai', kind: 'image' },
   // Anthropic
   {
-    id: 'claude-sonnet-4-6',
-    provider: 'anthropic',
+    id: 'anthropic/claude-sonnet-4.6',
+    provider: 'openrouter',
     kind: 'llm',
     contextWindow: 200000,
     inputPricePerMToken: 3.0,
@@ -40,19 +53,19 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsStructuredOutput: true,
   },
   {
-    id: 'claude-haiku-4-5-20251001',
-    provider: 'anthropic',
+    id: 'anthropic/claude-haiku-4.5',
+    provider: 'openrouter',
     kind: 'llm',
     contextWindow: 200000,
-    inputPricePerMToken: 0.8,
-    outputPricePerMToken: 4.0,
+    inputPricePerMToken: 1.0,
+    outputPricePerMToken: 5.0,
     supportsTools: true,
     supportsStructuredOutput: true,
   },
   // OpenAI
   {
-    id: 'gpt-4o',
-    provider: 'openai',
+    id: 'openai/gpt-4o',
+    provider: 'openrouter',
     kind: 'llm',
     contextWindow: 128000,
     inputPricePerMToken: 2.5,
@@ -61,8 +74,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsStructuredOutput: true,
   },
   {
-    id: 'gpt-4o-mini',
-    provider: 'openai',
+    id: 'openai/gpt-4o-mini',
+    provider: 'openrouter',
     kind: 'llm',
     contextWindow: 128000,
     inputPricePerMToken: 0.15,

@@ -1,11 +1,9 @@
 import { createHash } from 'node:crypto';
 
-import { ChatAnthropic } from '@langchain/anthropic';
 import { type BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
-import { ChatXAI } from '@langchain/xai';
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { type SchemaClass } from '@shadow-library/class-schema';
@@ -37,8 +35,14 @@ const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(r
 // An explicitly resolved provider always wins: `grok_only`, the AI_PROFILE defaults and a per-project
 // pin all choose provider and model together, so a model id that also happens to sit in MODEL_REGISTRY
 // must not silently reroute that choice. The registry is only the fallback when no provider was resolved.
-function resolveProvider(resolved: ResolvedModel): string {
+export function resolveProvider(resolved: ResolvedModel): string {
   return resolved.provider || (MODEL_MAP[resolved.model]?.provider ?? '');
+}
+
+// OpenRouter forwards Anthropic's native `cache_control` blocks verbatim to `anthropic/*` models and
+// ignores them elsewhere, so the breakpoints are worth injecting for exactly that vendor prefix.
+export function supportsPromptCaching(resolved: ResolvedModel): boolean {
+  return resolveProvider(resolved) === 'openrouter' && resolved.model.startsWith('anthropic/');
 }
 
 function extractJsonBlock(text: string): unknown {
@@ -108,35 +112,22 @@ export class ModelRouterService {
   }
 
   resolveModel(role: AiRole, project?: ProjectConfig): ResolvedModel {
-    if (project?.contentMode === 'grok_only') return { provider: 'xai', model: Config.get('ai.grok.llm.model') };
+    if (project?.contentMode === 'grok_only') return { provider: 'openrouter', model: Config.get('ai.grok.llm.model') };
     // The settings UI writes one selection across every role in a group, so group members resolve identically.
     const models = project?.config?.models as Record<string, ResolvedModel> | undefined;
     const projectModel = models?.[role];
     if (projectModel) return projectModel;
     if (role === 'chat' && models?.['plan']) return models['plan'];
-    return getProfileDefaults()[role] ?? { provider: 'xai', model: Config.get('ai.grok.llm.model') };
+    return getProfileDefaults()[role] ?? { provider: 'openrouter', model: Config.get('ai.grok.llm.model') };
   }
 
-  // Each vendor client points at either the vendor API or the in-cluster gateway that speaks the same
-  // wire protocol — chosen purely by whether its `ai.<vendor>.api.url` config is set. An unset URL is
-  // omitted from the options so the SDK's own default applies.
+  // Every hosted vendor is reached through OpenRouter's OpenAI-compatible endpoint, so one client
+  // covers them all; `ai.openrouter.api.url` redirects the leg at an in-cluster gateway speaking the
+  // same wire protocol. Ollama stays local and keeps its own client.
   buildClient(resolved: ResolvedModel, opts?: { format?: string | Record<string, unknown> }): BaseChatModel {
     switch (resolveProvider(resolved)) {
-      case 'xai': {
-        // @langchain/xai always writes a hardcoded baseURL into the underlying OpenAI client (and drops
-        // any caller-supplied `configuration`), so unlike the other two it honours no SDK env default —
-        // this top-level field is the only way to redirect the xAI leg.
-        const baseURL = Config.get('ai.xai.api.url');
-        return new ChatXAI({ model: resolved.model, apiKey: Config.get('ai.xai.api.key'), ...(baseURL ? { baseURL } : {}) });
-      }
-      case 'anthropic': {
-        const anthropicApiUrl = Config.get('ai.anthropic.api.url');
-        return new ChatAnthropic({ model: resolved.model, apiKey: Config.get('ai.anthropic.api.key'), ...(anthropicApiUrl ? { anthropicApiUrl } : {}) });
-      }
-      case 'openai': {
-        const baseURL = Config.get('ai.openai.api.url');
-        return new ChatOpenAI({ model: resolved.model, apiKey: Config.get('ai.openai.api.key'), ...(baseURL ? { configuration: { baseURL } } : {}) });
-      }
+      case 'openrouter':
+        return new ChatOpenAI({ model: resolved.model, apiKey: Config.get('ai.openrouter.api.key'), configuration: { baseURL: Config.get('ai.openrouter.api.url') } });
       case 'ollama':
         // Local reasoning models (e.g. qwen3) otherwise wrap answers in <think> blocks and prose that
         // make structured output unparseable. Disable thinking on every call, and — for structured
@@ -249,14 +240,14 @@ export class ModelRouterService {
   }
 
   // Formats the module's template into messages, applying two provider-specific adjustments:
-  // Anthropic gets cache_control breakpoints on cacheStrategy modules, and every provider EXCEPT
+  // Anthropic models get cache_control breakpoints on cacheStrategy modules, and every provider EXCEPT
   // Ollama gets the required JSON schema appended in-band — grammar-constrained decoding only exists
   // on Ollama, so API models must be told the exact output shape or the creative roles (whose prompts
   // never mention JSON) answer with plain prose.
   private async buildMessages<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, resolved: ResolvedModel): Promise<BaseMessage[]> {
     const provider = resolveProvider(resolved);
     let messages = await promptModule.template.formatMessages(input);
-    if (promptModule.cacheStrategy && provider === 'anthropic') messages = applyAnthropicCacheControl(messages);
+    if (promptModule.cacheStrategy && supportsPromptCaching(resolved)) messages = applyAnthropicCacheControl(messages);
     if (provider !== 'ollama') {
       messages = [
         ...messages,

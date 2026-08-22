@@ -6,15 +6,10 @@ declare module '@shadow-library/common' {
     'server.host': string;
 
     'ai.profile': 'production' | 'local-test';
-    'ai.anthropic.api.key': string | undefined;
-    /** Overrides the Anthropic-compatible API endpoint; omit to use the SDK default. */
-    'ai.anthropic.api.url': string | undefined;
-    'ai.openai.api.key': string | undefined;
-    /** Overrides the OpenAI-compatible API endpoint; omit to use the SDK default. */
-    'ai.openai.api.url': string | undefined;
-    'ai.xai.api.key': string | undefined;
-    /** Overrides the xAI-compatible API endpoint; omit to use the SDK default. */
-    'ai.xai.api.url': string | undefined;
+    /** Credential for every hosted chat model — they all route through OpenRouter. */
+    'ai.openrouter.api.key': string | undefined;
+    /** Points the OpenRouter leg at an in-cluster gateway speaking the same OpenAI-compatible protocol. */
+    'ai.openrouter.api.url': string;
 
     /** Direct vendor credential for image generation. Never reuse a gateway bearer token. */
     'ai.openai.image.api.key': string | undefined;
@@ -43,15 +38,11 @@ Config.load('server.port', { defaultValue: '8080', validateType: 'number' });
 Config.load('server.host', { defaultValue: '0.0.0.0' });
 
 Config.load('ai.profile', { defaultValue: 'production', allowedValues: ['production', 'local-test'] });
-Config.load('ai.anthropic.api.key');
-Config.load('ai.anthropic.api.url');
-Config.load('ai.openai.api.key');
-Config.load('ai.openai.api.url');
-Config.load('ai.xai.api.key');
-Config.load('ai.xai.api.url');
+Config.load('ai.openrouter.api.key');
+Config.load('ai.openrouter.api.url', { defaultValue: 'https://openrouter.ai/api/v1' });
 Config.load('ai.openai.image.api.key');
 Config.load('ai.xai.image.api.key');
-Config.load('ai.grok.llm.model', { defaultValue: 'grok-3' });
+Config.load('ai.grok.llm.model', { defaultValue: 'x-ai/grok-3' });
 Config.load('ai.grok.image.model', { defaultValue: 'grok-2-image' });
 Config.load('ai.ollama.host', { defaultValue: 'http://localhost:11434' });
 Config.load('ai.embedding.model', { defaultValue: 'qwen3-embedding:8b' });

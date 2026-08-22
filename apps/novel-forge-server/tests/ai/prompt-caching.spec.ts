@@ -47,12 +47,12 @@ describe('ModelRouterService cacheStrategy integration', () => {
   const input = { scopeInstructions: 'refine the volume', stableContext: bigText, history: [], volatileContext: 'nothing changed', userMessage: 'raise the stakes' };
   const ctx = { projectId: BigInt(1), promptKey: 'chat-refine', promptVersion: '1.0.0', role: 'chat' };
 
-  it('injects cache_control blocks for anthropic (and routes by module role, not key)', async () => {
+  it('injects cache_control blocks for anthropic models on openrouter (and routes by module role, not key)', async () => {
     const fakeLlm = { invoke: mock(async () => ({ content: JSON.stringify({ reply: 'sharper stakes proposed' }) })) };
     const router = makeRouter(fakeLlm);
-    // The override is keyed by role 'chat' — reaching anthropic proves the router maps key
+    // The override is keyed by role 'chat' — reaching the anthropic model proves the router maps key
     // 'chat-refine' to role 'chat' before resolving the model.
-    const project = { config: { models: { chat: { provider: 'anthropic', model: 'claude-sonnet-4-6' } } } } as never;
+    const project = { config: { models: { chat: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4.6' } } } } as never;
 
     const result = await router.structured<{ reply: string }>(chatRefinePrompt, input, ctx, project);
     expect(result.reply).toBe('sharper stakes proposed');
@@ -66,7 +66,18 @@ describe('ModelRouterService cacheStrategy integration', () => {
     expect(typeof messages[messages.length - 1]?.content).toBe('string');
   });
 
-  it('keeps messages unmarked for non-anthropic providers while preserving stable-first order', async () => {
+  it('keeps messages unmarked for a non-anthropic model on the same openrouter provider', async () => {
+    const fakeLlm = { invoke: mock(async () => ({ content: JSON.stringify({ reply: 'ok' }) })) };
+    const router = makeRouter(fakeLlm);
+    const project = { config: { models: { chat: { provider: 'openrouter', model: 'x-ai/grok-3' } } } } as never;
+
+    await router.structured<{ reply: string }>(chatRefinePrompt, input, ctx, project);
+
+    const [messages] = fakeLlm.invoke.mock.calls[0] as unknown as [{ content: unknown }[]];
+    expect(messages.every(m => typeof m.content === 'string')).toBe(true);
+  });
+
+  it('keeps messages unmarked for non-anthropic models while preserving stable-first order', async () => {
     const fakeLlm = { invoke: mock(async () => ({ content: JSON.stringify({ reply: 'ok' }) })) };
     const router = makeRouter(fakeLlm);
     const project = { config: { models: { chat: { provider: 'ollama', model: 'qwen3:14b' } } } } as never;
@@ -88,7 +99,7 @@ describe('generation path caching', () => {
   it('breakpoints the stable pack and leaves the per-chapter tail uncached', async () => {
     const fakeLlm = { invoke: mock(async () => ({ content: JSON.stringify(draft) })) };
     const router = makeRouter(fakeLlm);
-    const project = { config: { models: { generation: { provider: 'anthropic', model: 'claude-sonnet-4-6' } } } } as never;
+    const project = { config: { models: { generation: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4.6' } } } } as never;
 
     await router.structured(generationPrompt, input, ctx, project);
 
