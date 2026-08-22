@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 3
+- Completed: 4
 - In Progress: 0
-- Pending: 12
+- Pending: 11
 - Blocked: 0
 
 ## P1 Tasks
@@ -35,7 +35,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | P1-01 | P1       | Bible-builder characters stage emits full entity `body` + initial `canon_facts` with `terms[]`                                      | COMPLETED | —                                           |
 | P1-02 | P1       | Bible-builder world/power stage emits structured `world_facts`                                                                      | COMPLETED | —                                           |
 | P1-03 | P1       | Add `bible_doc:`/`fact:` ref prefixes to `ContextAssembler.resolveRefs`                                                             | COMPLETED | P1-01, P1-02                                |
-| P1-04 | P1       | Volume planner (`plan()`) reads relevant bible documents, behind a rebuild flag                                                     | PENDING   | P1-01, P1-02, P1-03                         |
+| P1-04 | P1       | Volume planner (`plan()`) reads relevant bible documents, behind a rebuild flag                                                     | COMPLETED | P1-01, P1-02, P1-03                         |
 | P1-05 | P1       | Extend `ContinuitySchema` with `characterStates`/`knowledgeChanges` fields                                                          | PENDING   | —                                           |
 | P1-06 | P1       | New `character_states` table (schema + migration)                                                                                   | PENDING   | —                                           |
 | P1-07 | P1       | Finalization applies ALL extracted continuity fields transactionally; fixes `continuityApplied` dead-end (D7)                       | PENDING   | P1-05, P1-06                                |
@@ -164,6 +164,31 @@ graph.spec.ts` (new — entity `body` persists; forced rebuild preserves `body` 
     relevant bible documents the builder writes (structured canon from P1-01/02, resolved via
     P1-03), so the planner is no longer blind to the bible it cost tokens to build.
   - Does not change the volume/arc contract shape — content input only.
+- What changed: `plan()` now fetches all of a project's `bible_documents` in parallel with the
+  existing project lookup (`Promise.all`, no added latency), renders each as
+  `${section}/${slug}:\n${body}` capped at 1,500 tokens per doc via `truncateAtParagraph` (bounded
+  even across all six bible stages, substantially richer than `premisePack`'s 5-line audit-purpose
+  teaser since this task's point is giving the planner real content), and passes it as a new
+  `bibleDocs` template var. Falls back to the literal `'(no bible written yet)'` placeholder for a
+  project with no bible yet, mirroring the existing `skeleton` fallback pattern exactly. The prompt
+  (bumped `1.1.0` → `1.2.0`) now instructs the model to treat the bible as canon reference — never
+  restated verbatim — and authoritative over the skeleton on conflicts (later-stage, more specific
+  content), unless the disagreement looks like an unintended inconsistency. Confirmed the
+  bible-builder's own stage order (`foundation → worldAndPower → factionsAndLocations → characters
+→ plot → volumes → indexLore`) means including the `volumes` stage's prose sketch is not
+  circular — it runs before `plan()` in the normal flow. No new "rebuild flag" was added — unlike
+  P1-01/P1-02's write paths, this is a read-only enhancement with no clobber risk, so it always
+  applies when bible docs exist and degrades cleanly to the placeholder when they don't.
+- Tests: `tests/generation/plan-bible-docs.spec.ts` (new) — bible-doc content reaches the model call
+  when docs exist; the explicit placeholder is used and `plan()` still succeeds when none exist; an
+  oversized single document is actually capped rather than concatenated unbounded.
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (641 pass, 10 skip, 0 fail) after I fixed a type-check error the sub-agent's own verify pass
+  missed (bare `mock.calls[0]?.[1]` indexing doesn't type-narrow cleanly against a zero-length tuple
+  inference — fixed by destructuring the whole call tuple with a single `as unknown as [...]` cast,
+  matching the existing precedent in `tests/ai/prompt-caching.spec.ts`). Confirmed no api-types
+  drift (`plan()`'s request/response DTOs are unchanged; only the internal prompt-input var changed).
+- Commit: c3f4cabe
 
 ### P1-05 — Extend `ContinuitySchema`
 
