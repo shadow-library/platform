@@ -3,7 +3,7 @@ import { describe, expect, it, mock } from 'bun:test';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 
-import { getGroupDefaults, LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, REASONING_POLICY, resolveReasoningEffort, ROLE_GROUP } from '@modules/ai/defaults';
+import { GROK_ONLY_MODEL, LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, REASONING_POLICY, resolveReasoningEffort, ROLE_GROUP } from '@modules/ai/defaults';
 import { ModelRouterService, resolveProvider, supportsPromptCaching } from '@modules/ai/model-router.service';
 import { MODEL_REGISTRY } from '@modules/ai/models';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
@@ -27,10 +27,10 @@ describe('ModelRouterService.resolveModel', () => {
   const stubTelemetry = {} as never;
   const router = new ModelRouterService(stubTelemetry, stubDatabaseService());
 
-  it('returns the profile writing default for grok_only project regardless of role', () => {
+  it('returns the fixed grok_only model regardless of role', () => {
     const resolved = router.resolveModel('extraction', { contentMode: 'grok_only' });
-    expect(resolved.provider).toBe(getGroupDefaults().writing.provider);
-    expect(resolved.model).toBe(getGroupDefaults().writing.model);
+    expect(resolved.provider).toBe(GROK_ONLY_MODEL.provider);
+    expect(resolved.model).toBe(GROK_ONLY_MODEL.model);
   });
 
   it('honours per-project config model override', () => {
@@ -53,8 +53,8 @@ describe('ModelRouterService.resolveModel', () => {
       contentMode: 'grok_only',
       config: { models: { generation: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } },
     });
-    expect(resolved.provider).toBe(getGroupDefaults().writing.provider);
-    expect(resolved.model).toBe(getGroupDefaults().writing.model);
+    expect(resolved.provider).toBe(GROK_ONLY_MODEL.provider);
+    expect(resolved.model).toBe(GROK_ONLY_MODEL.model);
   });
 
   it('refinement chat inherits the planning selection when no chat model is set', () => {
@@ -225,7 +225,7 @@ describe('MODEL_REGISTRY', () => {
 describe('PRODUCTION_DEFAULTS vs LOCAL_TEST_DEFAULTS', () => {
   it('production defaults route generation through openrouter', () => {
     expect(PRODUCTION_DEFAULTS.generation.provider).toBe('openrouter');
-    expect(PRODUCTION_DEFAULTS.generation.model).toBe('x-ai/grok-4.6');
+    expect(PRODUCTION_DEFAULTS.generation.model).toBe('moonshotai/kimi-k3');
   });
 
   it('local-test defaults use ollama for all LLM roles', () => {

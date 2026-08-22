@@ -68,19 +68,26 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
 
 // Group-level defaults are the single source of truth; the per-role maps below derive from them so the
 // router (which resolves per role) and the settings UI (which picks per group) never drift. `chat`
-// mirrors `planning`. Production routes every hosted role through OpenRouter, including image
-// generation (writing/planning/review/chat → x-ai/grok-4.6, helper → openai/gpt-5.6-luna, image →
-// x-ai/grok-imagine-image-2.0) — IllustrationService picks its own model per project rather than
-// calling `resolveModel('image', ...)`, so this entry is informational (settings UI) only.
+// mirrors `planning`. Production routes every hosted role through OpenRouter, per group, based on the
+// completed model evaluation: writing → moonshotai/kimi-k3 (top-2 measured long-form prose, near-zero
+// longform degradation), planning/chat → z-ai/glm-5.2 (strong structured output + instruction
+// following), review → anthropic/claude-sonnet-5 (best tool-calling reliability for the judge loop),
+// helper → openai/gpt-5.6-luna, image → x-ai/grok-imagine-image-2.0 — IllustrationService picks its own
+// model per project rather than calling `resolveModel('image', ...)`, so this entry is informational
+// (settings UI) only.
 const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
-  writing: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
-  planning: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
-  review: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
-  chat: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
+  writing: { provider: 'openrouter', model: 'moonshotai/kimi-k3' },
+  planning: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
+  review: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' },
+  chat: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
   helper: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
 };
+
+// grok_only content mode pins every role to a specific Grok model regardless of group defaults — see
+// its usage in model-router.service.ts.
+export const GROK_ONLY_MODEL: ResolvedModel = { provider: 'openrouter', model: 'x-ai/grok-4.6' };
 
 // Local-test profile: routes everything to Ollama (used in smoke tests / dev without API keys).
 const LOCAL_TEST_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
