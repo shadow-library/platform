@@ -30,7 +30,7 @@ export const fixPrompt: PromptModule<FixOutput> = {
   kind: 'authoring',
   system,
   // Few-shots ride inside the template — a fewShots field the router never injects teaches nothing.
-  template: ChatPromptTemplate.fromMessages([new SystemMessage(system), ...fewShots, ['human', '{contextPack}\n\n{task}']]),
+  template: ChatPromptTemplate.fromMessages([new SystemMessage(system), ...fewShots, ['human', '{contextPack}\n\nDraft to repair:\n{prose}\n\nFindings:\n{findings}']]),
   schema: FixSchema,
   fewShots,
 };

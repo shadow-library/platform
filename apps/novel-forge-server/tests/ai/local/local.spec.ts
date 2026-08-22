@@ -77,9 +77,10 @@ describe('Rung-3 Ollama integration', () => {
   });
 
   it('fix-loop: fixPrompt on a contradiction draft returns action=patch or action=rewrite', async () => {
-    const contextPack = 'CANON: The magic sword is named "Dawnbreaker".\n\nDRAFT: Kiran drew his sword, the legendary "Nightfall", and cut through the shadow.';
-    const task = 'Hard finding: The sword is named "Nightfall" in the draft but "Dawnbreaker" in the canon. Fix it.';
-    const result = await router.structured(fixPrompt, { contextPack, task }, noopCtx);
+    const contextPack = 'CANON: The magic sword is named "Dawnbreaker".';
+    const prose = 'Kiran drew his sword, the legendary "Nightfall", and cut through the shadow.';
+    const findings = '[hard] The sword is named "Nightfall" in the draft but "Dawnbreaker" in the canon.';
+    const result = await router.structured(fixPrompt, { contextPack, prose, findings }, noopCtx);
     expect(['patch', 'rewrite']).toContain(result.action);
     if (result.action === 'patch') expect(result.patches?.length).toBeGreaterThan(0);
     if (result.action === 'rewrite') expect(typeof result.body).toBe('string');
