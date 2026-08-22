@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 9
+- Completed: 10
 - In Progress: 0
-- Pending: 6
+- Pending: 5
 - Blocked: 0
 
 ## P1 Tasks
@@ -41,7 +41,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | P1-07 | P1       | Finalization applies ALL extracted continuity fields transactionally; fixes `continuityApplied` dead-end (D7)                       | COMPLETED | P1-05, P1-06                                |
 | P1-08 | P1       | Retire source-extraction overlap; drop or explicitly mark unused `timeline_events`/`power_progressions`                             | COMPLETED | P1-07                                       |
 | P1-09 | P1       | Route `outlineArc` through `forOutline()`; deprecate/cap whole-book `outline()`                                                     | COMPLETED | —                                           |
-| P1-10 | P1       | Reconciliation trigger every k finalized chapters (default 5, configurable) or on staleness                                         | PENDING   | P1-09                                       |
+| P1-10 | P1       | Reconciliation trigger every k finalized chapters (default 5, configurable) or on staleness                                         | COMPLETED | P1-09                                       |
 | P1-11 | P1       | Volume-completion epitome write (or explicitly drop the `volumes.epitome` column)                                                   | PENDING   | —                                           |
 | P1-12 | P1       | Outliner authors `knowledgeContract`; persist `pov`; wire mystery `truthFactKey`                                                    | PENDING   | —                                           |
 | P1-13 | P1       | Prompt-cache the generation path: `asStable` sections, `cacheStrategy`, fix rebrand/reforge stable-var bug                          | PENDING   | —                                           |
@@ -419,6 +419,35 @@ graph.spec.ts` (new — entity `body` persists; forced rebuild preserves `body` 
     guess to be tuned against usage.
   - Gated on hand-edit markers so a human's manual brief edits aren't silently clobbered by
     reconciliation.
+
+**What changed:**
+
+- Added `briefs.handEdited` (boolean, default `false`, migration `0007_special_agent_brand.sql`).
+  Set `true` by both human-edit write paths — `GenerationService.updateBrief` (the manual-edit
+  endpoint) and `ProposalApplyService`'s `applyBriefUpdate` (the refinement `brief.update` op).
+- `outlineArc` gained a `protectedBriefsInRange` guard, applied unconditionally (not just from the
+  new automatic trigger): a chapter is protected if its brief is `handEdited` or its chapter is
+  already finalized (`chapters.status = 'done'`). Protected chapters are never persisted over; the
+  response returns their existing DB row instead. Non-protected, AI-written briefs are written with
+  `handEdited: false`.
+- `GenerationService.finalize()` now calls a best-effort `maybeReconcileArc(projectId, chapter)`
+  after the finalization graph succeeds: it finds the _approved_ arc containing the finalized
+  chapter, skips if none or if the arc's last chapter just finalized, and re-runs `outlineArc` for
+  that arc when `finalizedInArc % cadence === 0` (finalization is strictly sequential, gated by the
+  existing `FIN_001` check, so `chapter - arc.chapterStart + 1` is a sound in-arc count) or when any
+  remaining brief in the arc carries a non-null `staleReason`. Reconciliation failures are caught and
+  logged as a warning — they never fail the finalize() call that triggered them.
+- New config knob `generation.reconciliation.cadence` (default `5`) in `bootstrap.ts`, documented in
+  `.env.example` as `GENERATION_RECONCILIATION_CADENCE`.
+
+**Tests:** `tests/generation/arc-reconciliation.spec.ts` (new, 11 cases, real-Postgres house style) —
+hand-edited/finalized-chapter protection, AI briefs marked not-hand-edited, cadence-triggered
+reconciliation, early stale-triggered reconciliation, no-fire off-cadence/on-last-chapter/unapproved
+arc, finalize survives a reconciliation failure, and `handEdited: true` from both human-edit paths.
+
+**Validation:** `bun scripts/verify.ts apps/novel-forge-server` — 664 pass, 0 fail, 10 skip.
+
+**Commit:** `2d8e50fc`
 
 ### P1-11 — Volume-completion epitome write
 
