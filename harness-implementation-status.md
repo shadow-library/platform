@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 7
+- Completed: 8
 - In Progress: 0
-- Pending: 8
+- Pending: 7
 - Blocked: 0
 
 ## P1 Tasks
@@ -39,7 +39,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | P1-05 | P1       | Extend `ContinuitySchema` with `characterStates`/`knowledgeChanges` fields                                                          | COMPLETED | —                                           |
 | P1-06 | P1       | New `character_states` table (schema + migration)                                                                                   | COMPLETED | —                                           |
 | P1-07 | P1       | Finalization applies ALL extracted continuity fields transactionally; fixes `continuityApplied` dead-end (D7)                       | COMPLETED | P1-05, P1-06                                |
-| P1-08 | P1       | Retire source-extraction overlap; drop or explicitly mark unused `timeline_events`/`power_progressions`                             | PENDING   | P1-07                                       |
+| P1-08 | P1       | Retire source-extraction overlap; drop or explicitly mark unused `timeline_events`/`power_progressions`                             | COMPLETED | P1-07                                       |
 | P1-09 | P1       | Route `outlineArc` through `forOutline()`; deprecate/cap whole-book `outline()`                                                     | PENDING   | —                                           |
 | P1-10 | P1       | Reconciliation trigger every k finalized chapters (default 5, configurable) or on staleness                                         | PENDING   | P1-09                                       |
 | P1-11 | P1       | Volume-completion epitome write (or explicitly drop the `volumes.epitome` column)                                                   | PENDING   | —                                           |
@@ -328,6 +328,46 @@ graph.spec.ts` (new — entity `body` persists; forced rebuild preserves `body` 
   - `timeline_events`/`power_progressions` (zero writers, grep-verified) are dropped with this P1
     migration, or left with an explicit "unused" note if a live project turns out to depend on them
     — do not wire them speculatively per the recommendation doc's explicit rejection.
+- What changed: the original framing (this task's own acceptance criteria above, inherited from the
+  recommendation doc) turned out to be stale — the source-extraction _graph_
+  (`source-extraction.graph.ts`) is actually live today, reached via the `/extract` endpoint fixed
+  in an earlier P0 task; it does its own raw upserts and was never part of the overlap. The
+  genuinely dead code was a _different_, self-described "simpler alternative to the LangGraph
+  source-extraction graph": `ExtractionService.extractChapter`/`.extractBatch`, which nothing
+  outside `src/modules/extraction/` ever called, and `KnowledgeRepository`, used only by that dead
+  method. Both deleted; `ExtractionService` keeps `resolvePendingChapters`/`DEFAULT_EXTRACT_LIMIT`
+  (both live), its constructor pruned to just the database client, and `extraction.module.ts`'s now
+  -unnecessary `AiModule` import removed (neither remaining class needs it).
+  - **A first pass at this task was correctly blocked by a sub-agent** before any edits landed: my
+    own initial investigation wrongly concluded `ConsolidateService` was also dead. It is not —
+    it's injected into `PipelineController` and served live at `POST
+/api/v1/projects/:projectId/consolidate`, consumed by a real "Consolidate" button in
+    `novel-forge-web`'s source-pipeline screen. I re-verified this myself, corrected the task scope,
+    and re-delegated — `consolidate.service.ts`, its endpoint, and all of `novel-forge-web` were
+    left completely untouched on the second, corrected pass.
+  - **A real, pre-existing gap surfaced, not fixed (out of scope):** `ConsolidateService`'s
+    `promoteRelationships()` half reads `relationship_observations`, which was written only by the
+    now-deleted `KnowledgeRepository.addRelationshipObservation` — itself called only by the
+    already-dead `extractChapter`. That table was already permanently empty in the live system
+    before this task (since `extractChapter` had zero callers even before this cleanup), so this
+    doesn't newly break the Consolidate feature — but it means the relationship-promotion half of
+    that live endpoint has never actually promoted anything. Worth a future look if that behavior is
+    expected to do something; not addressed here.
+  - `timeline_events`/`power_progressions` dropped via a clean, additive-only-in-reverse migration
+    (`DROP TABLE power_progressions CASCADE; DROP TABLE timeline_events CASCADE;` — nothing else
+    touched, verified table count 48 → 46). `relationship_observations` was left alone (not in the
+    recommendation doc's explicit drop list).
+- Tests: deleted `tests/knowledge/knowledge.spec.ts` (tested the now-deleted `KnowledgeRepository`
+  exclusively); removed one test in `tests/ai/continuity-apply.spec.ts` that asserted no rows land
+  in the now-dropped `timeline_events`/`power_progressions` tables (the assertion itself became
+  meaningless once the tables no longer exist, not a coverage loss). One sub-agent self-caught and
+  corrected an `rm -rf tests/knowledge` mistake that would have wrongly deleted four unrelated,
+  still-valid test files in that directory — restored via `git checkout --` before finishing, and
+  I independently confirmed all four are present and unmodified before committing.
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (649 pass, 10 skip, 0 fail). Confirmed `apps/novel-forge-web` has zero diff and no api-types
+  reference the deleted classes/tables.
+- Commit: bf07bd62
 
 ### P1-09 — Route `outlineArc` through `forOutline()`
 
