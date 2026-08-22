@@ -99,6 +99,39 @@ export class ContinuityPower {
 }
 
 @Schema()
+export class ContinuityCharacterState {
+  @Field({ minLength: 1 })
+  entityKey: string;
+
+  @Field({ optional: true })
+  location?: string;
+
+  @Field(() => [String], { optional: true })
+  conditions?: string[];
+
+  @Field({ optional: true })
+  immediateGoal?: string;
+
+  @Field({ optional: true })
+  statusNote?: string;
+
+  @Field({ minLength: 1, description: 'excerpt from the prose that justifies this state extraction' })
+  evidence: string;
+}
+
+@Schema()
+export class ContinuityKnowledgeChange {
+  @Field({ minLength: 1 })
+  entityKey: string;
+
+  @Field({ minLength: 1, description: 'corresponds to a canon_facts.factKey — what the character now knows' })
+  factKey: string;
+
+  @Field({ minLength: 1, description: 'short description of how the character learned it' })
+  how: string;
+}
+
+@Schema()
 export class ContinuitySchema {
   @Field(() => [String], { description: 'entityKeys of entities who appear in this chapter' })
   appeared: string[];
@@ -120,6 +153,12 @@ export class ContinuitySchema {
 
   @Field(() => [ContinuityPower])
   power: ContinuityPower[];
+
+  @Field(() => [ContinuityCharacterState], { description: 'characters whose state materially changed this chapter — replaces, not merges, the prior state' })
+  characterStates: ContinuityCharacterState[];
+
+  @Field(() => [ContinuityKnowledgeChange], { description: 'canon facts a character newly came to know this chapter' })
+  knowledgeChanges: ContinuityKnowledgeChange[];
 
   @Field({ minLength: 1, description: '2-3 sentence summary of what happened' })
   chapterSummary: string;

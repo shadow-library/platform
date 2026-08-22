@@ -5,6 +5,7 @@ import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
 import {
   BibleStageSchema,
   ChatRefineSchema,
+  ContinuitySchema,
   EndingContractSchema,
   ExtractionSchema,
   FixSchema,
@@ -486,6 +487,59 @@ describe('Prompt modules', () => {
     it('judge schema accepts knowledgeCompliance and keeps it optional', () => {
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [] }).success).toBe(true);
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], knowledgeCompliance: { compliant: false, issues: ['[ledger_forgery] leaked'] } }).success).toBe(true);
+    });
+  });
+
+  describe('ContinuitySchema (P1-05 characterStates/knowledgeChanges)', () => {
+    const base = {
+      appeared: ['amara'],
+      newEntities: [],
+      threads: [],
+      mysteries: [],
+      timeline: [],
+      relationships: [],
+      power: [],
+      characterStates: [],
+      knowledgeChanges: [],
+      chapterSummary: 'Amara confronts the forger in the archive.',
+    };
+
+    it('parses a payload with characterStates and knowledgeChanges entries', () => {
+      const output = {
+        ...base,
+        characterStates: [
+          {
+            entityKey: 'amara',
+            location: 'the city archive',
+            conditions: ['exhausted', 'wary'],
+            immediateGoal: 'confront the forger',
+            statusNote: 'closing in on the ledger',
+            evidence: 'Amara pressed her palm to the cold archive door, exhaustion dragging at her eyes.',
+          },
+        ],
+        knowledgeChanges: [{ entityKey: 'amara', factKey: 'amara_secret_past', how: 'read it in the archive ledger' }],
+      };
+      expect(parseSchema(ContinuitySchema, output).success).toBe(true);
+    });
+
+    it('rejects a characterStates entry missing the required evidence field', () => {
+      const output = {
+        ...base,
+        characterStates: [{ entityKey: 'amara', location: 'the city archive' }],
+      };
+      expect(parseSchema(ContinuitySchema, output).success).toBe(false);
+    });
+
+    it('accepts empty characterStates and knowledgeChanges arrays as the nothing-to-report case', () => {
+      expect(parseSchema(ContinuitySchema, base).success).toBe(true);
+    });
+
+    it('rejects a payload missing characterStates or knowledgeChanges, matching the existing required-array convention', () => {
+      const { characterStates: _characterStates, ...withoutCharacterStates } = base;
+      expect(parseSchema(ContinuitySchema, withoutCharacterStates).success).toBe(false);
+
+      const { knowledgeChanges: _knowledgeChanges, ...withoutKnowledgeChanges } = base;
+      expect(parseSchema(ContinuitySchema, withoutKnowledgeChanges).success).toBe(false);
     });
   });
 
