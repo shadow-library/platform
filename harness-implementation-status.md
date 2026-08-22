@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 12
+- Completed: 13
 - In Progress: 0
-- Pending: 3
+- Pending: 2
 - Blocked: 0
 
 ## P1 Tasks
@@ -44,7 +44,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | P1-10 | P1       | Reconciliation trigger every k finalized chapters (default 5, configurable) or on staleness                                         | COMPLETED | P1-09                                       |
 | P1-11 | P1       | Volume-completion epitome write (or explicitly drop the `volumes.epitome` column)                                                   | COMPLETED | —                                           |
 | P1-12 | P1       | Outliner authors `knowledgeContract`; persist `pov`; wire mystery `truthFactKey`                                                    | COMPLETED | —                                           |
-| P1-13 | P1       | Prompt-cache the generation path: `asStable` sections, `cacheStrategy`, fix rebrand/reforge stable-var bug                          | PENDING   | —                                           |
+| P1-13 | P1       | Prompt-cache the generation path: `asStable` sections, `cacheStrategy`, fix rebrand/reforge stable-var bug                          | COMPLETED | —                                           |
 | P1-14 | P1       | Deterministic draft checks as a graph node before `judge` (word bounds, duplicated paragraphs, n-grams, cliché counts, tag density) | PENDING   | — (may reuse eval Track 2 metric functions) |
 | P1-15 | P1       | Judge gains a brief-fulfillment category (D33's accepted half)                                                                      | PENDING   | —                                           |
 
@@ -567,6 +567,59 @@ optionality.
     alongside adding caching to generation itself.
   - Cost lever, not quality lever — measure via existing telemetry (`model_calls` cost/latency)
     rather than a new dashboard.
+
+**What changed:**
+
+- `forChapter` now marks `volume_objective`, `arc_objective`, `writing_style`, and the resolved
+  entity/ref sections `asStable`; `prev_ending`, `continuation_state`, the knowledge-contract sections
+  (`known_facts`/`chapter_reveals`/`hidden_constraints`), and the rolling `memory` window stay
+  volatile — they're inherently per-chapter. A new `splitSegments()` helper (`context/sections.ts`)
+  re-derives `renderedStable`/`renderedVolatile` from a persisted pack's `sections` jsonb, for graph
+  nodes that reload a pack by id rather than holding the freshly-assembled one.
+- `generation.prompt.ts` (bumped `2.2.0` → `2.3.0`) declares `cacheStrategy: { stableVars:
+['stableContext'] }` and splits its single `contextPack` var into `stableContext` (alone in the
+  first human message) and `volatileContext` (second message, with the brief/ending-contract/
+  guidance) — matching `chat.service.ts`'s already-working stable/volatile pattern.
+- Fixed the rebrand/reforge bug exactly as diagnosed: `rebrand-convert.prompt.ts`/
+  `reforge-write.prompt.ts` declared `cacheStrategy` but put the FULL joined pack (containing
+  per-chapter volatile content) in the message their `cacheStrategy` called "stable," defeating the
+  cache every chapter. Both now take separate `stableContext`/`volatileContext` vars; `forRebrand`/
+  `forReforge` already had the correct stable/volatile split from RB4/RF3, so only the graph call
+  sites (`chapter-rebrand.graph.ts`, `chapter-reforge.graph.ts`) needed to stop collapsing
+  `pack.rendered` into one var.
+- **Known fragility, not fixed (matches the doc's own softer "note" wording, not "fix")**:
+  `applyAnthropicCacheControl` places its cache_control breakpoint positionally — first human
+  message, unconditionally — and never actually reads `cacheStrategy.stableVars` by name; that field
+  is documentation only. Every prompt touched by this task was structured to conform to that
+  positional convention (stable content alone in the first human message) rather than rewriting the
+  router to do named-var lookup, which would touch every already-working cached prompt path
+  (chat-hub, etc.) for a P1 cost-lever task. Reordering a cached prompt's messages in the future will
+  silently move the breakpoint onto volatile content with no test or type failure — flagged for
+  whoever next touches a `cacheStrategy` prompt.
+- **Deliberately deferred**: the judge (`judgeDraft` / `chapter-generation.graph.ts`'s `judge` node)
+  builds `SystemMessage`/`HumanMessage` manually and calls `runToolLoop` directly, bypassing
+  `modelRouter.structured()` entirely — so it cannot receive `cache_control` today regardless of any
+  `cacheStrategy`. Folding the judge's tool-calling flow into `structured()` is a materially larger,
+  separate change; out of scope here.
+- **Two pre-existing bugs found and fixed in passing**: `generateGrok` called the generation prompt
+  without its required `endingContract` var (would throw `Missing value for input variable` at
+  render time — no test previously covered `generateGrok`, so this was live and undetected); and
+  `chapter-generation.graph.ts`'s `repairRewrite` node was a third, previously-unhandled call site
+  for the same prompt that also needed the stable/volatile var split.
+
+**Tests:** `tests/ai/context-assembler.spec.ts` (new `forChapter` stable/volatile describe — segment
+assertions, marker-based containment on `renderedStable`/`renderedVolatile`, stable-segment
+byte-identity across unchanged canon), `tests/ai/prompt-caching.spec.ts` (mocked-provider block
+injection for the generation path), `tests/ai/prompts.spec.ts` (updated versions/vars, cache-order +
+`cacheStrategy` assertions for all three prompts), `tests/ai/rebrand-graph.spec.ts` /
+`tests/ai/reforge-graph.spec.ts` (fake assemblers return distinct stable/volatile strings; assert the
+convert/write call sites pass them separately), `tests/generation/prompt-cache-vars.spec.ts` (new,
+end-to-end over the template DB — both the graph draft node and `generateGrok` pass real pack
+segments as separate vars, `contextPack` no longer appears, `endingContract` is present).
+
+**Validation:** `bun scripts/verify.ts apps/novel-forge-server` — 689 pass, 0 fail, 10 skip.
+
+**Commit:** `86b45367`
 
 ### P1-14 — Deterministic draft checks
 
