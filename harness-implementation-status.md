@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 2
+- Completed: 3
 - In Progress: 0
-- Pending: 13
+- Pending: 12
 - Blocked: 0
 
 ## P1 Tasks
@@ -34,7 +34,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------- |
 | P1-01 | P1       | Bible-builder characters stage emits full entity `body` + initial `canon_facts` with `terms[]`                                      | COMPLETED | —                                           |
 | P1-02 | P1       | Bible-builder world/power stage emits structured `world_facts`                                                                      | COMPLETED | —                                           |
-| P1-03 | P1       | Add `bible_doc:`/`fact:` ref prefixes to `ContextAssembler.resolveRefs`                                                             | PENDING   | P1-01, P1-02                                |
+| P1-03 | P1       | Add `bible_doc:`/`fact:` ref prefixes to `ContextAssembler.resolveRefs`                                                             | COMPLETED | P1-01, P1-02                                |
 | P1-04 | P1       | Volume planner (`plan()`) reads relevant bible documents, behind a rebuild flag                                                     | PENDING   | P1-01, P1-02, P1-03                         |
 | P1-05 | P1       | Extend `ContinuitySchema` with `characterStates`/`knowledgeChanges` fields                                                          | PENDING   | —                                           |
 | P1-06 | P1       | New `character_states` table (schema + migration)                                                                                   | PENDING   | —                                           |
@@ -128,6 +128,33 @@ graph.spec.ts` (new — entity `body` persists; forced rebuild preserves `body` 
     drafting path never queries.
   - Unknown/malformed refs of these prefixes fail closed into `unresolvedRefs`, consistent with
     existing prefix handling.
+- What changed: `resolveRefs` gained `bible_doc:section/slug` (compound-key lookup against
+  `bible_documents`' `(projectId, section, slug)` unique constraint — batched query filters on the
+  unique sections/slugs requested, final correctness comes from the exact `${section}/${slug}`
+  lookup map key, not the batched filter; rendered as the doc body truncated to 8,000 tokens via
+  `truncateAtParagraph`, matching the existing full-document cap already used for `current_draft`)
+  and `fact:factKey` (`canon_facts.text` + optional `constraintNote`, matching the existing
+  `thread`/`mystery` lookup pattern). Both fail closed into `unresolved` on a miss, matching the
+  existing six prefixes exactly.
+  - **Safety boundary (deliberate, documented in code):** `fact:` is NOT wired into
+    `catalog.service.ts`. `canon_facts` carries hidden-truth rows (per the character-knowledge
+    design and P1-01's characters-stage work) that must stay POV-filtered until ledgered per
+    chapter — `resolveRefs` is purpose-agnostic and has no chapter/POV context to check that, so a
+    naive catalog listing would let the automated outliner spontaneously request a not-yet-revealed
+    secret's ref and leak it straight into a future chapter's context, bypassing the entire CK3/CK4
+    POV-filtered knowledge system. Keeping `fact:` refs reachable only through hand-authored paths
+    (plan-import, manual brief edits, hand-authored chat-hub lookups) means only a human — who
+    already carries editorial responsibility for not self-spoiling — can populate one. No
+    per-chapter hiddenness filtering was built into `resolveRefs` itself; that would require
+    threading chapter/POV context into a function used by five-plus different callers, which is out
+    of this task's scope (mystery `truthFactKey` wiring is P1-12, a separate future task).
+- Tests: `tests/ai/context-assembler.spec.ts` — new `resolveRefs — bible_doc and fact prefixes`
+  describe block: resolves on hit, unresolved on miss for both prefixes, and a mixed-refs regression
+  test confirming the two new cases don't cross-contaminate the existing six.
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (638 pass, 10 skip, 0 fail). Confirmed `catalog.service.ts` has zero diff (the safety
+  boundary above is intact) and no `api-types.gen.ts` references this change.
+- Commit: 449d919d
 
 ### P1-04 — Volume planner reads bible documents
 
