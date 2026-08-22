@@ -26,16 +26,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsTools: true,
     supportsStructuredOutput: true,
   },
-  {
-    id: 'x-ai/grok-4.1-fast',
-    provider: 'openrouter',
-    kind: 'llm',
-    contextWindow: 2000000,
-    inputPricePerMToken: 0.2,
-    outputPricePerMToken: 0.5,
-    supportsTools: true,
-    supportsStructuredOutput: true,
-  },
   // xAI image
   { id: 'x-ai/grok-imagine-image-2.0', provider: 'openrouter', kind: 'image' },
   // Anthropic
@@ -67,6 +57,16 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     contextWindow: 1050000,
     inputPricePerMToken: 2.5,
     outputPricePerMToken: 15.0,
+    supportsTools: true,
+    supportsStructuredOutput: true,
+  },
+  {
+    id: 'openai/gpt-5.6-luna',
+    provider: 'openrouter',
+    kind: 'llm',
+    contextWindow: 1050000,
+    inputPricePerMToken: 0.2,
+    outputPricePerMToken: 1.2,
     supportsTools: true,
     supportsStructuredOutput: true,
   },

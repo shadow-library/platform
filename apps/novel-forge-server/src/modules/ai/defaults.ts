@@ -67,7 +67,7 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
 // Group-level defaults are the single source of truth; the per-role maps below derive from them so the
 // router (which resolves per role) and the settings UI (which picks per group) never drift. `chat`
 // mirrors `planning`. Production routes every hosted role through OpenRouter, including image
-// generation (writing/planning/review/chat → x-ai/grok-4.6, helper → x-ai/grok-4.1-fast, image →
+// generation (writing/planning/review/chat → x-ai/grok-4.6, helper → openai/gpt-5.6-luna, image →
 // x-ai/grok-imagine-image-2.0) — IllustrationService picks its own model per project rather than
 // calling `resolveModel('image', ...)`, so this entry is informational (settings UI) only.
 const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
@@ -75,7 +75,7 @@ const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   planning: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
   review: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
   chat: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
-  helper: { provider: 'openrouter', model: 'x-ai/grok-4.1-fast' },
+  helper: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
 };
