@@ -700,3 +700,73 @@ describe('ContextAssembler.forChapter — knowledge sections', () => {
     expect(pack.sections.some(s => ['known_facts', 'chapter_reveals', 'hidden_constraints'].includes(s.key))).toBe(false);
   });
 });
+
+describe('ContextAssembler.resolveRefs — bible_doc and fact prefixes', () => {
+  it('resolves a bible_doc:section/slug ref to the document body when the row exists', async () => {
+    const doc = { section: 'world', slug: 'factions-locations', body: 'The Ashen Concord governs the eastern reaches.' };
+    const assembler = makeAssembler({ query: { bibleDocuments: { findMany: mock(async () => [doc]) } } });
+
+    const { resolved, unresolved } = await assembler.resolveRefs(1n, ['bible_doc:world/factions-locations']);
+
+    expect(unresolved).toEqual([]);
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]?.key).toBe('ref:bible_doc:world/factions-locations');
+    expect(resolved[0]?.tier).toBe('canonical');
+    expect(resolved[0]?.rendered).toContain('The Ashen Concord governs the eastern reaches.');
+  });
+
+  it('reports a bible_doc: ref unresolved when the section/slug pair does not exist', async () => {
+    const assembler = makeAssembler({ query: { bibleDocuments: { findMany: mock(async () => []) } } });
+
+    const { resolved, unresolved } = await assembler.resolveRefs(1n, ['bible_doc:world/nonexistent']);
+
+    expect(resolved).toEqual([]);
+    expect(unresolved).toEqual(['bible_doc:world/nonexistent']);
+  });
+
+  it('resolves a fact:factKey ref to the fact text when the row exists', async () => {
+    const fact = { factKey: 'ledger_forgery', text: 'The ledger is a forgery planted by Elias.', constraintNote: null };
+    const assembler = makeAssembler({ query: { canonFacts: { findMany: mock(async () => [fact]) } } });
+
+    const { resolved, unresolved } = await assembler.resolveRefs(1n, ['fact:ledger_forgery']);
+
+    expect(unresolved).toEqual([]);
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]?.key).toBe('ref:fact:ledger_forgery');
+    expect(resolved[0]?.tier).toBe('canonical');
+    expect(resolved[0]?.rendered).toContain('The ledger is a forgery planted by Elias.');
+  });
+
+  it('reports a fact: ref unresolved when the factKey does not exist', async () => {
+    const assembler = makeAssembler({ query: { canonFacts: { findMany: mock(async () => []) } } });
+
+    const { resolved, unresolved } = await assembler.resolveRefs(1n, ['fact:nonexistent_key']);
+
+    expect(resolved).toEqual([]);
+    expect(unresolved).toEqual(['fact:nonexistent_key']);
+  });
+
+  it('resolves and unresolves the new prefixes alongside the existing six in one call without cross-contamination', async () => {
+    const entityRow = { entityKey: 'boone', name: 'Boone', type: 'character', status: 'active', body: 'A weary detective.', notes: null, aliases: [] };
+    const doc = { section: 'plot', slug: 'volumes', body: 'Volume outline body.' };
+    const fact = { factKey: 'motive_debt', text: 'Boone owes a gambling debt.', constraintNote: 'Elias avoids money talk.' };
+
+    const assembler = makeAssembler({
+      query: {
+        entities: { findMany: mock(async () => [entityRow]) },
+        worldFacts: { findMany: mock(async () => []) },
+        plotThreads: { findMany: mock(async () => []) },
+        mysteries: { findMany: mock(async () => []) },
+        bibleDocuments: { findMany: mock(async () => [doc]) },
+        canonFacts: { findMany: mock(async () => [fact]) },
+      },
+    });
+
+    const refs = ['entity:boone', 'entity:missing', 'bible_doc:plot/volumes', 'bible_doc:plot/missing', 'fact:motive_debt', 'fact:missing', 'world_fact:missing'];
+    const { resolved, unresolved } = await assembler.resolveRefs(1n, refs);
+
+    const resolvedKeys = resolved.map(s => s.key).sort();
+    expect(resolvedKeys).toEqual(['ref:bible_doc:plot/volumes', 'ref:entity:boone', 'ref:fact:motive_debt'].sort());
+    expect(unresolved.sort()).toEqual(['bible_doc:plot/missing', 'entity:missing', 'fact:missing', 'world_fact:missing'].sort());
+  });
+});

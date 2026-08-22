@@ -90,6 +90,8 @@ export class ContextAssembler {
     const mysteryKeys: string[] = [];
     const chapterNumbers: number[] = [];
     const volumeKeys: string[] = [];
+    const bibleDocRefs: { section: string; slug: string }[] = [];
+    const factKeys: string[] = [];
     const unknownRefs: string[] = [];
 
     for (const ref of refs) {
@@ -119,12 +121,20 @@ export class ContextAssembler {
         case 'volume':
           volumeKeys.push(value);
           break;
+        case 'bible_doc': {
+          const slashIdx = value.indexOf('/');
+          bibleDocRefs.push({ section: slashIdx === -1 ? value : value.slice(0, slashIdx), slug: slashIdx === -1 ? '' : value.slice(slashIdx + 1) });
+          break;
+        }
+        case 'fact':
+          factKeys.push(value);
+          break;
         default:
           unknownRefs.push(ref);
       }
     }
 
-    const [entitiesRows, worldFactRows, threadRows, mysteryRows, chapterRows, volumeRows] = await Promise.all([
+    const [entitiesRows, worldFactRows, threadRows, mysteryRows, chapterRows, volumeRows, bibleDocRows, factRows] = await Promise.all([
       entityKeys.length > 0
         ? this.db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, entityKeys)), with: { aliases: true } })
         : [],
@@ -137,6 +147,16 @@ export class ContextAssembler {
       mysteryKeys.length > 0 ? this.db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), inArray(schema.mysteries.mysteryKey, mysteryKeys)) }) : [],
       chapterNumbers.length > 0 ? this.db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), inArray(schema.chapters.number, chapterNumbers)) }) : [],
       volumeKeys.length > 0 ? this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, volumeKeys)) }) : [],
+      bibleDocRefs.length > 0
+        ? this.db.query.bibleDocuments.findMany({
+            where: and(
+              eq(schema.bibleDocuments.projectId, projectId),
+              inArray(schema.bibleDocuments.section, [...new Set(bibleDocRefs.map(r => r.section))] as schema.Bible.Section[]),
+              inArray(schema.bibleDocuments.slug, [...new Set(bibleDocRefs.map(r => r.slug))]),
+            ),
+          })
+        : [],
+      factKeys.length > 0 ? this.db.query.canonFacts.findMany({ where: and(eq(schema.canonFacts.projectId, projectId), inArray(schema.canonFacts.factKey, factKeys)) }) : [],
     ]);
 
     const entityMap = new Map(entitiesRows.map(e => [e.entityKey, e]));
@@ -150,6 +170,8 @@ export class ContextAssembler {
     const mysteryMap = new Map(mysteryRows.map(m => [m.mysteryKey, m]));
     const chapterMap = new Map(chapterRows.map(c => [c.number, c]));
     const volumeMap = new Map(volumeRows.map(v => [v.volumeKey, v]));
+    const bibleDocMap = new Map(bibleDocRows.map(d => [`${d.section}/${d.slug}`, d]));
+    const factMap = new Map(factRows.map(f => [f.factKey, f]));
 
     const resolved: ContextSection[] = [];
     const unresolved: string[] = [];
@@ -235,6 +257,34 @@ export class ContextAssembler {
           const tier: ContextTier = volume.status === 'source' ? 'canonical' : 'approved_intent';
           const content = `**${volume.title ?? volume.volumeKey}** (${volume.status})\nObjective: ${volume.objective ?? ''}\nChs ${volume.startChapter ?? '?'}–${volume.endChapter ?? '?'}`;
           resolved.push(makeSection(`ref:volume:${value}`, content, tier, [ref]));
+          break;
+        }
+        case 'bible_doc': {
+          const slashIdx = value.indexOf('/');
+          const section = slashIdx === -1 ? value : value.slice(0, slashIdx);
+          const slug = slashIdx === -1 ? '' : value.slice(slashIdx + 1);
+          const doc = bibleDocMap.get(`${section}/${slug}`);
+          if (!doc || !doc.body) {
+            unresolved.push(ref);
+            break;
+          }
+          const { text: body } = truncateAtParagraph(doc.body, 8_000);
+          resolved.push(makeSection(`ref:bible_doc:${value}`, `**${doc.section}/${doc.slug}**\n\n${body}`, 'canonical', [ref]));
+          break;
+        }
+        case 'fact': {
+          // Deliberately NOT surfaced via catalog.service.ts: canon_facts carries hidden-truth rows
+          // (character-knowledge design) that must stay POV-filtered until ledgered. Only hand-authored
+          // refs — plan-import, manual brief edits, hand-authored chat-hub lookups — may name a fact:
+          // ref, since the automated outliner reading the catalog must never be able to request one and
+          // self-spoil a not-yet-revealed fact into a future chapter's context.
+          const fact = factMap.get(value);
+          if (!fact) {
+            unresolved.push(ref);
+            break;
+          }
+          const constraintLine = fact.constraintNote ? `\nConstraint: ${fact.constraintNote}` : '';
+          resolved.push(makeSection(`ref:fact:${value}`, `**${fact.factKey}**: ${fact.text}${constraintLine}`, 'canonical', [ref]));
           break;
         }
         default:
