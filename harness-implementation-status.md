@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 8
+- Completed: 9
 - In Progress: 0
-- Pending: 7
+- Pending: 6
 - Blocked: 0
 
 ## P1 Tasks
@@ -40,7 +40,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | P1-06 | P1       | New `character_states` table (schema + migration)                                                                                   | COMPLETED | —                                           |
 | P1-07 | P1       | Finalization applies ALL extracted continuity fields transactionally; fixes `continuityApplied` dead-end (D7)                       | COMPLETED | P1-05, P1-06                                |
 | P1-08 | P1       | Retire source-extraction overlap; drop or explicitly mark unused `timeline_events`/`power_progressions`                             | COMPLETED | P1-07                                       |
-| P1-09 | P1       | Route `outlineArc` through `forOutline()`; deprecate/cap whole-book `outline()`                                                     | PENDING   | —                                           |
+| P1-09 | P1       | Route `outlineArc` through `forOutline()`; deprecate/cap whole-book `outline()`                                                     | COMPLETED | —                                           |
 | P1-10 | P1       | Reconciliation trigger every k finalized chapters (default 5, configurable) or on staleness                                         | PENDING   | P1-09                                       |
 | P1-11 | P1       | Volume-completion epitome write (or explicitly drop the `volumes.epitome` column)                                                   | PENDING   | —                                           |
 | P1-12 | P1       | Outliner authors `knowledgeContract`; persist `pov`; wire mystery `truthFactKey`                                                    | PENDING   | —                                           |
@@ -381,6 +381,33 @@ graph.spec.ts` (new — entity `body` persists; forced rebuild preserves `body` 
     hierarchy (§4.B).
   - Caveat inherited from the recommendation doc: `volumes.epitome` is never written (P1-11), so this
     task buys recent summaries + retrieval, not volume memory, until P1-11 lands.
+
+**What changed:**
+
+- `outline()` (whole-book) now derives its span from the volumes' chapter ranges when `count` is
+  omitted, then clamps to a new `MAX_WHOLE_BOOK_OUTLINE_SPAN = 25` — applied whether the span came
+  from that derivation or from an oversized explicit `body.count` — logging a warning when clamped.
+  Whole-book `outline()` stays the legacy planning path; `outlineArc` (gated on approved arcs) is the
+  intended production path per the planning hierarchy — the cap just stops an omitted/oversized
+  `count` from silently planning the entire unwritten novel in one model call.
+- `outlineArc()` is rewired onto `ContextAssembler.forOutline(projectId, arc.chapterStart)` — the
+  same pack the `/context/preview` debug endpoint already used — so the arc outline call now carries
+  recent finalized-chapter summaries, retrieval, and the volume-objective section. The hand-built
+  `volumePlan` text dropped its own redundant `## Volume: ...` block since `forOutline`'s
+  `volume_objective` section now covers it; the arc-specific block (objective/escalation/payoff/hook)
+  and next-arc-intent chaining are unchanged.
+
+**Tests:**
+
+- `tests/generation/outline-invariants.spec.ts`: 3 new cases via a `buildSpanService()` helper —
+  clamp-on-omitted-count, clamp-on-oversized-explicit-count, no-clamp-when-under-cap.
+- `tests/bible/arc.spec.ts`: extended the existing arc-outline test to assert the `catalog` prompt
+  var carries the `forOutline` volume-objective text, plus a new test asserting a finalized chapter's
+  summary text reaches the arc outline call through `catalog`.
+
+**Validation:** `bun scripts/verify.ts apps/novel-forge-server` — 653 pass, 0 fail, 10 skip.
+
+**Commit:** `118e8fb5`
 
 ### P1-10 — Reconciliation trigger
 
