@@ -8,6 +8,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { createChapterGenerationGraph } from '@modules/ai/graphs/chapter-generation.graph';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { FULL_LENGTH_DRAFT_BODY } from '@tests/fixtures/draft-body';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -29,7 +30,7 @@ function buildServices(db: PrimaryDatabase, seenMessages: BaseMessage[][]) {
 
   const modelRouter = {
     structured: async (promptModule: { key: string }) => {
-      if (promptModule.key === 'generation') return { title: 'Chapter Title', body: 'The prose body of the chapter.', summary: 'A summary.', state: {} };
+      if (promptModule.key === 'generation') return { title: 'Chapter Title', body: FULL_LENGTH_DRAFT_BODY, summary: 'A summary.', state: {} };
       if (promptModule.key === 'fix') return { action: 'patch', patches: [{ find: 'prose', replace: 'prose' }] };
       return { title: 'Chapter Title' };
     },

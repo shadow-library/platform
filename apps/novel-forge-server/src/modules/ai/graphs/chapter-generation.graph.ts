@@ -1,6 +1,6 @@
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
@@ -19,6 +19,7 @@ import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handl
 import { runToolLoop } from '../tools/tool-loop';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
 import { type ToolContext } from '../tools/types';
+import { checkDraftMechanics } from './mechanical-check';
 
 export interface GraphServices {
   db: PrimaryDatabase;
@@ -48,6 +49,8 @@ const ChapterGenAnnotation = Annotation.Root({
   verdict: Annotation<'consistent' | 'contradiction' | 'evaluation_failed' | null>({ reducer: (_, n) => n, default: () => null }),
   endingCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
   knowledgeCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
+  mechanicallyCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
+  mechanicalFindings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   findings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   previousFindings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   attempt: Annotation<number>({ reducer: (_, n) => n, default: () => 0 }),
@@ -80,16 +83,21 @@ export function sameFinding(findings: JudgeFinding[], previousFindings: JudgeFin
   return false;
 }
 
-// Routing function after judge — exported for testing. Ending-contract and knowledge-leak
+// Routing function after judge — exported for testing. Ending-contract, knowledge-leak and mechanical
 // violations ride the same repair ladder as continuity findings (refinement design §9.2,
-// character-knowledge design §6) but never harden the verdict.
+// character-knowledge design §6, harness D32) but never harden the verdict.
 export function routeAfterJudge(
-  state: Pick<ChapterGenState, 'verdict' | 'autoFix' | 'attempt' | 'maxFixes' | 'findings' | 'previousFindings'> & { endingCompliant?: boolean; knowledgeCompliant?: boolean },
+  state: Pick<ChapterGenState, 'verdict' | 'autoFix' | 'attempt' | 'maxFixes' | 'findings' | 'previousFindings'> & {
+    endingCompliant?: boolean;
+    knowledgeCompliant?: boolean;
+    mechanicallyCompliant?: boolean;
+  },
 ): string {
   const endingCompliant = state.endingCompliant !== false;
   const knowledgeCompliant = state.knowledgeCompliant !== false;
+  const mechanicallyCompliant = state.mechanicallyCompliant !== false;
   if (state.verdict === 'evaluation_failed') return 'awaitReview';
-  if (state.verdict === 'consistent' && endingCompliant && knowledgeCompliant) return 'accept';
+  if (state.verdict === 'consistent' && endingCompliant && knowledgeCompliant && mechanicallyCompliant) return 'accept';
   if (!state.autoFix) return 'awaitReview';
   if (state.attempt >= state.maxFixes || sameFinding(state.findings, state.previousFindings)) return 'acceptAsIs';
   return 'repairPatch';
@@ -263,6 +271,28 @@ export function createChapterGenerationGraph(services: GraphServices) {
     return { draftId: String(draft.id) };
   }
 
+  const MECHANICAL_PRIOR_WINDOW = 10;
+
+  async function mechanicalCheck(state: ChapterGenState) {
+    const priorChapters = await db.query.chapters.findMany({
+      where: and(eq(schema.chapters.projectId, BigInt(state.projectId)), eq(schema.chapters.status, 'done'), lt(schema.chapters.number, state.chapter)),
+      orderBy: [desc(schema.chapters.number)],
+      limit: MECHANICAL_PRIOR_WINDOW,
+      columns: { content: true },
+    });
+
+    const mechanicalFindings = checkDraftMechanics(state.prose, priorChapters.map(c => c.content ?? '').filter(Boolean));
+    const mechanicallyCompliant = !mechanicalFindings.some(f => f.severity === 'hard');
+    logger.debug('generation mechanicalCheck', {
+      runId: state.runId,
+      chapter: state.chapter,
+      attempt: state.attempt,
+      findings: mechanicalFindings.length,
+      mechanicallyCompliant,
+    });
+    return { mechanicalFindings, mechanicallyCompliant };
+  }
+
   async function judge(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
     const [projectRow, brief] = await Promise.all([
@@ -341,6 +371,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       forbidden.length > 0 ? scanKnowledgeLeaks(state.prose, forbidden) : [],
     );
     findings.push(...knowledge.findings);
+    findings.push(...state.mechanicalFindings);
     logger.debug('generation judge', {
       runId: state.runId,
       chapter: state.chapter,
@@ -492,6 +523,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
     .addNode('assembleContext', assembleContext)
     .addNode('draftChapter', draftChapter)
     .addNode('persistDraft', persistDraft)
+    .addNode('mechanicalCheck', mechanicalCheck)
     .addNode('judge', judge)
     .addNode('repairPatch', repairPatch)
     .addNode('repairRewrite', repairRewrite)
@@ -502,7 +534,8 @@ export function createChapterGenerationGraph(services: GraphServices) {
     .addEdge(START, 'assembleContext')
     .addEdge('assembleContext', 'draftChapter')
     .addEdge('draftChapter', 'persistDraft')
-    .addEdge('persistDraft', 'judge')
+    .addEdge('persistDraft', 'mechanicalCheck')
+    .addEdge('mechanicalCheck', 'judge')
     .addConditionalEdges('judge', routeAfterJudge, { accept: 'accept', awaitReview: 'awaitReview', acceptAsIs: 'acceptAsIs', repairPatch: 'repairPatch' })
     .addConditionalEdges('repairPatch', routeAfterPatch, { persistDraft: 'persistDraft', repairRewrite: 'repairRewrite' })
     .addEdge('repairRewrite', 'persistDraft')
