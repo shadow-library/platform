@@ -13,6 +13,7 @@ export namespace Knowledge {
   export type RelationshipObservation = InferSelectModel<typeof relationshipObservations>;
   export type CanonFact = InferSelectModel<typeof canonFacts>;
   export type CharacterKnowledge = InferSelectModel<typeof characterKnowledge>;
+  export type CharacterState = InferSelectModel<typeof characterStates>;
   export type EntityType = InferEnum<typeof entityType>;
   export type EntitySignificance = InferEnum<typeof entitySignificance>;
   export type EntityOrigin = InferEnum<typeof entityOrigin>;
@@ -176,6 +177,27 @@ export const characterKnowledge = pgTable(
   t => [primaryKey({ columns: [t.factId, t.entityId] }), index('character_knowledge_project_id_idx').on(t.projectId)],
 );
 
+// Each character's current dynamic state as of the most recently finalized chapter — location, conditions,
+// immediate goal, a one-line status note. One row per project/entity: `statusNote` is replaced, not appended.
+export const characterStates = pgTable(
+  'character_states',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    entityKey: varchar('entity_key').notNull(),
+    location: varchar('location'),
+    conditions: jsonb('conditions').$type<string[]>(),
+    immediateGoal: text('immediate_goal'),
+    statusNote: text('status_note'),
+    lastUpdatedChapter: integer('last_updated_chapter').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  t => [unique('character_states_project_id_entity_key_unique').on(t.projectId, t.entityKey)],
+);
+
 export const entitiesRelations = relations(entities, ({ one, many }) => ({
   project: one(projects, { fields: [entities.projectId], references: [projects.id] }),
   images: many(entityImages),
@@ -213,4 +235,8 @@ export const canonFactsRelations = relations(canonFacts, ({ one, many }) => ({
 export const characterKnowledgeRelations = relations(characterKnowledge, ({ one }) => ({
   fact: one(canonFacts, { fields: [characterKnowledge.factId], references: [canonFacts.id] }),
   entity: one(entities, { fields: [characterKnowledge.entityId], references: [entities.id] }),
+}));
+
+export const characterStatesRelations = relations(characterStates, ({ one }) => ({
+  project: one(projects, { fields: [characterStates.projectId], references: [projects.id] }),
 }));
