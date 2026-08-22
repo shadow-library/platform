@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 1
+- Completed: 2
 - In Progress: 0
-- Pending: 14
+- Pending: 13
 - Blocked: 0
 
 ## P1 Tasks
@@ -33,7 +33,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | ID    | Priority | Task                                                                                                                                | Status    | Dependencies                                |
 | ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------- |
 | P1-01 | P1       | Bible-builder characters stage emits full entity `body` + initial `canon_facts` with `terms[]`                                      | COMPLETED | —                                           |
-| P1-02 | P1       | Bible-builder world/power stage emits structured `world_facts`                                                                      | PENDING   | —                                           |
+| P1-02 | P1       | Bible-builder world/power stage emits structured `world_facts`                                                                      | COMPLETED | —                                           |
 | P1-03 | P1       | Add `bible_doc:`/`fact:` ref prefixes to `ContextAssembler.resolveRefs`                                                             | PENDING   | P1-01, P1-02                                |
 | P1-04 | P1       | Volume planner (`plan()`) reads relevant bible documents, behind a rebuild flag                                                     | PENDING   | P1-01, P1-02, P1-03                         |
 | P1-05 | P1       | Extend `ContinuitySchema` with `characterStates`/`knowledgeChanges` fields                                                          | PENDING   | —                                           |
@@ -95,6 +95,28 @@ graph.spec.ts` (new — entity `body` persists; forced rebuild preserves `body` 
   - World/power stage emits structured `world_facts` categories (not just prose), consistent with
     what `context-assembler.service.ts` already knows how to render.
   - Behind the same rebuild flag as P1-01.
+- What changed: `world_facts` was fully wired for reads (context assembly's `resolveRefs`,
+  `forValidationWindow`, `forRebrandSeed` all already render it as `category/key: value`), but
+  nothing wrote it — confirmed zero `worldFacts` writes anywhere in `bible-builder.graph.ts` before
+  this task. Added `BibleStageWorldFact` (`category`, `key`, `value`, `chapter?` — mirroring
+  `world_facts`'s columns and `BibleStageFact.revealChapter`'s optional-Integer pattern from P1-01)
+  and a `worldFacts?: BibleStageWorldFact[]` field on `BibleStageSchema`. The world-power prompt
+  (bumped `1.1.0` → `1.2.0`) now instructs the model to extract structured, lookup-ready facts
+  (suggested categories `geography`/`power_system`/`technology`/`politics`, explicitly framed as
+  examples, not an enforced enum — `category`/`key` are free-form varchar in the schema) alongside
+  the prose it already writes. `runStage()` gained a parallel upsert block for `result.worldFacts`
+  into `schema.worldFacts`, targeting the existing `(projectId, category, key)` unique constraint
+  with the same per-field COALESCE-on-omit semantics used for `canon_facts` in P1-01 — a forced
+  rebuild that omits a fact doesn't null it out, but does overwrite when fresh content is supplied.
+- Tests: `tests/ai/bible-builder-graph.spec.ts` — new `world-power stage persistence` describe
+  block (separate template-DB instance): initial persistence (value + chapter round-trip); COALESCE
+  preserves a fact on a forced rebuild that omits it; overwrite on a forced rebuild that supplies a
+  fresh value for the same `(category, key)`; the existing `force`-gated skip still applies (no
+  world-fact writes on a repeat non-force run).
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (633 pass, 10 skip, 0 fail). Confirmed `worldFacts`/`BibleStageWorldFact` never reach any
+  controller/DTO or `novel-forge-web`, so no api-types regeneration was needed.
+- Commit: 6f0e9da8
 
 ### P1-03 — `bible_doc:`/`fact:` ref prefixes
 
