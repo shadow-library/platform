@@ -9,8 +9,6 @@ export namespace Story {
   export type PlotThread = InferSelectModel<typeof plotThreads>;
   export type WorldFact = InferSelectModel<typeof worldFacts>;
   export type Mystery = InferSelectModel<typeof mysteries>;
-  export type TimelineEvent = InferSelectModel<typeof timelineEvents>;
-  export type PowerProgression = InferSelectModel<typeof powerProgressions>;
   export type ThreadStatus = InferEnum<typeof threadStatus>;
   export type MysteryStatus = InferEnum<typeof mysteryStatus>;
 }
@@ -99,35 +97,6 @@ export const mysteries = pgTable(
   t => [unique('mysteries_project_id_mystery_key_unique').on(t.projectId, t.mysteryKey)],
 );
 
-export const timelineEvents = pgTable('timeline_events', {
-  id: bigserial('id', { mode: 'bigint' }).primaryKey(),
-  projectId: bigint('project_id', { mode: 'bigint' })
-    .notNull()
-    .references(() => projects.id, { onDelete: 'cascade' }),
-  whenText: varchar('when_text'),
-  event: text('event').notNull(),
-  chapter: integer('chapter'),
-  significance: text('significance'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-});
-
-export const powerProgressions = pgTable(
-  'power_progressions',
-  {
-    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
-    projectId: bigint('project_id', { mode: 'bigint' })
-      .notNull()
-      .references(() => projects.id, { onDelete: 'cascade' }),
-    character: varchar('character'),
-    stage: varchar('stage'),
-    chapter: integer('chapter'),
-    feat: text('feat'),
-    next: text('next'),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-  },
-  t => [unique('power_progressions_project_id_character_chapter_unique').on(t.projectId, t.character, t.chapter)],
-);
-
 export const beatsRelations = relations(beats, ({ one }) => ({
   project: one(projects, { fields: [beats.projectId], references: [projects.id] }),
 }));
@@ -142,12 +111,4 @@ export const worldFactsRelations = relations(worldFacts, ({ one }) => ({
 
 export const mysteriesRelations = relations(mysteries, ({ one }) => ({
   project: one(projects, { fields: [mysteries.projectId], references: [projects.id] }),
-}));
-
-export const timelineEventsRelations = relations(timelineEvents, ({ one }) => ({
-  project: one(projects, { fields: [timelineEvents.projectId], references: [projects.id] }),
-}));
-
-export const powerProgressionsRelations = relations(powerProgressions, ({ one }) => ({
-  project: one(projects, { fields: [powerProgressions.projectId], references: [projects.id] }),
 }));

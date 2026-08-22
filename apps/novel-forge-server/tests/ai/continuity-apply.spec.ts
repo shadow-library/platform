@@ -173,20 +173,6 @@ describe.if(pgAvailable)('continuity delta application', () => {
     expect(entity).toBeDefined();
   });
 
-  it('should not persist timeline events or power progressions', async () => {
-    const projectId = await seedProject(`cont-discarded-${Date.now()}`);
-    await runFinalization(
-      projectId,
-      delta({ timeline: [{ whenText: 'dusk', event: 'the gate fell' }], power: [{ character: 'amara', stage: 'second ring', feat: 'broke the ward' }] }),
-      'discarded',
-    );
-
-    const timeline = await db.query.timelineEvents.findMany({ where: eq(schema.timelineEvents.projectId, projectId) });
-    const power = await db.query.powerProgressions.findMany({ where: eq(schema.powerProgressions.projectId, projectId) });
-    expect(timeline).toHaveLength(0);
-    expect(power).toHaveLength(0);
-  });
-
   it('should still apply an edited pending proposal through the manual endpoint and flag the chapter', async () => {
     const projectId = await seedProject(`cont-manual-${Date.now()}`);
     await db.insert(schema.chapters).values({ projectId, number: 1, content: 'ch', status: 'done', generator: 'grok', locked: true });
