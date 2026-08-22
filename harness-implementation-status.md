@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 0
+- Completed: 1
 - In Progress: 0
-- Pending: 15
+- Pending: 14
 - Blocked: 0
 
 ## P1 Tasks
@@ -30,23 +30,23 @@ Source: `harness-final-recommendation.md` §11 (7 top-level items), decomposed i
 matching P0's granularity. Each is small enough to implement/review/commit/merge independently, per
 the same one-task-at-a-time worktree workflow used for P0.
 
-| ID    | Priority | Task                                                                                                                                | Status  | Dependencies                                |
-| ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------- |
-| P1-01 | P1       | Bible-builder characters stage emits full entity `body` + initial `canon_facts` with `terms[]`                                      | PENDING | —                                           |
-| P1-02 | P1       | Bible-builder world/power stage emits structured `world_facts`                                                                      | PENDING | —                                           |
-| P1-03 | P1       | Add `bible_doc:`/`fact:` ref prefixes to `ContextAssembler.resolveRefs`                                                             | PENDING | P1-01, P1-02                                |
-| P1-04 | P1       | Volume planner (`plan()`) reads relevant bible documents, behind a rebuild flag                                                     | PENDING | P1-01, P1-02, P1-03                         |
-| P1-05 | P1       | Extend `ContinuitySchema` with `characterStates`/`knowledgeChanges` fields                                                          | PENDING | —                                           |
-| P1-06 | P1       | New `character_states` table (schema + migration)                                                                                   | PENDING | —                                           |
-| P1-07 | P1       | Finalization applies ALL extracted continuity fields transactionally; fixes `continuityApplied` dead-end (D7)                       | PENDING | P1-05, P1-06                                |
-| P1-08 | P1       | Retire source-extraction overlap; drop or explicitly mark unused `timeline_events`/`power_progressions`                             | PENDING | P1-07                                       |
-| P1-09 | P1       | Route `outlineArc` through `forOutline()`; deprecate/cap whole-book `outline()`                                                     | PENDING | —                                           |
-| P1-10 | P1       | Reconciliation trigger every k finalized chapters (default 5, configurable) or on staleness                                         | PENDING | P1-09                                       |
-| P1-11 | P1       | Volume-completion epitome write (or explicitly drop the `volumes.epitome` column)                                                   | PENDING | —                                           |
-| P1-12 | P1       | Outliner authors `knowledgeContract`; persist `pov`; wire mystery `truthFactKey`                                                    | PENDING | —                                           |
-| P1-13 | P1       | Prompt-cache the generation path: `asStable` sections, `cacheStrategy`, fix rebrand/reforge stable-var bug                          | PENDING | —                                           |
-| P1-14 | P1       | Deterministic draft checks as a graph node before `judge` (word bounds, duplicated paragraphs, n-grams, cliché counts, tag density) | PENDING | — (may reuse eval Track 2 metric functions) |
-| P1-15 | P1       | Judge gains a brief-fulfillment category (D33's accepted half)                                                                      | PENDING | —                                           |
+| ID    | Priority | Task                                                                                                                                | Status    | Dependencies                                |
+| ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------- |
+| P1-01 | P1       | Bible-builder characters stage emits full entity `body` + initial `canon_facts` with `terms[]`                                      | COMPLETED | —                                           |
+| P1-02 | P1       | Bible-builder world/power stage emits structured `world_facts`                                                                      | PENDING   | —                                           |
+| P1-03 | P1       | Add `bible_doc:`/`fact:` ref prefixes to `ContextAssembler.resolveRefs`                                                             | PENDING   | P1-01, P1-02                                |
+| P1-04 | P1       | Volume planner (`plan()`) reads relevant bible documents, behind a rebuild flag                                                     | PENDING   | P1-01, P1-02, P1-03                         |
+| P1-05 | P1       | Extend `ContinuitySchema` with `characterStates`/`knowledgeChanges` fields                                                          | PENDING   | —                                           |
+| P1-06 | P1       | New `character_states` table (schema + migration)                                                                                   | PENDING   | —                                           |
+| P1-07 | P1       | Finalization applies ALL extracted continuity fields transactionally; fixes `continuityApplied` dead-end (D7)                       | PENDING   | P1-05, P1-06                                |
+| P1-08 | P1       | Retire source-extraction overlap; drop or explicitly mark unused `timeline_events`/`power_progressions`                             | PENDING   | P1-07                                       |
+| P1-09 | P1       | Route `outlineArc` through `forOutline()`; deprecate/cap whole-book `outline()`                                                     | PENDING   | —                                           |
+| P1-10 | P1       | Reconciliation trigger every k finalized chapters (default 5, configurable) or on staleness                                         | PENDING   | P1-09                                       |
+| P1-11 | P1       | Volume-completion epitome write (or explicitly drop the `volumes.epitome` column)                                                   | PENDING   | —                                           |
+| P1-12 | P1       | Outliner authors `knowledgeContract`; persist `pov`; wire mystery `truthFactKey`                                                    | PENDING   | —                                           |
+| P1-13 | P1       | Prompt-cache the generation path: `asStable` sections, `cacheStrategy`, fix rebrand/reforge stable-var bug                          | PENDING   | —                                           |
+| P1-14 | P1       | Deterministic draft checks as a graph node before `judge` (word bounds, duplicated paragraphs, n-grams, cliché counts, tag density) | PENDING   | — (may reuse eval Track 2 metric functions) |
+| P1-15 | P1       | Judge gains a brief-fulfillment category (D33's accepted half)                                                                      | PENDING   | —                                           |
 
 ### P1-01 — Bible-builder characters stage: full entity `body` + initial `canon_facts`
 
@@ -58,6 +58,35 @@ the same one-task-at-a-time worktree workflow used for P0.
   - Emits initial `canon_facts` rows, including hidden truths, with `terms[]` populated so the
     deterministic knowledge leak scanner can see them.
   - Behind a rebuild flag — existing projects are unaffected until they opt in.
+- What changed: `BibleStageEntity` (`new-novel.schema.ts`) gained an optional `body` field (full
+  entity card — voice, motivations, relationships, backstory beats — sitting alongside, not
+  replacing, the existing shorter `notes`, confirmed `body ?? notes` is the established fallback
+  pattern already used in `context-assembler.service.ts`/`catalog.service.ts`/etc.). Added a new
+  `BibleStageFact` class mirroring plan-import's `PlanBundleFact` shape (`factKey`, `text`,
+  `subjects?`, `constraintNote?`, `terms?`, `revealChapter?`) and a `facts?: BibleStageFact[]` field
+  on `BibleStageSchema`. The characters prompt (`characters.prompt.ts`, bumped `1.1.0` → `1.2.0`)
+  now instructs the model to emit both, including hidden truths with `terms[]` for the leak scanner.
+  `bible-builder.graph.ts`'s existing raw entity upsert gained `body: COALESCE(EXCLUDED.body,
+entities.body)` (same pattern as `name`/`notes`, so a forced rebuild that omits `body` for an
+  entity never wipes a previously-persisted card, but a rebuild that does supply fresh content still
+  overwrites it — verified by dedicated tests for both directions); a new, parallel raw upsert block
+  persists `facts` into `canon_facts` with the same per-field COALESCE semantics. No new "rebuild
+  flag" was built — the existing `force`-gated stage-skip in `runStage()` already scopes this
+  correctly (new projects always run the stage; existing projects only get the new fields on an
+  explicit rebuild). `FactService` was deliberately NOT injected — its `upsert()` does a
+  read-then-merge-then-write that doesn't fit a tight loop, and injecting it would require threading
+  a new constructor param through `WorkflowRunService`'s `graphServices` getter (used by 7 other
+  `as XServices` casts) for what a straightforward raw upsert already handles consistently with the
+  existing `entities` upsert in the same function.
+- Tests: `tests/ai/prompts.spec.ts` (schema round-trip for `body`/`facts`), `tests/ai/bible-builder-
+graph.spec.ts` (new — entity `body` persists; forced rebuild preserves `body` on omission; forced
+  rebuild overwrites `body` when supplied; `canon_facts` upsert with `terms[]` persists and is
+  retrievable; the existing `force`-gated skip still works, writing nothing on a repeat non-force
+  run).
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (629 pass, 10 skip, 0 fail). Confirmed `BibleStage*` never reaches an HTTP controller (grep
+  of `api-types.gen.ts` returns zero matches), so no api-types regeneration was needed.
+- Commit: 6e5f58a1
 
 ### P1-02 — Bible-builder world/power stage: structured `world_facts`
 
