@@ -88,6 +88,9 @@ export const mysteries = pgTable(
     openedChapter: integer('opened_chapter'),
     resolvedChapter: integer('resolved_chapter'),
     knownTo: varchar('known_to'),
+    // The canon_facts.factKey holding the mystery's answer — a loose key like every other entity/fact
+    // reference here, deliberately not an FK so a mystery can name its truth before the fact exists.
+    truthFactKey: varchar('truth_fact_key'),
     // Marked by the outliner/continuity-extraction as a deliberate running mystery, not an oversight —
     // novel-validation must not flag it as an unresolved-mystery issue while this is true.
     intentionallyOpen: boolean('intentionally_open').notNull().default(false),

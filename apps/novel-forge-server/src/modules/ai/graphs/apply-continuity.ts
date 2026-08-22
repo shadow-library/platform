@@ -89,6 +89,7 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
         openedChapter: chapter,
         resolvedChapter: mystery.status === 'resolved' ? chapter : null,
         intentionallyOpen: mystery.intentionallyOpen ?? false,
+        truthFactKey: mystery.truthFactKey ?? null,
       })
       .onConflictDoUpdate({
         target: [schema.mysteries.projectId, schema.mysteries.mysteryKey],
@@ -97,6 +98,7 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
           resolvedChapter: mystery.status === 'resolved' ? chapter : sql`mysteries.resolved_chapter`,
           question: sql`COALESCE(NULLIF(EXCLUDED.question, ''), mysteries.question)`,
           intentionallyOpen: sql`EXCLUDED.intentionally_open`,
+          truthFactKey: sql`COALESCE(EXCLUDED.truth_fact_key, mysteries.truth_fact_key)`,
           updatedAt: new Date(),
         },
       });

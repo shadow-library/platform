@@ -488,6 +488,30 @@ describe('Prompt modules', () => {
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [] }).success).toBe(true);
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], knowledgeCompliance: { compliant: false, issues: ['[ledger_forgery] leaked'] } }).success).toBe(true);
     });
+
+    it('outline v2.2 instructs the outliner to author contracts from catalog fact keys', () => {
+      expect(PROMPT_REGISTRY.outline.version).toBe('2.2.0');
+      expect(PROMPT_REGISTRY.outline.system).toContain('CANON FACTS');
+      expect(PROMPT_REGISTRY.outline.system).toContain('never invent one');
+      expect(PROMPT_REGISTRY.outline.system).toContain('"knowledgeContract": {"pov": ["entity-key"]');
+    });
+
+    it('outline schema accepts a brief with a knowledgeContract and keeps it optional', () => {
+      const brief = {
+        chapter: 1,
+        volumeKey: 'vol_01',
+        title: 't',
+        objective: 'o',
+        events: ['e'],
+        requiredContext: [],
+        pov: 'amara',
+        endingContract: { hookType: 'cliffhanger', emotionalBeat: 'b', openQuestion: 'q', handoffState: 'h', mustNotResolve: [] },
+      };
+      expect(parseSchema(PROMPT_REGISTRY.outline.schema, [brief]).success).toBe(true);
+      const withContract = { ...brief, knowledgeContract: { pov: ['amara', 'rook'], learns: [{ entityKey: 'amara', factKey: 'the_heir' }] } };
+      expect(parseSchema(PROMPT_REGISTRY.outline.schema, [withContract]).success).toBe(true);
+      expect(parseSchema(PROMPT_REGISTRY.outline.schema, [{ ...brief, knowledgeContract: { pov: [] } }]).success).toBe(false);
+    });
   });
 
   describe('ContinuitySchema (P1-05 characterStates/knowledgeChanges)', () => {
@@ -532,6 +556,12 @@ describe('Prompt modules', () => {
 
     it('accepts empty characterStates and knowledgeChanges arrays as the nothing-to-report case', () => {
       expect(parseSchema(ContinuitySchema, base).success).toBe(true);
+    });
+
+    it('carries an optional mystery truthFactKey pointing at a canon fact', () => {
+      const mystery = { mysteryKey: 'the_heir_mystery', status: 'open' as const };
+      expect(parseSchema(ContinuitySchema, { ...base, mysteries: [mystery] }).success).toBe(true);
+      expect(parseSchema(ContinuitySchema, { ...base, mysteries: [{ ...mystery, truthFactKey: 'the_heir' }] }).success).toBe(true);
     });
 
     it('rejects a payload missing characterStates or knowledgeChanges, matching the existing required-array convention', () => {

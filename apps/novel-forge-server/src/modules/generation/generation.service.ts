@@ -269,6 +269,7 @@ export class GenerationService {
       startsFromPreviousChapter?: boolean;
       handoffBeat?: string;
       endingContract?: Record<string, unknown>;
+      knowledgeContract?: Record<string, unknown>;
     }[];
 
     await this.dropUnresolvedContextRefs(projectId, chapters);
@@ -276,21 +277,19 @@ export class GenerationService {
     const upserted = await Promise.all(
       chapters.map(c => {
         const briefBody = renderBriefBody(c);
+        const values = {
+          volumeKey: c.volumeKey,
+          title: c.title,
+          body: briefBody,
+          contextRefs: c.requiredContext as never,
+          pov: c.pov ?? null,
+          endingContract: c.endingContract,
+          knowledgeContract: c.knowledgeContract ?? null,
+        };
         return this.db
           .insert(schema.briefs)
-          .values({
-            projectId,
-            chapter: c.chapter,
-            volumeKey: c.volumeKey,
-            title: c.title,
-            body: briefBody,
-            contextRefs: c.requiredContext as never,
-            endingContract: c.endingContract,
-          })
-          .onConflictDoUpdate({
-            target: [schema.briefs.projectId, schema.briefs.chapter],
-            set: { volumeKey: c.volumeKey, title: c.title, body: briefBody, contextRefs: c.requiredContext as never, endingContract: c.endingContract, updatedAt: new Date() },
-          })
+          .values({ projectId, chapter: c.chapter, ...values })
+          .onConflictDoUpdate({ target: [schema.briefs.projectId, schema.briefs.chapter], set: { ...values, updatedAt: new Date() } })
           .returning()
           .then(rows => rows[0]);
       }),
@@ -347,7 +346,9 @@ export class GenerationService {
         objective: string;
         events: string[];
         requiredContext: string[];
+        pov?: string;
         endingContract?: Record<string, unknown>;
+        knowledgeContract?: Record<string, unknown>;
       }[]
     ).filter(c => c.chapter >= (arc.chapterStart as number) && c.chapter <= (arc.chapterEnd as number));
 
@@ -365,7 +366,9 @@ export class GenerationService {
           title: c.title,
           body: briefBody,
           contextRefs: c.requiredContext as never,
+          pov: c.pov ?? null,
           endingContract: c.endingContract,
+          knowledgeContract: c.knowledgeContract ?? null,
           staleReason: null,
           handEdited: false,
         };

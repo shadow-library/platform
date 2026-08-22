@@ -54,6 +54,9 @@ export class ContinuityMystery {
     description: 'marked as a deliberate running mystery, not an oversight — novel-validation must not flag it as unresolved',
   })
   intentionallyOpen?: boolean;
+
+  @Field({ optional: true, description: 'corresponds to a canon_facts.factKey — the hidden fact that answers this mystery, when the prose has revealed which one it is' })
+  truthFactKey?: string;
 }
 
 @Schema()

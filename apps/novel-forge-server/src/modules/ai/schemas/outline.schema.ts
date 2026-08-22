@@ -1,6 +1,7 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
 import { EndingContractSchema } from './ending-contract.schema';
+import { KnowledgeContractSchema } from './knowledge-contract.schema';
 
 @Schema()
 export class ChapterBriefSchema {
@@ -49,6 +50,12 @@ export class ChapterBriefSchema {
       'how the chapter must end — end in the contracted hookType; closure modes (closure_with_momentum, earned_rest) still hand off momentum rather than fully resolving the arc',
   })
   endingContract: EndingContractSchema;
+
+  @Field(() => KnowledgeContractSchema, {
+    optional: true,
+    description: 'the cast whose ledgered knowledge bounds this chapter and the canon facts they learn on-page — omit when the chapter reveals nothing previously hidden',
+  })
+  knowledgeContract?: KnowledgeContractSchema;
 }
 
 export const OutlineSchema = [ChapterBriefSchema] as [typeof ChapterBriefSchema];
