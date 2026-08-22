@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 13
+- Completed: 14
 - In Progress: 0
-- Pending: 2
+- Pending: 1
 - Blocked: 0
 
 ## P1 Tasks
@@ -45,7 +45,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | P1-11 | P1       | Volume-completion epitome write (or explicitly drop the `volumes.epitome` column)                                                   | COMPLETED | —                                           |
 | P1-12 | P1       | Outliner authors `knowledgeContract`; persist `pov`; wire mystery `truthFactKey`                                                    | COMPLETED | —                                           |
 | P1-13 | P1       | Prompt-cache the generation path: `asStable` sections, `cacheStrategy`, fix rebrand/reforge stable-var bug                          | COMPLETED | —                                           |
-| P1-14 | P1       | Deterministic draft checks as a graph node before `judge` (word bounds, duplicated paragraphs, n-grams, cliché counts, tag density) | PENDING   | — (may reuse eval Track 2 metric functions) |
+| P1-14 | P1       | Deterministic draft checks as a graph node before `judge` (word bounds, duplicated paragraphs, n-grams, cliché counts, tag density) | COMPLETED | — (may reuse eval Track 2 metric functions) |
 | P1-15 | P1       | Judge gains a brief-fulfillment category (D33's accepted half)                                                                      | PENDING   | —                                           |
 
 ### P1-01 — Bible-builder characters stage: full entity `body` + initial `canon_facts`
@@ -633,6 +633,58 @@ segments as separate vars, `contextPack` no longer appears, `endingContract` is 
   - Consider reusing the metric-computation functions built for the §14 Track 2 evaluation script
     (`tests/eval/deterministic-metrics.ts` or wherever it lands) rather than re-implementing n-gram/
     cliché-counting logic a second time — check for that overlap before writing new code.
+
+**What changed:**
+
+- New pure module `src/modules/ai/graphs/mechanical-check.ts` exporting `checkDraftMechanics(body,
+priorBodies)`, reusing `src/modules/eval/deterministic-metrics.ts`'s `countWords`,
+  `computeCrossChapterRepeatedNgrams`, `computeStockPhraseCounts`, `computeDialogueTagMetrics`, and
+  the unified `WORD_TARGET_MIN`/`MAX` (1,800–2,600, from P0's D30). Duplicated-paragraph detection did
+  not exist anywhere in either the app or the eval tooling; added `findDuplicatedParagraphs` from
+  scratch (paragraph-boundary split, whitespace-normalized, ignores paragraphs under 20 words to
+  avoid flagging legitimate short repeats like a refrain or a shouted name).
+- Severity follows the generation prompt's own framing, not a fixed per-check-type rule: the prompt
+  already instructs the model to treat 1,800–2,600 words as "a guide, not a hard wall," so drifting
+  outside that band is a **soft** finding, while a wider structural floor/ceiling (1,200/3,200 words —
+  ~600 words of slack past the target) is **hard**. A verbatim duplicated paragraph is always hard —
+  never a stylistic nit. Repeated cross-chapter 5–8-grams (>5% overlap with the last 10 finished
+  chapters), stock-phrase counts (>5 hits), and dialogue-tag density outliers are soft only — prose-
+  quality signals that shouldn't auto-block a chapter over a threshold call. All thresholds are named
+  constants with a one-line rationale comment in the new module; none existed to reuse from the eval
+  module's own report code (it only exposed the raw metric functions, no pass/fail flags).
+- `mechanicalCheck` is a new graph node inserted on the single `persistDraft → judge` edge — the same
+  edge both a fresh draft and every repair-ladder loop already funnel through, so mechanical checks
+  re-run on every repair attempt for free without a second insertion point. It queries the last 10
+  finished (`status: 'done'`) chapters' `content` for the cross-chapter n-gram comparison.
+  `mechanicallyCompliant`/`mechanicalFindings` are new state fields; `judge` merges
+  `state.mechanicalFindings` into its own `findings` array (same pattern already used for the
+  knowledge-leak pre-scan), and `routeAfterJudge` gains `mechanicallyCompliant` as a fourth required
+  condition for the `accept` transition — mirroring the existing `endingCompliant`/`knowledgeCompliant`
+  gates exactly, so a hard mechanical finding forces the patch ladder even when the judge LLM itself
+  returns `consistent`, while soft findings ride into the persisted `judgeNote` and surface at review
+  without blocking.
+- **Deliberately out of scope**: `GenerationService.generateGrok` bypasses the LangGraph judge/patch-
+  ladder pipeline entirely (pre-existing behavior — grok drafts already skip `judge` and land straight
+  in the review queue) and is not covered by this check; wiring it in would be a separate, larger
+  change to that path's own architecture.
+- Three existing graph-level test fixtures (`checkpoint-resume`, `judge-fail-closed`, `repair-ladder`
+  specs) mocked the drafter with a 6-word stub body and asserted an `accepted` outcome — the new hard
+  word-count floor would now correctly block those. Replaced the stub with a new shared fixture,
+  `tests/fixtures/draft-body.ts`'s `FULL_LENGTH_DRAFT_BODY` (~1,896 words, in-band, still containing
+  the word "prose" exactly once so `repair-ladder`'s patch-anchor test still resolves uniquely) — no
+  assertion in any of those three files changed, only the fixture body.
+
+**Tests:** `tests/ai/mechanical-check.spec.ts` (13 pure unit tests — hard/soft word-count bounds,
+duplicate-paragraph detection incl. short-paragraph exemption, cross-chapter n-gram/cliché/tag-density
+soft findings, zero findings on a clean draft). `tests/ai/mechanical-check-graph.spec.ts` (5
+real-Postgres graph tests — a hard finding blocks `accept` even against a `consistent` judge verdict
+and routes into the repair ladder when `autoFix` is on; soft-only findings still reach `accept` while
+landing in `judgeNote`; a clean draft produces no `judgeNote`; the cross-chapter comparison reads the
+prior finished chapter's content).
+
+**Validation:** `bun scripts/verify.ts apps/novel-forge-server` — 707 pass, 0 fail, 10 skip.
+
+**Commit:** `d5d9688e`
 
 ### P1-15 — Judge brief-fulfillment category
 
