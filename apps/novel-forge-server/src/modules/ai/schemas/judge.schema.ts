@@ -32,6 +32,15 @@ export class KnowledgeComplianceSchema {
   issues: string[];
 }
 
+@Schema()
+export class BriefComplianceSchema {
+  @Field({ description: 'true when the draft delivers the objective and every planned event of the chapter brief' })
+  compliant: boolean;
+
+  @Field(() => [String], { description: 'each unfulfilled part of the brief, naming the objective or event the draft skips, defers, or replaces' })
+  issues: string[];
+}
+
 // A contradiction verdict must include at least one hard finding — expressed declaratively as a
 // JSON Schema if/then so AJV enforces the same cross-field rule zod's `.refine()` used to.
 @Schema({
@@ -53,6 +62,9 @@ export class JudgeSchema {
 
   @Field(() => KnowledgeComplianceSchema, { optional: true, description: 'assessment of the draft against the forbidden-knowledge list; omit when the task provided no list' })
   knowledgeCompliance?: KnowledgeComplianceSchema;
+
+  @Field(() => BriefComplianceSchema, { optional: true, description: 'assessment of the draft against the chapter brief it was written from' })
+  briefCompliance?: BriefComplianceSchema;
 }
 
 export type JudgeOutput = JudgeSchema;

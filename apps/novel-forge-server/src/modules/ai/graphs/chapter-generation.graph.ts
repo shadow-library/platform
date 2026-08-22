@@ -50,6 +50,7 @@ const ChapterGenAnnotation = Annotation.Root({
   endingCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
   knowledgeCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
   mechanicallyCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
+  briefCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
   mechanicalFindings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   findings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   previousFindings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
@@ -83,21 +84,23 @@ export function sameFinding(findings: JudgeFinding[], previousFindings: JudgeFin
   return false;
 }
 
-// Routing function after judge — exported for testing. Ending-contract, knowledge-leak and mechanical
-// violations ride the same repair ladder as continuity findings (refinement design §9.2,
-// character-knowledge design §6, harness D32) but never harden the verdict.
+// Routing function after judge — exported for testing. Ending-contract, knowledge-leak, mechanical and
+// brief-fulfillment violations ride the same repair ladder as continuity findings (refinement design §9.2,
+// character-knowledge design §6, harness D32/D33) but never harden the verdict.
 export function routeAfterJudge(
   state: Pick<ChapterGenState, 'verdict' | 'autoFix' | 'attempt' | 'maxFixes' | 'findings' | 'previousFindings'> & {
     endingCompliant?: boolean;
     knowledgeCompliant?: boolean;
     mechanicallyCompliant?: boolean;
+    briefCompliant?: boolean;
   },
 ): string {
   const endingCompliant = state.endingCompliant !== false;
   const knowledgeCompliant = state.knowledgeCompliant !== false;
   const mechanicallyCompliant = state.mechanicallyCompliant !== false;
+  const briefCompliant = state.briefCompliant !== false;
   if (state.verdict === 'evaluation_failed') return 'awaitReview';
-  if (state.verdict === 'consistent' && endingCompliant && knowledgeCompliant && mechanicallyCompliant) return 'accept';
+  if (state.verdict === 'consistent' && endingCompliant && knowledgeCompliant && mechanicallyCompliant && briefCompliant) return 'accept';
   if (!state.autoFix) return 'awaitReview';
   if (state.attempt >= state.maxFixes || sameFinding(state.findings, state.previousFindings)) return 'acceptAsIs';
   return 'repairPatch';
@@ -334,9 +337,11 @@ export function createChapterGenerationGraph(services: GraphServices) {
         ? `\n\n## FORBIDDEN KNOWLEDGE\n${renderForbiddenFacts(forbidden)}\n\nThe POV cast does not know these facts — assess the draft for leaks and include knowledgeCompliance in your JSON.`
         : '';
 
+    const briefBlock = `\n\n## BRIEF\n${brief?.body ?? ''}\n\nThis is the plan the chapter was written from — assess whether the draft delivers it and include briefCompliance in your JSON.`;
+
     const systemMsg = new SystemMessage(PROMPT_REGISTRY.judge.system);
     const humanMsg = new HumanMessage(
-      `Context:\n${renderedPack}\n\n---\nDraft prose to evaluate:\n${state.prose}${contractBlock}${knowledgeBlock}\n\nEvaluate this chapter draft for continuity and consistency with the established canon. Return a JSON object with verdict ("consistent" or "contradiction") and findings array.`,
+      `Context:\n${renderedPack}\n\n---\nDraft prose to evaluate:\n${state.prose}${briefBlock}${contractBlock}${knowledgeBlock}\n\nEvaluate this chapter draft for continuity and consistency with the established canon. Return a JSON object with verdict ("consistent" or "contradiction") and findings array.`,
     );
     const judgeMessages = [...(PROMPT_REGISTRY.judge.fewShots ?? []), systemMsg, humanMsg];
 
@@ -366,6 +371,10 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const endingCompliant = compliance ? compliance.compliant : true;
     if (compliance && !compliance.compliant) findings.push(...compliance.issues.map(issue => ({ severity: 'soft' as const, text: `ending contract: ${issue}` })));
 
+    const briefCompliance = judgeResult?.briefCompliance;
+    const briefCompliant = briefCompliance ? briefCompliance.compliant : true;
+    if (briefCompliance && !briefCompliance.compliant) findings.push(...briefCompliance.issues.map(issue => ({ severity: 'soft' as const, text: `brief: ${issue}` })));
+
     const knowledge = mergeKnowledgeCompliance(
       forbidden.length > 0 ? judgeResult?.knowledgeCompliance : undefined,
       forbidden.length > 0 ? scanKnowledgeLeaks(state.prose, forbidden) : [],
@@ -380,6 +389,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       findings: findings.length,
       endingCompliant,
       knowledgeCompliant: knowledge.knowledgeCompliant,
+      briefCompliant,
     });
 
     if (state.draftId) {
@@ -391,7 +401,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
         .where(eq(schema.drafts.id, BigInt(state.draftId)));
     }
 
-    return { verdict, findings, endingCompliant, knowledgeCompliant: knowledge.knowledgeCompliant };
+    return { verdict, findings, endingCompliant, knowledgeCompliant: knowledge.knowledgeCompliant, briefCompliant };
   }
 
   async function repairPatch(state: ChapterGenState) {

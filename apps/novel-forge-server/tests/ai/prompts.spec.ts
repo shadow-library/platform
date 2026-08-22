@@ -510,7 +510,6 @@ describe('Prompt modules', () => {
     });
 
     it('judge v2.2 explains the forbidden-knowledge assessment and its JSON field', () => {
-      expect(PROMPT_REGISTRY.judge.version).toBe('2.2.0');
       expect(PROMPT_REGISTRY.judge.system).toContain('## FORBIDDEN KNOWLEDGE');
       expect(PROMPT_REGISTRY.judge.system).toContain('knowledgeCompliance');
     });
@@ -542,6 +541,23 @@ describe('Prompt modules', () => {
       const withContract = { ...brief, knowledgeContract: { pov: ['amara', 'rook'], learns: [{ entityKey: 'amara', factKey: 'the_heir' }] } };
       expect(parseSchema(PROMPT_REGISTRY.outline.schema, [withContract]).success).toBe(true);
       expect(parseSchema(PROMPT_REGISTRY.outline.schema, [{ ...brief, knowledgeContract: { pov: [] } }]).success).toBe(false);
+    });
+  });
+
+  describe('brief fulfillment (judge v2.3, harness §11 item 7)', () => {
+    it('judge v2.3 asks for an unconditional brief-fulfillment assessment', () => {
+      expect(PROMPT_REGISTRY.judge.version).toBe('2.3.0');
+      expect(PROMPT_REGISTRY.judge.system).toContain('## BRIEF');
+      expect(PROMPT_REGISTRY.judge.system).toContain('briefCompliance');
+      expect(PROMPT_REGISTRY.judge.system).toContain('"briefCompliance": {"compliant": true/false, "issues": ["..."]} (always)');
+    });
+
+    it('judge schema accepts briefCompliance and keeps it optional', () => {
+      expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [] }).success).toBe(true);
+      expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], briefCompliance: { compliant: false, issues: ['the bribe never happens on-page'] } }).success).toBe(
+        true,
+      );
+      expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], briefCompliance: { compliant: false } }).success).toBe(false);
     });
   });
 

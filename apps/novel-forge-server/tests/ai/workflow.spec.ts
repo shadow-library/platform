@@ -122,6 +122,24 @@ describe('routeAfterJudge', () => {
     expect(routeAfterJudge({ verdict: 'consistent', autoFix: true, attempt: 0, maxFixes: 3, findings: [], previousFindings: [], knowledgeCompliant: true })).toBe('accept');
   });
 
+  it('routes an unfulfilled brief to repairPatch with autoFix even when the verdict is consistent', () => {
+    const state = {
+      verdict: 'consistent' as const,
+      attempt: 0,
+      maxFixes: 3,
+      findings: [{ severity: 'soft' as const, text: 'brief: the bribe is never dramatized' }],
+      previousFindings: [],
+      briefCompliant: false,
+    };
+    expect(routeAfterJudge({ ...state, autoFix: true })).toBe('repairPatch');
+    expect(routeAfterJudge({ ...state, autoFix: false })).toBe('awaitReview');
+  });
+
+  it('accepts a consistent verdict when the draft fulfills its brief, and when the judge reported nothing about it', () => {
+    expect(routeAfterJudge({ verdict: 'consistent', autoFix: true, attempt: 0, maxFixes: 3, findings: [], previousFindings: [], briefCompliant: true })).toBe('accept');
+    expect(routeAfterJudge({ verdict: 'consistent', autoFix: true, attempt: 0, maxFixes: 3, findings: [], previousFindings: [] })).toBe('accept');
+  });
+
   it('routes to awaitReview when the judge output was unparseable, regardless of autoFix', () => {
     const state = {
       verdict: 'evaluation_failed' as const,
