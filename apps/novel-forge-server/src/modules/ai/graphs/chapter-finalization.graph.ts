@@ -13,6 +13,7 @@ import { type IndexingService } from '../retrieval/indexing.service';
 import { type ContinuityOutput } from '../schemas';
 import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
+import { applyContinuityDelta } from './apply-continuity';
 
 export interface FinalizationServices {
   db: PrimaryDatabase;
@@ -155,94 +156,22 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     const projectId = BigInt(state.projectId);
     const delta = state.continuityDelta;
 
-    // Apply every canon mutation and mark the proposal applied in one transaction. A single failed
-    // row rolls the whole delta back and leaves the proposal `pending` — never a partial canon that
-    // reports success. Errors propagate so the run fails (and resumes) rather than silently swallowing.
+    // Apply every canon mutation, mark the proposal applied, and flag the chapter in one transaction. A
+    // single failed row rolls the whole delta back and leaves the proposal `pending` — never a partial
+    // canon that reports success. Errors propagate so the run fails (and resumes) rather than silently
+    // swallowing.
     await db.transaction(async tx => {
-      // Upsert appeared entities' appearances.
-      for (const entityKey of delta.appeared ?? []) {
-        const entity = await tx.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)) });
-        if (entity) {
-          await tx
-            .insert(schema.entityAppearances)
-            .values({ entityId: entity.id, projectId, chapter: state.chapter, firstChapter: state.chapter, lastChapter: state.chapter })
-            .onConflictDoNothing();
-        }
-      }
-
-      for (const ne of delta.newEntities ?? []) {
-        const [entity] = await tx
-          .insert(schema.entities)
-          .values({
-            projectId,
-            entityKey: ne.entityKey,
-            name: ne.name,
-            type: ne.type,
-            notes: ne.notes ?? null,
-            origin: 'generated',
-            status: 'active',
-            firstSeenChapter: state.chapter,
-          })
-          .onConflictDoUpdate({
-            target: [schema.entities.projectId, schema.entities.entityKey],
-            set: { name: sql`COALESCE(EXCLUDED.name, entities.name)`, updatedAt: new Date() },
-          })
-          .returning();
-        if (entity) {
-          await tx.insert(schema.entityAppearances).values({ entityId: entity.id, projectId, chapter: state.chapter }).onConflictDoNothing();
-        }
-      }
-
-      for (const t of delta.threads ?? []) {
-        await tx
-          .insert(schema.plotThreads)
-          .values({
-            projectId,
-            threadKey: t.threadKey,
-            status: t.status,
-            openedChapter: state.chapter,
-            summary: t.summary ?? null,
-            intentionallyOpen: t.intentionallyOpen ?? false,
-          })
-          .onConflictDoUpdate({
-            target: [schema.plotThreads.projectId, schema.plotThreads.threadKey],
-            set: {
-              status: sql`EXCLUDED.status`,
-              closedChapter: t.status === 'closed' ? state.chapter : sql`plot_threads.closed_chapter`,
-              summary: sql`COALESCE(EXCLUDED.summary, plot_threads.summary)`,
-              intentionallyOpen: sql`EXCLUDED.intentionally_open`,
-              updatedAt: new Date(),
-            },
-          });
-      }
-
-      for (const m of delta.mysteries ?? []) {
-        await tx
-          .insert(schema.mysteries)
-          .values({
-            projectId,
-            mysteryKey: m.mysteryKey,
-            status: m.status,
-            openedChapter: state.chapter,
-            question: m.question ?? '',
-            intentionallyOpen: m.intentionallyOpen ?? false,
-          })
-          .onConflictDoUpdate({
-            target: [schema.mysteries.projectId, schema.mysteries.mysteryKey],
-            set: {
-              status: sql`EXCLUDED.status`,
-              resolvedChapter: m.status === 'resolved' ? state.chapter : sql`mysteries.resolved_chapter`,
-              question: sql`COALESCE(EXCLUDED.question, mysteries.question)`,
-              intentionallyOpen: sql`EXCLUDED.intentionally_open`,
-              updatedAt: new Date(),
-            },
-          });
-      }
+      await applyContinuityDelta(tx, projectId, state.chapter, delta);
 
       await tx
         .update(schema.continuityProposals)
         .set({ status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, state.chapter)));
+
+      await tx
+        .update(schema.chapters)
+        .set({ continuityApplied: true, updatedAt: new Date() })
+        .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter)));
     });
 
     return {};

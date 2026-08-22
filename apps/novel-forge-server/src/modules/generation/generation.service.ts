@@ -12,6 +12,7 @@ import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, ty
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { type ContextSection } from '../ai/context/sections';
 import { truncateAtParagraph } from '../ai/context/token-budget';
+import { applyContinuityDelta } from '../ai/graphs/apply-continuity';
 import { type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService } from '../ai/model-router.service';
 import { buildOutlinePrompt, PROMPT_REGISTRY } from '../ai/prompts';
@@ -945,80 +946,7 @@ export class GenerationService {
     // Apply every canon mutation, mark the proposal applied, and flag the chapter in one transaction:
     // a partial application must never be recorded as `applied`.
     const updated = await this.db.transaction(async tx => {
-      if (delta.newEntities && delta.newEntities.length > 0) {
-        await tx
-          .insert(schema.entities)
-          .values(
-            delta.newEntities.map(e => ({
-              projectId,
-              entityKey: e.entityKey,
-              name: e.name,
-              type: e.type,
-              notes: e.notes,
-              origin: 'generated' as const,
-              firstSeenChapter: chapter,
-            })),
-          )
-          .onConflictDoNothing();
-      }
-
-      if (delta.appeared && delta.appeared.length > 0) {
-        const entityRows = await tx.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, delta.appeared)) });
-        for (const entity of entityRows) {
-          await tx.insert(schema.entityAppearances).values({ entityId: entity.id, projectId, chapter, firstChapter: chapter }).onConflictDoNothing();
-        }
-      }
-
-      if (delta.threads && delta.threads.length > 0) {
-        for (const t of delta.threads) {
-          await tx
-            .insert(schema.plotThreads)
-            .values({
-              projectId,
-              threadKey: t.threadKey,
-              status: t.status,
-              summary: t.summary,
-              openedChapter: t.status === 'open' ? chapter : undefined,
-              intentionallyOpen: t.intentionallyOpen ?? false,
-            })
-            .onConflictDoUpdate({
-              target: [schema.plotThreads.projectId, schema.plotThreads.threadKey],
-              set: {
-                status: t.status,
-                summary: t.summary,
-                closedChapter: t.status === 'closed' ? chapter : undefined,
-                intentionallyOpen: t.intentionallyOpen ?? false,
-                updatedAt: new Date(),
-              },
-            });
-        }
-      }
-
-      if (delta.mysteries && delta.mysteries.length > 0) {
-        for (const m of delta.mysteries) {
-          await tx
-            .insert(schema.mysteries)
-            .values({
-              projectId,
-              mysteryKey: m.mysteryKey,
-              status: m.status,
-              question: m.question ?? '',
-              openedChapter: m.status === 'open' ? chapter : undefined,
-              resolvedChapter: m.status === 'resolved' ? chapter : undefined,
-              intentionallyOpen: m.intentionallyOpen ?? false,
-            })
-            .onConflictDoUpdate({
-              target: [schema.mysteries.projectId, schema.mysteries.mysteryKey],
-              set: {
-                status: m.status,
-                question: m.question ?? undefined,
-                resolvedChapter: m.status === 'resolved' ? chapter : undefined,
-                intentionallyOpen: m.intentionallyOpen ?? false,
-                updatedAt: new Date(),
-              },
-            });
-        }
-      }
+      await applyContinuityDelta(tx, projectId, chapter, delta);
 
       const [row] = await tx
         .update(schema.continuityProposals)
