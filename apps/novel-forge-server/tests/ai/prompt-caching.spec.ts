@@ -52,7 +52,7 @@ describe('ModelRouterService cacheStrategy integration', () => {
     const router = makeRouter(fakeLlm);
     // The override is keyed by role 'chat' — reaching the anthropic model proves the router maps key
     // 'chat-refine' to role 'chat' before resolving the model.
-    const project = { config: { models: { chat: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4.6' } } } } as never;
+    const project = { config: { models: { chat: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } } } as never;
 
     const result = await router.structured<{ reply: string }>(chatRefinePrompt, input, ctx, project);
     expect(result.reply).toBe('sharper stakes proposed');
@@ -69,7 +69,7 @@ describe('ModelRouterService cacheStrategy integration', () => {
   it('keeps messages unmarked for a non-anthropic model on the same openrouter provider', async () => {
     const fakeLlm = { invoke: mock(async () => ({ content: JSON.stringify({ reply: 'ok' }) })) };
     const router = makeRouter(fakeLlm);
-    const project = { config: { models: { chat: { provider: 'openrouter', model: 'x-ai/grok-3' } } } } as never;
+    const project = { config: { models: { chat: { provider: 'openrouter', model: 'x-ai/grok-4.6' } } } } as never;
 
     await router.structured<{ reply: string }>(chatRefinePrompt, input, ctx, project);
 
@@ -99,7 +99,7 @@ describe('generation path caching', () => {
   it('breakpoints the stable pack and leaves the per-chapter tail uncached', async () => {
     const fakeLlm = { invoke: mock(async () => ({ content: JSON.stringify(draft) })) };
     const router = makeRouter(fakeLlm);
-    const project = { config: { models: { generation: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4.6' } } } } as never;
+    const project = { config: { models: { generation: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } } } as never;
 
     await router.structured(generationPrompt, input, ctx, project);
 

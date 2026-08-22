@@ -27,21 +27,21 @@ describe('ModelRouterService.resolveModel', () => {
   const stubTelemetry = {} as never;
   const router = new ModelRouterService(stubTelemetry, stubDatabaseService());
 
-  setConfig('ai.grok.llm.model', 'x-ai/grok-3');
+  setConfig('ai.grok.llm.model', 'x-ai/grok-4.6');
 
-  it('returns openrouter/x-ai/grok-3 for grok_only project regardless of role', () => {
+  it('returns openrouter/x-ai/grok-4.6 for grok_only project regardless of role', () => {
     const resolved = router.resolveModel('extraction', { contentMode: 'grok_only' });
     expect(resolved.provider).toBe('openrouter');
-    expect(resolved.model).toBe('x-ai/grok-3');
+    expect(resolved.model).toBe('x-ai/grok-4.6');
   });
 
   it('honours per-project config model override', () => {
     const resolved = router.resolveModel('judge', {
       contentMode: 'standard',
-      config: { models: { judge: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4.6' } } },
+      config: { models: { judge: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } },
     });
     expect(resolved.provider).toBe('openrouter');
-    expect(resolved.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(resolved.model).toBe('anthropic/claude-sonnet-5');
   });
 
   it('falls through to profile defaults when no override', () => {
@@ -53,24 +53,24 @@ describe('ModelRouterService.resolveModel', () => {
   it('grok_only overrides per-project model config', () => {
     const resolved = router.resolveModel('generation', {
       contentMode: 'grok_only',
-      config: { models: { generation: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4.6' } } },
+      config: { models: { generation: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } },
     });
     expect(resolved.provider).toBe('openrouter');
-    expect(resolved.model).toBe('x-ai/grok-3');
+    expect(resolved.model).toBe('x-ai/grok-4.6');
   });
 
   it('refinement chat inherits the planning selection when no chat model is set', () => {
-    const resolved = router.resolveModel('chat', { contentMode: 'standard', config: { models: { plan: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4.6' } } } });
+    const resolved = router.resolveModel('chat', { contentMode: 'standard', config: { models: { plan: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } } });
     expect(resolved.provider).toBe('openrouter');
-    expect(resolved.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(resolved.model).toBe('anthropic/claude-sonnet-5');
   });
 
   it('an explicit chat model overrides the planning inheritance', () => {
     const resolved = router.resolveModel('chat', {
       contentMode: 'standard',
-      config: { models: { plan: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4.6' }, chat: { provider: 'openrouter', model: 'x-ai/grok-3' } } },
+      config: { models: { plan: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' }, chat: { provider: 'openrouter', model: 'x-ai/grok-4.6' } } },
     });
-    expect(resolved.model).toBe('x-ai/grok-3');
+    expect(resolved.model).toBe('x-ai/grok-4.6');
   });
 
   it('maps every fine-grained role to a model group', () => {
@@ -85,12 +85,12 @@ describe('ModelRouterService.buildClient', () => {
   setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
 
   it('should let an explicitly resolved provider win over the registry entry for that model', () => {
-    expect(router.buildClient({ provider: 'ollama', model: 'x-ai/grok-3' })).toBeInstanceOf(ChatOllama);
+    expect(router.buildClient({ provider: 'ollama', model: 'x-ai/grok-4.6' })).toBeInstanceOf(ChatOllama);
   });
 
   it('should fall back to the registry provider when the resolution names none', () => {
-    expect(resolveProvider({ provider: '', model: 'x-ai/grok-3' })).toBe('openrouter');
-    expect(router.buildClient({ provider: '', model: 'x-ai/grok-3' })).toBeInstanceOf(ChatOpenAI);
+    expect(resolveProvider({ provider: '', model: 'x-ai/grok-4.6' })).toBe('openrouter');
+    expect(router.buildClient({ provider: '', model: 'x-ai/grok-4.6' })).toBeInstanceOf(ChatOpenAI);
   });
 
   it('should reject a model whose provider is neither resolved nor in the registry', () => {
@@ -98,11 +98,11 @@ describe('ModelRouterService.buildClient', () => {
   });
 
   it('should reject an image model, which the router never serves', () => {
-    expect(() => router.buildClient({ provider: '', model: 'grok-2-image' })).toThrow();
+    expect(() => router.buildClient({ provider: '', model: 'grok-imagine-image-2.0' })).toThrow();
   });
 
   it('should route every former vendor through one openrouter client carrying the gateway credential', () => {
-    for (const model of ['x-ai/grok-3', 'anthropic/claude-sonnet-4.6', 'openai/gpt-4o']) {
+    for (const model of ['x-ai/grok-4.6', 'anthropic/claude-sonnet-5', 'openai/gpt-5.4']) {
       const client = router.buildClient({ provider: 'openrouter', model }) as ChatOpenAI;
       expect(client.model).toBe(model);
       expect(client.clientConfig.baseURL).toBe('https://openrouter.ai/api/v1');
@@ -112,7 +112,7 @@ describe('ModelRouterService.buildClient', () => {
 
   it('should point the openrouter client at its configured base url', () => {
     setConfig('ai.openrouter.api.url', 'http://gateway/openrouter');
-    expect((router.buildClient({ provider: 'openrouter', model: 'x-ai/grok-3' }) as ChatOpenAI).clientConfig.baseURL).toBe('http://gateway/openrouter');
+    expect((router.buildClient({ provider: 'openrouter', model: 'x-ai/grok-4.6' }) as ChatOpenAI).clientConfig.baseURL).toBe('http://gateway/openrouter');
     setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
   });
 
@@ -125,9 +125,9 @@ describe('ModelRouterService.buildClient', () => {
 
 describe('supportsPromptCaching', () => {
   it('fires only for anthropic models routed through openrouter', () => {
-    expect(supportsPromptCaching({ provider: 'openrouter', model: 'anthropic/claude-sonnet-4.6' })).toBe(true);
-    expect(supportsPromptCaching({ provider: 'openrouter', model: 'x-ai/grok-3' })).toBe(false);
-    expect(supportsPromptCaching({ provider: 'openrouter', model: 'openai/gpt-4o' })).toBe(false);
+    expect(supportsPromptCaching({ provider: 'openrouter', model: 'anthropic/claude-sonnet-5' })).toBe(true);
+    expect(supportsPromptCaching({ provider: 'openrouter', model: 'x-ai/grok-4.6' })).toBe(false);
+    expect(supportsPromptCaching({ provider: 'openrouter', model: 'openai/gpt-5.4' })).toBe(false);
     expect(supportsPromptCaching({ provider: 'ollama', model: 'qwen3:14b' })).toBe(false);
   });
 
@@ -160,7 +160,7 @@ describe('MODEL_REGISTRY', () => {
 describe('PRODUCTION_DEFAULTS vs LOCAL_TEST_DEFAULTS', () => {
   it('production defaults route generation through openrouter', () => {
     expect(PRODUCTION_DEFAULTS.generation.provider).toBe('openrouter');
-    expect(PRODUCTION_DEFAULTS.generation.model).toBe('x-ai/grok-3');
+    expect(PRODUCTION_DEFAULTS.generation.model).toBe('x-ai/grok-4.6');
   });
 
   it('local-test defaults use ollama for all LLM roles', () => {

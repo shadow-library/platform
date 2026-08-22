@@ -19,8 +19,8 @@ Keys marked **required in prod** must be set when `APP_STAGE=prod`.
 | `AI_OPENROUTER_API_URL`   | `https://openrouter.ai/api/v1` | OpenRouter base URL (or in-cluster gateway)  |
 | `AI_XAI_IMAGE_API_KEY`    | —                              | xAI key for image generation only            |
 | `AI_OPENAI_IMAGE_API_KEY` | —                              | OpenAI key for image generation only         |
-| `AI_GROK_LLM_MODEL`       | `x-ai/grok-3`                  | Grok model id used by `grok_only` projects   |
-| `AI_GROK_IMAGE_MODEL`     | `grok-2-image`                 | xAI image model                              |
+| `AI_GROK_LLM_MODEL`       | `x-ai/grok-4.6`                | Grok model id used by `grok_only` projects   |
+| `AI_GROK_IMAGE_MODEL`     | `grok-imagine-image-2.0`       | xAI image model                              |
 | `AI_OLLAMA_HOST`          | `http://localhost:11434`       | Ollama server URL                            |
 | `AI_EMBEDDING_MODEL`      | `qwen3-embedding:8b`           | Embedding model for vector indexes           |
 | `AI_LANGSMITH_API_KEY`    | —                              | LangSmith API key (enables tracing when set) |

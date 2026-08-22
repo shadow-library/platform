@@ -51,7 +51,7 @@ export class IllustrationService {
     // own vendor credential.
     const apiKey = isGrokOnly ? Config.get('ai.xai.image.api.key') : Config.get('ai.openai.image.api.key');
     const url = isGrokOnly ? 'https://api.x.ai/v1/images/generations' : 'https://api.openai.com/v1/images/generations';
-    const model = isGrokOnly ? Config.get('ai.grok.image.model') : 'gpt-image-1';
+    const model = isGrokOnly ? Config.get('ai.grok.image.model') : 'gpt-image-2';
     // Fail closed rather than falling back to the chat credential.
     if (!apiKey) throw AppError.internal(`Image generation is not configured — set ${isGrokOnly ? 'AI_XAI_IMAGE_API_KEY' : 'AI_OPENAI_IMAGE_API_KEY'}`);
 
