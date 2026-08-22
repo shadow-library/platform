@@ -3,7 +3,7 @@ import { describe, expect, it, mock } from 'bun:test';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 
-import { getGroupDefaults, LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, ROLE_GROUP } from '@modules/ai/defaults';
+import { getGroupDefaults, LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, REASONING_POLICY, resolveReasoningEffort, ROLE_GROUP } from '@modules/ai/defaults';
 import { ModelRouterService, resolveProvider, supportsPromptCaching } from '@modules/ai/model-router.service';
 import { MODEL_REGISTRY } from '@modules/ai/models';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
@@ -118,6 +118,73 @@ describe('ModelRouterService.buildClient', () => {
     for (const role of ['generation', 'judge', 'chat'] as const) {
       expect(router.buildClient(LOCAL_TEST_DEFAULTS[role])).toBeInstanceOf(ChatOllama);
     }
+  });
+});
+
+describe('resolveReasoningEffort', () => {
+  it('should omit reasoning for an optional model under the helper "none" policy it cannot express', () => {
+    expect(REASONING_POLICY.helper).toBe('none');
+    expect(resolveReasoningEffort('anthropic/claude-sonnet-5', 'helper')).toBeUndefined();
+  });
+
+  it('should send "none" for an optional model that lists it as a supported effort', () => {
+    expect(resolveReasoningEffort('openai/gpt-5.6-luna', 'helper')).toBe('none');
+    expect(resolveReasoningEffort('openai/gpt-5.4-mini', 'helper')).toBe('none');
+  });
+
+  it('should send the policy effort for an optional model that supports it', () => {
+    expect(resolveReasoningEffort('anthropic/claude-sonnet-5', 'writing')).toBe('low');
+    expect(resolveReasoningEffort('openai/gpt-5.4', 'planning')).toBe('low');
+  });
+
+  it('should omit reasoning for an optional model that declares no effort scale', () => {
+    expect(resolveReasoningEffort('anthropic/claude-haiku-4.5', 'writing')).toBeUndefined();
+    expect(resolveReasoningEffort('anthropic/claude-haiku-4.5', 'helper')).toBeUndefined();
+  });
+
+  it('should clamp a mandatory model to its lowest effort when the policy asks for none', () => {
+    expect(resolveReasoningEffort('x-ai/grok-4.6', 'helper')).toBe('low');
+  });
+
+  it('should send the policy effort for a mandatory model that supports it', () => {
+    expect(resolveReasoningEffort('x-ai/grok-4.6', 'writing')).toBe('low');
+    expect(resolveReasoningEffort('x-ai/grok-4.6', 'review')).toBe('low');
+  });
+
+  it('should send nothing for a model with no reasoning metadata', () => {
+    expect(resolveReasoningEffort('qwen3:14b', 'writing')).toBeUndefined();
+    expect(resolveReasoningEffort('not-a-real-model', 'writing')).toBeUndefined();
+  });
+});
+
+describe('ModelRouterService.buildClient reasoning', () => {
+  const router = new ModelRouterService({} as never, stubDatabaseService());
+
+  setConfig('ai.openrouter.api.key', 'test-openrouter-key');
+  setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
+
+  it('should send no reasoning field when the caller names no role', () => {
+    const client = router.buildClient({ provider: 'openrouter', model: 'x-ai/grok-4.6' }) as ChatOpenAI;
+    expect(client.modelKwargs).toEqual({});
+  });
+
+  it('should clamp a mandatory model to its floor for a helper role', () => {
+    const client = router.buildClient({ provider: 'openrouter', model: 'x-ai/grok-4.6' }, { role: 'title' }) as ChatOpenAI;
+    expect(client.modelKwargs).toEqual({ reasoning: { effort: 'low' } });
+  });
+
+  it('should disable reasoning outright for an optional model on a helper role', () => {
+    const client = router.buildClient({ provider: 'openrouter', model: 'openai/gpt-5.6-luna' }, { role: 'compact' }) as ChatOpenAI;
+    expect(client.modelKwargs).toEqual({ reasoning: { effort: 'none' } });
+  });
+
+  it('should omit reasoning for an optional model with no effort scale', () => {
+    const client = router.buildClient({ provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' }, { role: 'epitome' }) as ChatOpenAI;
+    expect(client.modelKwargs).toEqual({});
+  });
+
+  it('should not disturb the ollama client, which disables thinking on its own', () => {
+    expect(router.buildClient({ provider: 'ollama', model: 'qwen3:14b' }, { role: 'title' })).toBeInstanceOf(ChatOllama);
   });
 });
 

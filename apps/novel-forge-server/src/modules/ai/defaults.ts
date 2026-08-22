@@ -1,3 +1,5 @@
+import { MODEL_MAP, type ReasoningEffort } from './models';
+
 export type AiRole =
   | 'extraction'
   | 'generation'
@@ -114,4 +116,30 @@ export function getGroupDefaults(): Record<ModelGroup, ResolvedModel> {
   const profile = process.env['AI_PROFILE'] ?? 'production';
   if (profile === 'local-test') return LOCAL_TEST_GROUP_DEFAULTS;
   return PRODUCTION_GROUP_DEFAULTS;
+}
+
+// How hard each group is allowed to think. Hidden reasoning tokens bill as output, so the mechanical
+// helper roles (title, compact, epitome) ask for none at all; every authoring group buys the cheapest
+// tier its model offers rather than the provider default, which is typically medium or high.
+export const REASONING_POLICY: Record<ModelGroup, ReasoningEffort> = {
+  writing: 'low',
+  planning: 'low',
+  review: 'low',
+  chat: 'low',
+  helper: 'none',
+  image: 'none',
+  embedding: 'none',
+};
+
+// Returns the effort to send, or undefined to omit the reasoning field entirely — which is itself how
+// an `optional` model is told not to reason. A `mandatory` model cannot be silenced, so a policy its
+// registry entry does not list clamps to the lowest tier it does.
+export function resolveReasoningEffort(model: string, group: ModelGroup): ReasoningEffort | undefined {
+  const reasoning = MODEL_MAP[model]?.reasoning;
+  if (!reasoning || reasoning.mode === 'none') return undefined;
+  const policy = REASONING_POLICY[group];
+  const efforts = reasoning.efforts;
+  if (efforts?.includes(policy)) return policy;
+  if (reasoning.mode === 'optional') return undefined;
+  return efforts?.at(-1);
 }

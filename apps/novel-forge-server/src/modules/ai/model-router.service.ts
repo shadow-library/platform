@@ -14,7 +14,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
-import { type AiRole, getGroupDefaults, getProfileDefaults, type ResolvedModel } from './defaults';
+import { type AiRole, getGroupDefaults, getProfileDefaults, type ResolvedModel, resolveReasoningEffort, ROLE_GROUP } from './defaults';
 import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
@@ -127,10 +127,20 @@ export class ModelRouterService {
   // Every hosted vendor is reached through OpenRouter's OpenAI-compatible endpoint, so one client
   // covers them all; `ai.openrouter.api.url` redirects the leg at an in-cluster gateway speaking the
   // same wire protocol. Ollama stays local and keeps its own client.
-  buildClient(resolved: ResolvedModel, opts?: { format?: string | Record<string, unknown> }): BaseChatModel {
+  buildClient(resolved: ResolvedModel, opts?: { format?: string | Record<string, unknown>; role?: AiRole }): BaseChatModel {
     switch (resolveProvider(resolved)) {
-      case 'openrouter':
-        return new ChatOpenAI({ model: resolved.model, apiKey: Config.get('ai.openrouter.api.key'), configuration: { baseURL: Config.get('ai.openrouter.api.url') } });
+      case 'openrouter': {
+        // OpenRouter takes reasoning control as a top-level `reasoning: { effort }` body field, which is
+        // not part of the OpenAI chat-completions schema — modelKwargs is what ChatOpenAI splices into
+        // the request verbatim. Omitting it entirely is what disables reasoning on `optional` models.
+        const effort = opts?.role ? resolveReasoningEffort(resolved.model, ROLE_GROUP[opts.role]) : undefined;
+        return new ChatOpenAI({
+          model: resolved.model,
+          apiKey: Config.get('ai.openrouter.api.key'),
+          configuration: { baseURL: Config.get('ai.openrouter.api.url') },
+          ...(effort ? { modelKwargs: { reasoning: { effort } } } : {}),
+        });
+      }
       case 'ollama':
         // Local reasoning models (e.g. qwen3) otherwise wrap answers in <think> blocks and prose that
         // make structured output unparseable. Disable thinking on every call, and — for structured
@@ -155,13 +165,13 @@ export class ModelRouterService {
   chatFor(role: AiRole, project?: ProjectConfig): BaseChatModel {
     const resolved = this.resolveModel(role, project);
     this.logger.debug(`Routing role=${role} to provider=${resolved.provider} model=${resolved.model}`);
-    return this.buildClient(resolved);
+    return this.buildClient(resolved, { role });
   }
 
   async structured<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, ctx: TelemetryContext, project?: ProjectConfig): Promise<T> {
     const role = promptModule.role ?? (promptModule.key as AiRole);
     const resolved = this.resolveModel(role, project);
-    const llm = this.buildClient(resolved, { format: toJsonSchemaFormat(promptModule.schema) });
+    const llm = this.buildClient(resolved, { format: toJsonSchemaFormat(promptModule.schema), role });
     const messages = await this.buildMessages(promptModule, input, resolved);
     // Input carries the rendered context pack and user prose — sensitive/large, so it rides on debug
     // (dev-only) as a full snapshot to reproduce the exact model call locally.
