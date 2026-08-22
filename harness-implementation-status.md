@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 6
+- Completed: 7
 - In Progress: 0
-- Pending: 9
+- Pending: 8
 - Blocked: 0
 
 ## P1 Tasks
@@ -38,7 +38,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | P1-04 | P1       | Volume planner (`plan()`) reads relevant bible documents, behind a rebuild flag                                                     | COMPLETED | P1-01, P1-02, P1-03                         |
 | P1-05 | P1       | Extend `ContinuitySchema` with `characterStates`/`knowledgeChanges` fields                                                          | COMPLETED | —                                           |
 | P1-06 | P1       | New `character_states` table (schema + migration)                                                                                   | COMPLETED | —                                           |
-| P1-07 | P1       | Finalization applies ALL extracted continuity fields transactionally; fixes `continuityApplied` dead-end (D7)                       | PENDING   | P1-05, P1-06                                |
+| P1-07 | P1       | Finalization applies ALL extracted continuity fields transactionally; fixes `continuityApplied` dead-end (D7)                       | COMPLETED | P1-05, P1-06                                |
 | P1-08 | P1       | Retire source-extraction overlap; drop or explicitly mark unused `timeline_events`/`power_progressions`                             | PENDING   | P1-07                                       |
 | P1-09 | P1       | Route `outlineArc` through `forOutline()`; deprecate/cap whole-book `outline()`                                                     | PENDING   | —                                           |
 | P1-10 | P1       | Reconciliation trigger every k finalized chapters (default 5, configurable) or on staleness                                         | PENDING   | P1-09                                       |
@@ -269,6 +269,54 @@ graph.spec.ts` (new — entity `body` persists; forced rebuild preserves `body` 
     auto-applying.
   - Not persisted: timeline events, power progression, emotion/trust scores, before/after diffs,
     repetition signatures (explicitly rejected in the recommendation doc).
+- What changed: the two independent apply paths (`chapter-finalization.graph.ts`'s automatic
+  `applyContinuity` node and `generation.service.ts`'s manual `applyContinuityProposal` endpoint)
+  had already drifted from each other while both discarded `relationships`/`characterStates`/
+  `knowledgeChanges` entirely. Extracted a single shared `applyContinuityDelta` (new
+  `src/modules/ai/graphs/apply-continuity.ts`) both now call inside their existing transactions.
+  Reconciling the drift surfaced three real bugs beyond the task's stated scope: entity-appearance
+  rows only got `firstChapter` from the service path (`lastChapter` stayed null — kept the graph's
+  full-bounds version); `plotThreads`/`mysteries` only set `closedChapter`/`resolvedChapter` on
+  _update_, so a thread first extracted already-closed landed with a permanently null close chapter
+  (now set on insert too); and the mystery upsert's `COALESCE(EXCLUDED.question, ...)` compared
+  against `''` (the insert default), never actual `NULL`, so it was a silent no-op that blanked an
+  existing question whenever a later extraction omitted it (fixed with `NULLIF(EXCLUDED.question,
+'')`). Added `relationships` → `entity_relationships` (entityKey resolved to id via a memoized
+  lookup shared with `appeared`, unresolvable keys logged and skipped, never fatal) and
+  `characterStates` → `character_states` (per-field `COALESCE`, matching the P1-01/P1-02 precedent —
+  an omitted field isn't nulled out). The graph's `applyContinuity` now also sets
+  `chapters.continuityApplied = true` in the same transaction as the D7 fix — the direct cause of
+  the dead-end (the manual endpoint's `pending`-only guard was never reachable for graph-finalized
+  chapters because the graph had already flipped the proposal to `'applied'` first).
+  - **Deviation from the literal doc text, deliberate and documented:** `knowledgeChanges` is
+    written NOWHERE. `character_knowledge` carries a hard, pre-existing invariant — "populated
+    deterministically from brief `learns` declarations at draft approval, never by AI extraction"
+    (`docs/character-knowledge-design.md` §4, also stated directly on the table's schema comment)
+    — because it's the single source of truth the deterministic knowledge-leak scanner and the
+    judge's forbidden-knowledge gate trust to decide what a character may safely reference. Auto-
+    applying an LLM's `knowledgeChanges` extraction (especially via the fully-automatic, unreviewed
+    graph path) risks a hallucinated or over-eager reveal silently marking a still-hidden fact as
+    "known," defeating the leak scanner for every subsequent chapter — the false-negative mirror of
+    the exact failure class this project's epistemic-ledger work exists to prevent. This satisfies
+    the recommendation doc's own general principle — "low-confidence extractor output routes
+    through the existing proposal-review flow instead of auto-applying" — more literally than
+    writing it would have: the raw `knowledgeChanges` array is already visible on the persisted
+    `continuity_proposals.proposal`, so a human reviewing it can act via the existing manual
+    fact-reveal endpoint (`POST /:factKey/reveal`) if they agree. No new endpoint/UI was built. The
+    reasoning is documented as a code comment at the point in `applyContinuityDelta` where the
+    handling would otherwise go, alongside the (unchanged, always-true) note that `timeline`/`power`
+    stay unpersisted per §6 of the recommendation doc.
+- Tests: `tests/ai/continuity-apply.spec.ts` (new) — the graph path sets `continuityApplied` (direct
+  D7 regression test); `relationships` persist from both apply paths, with unresolvable entity keys
+  skipped; `characterStates` upsert with COALESCE-preserve-on-omission verified across two chapters;
+  `knowledgeChanges` produce zero `character_knowledge` rows from either path (positive regression
+  guard for the deliberate exclusion); `timeline`/`power` still produce no writes anywhere; the
+  manual endpoint still works end-to-end for an edited pending proposal (confirms the shared-function
+  refactor didn't break its existing gate/behavior).
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (656 pass, 10 skip, 0 fail). Confirmed no api-types drift (internal application logic only,
+  no DTO/controller shape changed).
+- Commit: d965c78f
 
 ### P1-08 — Retire dead extraction paths
 
