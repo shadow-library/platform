@@ -66,16 +66,17 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
 
 // Group-level defaults are the single source of truth; the per-role maps below derive from them so the
 // router (which resolves per role) and the settings UI (which picks per group) never drift. `chat`
-// mirrors `planning`. Production routes every hosted chat role through OpenRouter (writing/planning/
-// review/chat → x-ai/grok-4.6, helper → x-ai/grok-4.1-fast); `image` names the vendor directly because
-// IllustrationService calls the vendor endpoint rather than the router.
+// mirrors `planning`. Production routes every hosted role through OpenRouter, including image
+// generation (writing/planning/review/chat → x-ai/grok-4.6, helper → x-ai/grok-4.1-fast, image →
+// x-ai/grok-imagine-image-2.0) — IllustrationService picks its own model per project rather than
+// calling `resolveModel('image', ...)`, so this entry is informational (settings UI) only.
 const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
   planning: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
   review: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
   chat: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
   helper: { provider: 'openrouter', model: 'x-ai/grok-4.1-fast' },
-  image: { provider: 'xai', model: 'grok-imagine-image-2.0' },
+  image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
 };
 

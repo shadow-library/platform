@@ -14,7 +14,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
-import { type AiRole, getProfileDefaults, type ResolvedModel } from './defaults';
+import { type AiRole, getGroupDefaults, getProfileDefaults, type ResolvedModel } from './defaults';
 import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
@@ -112,13 +112,16 @@ export class ModelRouterService {
   }
 
   resolveModel(role: AiRole, project?: ProjectConfig): ResolvedModel {
-    if (project?.contentMode === 'grok_only') return { provider: 'openrouter', model: Config.get('ai.grok.llm.model') };
+    // grok_only pins every role to the profile's own writing default rather than a separate config
+    // knob — now that every hosted role already resolves to a Grok model via OpenRouter, a dedicated
+    // "which Grok" override has nothing left to say that the profile defaults don't already say.
+    if (project?.contentMode === 'grok_only') return getGroupDefaults().writing;
     // The settings UI writes one selection across every role in a group, so group members resolve identically.
     const models = project?.config?.models as Record<string, ResolvedModel> | undefined;
     const projectModel = models?.[role];
     if (projectModel) return projectModel;
     if (role === 'chat' && models?.['plan']) return models['plan'];
-    return getProfileDefaults()[role] ?? { provider: 'openrouter', model: Config.get('ai.grok.llm.model') };
+    return getProfileDefaults()[role] ?? getGroupDefaults().writing;
   }
 
   // Every hosted vendor is reached through OpenRouter's OpenAI-compatible endpoint, so one client

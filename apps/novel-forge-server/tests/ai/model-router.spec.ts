@@ -3,7 +3,7 @@ import { describe, expect, it, mock } from 'bun:test';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 
-import { LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, ROLE_GROUP } from '@modules/ai/defaults';
+import { getGroupDefaults, LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, ROLE_GROUP } from '@modules/ai/defaults';
 import { ModelRouterService, resolveProvider, supportsPromptCaching } from '@modules/ai/model-router.service';
 import { MODEL_REGISTRY } from '@modules/ai/models';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
@@ -27,12 +27,10 @@ describe('ModelRouterService.resolveModel', () => {
   const stubTelemetry = {} as never;
   const router = new ModelRouterService(stubTelemetry, stubDatabaseService());
 
-  setConfig('ai.grok.llm.model', 'x-ai/grok-4.6');
-
-  it('returns openrouter/x-ai/grok-4.6 for grok_only project regardless of role', () => {
+  it('returns the profile writing default for grok_only project regardless of role', () => {
     const resolved = router.resolveModel('extraction', { contentMode: 'grok_only' });
-    expect(resolved.provider).toBe('openrouter');
-    expect(resolved.model).toBe('x-ai/grok-4.6');
+    expect(resolved.provider).toBe(getGroupDefaults().writing.provider);
+    expect(resolved.model).toBe(getGroupDefaults().writing.model);
   });
 
   it('honours per-project config model override', () => {
@@ -55,8 +53,8 @@ describe('ModelRouterService.resolveModel', () => {
       contentMode: 'grok_only',
       config: { models: { generation: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } },
     });
-    expect(resolved.provider).toBe('openrouter');
-    expect(resolved.model).toBe('x-ai/grok-4.6');
+    expect(resolved.provider).toBe(getGroupDefaults().writing.provider);
+    expect(resolved.model).toBe(getGroupDefaults().writing.model);
   });
 
   it('refinement chat inherits the planning selection when no chat model is set', () => {

@@ -1,12 +1,9 @@
 export type ModelKind = 'llm' | 'embedding' | 'image';
 export type ModelProvider = 'openrouter' | 'ollama';
-// Image models never reach the router: IllustrationService posts to the vendor endpoint directly with
-// its own credential, so these name the vendor rather than a routed provider.
-export type ImageProvider = 'xai' | 'openai';
 
 export interface ModelEntry {
   id: string;
-  provider: ModelProvider | ImageProvider;
+  provider: ModelProvider;
   kind: ModelKind;
   contextWindow?: number;
   inputPricePerMToken?: number;
@@ -40,7 +37,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsStructuredOutput: true,
   },
   // xAI image
-  { id: 'grok-imagine-image-2.0', provider: 'xai', kind: 'image' },
+  { id: 'x-ai/grok-imagine-image-2.0', provider: 'openrouter', kind: 'image' },
   // Anthropic
   {
     id: 'anthropic/claude-sonnet-5',
@@ -83,7 +80,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsTools: true,
     supportsStructuredOutput: true,
   },
-  { id: 'gpt-image-2', provider: 'openai', kind: 'image' },
+  { id: 'openai/gpt-5.4-image-2', provider: 'openrouter', kind: 'image' },
   // Ollama (local — no pricing, variable context)
   { id: 'qwen3:14b', provider: 'ollama', kind: 'llm', supportsTools: false, supportsStructuredOutput: false },
   { id: 'qwen3:8b', provider: 'ollama', kind: 'llm', supportsTools: false, supportsStructuredOutput: false },

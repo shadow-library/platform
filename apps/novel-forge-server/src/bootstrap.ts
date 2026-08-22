@@ -11,13 +11,6 @@ declare module '@shadow-library/common' {
     /** Points the OpenRouter leg at an in-cluster gateway speaking the same OpenAI-compatible protocol. */
     'ai.openrouter.api.url': string;
 
-    /** Direct vendor credential for image generation. Never reuse a gateway bearer token. */
-    'ai.openai.image.api.key': string | undefined;
-    /** Direct vendor credential for image generation. Never reuse a gateway bearer token. */
-    'ai.xai.image.api.key': string | undefined;
-
-    'ai.grok.llm.model': string;
-    'ai.grok.image.model': string;
     'ai.ollama.host': string;
     'ai.embedding.model': string;
 
@@ -40,10 +33,6 @@ Config.load('server.host', { defaultValue: '0.0.0.0' });
 Config.load('ai.profile', { defaultValue: 'production', allowedValues: ['production', 'local-test'] });
 Config.load('ai.openrouter.api.key');
 Config.load('ai.openrouter.api.url', { defaultValue: 'https://openrouter.ai/api/v1' });
-Config.load('ai.openai.image.api.key');
-Config.load('ai.xai.image.api.key');
-Config.load('ai.grok.llm.model', { defaultValue: 'x-ai/grok-4.6' });
-Config.load('ai.grok.image.model', { defaultValue: 'grok-imagine-image-2.0' });
 Config.load('ai.ollama.host', { defaultValue: 'http://localhost:11434' });
 Config.load('ai.embedding.model', { defaultValue: 'qwen3-embedding:8b' });
 Config.load('ai.llm.timeout-ms', { defaultValue: '300000', validateType: 'number' });

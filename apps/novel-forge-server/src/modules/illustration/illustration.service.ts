@@ -45,23 +45,20 @@ export class IllustrationService {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     const isGrokOnly = project?.contentMode === 'grok_only';
 
-    // Deliberately not `ai.openrouter.api.key`. That holds an OpenRouter (or in-cluster gateway) bearer
-    // token, while the URLs below are the vendors' own endpoints — reusing it here would post a host
-    // credential to a third party. Image generation never routes through the gateway, so it needs its
-    // own vendor credential.
-    const apiKey = isGrokOnly ? Config.get('ai.xai.image.api.key') : Config.get('ai.openai.image.api.key');
-    const url = isGrokOnly ? 'https://api.x.ai/v1/images/generations' : 'https://api.openai.com/v1/images/generations';
-    const model = isGrokOnly ? Config.get('ai.grok.image.model') : 'gpt-image-2';
-    // Fail closed rather than falling back to the chat credential.
-    if (!apiKey) throw AppError.internal(`Image generation is not configured — set ${isGrokOnly ? 'AI_XAI_IMAGE_API_KEY' : 'AI_OPENAI_IMAGE_API_KEY'}`);
+    // Same gateway credential as chat — OpenRouter's unified image API proxies both vendors, so image
+    // generation no longer needs its own vendor-specific key.
+    const apiKey = Config.get('ai.openrouter.api.key');
+    const url = `${Config.get('ai.openrouter.api.url')}/images`;
+    const model = isGrokOnly ? 'x-ai/grok-imagine-image-2.0' : 'openai/gpt-5.4-image-2';
+    if (!apiKey) throw AppError.internal('Image generation is not configured — set AI_OPENROUTER_API_KEY');
 
     // The full prompt is sensitive/verbose — dev-only debug is where it belongs.
-    this.logger.debug('generateImage: requesting', { projectId, provider: isGrokOnly ? 'xai' : 'openai', model, instruction });
+    this.logger.debug('generateImage: requesting', { projectId, model, instruction });
     const startedAt = Date.now();
     const res = await fetch(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, prompt: instruction, n: 1, size: '1024x1024', response_format: 'b64_json' }),
+      body: JSON.stringify({ model, prompt: instruction, n: 1 }),
     });
 
     if (!res.ok) {
