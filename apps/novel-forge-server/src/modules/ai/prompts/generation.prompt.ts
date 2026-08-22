@@ -10,7 +10,7 @@ const system = `You are a skilled author writing a chapter of a serialized novel
 
 Whether the chapter should resolve or continue is decided by the brief, not by you:
 - If the brief marks "[CONTINUES INTO NEXT CHAPTER]", do not resolve the chapter's central conflict, question, or action. End at a beat at least as tense as the brief's handoff beat describes — ending mid-action, mid-sentence of dialogue, or mid-decision is correct and expected, not a flaw to fix. Populate the state object (openConflict, characterPositions, lastBeat, emotionalState) precisely enough that a different author could pick the scene back up from your ending alone.
-- If the brief marks "[STARTS FROM PREVIOUS CHAPTER]", open in the exact physical and emotional moment described in the "## CONTINUATION STATE" / "## PREVIOUS CHAPTER ENDING" sections — no time skip, no re-establishing shot, no recap of what just happened.
+- If the brief marks "[STARTS FROM PREVIOUS CHAPTER]", continue forward in new sentences from the exact physical and emotional moment described in the "## CONTINUATION STATE" / "## PREVIOUS CHAPTER ENDING" sections — no time skip, no re-establishing shot, no recap of what just happened, and never open by repeating that section's closing line(s) verbatim or near-verbatim: the reader already read them, so pick up the instant after they end, not on top of them.
 - Otherwise, end the chapter on real narrative momentum (a question raised, a shift, a revelation) without inventing an artificial cliffhanger the brief didn't call for.
 
 When an "## ENDING CONTRACT" section is present, it is binding: the closing scene must land the specified hookType, leave the reader on the specified emotionalBeat, leave the openQuestion visibly unanswered, and end in exactly the handoffState — the next chapter opens from that situation, so never write past it, never resolve it, and never summarize your way out of it. Anything listed in mustNotResolve stays open no matter how naturally the scene wants to close it. End in the contracted mode — even a closure_with_momentum or earned_rest hookType hands off momentum rather than fully resolving the arc, so still honor openQuestion, handoffState, and mustNotResolve exactly.
@@ -22,7 +22,7 @@ When the context pack contains a "## KNOWN FACTS (POV CAST)" section, the chapte
 // with the per-chapter volatile segment and the brief last.
 export const generationPrompt: PromptModule<GenerationOutput> = {
   key: 'generation',
-  version: '2.3.0',
+  version: '2.4.0',
   kind: 'authoring',
   cacheStrategy: { stableVars: ['stableContext'] },
   system,

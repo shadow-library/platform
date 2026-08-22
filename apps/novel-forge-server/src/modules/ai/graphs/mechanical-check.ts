@@ -3,6 +3,8 @@ import {
   computeDialogueTagMetrics,
   computeStockPhraseCounts,
   countWords,
+  ngrams,
+  tokenizeWords,
   WORD_TARGET_MAX,
   WORD_TARGET_MIN,
 } from '../../eval/deterministic-metrics';
@@ -35,6 +37,29 @@ export const DIALOGUE_TAG_RATE_MIN_SAMPLE = 10;
 
 // "Said" should carry most attributions; a majority of exotic alternatives is the classic said-bookism tell.
 export const SAID_ALTERNATIVE_RATE_MAX = 0.5;
+
+// How much of the opening/closing to compare for a boundary echo, and how long a shared run has to be
+// before it's unambiguously the same sentence rather than incidental phrase reuse (e.g. a character's
+// name and a stock verb landing in both windows by chance).
+export const BOUNDARY_ECHO_WINDOW_WORDS = 60;
+export const BOUNDARY_ECHO_NGRAM_SIZE = 6;
+
+/**
+ * Detects a chapter opening by repeating the previous chapter's closing verbatim (or near-verbatim) —
+ * a "no time skip, no recap" instruction taken too literally: the model echoes the shown context
+ * instead of continuing past it. Compares only the immediate boundary (last ~60 words of the prior
+ * chapter vs first ~60 of this one), not the whole chapter — unlike ordinary cross-chapter phrase
+ * reuse, a shared run right at the seam is never coincidental.
+ */
+export function findBoundaryEcho(body: string, prevBody: string | undefined): string | null {
+  if (!prevBody) return null;
+  const opening = tokenizeWords(body).slice(0, BOUNDARY_ECHO_WINDOW_WORDS);
+  const closing = tokenizeWords(prevBody).slice(-BOUNDARY_ECHO_WINDOW_WORDS);
+  if (opening.length < BOUNDARY_ECHO_NGRAM_SIZE || closing.length < BOUNDARY_ECHO_NGRAM_SIZE) return null;
+  const openingGrams = new Set(ngrams(opening, BOUNDARY_ECHO_NGRAM_SIZE));
+  const shared = ngrams(closing, BOUNDARY_ECHO_NGRAM_SIZE).find(gram => openingGrams.has(gram));
+  return shared ?? null;
+}
 
 function splitParagraphs(body: string): string[] {
   return body
@@ -73,6 +98,11 @@ export function checkDraftMechanics(body: string, priorBodies: string[] = []): J
 
   for (const paragraph of findDuplicatedParagraphs(body)) {
     findings.push({ severity: 'hard', text: `mechanical: a paragraph is repeated verbatim — "${excerpt(paragraph)}"` });
+  }
+
+  const boundaryEcho = findBoundaryEcho(body, priorBodies[0]);
+  if (boundaryEcho) {
+    findings.push({ severity: 'hard', text: `mechanical: chapter opens by repeating the previous chapter's ending verbatim — "${excerpt(boundaryEcho)}"` });
   }
 
   if (priorBodies.length > 0) {

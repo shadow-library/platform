@@ -12,7 +12,10 @@ export interface BriefBodyInput {
 export function renderBriefBody(c: BriefBodyInput): string {
   const lines = [c.objective, ...(c.events ?? [])];
   if (c.continuesIntoNextChapter) lines.push("[CONTINUES INTO NEXT CHAPTER] Do not resolve this chapter's central action/tension.");
-  if (c.startsFromPreviousChapter) lines.push('[STARTS FROM PREVIOUS CHAPTER] Open in the exact beat the previous chapter handed off — no time skip, no recap.');
+  if (c.startsFromPreviousChapter)
+    lines.push(
+      "[STARTS FROM PREVIOUS CHAPTER] Continue forward in new sentences from the exact beat the previous chapter handed off — no time skip, no recap, and never repeat the previous chapter's closing line(s) verbatim; the reader already read them.",
+    );
   if (c.handoffBeat) lines.push(`Handoff beat: ${c.handoffBeat}`);
   return lines.join('\n');
 }

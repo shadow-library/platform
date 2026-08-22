@@ -502,7 +502,7 @@ describe('Prompt modules', () => {
 
   describe('knowledge contract (generation/judge v2.2, character-knowledge design §5–6)', () => {
     it('generation v2.2 states the epistemic rule for the knowledge sections', () => {
-      expect(PROMPT_REGISTRY.generation.version).toBe('2.3.0');
+      expect(PROMPT_REGISTRY.generation.version).toBe('2.4.0');
       expect(PROMPT_REGISTRY.generation.system).toContain('## KNOWN FACTS (POV CAST)');
       expect(PROMPT_REGISTRY.generation.system).toContain('## REVEALED THIS CHAPTER');
       expect(PROMPT_REGISTRY.generation.system).toContain('## BEHAVIORAL CONSTRAINTS');
