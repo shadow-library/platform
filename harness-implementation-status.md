@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 4
+- Completed: 5
 - In Progress: 0
-- Pending: 11
+- Pending: 10
 - Blocked: 0
 
 ## P1 Tasks
@@ -36,7 +36,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | P1-02 | P1       | Bible-builder world/power stage emits structured `world_facts`                                                                      | COMPLETED | —                                           |
 | P1-03 | P1       | Add `bible_doc:`/`fact:` ref prefixes to `ContextAssembler.resolveRefs`                                                             | COMPLETED | P1-01, P1-02                                |
 | P1-04 | P1       | Volume planner (`plan()`) reads relevant bible documents, behind a rebuild flag                                                     | COMPLETED | P1-01, P1-02, P1-03                         |
-| P1-05 | P1       | Extend `ContinuitySchema` with `characterStates`/`knowledgeChanges` fields                                                          | PENDING   | —                                           |
+| P1-05 | P1       | Extend `ContinuitySchema` with `characterStates`/`knowledgeChanges` fields                                                          | COMPLETED | —                                           |
 | P1-06 | P1       | New `character_states` table (schema + migration)                                                                                   | PENDING   | —                                           |
 | P1-07 | P1       | Finalization applies ALL extracted continuity fields transactionally; fixes `continuityApplied` dead-end (D7)                       | PENDING   | P1-05, P1-06                                |
 | P1-08 | P1       | Retire source-extraction overlap; drop or explicitly mark unused `timeline_events`/`power_progressions`                             | PENDING   | P1-07                                       |
@@ -200,6 +200,30 @@ graph.spec.ts` (new — entity `body` persists; forced rebuild preserves `body` 
     (P1-07).
   - Prompt instructs "extract only what the prose establishes, with an evidence excerpt; empty
     arrays are correct."
+- What changed: `continuity.schema.ts` gained `ContinuityCharacterState` (`entityKey` required;
+  `location`/`conditions: string[]`/`immediateGoal`/`statusNote` all optional; `evidence` required —
+  the only non-optional field beyond `entityKey`, matching the recommendation doc's exact shape) and
+  `ContinuityKnowledgeChange` (`entityKey`/`factKey`/`how`, all required). `ContinuitySchema` gained
+  `characterStates`/`knowledgeChanges` as required (non-optional) array fields, matching the existing
+  convention every other extraction array in this schema already uses (`threads`, `mysteries`,
+  `timeline`, `relationships`, `power`) — the model must emit `[]`, not omit the field, when there's
+  nothing to report. `continuity.prompt.ts` (bumped `1.0.0` → `1.1.0`) now instructs the model to
+  extract character states (explicitly "replaces, not merges" the prior state — sets up how P1-07
+  will later apply it) and knowledge changes, plus the recommendation doc's verbatim-in-spirit
+  instruction: "extract only what the prose establishes, with an evidence excerpt; empty arrays are
+  correct." Confirmed `chapter-finalization.graph.ts`'s `extractContinuity` needed zero changes — it
+  persists the whole `delta` object as an opaque jsonb blob with no field-level destructuring, so the
+  richer payload flows through unchanged. This task is schema-and-prompt only; `character_states`
+  (P1-06) and the transactional apply (P1-07) are separate, not-yet-started tasks.
+- Tests: `tests/ai/prompts.spec.ts` — new `ContinuitySchema (P1-05 characterStates/knowledgeChanges)`
+  describe block: parses a populated payload; rejects a `characterStates` entry missing `evidence`;
+  accepts empty arrays for both new fields; rejects a payload omitting either new field (regression
+  guard matching the required-array convention).
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (645 pass, 10 skip, 0 fail). Confirmed no api-types drift (`ContinuitySchema` is purely
+  internal to the LLM extraction call, never exposed via HTTP — the web-facing continuity-proposal
+  DTOs are a separate, untyped-jsonb surface).
+- Commit: 0211cffb
 
 ### P1-06 — New `character_states` table
 
