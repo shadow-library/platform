@@ -1,4 +1,4 @@
-import { Field, Schema } from '@shadow-library/class-schema';
+import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
 import { EntitySignificance, EntityType } from '@server/common';
 import { type Knowledge } from '@server/database';
@@ -19,6 +19,30 @@ export class BibleStageEntity {
 
   @Field({ optional: true })
   notes?: string;
+
+  @Field({ optional: true, description: 'full entity card prose — voice, motivations, relationships, backstory beats that shape present behavior' })
+  body?: string;
+}
+
+@Schema()
+export class BibleStageFact {
+  @Field({ minLength: 1 })
+  factKey: string;
+
+  @Field({ minLength: 1 })
+  text: string;
+
+  @Field(() => [String], { optional: true })
+  subjects?: string[];
+
+  @Field({ optional: true })
+  constraintNote?: string;
+
+  @Field(() => [String], { optional: true })
+  terms?: string[];
+
+  @Field(() => Integer, { optional: true, minimum: 1 })
+  revealChapter?: number;
 }
 
 @Schema()
@@ -28,6 +52,9 @@ export class BibleStageSchema {
 
   @Field(() => [BibleStageEntity], { optional: true, description: 'entities introduced in this section, if applicable' })
   entities?: BibleStageEntity[];
+
+  @Field(() => [BibleStageFact], { optional: true, description: 'canon facts established in this section, if applicable' })
+  facts?: BibleStageFact[];
 }
 
 export type BibleStageOutput = BibleStageSchema;

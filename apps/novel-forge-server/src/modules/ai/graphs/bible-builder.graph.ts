@@ -119,14 +119,49 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
             type: e.type,
             significance: e.significance ?? null,
             notes: e.notes ?? null,
+            body: e.body ?? null,
             origin: 'generated',
             status: 'active',
           })
           .onConflictDoUpdate({
             target: [schema.entities.projectId, schema.entities.entityKey],
-            set: { name: sql`COALESCE(EXCLUDED.name, entities.name)`, notes: sql`COALESCE(EXCLUDED.notes, entities.notes)`, updatedAt: new Date() },
+            set: {
+              name: sql`COALESCE(EXCLUDED.name, entities.name)`,
+              notes: sql`COALESCE(EXCLUDED.notes, entities.notes)`,
+              body: sql`COALESCE(EXCLUDED.body, entities.body)`,
+              updatedAt: new Date(),
+            },
           })
           .catch(err => logger.warn(`bible-builder entity upsert error`, { err, entityKey: e.entityKey }));
+      }
+    }
+
+    // Upsert canon facts if present.
+    if (result.facts && result.facts.length > 0) {
+      for (const f of result.facts) {
+        await db
+          .insert(schema.canonFacts)
+          .values({
+            projectId,
+            factKey: f.factKey,
+            text: f.text,
+            subjects: f.subjects ?? null,
+            constraintNote: f.constraintNote ?? null,
+            terms: f.terms ?? null,
+            revealChapter: f.revealChapter ?? null,
+          })
+          .onConflictDoUpdate({
+            target: [schema.canonFacts.projectId, schema.canonFacts.factKey],
+            set: {
+              text: sql`COALESCE(EXCLUDED.text, canon_facts.text)`,
+              subjects: sql`COALESCE(EXCLUDED.subjects, canon_facts.subjects)`,
+              constraintNote: sql`COALESCE(EXCLUDED.constraint_note, canon_facts.constraint_note)`,
+              terms: sql`COALESCE(EXCLUDED.terms, canon_facts.terms)`,
+              revealChapter: sql`COALESCE(EXCLUDED.reveal_chapter, canon_facts.reveal_chapter)`,
+              updatedAt: new Date(),
+            },
+          })
+          .catch(err => logger.warn(`bible-builder fact upsert error`, { err, factKey: f.factKey }));
       }
     }
 

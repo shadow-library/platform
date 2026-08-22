@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { buildChatRefinePrompt, buildOutlinePrompt, PROMPT_REGISTRY, SCOPE_PLAYBOOKS } from '@modules/ai/prompts';
 import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
 import {
+  BibleStageSchema,
   ChatRefineSchema,
   EndingContractSchema,
   ExtractionSchema,
@@ -93,6 +94,44 @@ describe('Prompt modules', () => {
 
     it('accepts rewrite with body', () => {
       expect(parseSchema(FixSchema, { action: 'rewrite', body: 'Full replacement chapter prose.' }).success).toBe(true);
+    });
+  });
+
+  describe('BibleStageSchema (characters stage)', () => {
+    it('parses an entity with a full body card and stage-level facts with terms', () => {
+      const output = {
+        body: 'Characters bible prose...',
+        entities: [
+          {
+            entityKey: 'amara',
+            name: 'Detective Amara',
+            type: 'character',
+            significance: 'major',
+            notes: 'Short blurb.',
+            body: 'Full entity card: voice, motivations, relationships, backstory beats.',
+          },
+        ],
+        facts: [
+          {
+            factKey: 'amara_secret_past',
+            text: 'Amara was once the forger the ledger investigation targets.',
+            subjects: ['amara'],
+            constraintNote: 'Narration must not state Amara forged documents before the reveal chapter.',
+            terms: ['forger', 'forged the ledger'],
+            revealChapter: 12,
+          },
+        ],
+      };
+      const parsed = parseSchema(BibleStageSchema, output);
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+      expect((parsed.data as typeof output).entities?.[0]?.body).toBe(output.entities[0]!.body);
+      expect((parsed.data as typeof output).facts?.[0]?.terms).toEqual(['forger', 'forged the ledger']);
+    });
+
+    it('accepts entities and facts as optional, so other stages with neither still parse', () => {
+      const parsed = parseSchema(BibleStageSchema, { body: 'Foundation prose only.' });
+      expect(parsed.success).toBe(true);
     });
   });
 
