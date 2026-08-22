@@ -2,9 +2,11 @@ import { describe, expect, it, mock } from 'bun:test';
 
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 
+import { countTokens } from '@modules/ai/context/token-budget';
 import { ModelRouterService } from '@modules/ai/model-router.service';
-import { applyAnthropicCacheControl } from '@modules/ai/prompt-caching';
+import { applyAnthropicCacheControl, MIN_CACHEABLE_TOKENS } from '@modules/ai/prompt-caching';
 import { chatRefinePrompt } from '@modules/ai/prompts/chat-refine.prompt';
+import { generationPrompt } from '@modules/ai/prompts/generation.prompt';
 
 const bigText = 'the sect trials continue with rising stakes and sharper blades. '.repeat(150);
 const smallText = 'short volatile tail';
@@ -75,5 +77,30 @@ describe('ModelRouterService cacheStrategy integration', () => {
     expect(messages.every(m => typeof m.content === 'string')).toBe(true);
     expect(messages[0]?.getType()).toBe('system');
     expect(String(messages[1]?.content)).toContain(bigText.slice(0, 40));
+  });
+});
+
+describe('generation path caching', () => {
+  const ctx = { projectId: BigInt(1), promptKey: 'generation', promptVersion: generationPrompt.version, role: 'generation' };
+  const input = { stableContext: bigText, volatileContext: smallText, chapterBrief: 'reach the summit', endingContract: 'none', guidance: '' };
+  const draft = { title: 'Ascent', body: 'the rope bit into his palms and the ledge came no closer. '.repeat(4), summary: 'they climbed' };
+
+  it('breakpoints the stable pack and leaves the per-chapter tail uncached', async () => {
+    const fakeLlm = { invoke: mock(async () => ({ content: JSON.stringify(draft) })) };
+    const router = makeRouter(fakeLlm);
+    const project = { config: { models: { generation: { provider: 'anthropic', model: 'claude-sonnet-4-6' } } } } as never;
+
+    await router.structured(generationPrompt, input, ctx, project);
+
+    // The JSON-schema reminder is appended after cache injection, so it never displaces a breakpoint.
+    const [messages] = fakeLlm.invoke.mock.calls[0] as unknown as [{ content: unknown; getType(): string }[]];
+    expect(messages).toHaveLength(4);
+    // The generation system prompt is ~700 tokens — below the cacheable minimum — so the stable pack
+    // is the only breakpoint, and the per-chapter tail must stay outside it.
+    expect(countTokens(generationPrompt.system)).toBeLessThan(MIN_CACHEABLE_TOKENS);
+    expect(typeof messages[0]?.content).toBe('string');
+    expect(cacheControlOf(messages[1]?.content)).toEqual({ type: 'ephemeral' });
+    expect(typeof messages[2]?.content).toBe('string');
+    expect(String(messages[2]?.content)).toContain(smallText);
   });
 });

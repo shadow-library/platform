@@ -290,10 +290,10 @@ describe('Prompt modules', () => {
 
   describe('rebrand prompt modules', () => {
     it('registers the three rebrand prompt keys with the expected roles', () => {
-      for (const key of ['rebrand-glossary', 'rebrand-convert', 'rebrand-audit'] as const) {
-        expect(PROMPT_REGISTRY[key]).toBeDefined();
-        expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
-      }
+      for (const key of ['rebrand-glossary', 'rebrand-convert', 'rebrand-audit'] as const) expect(PROMPT_REGISTRY[key]).toBeDefined();
+      expect(PROMPT_REGISTRY['rebrand-glossary'].version).toBe('1.0.0');
+      expect(PROMPT_REGISTRY['rebrand-audit'].version).toBe('1.0.0');
+      expect(PROMPT_REGISTRY['rebrand-convert'].version).toBe('1.1.0');
       expect(PROMPT_REGISTRY['rebrand-glossary'].role).toBe('rebrand');
       expect(PROMPT_REGISTRY['rebrand-convert'].role).toBe('rebrand');
       // The audit reuses the cacheable `audit` role so identical re-audits hit llm_cache.
@@ -302,15 +302,21 @@ describe('Prompt modules', () => {
 
     it('renders rebrand-convert in cache order: system, stable pack, volatile chapter tail', async () => {
       const messages = await PROMPT_REGISTRY['rebrand-convert'].template.formatMessages({
-        contextPack: 'STABLE-WORLD-NOTES',
+        stableContext: 'STABLE-WORLD-NOTES',
+        volatileContext: 'VOLATILE-GLOSSARY-SLICE',
         chapterProse: 'VOLATILE-CHAPTER-PROSE',
         repairNotes: 'fix the leftover name',
       });
       expect(messages).toHaveLength(3);
       expect(messages[0]?.getType()).toBe('system');
       expect(String(messages[1]?.content)).toBe('STABLE-WORLD-NOTES');
+      expect(String(messages[2]?.content)).toContain('VOLATILE-GLOSSARY-SLICE');
       expect(String(messages[2]?.content)).toContain('VOLATILE-CHAPTER-PROSE');
       expect(String(messages[2]?.content)).toContain('fix the leftover name');
+    });
+
+    it('names only the stable-segment var in rebrand-convert cacheStrategy', () => {
+      expect(PROMPT_REGISTRY['rebrand-convert'].cacheStrategy?.stableVars).toEqual(['stableContext']);
     });
 
     it('renders rebrand-glossary and rebrand-audit with their template vars', async () => {
@@ -363,10 +369,10 @@ describe('Prompt modules', () => {
 
   describe('reforge prompt modules', () => {
     it('registers the three reforge prompt keys with the expected roles', () => {
-      for (const key of ['reforge-outline', 'reforge-write', 'reforge-judge'] as const) {
-        expect(PROMPT_REGISTRY[key]).toBeDefined();
-        expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
-      }
+      for (const key of ['reforge-outline', 'reforge-write', 'reforge-judge'] as const) expect(PROMPT_REGISTRY[key]).toBeDefined();
+      expect(PROMPT_REGISTRY['reforge-outline'].version).toBe('1.0.0');
+      expect(PROMPT_REGISTRY['reforge-judge'].version).toBe('1.0.0');
+      expect(PROMPT_REGISTRY['reforge-write'].version).toBe('1.1.0');
       // Outline and write ride the dedicated writing-group `reforge` role; the fidelity check reuses `judge`.
       expect(PROMPT_REGISTRY['reforge-outline'].role).toBe('reforge');
       expect(PROMPT_REGISTRY['reforge-write'].role).toBe('reforge');
@@ -388,15 +394,21 @@ describe('Prompt modules', () => {
 
     it('renders reforge-write in cache order: system, stable pack, volatile outline tail', async () => {
       const messages = await PROMPT_REGISTRY['reforge-write'].template.formatMessages({
-        contextPack: 'STABLE-PACK',
+        stableContext: 'STABLE-PACK',
+        volatileContext: 'VOLATILE-CARRY-STATE',
         outline: 'VOLATILE-OUTLINE',
         repairNotes: 'fix the leftover name',
       });
       expect(messages).toHaveLength(3);
       expect(messages[0]?.getType()).toBe('system');
       expect(String(messages[1]?.content)).toBe('STABLE-PACK');
+      expect(String(messages[2]?.content)).toContain('VOLATILE-CARRY-STATE');
       expect(String(messages[2]?.content)).toContain('VOLATILE-OUTLINE');
       expect(String(messages[2]?.content)).toContain('fix the leftover name');
+    });
+
+    it('names only the stable-segment var in reforge-write cacheStrategy', () => {
+      expect(PROMPT_REGISTRY['reforge-write'].cacheStrategy?.stableVars).toEqual(['stableContext']);
     });
 
     it('renders reforge-judge with its outline, world notes, glossary, and written prose vars', async () => {
@@ -460,18 +472,37 @@ describe('Prompt modules', () => {
 
     it('generation v2 renders the ending contract in the volatile tail', async () => {
       const messages = await PROMPT_REGISTRY.generation.template.formatMessages({
-        contextPack: 'PACK',
+        stableContext: 'STABLE-PACK',
+        volatileContext: 'VOLATILE-PACK',
         chapterBrief: 'BRIEF',
         endingContract: 'Hook type: cliffhanger',
         guidance: '',
       });
       expect(String(messages[messages.length - 1]?.content)).toContain('## ENDING CONTRACT\nHook type: cliffhanger');
     });
+
+    it('renders generation in cache order: system, stable pack alone, volatile pack + brief tail', async () => {
+      expect(PROMPT_REGISTRY.generation.cacheStrategy?.stableVars).toEqual(['stableContext']);
+      const messages = await PROMPT_REGISTRY.generation.template.formatMessages({
+        stableContext: 'STABLE-PACK',
+        volatileContext: 'VOLATILE-PACK',
+        chapterBrief: 'BRIEF',
+        endingContract: 'none',
+        guidance: 'GUIDANCE',
+      });
+      expect(messages).toHaveLength(3);
+      expect(messages[0]?.getType()).toBe('system');
+      expect(String(messages[1]?.content)).toBe('STABLE-PACK');
+      expect(String(messages[1]?.content)).not.toContain('VOLATILE-PACK');
+      expect(String(messages[2]?.content)).toContain('VOLATILE-PACK');
+      expect(String(messages[2]?.content)).toContain('BRIEF');
+      expect(String(messages[2]?.content)).toContain('GUIDANCE');
+    });
   });
 
   describe('knowledge contract (generation/judge v2.2, character-knowledge design §5–6)', () => {
     it('generation v2.2 states the epistemic rule for the knowledge sections', () => {
-      expect(PROMPT_REGISTRY.generation.version).toBe('2.2.0');
+      expect(PROMPT_REGISTRY.generation.version).toBe('2.3.0');
       expect(PROMPT_REGISTRY.generation.system).toContain('## KNOWN FACTS (POV CAST)');
       expect(PROMPT_REGISTRY.generation.system).toContain('## REVEALED THIS CHAPTER');
       expect(PROMPT_REGISTRY.generation.system).toContain('## BEHAVIORAL CONSTRAINTS');

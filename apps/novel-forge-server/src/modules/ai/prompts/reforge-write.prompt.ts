@@ -20,15 +20,15 @@ const system =
 // pack (world notes + directives + author instructions) in the first human message, volatile outline last.
 export const reforgeWritePrompt: PromptModule<ReforgeWriteOutput> = {
   key: 'reforge-write',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'authoring',
   role: 'reforge',
-  cacheStrategy: { stableVars: ['contextPack'] },
+  cacheStrategy: { stableVars: ['stableContext'] },
   system,
   template: ChatPromptTemplate.fromMessages([
     new SystemMessage(system),
-    ['human', '{contextPack}'],
-    ['human', 'Faithful outline to write from:\n{outline}\n\nRepair notes: {repairNotes}'],
+    ['human', '{stableContext}'],
+    ['human', '{volatileContext}\n\nFaithful outline to write from:\n{outline}\n\nRepair notes: {repairNotes}'],
   ]),
   schema: ReforgeWriteSchema,
 };

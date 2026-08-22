@@ -42,7 +42,14 @@ function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, convert
       throw new Error(`unexpected prompt ${promptModule.key}`);
     },
   };
-  const contextAssembler = { forRebrand: async () => ({ id: null, rendered: 'REBRAND-PACK' }) };
+  const contextAssembler = {
+    forRebrand: async () => ({
+      id: null,
+      rendered: 'STABLE-WORLD-NOTES\n\nVOLATILE-GLOSSARY-SLICE',
+      renderedStable: 'STABLE-WORLD-NOTES',
+      renderedVolatile: 'VOLATILE-GLOSSARY-SLICE',
+    }),
+  };
   return { db, contextAssembler, modelRouter, checkpointer } as never;
 }
 
@@ -102,6 +109,12 @@ describe.if(pgAvailable)('chapter-rebrand graph', () => {
     expect(convertCalls).toHaveLength(2);
     expect(convertCalls[0]?.inputs['repairNotes']).toBe('none');
     expect(String(convertCalls[1]?.inputs['repairNotes'])).toContain('glossary_leftover');
+    // The cached var must carry the pack's stable segment alone — the per-chapter glossary/carry
+    // state travels separately, or the cache misses on every chapter.
+    for (const call of convertCalls) {
+      expect(call.inputs['stableContext']).toBe('STABLE-WORLD-NOTES');
+      expect(call.inputs['volatileContext']).toBe('VOLATILE-GLOSSARY-SLICE');
+    }
 
     const conversion = await db.query.chapterConversions.findFirst({ where: and(eq(schema.chapterConversions.projectId, projectId), eq(schema.chapterConversions.chapter, 1)) });
     expect(conversion).toMatchObject({ status: 'converted', issues: null, carryState: { activeThreads: 'Mira spark' }, revision: 1 });

@@ -19,15 +19,15 @@ const system =
 // pack (world notes + directives) in the first human message, volatile chapter material last.
 export const rebrandConvertPrompt: PromptModule<RebrandConvertOutput> = {
   key: 'rebrand-convert',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'authoring',
   role: 'rebrand',
-  cacheStrategy: { stableVars: ['contextPack'] },
+  cacheStrategy: { stableVars: ['stableContext'] },
   system,
   template: ChatPromptTemplate.fromMessages([
     new SystemMessage(system),
-    ['human', '{contextPack}'],
-    ['human', 'Source chapter to convert:\n{chapterProse}\n\nRepair notes: {repairNotes}'],
+    ['human', '{stableContext}'],
+    ['human', '{volatileContext}\n\nSource chapter to convert:\n{chapterProse}\n\nRepair notes: {repairNotes}'],
   ]),
   schema: RebrandConvertSchema,
 };

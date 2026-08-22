@@ -11,7 +11,7 @@ import { loadKnowledgeView, parseKnowledgeContract, renderChapterReveals, render
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../prompts/authoring-preamble';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 import { CatalogService } from './catalog.service';
-import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextSegment, type ContextTier, joinSections, renderSection } from './sections';
+import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextSegment, type ContextTier, joinSections, renderSection, splitSegments } from './sections';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
 
 export interface ChatScopeInput {
@@ -351,12 +351,12 @@ export class ContextAssembler {
 
     if (currentVolume) {
       const content = [currentVolume.objective, currentVolume.conflict].filter(Boolean).join('\n');
-      sections.push(makeSection('volume_objective', content, 'approved_intent', [`volume:${currentVolume.volumeKey}`]));
+      sections.push(asStable(makeSection('volume_objective', content, 'approved_intent', [`volume:${currentVolume.volumeKey}`])));
     }
 
     if (currentArc) {
       const content = [currentArc.objective, currentArc.escalation, currentArc.hook].filter(Boolean).join('\n');
-      if (content) sections.push(makeSection('arc_objective', content, 'approved_intent', [`arc:${currentArc.arcKey}`]));
+      if (content) sections.push(asStable(makeSection('arc_objective', content, 'approved_intent', [`arc:${currentArc.arcKey}`])));
     }
 
     // Only the POV cast's ledgered facts enter the drafting pack; still-hidden facts surface as behavioral
@@ -408,10 +408,10 @@ export class ContextAssembler {
     // Only the first FULL_CAST_MAX entity refs retain caller-requested priority; the rest move below memory and style.
     const entityRefSections = refSections.filter(s => s.key.startsWith('ref:entity:'));
     const nonEntityRefSections = refSections.filter(s => !s.key.startsWith('ref:entity:'));
-    const priorityEntitySections = entityRefSections.slice(0, FULL_CAST_MAX);
-    const excessEntitySections = entityRefSections.slice(FULL_CAST_MAX);
+    const priorityEntitySections = entityRefSections.slice(0, FULL_CAST_MAX).map(asStable);
+    const excessEntitySections = entityRefSections.slice(FULL_CAST_MAX).map(asStable);
 
-    for (const s of [...priorityEntitySections, ...nonEntityRefSections]) sections.push(s);
+    for (const s of [...priorityEntitySections, ...nonEntityRefSections.map(asStable)]) sections.push(s);
 
     if (recentChapters.length > 0) {
       const lines = recentChapters
@@ -422,7 +422,7 @@ export class ContextAssembler {
     }
 
     // Writing style is always present because this is the generator's only source for voice, craft, and length.
-    sections.push(makeSection('writing_style', project?.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS, 'canonical', []));
+    sections.push(asStable(makeSection('writing_style', project?.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS, 'canonical', [])));
 
     for (const s of excessEntitySections) sections.push(s);
 
@@ -1042,8 +1042,7 @@ export class ContextAssembler {
     // legacy all-volatile purposes this is a no-op.
     const stableSections = fittingSections.filter(s => s.segment === 'stable');
     const volatileSections = fittingSections.filter(s => s.segment !== 'stable');
-    const renderedStable = joinSections(stableSections);
-    const renderedVolatile = joinSections(volatileSections);
+    const { renderedStable, renderedVolatile } = splitSegments(fittingSections);
     const rendered = joinSections([...stableSections, ...volatileSections]);
     const usedTokens = fittingSections.reduce((sum, s) => sum + s.tokens, 0);
     const hash = createHash('sha256').update(rendered).digest('hex');

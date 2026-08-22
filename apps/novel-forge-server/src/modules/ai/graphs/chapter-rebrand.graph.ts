@@ -44,7 +44,8 @@ const ChapterRebrandAnnotation = Annotation.Root({
   glossarySlice: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   carryState: Annotation<Record<string, unknown> | null>({ reducer: (_, n) => n, default: () => null }),
   prevBody: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
-  contextPack: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
+  stableContext: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
+  volatileContext: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   converted: Annotation<RebrandConvertOutput | null>({ reducer: (_, n) => n, default: () => null }),
   residueIssues: Annotation<ResidueIssue[]>({ reducer: (_, n) => n, default: () => [] }),
   auditIssues: Annotation<RebrandAuditIssueRecord[]>({ reducer: (_, n) => n, default: () => [] }),
@@ -126,7 +127,7 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     if (pack.id) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
 
     logger.debug('rebrand assembleContext', { runId: state.runId, chapter: state.chapter, glossarySliceLength: glossarySlice.length, contextPackLength: pack.rendered.length });
-    return { contextPack: pack.rendered, glossarySlice };
+    return { stableContext: pack.renderedStable, volatileContext: pack.renderedVolatile, glossarySlice };
   }
 
   async function convert(state: RebrandState) {
@@ -144,7 +145,7 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     };
     const result = (await modelRouter.structured(
       prompt,
-      { contextPack: state.contextPack, chapterProse: state.chapterProse, repairNotes: state.repairNotes || 'none' },
+      { stableContext: state.stableContext, volatileContext: state.volatileContext, chapterProse: state.chapterProse, repairNotes: state.repairNotes || 'none' },
       ctx,
       projectRow as ProjectConfig | undefined,
     )) as RebrandConvertOutput;

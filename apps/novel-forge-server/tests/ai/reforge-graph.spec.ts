@@ -45,7 +45,7 @@ function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, outline
   };
   const contextAssembler = {
     forReforgeOutline: async () => ({ id: null, rendered: 'OUTLINE-PACK' }),
-    forReforge: async () => ({ id: null, rendered: 'WRITE-PACK' }),
+    forReforge: async () => ({ id: null, rendered: 'STABLE-WORLD-NOTES\n\nVOLATILE-CARRY-STATE', renderedStable: 'STABLE-WORLD-NOTES', renderedVolatile: 'VOLATILE-CARRY-STATE' }),
   };
   return { db, contextAssembler, modelRouter, checkpointer } as never;
 }
@@ -113,6 +113,12 @@ describe.if(pgAvailable)('chapter-reforge graph', () => {
     expect(writeCalls).toHaveLength(2);
     expect(writeCalls[0]?.inputs['repairNotes']).toBe('none');
     expect(String(writeCalls[1]?.inputs['repairNotes'])).toContain('glossary_leftover');
+    // The cached var must carry the pack's stable segment alone — the per-chapter carry state and
+    // outline travel separately, or the cache misses on every chapter.
+    for (const call of writeCalls) {
+      expect(call.inputs['stableContext']).toBe('STABLE-WORLD-NOTES');
+      expect(call.inputs['volatileContext']).toBe('VOLATILE-CARRY-STATE');
+    }
 
     const reforge = await db.query.chapterReforges.findFirst({ where: and(eq(schema.chapterReforges.projectId, projectId), eq(schema.chapterReforges.chapter, 1)) });
     expect(reforge).toMatchObject({ status: 'reforged', issues: null, carryState: { activeThreads: 'Mira spark' }, revision: 1 });

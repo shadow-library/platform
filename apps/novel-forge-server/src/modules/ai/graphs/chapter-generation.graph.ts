@@ -9,6 +9,7 @@ import * as schema from '@server/database/schemas';
 
 import { type KnowledgeLeakIssue, loadKnowledgeView, parseKnowledgeContract, renderForbiddenFacts, scanKnowledgeLeaks } from '../../bible/fact/knowledge-view';
 import { type ContextAssembler } from '../context/context-assembler.service';
+import { type ContextSection, splitSegments } from '../context/sections';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
 import { type IndexingService } from '../retrieval/indexing.service';
@@ -167,10 +168,11 @@ export function createChapterGenerationGraph(services: GraphServices) {
       db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
 
-    let renderedPack = '';
+    let stableContext = '';
+    let volatileContext = '';
     if (state.contextPackId) {
       const pack = await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) });
-      renderedPack = pack?.rendered ?? '';
+      ({ renderedStable: stableContext, renderedVolatile: volatileContext } = splitSegments((pack?.sections as ContextSection[] | null) ?? []));
     }
 
     const ctx: TelemetryContext = {
@@ -184,7 +186,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
 
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
-      { contextPack: renderedPack, chapterBrief: brief?.body ?? '', endingContract: renderEndingContract(brief?.endingContract), guidance: state.guidance },
+      { stableContext, volatileContext, chapterBrief: brief?.body ?? '', endingContract: renderEndingContract(brief?.endingContract), guidance: state.guidance },
       ctx,
       projectRow as ProjectConfig | undefined,
     )) as { title: string; body: string; summary: string; state?: Record<string, string> };
@@ -415,10 +417,11 @@ export function createChapterGenerationGraph(services: GraphServices) {
       db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
 
-    let renderedPack = '';
+    let stableContext = '';
+    let volatileContext = '';
     if (state.contextPackId) {
       const pack = await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) });
-      renderedPack = pack?.rendered ?? '';
+      ({ renderedStable: stableContext, renderedVolatile: volatileContext } = splitSegments((pack?.sections as ContextSection[] | null) ?? []));
     }
 
     const findingsStr = state.findings.map(f => `[${f.severity}] ${f.text}`).join('\n');
@@ -435,7 +438,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
 
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
-      { contextPack: renderedPack, chapterBrief: brief?.body ?? '', endingContract: renderEndingContract(brief?.endingContract), guidance },
+      { stableContext, volatileContext, chapterBrief: brief?.body ?? '', endingContract: renderEndingContract(brief?.endingContract), guidance },
       ctx,
       projectRow as ProjectConfig | undefined,
     )) as { title: string; body: string; summary: string; state?: Record<string, string> };

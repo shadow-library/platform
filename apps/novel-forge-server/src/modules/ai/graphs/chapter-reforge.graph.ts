@@ -45,7 +45,8 @@ const ChapterReforgeAnnotation = Annotation.Root({
   carryState: Annotation<Record<string, unknown> | null>({ reducer: (_, n) => n, default: () => null }),
   prevBody: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   outlinePack: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
-  writePack: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
+  writeStableContext: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
+  writeVolatileContext: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   outline: Annotation<ReforgeOutlineOutput | null>({ reducer: (_, n) => n, default: () => null }),
   renderedOutline: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   written: Annotation<ReforgeWriteOutput | null>({ reducer: (_, n) => n, default: () => null }),
@@ -181,7 +182,7 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     if (pack.id) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
 
     logger.debug('reforge writeContext', { runId: state.runId, chapter: state.chapter, packLength: pack.rendered.length });
-    return { writePack: pack.rendered };
+    return { writeStableContext: pack.renderedStable, writeVolatileContext: pack.renderedVolatile };
   }
 
   async function write(state: ReforgeState) {
@@ -199,7 +200,7 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     };
     const result = (await modelRouter.structured(
       prompt,
-      { contextPack: state.writePack, outline: state.renderedOutline, repairNotes: state.repairNotes || 'none' },
+      { stableContext: state.writeStableContext, volatileContext: state.writeVolatileContext, outline: state.renderedOutline, repairNotes: state.repairNotes || 'none' },
       ctx,
       projectRow as ProjectConfig | undefined,
     )) as ReforgeWriteOutput;

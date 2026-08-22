@@ -20,6 +20,7 @@ import { IndexingService } from '../ai/retrieval/indexing.service';
 import { RetrievalService } from '../ai/retrieval/retrieval.service';
 import { type ChapterExtractOutput } from '../ai/schemas/chapter-extract.schema';
 import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
+import { renderEndingContract } from '../ai/schemas/ending-contract.schema';
 import { type EpitomeOutput } from '../ai/schemas/epitome.schema';
 import { type JudgeOutput, JudgeSchema } from '../ai/schemas/judge.schema';
 import { parseSchema } from '../ai/schemas/validate';
@@ -944,7 +945,13 @@ export class GenerationService {
 
     const result = (await this.modelRouter.structured(
       PROMPT_REGISTRY.generation,
-      { contextPack: pack.rendered, chapterBrief: brief?.body ?? '', guidance: body.guidance ?? '' },
+      {
+        stableContext: pack.renderedStable,
+        volatileContext: pack.renderedVolatile,
+        chapterBrief: brief?.body ?? '',
+        endingContract: renderEndingContract(brief?.endingContract),
+        guidance: body.guidance ?? '',
+      },
       ctx,
       { contentMode: 'grok_only', config: project?.config as never },
     )) as {

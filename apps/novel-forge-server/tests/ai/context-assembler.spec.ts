@@ -409,6 +409,69 @@ describe('ContextAssembler.forChapter — arc_objective', () => {
   });
 });
 
+describe('ContextAssembler.forChapter — stable/volatile split', () => {
+  const brief = { id: 1n, projectId: 1n, chapter: 5, body: 'Chapter body.', contextRefs: ['entity:mira'], arcKey: 'arc1' };
+  const arc = { arcKey: 'arc1', volumeKey: 'v1', objective: 'ARC_OBJECTIVE_MARKER', escalation: '', hook: '' };
+  const volume = { volumeKey: 'v1', ordinal: 1, objective: 'VOLUME_OBJECTIVE_MARKER', conflict: '' };
+  const entity = { entityKey: 'mira', name: 'Mira', type: 'character', status: 'active', origin: 'extracted', body: 'ENTITY_CARD_MARKER', notes: null, aliases: [] };
+
+  function overrides(prevContent: string) {
+    return {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, instructions: 'WRITING_STYLE_MARKER', contentMode: 'standard' })) },
+        briefs: { findFirst: mock(async () => brief) },
+        chapters: {
+          findFirst: mock(async () => ({ number: 4, generator: 'claude', status: 'done', content: prevContent, summary: 'ch4' })),
+          findMany: mock(async () => [{ number: 4, summary: 'MEMORY_MARKER' }]),
+        },
+        volumes: { findFirst: mock(async () => volume), findMany: mock(async () => []) },
+        arcs: { findFirst: mock(async () => arc), findMany: mock(async () => []) },
+        drafts: { findFirst: mock(async () => ({ state: { lastBeat: 'CONTINUATION_MARKER' } })) },
+        entities: { findMany: mock(async () => [entity]) },
+        worldFacts: { findMany: mock(async () => []) },
+        plotThreads: { findMany: mock(async () => []) },
+        mysteries: { findMany: mock(async () => []) },
+        contextPacks: { findFirst: mock(async () => null) },
+        userFeedback: { findMany: mock(async () => []) },
+      },
+    };
+  }
+
+  it('marks the volume/arc objectives, writing style, and canon cards stable and the per-chapter sections volatile', async () => {
+    const assembler = makeAssembler(overrides('PREV_ENDING_MARKER'));
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    const segments = Object.fromEntries(pack.sections.map(s => [s.key, s.segment]));
+    expect(segments).toMatchObject({
+      volume_objective: 'stable',
+      arc_objective: 'stable',
+      writing_style: 'stable',
+      'ref:entity:mira': 'stable',
+      prev_ending: 'volatile',
+      continuation_state: 'volatile',
+      memory: 'volatile',
+    });
+
+    for (const marker of ['VOLUME_OBJECTIVE_MARKER', 'ARC_OBJECTIVE_MARKER', 'WRITING_STYLE_MARKER', 'ENTITY_CARD_MARKER']) {
+      expect(pack.renderedStable).toContain(marker);
+      expect(pack.renderedVolatile).not.toContain(marker);
+    }
+    for (const marker of ['PREV_ENDING_MARKER', 'CONTINUATION_MARKER', 'MEMORY_MARKER']) {
+      expect(pack.renderedVolatile).toContain(marker);
+      expect(pack.renderedStable).not.toContain(marker);
+    }
+  });
+
+  it('keeps the stable segment byte-identical when only per-chapter content changes', async () => {
+    const pack5 = await makeAssembler(overrides('ENDING_A')).forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+    const pack6 = await makeAssembler(overrides('ENDING_B')).forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    expect(pack5.renderedStable.length).toBeGreaterThan(0);
+    expect(pack6.renderedStable).toBe(pack5.renderedStable);
+    expect(pack6.renderedVolatile).not.toBe(pack5.renderedVolatile);
+  });
+});
+
 describe('ContextAssembler.forChapter — FULL_CAST_MAX', () => {
   it(`moves entity refs beyond FULL_CAST_MAX (${FULL_CAST_MAX}) to end of section list`, async () => {
     const entityRefs = Array.from({ length: 7 }, (_, i) => `entity:ent${i}`);

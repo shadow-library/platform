@@ -84,3 +84,11 @@ export function renderSection(key: string, content: string): string {
 export function joinSections(sections: ContextSection[]): string {
   return sections.map(s => s.rendered).join('\n\n---\n\n');
 }
+
+/** Re-derives the stable/volatile split from a persisted pack's sections, for callers that reload a pack by id. */
+export function splitSegments(sections: ContextSection[]): { renderedStable: string; renderedVolatile: string } {
+  return {
+    renderedStable: joinSections(sections.filter(s => s.segment === 'stable')),
+    renderedVolatile: joinSections(sections.filter(s => s.segment !== 'stable')),
+  };
+}
