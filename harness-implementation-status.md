@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 10
+- Completed: 11
 - In Progress: 0
-- Pending: 5
+- Pending: 4
 - Blocked: 0
 
 ## P1 Tasks
@@ -42,7 +42,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | P1-08 | P1       | Retire source-extraction overlap; drop or explicitly mark unused `timeline_events`/`power_progressions`                             | COMPLETED | P1-07                                       |
 | P1-09 | P1       | Route `outlineArc` through `forOutline()`; deprecate/cap whole-book `outline()`                                                     | COMPLETED | —                                           |
 | P1-10 | P1       | Reconciliation trigger every k finalized chapters (default 5, configurable) or on staleness                                         | COMPLETED | P1-09                                       |
-| P1-11 | P1       | Volume-completion epitome write (or explicitly drop the `volumes.epitome` column)                                                   | PENDING   | —                                           |
+| P1-11 | P1       | Volume-completion epitome write (or explicitly drop the `volumes.epitome` column)                                                   | COMPLETED | —                                           |
 | P1-12 | P1       | Outliner authors `knowledgeContract`; persist `pov`; wire mystery `truthFactKey`                                                    | PENDING   | —                                           |
 | P1-13 | P1       | Prompt-cache the generation path: `asStable` sections, `cacheStrategy`, fix rebrand/reforge stable-var bug                          | PENDING   | —                                           |
 | P1-14 | P1       | Deterministic draft checks as a graph node before `judge` (word bounds, duplicated paragraphs, n-grams, cliché counts, tag density) | PENDING   | — (may reuse eval Track 2 metric functions) |
@@ -457,6 +457,39 @@ arc, finalize survives a reconciliation failure, and `handEdited: true` from bot
     support (currently inert) starts doing something — OR — the column is consciously dropped with
     a documented decision, per the recommendation doc's explicit either/or framing. Pick one and
     justify it in the commit/status entry; don't leave it half-done.
+
+**Decision: implement the write** (not drop). The recommendation doc's own diagnosis names
+`volumes.epitome` as exactly the kind of "information that would keep a story coherent at chapter
+300" that's "never written" — dropping the column would abandon the defect this task exists to fix,
+and the read side (`forOutline`/`forChapter`'s memory sections) was already fully wired and waiting.
+
+**What changed:**
+
+- New prompt module `epitome.prompt.ts` (key `epitome`, `kind: 'analytical'`, modeled on the
+  simplest existing prompt, `title.prompt.ts`) + `EpitomeSchema` (single `epitome: string` field,
+  `@Field` description carries the ~200-token/150-word soft target — no hard validator, matching
+  house convention of prompt-text-only length guidance). Registered in `PROMPT_REGISTRY`, `PromptKey`,
+  and a new `AiRole 'epitome'` mapped to the `helper` model group.
+- `GenerationService.finalize()` gained a sibling best-effort hook to P1-10's `maybeReconcileArc`:
+  `maybeWriteVolumeEpitome(projectId, chapter)`. Finds the `approved` volume whose `endChapter`
+  equals the just-finalized chapter (exact equality — the precise "volume just completed" signal, and
+  it can't re-fire on a later volume's chapters). Bails if the volume's epitome is already set (a
+  one-time write, per the original design doc's "one-time analysis call" framing), or if no finalized
+  chapter in the volume's range has a `summary` (logs a warning, skips rather than sending empty
+  content to the model). Otherwise calls the model with the volume plan + ordered chapter summaries
+  and writes the result with a `WHERE ... AND epitome IS NULL` guard (idempotent against a concurrent
+  write). The whole model call + write is `.catch()`-wrapped into a warning log — never fails
+  `finalize()`.
+- No schema/migration change: `volumes.epitome` already existed as an unused column.
+
+**Tests:** `tests/generation/volume-epitome.spec.ts` (new, 6 cases, real-Postgres house style) —
+epitome written and distilled correctly from chapter summaries on last-chapter finalization; no write
+on a non-last chapter; no write for an unapproved volume; existing epitome never overwritten; skipped
+gracefully with no chapter summaries in range; `finalize()` survives a model-call failure.
+
+**Validation:** `bun scripts/verify.ts apps/novel-forge-server` — 670 pass, 0 fail, 10 skip.
+
+**Commit:** `aae9c155`
 
 ### P1-12 — Outliner authors `knowledgeContract`
 
