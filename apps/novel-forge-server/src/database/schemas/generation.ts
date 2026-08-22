@@ -1,5 +1,5 @@
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 import { jsonb } from './jsonb';
 import { contentGenerator, projects } from './projects';
@@ -82,6 +82,8 @@ export const briefs = pgTable(
     revision: integer('revision').notNull().default(1),
     contentHash: varchar('content_hash'),
     staleReason: varchar('stale_reason'),
+    // Set by the human edit paths; arc reconciliation refuses to overwrite a brief carrying it.
+    handEdited: boolean('hand_edited').notNull().default(false),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

@@ -652,10 +652,10 @@ export class ProposalApplyService {
     if (existing) {
       await ctx.tx
         .update(schema.briefs)
-        .set({ ...merged, revision, contentHash, staleReason: null, updatedAt: new Date() })
+        .set({ ...merged, revision, contentHash, staleReason: null, handEdited: true, updatedAt: new Date() })
         .where(eq(schema.briefs.id, existing.id));
     } else {
-      await ctx.tx.insert(schema.briefs).values({ projectId: ctx.projectId, chapter: op.chapter, ...merged, revision, contentHash });
+      await ctx.tx.insert(schema.briefs).values({ projectId: ctx.projectId, chapter: op.chapter, ...merged, revision, contentHash, handEdited: true });
     }
     ctx.applied.push({ artifactRef: `chapter:${op.chapter}`, newRevision: revision });
   }

@@ -33,6 +33,9 @@ declare module '@shadow-library/common' {
     'ai.langsmith.api.key': string | undefined;
 
     'publishing.auto-push': boolean;
+
+    /** Finalized chapters within an arc between automatic re-outlines of the arc's remaining chapters. */
+    'generation.reconciliation.cadence': number;
   }
 }
 
@@ -58,3 +61,5 @@ Config.load('ai.llm.backoff-ms', { defaultValue: '500', validateType: 'number' }
 Config.load('ai.langsmith.api.key');
 
 Config.load('publishing.auto-push', { validateType: 'boolean', defaultValue: 'true' });
+
+Config.load('generation.reconciliation.cadence', { defaultValue: '5', validateType: 'number' });

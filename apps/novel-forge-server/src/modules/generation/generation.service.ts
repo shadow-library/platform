@@ -1,7 +1,7 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { and, asc, desc, eq, gt, inArray, lt, ne, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, lte, ne, sql, sum } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
@@ -352,8 +352,11 @@ export class GenerationService {
 
     await this.dropUnresolvedContextRefs(projectId, chapters);
 
+    const { chapters: protectedChapters, briefs: preservedBriefs } = await this.protectedBriefsInRange(projectId, arc.chapterStart, arc.chapterEnd);
     const upserted = await Promise.all(
       chapters.map(c => {
+        if (protectedChapters.has(c.chapter)) return Promise.resolve(preservedBriefs.get(c.chapter));
+
         const briefBody = renderBriefBody(c);
         const values = {
           volumeKey: arc.volumeKey,
@@ -363,6 +366,7 @@ export class GenerationService {
           contextRefs: c.requiredContext as never,
           endingContract: c.endingContract,
           staleReason: null,
+          handEdited: false,
         };
         return this.db
           .insert(schema.briefs)
@@ -373,7 +377,32 @@ export class GenerationService {
       }),
     );
 
+    if (protectedChapters.size > 0) this.logger.info('outlineArc: preserved protected briefs', { projectId, arcKey, chapters: [...protectedChapters] });
     return { briefs: upserted.filter(Boolean) as Generation.Brief[] };
+  }
+
+  /**
+   * Chapters a re-outline must never overwrite: a human authored the brief, or the chapter is already
+   * written canon. The briefs map carries the rows as they stand so callers still see current state —
+   * a finalized chapter may have no brief row at all, hence the separate chapter set.
+   */
+  private async protectedBriefsInRange(projectId: bigint, chapterStart: number, chapterEnd: number): Promise<{ chapters: Set<number>; briefs: Map<number, Generation.Brief> }> {
+    const [existing, finalized] = await Promise.all([
+      this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), gte(schema.briefs.chapter, chapterStart), lte(schema.briefs.chapter, chapterEnd)) }),
+      this.db.query.chapters.findMany({
+        where: and(
+          eq(schema.chapters.projectId, projectId),
+          eq(schema.chapters.status, 'done'),
+          gte(schema.chapters.number, chapterStart),
+          lte(schema.chapters.number, chapterEnd),
+        ),
+        columns: { number: true },
+      }),
+    ]);
+
+    const chapters = new Set(finalized.map(c => c.number));
+    for (const brief of existing) if (brief.handEdited) chapters.add(brief.chapter);
+    return { chapters, briefs: new Map(existing.filter(b => chapters.has(b.chapter)).map(b => [b.chapter, b])) };
   }
 
   /**
@@ -412,10 +441,10 @@ export class GenerationService {
     const contract = body.knowledgeContract ? ({ pov: body.knowledgeContract.pov, learns: body.knowledgeContract.learns ?? [] } as Record<string, unknown>) : undefined;
     const [result] = await this.db
       .insert(schema.briefs)
-      .values({ projectId, chapter, title: body.title, body: body.body, knowledgeContract: contract ?? null })
+      .values({ projectId, chapter, title: body.title, body: body.body, knowledgeContract: contract ?? null, handEdited: true })
       .onConflictDoUpdate({
         target: [schema.briefs.projectId, schema.briefs.chapter],
-        set: { title: body.title, body: body.body, ...(contract !== undefined ? { knowledgeContract: contract } : {}), updatedAt: new Date() },
+        set: { title: body.title, body: body.body, ...(contract !== undefined ? { knowledgeContract: contract } : {}), handEdited: true, updatedAt: new Date() },
       })
       .returning();
     if (!result) throw AppErrorCode.DRF_001.create();
@@ -807,7 +836,7 @@ export class GenerationService {
     const reportIssues = (latestReport?.payload as { issues?: { chapter?: number; severity?: string }[] } | undefined)?.issues ?? [];
     if (reportIssues.some(i => i.severity === 'error' && i.chapter === draft.chapter)) throw AppErrorCode.FIN_003.create();
 
-    return this.workflowRunService.runChapterFinalization({
+    const result = await this.workflowRunService.runChapterFinalization({
       projectId,
       chapter: draft.chapter,
       draftId: draft.id,
@@ -817,6 +846,39 @@ export class GenerationService {
       continuationState: draft.state as Record<string, string> | undefined,
       generator: draft.generator,
     });
+
+    await this.maybeReconcileArc(projectId, draft.chapter);
+    return result;
+  }
+
+  /**
+   * Re-outlines the *remaining* chapters of the arc the just-finalized chapter belongs to, every
+   * `generation.reconciliation.cadence` finalized chapters or as soon as a remaining brief is marked
+   * stale. Best-effort: a failed reconciliation must never fail the finalization that triggered it.
+   */
+  private async maybeReconcileArc(projectId: bigint, chapter: number): Promise<void> {
+    const arc = await this.db.query.arcs.findFirst({
+      where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.status, 'approved'), lte(schema.arcs.chapterStart, chapter), gte(schema.arcs.chapterEnd, chapter)),
+    });
+    if (!arc || arc.chapterStart === null || arc.chapterEnd === null) return;
+    if (chapter >= arc.chapterEnd) return;
+
+    // Finalization is strictly sequential (the FIN_001 gate above), so position within the arc is the count.
+    const finalizedInArc = chapter - arc.chapterStart + 1;
+    const cadence = Config.get('generation.reconciliation.cadence');
+    const cadenceReached = cadence > 0 && finalizedInArc % cadence === 0;
+
+    let reason = 'cadence';
+    if (!cadenceReached) {
+      const stale = await this.db.query.briefs.findFirst({
+        where: and(eq(schema.briefs.projectId, projectId), gt(schema.briefs.chapter, chapter), lte(schema.briefs.chapter, arc.chapterEnd), isNotNull(schema.briefs.staleReason)),
+      });
+      if (!stale) return;
+      reason = 'stale';
+    }
+
+    this.logger.info('finalize: reconciling arc briefs', { projectId, arcKey: arc.arcKey, chapter, finalizedInArc, cadence, reason });
+    await this.outlineArc(projectId, arc.arcKey, {}).catch(err => this.logger.warn('finalize: arc reconciliation failed', { projectId, arcKey: arc.arcKey, chapter, err }));
   }
 
   async generateGrok(projectId: bigint, chapter: number, body: GenerateGrokBody): Promise<Generation.Draft> {
