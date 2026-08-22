@@ -11,6 +11,7 @@ import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, ty
 
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { type ContextSection } from '../ai/context/sections';
+import { truncateAtParagraph } from '../ai/context/token-budget';
 import { type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService } from '../ai/model-router.service';
 import { buildOutlinePrompt, PROMPT_REGISTRY } from '../ai/prompts';
@@ -100,6 +101,8 @@ export interface JobEnqueueResult {
   target: string;
 }
 
+const PLAN_BIBLE_DOC_TOKEN_CAP = 1_500;
+
 @Injectable()
 export class GenerationService {
   private readonly logger = Logger.getLogger(APP_NAME, GenerationService.name);
@@ -127,7 +130,10 @@ export class GenerationService {
   }
 
   async plan(projectId: bigint, body: PlanBody): Promise<{ volumes: Plan.Volume[] }> {
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const [project, bibleDocs] = await Promise.all([
+      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+      this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
+    ]);
     if (!project) throw AppErrorCode.PRJ_001.create();
 
     // Fresh (non-source) novels have no skeleton; a blank "Novel skeleton:" line makes weak models
@@ -135,11 +141,18 @@ export class GenerationService {
     const derived = [project.skeletonPowerCurve, project.skeletonCharacterArcs ? JSON.stringify(project.skeletonCharacterArcs) : ''].filter(Boolean).join('\n\n');
     const skeleton = body.skeleton ?? (derived || 'No skeleton available — derive the character arcs and escalation curve from the brief.');
 
+    // Same fallback pattern as `skeleton` above — an explicit placeholder rather than a silently empty var, so a
+    // weak model doesn't misread a blank "Bible:" section as "no canon exists" when it just hasn't been built yet.
+    const bibleDocsText =
+      bibleDocs.length > 0
+        ? bibleDocs.map(d => `${d.section}/${d.slug}:\n${truncateAtParagraph(d.body ?? '', PLAN_BIBLE_DOC_TOKEN_CAP).text}`).join('\n\n')
+        : '(no bible written yet)';
+
     this.logger.info('plan: generating volume plan', { projectId, volumeCount: body.volumeCount, chaptersPerVolume: body.chaptersPerVolume });
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.plan.key, promptVersion: PROMPT_REGISTRY.plan.version, role: PROMPT_REGISTRY.plan.key };
     const planOutput = await this.modelRouter.structured(
       PROMPT_REGISTRY.plan,
-      { skeleton, volumeCount: body.volumeCount, chaptersPerVolume: body.chaptersPerVolume, projectBrief: project.brief ?? '' },
+      { skeleton, volumeCount: body.volumeCount, chaptersPerVolume: body.chaptersPerVolume, projectBrief: project.brief ?? '', bibleDocs: bibleDocsText },
       ctx,
       project as never,
     );
