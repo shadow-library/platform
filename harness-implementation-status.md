@@ -19,9 +19,9 @@ should still happen before P1 changes ship to confirm no regression.
 
 ## Summary — P1
 
-- Completed: 5
+- Completed: 6
 - In Progress: 0
-- Pending: 10
+- Pending: 9
 - Blocked: 0
 
 ## P1 Tasks
@@ -37,7 +37,7 @@ the same one-task-at-a-time worktree workflow used for P0.
 | P1-03 | P1       | Add `bible_doc:`/`fact:` ref prefixes to `ContextAssembler.resolveRefs`                                                             | COMPLETED | P1-01, P1-02                                |
 | P1-04 | P1       | Volume planner (`plan()`) reads relevant bible documents, behind a rebuild flag                                                     | COMPLETED | P1-01, P1-02, P1-03                         |
 | P1-05 | P1       | Extend `ContinuitySchema` with `characterStates`/`knowledgeChanges` fields                                                          | COMPLETED | —                                           |
-| P1-06 | P1       | New `character_states` table (schema + migration)                                                                                   | PENDING   | —                                           |
+| P1-06 | P1       | New `character_states` table (schema + migration)                                                                                   | COMPLETED | —                                           |
 | P1-07 | P1       | Finalization applies ALL extracted continuity fields transactionally; fixes `continuityApplied` dead-end (D7)                       | PENDING   | P1-05, P1-06                                |
 | P1-08 | P1       | Retire source-extraction overlap; drop or explicitly mark unused `timeline_events`/`power_progressions`                             | PENDING   | P1-07                                       |
 | P1-09 | P1       | Route `outlineArc` through `forOutline()`; deprecate/cap whole-book `outline()`                                                     | PENDING   | —                                           |
@@ -232,6 +232,27 @@ graph.spec.ts` (new — entity `body` persists; forced rebuild preserves `body` 
   - New table per §6: `projectId`, `entityKey`, `location`, `conditions: string[]`, `immediateGoal`,
     `statusNote` (one line, replaced not appended each update), `lastUpdatedChapter`.
   - Additive migration only.
+- What changed: added `characterStates` to `src/database/schemas/knowledge.ts` (the home for the
+  rest of the knowledge/canon domain — `entities`, `canonFacts`, `characterKnowledge`), mirroring
+  `canonFacts`'s exact conventions: `entityKey` is a plain `varchar` (not a FK to `entities.id`,
+  matching `entityRelationships.targetKey`'s established pattern for AI-extraction-sourced entity
+  references), `immediateGoal`/`statusNote` use `text` (this file's convention for free-text/
+  sentence-length fields vs `varchar` for short/enum-like strings), `conditions` is
+  `jsonb('conditions').$type<string[]>()` matching `canonFacts.subjects`/`canonFacts.terms` exactly,
+  and a single unique constraint on `(projectId, entityKey)` — one current-state row per character,
+  no separate index needed since the constraint already backs one (matching `canonFacts`'s
+  precedent). Added `Knowledge.CharacterState` to the namespace block and a simple
+  `characterStatesRelations` (`project` only, no back-reference needed yet). Migration
+  `0005_purple_major_mapleleaf.sql` is a single additive `CREATE TABLE` + its one FK constraint — no
+  other tables/columns touched. Nothing reads or writes this table yet — that's P1-07.
+- Tests: `tests/knowledge/character-states-schema.spec.ts` (new) — insert/round-trip; the unique
+  constraint rejects a duplicate `(projectId, entityKey)`; an `onConflictDoUpdate` upsert replaces
+  `statusNote` rather than appending; cascade delete removes state rows when the parent project is
+  deleted.
+- Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all
+  green (649 pass, 10 skip, 0 fail). Confirmed no api-types drift (pure schema, no DTO/controller
+  surface).
+- Commit: c4f59128
 
 ### P1-07 — Finalization applies all extracted continuity fields transactionally
 
