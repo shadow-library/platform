@@ -46,6 +46,21 @@ export class BibleStageFact {
 }
 
 @Schema()
+export class BibleStageWorldFact {
+  @Field({ minLength: 1 })
+  category: string;
+
+  @Field({ minLength: 1 })
+  key: string;
+
+  @Field({ minLength: 1 })
+  value: string;
+
+  @Field(() => Integer, { optional: true, minimum: 1 })
+  chapter?: number;
+}
+
+@Schema()
 export class BibleStageSchema {
   @Field({ minLength: 1, description: 'prose content for this bible section' })
   body: string;
@@ -55,6 +70,9 @@ export class BibleStageSchema {
 
   @Field(() => [BibleStageFact], { optional: true, description: 'canon facts established in this section, if applicable' })
   facts?: BibleStageFact[];
+
+  @Field(() => [BibleStageWorldFact], { optional: true, description: 'structured worldbuilding facts established in this section, if applicable' })
+  worldFacts?: BibleStageWorldFact[];
 }
 
 export type BibleStageOutput = BibleStageSchema;

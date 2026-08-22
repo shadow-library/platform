@@ -168,3 +168,109 @@ describe.if(pgAvailable)('bible-builder.graph characters stage persistence', () 
     expect(original?.body).toBe('Original.');
   });
 });
+
+describe.if(pgAvailable)('bible-builder.graph world-power stage persistence', () => {
+  let db: PrimaryDatabase;
+  let checkpointer: PostgresSaver;
+
+  afterAll(() => (db as unknown as { $client: SQL }).$client.close());
+
+  beforeAll(async () => {
+    const url = await createDatabaseFromTemplate(`${dbName}_world_power`);
+    db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
+    checkpointer = PostgresSaver.fromConnString(url);
+    await checkpointer.setup();
+  });
+
+  async function seedProject(name: string): Promise<bigint> {
+    const [project] = await db.insert(schema.projects).values({ name, kind: 'new_novel' }).returning();
+    if (!project) throw new Error('failed to seed project');
+    return project.id;
+  }
+
+  async function runBibleBuilder(projectId: bigint, output: BibleStageOutput, force: boolean, threadSuffix: string): Promise<void> {
+    const graph = createBibleBuilderGraph(buildServices(db, checkpointer, output));
+    const runId = `bible-builder-world-${projectId}-${threadSuffix}`;
+    await graph.invoke({ projectId: String(projectId), brief: 'A test brief.', force, runId }, { configurable: { thread_id: runId } });
+  }
+
+  it('persists world facts from the world-power stage, retrievable via db.query.worldFacts', async () => {
+    const projectId = await seedProject(`bible-world-facts-${Date.now()}`);
+    await runBibleBuilder(
+      projectId,
+      {
+        body: 'World and power bible prose.',
+        worldFacts: [{ category: 'power_system', key: 'cost_of_casting', value: "Casting drains a caster's lifespan by one day per spell tier.", chapter: 3 }],
+      },
+      false,
+      'initial',
+    );
+
+    const fact = await db.query.worldFacts.findFirst({
+      where: and(eq(schema.worldFacts.projectId, projectId), eq(schema.worldFacts.category, 'power_system'), eq(schema.worldFacts.key, 'cost_of_casting')),
+    });
+    expect(fact?.value).toBe("Casting drains a caster's lifespan by one day per spell tier.");
+    expect(fact?.chapter).toBe(3);
+  });
+
+  it('does not null out a previously-persisted world fact when a forced rebuild omits it (COALESCE)', async () => {
+    const projectId = await seedProject(`bible-world-rebuild-${Date.now()}`);
+    await runBibleBuilder(
+      projectId,
+      { body: 'World and power bible prose.', worldFacts: [{ category: 'geography', key: 'capital_city', value: 'Veyrath, the coastal capital.' }] },
+      false,
+      'first',
+    );
+
+    await runBibleBuilder(projectId, { body: 'World and power bible prose, rebuilt.' }, true, 'rebuild');
+
+    const fact = await db.query.worldFacts.findFirst({
+      where: and(eq(schema.worldFacts.projectId, projectId), eq(schema.worldFacts.category, 'geography'), eq(schema.worldFacts.key, 'capital_city')),
+    });
+    expect(fact?.value).toBe('Veyrath, the coastal capital.');
+  });
+
+  it('overwrites a world fact value when the rebuild output supplies a fresh one for the same category/key', async () => {
+    const projectId = await seedProject(`bible-world-overwrite-${Date.now()}`);
+    await runBibleBuilder(
+      projectId,
+      { body: 'World and power bible prose.', worldFacts: [{ category: 'geography', key: 'capital_city', value: 'Veyrath, the coastal capital.' }] },
+      false,
+      'first',
+    );
+
+    await runBibleBuilder(
+      projectId,
+      { body: 'World and power bible prose, rebuilt.', worldFacts: [{ category: 'geography', key: 'capital_city', value: 'Veyrath, rebuilt as the inland fortress-capital.' }] },
+      true,
+      'rebuild',
+    );
+
+    const fact = await db.query.worldFacts.findFirst({
+      where: and(eq(schema.worldFacts.projectId, projectId), eq(schema.worldFacts.category, 'geography'), eq(schema.worldFacts.key, 'capital_city')),
+    });
+    expect(fact?.value).toBe('Veyrath, rebuilt as the inland fortress-capital.');
+  });
+
+  it('skips the world-power stage entirely (no world-fact writes) when force is false and the document already exists', async () => {
+    const projectId = await seedProject(`bible-world-skip-${Date.now()}`);
+    await runBibleBuilder(projectId, { body: 'World and power bible prose.', worldFacts: [{ category: 'geography', key: 'capital_city', value: 'Original.' }] }, false, 'first');
+
+    await runBibleBuilder(
+      projectId,
+      { body: 'This should never be written.', worldFacts: [{ category: 'geography', key: 'second_city', value: 'Should not persist.' }] },
+      false,
+      'second',
+    );
+
+    const skipped = await db.query.worldFacts.findFirst({
+      where: and(eq(schema.worldFacts.projectId, projectId), eq(schema.worldFacts.category, 'geography'), eq(schema.worldFacts.key, 'second_city')),
+    });
+    expect(skipped).toBeUndefined();
+
+    const original = await db.query.worldFacts.findFirst({
+      where: and(eq(schema.worldFacts.projectId, projectId), eq(schema.worldFacts.category, 'geography'), eq(schema.worldFacts.key, 'capital_city')),
+    });
+    expect(original?.value).toBe('Original.');
+  });
+});

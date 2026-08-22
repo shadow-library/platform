@@ -165,6 +165,30 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
       }
     }
 
+    // Upsert world facts if present.
+    if (result.worldFacts && result.worldFacts.length > 0) {
+      for (const wf of result.worldFacts) {
+        await db
+          .insert(schema.worldFacts)
+          .values({
+            projectId,
+            category: wf.category,
+            key: wf.key,
+            value: wf.value,
+            chapter: wf.chapter ?? null,
+          })
+          .onConflictDoUpdate({
+            target: [schema.worldFacts.projectId, schema.worldFacts.category, schema.worldFacts.key],
+            set: {
+              value: sql`COALESCE(EXCLUDED.value, world_facts.value)`,
+              chapter: sql`COALESCE(EXCLUDED.chapter, world_facts.chapter)`,
+              updatedAt: new Date(),
+            },
+          })
+          .catch(err => logger.warn(`bible-builder world fact upsert error`, { err, category: wf.category, key: wf.key }));
+      }
+    }
+
     return {
       stagesDone: [...state.stagesDone, stageName],
       counts: { ...state.counts, [stageName]: result.entities?.length ?? 1 },
