@@ -1,5 +1,5 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, lte, ne, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, sql, sum } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -20,6 +20,7 @@ import { IndexingService } from '../ai/retrieval/indexing.service';
 import { RetrievalService } from '../ai/retrieval/retrieval.service';
 import { type ChapterExtractOutput } from '../ai/schemas/chapter-extract.schema';
 import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
+import { type EpitomeOutput } from '../ai/schemas/epitome.schema';
 import { type JudgeOutput, JudgeSchema } from '../ai/schemas/judge.schema';
 import { parseSchema } from '../ai/schemas/validate';
 import { TelemetryHandler } from '../ai/telemetry.handler';
@@ -848,6 +849,7 @@ export class GenerationService {
     });
 
     await this.maybeReconcileArc(projectId, draft.chapter);
+    await this.maybeWriteVolumeEpitome(projectId, draft.chapter);
     return result;
   }
 
@@ -879,6 +881,53 @@ export class GenerationService {
 
     this.logger.info('finalize: reconciling arc briefs', { projectId, arcKey: arc.arcKey, chapter, finalizedInArc, cadence, reason });
     await this.outlineArc(projectId, arc.arcKey, {}).catch(err => this.logger.warn('finalize: arc reconciliation failed', { projectId, arcKey: arc.arcKey, chapter, err }));
+  }
+
+  /**
+   * Distils a volume into `volumes.epitome` the one time its last chapter finalizes, so the outliner's
+   * serial memory stays O(volumes) instead of O(chapters). Best-effort: a failed epitome must never fail
+   * the finalization that triggered it, and an epitome already on the row is never rewritten.
+   */
+  private async maybeWriteVolumeEpitome(projectId: bigint, chapter: number): Promise<void> {
+    const volume = await this.db.query.volumes.findFirst({
+      where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.status, 'approved'), eq(schema.volumes.endChapter, chapter)),
+    });
+    if (!volume || volume.startChapter === null || volume.endChapter === null || volume.epitome !== null) return;
+
+    const chapters = await this.db.query.chapters.findMany({
+      where: and(
+        eq(schema.chapters.projectId, projectId),
+        eq(schema.chapters.status, 'done'),
+        gte(schema.chapters.number, volume.startChapter),
+        lte(schema.chapters.number, volume.endChapter),
+      ),
+      orderBy: asc(schema.chapters.number),
+    });
+    const chapterSummaries = chapters
+      .filter(c => c.summary)
+      .map(c => `Ch ${c.number}: ${c.summary}`)
+      .join('\n');
+    if (!chapterSummaries) {
+      this.logger.warn('finalize: skipping volume epitome — no chapter summaries in range', { projectId, volumeKey: volume.volumeKey, chapter });
+      return;
+    }
+
+    const volumePlan = `## ${volume.title ?? volume.volumeKey} (${volume.volumeKey})\nObjective: ${volume.objective ?? ''}\nConflict: ${volume.conflict ?? ''}\nPayoff: ${volume.payoff ?? ''}`;
+    const prompt = PROMPT_REGISTRY.epitome;
+    const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
+
+    this.logger.info('finalize: writing volume epitome', { projectId, volumeKey: volume.volumeKey, chapter, summaries: chapters.length });
+    await this.modelRouter
+      .structured(prompt, { volumePlan, chapterSummaries, startChapter: volume.startChapter, endChapter: volume.endChapter }, ctx)
+      .then(output => {
+        const epitome = (output as EpitomeOutput).epitome?.trim();
+        if (!epitome) throw new Error('epitome prompt returned an empty epitome');
+        return this.db
+          .update(schema.volumes)
+          .set({ epitome, updatedAt: new Date() })
+          .where(and(eq(schema.volumes.id, volume.id), isNull(schema.volumes.epitome)));
+      })
+      .catch(err => this.logger.warn('finalize: volume epitome failed', { projectId, volumeKey: volume.volumeKey, chapter, err }));
   }
 
   async generateGrok(projectId: bigint, chapter: number, body: GenerateGrokBody): Promise<Generation.Draft> {

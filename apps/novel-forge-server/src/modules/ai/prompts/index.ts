@@ -10,6 +10,7 @@ import { chapterExtractPrompt } from './chapter-extract.prompt';
 import { chatCompactPrompt } from './chat-compact.prompt';
 import { chatRefinePrompt } from './chat-refine.prompt';
 import { continuityPrompt } from './continuity.prompt';
+import { epitomePrompt } from './epitome.prompt';
 import { extractionPrompt } from './extraction.prompt';
 import { fixPrompt } from './fix.prompt';
 import { generationPrompt } from './generation.prompt';
@@ -41,6 +42,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   title: titlePrompt as PromptModule<unknown>,
   revision: revisionPrompt as PromptModule<unknown>,
   continuity: continuityPrompt as PromptModule<unknown>,
+  epitome: epitomePrompt as PromptModule<unknown>,
   validation: validationPrompt as PromptModule<unknown>,
   review: reviewPrompt as PromptModule<unknown>,
   'new-novel': newNovelPrompt as PromptModule<unknown>,

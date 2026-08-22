@@ -6,6 +6,7 @@ export * from './fix.schema';
 export * from './outline.schema';
 export * from './title.schema';
 export * from './continuity.schema';
+export * from './epitome.schema';
 export * from './chapter-extract.schema';
 export * from './validation.schema';
 export * from './review.schema';

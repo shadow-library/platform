@@ -13,6 +13,7 @@ export type PromptKey =
   | 'title'
   | 'revision'
   | 'continuity'
+  | 'epitome'
   | 'validation'
   | 'review'
   | 'new-novel'

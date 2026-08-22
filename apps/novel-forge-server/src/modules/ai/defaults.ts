@@ -9,6 +9,7 @@ export type AiRole =
   | 'revision'
   | 'title'
   | 'continuity'
+  | 'epitome'
   | 'validation'
   | 'review'
   | 'plan'
@@ -58,6 +59,7 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
   chat: 'chat',
   title: 'helper',
   compact: 'helper',
+  epitome: 'helper',
   image: 'image',
   embedding: 'embedding',
 };
