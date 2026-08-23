@@ -166,7 +166,13 @@ export default defineConfig([
    * `@typescript-eslint/no-namespace` is off across every server.
    */
   {
-    files: ['apps/identity-server/**/*.{ts,tsx}', 'apps/novel-forge-server/**/*.{ts,tsx}', 'apps/pulse-server/**/*.{ts,tsx}', 'apps/web-novel-server/**/*.{ts,tsx}'],
+    files: [
+      'apps/identity-server/**/*.{ts,tsx}',
+      'apps/novel-forge-server/**/*.{ts,tsx}',
+      'apps/pulse-server/**/*.{ts,tsx}',
+      'apps/web-novel-server/**/*.{ts,tsx}',
+      'apps/shadow-memoir-server/**/*.{ts,tsx}',
+    ],
     rules: { '@typescript-eslint/no-namespace': 'off' },
   },
 

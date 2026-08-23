@@ -1,0 +1,734 @@
+{
+  "id": "1b01e32d-5688-4fe7-be52-a4544bf64a0c",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.accounts": {
+      "name": "accounts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "identity_sub": {
+          "name": "identity_sub",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(320)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "photo_url": {
+          "name": "photo_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auth_provider": {
+          "name": "auth_provider",
+          "type": "auth_provider",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "default_currency": {
+          "name": "default_currency",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled_currencies": {
+          "name": "enabled_currencies",
+          "type": "char(3)[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "schedule_start_min": {
+          "name": "schedule_start_min",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 360
+        },
+        "schedule_end_min": {
+          "name": "schedule_end_min",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1380
+        },
+        "theme": {
+          "name": "theme",
+          "type": "theme",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'system'"
+        },
+        "week_start": {
+          "name": "week_start",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "intensity_mode": {
+          "name": "intensity_mode",
+          "type": "intensity_mode",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'standard'"
+        },
+        "returner_threshold_days": {
+          "name": "returner_threshold_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 7
+        },
+        "level": {
+          "name": "level",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "total_xp": {
+          "name": "total_xp",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "coins": {
+          "name": "coins",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "stat_discipline": {
+          "name": "stat_discipline",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "stat_body": {
+          "name": "stat_body",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "stat_wealth": {
+          "name": "stat_wealth",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "stat_mind": {
+          "name": "stat_mind",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "hp_today": {
+          "name": "hp_today",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "hp_start_today": {
+          "name": "hp_start_today",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "hp_max": {
+          "name": "hp_max",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "last_hp_date": {
+          "name": "last_hp_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_active_date": {
+          "name": "last_active_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "capacity_baseline": {
+          "name": "capacity_baseline",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "warmth_state": {
+          "name": "warmth_state",
+          "type": "warmth_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'cold'"
+        },
+        "crown_period_start": {
+          "name": "crown_period_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "crown_remaining": {
+          "name": "crown_remaining",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "crown_coins_remaining": {
+          "name": "crown_coins_remaining",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "displayed_title_id": {
+          "name": "displayed_title_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "feature_flags": {
+          "name": "feature_flags",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "ocr_quota_date": {
+          "name": "ocr_quota_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocr_quota_count": {
+          "name": "ocr_quota_count",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "notification_prefs": {
+          "name": "notification_prefs",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "onboarding_completed_at": {
+          "name": "onboarding_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deletion_state": {
+          "name": "deletion_state",
+          "type": "deletion_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'none'"
+        },
+        "deletion_started_at": {
+          "name": "deletion_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "accounts_identity_sub_unique": {
+          "name": "accounts_identity_sub_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "identity_sub"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "accounts_level_check": {
+          "name": "accounts_level_check",
+          "value": "\"accounts\".\"level\" >= 1"
+        },
+        "accounts_total_xp_check": {
+          "name": "accounts_total_xp_check",
+          "value": "\"accounts\".\"total_xp\" >= 0"
+        },
+        "accounts_coins_check": {
+          "name": "accounts_coins_check",
+          "value": "\"accounts\".\"coins\" >= 0"
+        },
+        "accounts_stat_discipline_check": {
+          "name": "accounts_stat_discipline_check",
+          "value": "\"accounts\".\"stat_discipline\" >= 0"
+        },
+        "accounts_stat_body_check": {
+          "name": "accounts_stat_body_check",
+          "value": "\"accounts\".\"stat_body\" >= 0"
+        },
+        "accounts_stat_wealth_check": {
+          "name": "accounts_stat_wealth_check",
+          "value": "\"accounts\".\"stat_wealth\" >= 0"
+        },
+        "accounts_stat_mind_check": {
+          "name": "accounts_stat_mind_check",
+          "value": "\"accounts\".\"stat_mind\" >= 0"
+        },
+        "accounts_ocr_quota_count_check": {
+          "name": "accounts_ocr_quota_count_check",
+          "value": "\"accounts\".\"ocr_quota_count\" >= 0"
+        },
+        "accounts_schedule_start_min_check": {
+          "name": "accounts_schedule_start_min_check",
+          "value": "\"accounts\".\"schedule_start_min\" BETWEEN 0 AND 1439"
+        },
+        "accounts_schedule_end_min_check": {
+          "name": "accounts_schedule_end_min_check",
+          "value": "\"accounts\".\"schedule_end_min\" BETWEEN 0 AND 1439"
+        },
+        "accounts_week_start_check": {
+          "name": "accounts_week_start_check",
+          "value": "\"accounts\".\"week_start\" BETWEEN 0 AND 6"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.devices": {
+      "name": "devices",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "push_subscription": {
+          "name": "push_subscription",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "push_opt_in": {
+          "name": "push_opt_in",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "reminder_prefs": {
+          "name": "reminder_prefs",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_sync_seq": {
+          "name": "last_sync_seq",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "devices_account_id_idx": {
+          "name": "devices_account_id_idx",
+          "columns": [
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "devices_account_id_accounts_id_fk": {
+          "name": "devices_account_id_accounts_id_fk",
+          "tableFrom": "devices",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.command_log": {
+      "name": "command_log",
+      "schema": "",
+      "columns": {
+        "account_id": {
+          "name": "account_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "command_id": {
+          "name": "command_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "command_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "result": {
+          "name": "result",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "applied_at": {
+          "name": "applied_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "command_log_applied_at_idx": {
+          "name": "command_log_applied_at_idx",
+          "columns": [
+            {
+              "expression": "applied_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "command_log_account_id_accounts_id_fk": {
+          "name": "command_log_account_id_accounts_id_fk",
+          "tableFrom": "command_log",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "command_log_device_id_devices_id_fk": {
+          "name": "command_log_device_id_devices_id_fk",
+          "tableFrom": "command_log",
+          "tableTo": "devices",
+          "columnsFrom": [
+            "device_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "command_log_account_id_command_id_pk": {
+          "name": "command_log_account_id_command_id_pk",
+          "columns": [
+            "account_id",
+            "command_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.deleted_records": {
+      "name": "deleted_records",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "table_name": {
+          "name": "table_name",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "record_id": {
+          "name": "record_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sync_seq": {
+          "name": "sync_seq",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "nextval('sync_seq')"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "deleted_records_account_id_sync_seq_idx": {
+          "name": "deleted_records_account_id_sync_seq_idx",
+          "columns": [
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sync_seq",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "deleted_records_account_id_accounts_id_fk": {
+          "name": "deleted_records_account_id_accounts_id_fk",
+          "tableFrom": "deleted_records",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.auth_provider": {
+      "name": "auth_provider",
+      "schema": "public",
+      "values": [
+        "google",
+        "apple"
+      ]
+    },
+    "public.deletion_state": {
+      "name": "deletion_state",
+      "schema": "public",
+      "values": [
+        "none",
+        "pending",
+        "blobs_deleted",
+        "data_deleted",
+        "identity_closed",
+        "done"
+      ]
+    },
+    "public.intensity_mode": {
+      "name": "intensity_mode",
+      "schema": "public",
+      "values": [
+        "standard",
+        "low_intensity",
+        "high_intensity"
+      ]
+    },
+    "public.theme": {
+      "name": "theme",
+      "schema": "public",
+      "values": [
+        "system",
+        "light",
+        "dark"
+      ]
+    },
+    "public.warmth_state": {
+      "name": "warmth_state",
+      "schema": "public",
+      "values": [
+        "cold",
+        "steady",
+        "warm"
+      ]
+    },
+    "public.command_status": {
+      "name": "command_status",
+      "schema": "public",
+      "values": [
+        "applied",
+        "rejected",
+        "superseded"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {
+    "public.sync_seq": {
+      "name": "sync_seq",
+      "schema": "public",
+      "increment": "1",
+      "startWith": "1",
+      "minValue": "1",
+      "maxValue": "9223372036854775807",
+      "cache": "1",
+      "cycle": false
+    }
+  },
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
