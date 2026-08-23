@@ -111,13 +111,17 @@ export class ProjectService {
   }
 
   async setCover(id: bigint, image: string, mime: 'image/png' | 'image/jpeg' | 'image/webp'): Promise<Project.Presented> {
+    const ref = await this.storage.save(new Uint8Array(Buffer.from(image, 'base64')), { contentType: mime });
+    return this.setCoverRef(id, ref);
+  }
+
+  /** Points the cover at an object already in storage — the path the illustration subsystem takes, since it saved the bytes itself. */
+  async setCoverRef(id: bigint, ref: string): Promise<Project.Presented> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) });
     if (!project) throw AppErrorCode.PRJ_001.create();
 
     // Content-addressed refs are immutable and deduplicated, so the previous cover is left in place
     // (it may still back another project); setting a new cover only repoints this project's ref.
-    const ref = await this.storage.save(new Uint8Array(Buffer.from(image, 'base64')), { contentType: mime });
-
     const [result] = await this.db.update(schema.projects).set({ coverImagePath: ref, updatedAt: new Date() }).where(eq(schema.projects.id, id)).returning();
     if (!result) throw AppErrorCode.PRJ_001.create();
     return this.present(result);

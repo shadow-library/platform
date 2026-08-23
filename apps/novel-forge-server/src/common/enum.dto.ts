@@ -43,3 +43,6 @@ export const ChapterPublicationStatus = EnumType.create('ChapterPublicationStatu
 export const PublicationVisibility = EnumType.create('PublicationVisibility', schema.publicationVisibility.enumValues);
 export const PublicationGrantState = EnumType.create('PublicationGrantState', schema.publicationGrantState.enumValues);
 export const RefinementProposalStatus = EnumType.create('RefinementProposalStatus', schema.refinementProposalStatus.enumValues);
+export const IllustrationSubjectType = EnumType.create('IllustrationSubjectType', schema.illustrationSubjectType.enumValues);
+export const IllustrationStatus = EnumType.create('IllustrationStatus', schema.illustrationStatus.enumValues);
+export const IllustrationSaveTarget = EnumType.create('IllustrationSaveTarget', ['portrait', 'gallery', 'chapter', 'cover']);

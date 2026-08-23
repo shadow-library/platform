@@ -80,6 +80,22 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AI_001 = AppErrorCode.badRequest('AI_001', 'AI model returned unparseable response');
   static readonly AI_002 = AppErrorCode.badRequest('AI_002', 'Role or model not in registry, or provider is not supported');
   static readonly AI_003 = AppErrorCode.badRequest('AI_003', 'Grok-only projects and grok interlude operations may only use xAI');
+  // User-facing 500s: both are actionable by the operator (set the key / retry), so the detail must not
+  // be swallowed by the internal() mask.
+  static readonly AI_004 = new AppErrorCode('AI_004', 'Image generation is not configured — set AI_OPENROUTER_API_KEY', 500);
+  static readonly AI_005 = new AppErrorCode('AI_005', 'Image generation failed — see the model call log', 500);
+
+  /*!
+   * Illustration Errors
+   */
+  static readonly ILL_001 = AppErrorCode.notFound('ILL_001', 'Illustration not found');
+  static readonly ILL_002 = AppErrorCode.badRequest('ILL_002', 'Illustration is no longer active — start a new one to keep iterating');
+  static readonly ILL_003 = AppErrorCode.badRequest('ILL_003', 'Select a candidate before saving the illustration');
+  static readonly ILL_004 = AppErrorCode.badRequest('ILL_004', 'Candidate is not part of this illustration');
+  static readonly ILL_005 = AppErrorCode.badRequest('ILL_005', 'Save target does not match the illustration subject');
+  static readonly ILL_006 = AppErrorCode.badRequest('ILL_006', 'Illustration subject requires an entity key or chapter number');
+  static readonly ILL_007 = AppErrorCode.badRequest('ILL_007', 'Refinement must add, remove, or replace exactly one instruction');
+  static readonly ILL_008 = AppErrorCode.badRequest('ILL_008', 'Instruction index is out of range');
 
   /*!
    * Continuity Errors

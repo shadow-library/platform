@@ -37,7 +37,8 @@ export type PromptKey =
   | 'reforge-outline'
   | 'reforge-write'
   | 'reforge-judge'
-  | 'recombine';
+  | 'recombine'
+  | 'illustration-compose';
 
 /** Mirrors the `reforge_fidelity` enum — how much latitude the re-author has against the source. */
 export type ReforgeFidelityLevel = 'preserve' | 'close' | 'loose';

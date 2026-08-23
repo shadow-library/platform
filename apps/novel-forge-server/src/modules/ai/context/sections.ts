@@ -1,6 +1,19 @@
 export type ContextTier = 'canonical' | 'approved_intent' | 'working';
 export type ContextPurpose =
-  'generation' | 'revision' | 'validation' | 'outline' | 'chat' | 'chat_hub' | 'arc_plan' | 'premise' | 'audit' | 'rebrand_seed' | 'rebrand' | 'reforge_outline' | 'reforge';
+  | 'generation'
+  | 'revision'
+  | 'validation'
+  | 'outline'
+  | 'chat'
+  | 'chat_hub'
+  | 'arc_plan'
+  | 'premise'
+  | 'audit'
+  | 'rebrand_seed'
+  | 'rebrand'
+  | 'reforge_outline'
+  | 'reforge'
+  | 'illustration';
 
 // Stable = scope canon that only changes when a proposal is applied or a manual edit lands; volatile
 // = per-turn/per-chapter content. The stable prefix must stay byte-identical across calls with
@@ -72,6 +85,9 @@ export const SECTION_LABELS: Record<string, string> = {
   known_facts: '## KNOWN FACTS (POV CAST)',
   chapter_reveals: '## REVEALED THIS CHAPTER',
   hidden_constraints: '## BEHAVIORAL CONSTRAINTS',
+  art_style: '## ART STYLE BIBLE',
+  subject_card: '## SUBJECT',
+  cast_appearance: '## CAST APPEARANCE',
 };
 
 export function sectionLabel(key: string): string {

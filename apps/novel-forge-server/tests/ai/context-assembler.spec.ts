@@ -852,3 +852,106 @@ describe('ContextAssembler.resolveRefs — bible_doc and fact prefixes', () => {
     expect(unresolved.sort()).toEqual(['bible_doc:plot/missing', 'entity:missing', 'fact:missing', 'world_fact:missing'].sort());
   });
 });
+
+describe('ContextAssembler.forIllustration', () => {
+  const project = { id: 1n, title: 'Ashfall', premise: 'A frozen empire eats its heirs.', brief: null, themes: ['betrayal'], instructions: null };
+  const artStyle = { section: 'project', slug: 'art-style', body: 'Heavy ink outlines over a bleached winter palette.' };
+
+  // `makeDbStub` spreads its raw overrides last, so an override of `query` replaces the defaults wholesale.
+  function illustrationAssembler(query: Record<string, unknown>) {
+    return makeAssembler({
+      query: {
+        contextPacks: { findFirst: mock(async () => null) },
+        projects: { findFirst: mock(async () => project) },
+        bibleDocuments: { findFirst: mock(async () => null) },
+        entities: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        entityAppearances: { findMany: mock(async () => []) },
+        worldFacts: { findMany: mock(async () => []) },
+        chapters: { findFirst: mock(async () => null) },
+        ...query,
+      },
+    });
+  }
+
+  it('carries the art-style bible and the premise as the stable prefix', async () => {
+    const assembler = illustrationAssembler({ bibleDocuments: { findFirst: mock(async () => artStyle) } });
+
+    const pack = await assembler.forIllustration(1n, 'cover', null);
+
+    expect(pack.purpose).toBe('illustration');
+    expect(pack.renderedStable).toContain('## ART STYLE BIBLE');
+    expect(pack.renderedStable).toContain('Heavy ink outlines');
+    expect(pack.renderedStable).toContain('A frozen empire eats its heirs.');
+    expect(pack.renderedVolatile).toBe('');
+  });
+
+  it('omits the art-style section when the project has no such document', async () => {
+    const assembler = illustrationAssembler({});
+
+    const pack = await assembler.forIllustration(1n, 'cover', null);
+
+    expect(pack.sections.map(s => s.key)).toEqual(['premise']);
+  });
+
+  it('renders the entity card with its canonical appearance and the world facts around it', async () => {
+    const entity = {
+      entityKey: 'hero',
+      name: 'Evan Vale',
+      type: 'character',
+      significance: 'major',
+      status: 'alive',
+      appearance: 'silver hair, scarred jaw',
+      body: 'Heir to a broken house.',
+      notes: null,
+      motivation: 'Reclaim the ridge.',
+      aliases: [{ alias: 'The Ridgeling' }],
+    };
+    const assembler = illustrationAssembler({
+      bibleDocuments: { findFirst: mock(async () => artStyle) },
+      entities: { findFirst: mock(async () => entity) },
+      worldFacts: { findMany: mock(async () => [{ category: 'climate', key: 'winter', value: 'A century of unbroken frost.' }]) },
+    });
+
+    const pack = await assembler.forIllustration(1n, 'entity', 'hero');
+
+    expect(pack.rendered).toContain('## SUBJECT');
+    expect(pack.rendered).toContain('silver hair, scarred jaw');
+    expect(pack.rendered).toContain('The Ridgeling');
+    expect(pack.rendered).toContain('A century of unbroken frost.');
+  });
+
+  it('tells the composer to derive an appearance when the entity records none', async () => {
+    const entity = {
+      entityKey: 'hero',
+      name: 'Evan Vale',
+      type: 'character',
+      significance: null,
+      status: null,
+      appearance: null,
+      body: null,
+      notes: null,
+      motivation: null,
+      aliases: [],
+    };
+    const assembler = illustrationAssembler({ entities: { findFirst: mock(async () => entity) } });
+
+    const pack = await assembler.forIllustration(1n, 'entity', 'hero');
+
+    expect(pack.rendered).toContain('none recorded — derive one');
+  });
+
+  it('renders a chapter subject with the appearance of its on-page cast', async () => {
+    const assembler = illustrationAssembler({
+      chapters: { findFirst: mock(async () => ({ number: 3, title: 'The Ridge', summary: 'Evan crosses the ridge alone.' })) },
+      entityAppearances: { findMany: mock(async () => [{ entityId: 7n }]) },
+      entities: { findFirst: mock(async () => null), findMany: mock(async () => [{ entityKey: 'hero', name: 'Evan Vale', type: 'character', appearance: 'silver hair' }]) },
+    });
+
+    const pack = await assembler.forIllustration(1n, 'chapter', '3');
+
+    expect(pack.chapter).toBe(3);
+    expect(pack.rendered).toContain('Chapter 3: The Ridge');
+    expect(pack.rendered).toContain('## CAST APPEARANCE');
+    expect(pack.rendered).toContain('Evan Vale (character): silver hair');
+  });
+});

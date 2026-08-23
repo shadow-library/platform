@@ -48,6 +48,13 @@ export const REBRAND_BUDGET = 12_000;
 // pack) both travel as template vars, not pack sections, so the pack itself stays rebrand-sized.
 export const REFORGE_OUTLINE_BUDGET = 12_000;
 export const REFORGE_BUDGET = 12_000;
+// An image prompt is a paragraph: the composer needs the subject, the look, and nothing else.
+export const ILLUSTRATION_BUDGET = 6_000;
+export const ILLUSTRATION_WORLD_FACTS_MAX = 30;
+
+// The project's art direction lives in one conventional bible document; every illustration prompt is
+// bound by it when it exists. Authors create it like any other bible doc — no bespoke table.
+export const ART_STYLE_DOC = { section: 'project', slug: 'art-style' } as const;
 
 function makeSection(key: string, content: string, tier: ContextTier, sourceRefs: string[] = [], segment: ContextSegment = 'volatile'): ContextSection {
   const rendered = renderSection(key, content);
@@ -983,6 +990,92 @@ export class ContextAssembler {
     if (input.prevBody) sections.push(makeSectionTail('prev_ending', input.prevBody, PREV_ENDING_TAIL, 'canonical', [`reforge:${chapter - 1}`]));
 
     return this.finalize(projectId, 'reforge', chapter, sections, [], REFORGE_BUDGET, false);
+  }
+
+  /**
+   * Pack for composing one image prompt. The art-style bible and the project premise are stable (they
+   * bind every illustration in the project); the subject card and the canon that describes how the
+   * subject looks are volatile. `subjectKey` is the entity key, the chapter number as text, or null
+   * for the project cover.
+   */
+  async forIllustration(projectId: bigint, subjectType: schema.Illustration.SubjectType, subjectKey: string | null): Promise<AssembledPack & { id: bigint | null }> {
+    const [project, artStyle] = await Promise.all([
+      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+      this.db.query.bibleDocuments.findFirst({
+        where: and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, ART_STYLE_DOC.section), eq(schema.bibleDocuments.slug, ART_STYLE_DOC.slug)),
+      }),
+    ]);
+
+    const sections: ContextSection[] = [];
+    if (artStyle?.body) sections.push(asStable(makeSection('art_style', artStyle.body, 'canonical', [`doc:${ART_STYLE_DOC.section}/${ART_STYLE_DOC.slug}`])));
+    if (project)
+      sections.push(
+        asStable(makeSection('premise', [project.title ? `Title: ${project.title}` : '', this.renderPremise(project)].filter(Boolean).join('\n\n'), 'canonical', ['premise'])),
+      );
+
+    if (subjectType === 'entity' && subjectKey) sections.push(...(await this.entitySubjectSections(projectId, subjectKey)));
+    if (subjectType === 'chapter' && subjectKey) sections.push(...(await this.chapterSubjectSections(projectId, Number(subjectKey))));
+
+    return this.finalize(projectId, 'illustration', subjectType === 'chapter' && subjectKey ? Number(subjectKey) : null, sections, [], ILLUSTRATION_BUDGET, false);
+  }
+
+  private async entitySubjectSections(projectId: bigint, entityKey: string): Promise<ContextSection[]> {
+    const entity = await this.db.query.entities.findFirst({
+      where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)),
+      with: { aliases: true },
+    });
+    if (!entity) return [];
+
+    const card = [
+      `${entity.name} (${entity.type}${entity.significance ? `, ${entity.significance}` : ''})`,
+      entity.aliases.length > 0 ? `Also known as: ${entity.aliases.map(a => a.alias).join(', ')}` : '',
+      entity.status ? `Status: ${entity.status}` : '',
+      entity.appearance ? `Canonical appearance: ${entity.appearance}` : 'Canonical appearance: none recorded — derive one.',
+      entity.body ?? '',
+      entity.notes ?? '',
+      entity.motivation ? `Motivation: ${entity.motivation}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const sections = [makeSection('subject_card', card, 'canonical', [`entity:${entityKey}`])];
+
+    const facts = await this.db.query.worldFacts.findMany({
+      where: eq(schema.worldFacts.projectId, projectId),
+      orderBy: [schema.worldFacts.category, schema.worldFacts.key],
+      limit: ILLUSTRATION_WORLD_FACTS_MAX,
+    });
+    if (facts.length > 0) sections.push(makeSection('world_facts', facts.map(f => `${f.category}/${f.key}: ${f.value}`).join('\n'), 'canonical', []));
+
+    return sections;
+  }
+
+  private async chapterSubjectSections(projectId: bigint, chapter: number): Promise<ContextSection[]> {
+    const [chapterRow, appearances] = await Promise.all([
+      this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter)) }),
+      this.db.query.entityAppearances.findMany({ where: and(eq(schema.entityAppearances.projectId, projectId), eq(schema.entityAppearances.chapter, chapter)) }),
+    ]);
+    if (!chapterRow) return [];
+
+    const sections = [
+      makeSection('subject_card', [`Chapter ${chapter}: ${chapterRow.title ?? ''}`, chapterRow.summary ?? ''].filter(Boolean).join('\n\n'), 'canonical', [`chapter:${chapter}`]),
+    ];
+
+    const entityIds = appearances.map(a => a.entityId);
+    if (entityIds.length === 0) return sections;
+
+    const cast = await this.db.query.entities.findMany({ where: inArray(schema.entities.id, entityIds), orderBy: [schema.entities.name] });
+    const rendered = cast.map(e => `${e.name} (${e.type}): ${e.appearance ?? 'no canonical appearance recorded'}`).join('\n');
+    sections.push(
+      makeSection(
+        'cast_appearance',
+        rendered,
+        'canonical',
+        cast.map(e => `entity:${e.entityKey}`),
+      ),
+    );
+
+    return sections;
   }
 
   private async premisePack(projectId: bigint, purpose: ContextPurpose, inventoryLines: number, budgetTokens: number): Promise<AssembledPack & { id: bigint | null }> {

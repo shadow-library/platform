@@ -56,6 +56,7 @@ export class EntityService {
         notes: body.notes,
         motivation: body.motivation,
         body: body.body,
+        appearance: body.appearance,
       })
       .onConflictDoUpdate({
         target: [schema.entities.projectId, schema.entities.entityKey],
@@ -67,6 +68,7 @@ export class EntityService {
           notes: body.notes,
           motivation: body.motivation,
           body: body.body,
+          appearance: body.appearance,
           updatedAt: new Date(),
         },
       })
@@ -125,13 +127,17 @@ export class EntityService {
   }
 
   async setImage(projectId: bigint, entityKey: string, image: string, mime: 'image/png' | 'image/jpeg' | 'image/webp'): Promise<PresentedEntity> {
+    const ref = await this.storage.save(new Uint8Array(Buffer.from(image, 'base64')), { contentType: mime });
+    return this.setImageRef(projectId, entityKey, ref);
+  }
+
+  /** Points the portrait at an object already in storage — the path the illustration subsystem takes, since it saved the bytes itself. */
+  async setImageRef(projectId: bigint, entityKey: string, ref: string): Promise<PresentedEntity> {
     const entity = await this.get(projectId, entityKey);
     if (!entity) throw AppErrorCode.ENT_001.create();
 
     // Content-addressed refs are immutable and deduplicated, so the previous object is left in place
     // (it may still back another row); replacing the portrait only repoints this entity's ref.
-    const ref = await this.storage.save(new Uint8Array(Buffer.from(image, 'base64')), { contentType: mime });
-
     const [updated] = await this.db
       .update(schema.entities)
       .set({ imagePath: ref, updatedAt: new Date() })
@@ -157,10 +163,15 @@ export class EntityService {
   }
 
   async addImage(projectId: bigint, entityKey: string, image: string, mime: UploadMime, caption?: string): Promise<PresentedEntityWithImages> {
+    const ref = await this.storage.save(new Uint8Array(Buffer.from(image, 'base64')), { contentType: mime });
+    return this.addImageRef(projectId, entityKey, ref, caption);
+  }
+
+  /** Appends a gallery row for an object already in storage — the path the illustration subsystem takes. */
+  async addImageRef(projectId: bigint, entityKey: string, ref: string, caption?: string): Promise<PresentedEntityWithImages> {
     const entity = await this.get(projectId, entityKey);
     if (!entity) throw AppErrorCode.ENT_001.create();
 
-    const ref = await this.storage.save(new Uint8Array(Buffer.from(image, 'base64')), { contentType: mime });
     const nextOrder = entity.images.reduce((max, img) => Math.max(max, img.sortOrder + 1), 0);
 
     await this.db.insert(schema.entityImages).values({ entityId: entity.id, projectId, imagePath: ref, caption: caption ?? null, sortOrder: nextOrder });

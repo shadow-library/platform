@@ -22,4 +22,5 @@ export * from './reforge.schema';
 export * from './recombine.schema';
 export * from './chat-refine.schema';
 export * from './arc-plan.schema';
+export * from './illustration.schema';
 export * from './validate';

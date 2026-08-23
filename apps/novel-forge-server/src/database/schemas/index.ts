@@ -9,6 +9,7 @@ export * from './refinement';
 export * from './rebrand';
 export * from './reforge';
 export * from './publishing';
+export * from './illustration';
 export * from './jobs';
 export * from './vectors';
 export * from './ai';

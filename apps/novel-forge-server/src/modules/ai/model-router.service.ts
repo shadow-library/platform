@@ -26,6 +26,26 @@ export interface ProjectConfig {
   config?: { models?: Partial<Record<AiRole, ResolvedModel>> } | null;
 }
 
+export interface ImageRequest {
+  prompt: string;
+  n: number;
+  /**
+   * Reference images for image-to-image work, as HTTP(S) or `data:` URLs. OpenRouter's images endpoint
+   * accepts up to 14; how many a given model honours varies by provider.
+   */
+  inputReferences?: string[];
+}
+
+export interface GeneratedImage {
+  bytes: Uint8Array;
+  contentType: string;
+}
+
+interface OpenRouterImageResponse {
+  data?: { b64_json?: string; media_type?: string }[];
+  usage?: { cost?: number };
+}
+
 // Deterministic verification/extraction roles: identical input must yield identical output, so their
 // results are safe to cache. Creative roles (generation, revision, plan, outline, chat…) are never
 // cached — caching them would make a re-request return byte-identical prose.
@@ -242,6 +262,91 @@ export class ModelRouterService {
     // Full outputs only on debug (dev) — an operator can read the exact prose the model returned.
     this.logger.debug('All parse attempts failed — full raw outputs', { role, runId: ctx.runId, rawOutput1, rawOutput2 });
     throw AppErrorCode.AI_001.create();
+  }
+
+  /**
+   * Image generation through OpenRouter's dedicated images endpoint, which speaks its own wire format
+   * rather than chat completions — so it cannot ride LangChain's callback telemetry and writes its own
+   * `model_calls` row instead. It gets the same timeout budget and transient-error backoff as a chat
+   * call. `inputReferences` is the endpoint's image-to-image channel; models that ignore it degrade to
+   * plain text-to-image rather than failing.
+   */
+  async images(request: ImageRequest, ctx: TelemetryContext, project?: ProjectConfig): Promise<GeneratedImage[]> {
+    const resolved = this.resolveModel('image', project);
+    const apiKey = Config.get('ai.openrouter.api.key');
+    if (!apiKey) throw AppErrorCode.AI_004.create();
+    const url = `${Config.get('ai.openrouter.api.url')}/images`;
+    const body = JSON.stringify({
+      model: resolved.model,
+      prompt: request.prompt,
+      n: request.n,
+      ...(request.inputReferences?.length ? { input_references: request.inputReferences.map(image => ({ type: 'image_url', image_url: { url: image } })) } : {}),
+    });
+
+    this.logger.debug('images: requesting', {
+      projectId: ctx.projectId,
+      model: resolved.model,
+      n: request.n,
+      references: request.inputReferences?.length ?? 0,
+      prompt: request.prompt,
+    });
+
+    const startedAt = Date.now();
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= this.llmMaxRetries; attempt++) {
+      try {
+        const res = await this.withTimeout(
+          fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body }),
+          this.llmTimeoutMs,
+        );
+        if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
+
+        const payload = (await res.json()) as OpenRouterImageResponse;
+        const images = (payload.data ?? [])
+          .filter(item => item.b64_json)
+          .map(item => ({ bytes: new Uint8Array(Buffer.from(item.b64_json as string, 'base64')), contentType: item.media_type ?? 'image/png' }));
+        if (images.length === 0) throw new Error('provider returned no image data');
+
+        await this.recordImageCall(ctx, resolved, 'ok', attempt, Date.now() - startedAt, payload.usage?.cost);
+        return images;
+      } catch (err) {
+        lastErr = err;
+        if (attempt < this.llmMaxRetries) await sleep(this.llmBackoffMs * 2 ** attempt);
+      }
+    }
+
+    this.logger.error('Image call failed after retries', { projectId: ctx.projectId, model: resolved.model, err: lastErr });
+    await this.recordImageCall(ctx, resolved, 'transport_error', this.llmMaxRetries, Date.now() - startedAt, undefined, lastErr);
+    throw AppErrorCode.AI_005.create();
+  }
+
+  private async recordImageCall(
+    ctx: TelemetryContext,
+    resolved: ResolvedModel,
+    status: 'ok' | 'transport_error',
+    attempt: number,
+    latencyMs: number,
+    costUsd?: number,
+    err?: unknown,
+  ): Promise<void> {
+    await this.db
+      .insert(schema.modelCalls)
+      .values({
+        projectId: ctx.projectId,
+        runId: ctx.runId,
+        node: ctx.node,
+        role: ctx.role,
+        provider: resolveProvider(resolved),
+        model: resolved.model,
+        promptKey: ctx.promptKey,
+        promptVersion: ctx.promptVersion,
+        status,
+        latencyMs,
+        costUsd: costUsd === undefined ? null : String(costUsd),
+        attempt,
+        error: err ? { message: err instanceof Error ? err.message : String(err) } : null,
+      })
+      .catch(insertErr => this.logger.warn('Failed to write model_calls row for an image call', { err: insertErr }));
   }
 
   // Normalise the raw parsed value for the module's schema (unwrapping object-wrapped arrays from

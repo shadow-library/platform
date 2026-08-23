@@ -13,6 +13,6 @@ import { GenerationService } from './generation.service';
   imports: [DatabaseModule, AiModule, JobsModule, RefinementModule, StorageModule],
   controllers: [GenerationController, ChapterImageController],
   providers: [GenerationService, ChapterImageService],
-  exports: [GenerationService],
+  exports: [GenerationService, ChapterImageService],
 })
 export class GenerationModule {}

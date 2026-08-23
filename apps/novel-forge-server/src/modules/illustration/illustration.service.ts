@@ -1,130 +1,340 @@
-import { randomUUID } from 'node:crypto';
-
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, ne, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { AppError, Config, Logger } from '@shadow-library/common';
+import { Logger } from '@shadow-library/common';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
+import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase } from '@server/database';
-import * as schema from '@server/database/schemas';
+import { type Illustration, type PrimaryDatabase, schema } from '@server/database';
 
-import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
+import { ContextAssembler } from '../ai/context/context-assembler.service';
+import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
+import { type GeneratedImage, ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
+import { illustrationComposePrompt } from '../ai/prompts/illustration-compose.prompt';
+import { EntityService } from '../bible/entity/entity.service';
+import { ChapterImageService } from '../generation/chapter-image.service';
+import { ProjectService } from '../project/project/project.service';
+import { applyInstructionEdit, hashInstructions, type InstructionEdit, renderPromptSpec } from './prompt-spec';
 
-interface IllustrationSession {
-  sessionId: string;
-  projectId: bigint;
-  entityKey: string;
-  instruction: string;
-  previewBytes: Uint8Array | null;
-  status: 'active' | 'saved' | 'cancelled';
-  createdAt: Date;
+export interface StartIllustrationInput {
+  subjectType: Illustration.SubjectType;
+  subjectKey?: string | null;
+  instruction?: string;
 }
 
-const SESSION_TTL_MS = 60 * 60 * 1000;
+export interface PresentedCandidate {
+  ref: string;
+  imageUrl: string;
+  createdAt: string;
+  instructionsHash: string;
+}
+
+export interface PresentedIllustration {
+  id: bigint;
+  projectId: bigint;
+  subjectType: Illustration.SubjectType;
+  subjectKey: string | null;
+  status: Illustration.Status;
+  revision: number;
+  instructions: string[];
+  prompt: string;
+  candidates: PresentedCandidate[];
+  selectedRef: string | null;
+  selectedUrl?: string;
+  /** Set only when the composer had to invent the entity's appearance; the client decides whether to PATCH it onto the entity. */
+  suggestedAppearance?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const CANDIDATE_COUNT = 2;
+
+const TARGET_SUBJECT: Record<Illustration.SaveTarget, Illustration.SubjectType> = {
+  portrait: 'entity',
+  gallery: 'entity',
+  chapter: 'chapter',
+  cover: 'cover',
+};
 
 @Injectable()
 export class IllustrationService {
   private readonly logger = Logger.getLogger(APP_NAME, IllustrationService.name);
   private readonly db: PrimaryDatabase;
-  private readonly sessions = new Map<string, IllustrationSession>();
 
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly storage: StorageService,
     private readonly modelRouter: ModelRouterService,
+    private readonly assembler: ContextAssembler,
+    private readonly workflowRuns: WorkflowRunService,
+    private readonly entityService: EntityService,
+    private readonly chapterImageService: ChapterImageService,
+    private readonly projectService: ProjectService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  private pruneExpired(): void {
-    const now = Date.now();
-    for (const [id, session] of this.sessions) {
-      if (now - session.createdAt.getTime() > SESSION_TTL_MS) this.sessions.delete(id);
-    }
-  }
-
-  private async generateImage(instruction: string, projectId: bigint): Promise<Uint8Array> {
+  async start(projectId: bigint, input: StartIllustrationInput): Promise<PresentedIllustration> {
+    const subjectKey = this.normalizeSubjectKey(input.subjectType, input.subjectKey);
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    if (!project) throw AppErrorCode.PRJ_001.create();
 
-    // Same gateway credential as chat — OpenRouter's unified image API proxies both vendors, so image
-    // generation no longer needs its own vendor-specific key.
-    const apiKey = Config.get('ai.openrouter.api.key');
-    const url = `${Config.get('ai.openrouter.api.url')}/images`;
-    const { model } = this.modelRouter.resolveModel('image', project as ProjectConfig | undefined);
-    if (!apiKey) throw AppError.internal('Image generation is not configured — set AI_OPENROUTER_API_KEY');
+    const instructions = input.instruction ? [input.instruction] : [];
+    const target = `${input.subjectType}:${subjectKey ?? 'cover'}`;
 
-    // The full prompt is sensitive/verbose — dev-only debug is where it belongs.
-    this.logger.debug('generateImage: requesting', { projectId, model, instruction });
-    const startedAt = Date.now();
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, prompt: instruction, n: 1 }),
+    const { result } = await this.workflowRuns.runChain(projectId, 'illustration', target, { subjectType: input.subjectType, subjectKey, instructions }, async runId => {
+      const promptSpec = await this.compose(projectId, project, input.subjectType, subjectKey, instructions, runId);
+      const candidates = await this.generate(projectId, project, promptSpec, runId, []);
+      return { promptSpec, candidates };
     });
 
-    if (!res.ok) {
-      const err = await res.text().catch(() => res.statusText);
-      this.logger.error('generateImage: provider returned an error', { projectId, model, status: res.status, err });
-      throw AppError.internal(`Image generation failed: ${err}`);
+    const [created] = await this.db
+      .insert(schema.illustrations)
+      .values({
+        projectId,
+        subjectType: input.subjectType,
+        subjectKey,
+        promptSpec: result.promptSpec,
+        candidates: result.candidates,
+        ownerId: project.ownerId,
+      })
+      .returning()
+      .catch(err => this.databaseService.translateError(err));
+
+    if (!created) throw AppErrorCode.S001.create();
+    this.logger.info('illustration started', { projectId, illustrationId: created.id, target, candidates: result.candidates.length });
+    return this.present(created);
+  }
+
+  /**
+   * Regenerates from a structurally edited prompt spec. The currently selected candidate rides along as
+   * an image-to-image reference so the refinement adjusts the picture the author is looking at rather
+   * than rolling a fresh one; the appearance anchor holds the subject steady when the provider ignores it.
+   */
+  async refine(projectId: bigint, illustrationId: bigint, edit: InstructionEdit): Promise<PresentedIllustration> {
+    const row = await this.getActive(projectId, illustrationId);
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    if (!project) throw AppErrorCode.PRJ_001.create();
+
+    const promptSpec: Illustration.PromptSpec = { ...row.promptSpec, instructions: applyInstructionEdit(row.promptSpec.instructions, edit) };
+    const referenceRef = row.selectedRef ?? row.candidates.at(-1)?.ref;
+
+    const { result } = await this.workflowRuns.runChain(projectId, 'illustration', `refine:${illustrationId}`, { edit }, runId =>
+      this.generate(projectId, project, promptSpec, runId, referenceRef ? [referenceRef] : []),
+    );
+
+    const [updated] = await this.db
+      .update(schema.illustrations)
+      .set({ promptSpec, candidates: [...row.candidates, ...result], revision: row.revision + 1, selectedRef: null, updatedAt: new Date() })
+      .where(eq(schema.illustrations.id, illustrationId))
+      .returning();
+
+    if (!updated) throw AppErrorCode.ILL_001.create();
+    this.logger.info('illustration refined', { projectId, illustrationId, revision: updated.revision });
+    return this.present(updated);
+  }
+
+  async select(projectId: bigint, illustrationId: bigint, ref: string): Promise<PresentedIllustration> {
+    const row = await this.getActive(projectId, illustrationId);
+    if (!row.candidates.some(candidate => candidate.ref === ref)) throw AppErrorCode.ILL_004.create();
+
+    const [updated] = await this.db.update(schema.illustrations).set({ selectedRef: ref, updatedAt: new Date() }).where(eq(schema.illustrations.id, illustrationId)).returning();
+    if (!updated) throw AppErrorCode.ILL_001.create();
+    return this.present(updated);
+  }
+
+  async save(projectId: bigint, illustrationId: bigint, target: Illustration.SaveTarget): Promise<PresentedIllustration> {
+    const row = await this.getActive(projectId, illustrationId);
+    if (!row.selectedRef) throw AppErrorCode.ILL_003.create();
+    if (TARGET_SUBJECT[target] !== row.subjectType) throw AppErrorCode.ILL_005.create();
+
+    await this.writeTarget(projectId, row, target, row.selectedRef);
+
+    const [updated] = await this.db.update(schema.illustrations).set({ status: 'saved', updatedAt: new Date() }).where(eq(schema.illustrations.id, illustrationId)).returning();
+
+    if (!updated) throw AppErrorCode.ILL_001.create();
+    await this.collect(
+      illustrationId,
+      row.candidates.filter(candidate => candidate.ref !== row.selectedRef).map(candidate => candidate.ref),
+    );
+
+    this.logger.info('illustration saved', { projectId, illustrationId, target, ref: row.selectedRef });
+    return this.present(updated);
+  }
+
+  async discard(projectId: bigint, illustrationId: bigint): Promise<PresentedIllustration> {
+    const row = await this.getActive(projectId, illustrationId);
+
+    const [updated] = await this.db
+      .update(schema.illustrations)
+      .set({ status: 'discarded', selectedRef: null, updatedAt: new Date() })
+      .where(eq(schema.illustrations.id, illustrationId))
+      .returning();
+
+    if (!updated) throw AppErrorCode.ILL_001.create();
+    await this.collect(
+      illustrationId,
+      row.candidates.map(candidate => candidate.ref),
+    );
+
+    this.logger.info('illustration discarded', { projectId, illustrationId });
+    return this.present(updated);
+  }
+
+  /** Every illustration for a subject, newest first — a saved one can be re-rolled from its stored prompt spec. */
+  async list(projectId: bigint, filter?: { subjectType?: Illustration.SubjectType; subjectKey?: string }): Promise<PresentedIllustration[]> {
+    const conditions = [eq(schema.illustrations.projectId, projectId)];
+    if (filter?.subjectType) conditions.push(eq(schema.illustrations.subjectType, filter.subjectType));
+    if (filter?.subjectKey) conditions.push(eq(schema.illustrations.subjectKey, filter.subjectKey));
+
+    const rows = await this.db.query.illustrations.findMany({ where: and(...conditions), orderBy: [desc(schema.illustrations.id)] });
+    return rows.map(row => this.present(row));
+  }
+
+  private async compose(
+    projectId: bigint,
+    project: ProjectConfig,
+    subjectType: Illustration.SubjectType,
+    subjectKey: string | null,
+    instructions: string[],
+    runId: string,
+  ): Promise<Illustration.PromptSpec> {
+    const [pack, anchor] = await Promise.all([this.assembler.forIllustration(projectId, subjectType, subjectKey), this.loadAppearance(projectId, subjectType, subjectKey)]);
+
+    const composed = await this.modelRouter.structured(
+      illustrationComposePrompt,
+      {
+        contextPack: pack.rendered,
+        subjectType,
+        subjectLabel: subjectKey ?? 'project cover',
+        instructions: instructions.length > 0 ? instructions.map((text, index) => `${index + 1}. ${text}`).join('\n') : '(none)',
+      },
+      { projectId, runId, node: 'compose', promptKey: illustrationComposePrompt.key, promptVersion: illustrationComposePrompt.version, role: 'illustration' },
+      project,
+    );
+
+    return {
+      basePrompt: composed.basePrompt,
+      subjectFraming: composed.subjectFraming,
+      styleNotes: composed.styleNotes,
+      negativePrompt: composed.negativePrompt,
+      appearanceAnchor: anchor ?? composed.appearance,
+      appearanceDerived: !anchor && Boolean(composed.appearance),
+      instructions,
+      promptKey: illustrationComposePrompt.key,
+      promptVersion: illustrationComposePrompt.version,
+    };
+  }
+
+  private async generate(
+    projectId: bigint,
+    project: ProjectConfig,
+    promptSpec: Illustration.PromptSpec,
+    runId: string,
+    referenceRefs: string[],
+  ): Promise<Illustration.Candidate[]> {
+    const inputReferences = await Promise.all(referenceRefs.map(ref => this.toDataUrl(ref)));
+    const images = await this.modelRouter.images(
+      { prompt: renderPromptSpec(promptSpec), n: CANDIDATE_COUNT, inputReferences },
+      { projectId, runId, node: 'generate', promptKey: promptSpec.promptKey, promptVersion: promptSpec.promptVersion, role: 'image' },
+      project,
+    );
+
+    const instructionsHash = hashInstructions(promptSpec.instructions);
+    return Promise.all(images.map(image => this.persist(image, instructionsHash)));
+  }
+
+  private async persist(image: GeneratedImage, instructionsHash: string): Promise<Illustration.Candidate> {
+    const ref = await this.storage.save(image.bytes, { contentType: image.contentType });
+    return { ref, createdAt: new Date().toISOString(), instructionsHash };
+  }
+
+  private async toDataUrl(ref: string): Promise<string> {
+    const object = await this.storage.read(ref);
+    return `data:${object.contentType};base64,${Buffer.from(object.bytes).toString('base64')}`;
+  }
+
+  private loadAppearance(projectId: bigint, subjectType: Illustration.SubjectType, subjectKey: string | null): Promise<string | null> {
+    if (subjectType !== 'entity' || !subjectKey) return Promise.resolve(null);
+    return this.db.query.entities
+      .findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, subjectKey)), columns: { appearance: true } })
+      .then(entity => entity?.appearance ?? null);
+  }
+
+  private normalizeSubjectKey(subjectType: Illustration.SubjectType, subjectKey?: string | null): string | null {
+    if (subjectType === 'cover') return null;
+    if (!subjectKey) throw AppErrorCode.ILL_006.create();
+    if (subjectType === 'chapter' && !/^\d+$/.test(subjectKey)) throw AppErrorCode.ILL_006.create();
+    return subjectKey;
+  }
+
+  private async getActive(projectId: bigint, illustrationId: bigint): Promise<Illustration.Row> {
+    const row = await this.db.query.illustrations.findFirst({ where: and(eq(schema.illustrations.id, illustrationId), eq(schema.illustrations.projectId, projectId)) });
+    if (!row) throw AppErrorCode.ILL_001.create();
+    if (row.status !== 'active') throw AppErrorCode.ILL_002.create();
+    return row;
+  }
+
+  private writeTarget(projectId: bigint, row: Illustration.Row, target: Illustration.SaveTarget, ref: string): Promise<unknown> {
+    switch (target) {
+      case 'portrait':
+        return this.entityService.setImageRef(projectId, row.subjectKey as string, ref);
+      case 'gallery':
+        return this.entityService.addImageRef(projectId, row.subjectKey as string, ref);
+      case 'chapter':
+        return this.chapterImageService.addRef(projectId, Number(row.subjectKey), ref);
+      case 'cover':
+        return this.projectService.setCoverRef(projectId, ref);
     }
-
-    const data = (await res.json()) as { data: { b64_json: string }[] };
-    const b64 = data.data[0]?.b64_json;
-    if (!b64) throw AppError.internal('Image generation returned no data');
-    const bytes = new Uint8Array(Buffer.from(b64, 'base64'));
-    this.logger.debug('generateImage: received image', { projectId, model, bytes: bytes.length, latencyMs: Date.now() - startedAt });
-    return bytes;
   }
 
-  async start(projectId: bigint, entityKey: string, options: { instruction?: string; noChat?: boolean }): Promise<{ sessionId: string; previewUrl: string }> {
-    this.pruneExpired();
-    const entity = await this.db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)) });
-    const instruction = options.instruction ?? `Create a character portrait for "${entity?.name ?? entityKey}", a ${entity?.type ?? 'character'} in a fantasy novel.`;
-
-    this.logger.info('illustration start', { projectId, entityKey });
-    const bytes = await this.generateImage(instruction, projectId);
-    const sessionId = randomUUID();
-    this.sessions.set(sessionId, { sessionId, projectId, entityKey, instruction, previewBytes: bytes, status: 'active', createdAt: new Date() });
-
-    const ref = await this.storage.save(bytes, { contentType: 'image/png' });
-    return { sessionId, previewUrl: this.storage.getPublicUrl(ref) };
+  /**
+   * Deletes candidate objects nothing else points at. Storage is content-addressed and shared across
+   * projects, so a ref is only removed once no saved target and no other live illustration references it.
+   */
+  private async collect(illustrationId: bigint, refs: string[]): Promise<void> {
+    for (const ref of refs) {
+      if (await this.isReferenced(ref, illustrationId)) continue;
+      await this.storage.delete(ref).catch(err => this.logger.warn('Failed to delete an orphaned illustration object', { ref, err }));
+    }
   }
 
-  async refine(sessionId: string, instruction: string): Promise<{ previewUrl: string }> {
-    const session = this.sessions.get(sessionId);
-    if (!session || session.status !== 'active') throw AppError.internal(`Session ${sessionId} not found or inactive`);
-
-    this.logger.info('illustration refine', { sessionId, projectId: session.projectId, entityKey: session.entityKey });
-    const fullInstruction = `${session.instruction}\n\nRefinement: ${instruction}`;
-    const bytes = await this.generateImage(fullInstruction, session.projectId);
-    session.previewBytes = bytes;
-    session.instruction = fullInstruction;
-
-    const ref = await this.storage.save(bytes, { contentType: 'image/png' });
-    return { previewUrl: this.storage.getPublicUrl(ref) };
+  private async isReferenced(ref: string, excludeIllustrationId: bigint): Promise<boolean> {
+    const counts = await Promise.all([
+      this.db.$count(schema.entities, eq(schema.entities.imagePath, ref)),
+      this.db.$count(schema.entityImages, eq(schema.entityImages.imagePath, ref)),
+      this.db.$count(schema.chapterImages, eq(schema.chapterImages.imagePath, ref)),
+      this.db.$count(schema.projects, eq(schema.projects.coverImagePath, ref)),
+      this.db.$count(
+        schema.illustrations,
+        and(
+          ne(schema.illustrations.id, excludeIllustrationId),
+          ne(schema.illustrations.status, 'discarded'),
+          // Unrolled rather than `@> '[{"ref":…}]'::jsonb`: the bun-sql driver binds a JSON-string
+          // parameter in a form the containment operator never matches.
+          or(eq(schema.illustrations.selectedRef, ref), sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${schema.illustrations.candidates}) e WHERE e->>'ref' = ${ref})`),
+        ),
+      ),
+    ]);
+    return counts.some(count => count > 0);
   }
 
-  async save(sessionId: string): Promise<{ saved: boolean; imageUrl: string }> {
-    const session = this.sessions.get(sessionId);
-    if (!session || session.status !== 'active') throw AppError.internal(`Session ${sessionId} not found or inactive`);
-    if (!session.previewBytes) throw AppError.internal('No preview to save');
-
-    const ref = await this.storage.save(session.previewBytes, { contentType: 'image/png' });
-
-    await this.db
-      .update(schema.entities)
-      .set({ imagePath: ref, updatedAt: new Date() })
-      .where(and(eq(schema.entities.projectId, session.projectId), eq(schema.entities.entityKey, session.entityKey)));
-
-    session.status = 'saved';
-    this.logger.info('illustration saved', { sessionId, ref });
-    return { saved: true, imageUrl: this.storage.getPublicUrl(ref) };
-  }
-
-  async cancel(sessionId: string): Promise<{ cancelled: boolean }> {
-    const session = this.sessions.get(sessionId);
-    if (session) session.status = 'cancelled';
-    return { cancelled: true };
+  private present(row: Illustration.Row): PresentedIllustration {
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      subjectType: row.subjectType,
+      subjectKey: row.subjectKey,
+      status: row.status,
+      revision: row.revision,
+      instructions: row.promptSpec.instructions,
+      prompt: renderPromptSpec(row.promptSpec),
+      candidates: row.candidates.map(candidate => ({ ...candidate, imageUrl: this.storage.getPublicUrl(candidate.ref) })),
+      selectedRef: row.selectedRef,
+      selectedUrl: this.storage.getPublicUrl(row.selectedRef),
+      suggestedAppearance: row.promptSpec.appearanceDerived ? row.promptSpec.appearanceAnchor : undefined,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
   }
 }

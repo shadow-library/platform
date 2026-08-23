@@ -39,12 +39,16 @@ export class ChapterImageService {
   }
 
   async add(projectId: bigint, chapter: number, image: string, mime: UploadMime, caption?: string): Promise<PresentedChapterImage> {
+    const bytes = Buffer.from(image, 'base64');
+    this.logger.debug('chapter image add: saving', { projectId, chapter, mime, bytes: bytes.length });
+    const ref = await this.storage.save(new Uint8Array(bytes), { contentType: mime });
+    return this.addRef(projectId, chapter, ref, caption);
+  }
+
+  /** Appends a scene-image row for an object already in storage — the path the illustration subsystem takes. */
+  async addRef(projectId: bigint, chapter: number, ref: string, caption?: string): Promise<PresentedChapterImage> {
     const existing = await this.list(projectId, chapter);
     const nextOrder = existing.reduce((max, img) => Math.max(max, img.sortOrder + 1), 0);
-
-    const bytes = Buffer.from(image, 'base64');
-    this.logger.debug('chapter image add: saving', { projectId, chapter, mime, bytes: bytes.length, sortOrder: nextOrder });
-    const ref = await this.storage.save(new Uint8Array(bytes), { contentType: mime });
 
     const [created] = await this.db
       .insert(schema.chapterImages)

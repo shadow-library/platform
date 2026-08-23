@@ -14,6 +14,7 @@ import { epitomePrompt } from './epitome.prompt';
 import { extractionPrompt } from './extraction.prompt';
 import { fixPrompt } from './fix.prompt';
 import { generationPrompt } from './generation.prompt';
+import { illustrationComposePrompt } from './illustration-compose.prompt';
 import { judgePrompt } from './judge.prompt';
 import { newNovelPrompt } from './new-novel.prompt';
 import { outlinePrompt } from './outline.prompt';
@@ -67,6 +68,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'reforge-write': reforgeWritePrompt as PromptModule<unknown>,
   'reforge-judge': reforgeJudgePrompt as PromptModule<unknown>,
   recombine: recombinePrompt as PromptModule<unknown>,
+  'illustration-compose': illustrationComposePrompt as PromptModule<unknown>,
 };
 
 export * from './types';

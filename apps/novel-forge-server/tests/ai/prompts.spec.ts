@@ -17,6 +17,7 @@ import {
   EndingContractSchema,
   ExtractionSchema,
   FixSchema,
+  IllustrationComposeSchema,
   JudgeSchema,
   PlanSchema,
   RebrandAuditSchema,
@@ -784,6 +785,39 @@ describe('Prompt modules', () => {
         chapterSummary: 'The hero arrives in the city.',
       });
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('illustration-compose', () => {
+    it('registers as an analytical helper-group prompt', () => {
+      expect(PROMPT_REGISTRY['illustration-compose'].kind).toBe('analytical');
+      expect(PROMPT_REGISTRY['illustration-compose'].role).toBe('illustration');
+      expect(PROMPT_REGISTRY['illustration-compose'].version).toBe('1.0.0');
+    });
+
+    it('documents the art-style bible convention so authors know where to put it', () => {
+      expect(PROMPT_REGISTRY['illustration-compose'].system).toContain('section "project" with slug "art-style"');
+    });
+
+    it('renders the pack first and the ordered author instructions last', async () => {
+      const messages = await PROMPT_REGISTRY['illustration-compose'].template.formatMessages({
+        contextPack: 'SUBJECT-CANON-BLOCK',
+        subjectType: 'entity',
+        subjectLabel: 'hero',
+        instructions: '1. in falling snow',
+      });
+      expect(messages).toHaveLength(3);
+      expect(messages[0]?.getType()).toBe('system');
+      expect(String(messages[1]?.content)).toBe('SUBJECT-CANON-BLOCK');
+      expect(String(messages[2]?.content)).toContain('Subject type: entity');
+      expect(String(messages[2]?.content)).toContain('1. in falling snow');
+    });
+
+    it('accepts a composed spec without a negative prompt and rejects a too-thin base prompt', () => {
+      const base = { basePrompt: 'a lone swordsman on a frozen ridge, backlit', subjectFraming: 'half-body portrait', styleNotes: 'ink wash, muted palette' };
+      expect(parseSchema(IllustrationComposeSchema, base).success).toBe(true);
+      expect(parseSchema(IllustrationComposeSchema, { ...base, negativePrompt: 'text, watermark' }).success).toBe(true);
+      expect(parseSchema(IllustrationComposeSchema, { ...base, basePrompt: 'a man' }).success).toBe(false);
     });
   });
 });

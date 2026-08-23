@@ -23,6 +23,7 @@ export type AiRole =
   | 'compact'
   | 'arc'
   | 'embedding'
+  | 'illustration'
   | 'image';
 
 export interface ResolvedModel {
@@ -62,6 +63,8 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
   title: 'helper',
   compact: 'helper',
   epitome: 'helper',
+  // Composing an image prompt from canon is short mechanical structuring, not authoring or review.
+  illustration: 'helper',
   image: 'image',
   embedding: 'embedding',
 };

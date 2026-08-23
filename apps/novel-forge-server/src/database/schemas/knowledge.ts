@@ -49,6 +49,9 @@ export const entities = pgTable(
     notes: text('notes'),
     motivation: text('motivation'),
     body: text('body'),
+    // The canonical visual description. When set it anchors every generated image for this entity, so
+    // re-rolls and refinements keep producing the same character rather than a new one each time.
+    appearance: text('appearance'),
     imagePath: varchar('image_path'),
     wikiVisibility: entityWikiVisibility('wiki_visibility').notNull().default('default'),
     createdAt: timestamp('created_at').notNull().defaultNow(),

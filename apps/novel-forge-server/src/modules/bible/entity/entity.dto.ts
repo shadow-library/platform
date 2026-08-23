@@ -65,6 +65,9 @@ export class CreateEntityBody {
   @Field({ optional: true })
   body?: string;
 
+  @Field({ optional: true, description: 'Canonical visual description; anchors every generated illustration of this entity so re-rolls keep the same look.' })
+  appearance?: string;
+
   @Field(() => [String], { optional: true })
   aliases?: string[];
 }
@@ -121,6 +124,9 @@ export class EntityResponse {
 
   @Field({ optional: true, nullable: true })
   body?: string | null;
+
+  @Field({ optional: true, nullable: true, description: 'Canonical visual description used as the anchor for generated illustrations.' })
+  appearance?: string | null;
 
   @Field({ optional: true, nullable: true, description: 'Absolute public URL for the portrait, or null when the entity has no portrait.' })
   imageUrl?: string | null;
