@@ -40,13 +40,17 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
     const modelRouter = { structured: options.structured ?? (async () => delta), resolveModel: () => ({ model: 'test-model' }) };
     const indexingService = { addProse: async () => undefined, addLore: async () => undefined };
 
-    // advanceCursor is the only node that reaches for `db.update` outside a transaction, so trapping it fails
-    // the run exactly where a cursor write would.
+    // advanceCursor is the only node that updates `projects` outside a transaction, so trapping that one table
+    // fails the run exactly where a cursor write would — extractContinuity's claim write must still go through.
     const client = options.failCursor
       ? new Proxy(db, {
           get: (target, prop) => {
-            if (prop === 'update') throw new Error('cursor update failed');
             const value = Reflect.get(target, prop) as unknown;
+            if (prop === 'update')
+              return (table: unknown) => {
+                if (table === schema.projects) throw new Error('cursor update failed');
+                return (value as (t: unknown) => unknown).call(target, table);
+              };
             return typeof value === 'function' ? value.bind(target) : value;
           },
         })
@@ -67,10 +71,19 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
     return { projectId: project.id, draftId: draft.id };
   }
 
-  function invoke(projectId: bigint, draftId: bigint, options: Parameters<typeof buildGraph>[0] = {}): Promise<unknown> {
+  function invoke(projectId: bigint, draftId: bigint, options: Parameters<typeof buildGraph>[0] & { runId?: string } = {}): Promise<unknown> {
     return buildGraph(options).invoke(
-      { projectId: String(projectId), chapter: 1, draftId: String(draftId), prose: 'ch1', summary: 's1', title: 'One', generator: 'standard', runId: 'run-resume' },
-      { configurable: { thread_id: `resume-${draftId}` } },
+      {
+        projectId: String(projectId),
+        chapter: 1,
+        draftId: String(draftId),
+        prose: 'ch1',
+        summary: 's1',
+        title: 'One',
+        generator: 'standard',
+        runId: options.runId ?? 'run-resume',
+      },
+      { configurable: { thread_id: `resume-${draftId}-${options.runId ?? 'run-resume'}` } },
     );
   }
 
@@ -109,6 +122,69 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
     expect(proposal?.proposal).toEqual(delta);
     expect(rival).toBeUndefined();
     expect(project?.storyCurrentChapter).toBe(1);
+  });
+
+  it('should apply exactly one continuity delta when two finalize calls race for the same chapter', async () => {
+    const { projectId, draftId } = await seedPartiallyFinalizedChapter('final');
+    let entered = 0;
+    let openGate = (): void => undefined;
+    const gate = new Promise<void>(resolve => (openGate = resolve));
+
+    // The winner of the claim parks inside `structured` until the loser has settled, so the loser evaluates the
+    // claim while it is held and un-applied. `entered === 2` is the escape hatch for a regressed claim: both
+    // extractions would proceed instead of hanging, and the assertions below report the double apply.
+    const structuredFor = (value: unknown) => async (): Promise<unknown> => {
+      entered += 1;
+      if (entered === 2) openGate();
+      await gate;
+      return value;
+    };
+
+    const first = invoke(projectId, draftId, { structured: structuredFor(delta), runId: 'run-race-a' });
+    const second = invoke(projectId, draftId, { structured: structuredFor(deltaB), runId: 'run-race-b' });
+    void Promise.race([first.catch(() => undefined), second.catch(() => undefined)]).then(openGate);
+
+    const results = await Promise.allSettled([first, second]);
+    const rejected = results.filter(r => r.status === 'rejected');
+    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason.message).toMatch(/already in progress/);
+    expect(entered).toBe(1);
+
+    const chapter = await db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, 1)) });
+    const entities = await db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId) });
+    expect(chapter?.continuityApplied).toBe(true);
+    expect(entities.map(e => e.entityKey)).toHaveLength(1);
+
+    // The winner advanced the cursor, which `guard` would reject on the retry; rewinding it puts the retry in
+    // the state a losing run reaches when its own attempt died before advanceCursor.
+    await db.update(schema.projects).set({ storyCurrentChapter: 0 }).where(eq(schema.projects.id, projectId));
+    await invoke(projectId, draftId, { structured: structuredFor(deltaB), runId: 'run-race-retry' });
+
+    const afterRetry = await db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId) });
+    expect(afterRetry).toHaveLength(1);
+    expect(entered).toBe(1);
+  });
+
+  it('should release the continuity claim when extraction fails so an immediate retry is not blocked', async () => {
+    const { projectId, draftId } = await seedPartiallyFinalizedChapter('final');
+    const structured = async (): Promise<unknown> => {
+      throw new Error('extractor exploded');
+    };
+
+    await expect(invoke(projectId, draftId, { structured, runId: 'run-fail' })).rejects.toThrow(/extractor exploded/);
+
+    const afterFailure = await db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, 1)) });
+    expect(afterFailure?.continuityClaimedAt).toBeNull();
+    expect(afterFailure?.continuityClaimedBy).toBeNull();
+    expect(afterFailure?.continuityApplied).toBe(false);
+
+    await invoke(projectId, draftId, { runId: 'run-fail-retry' });
+
+    const afterRetry = await db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, 1)) });
+    const hero = await db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, 'char_hero')) });
+    expect(afterRetry?.continuityApplied).toBe(true);
+    expect(hero?.name).toBe('Hero');
   });
 
   it('should still refuse a draft that was never approved', async () => {

@@ -1,5 +1,5 @@
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
-import { and, eq, ne, sql } from 'drizzle-orm';
+import { and, eq, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
@@ -43,6 +43,10 @@ const ChapterFinalizationAnnotation = Annotation.Root({
 type FinalizationState = typeof ChapterFinalizationAnnotation.State;
 
 const logger = Logger.getLogger(APP_NAME, 'chapter-finalization.graph');
+
+// How long a continuity claim stays live before another run may steal it — long enough to outlast a slow
+// extraction, short enough that a worker killed mid-extraction does not brick the chapter until a human looks.
+const CONTINUITY_CLAIM_LEASE_MS = 5 * 60 * 1000;
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function createChapterFinalizationGraph(services: FinalizationServices) {
@@ -118,20 +122,35 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     return { nodeTrace: ['commitProse'] };
   }
 
+  async function releaseClaim(projectId: bigint, chapter: number) {
+    await db
+      .update(schema.chapters)
+      .set({ continuityClaimedAt: null, continuityClaimedBy: null })
+      .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter)));
+  }
+
   async function extractContinuity(state: FinalizationState) {
     // grok chapters skip continuity extraction.
     if (state.generator === 'grok') return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
 
     const projectId = BigInt(state.projectId);
+    const chapterWhere = and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter));
 
-    // A resumed run re-enters from START, so re-extracting would overwrite the already-applied proposal with a
-    // fresh (non-deterministic) LLM delta and apply a second, contradictory canon mutation. `continuityApplied`
-    // is the durable marker that the delta already landed; skipping here leaves applyContinuity a no-op.
-    const chapterRow = await db.query.chapters.findFirst({
-      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter)),
-      columns: { continuityApplied: true },
-    });
-    if (chapterRow?.continuityApplied) {
+    // Claiming the row is the only thing that grants the right to extract. A plain `continuityApplied` read
+    // would be a check-then-act: two concurrent finalizes of the same chapter both see `false`, both call the
+    // (non-deterministic) extractor, and both apply contradictory canon. The lease is compared against the app
+    // clock because the claim timestamp is written by the app clock too — mixing in `now()` would compare
+    // across two clocks. A resumed run re-enters from START and takes the same path.
+    const staleBefore = new Date(Date.now() - CONTINUITY_CLAIM_LEASE_MS);
+    const [claimed] = await db
+      .update(schema.chapters)
+      .set({ continuityClaimedAt: new Date(), continuityClaimedBy: state.runId })
+      .where(and(chapterWhere, eq(schema.chapters.continuityApplied, false), or(isNull(schema.chapters.continuityClaimedAt), lt(schema.chapters.continuityClaimedAt, staleBefore))))
+      .returning({ id: schema.chapters.id });
+
+    if (!claimed) {
+      const chapterRow = await db.query.chapters.findFirst({ where: chapterWhere, columns: { continuityApplied: true } });
+      if (!chapterRow?.continuityApplied) throw AppError.internal(`[extractContinuity] Continuity finalization for chapter ${state.chapter} is already in progress`);
       logger.debug('finalization extractContinuity skipped: continuity already applied', { runId: state.runId, chapter: state.chapter });
       return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
     }
@@ -156,24 +175,31 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'extractContinuity', promptKey: 'continuity', promptVersion: '1.0.0', role: 'continuity' };
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
-    const delta = (await modelRouter.structured(
-      PROMPT_REGISTRY.continuity,
-      { contextPack, chapterNumber: state.chapter, chapterProse: state.prose },
-      ctx,
-      projectRow as ProjectConfig | undefined,
-    )) as ContinuityOutput;
+    // A failure that surfaces fast releases the claim immediately, so the next retry starts at once instead of
+    // waiting out the whole lease; only a worker that dies without unwinding leaves the lease to expire.
+    try {
+      const delta = (await modelRouter.structured(
+        PROMPT_REGISTRY.continuity,
+        { contextPack, chapterNumber: state.chapter, chapterProse: state.prose },
+        ctx,
+        projectRow as ProjectConfig | undefined,
+      )) as ContinuityOutput;
 
-    // Upsert continuity proposal.
-    const resolvedModel = modelRouter.resolveModel('continuity', projectRow as ProjectConfig | undefined);
-    await db
-      .insert(schema.continuityProposals)
-      .values({ projectId, chapter: state.chapter, proposal: delta as never, model: resolvedModel.model, status: 'pending' })
-      .onConflictDoUpdate({
-        target: [schema.continuityProposals.projectId, schema.continuityProposals.chapter],
-        set: { proposal: sql`EXCLUDED.proposal`, model: sql`EXCLUDED.model`, status: 'pending', updatedAt: new Date() },
-      });
+      // Upsert continuity proposal.
+      const resolvedModel = modelRouter.resolveModel('continuity', projectRow as ProjectConfig | undefined);
+      await db
+        .insert(schema.continuityProposals)
+        .values({ projectId, chapter: state.chapter, proposal: delta as never, model: resolvedModel.model, status: 'pending' })
+        .onConflictDoUpdate({
+          target: [schema.continuityProposals.projectId, schema.continuityProposals.chapter],
+          set: { proposal: sql`EXCLUDED.proposal`, model: sql`EXCLUDED.model`, status: 'pending', updatedAt: new Date() },
+        });
 
-    return { continuityDelta: delta, nodeTrace: ['extractContinuity'] };
+      return { continuityDelta: delta, nodeTrace: ['extractContinuity'] };
+    } catch (err) {
+      await releaseClaim(projectId, state.chapter);
+      throw err;
+    }
   }
 
   async function applyContinuity(state: FinalizationState) {
@@ -190,19 +216,26 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     // delta that applied in full becomes `applied`.
     const hasHeldEntries = continuityHasHeldEntries(delta);
 
-    await db.transaction(async tx => {
-      await applyContinuityDelta(tx, projectId, state.chapter, delta);
+    // The claim taken in extractContinuity is released here on failure only: a committed transaction leaves
+    // `continuityApplied` true, which makes the claim columns moot for every later read.
+    try {
+      await db.transaction(async tx => {
+        await applyContinuityDelta(tx, projectId, state.chapter, delta);
 
-      await tx
-        .update(schema.continuityProposals)
-        .set(hasHeldEntries ? { updatedAt: new Date() } : { status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
-        .where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, state.chapter)));
+        await tx
+          .update(schema.continuityProposals)
+          .set(hasHeldEntries ? { updatedAt: new Date() } : { status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
+          .where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, state.chapter)));
 
-      await tx
-        .update(schema.chapters)
-        .set({ continuityApplied: true, updatedAt: new Date() })
-        .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter)));
-    });
+        await tx
+          .update(schema.chapters)
+          .set({ continuityApplied: true, updatedAt: new Date() })
+          .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter)));
+      });
+    } catch (err) {
+      await releaseClaim(projectId, state.chapter);
+      throw err;
+    }
 
     return { nodeTrace: ['applyContinuity'] };
   }

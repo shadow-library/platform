@@ -37,6 +37,10 @@ export const chapters = pgTable(
     // Set true when a dependency (bible doc or an earlier chapter) changed after this chapter was validated.
     needsRevalidation: boolean('needs_revalidation').notNull().default(false),
     continuityApplied: boolean('continuity_applied').notNull().default(false),
+    // Durable lease over continuity extraction: a concurrent finalize that cannot claim it must not extract a
+    // second, contradictory delta. Cleared on failure, and made moot by `continuityApplied` on success.
+    continuityClaimedAt: timestamp('continuity_claimed_at'),
+    continuityClaimedBy: text('continuity_claimed_by'),
     // Audit trail of translator parts merged into this chapter by the recombine pass; null = never merged.
     mergedFrom: jsonb('merged_from'),
     note: text('note'),
