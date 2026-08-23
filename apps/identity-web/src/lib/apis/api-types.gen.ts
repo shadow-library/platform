@@ -1159,7 +1159,8 @@ export interface paths {
     /** Handle Federated Callback */
     get: operations['get_api_v1_auth_federated_callback'];
     put?: never;
-    post?: never;
+    /** Handle Federated Callback Form Post */
+    post: operations['post_api_v1_auth_federated_callback'];
     delete?: never;
     options?: never;
     head?: never;
@@ -3091,7 +3092,7 @@ export interface components {
     };
     SocialProviderOptionDto: {
       /** @enum {string} */
-      provider: 'GOOGLE' | 'MICROSOFT';
+      provider: 'GOOGLE' | 'MICROSOFT' | 'APPLE';
       label: string;
     };
     SocialLoginStartBody: {
@@ -3129,6 +3130,13 @@ export interface components {
     };
     SessionsRevokedResponse: {
       revoked: number;
+    };
+    FederatedCallbackBody: {
+      state?: string;
+      code?: string;
+      error?: string;
+      /** @description Apple only: a JSON-encoded {name,email} object, sent by Apple on the account's first authorization only. */
+      user?: string;
     };
     MfaEnrollmentsResponse: {
       enrollments: components['schemas']['MfaEnrollmentItem'][];
@@ -3529,7 +3537,7 @@ export interface components {
     };
     AuthModeItem: {
       /** @enum {string} */
-      method: 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP' | 'GOOGLE' | 'MICROSOFT';
+      method: 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP' | 'GOOGLE' | 'MICROSOFT' | 'APPLE';
       label: string;
       description: string;
       /** @enum {string} */
@@ -3542,7 +3550,7 @@ export interface components {
     GlobalIdentityProviderItem: {
       id: string;
       /** @enum {string} */
-      kind: 'GOOGLE' | 'MICROSOFT';
+      kind: 'GOOGLE' | 'MICROSOFT' | 'APPLE';
       name: string;
       issuer: string;
       clientId: string;
@@ -3550,6 +3558,10 @@ export interface components {
       allowSignUp: boolean;
       isActive: boolean;
       createdAt: string;
+      /** @description Apple only: the Apple Developer Team ID. */
+      appleTeamId?: string;
+      /** @description Apple only: the Key ID of the registered .p8 client-secret key. */
+      appleKeyId?: string;
     };
     SetAuthModeBody: {
       /** @description Whether members may use this sign-in method. A social method must be configured before it can be turned on. */
@@ -3560,15 +3572,21 @@ export interface components {
     };
     CreateGlobalIdentityProviderBody: {
       /** @enum {string} */
-      kind: 'GOOGLE' | 'MICROSOFT';
+      kind: 'GOOGLE' | 'MICROSOFT' | 'APPLE';
       name: string;
-      /** @description Issuer url whose discovery document is fetched. Google is https://accounts.google.com; Microsoft must be a single tenant, https://login.microsoftonline.com/<tenant-id>/v2.0. */
+      /** @description Issuer url whose discovery document is fetched. Google is https://accounts.google.com; Microsoft must be a single tenant, https://login.microsoftonline.com/<tenant-id>/v2.0; Apple is https://appleid.apple.com. */
       issuer: string;
+      /** @description Apple: the Services ID configured for Sign in with Apple. */
       clientId: string;
+      /** @description Apple: the PEM contents of the registered .p8 private key, not a static secret — it is used to mint a fresh client-secret JWT per sign-in. */
       clientSecret: string;
       scopes?: string;
       /** @description Whether an upstream account with no local match may create one. Turn it off to make the provider link-only. */
       allowSignUp?: boolean;
+      /** @description Apple only, required for kind APPLE: the Apple Developer Team ID. */
+      appleTeamId?: string;
+      /** @description Apple only, required for kind APPLE: the Key ID of the registered .p8 client-secret key. */
+      appleKeyId?: string;
     };
     UpdateGlobalIdentityProviderBody: {
       name?: string;
@@ -3578,6 +3596,10 @@ export interface components {
       scopes?: string;
       allowSignUp?: boolean;
       isActive?: boolean;
+      /** @description Apple only: the Apple Developer Team ID. */
+      appleTeamId?: string;
+      /** @description Apple only: the Key ID of the registered .p8 client-secret key. */
+      appleKeyId?: string;
     };
     ClientListResponse: {
       items: components['schemas']['ClientSummaryItem'][];
@@ -6822,7 +6844,7 @@ export interface operations {
       query?: never;
       header?: never;
       path: {
-        provider: 'GOOGLE' | 'MICROSOFT';
+        provider: 'GOOGLE' | 'MICROSOFT' | 'APPLE';
       };
       cookie?: never;
     };
@@ -7071,6 +7093,39 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_auth_federated_callback: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FederatedCallbackBody'];
+      };
+    };
     responses: {
       /** @description Default Response */
       '4XX': {
@@ -9292,7 +9347,7 @@ export interface operations {
       query?: never;
       header?: never;
       path: {
-        method: 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP' | 'GOOGLE' | 'MICROSOFT';
+        method: 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP' | 'GOOGLE' | 'MICROSOFT' | 'APPLE';
       };
       cookie?: never;
     };
@@ -11461,6 +11516,7 @@ export type StepUpFederatedStartBody = components['schemas']['StepUpFederatedSta
 export type MeSessionsResponse = components['schemas']['MeSessionsResponse'];
 export type MeSessionItem = components['schemas']['MeSessionItem'];
 export type SessionsRevokedResponse = components['schemas']['SessionsRevokedResponse'];
+export type FederatedCallbackBody = components['schemas']['FederatedCallbackBody'];
 export type MfaEnrollmentsResponse = components['schemas']['MfaEnrollmentsResponse'];
 export type MfaEnrollmentItem = components['schemas']['MfaEnrollmentItem'];
 export type TotpEnrollResponse = components['schemas']['TotpEnrollResponse'];

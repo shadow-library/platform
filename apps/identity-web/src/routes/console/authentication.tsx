@@ -37,6 +37,10 @@ const PROVIDER_DEFAULTS: Record<SocialProviderKind, { issuer: string; issuerHelp
     issuer: '',
     issuerHelper: 'Must be a single Entra tenant — https://login.microsoftonline.com/<tenant-id>/v2.0. The multi-tenant “common” issuer cannot be verified and is rejected.',
   },
+  APPLE: {
+    issuer: 'https://appleid.apple.com',
+    issuerHelper: 'Apple’s issuer never changes; the client id is the Services ID configured for Sign in with Apple.',
+  },
 };
 
 export const Route = createFileRoute('/console/authentication')({
