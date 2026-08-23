@@ -169,6 +169,13 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly REF_001 = AppErrorCode.notFound('REF_001', 'Reforge is not configured for this project');
   static readonly REF_002 = AppErrorCode.notFound('REF_002', 'Reforged chapter not found');
   static readonly REF_003 = AppErrorCode.badRequest('REF_003', 'Reforge is only available for source projects');
+  static readonly REF_004 = AppErrorCode.notFound('REF_004', 'No analysis has been run for this project');
+  static readonly REF_005 = AppErrorCode.badRequest('REF_005', 'Transform requires an approved plan');
+  static readonly REF_006 = AppErrorCode.badRequest('REF_006', 'Plan is invalid — spans must partition every source chapter exactly once');
+  static readonly REF_007 = AppErrorCode.notFound('REF_007', 'Output chapter not found');
+  static readonly REF_008 = AppErrorCode.badRequest('REF_008', 'Transform mode requires fidelity: loose');
+  static readonly REF_009 = AppErrorCode.badRequest('REF_009', 'Promotion requires an approved plan with no failed outputs');
+  static readonly REF_010 = AppErrorCode.conflict('REF_010', 'Plan was superseded by a newer revision');
 
   /*!
    * Context Errors

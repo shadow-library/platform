@@ -41,4 +41,14 @@ describe('AppErrorCode', () => {
     expect(AppErrorCode.RFN_005).toBeDefined();
     expect(AppErrorCode.PRM_001).toBeDefined();
   });
+
+  it('should define transform reforge error codes', () => {
+    expect(AppErrorCode.REF_004.status).toBe(404);
+    expect(AppErrorCode.REF_005.status).toBe(400);
+    expect(AppErrorCode.REF_006.status).toBe(400);
+    expect(AppErrorCode.REF_007.status).toBe(404);
+    expect(AppErrorCode.REF_008.status).toBe(400);
+    expect(AppErrorCode.REF_009.status).toBe(400);
+    expect(AppErrorCode.REF_010.status).toBe(409);
+  });
 });

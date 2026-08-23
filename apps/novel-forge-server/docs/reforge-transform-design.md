@@ -262,15 +262,15 @@ Two candidates were weighed:
 
 **New schema file** `src/database/schemas/reforge-transform.ts` (the shipped `reforge.ts` is not edited beyond the `mode` column):
 
-| Table                   | Purpose                                               | Key constraint                   |
-| ----------------------- | ----------------------------------------------------- | -------------------------------- |
-| `reforge_analyses`      | one analysis run: report, metrics, signals            | `(projectId, createdAt)` index   |
-| `reforge_chapter_cards` | per-source-chapter digest — the re-planning substrate | unique `(analysisId, chapter)`   |
-| `reforge_findings`      | typed, evidenced quality findings                     | `(analysisId, type)` index       |
-| `reforge_plans`         | versioned plan header + approval + promoted project   | unique `(projectId, revision)`   |
-| `reforge_plan_spans`    | the span rows of §4                                   | unique `(planId, ordinal)`       |
-| `reforge_outputs`       | output chapters (§5)                                  | unique `(planId, outputChapter)` |
-| `reforge_cuts`          | append-only cut ledger (§6.1)                         | unique `(planId, cutKey)`        |
+| Table                   | Purpose                                               | Key constraint                                         |
+| ----------------------- | ----------------------------------------------------- | ------------------------------------------------------ |
+| `reforge_analyses`      | one analysis run: report, metrics, signals            | `(projectId, createdAt)` index                         |
+| `reforge_chapter_cards` | per-source-chapter digest — the re-planning substrate | unique `(analysisId, chapter)`                         |
+| `reforge_findings`      | typed, evidenced quality findings                     | `(analysisId, type)` index                             |
+| `reforge_plans`         | versioned plan header + approval + promoted project   | unique `(projectId, revision)`                         |
+| `reforge_plan_spans`    | the span rows of §4                                   | unique `(planId, ordinal)`, unique `(planId, spanKey)` |
+| `reforge_outputs`       | output chapters (§5)                                  | unique `(planId, outputChapter)`                       |
+| `reforge_cuts`          | append-only cut ledger (§6.1)                         | unique `(planId, cutKey)`                              |
 
 **Column addition:** `reforges.mode` (`reforge_mode`, default `'chapter'`). **New enums:** `reforge_mode`, `reforge_analysis_status`, `reforge_finding_type`, `reforge_finding_source`, `reforge_span_action`, `reforge_plan_status`, `reforge_output_status`, `reforge_cut_kind`, `reforge_cut_disposition`. Baseline migration regenerated with `bun scripts/db.ts apps/novel-forge-server generate`; template DB rebuilt with `create-template`.
 
@@ -318,7 +318,8 @@ Two candidates were weighed:
 
 Ordered so each task leaves the tree green on its own.
 
-- [ ] **RT1** — Schema & error codes: `src/database/schemas/reforge-transform.ts` (7 tables), `reforges.mode` column, 9 enums, `REF_004`–`REF_010`, baseline migration regen, template DB rebuild, this doc cross-linked from CLAUDE.md. _Verify:_ migration applies to the template DB, schema tests green.
+- [x] **RT1** — Schema & error codes: `src/database/schemas/reforge-transform.ts` (7 tables), `reforges.mode` column, 9 enums, `REF_004`–`REF_010`, baseline migration regen, template DB rebuild, this doc cross-linked from CLAUDE.md. _Verify:_ migration applies to the template DB, schema tests green.
+      `spanKey` carries a second unique constraint per plan — it is the carry-forward merge key, so a duplicate would silently mis-copy an output. `reforge_plan_spans.bridgeDirective` is materialized now rather than at RT6, since §6.2 stores it on the span.
 - [ ] **RT2** — Deterministic signals: `analysis-signals.ts` pure module — shingle inverted index + Jaccard clustering, MAD length outliers, static-chapter detection, first/last-mention map, title-stem runs. _Verify:_ unit matrix over synthetic corpora incl. a planted repeated arc and a planted dropped thread; a 2,000-chapter corpus completes under 30s.
 - [ ] **RT3** — Analysis prompts & context: `reforge-analyze-window` + `reforge-synthesize` (analytical, role `extraction`), class-schema outputs in `reforge-transform.schema.ts`, registry entries, render goldens, `ContextAssembler.forReforgeAnalysis` + `REFORGE_ANALYSIS_BUDGET`. _Verify:_ prompt suite green; stable segment byte-identical across windows.
 - [ ] **RT4** — Analysis stage: `runReforge` gains `payload.stage`, `analyze` implemented (signals → serial windows via `runChain` with carry-forward → synthesis → persist cards/findings/report), 10%-failed-window abort, report renderer, analysis endpoints + DTOs. _Verify:_ mocked-model executor test over a 40-chapter fixture incl. a mid-run window failure.

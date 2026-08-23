@@ -8,6 +8,7 @@ export * from './generation';
 export * from './refinement';
 export * from './rebrand';
 export * from './reforge';
+export * from './reforge-transform';
 export * from './publishing';
 export * from './illustration';
 export * from './jobs';

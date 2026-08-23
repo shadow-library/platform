@@ -10,6 +10,7 @@ export namespace Reforge {
   export type Status = InferEnum<typeof reforgeStatus>;
   export type ChapterStatus = InferEnum<typeof reforgeChapterStatus>;
   export type Fidelity = InferEnum<typeof reforgeFidelity>;
+  export type Mode = InferEnum<typeof reforgeMode>;
 
   /** Per-project knobs stored on `reforges.settings`. */
   export interface Settings {
@@ -27,6 +28,10 @@ export const reforgeChapterStatus = pgEnum('reforge_chapter_status', ['reforged'
 // How faithful the re-author stays to the source: preserve = keep beats + dialogue meaning, re-prose fully
 // (default); close = keep dialogue near the source wording; loose = allow scene re-ordering for pacing.
 export const reforgeFidelity = pgEnum('reforge_fidelity', ['preserve', 'close', 'loose']);
+// Structural re-authoring is gated here rather than on `fidelity` (transform design §7): overloading the
+// fidelity enum would silently re-route every project already configured `loose` into a pipeline that
+// refuses to run without an analysis and an approved plan.
+export const reforgeMode = pgEnum('reforge_mode', ['chapter', 'transform']);
 
 export const reforges = pgTable(
   'reforges',
@@ -36,6 +41,7 @@ export const reforges = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
     status: reforgeStatus('status').notNull().default('pending'),
+    mode: reforgeMode('mode').notNull().default('chapter'),
     instructions: text('instructions'),
     fidelity: reforgeFidelity('fidelity').notNull().default('preserve'),
     settings: jsonb('settings').$type<Reforge.Settings>(),
