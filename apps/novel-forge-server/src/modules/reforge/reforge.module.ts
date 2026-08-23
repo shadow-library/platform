@@ -5,6 +5,7 @@ import { AiModule } from '../ai/ai.module';
 import { ReforgeAnalysisService } from './reforge-analysis.service';
 import { ReforgeCutService } from './reforge-cut.service';
 import { ReforgePlanService } from './reforge-plan.service';
+import { ReforgePromoteService } from './reforge-promote.service';
 import { ReforgeService } from './reforge.service';
 
 // ReforgeService is pure CRUD over the reforge tables; the transform analysis stage needs the AI
@@ -14,7 +15,7 @@ import { ReforgeService } from './reforge.service';
 // module graph acyclic (Rebrand and Ai never import Reforge).
 @Module({
   imports: [DatabaseModule, AiModule],
-  providers: [ReforgeService, ReforgeAnalysisService, ReforgeCutService, ReforgePlanService],
-  exports: [ReforgeService, ReforgeAnalysisService, ReforgeCutService, ReforgePlanService],
+  providers: [ReforgeService, ReforgeAnalysisService, ReforgeCutService, ReforgePlanService, ReforgePromoteService],
+  exports: [ReforgeService, ReforgeAnalysisService, ReforgeCutService, ReforgePlanService, ReforgePromoteService],
 })
 export class ReforgeModule {}

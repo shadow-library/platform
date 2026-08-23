@@ -8,11 +8,13 @@ import { type Job, type PrimaryDatabase, type Rebrand, type Reforge, type Reforg
 
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
+import { landFinalChapters } from '../novel-import/land-chapters';
 import { PublishRunner } from '../publishing/publish-runner';
 import { RebrandService } from '../rebrand/rebrand.service';
 import { locateOutputChapter } from '../reforge/plan-validation';
 import { ReforgeAnalysisService } from '../reforge/reforge-analysis.service';
 import { ReforgePlanService } from '../reforge/reforge-plan.service';
+import { ReforgePromoteService } from '../reforge/reforge-promote.service';
 import { RecombineService } from '../source/recombine.service';
 import { ConcurrencyController } from './concurrency.controller';
 import { JobService } from './job.service';
@@ -42,6 +44,9 @@ interface ReforgePayload {
   outputs?: number[];
   force?: boolean;
   limit?: number;
+  /** Promote stage only. */
+  title?: string;
+  seedVolumes?: boolean;
 }
 
 // Staged on `jobs.payload` by `NovelImportService.import` inside the same transaction that creates the
@@ -51,12 +56,6 @@ interface ImportPayload {
   mode: 'final' | 'source';
   chapters: { title: string; content: string }[];
   cover?: { mimeType: string; dataBase64: string };
-}
-
-const IMPORT_BATCH_SIZE = 25;
-
-function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
 @Injectable()
@@ -76,6 +75,7 @@ export class JobExecutor {
     private readonly recombineService: RecombineService,
     private readonly publishRunner: PublishRunner,
     private readonly storage: StorageService,
+    private readonly reforgePromoteService: ReforgePromoteService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -262,6 +262,7 @@ export class JobExecutor {
     if (payload.stage === 'analyze') return this.runReforgeAnalyze(job);
     if (payload.stage === 'plan') return this.runReforgePlan(job);
     if (payload.stage === 'transform') return this.runReforgeTransform(job, payload);
+    if (payload.stage === 'promote') return this.runReforgePromote(job, payload);
     return this.runChapterReforge(job, payload);
   }
 
@@ -332,6 +333,25 @@ export class JobExecutor {
       await this.setReforgeStatus(projectId, 'failed', err instanceof Error ? err.message : String(err));
       throw err;
     }
+  }
+
+  // The finished transform becomes a project. Nothing here is generated — the outputs are already
+  // written and human-gated, so the stage is a landing, not a pipeline.
+  private async runReforgePromote(job: Job.Row, payload: ReforgePayload): Promise<void> {
+    const result = await this.reforgePromoteService.promote(job.projectId, {
+      title: payload.title,
+      seedVolumes: payload.seedVolumes,
+      onProgress: progress => this.jobService.progress(job.id, progress),
+    });
+    await this.jobService.progress(job.id, { done: 1, total: 1, current: 'done', phase: 'seeding' });
+    this.logger.info('runReforgePromote: complete', {
+      jobId: job.id,
+      projectId: job.projectId,
+      promotedProjectId: String(result.projectId),
+      chapters: result.chapters,
+      volumes: result.volumes,
+      alreadyPromoted: result.alreadyPromoted,
+    });
   }
 
   private async runChapterReforge(job: Job.Row, payload: ReforgePayload): Promise<void> {
@@ -418,26 +438,15 @@ export class JobExecutor {
     const total = chapters.length;
     this.logger.info('runImport: starting', { jobId: job.id, projectId, mode, total, hasCover: !!cover });
 
-    for (let i = 0; i < total; i += IMPORT_BATCH_SIZE) {
-      const batch = chapters.slice(i, i + IMPORT_BATCH_SIZE);
-      await this.jobService.progress(job.id, { done: i, total, current: String(i + 1), phase: 'inserting' });
-      this.logger.debug('runImport: inserting chapter batch', { jobId: job.id, from: i + 1, to: i + batch.length, total });
-      const values = batch.map((chapter, offset) => ({
-        projectId,
-        number: i + offset + 1,
-        title: chapter.title,
-        content: chapter.content,
-        wordCount: countWords(chapter.content),
-        status: 'done' as const,
-        // `final` mode is the finished novel: human-authored, immutable, publishable from chapter 1
-        // (PUB_002/PUB_003). `source` mode explicitly writes the column's own default so a later
-        // rebrand/reforge/extract pass treats it exactly like any other source project's chapters.
-        generator: mode === 'final' ? ('human' as const) : ('standard' as const),
-        locked: mode === 'final',
-      }));
-      await this.db.insert(schema.chapters).values(values);
-    }
-    await this.jobService.progress(job.id, { done: total, total, current: 'chapters', phase: 'inserting' });
+    // `final` mode is the finished novel: human-authored, immutable, publishable from chapter 1
+    // (PUB_002/PUB_003). `source` mode explicitly writes the column's own default so a later
+    // rebrand/reforge/extract pass treats it exactly like any other source project's chapters.
+    await landFinalChapters(this.db, projectId, chapters, {
+      mode,
+      onBatch: async (done, chapterTotal) => {
+        await this.jobService.progress(job.id, { done, total: chapterTotal, current: done === chapterTotal ? 'chapters' : String(done + 1), phase: 'inserting' });
+      },
+    });
 
     if (cover) {
       this.logger.debug('runImport: storing cover asset', { jobId: job.id, projectId });

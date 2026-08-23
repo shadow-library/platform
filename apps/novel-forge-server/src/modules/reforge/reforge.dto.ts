@@ -513,6 +513,15 @@ export class ReforgeTransformStartBody {
 }
 
 @Schema()
+export class ReforgePromoteBody {
+  @Field({ optional: true, description: 'Title of the promoted project; defaults to the source project’s.' })
+  title?: string;
+
+  @Field({ optional: true, description: 'Write the plan’s arc boundaries as volumes so the promoted project is immediately plannable.' })
+  seedVolumes?: boolean;
+}
+
+@Schema()
 export class ReforgeOutputSummaryResponse {
   @Field(() => Integer)
   outputChapter: number;

@@ -243,6 +243,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
       {} as never,
       runner,
       {} as never,
+      {} as never,
     );
     const janitor = new PublicationJanitor(databaseService, jobService, executor);
 
@@ -282,6 +283,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
       {} as never,
       {} as never,
       runner,
+      {} as never,
       {} as never,
     );
     const jobId = await jobService.enqueue(projectId, 'publish', `publish-${projectId}`);

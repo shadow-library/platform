@@ -104,6 +104,13 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
       listSpans: async () => options.spans ?? [],
     } as never;
 
+    const promoteService = {
+      promote: async () => {
+        events.push('promote');
+        return { projectId: 99n, chapters: 3, volumes: 0, alreadyPromoted: false };
+      },
+    } as never;
+
     const workflowRunService = {
       runChapterReforge: async ({ chapter }: { chapter: number }) => {
         events.push(chapter);
@@ -129,6 +136,7 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
       recombineService,
       {} as never,
       {} as never,
+      promoteService,
     );
     return { executor, jobService, events };
   }
@@ -287,6 +295,17 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
       expect((await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) }))?.status).toBe('done');
       const failed = await db.query.reforgeOutputs.findFirst({ where: eq(schema.reforgeOutputs.planId, planId) });
       expect(failed).toMatchObject({ outputChapter: 3, status: 'failed', body: '', spanOrdinal: 2, spanKey: 'span-two', fromChapter: 3, toChapter: 6, indexInSpan: 0 });
+    });
+
+    it('should route the promote stage to the promote service alone', async () => {
+      const projectId = await seedProject(6);
+      const harness = buildExecutor({ plan: { id: 1n, revision: 1, outputChapterCount: 3 }, spans });
+
+      const jobId = await harness.jobService.enqueue(projectId, 'reforge', `reforge-promote-${projectId}`, { stage: 'promote', seedVolumes: true });
+      await harness.executor.dispatch(jobId);
+
+      expect(harness.events).toEqual(['promote']);
+      expect((await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) }))?.status).toBe('done');
     });
 
     it('should fail the job when no plan is approved', async () => {

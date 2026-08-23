@@ -34,6 +34,7 @@ function makeExecutor(runSourceExtraction: (input: unknown) => Promise<WorkflowR
     recombineService,
     publishRunner,
     storage,
+    {} as never,
   );
   return { executor, progressCalls, runSourceExtraction: runSourceExtractionMock };
 }

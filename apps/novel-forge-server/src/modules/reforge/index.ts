@@ -5,6 +5,7 @@ export * from './plan-validation';
 export * from './reforge-cut.service';
 export * from './reforge-analysis.service';
 export * from './reforge-plan.service';
+export * from './reforge-promote.service';
 export * from './reforge.dto';
 export * from './reforge.service';
 export * from './reforge.controller';

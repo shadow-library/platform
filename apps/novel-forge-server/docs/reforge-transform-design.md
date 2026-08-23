@@ -341,7 +341,15 @@ Ordered so each task leaves the tree green on its own.
       transform settings became settable in the same change — they were specified but no request DTO accepted them. `locateOutputChapter`
       is extracted pure from the graph's `loadSpan` and shared with the executor, which needs the same span to place a failed output.
       Outputs, cuts, and the transform manuscript all read the **newest plan revision**: outputs under a superseded one are stale by §4.
-- [ ] **RT9** — Promotion: `landFinalChapters` extracted from `runImport` and shared, `promote` stage + endpoint, `sourceProjectId` link, `promotedProjectId`, optional volume seeding from arc boundaries. _Verify:_ promote → `POST /publish` → chapter publish round-trip green; `runImport` tests unchanged.
+- [x] **RT9** — Promotion: `landFinalChapters` extracted from `runImport` and shared, `promote` stage + endpoint, `sourceProjectId` link, `promotedProjectId`, optional volume seeding from arc boundaries. _Verify:_ promote → `POST /publish` → chapter publish round-trip green; `runImport` tests unchanged.
+      `landFinalChapters` (`src/modules/novel-import/land-chapters.ts`) takes a `mode` option so `runImport` uses the one definition for both
+      of its modes rather than keeping a near-copy for `source`; batch progress rides an `onBatch` callback, so job progress stays the
+      executor's business and the helper stays free of `JobService`. Promotion itself lives in `ReforgePromoteService`, which imports that
+      file directly and never the novel-import barrel. `REF_009` is asserted at the endpoint before enqueue **and** in the service, so an
+      incomplete transform is a 400 rather than a job that fails minutes later. Idempotence is by stored `promotedProjectId`: a revision
+      that already promoted returns its project instead of landing a second book. `seedVolumes` groups consecutive spans sharing an
+      `arcLabel` into one volume; spans without a label seed nothing. The cover carries over as the source's storage reference — the
+      promoted project points at the same asset rather than duplicating it.
 - [ ] **RT10** — Web UI: analysis/plan/transform/cuts/promote tabs per §9. _Verify:_ web type-check + lint + build green; api-types regenerated per the monorepo's non-atomic-contract rule.
 - [ ] **RT11** — Evaluation: run the full pipeline over a known-flawed sample (a ~300-chapter MTL cultivation serial with a documented filler arc), and record in this doc: chapter-count reduction, `repetitionRatio` and `stallRatio` before vs. after (the same shingle statistic, re-run over the promoted project's chapters), median chapter length, dead-thread count, judge issue rates, and a human read-through of 10 sampled seams. _Verify:_ the after-metrics improve on repetition and stall ratio without a rise in `seam_break` issues above 5% of outputs; results appended as §12.
 

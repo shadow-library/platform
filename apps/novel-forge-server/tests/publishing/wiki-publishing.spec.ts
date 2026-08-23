@@ -260,6 +260,7 @@ describe.if(pgAvailable)('Wiki publish pipeline (mocked reader service)', () => 
       {} as never,
       runner,
       {} as never,
+      {} as never,
     );
     const jobId = await jobService.enqueue(projectId, 'publish', `publish-${projectId}`);
     await executor.dispatch(jobId);

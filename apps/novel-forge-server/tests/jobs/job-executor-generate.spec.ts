@@ -34,6 +34,7 @@ function makeExecutor(runChapterGeneration: (input: unknown) => Promise<Workflow
     recombineService,
     publishRunner,
     storage,
+    {} as never,
   );
   return { executor, progressCalls, runChapterGeneration: runChapterGenerationMock };
 }

@@ -6,6 +6,7 @@ import { JobService } from '../jobs/job.service';
 import { JobEnqueueResponse } from '../pipeline/pipeline.dto';
 import { ReforgeAnalysisService } from './reforge-analysis.service';
 import { ReforgePlanService } from './reforge-plan.service';
+import { ReforgePromoteService } from './reforge-promote.service';
 import {
   ListReforgeCutsResponse,
   ListReforgeFindingsResponse,
@@ -23,6 +24,7 @@ import {
   ReforgePlanApproveBody,
   ReforgePlanDetailResponse,
   ReforgePlanSpansBody,
+  ReforgePromoteBody,
   ReforgeReportResponse,
   ReforgeResponse,
   ReforgeStartBody,
@@ -38,6 +40,7 @@ export class ReforgeController {
     private readonly reforgeService: ReforgeService,
     private readonly analysisService: ReforgeAnalysisService,
     private readonly planService: ReforgePlanService,
+    private readonly promoteService: ReforgePromoteService,
     private readonly jobService: JobService,
     private readonly jobExecutor: JobExecutor,
   ) {}
@@ -195,6 +198,20 @@ export class ReforgeController {
     await this.planService.getApproved(projectId);
     const target = `reforge-${projectId}-out-${outputChapter}`;
     const jobId = await this.jobService.enqueue(projectId, 'reforge', target, { stage: 'transform', outputs: [outputChapter], force: true });
+    this.jobExecutor.dispatch(jobId).catch(() => undefined);
+    return { jobId, kind: 'reforge', status: 'pending', target };
+  }
+
+  @Post('/promote')
+  @HttpStatus(202)
+  @RespondFor(202, JobEnqueueResponse)
+  async startPromote(@Params() params: ReforgeParams, @Body() body: ReforgePromoteBody): Promise<JobEnqueueResponse> {
+    const { projectId } = params;
+    await this.reforgeService.getOrCreate(projectId);
+    // REF_009 before enqueue: an incomplete transform is a 400, not a job that fails minutes later.
+    await this.promoteService.assertPromotable(projectId);
+    const target = `reforge-promote-${projectId}`;
+    const jobId = await this.jobService.enqueue(projectId, 'reforge', target, { stage: 'promote', title: body.title, seedVolumes: body.seedVolumes });
     this.jobExecutor.dispatch(jobId).catch(() => undefined);
     return { jobId, kind: 'reforge', status: 'pending', target };
   }
