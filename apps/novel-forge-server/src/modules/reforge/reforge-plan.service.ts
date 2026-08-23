@@ -1,4 +1,4 @@
-import { asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -12,8 +12,10 @@ import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { PROMPT_REGISTRY } from '../ai/prompts';
 import { type ReforgePlanOutput, type ReforgePlanSpanSchema } from '../ai/schemas/reforge-transform.schema';
+import { buildBridgeDirectives } from './cut-ledger';
 import { DEFAULT_MAX_SPAN_SOURCE_CHAPTERS, DEFAULT_MIN_SPAN_CHAPTERS, deriveOutputNumbering, type PlanSpanLike, spanKeyFor, validateTransformPlan } from './plan-validation';
 import { ReforgeAnalysisService } from './reforge-analysis.service';
+import { ReforgeCutService } from './reforge-cut.service';
 import { ReforgeService } from './reforge.service';
 
 export interface PlanSpanInput extends PlanSpanLike {
@@ -40,6 +42,7 @@ export class ReforgePlanService {
     private readonly databaseService: DatabaseService,
     private readonly reforgeService: ReforgeService,
     private readonly analysisService: ReforgeAnalysisService,
+    private readonly cutService: ReforgeCutService,
     private readonly contextAssembler: ContextAssembler,
     private readonly modelRouter: ModelRouterService,
     private readonly workflowRunService: WorkflowRunService,
@@ -159,6 +162,16 @@ export class ReforgePlanService {
       minSpanChapters: reforge.settings?.minSpanChapters ?? DEFAULT_MIN_SPAN_CHAPTERS,
     });
     if (issues.length > 0) throw AppErrorCode.REF_006.create({ issues });
+
+    // Seeding and bridging before the freeze keeps the invariant simple: an approved plan always has
+    // its ledger and its seam directives, so the writer never has to check for them.
+    await this.cutService.seed(plan.id, spans);
+    for (const [ordinal, directive] of buildBridgeDirectives(spans)) {
+      await this.db
+        .update(schema.reforgePlanSpans)
+        .set({ bridgeDirective: directive, updatedAt: new Date() })
+        .where(and(eq(schema.reforgePlanSpans.planId, plan.id), eq(schema.reforgePlanSpans.ordinal, ordinal)));
+    }
 
     const [approved] = await this.db
       .update(schema.reforgePlans)

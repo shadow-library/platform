@@ -5,6 +5,7 @@ import { asc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { type PlanSpanInput, ReforgePlanService } from '@modules/reforge/reforge-plan.service';
+import { ReforgeCutService } from '@modules/reforge/reforge-cut.service';
 import { ReforgeService } from '@modules/reforge/reforge.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -62,7 +63,7 @@ function buildService(db: PrimaryDatabase, calls: string[] = []): ReforgePlanSer
     linkContextPack: async () => undefined,
   } as never;
 
-  return new ReforgePlanService(databaseService, reforgeService, analysisService, contextAssembler, modelRouter, workflowRunService);
+  return new ReforgePlanService(databaseService, reforgeService, analysisService, new ReforgeCutService(databaseService), contextAssembler, modelRouter, workflowRunService);
 }
 
 describe.if(pgAvailable)('ReforgePlanService', () => {
@@ -169,6 +170,28 @@ describe.if(pgAvailable)('ReforgePlanService', () => {
 
     await service.approve(projectId);
     expect((await service.getApproved(projectId)).status).toBe('approved');
+  });
+
+  it('should seed the cut ledger and the seam bridges at approval, and stay idempotent on re-approval', async () => {
+    const projectId = await seedProject(`plan-ledger-${Date.now()}`);
+    const service = buildService(db);
+    const { plan } = await service.draft(projectId);
+
+    expect(await db.query.reforgeCuts.findMany({ where: eq(schema.reforgeCuts.planId, plan.id) })).toHaveLength(0);
+
+    await service.approve(projectId);
+    const cuts = await db.query.reforgeCuts.findMany({ where: eq(schema.reforgeCuts.planId, plan.id) });
+    expect(cuts.map(c => c.cutKey).sort()).toEqual(['source-chapters-13-16', 'the-tribunal-subplot']);
+    expect(cuts.find(c => c.cutKey === 'source-chapters-13-16')).toMatchObject({ kind: 'arc', effectiveFromOutput: 8 });
+
+    const spans = await db.query.reforgePlanSpans.findMany({ where: eq(schema.reforgePlanSpans.planId, plan.id), orderBy: [asc(schema.reforgePlanSpans.ordinal)] });
+    expect(spans[3]?.bridgeDirective).toContain('source chapters 13-16');
+    expect(spans[3]?.bridgeDirective).toContain('six months have passed');
+    // Only the span on the far side of a drop carries a bridge.
+    expect(spans.slice(0, 3).every(s => s.bridgeDirective === null)).toBe(true);
+
+    await service.approve(projectId);
+    expect(await db.query.reforgeCuts.findMany({ where: eq(schema.reforgeCuts.planId, plan.id) })).toHaveLength(2);
   });
 
   it('should persist the span rows in ordinal order with their beats and cuts', async () => {

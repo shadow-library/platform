@@ -14,6 +14,7 @@ export type ContextPurpose =
   | 'reforge_outline'
   | 'reforge'
   | 'reforge_analysis'
+  | 'reforge_transform'
   | 'illustration';
 
 // Stable = scope canon that only changes when a proposal is applied or a manual edit lands; volatile
@@ -82,6 +83,10 @@ export const SECTION_LABELS: Record<string, string> = {
   glossary_slice: '## GLOSSARY',
   carry_state: '## CARRY STATE',
   signal_digest: '## DETERMINISTIC SIGNALS',
+  cut_ledger: '## CUT LEDGER — THIS MATERIAL IS GONE',
+  discovered_cuts: '## CUTS DISCOVERED WHILE WRITING',
+  plan_span: '## PLAN SPAN',
+  bridge: '## BRIDGE ACROSS THE CUT',
   entity_roster: '## ENTITY ROSTER',
   world_facts: '## WORLD FACTS',
   known_facts: '## KNOWN FACTS (POV CAST)',

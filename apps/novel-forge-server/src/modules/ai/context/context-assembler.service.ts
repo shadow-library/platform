@@ -51,6 +51,9 @@ export const REFORGE_BUDGET = 12_000;
 // The analysis window's chapters and the synthesis card index both travel as template vars, so the pack
 // only carries the rename bible, the window's signal digest, and the carry-forward state (§3.2).
 export const REFORGE_ANALYSIS_BUDGET = 12_000;
+// A transform write carries the span's plan contract and the cut ledger on top of a reforge pack; the
+// span's source prose still travels as a template var.
+export const REFORGE_TRANSFORM_BUDGET = 16_000;
 // An image prompt is a paragraph: the composer needs the subject, the look, and nothing else.
 export const ILLUSTRATION_BUDGET = 6_000;
 export const ILLUSTRATION_WORLD_FACTS_MAX = 30;
@@ -1013,6 +1016,49 @@ export class ContextAssembler {
     if (input.prevBody) sections.push(makeSectionTail('prev_ending', input.prevBody, PREV_ENDING_TAIL, 'canonical', [`reforge:${chapter - 1}`]));
 
     return this.finalize(projectId, 'reforge', chapter, sections, [], REFORGE_BUDGET, false);
+  }
+
+  /**
+   * Pack for one output chapter of a transform (transform design §6.1). The rename bible, the author's
+   * voice instructions, and the SEEDED cut ledger are stable — the ledger seeded at approval is
+   * byte-identical for the whole run, which is what keeps the cache prefix alive as the volatile
+   * `discovered_cuts` section grows underneath it. The plan span (its kept beats, its continuity notes,
+   * its bridge directive) is the per-chapter contract and is volatile, as are the glossary slice, the
+   * carry state, and the tail of the previous OUTPUT chapter — never the source tail, which by
+   * definition leaks pre-rename names and pre-cut material. Callers pass pre-rendered strings.
+   */
+  async forReforgeTransform(
+    projectId: bigint,
+    outputChapter: number,
+    input: {
+      worldNotes: string;
+      directives: string | null;
+      instructions: string | null;
+      targetWords?: number | null;
+      cutLedger: string;
+      discoveredCuts: string | null;
+      planSpan: string;
+      bridge: string | null;
+      glossarySlice: string;
+      carryState: string | null;
+      prevBody: string | null;
+    },
+  ): Promise<AssembledPack & { id: bigint | null }> {
+    const sections: ContextSection[] = [asStable(makeSection('world_notes', input.worldNotes, 'canonical', []))];
+    if (input.directives) sections.push(asStable(makeSection('directives', input.directives, 'approved_intent', [])));
+    if (input.instructions) sections.push(asStable(makeSection('instructions', input.instructions, 'approved_intent', [])));
+    if (input.targetWords) {
+      sections.push(asStable(makeSection('target_length', `Target about ${input.targetWords} words of prose; treat as a guide, not a hard wall.`, 'approved_intent', [])));
+    }
+    sections.push(asStable(makeSection('cut_ledger', input.cutLedger, 'approved_intent', [])));
+    sections.push(makeSection('plan_span', input.planSpan, 'approved_intent', [`output:${outputChapter}`]));
+    if (input.bridge) sections.push(makeSection('bridge', input.bridge, 'approved_intent', []));
+    if (input.discoveredCuts) sections.push(makeSection('discovered_cuts', input.discoveredCuts, 'working', []));
+    sections.push(makeSection('glossary_slice', input.glossarySlice, 'canonical', []));
+    if (input.carryState) sections.push(makeSection('carry_state', input.carryState, 'working', []));
+    if (input.prevBody) sections.push(makeSectionTail('prev_ending', input.prevBody, PREV_ENDING_TAIL, 'canonical', [`output:${outputChapter - 1}`]));
+
+    return this.finalize(projectId, 'reforge_transform', outputChapter, sections, [], REFORGE_TRANSFORM_BUDGET, false);
   }
 
   /**

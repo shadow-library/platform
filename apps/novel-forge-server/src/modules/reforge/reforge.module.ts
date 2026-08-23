@@ -3,6 +3,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 
 import { AiModule } from '../ai/ai.module';
 import { ReforgeAnalysisService } from './reforge-analysis.service';
+import { ReforgeCutService } from './reforge-cut.service';
 import { ReforgePlanService } from './reforge-plan.service';
 import { ReforgeService } from './reforge.service';
 
@@ -13,7 +14,7 @@ import { ReforgeService } from './reforge.service';
 // module graph acyclic (Rebrand and Ai never import Reforge).
 @Module({
   imports: [DatabaseModule, AiModule],
-  providers: [ReforgeService, ReforgeAnalysisService, ReforgePlanService],
-  exports: [ReforgeService, ReforgeAnalysisService, ReforgePlanService],
+  providers: [ReforgeService, ReforgeAnalysisService, ReforgeCutService, ReforgePlanService],
+  exports: [ReforgeService, ReforgeAnalysisService, ReforgeCutService, ReforgePlanService],
 })
 export class ReforgeModule {}

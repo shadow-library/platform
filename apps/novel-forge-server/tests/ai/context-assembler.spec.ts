@@ -752,6 +752,74 @@ describe('ContextAssembler.forReforgeAnalysis', () => {
   });
 });
 
+describe('ContextAssembler.forReforgeTransform', () => {
+  const input = {
+    worldNotes: 'Veldram replaces every real nation.',
+    directives: 'weave romance in',
+    instructions: 'raise the prose',
+    cutLedger: '- the Azure Sect tribunal [subplot, cut, from output ch. 3]',
+    discoveredCuts: '- the sword-scoring gag [running_gag, cut, from output ch. 12]',
+    planSpan: 'Span 4 (source ch. 17-20 → output ch. 8): keep. Beats: the duel lands.',
+    bridge: 'The source chapters 13-16 are cut. The reader never saw them.',
+    glossarySlice: 'Ye Fan → Evan Vale [character]',
+    carryState: '{"activeThreads":"Mira spark"}',
+    prevBody: `${'OPENING_MARKER: '.repeat(200)}\n\n${'CLOSING_MARKER: '.repeat(200)}`,
+  };
+
+  it('keeps the seeded ledger stable and the per-chapter plan contract volatile', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forReforgeTransform(1n, 8, input);
+
+    expect(pack.purpose).toBe('reforge_transform');
+    expect(pack.chapter).toBe(8);
+    const segments = Object.fromEntries(pack.sections.map(s => [s.key, s.segment]));
+    expect(segments).toMatchObject({
+      world_notes: 'stable',
+      instructions: 'stable',
+      cut_ledger: 'stable',
+      plan_span: 'volatile',
+      bridge: 'volatile',
+      discovered_cuts: 'volatile',
+      glossary_slice: 'volatile',
+      prev_ending: 'volatile',
+    });
+    expect(pack.renderedStable).toContain('## CUT LEDGER — THIS MATERIAL IS GONE');
+    expect(pack.renderedVolatile).toContain('## BRIDGE ACROSS THE CUT');
+  });
+
+  it('keeps the stable prefix byte-identical while the discovered cuts grow underneath it', async () => {
+    const assembler = makeAssembler();
+    const first = await assembler.forReforgeTransform(1n, 8, { ...input, discoveredCuts: null });
+    const later = await assembler.forReforgeTransform(1n, 9, { ...input, discoveredCuts: `${input.discoveredCuts}\n- another one [thread, cut, from output ch. 13]` });
+
+    expect(first.renderedStable.length).toBeGreaterThan(0);
+    expect(later.renderedStable).toBe(first.renderedStable);
+  });
+
+  it('carries the tail of the previous OUTPUT chapter, never its opening', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forReforgeTransform(1n, 8, input);
+    const prevEnding = pack.sections.find(s => s.key === 'prev_ending');
+    expect(prevEnding?.rendered).toContain('CLOSING_MARKER');
+    expect(prevEnding?.rendered).not.toContain('OPENING_MARKER');
+    expect(prevEnding?.sourceRefs).toEqual(['output:7']);
+  });
+
+  it('omits the optional sections when a span has no bridge, no discovered cuts, and no predecessor', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forReforgeTransform(1n, 1, {
+      ...input,
+      directives: null,
+      instructions: null,
+      bridge: null,
+      discoveredCuts: null,
+      carryState: null,
+      prevBody: null,
+    });
+    expect(pack.sections.map(s => s.key)).toEqual(['world_notes', 'cut_ledger', 'plan_span', 'glossary_slice']);
+  });
+});
+
 describe('ContextAssembler.forChapter — knowledge sections', () => {
   const facts = [
     { id: 1n, factKey: 'service_door', text: 'The killer used the service door.', constraintNote: null, terms: ['service door'] },
