@@ -742,14 +742,14 @@ describe('ContextAssembler.forChapter — knowledge sections', () => {
     expect(pack.rendered).not.toContain('motive_debt');
   });
 
-  it('renders hidden constraints for unrevealed facts and the placeholder when nothing is known', async () => {
+  it('renders hidden constraints for unrevealed facts and omits known_facts when nothing is known', async () => {
     const brief = { chapter: 5, body: 'Boone canvasses the street.', contextRefs: [], knowledgeContract: { pov: ['boone'], learns: [] } };
     const overrides = knowledgeOverrides(brief);
     overrides.query.entities.findMany = mock(async () => []);
     const assembler = makeAssembler(overrides);
     const pack = await assembler.forChapter(1n, 5, { dryRun: true });
 
-    expect(pack.sections.find(s => s.key === 'known_facts')?.rendered).toContain('(none established');
+    expect(pack.sections.find(s => s.key === 'known_facts')).toBeUndefined();
     const constraints = pack.sections.find(s => s.key === 'hidden_constraints');
     expect(constraints?.rendered).toContain('Elias steers conversation away from the study.');
     expect(constraints?.rendered).not.toContain('forgery');

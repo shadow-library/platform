@@ -364,14 +364,16 @@ export class ContextAssembler {
     const knowledgeContract = parseKnowledgeContract(brief?.knowledgeContract);
     if (knowledgeContract) {
       const view = await loadKnowledgeView(this.db, projectId, chapter, knowledgeContract);
-      sections.push(
-        makeSection(
-          'known_facts',
-          renderKnownFacts(view.known),
-          'canonical',
-          view.known.map(f => `fact:${f.factKey}`),
-        ),
-      );
+      if (view.known.length > 0) {
+        sections.push(
+          makeSection(
+            'known_facts',
+            renderKnownFacts(view.known),
+            'canonical',
+            view.known.map(f => `fact:${f.factKey}`),
+          ),
+        );
+      }
       if (view.reveals.length > 0) {
         sections.push(
           makeSection(
