@@ -3,7 +3,7 @@ import { describe, expect, it, mock } from 'bun:test';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 
-import { GROK_ONLY_MODEL, LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, REASONING_POLICY, resolveReasoningEffort, ROLE_GROUP } from '@modules/ai/defaults';
+import { GROK_ONLY_IMAGE_MODEL, GROK_ONLY_MODEL, LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, REASONING_POLICY, resolveReasoningEffort, ROLE_GROUP } from '@modules/ai/defaults';
 import { ModelRouterService, resolveProvider, supportsPromptCaching } from '@modules/ai/model-router.service';
 import { MODEL_REGISTRY } from '@modules/ai/models';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
@@ -31,6 +31,12 @@ describe('ModelRouterService.resolveModel', () => {
     const resolved = router.resolveModel('extraction', { contentMode: 'grok_only' });
     expect(resolved.provider).toBe(GROK_ONLY_MODEL.provider);
     expect(resolved.model).toBe(GROK_ONLY_MODEL.model);
+  });
+
+  it('should pin the image role to the Grok image model in grok_only mode, not the text model', () => {
+    const resolved = router.resolveModel('image', { contentMode: 'grok_only' });
+    expect(resolved.model).toBe(GROK_ONLY_IMAGE_MODEL.model);
+    expect(resolved.model).not.toBe(GROK_ONLY_MODEL.model);
   });
 
   it('honours per-project config model override', () => {

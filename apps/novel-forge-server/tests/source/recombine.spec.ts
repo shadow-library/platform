@@ -123,6 +123,12 @@ describe.if(pgAvailable)('RecombineService', () => {
     expect(service.recombine(novel)).rejects.toThrow(/not valid for this project kind/);
   });
 
+  it('should refuse to renumber a project that already has reforged chapters', async () => {
+    const reforged = await seedProject();
+    await db.insert(schema.chapterReforges).values({ projectId: reforged, chapter: 1, body: 'Re-authored prose.', status: 'reforged' });
+    expect(service.recombine(reforged)).rejects.toThrow(/renumbering would corrupt/);
+  });
+
   it('should log-and-skip guard violations in autoRecombine', async () => {
     const empty = await seedProject({ withChapters: false });
     expect(await service.autoRecombine(empty)).toBeNull();

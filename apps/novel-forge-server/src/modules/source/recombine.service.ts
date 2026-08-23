@@ -176,16 +176,17 @@ export class RecombineService {
 
   /** Renumbering corrupts anything keyed by chapter number — refuse once derived data exists. */
   private async assertNoDerivedData(projectId: bigint): Promise<void> {
-    const [extracted, appearances, beats, chunks, briefs, conversions, drafts] = await Promise.all([
+    const [extracted, appearances, beats, chunks, briefs, conversions, reforges, drafts] = await Promise.all([
       this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), isNotNull(schema.chapters.summary)), columns: { id: true } }),
       this.db.query.entityAppearances.findFirst({ where: eq(schema.entityAppearances.projectId, projectId), columns: { chapter: true } }),
       this.db.query.beats.findFirst({ where: eq(schema.beats.projectId, projectId), columns: { id: true } }),
       this.db.query.chapterChunks.findFirst({ where: eq(schema.chapterChunks.projectId, projectId), columns: { id: true } }),
       this.db.query.briefs.findFirst({ where: eq(schema.briefs.projectId, projectId), columns: { id: true } }),
       this.db.query.chapterConversions.findFirst({ where: eq(schema.chapterConversions.projectId, projectId), columns: { id: true } }),
+      this.db.query.chapterReforges.findFirst({ where: eq(schema.chapterReforges.projectId, projectId), columns: { id: true } }),
       this.db.query.drafts.findFirst({ where: eq(schema.drafts.projectId, projectId), columns: { id: true } }),
     ]);
-    if (extracted || appearances || beats || chunks || briefs || conversions || drafts) {
+    if (extracted || appearances || beats || chunks || briefs || conversions || reforges || drafts) {
       // Naming the blocking table makes an auto-recombine no-op self-explanatory in the logs.
       this.logger.debug('recombine blocked by existing derived data', {
         projectId,
@@ -195,6 +196,7 @@ export class RecombineService {
         chunks: !!chunks,
         briefs: !!briefs,
         conversions: !!conversions,
+        reforges: !!reforges,
         drafts: !!drafts,
       });
       throw AppErrorCode.SRC_003.create();

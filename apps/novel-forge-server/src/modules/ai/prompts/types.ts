@@ -39,6 +39,9 @@ export type PromptKey =
   | 'reforge-judge'
   | 'recombine';
 
+/** Mirrors the `reforge_fidelity` enum — how much latitude the re-author has against the source. */
+export type ReforgeFidelityLevel = 'preserve' | 'close' | 'loose';
+
 export interface PromptModule<TOut> {
   key: PromptKey;
   version: string;

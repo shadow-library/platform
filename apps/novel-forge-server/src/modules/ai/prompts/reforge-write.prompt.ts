@@ -3,7 +3,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 import { type ReforgeWriteOutput, ReforgeWriteSchema } from '../schemas/reforge.schema';
 import { AUTHORING_STYLE } from './authoring-preamble';
-import { type PromptModule } from './types';
+import { type PromptModule, type ReforgeFidelityLevel } from './types';
 
 const system =
   `${AUTHORING_STYLE}\n\n` +
@@ -16,18 +16,39 @@ const system =
   'Respond with ONLY one valid JSON object — nothing outside the JSON, no markdown fences — of exactly this shape:\n' +
   '{"title": string, "body": string, "summary": string, "discoveredNames": [{"sourceName": string, "variants": [string], "replacement": string, "category": "character|place|country|culture|faction|technique|item|term", "notes": string}], "changes": {"renames": [string], "removals": [string], "addedScenes": [string], "proseNotes": string}, "carryState": {"activeThreads": string, "lastInsertedBeat": string, "pendingSetups": string}}';
 
+/**
+ * Extra latitude the author bought with `reforges.fidelity`. `preserve` renders empty so its prompt
+ * stays byte-identical to the level-less original; the other levels append a stable block.
+ */
+export function renderReforgeFidelityGuidance(fidelity: ReforgeFidelityLevel): string {
+  if (fidelity === 'close') {
+    return (
+      '\n\n## FIDELITY: CLOSE\nThe author asked you to stay close to the source dialogue: you may keep key dialogue lines at or near their source wording ' +
+      'where that wording carries the beat, while still elevating the narration, description, and interiority into prose of your own.'
+    );
+  }
+  if (fidelity === 'loose') {
+    return (
+      '\n\n## FIDELITY: LOOSE\nThe author gave you room to shape pacing: WITHIN THIS CHAPTER you may reorder beats and condense slack passages so the ' +
+      'chapter moves, provided every major beat still lands and the chapter ends where the outline ends. Never move material into or out of another chapter.'
+    );
+  }
+  return '';
+}
+
 // The message layout is the caching contract (refinement design §10.2): static system, then the stable
-// pack (world notes + directives + author instructions) in the first human message, volatile outline last.
+// pack (world notes + directives + author instructions + fidelity latitude) in the first human message,
+// volatile outline last.
 export const reforgeWritePrompt: PromptModule<ReforgeWriteOutput> = {
   key: 'reforge-write',
-  version: '1.1.0',
+  version: '1.2.0',
   kind: 'authoring',
   role: 'reforge',
-  cacheStrategy: { stableVars: ['stableContext'] },
+  cacheStrategy: { stableVars: ['stableContext', 'fidelityGuidance'] },
   system,
   template: ChatPromptTemplate.fromMessages([
     new SystemMessage(system),
-    ['human', '{stableContext}'],
+    ['human', '{stableContext}{fidelityGuidance}'],
     ['human', '{volatileContext}\n\nFaithful outline to write from:\n{outline}\n\nRepair notes: {repairNotes}'],
   ]),
   schema: ReforgeWriteSchema,

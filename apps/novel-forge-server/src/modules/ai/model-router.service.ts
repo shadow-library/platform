@@ -14,7 +14,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
-import { type AiRole, getGroupDefaults, getProfileDefaults, GROK_ONLY_MODEL, type ResolvedModel, resolveReasoningEffort, ROLE_GROUP } from './defaults';
+import { type AiRole, getGroupDefaults, getProfileDefaults, GROK_ONLY_IMAGE_MODEL, GROK_ONLY_MODEL, type ResolvedModel, resolveReasoningEffort, ROLE_GROUP } from './defaults';
 import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
@@ -114,7 +114,7 @@ export class ModelRouterService {
   resolveModel(role: AiRole, project?: ProjectConfig): ResolvedModel {
     // grok_only pins every role to a fixed Grok model regardless of the group defaults, which now
     // route each group to a different provider per the model evaluation.
-    if (project?.contentMode === 'grok_only') return GROK_ONLY_MODEL;
+    if (project?.contentMode === 'grok_only') return role === 'image' ? GROK_ONLY_IMAGE_MODEL : GROK_ONLY_MODEL;
     // The settings UI writes one selection across every role in a group, so group members resolve identically.
     const models = project?.config?.models as Record<string, ResolvedModel> | undefined;
     const projectModel = models?.[role];

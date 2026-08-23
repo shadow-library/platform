@@ -72,9 +72,8 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
 // completed model evaluation: writing → moonshotai/kimi-k3 (top-2 measured long-form prose, near-zero
 // longform degradation), planning/chat → z-ai/glm-5.2 (strong structured output + instruction
 // following), review → anthropic/claude-sonnet-5 (best tool-calling reliability for the judge loop),
-// helper → openai/gpt-5.6-luna, image → x-ai/grok-imagine-image-2.0 — IllustrationService picks its own
-// model per project rather than calling `resolveModel('image', ...)`, so this entry is informational
-// (settings UI) only.
+// helper → openai/gpt-5.6-luna, image → x-ai/grok-imagine-image-2.0 (IllustrationService resolves it
+// through `resolveModel('image', project)`, so a project-level override is honoured).
 const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'openrouter', model: 'moonshotai/kimi-k3' },
   planning: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
@@ -86,8 +85,9 @@ const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
 };
 
 // grok_only content mode pins every role to a specific Grok model regardless of group defaults — see
-// its usage in model-router.service.ts.
+// its usage in model-router.service.ts. The image role needs its own pin: grok-4.6 is text-only.
 export const GROK_ONLY_MODEL: ResolvedModel = { provider: 'openrouter', model: 'x-ai/grok-4.6' };
+export const GROK_ONLY_IMAGE_MODEL: ResolvedModel = { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' };
 
 // Local-test profile: routes everything to Ollama (used in smoke tests / dev without API keys).
 const LOCAL_TEST_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {

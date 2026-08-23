@@ -64,6 +64,7 @@ export const SECTION_LABELS: Record<string, string> = {
   world_notes: '## WORLD NOTES',
   directives: '## DIRECTIVES',
   instructions: '## AUTHOR INSTRUCTIONS',
+  target_length: '## TARGET LENGTH',
   glossary_slice: '## GLOSSARY',
   carry_state: '## CARRY STATE',
   entity_roster: '## ENTITY ROSTER',

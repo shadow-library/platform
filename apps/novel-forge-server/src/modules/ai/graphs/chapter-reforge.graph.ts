@@ -3,13 +3,13 @@ import { and, desc, eq, lt, ne, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type Reforge } from '@server/database';
+import { type PrimaryDatabase, type Rebrand, type Reforge } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import { type GlossaryLike, renderGlossarySlice, type ResidueIssue, scanResidue, selectGlossarySlice } from '../../rebrand/residue-scan';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
-import { PROMPT_REGISTRY } from '../prompts';
+import { PROMPT_REGISTRY, type ReforgeFidelityLevel, renderReforgeFidelityGuidance, renderReforgeFidelityRule } from '../prompts';
 import { type ReforgeJudgeOutput, type ReforgeOutlineOutput, type ReforgeWriteOutput } from '../schemas';
 import { type TelemetryContext } from '../telemetry.handler';
 
@@ -40,6 +40,8 @@ const ChapterReforgeAnnotation = Annotation.Root({
   directives: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   instructions: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   settings: Annotation<Reforge.Settings>({ reducer: (_, n) => n, default: () => ({}) }),
+  fidelityLevel: Annotation<ReforgeFidelityLevel>({ reducer: (_, n) => n, default: () => 'preserve' }),
+  bannedExtra: Annotation<string[]>({ reducer: (_, n) => n, default: () => [] }),
   glossary: Annotation<GlossaryLike[]>({ reducer: (_, n) => n, default: () => [] }),
   glossarySlice: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   carryState: Annotation<Record<string, unknown> | null>({ reducer: (_, n) => n, default: () => null }),
@@ -137,6 +139,9 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
       directives: rebrand.directives,
       instructions: reforge?.instructions ?? null,
       settings: (reforge?.settings ?? {}) as Reforge.Settings,
+      fidelityLevel: (reforge?.fidelity ?? 'preserve') as ReforgeFidelityLevel,
+      // Residue terms are a property of the rename bible, which reforge shares with rebrand.
+      bannedExtra: ((rebrand.settings as Rebrand.Settings | null)?.bannedExtra ?? []) as string[],
       glossary: glossaryRows.map(g => ({ sourceName: g.sourceName, variants: g.variants as string[] | null, replacement: g.replacement, category: g.category, notes: g.notes })),
       carryState: (previous?.carryState as Record<string, unknown> | null) ?? null,
       prevBody: previous?.body || null,
@@ -177,6 +182,7 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
       worldNotes: state.worldNotes,
       directives: state.directives,
       instructions: state.instructions,
+      targetWords: state.settings.targetWords ?? null,
       glossarySlice: state.glossarySlice,
       carryState: state.carryState ? JSON.stringify(state.carryState) : null,
       prevBody: state.prevBody,
@@ -202,7 +208,13 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     };
     const result = (await modelRouter.structured(
       prompt,
-      { stableContext: state.writeStableContext, volatileContext: state.writeVolatileContext, outline: state.renderedOutline, repairNotes: state.repairNotes || 'none' },
+      {
+        stableContext: state.writeStableContext,
+        fidelityGuidance: renderReforgeFidelityGuidance(state.fidelityLevel),
+        volatileContext: state.writeVolatileContext,
+        outline: state.renderedOutline,
+        repairNotes: state.repairNotes || 'none',
+      },
       ctx,
       projectRow as ProjectConfig | undefined,
     )) as ReforgeWriteOutput;
@@ -221,8 +233,9 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
   function residueScan(state: ReforgeState) {
     if (!state.written) return { residueIssues: [], nodeTrace: ['residueScan'] };
     const combined = [...state.glossary, ...(state.written.discoveredNames ?? [])];
-    // The shared BANNED_REAL_WORLD_TERMS list lives inside scanResidue; reforge adds no extra terms.
-    const residueIssues = scanResidue(state.written.body, combined, []);
+    // The shared BANNED_REAL_WORLD_TERMS list lives inside scanResidue; bannedExtra comes from the
+    // rebrand row, whose rename bible reforge shares.
+    const residueIssues = scanResidue(state.written.body, combined, state.bannedExtra);
     if (residueIssues.length > 0) logger.debug('reforge residueScan found issues', { runId: state.runId, chapter: state.chapter, issues: residueIssues });
     return { residueIssues, nodeTrace: ['residueScan'] };
   }
@@ -237,7 +250,13 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'judge', promptKey: prompt.key, promptVersion: prompt.version, role: 'judge' };
     const result = (await modelRouter.structured(
       prompt,
-      { outline: state.renderedOutline, worldNotes: state.worldNotes, glossarySlice: state.glossarySlice, writtenProse: state.written.body },
+      {
+        outline: state.renderedOutline,
+        worldNotes: state.worldNotes,
+        glossarySlice: state.glossarySlice,
+        fidelityRule: renderReforgeFidelityRule(state.fidelityLevel),
+        writtenProse: state.written.body,
+      },
       ctx,
       projectRow as ProjectConfig | undefined,
     )) as ReforgeJudgeOutput;

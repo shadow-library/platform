@@ -75,3 +75,5 @@ export * from './scope-playbooks';
 export { buildChatRefinePrompt } from './chat-refine.prompt';
 export { buildArcPlanPrompt } from './arc-plan.prompt';
 export { buildOutlinePrompt } from './outline.prompt';
+export { renderReforgeFidelityGuidance } from './reforge-write.prompt';
+export { renderReforgeFidelityRule } from './reforge-judge.prompt';

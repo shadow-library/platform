@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { buildChatRefinePrompt, buildOutlinePrompt, PROMPT_REGISTRY, SCOPE_PLAYBOOKS } from '@modules/ai/prompts';
+import { buildChatRefinePrompt, buildOutlinePrompt, PROMPT_REGISTRY, renderReforgeFidelityGuidance, renderReforgeFidelityRule, SCOPE_PLAYBOOKS } from '@modules/ai/prompts';
 import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
 import {
   BibleStageSchema,
@@ -21,6 +21,7 @@ import {
   validatePlanContiguity,
 } from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
+import { reforgeFidelity } from '@server/database/schemas';
 
 describe('Prompt modules', () => {
   describe('AUTHORING_STYLE invariant', () => {
@@ -378,8 +379,8 @@ describe('Prompt modules', () => {
     it('registers the three reforge prompt keys with the expected roles', () => {
       for (const key of ['reforge-outline', 'reforge-write', 'reforge-judge'] as const) expect(PROMPT_REGISTRY[key]).toBeDefined();
       expect(PROMPT_REGISTRY['reforge-outline'].version).toBe('1.0.0');
-      expect(PROMPT_REGISTRY['reforge-judge'].version).toBe('1.0.0');
-      expect(PROMPT_REGISTRY['reforge-write'].version).toBe('1.1.0');
+      expect(PROMPT_REGISTRY['reforge-judge'].version).toBe('1.1.0');
+      expect(PROMPT_REGISTRY['reforge-write'].version).toBe('1.2.0');
       // Outline and write ride the dedicated writing-group `reforge` role; the fidelity check reuses `judge`.
       expect(PROMPT_REGISTRY['reforge-outline'].role).toBe('reforge');
       expect(PROMPT_REGISTRY['reforge-write'].role).toBe('reforge');
@@ -402,6 +403,7 @@ describe('Prompt modules', () => {
     it('renders reforge-write in cache order: system, stable pack, volatile outline tail', async () => {
       const messages = await PROMPT_REGISTRY['reforge-write'].template.formatMessages({
         stableContext: 'STABLE-PACK',
+        fidelityGuidance: '',
         volatileContext: 'VOLATILE-CARRY-STATE',
         outline: 'VOLATILE-OUTLINE',
         repairNotes: 'fix the leftover name',
@@ -414,8 +416,8 @@ describe('Prompt modules', () => {
       expect(String(messages[2]?.content)).toContain('fix the leftover name');
     });
 
-    it('names only the stable-segment var in reforge-write cacheStrategy', () => {
-      expect(PROMPT_REGISTRY['reforge-write'].cacheStrategy?.stableVars).toEqual(['stableContext']);
+    it('names only the stable-segment vars in reforge-write cacheStrategy', () => {
+      expect(PROMPT_REGISTRY['reforge-write'].cacheStrategy?.stableVars).toEqual(['stableContext', 'fidelityGuidance']);
     });
 
     it('renders reforge-judge with its outline, world notes, glossary, and written prose vars', async () => {
@@ -423,11 +425,63 @@ describe('Prompt modules', () => {
         outline: 'OUTLINE',
         worldNotes: 'NOTES',
         glossarySlice: 'SLICE',
+        fidelityRule: '',
         writtenProse: 'PROSE',
       });
       expect(String(messages[1]?.content)).toContain('OUTLINE');
       expect(String(messages[1]?.content)).toContain('SLICE');
       expect(String(messages[2]?.content)).toContain('PROSE');
+    });
+
+    it('should keep the prompt fidelity levels aligned with the reforge_fidelity enum', () => {
+      expect(reforgeFidelity.enumValues).toEqual(['preserve', 'close', 'loose']);
+    });
+
+    it('should render no fidelity block at preserve, keeping the level-less prompts byte-identical', async () => {
+      expect(renderReforgeFidelityGuidance('preserve')).toBe('');
+      expect(renderReforgeFidelityRule('preserve')).toBe('');
+      expect(renderReforgeFidelityRule('close')).toBe('');
+
+      const messages = await PROMPT_REGISTRY['reforge-write'].template.formatMessages({
+        stableContext: 'STABLE-PACK',
+        fidelityGuidance: renderReforgeFidelityGuidance('preserve'),
+        volatileContext: 'V',
+        outline: 'O',
+        repairNotes: 'none',
+      });
+      expect(String(messages[1]?.content)).toBe('STABLE-PACK');
+    });
+
+    it('should give the writer dialogue latitude at close and beat-reordering latitude at loose', async () => {
+      expect(renderReforgeFidelityGuidance('close')).toContain('source dialogue');
+      expect(renderReforgeFidelityGuidance('loose')).toContain('reorder beats');
+      expect(renderReforgeFidelityGuidance('loose')).toContain('Never move material into or out of another chapter');
+
+      const messages = await PROMPT_REGISTRY['reforge-write'].template.formatMessages({
+        stableContext: 'STABLE-PACK',
+        fidelityGuidance: renderReforgeFidelityGuidance('loose'),
+        volatileContext: 'V',
+        outline: 'O',
+        repairNotes: 'none',
+      });
+      // The latitude must ride the cached stable message, not the per-chapter tail.
+      expect(String(messages[1]?.content)).toContain('FIDELITY: LOOSE');
+      expect(String(messages[2]?.content)).not.toContain('FIDELITY');
+    });
+
+    it('should stop the judge flagging reordering as missing or invented beats at loose only', async () => {
+      const rule = renderReforgeFidelityRule('loose');
+      expect(rule).toContain('Do not report reordering');
+      expect(rule).toContain('MAJOR beat dropped outright');
+
+      const messages = await PROMPT_REGISTRY['reforge-judge'].template.formatMessages({
+        outline: 'OUTLINE',
+        worldNotes: 'NOTES',
+        glossarySlice: 'SLICE',
+        fidelityRule: rule,
+        writtenProse: 'PROSE',
+      });
+      expect(String(messages[1]?.content)).toContain('Do not report reordering');
     });
 
     it('validates the reforge output shapes', () => {

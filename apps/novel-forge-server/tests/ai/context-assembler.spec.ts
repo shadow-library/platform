@@ -693,6 +693,25 @@ describe('ContextAssembler.forReforge', () => {
     const pack = await assembler.forReforge(1n, 1, { ...input, directives: null, instructions: null, carryState: null, prevBody: null });
     expect(pack.sections.map(s => s.key)).toEqual(['world_notes', 'glossary_slice']);
   });
+
+  it('should carry the target word count as a stable section when set', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forReforge(1n, 5, { ...input, targetWords: 3200 });
+
+    const target = pack.sections.find(s => s.key === 'target_length');
+    expect(target?.segment).toBe('stable');
+    expect(pack.renderedStable).toContain('## TARGET LENGTH');
+    expect(pack.renderedStable).toContain('Target about 3200 words');
+    expect(pack.renderedStable).toContain('not a hard wall');
+  });
+
+  it('should omit the target-length section when no target word count is set', async () => {
+    const assembler = makeAssembler();
+    const packUnset = await assembler.forReforge(1n, 5, input);
+    const packZero = await assembler.forReforge(1n, 5, { ...input, targetWords: 0 });
+    expect(packUnset.sections.map(s => s.key)).not.toContain('target_length');
+    expect(packZero.sections.map(s => s.key)).not.toContain('target_length');
+  });
 });
 
 describe('ContextAssembler.forChapter — knowledge sections', () => {

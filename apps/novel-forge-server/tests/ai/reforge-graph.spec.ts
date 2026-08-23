@@ -45,16 +45,28 @@ function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, outline
   };
   const contextAssembler = {
     forReforgeOutline: async () => ({ id: null, rendered: 'OUTLINE-PACK' }),
-    forReforge: async () => ({ id: null, rendered: 'STABLE-WORLD-NOTES\n\nVOLATILE-CARRY-STATE', renderedStable: 'STABLE-WORLD-NOTES', renderedVolatile: 'VOLATILE-CARRY-STATE' }),
+    forReforge: async (_projectId: bigint, _chapter: number, input: Record<string, unknown>) => {
+      calls.push({ key: 'context:reforge', inputs: input });
+      return { id: null, rendered: 'STABLE-WORLD-NOTES\n\nVOLATILE-CARRY-STATE', renderedStable: 'STABLE-WORLD-NOTES', renderedVolatile: 'VOLATILE-CARRY-STATE' };
+    },
   };
   return { db, contextAssembler, modelRouter, checkpointer } as never;
 }
 
-async function seedProject(db: PrimaryDatabase, name: string, settings: Record<string, unknown> | null = null) {
+async function seedProject(
+  db: PrimaryDatabase,
+  name: string,
+  settings: Record<string, unknown> | null = null,
+  opts: { fidelity?: 'preserve' | 'close' | 'loose'; rebrandSettings?: Record<string, unknown> } = {},
+) {
   const [project] = await db.insert(schema.projects).values({ name, kind: 'source' }).returning();
   if (!project) throw new Error('failed to seed project');
-  await db.insert(schema.reforges).values({ projectId: project.id, instructions: 'cut the filler tournament arc; raise the prose', settings });
-  await db.insert(schema.rebrands).values({ projectId: project.id, worldNotes: 'Veldram replaces every real nation.', directives: 'weave romance in' });
+  await db
+    .insert(schema.reforges)
+    .values({ projectId: project.id, instructions: 'cut the filler tournament arc; raise the prose', settings, fidelity: opts.fidelity ?? 'preserve' });
+  await db
+    .insert(schema.rebrands)
+    .values({ projectId: project.id, worldNotes: 'Veldram replaces every real nation.', directives: 'weave romance in', settings: opts.rebrandSettings ?? null });
   await db.insert(schema.rebrandGlossary).values([
     { projectId: project.id, sourceName: 'Ye Fan', variants: ['Yefan'], replacement: 'Evan Vale', category: 'character', createdChapter: 0 },
     { projectId: project.id, sourceName: 'Huaxia', replacement: 'Veldram', category: 'country', createdChapter: 0 },
@@ -154,6 +166,68 @@ describe.if(pgAvailable)('chapter-reforge graph', () => {
     const reforge = await db.query.chapterReforges.findFirst({ where: and(eq(schema.chapterReforges.projectId, projectId), eq(schema.chapterReforges.chapter, 1)) });
     expect(reforge?.status).toBe('attention');
     expect(reforge?.issues).toEqual([{ source: 'fidelity', type: 'missing_beat', detail: 'the duel is gone', excerpt: 'the duel' }]);
+  });
+
+  it('should thread the stored target word count into the reforge context pack, and omit it when unset', async () => {
+    const targeted = await seedProject(db, `reforge-graph-target-${Date.now()}`, { judgeEnabled: false, targetWords: 3200 });
+    const untargeted = await seedProject(db, `reforge-graph-untargeted-${Date.now()}`, { judgeEnabled: false });
+    const calls: ScriptedCall[] = [];
+    const write = () => [{ title: 'Awakening', body: cleanBody('One pass.') }];
+
+    for (const projectId of [targeted, untargeted]) {
+      const graph = createChapterReforgeGraph(buildServices(db, checkpointer, [outline], write(), [], calls));
+      const runId = randomUUID();
+      await graph.invoke({ projectId: String(projectId), chapter: 1, runId }, { configurable: { thread_id: runId } });
+    }
+
+    const packs = calls.filter(c => c.key === 'context:reforge');
+    expect(packs).toHaveLength(2);
+    expect(packs[0]?.inputs['targetWords']).toBe(3200);
+    expect(packs[1]?.inputs['targetWords']).toBeNull();
+  });
+
+  it('should give the writer and judge loose-fidelity latitude when the reforge row asks for it', async () => {
+    const projectId = await seedProject(db, `reforge-graph-loose-${Date.now()}`, null, { fidelity: 'loose' });
+    const calls: ScriptedCall[] = [];
+    const writeOutputs = [{ title: 'Awakening', body: cleanBody('One pass.') }];
+    const graph = createChapterReforgeGraph(buildServices(db, checkpointer, [outline], writeOutputs, [cleanJudge], calls));
+
+    const runId = randomUUID();
+    await graph.invoke({ projectId: String(projectId), chapter: 1, runId }, { configurable: { thread_id: runId } });
+
+    expect(String(calls.find(c => c.key === 'reforge-write')?.inputs['fidelityGuidance'])).toContain('FIDELITY: LOOSE');
+    expect(String(calls.find(c => c.key === 'reforge-judge')?.inputs['fidelityRule'])).toContain('Do not report reordering');
+  });
+
+  it('should leave the prompts level-less at the default preserve fidelity', async () => {
+    const projectId = await seedProject(db, `reforge-graph-preserve-${Date.now()}`);
+    const calls: ScriptedCall[] = [];
+    const writeOutputs = [{ title: 'Awakening', body: cleanBody('One pass.') }];
+    const graph = createChapterReforgeGraph(buildServices(db, checkpointer, [outline], writeOutputs, [cleanJudge], calls));
+
+    const runId = randomUUID();
+    await graph.invoke({ projectId: String(projectId), chapter: 1, runId }, { configurable: { thread_id: runId } });
+
+    expect(calls.find(c => c.key === 'reforge-write')?.inputs['fidelityGuidance']).toBe('');
+    expect(calls.find(c => c.key === 'reforge-judge')?.inputs['fidelityRule']).toBe('');
+  });
+
+  it("should scan residue with the rebrand row's extra banned terms", async () => {
+    const projectId = await seedProject(db, `reforge-graph-banned-${Date.now()}`, { judgeEnabled: false }, { rebrandSettings: { bannedExtra: ['Shanghai'] } });
+    const calls: ScriptedCall[] = [];
+    const writeOutputs = [
+      { title: 'Awakening', body: `${cleanBody('The lights of Shanghai burned.')}` },
+      { title: 'Awakening', body: cleanBody('The lights of the harbour burned.') },
+    ];
+    const graph = createChapterReforgeGraph(buildServices(db, checkpointer, [outline], writeOutputs, [], calls));
+
+    const runId = randomUUID();
+    const state = (await graph.invoke({ projectId: String(projectId), chapter: 1, runId }, { configurable: { thread_id: runId } })) as { outcome: string | null };
+
+    expect(state.outcome).toBe('reforged');
+    const writeCalls = calls.filter(c => c.key === 'reforge-write');
+    expect(writeCalls).toHaveLength(2);
+    expect(String(writeCalls[1]?.inputs['repairNotes'])).toContain('Shanghai');
   });
 
   it('should merge discovered names without overwriting existing mappings and skip the judge when disabled', async () => {

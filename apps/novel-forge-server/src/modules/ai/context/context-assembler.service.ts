@@ -947,8 +947,8 @@ export class ContextAssembler {
   }
 
   /**
-   * Pack for one chapter re-author (reforge design §5). World notes, directives, and the author's
-   * instructions are the stable segment (the provider cache prefix); the glossary slice, carry state,
+   * Pack for one chapter re-author (reforge design §5). World notes, directives, the author's
+   * instructions, and the target-length guide are the stable segment (the provider cache prefix); the glossary slice, carry state,
    * and previous REFORGED ending are volatile. `prev_ending` is the tail of the previous reforged
    * body — never the source tail, which would leak pre-rename names and break re-authored continuity.
    * The outline travels as a template var so the pack stays cacheable. Callers pass pre-rendered
@@ -957,11 +957,23 @@ export class ContextAssembler {
   async forReforge(
     projectId: bigint,
     chapter: number,
-    input: { worldNotes: string; directives: string | null; instructions: string | null; glossarySlice: string; carryState: string | null; prevBody: string | null },
+    input: {
+      worldNotes: string;
+      directives: string | null;
+      instructions: string | null;
+      /** Per-project word-count guide from `reforges.settings.targetWords`; omitted when unset. */
+      targetWords?: number | null;
+      glossarySlice: string;
+      carryState: string | null;
+      prevBody: string | null;
+    },
   ): Promise<AssembledPack & { id: bigint | null }> {
     const sections: ContextSection[] = [asStable(makeSection('world_notes', input.worldNotes, 'canonical', []))];
     if (input.directives) sections.push(asStable(makeSection('directives', input.directives, 'approved_intent', [])));
     if (input.instructions) sections.push(asStable(makeSection('instructions', input.instructions, 'approved_intent', [])));
+    if (input.targetWords) {
+      sections.push(asStable(makeSection('target_length', `Target about ${input.targetWords} words of prose; treat as a guide, not a hard wall.`, 'approved_intent', [])));
+    }
     sections.push(makeSection('glossary_slice', input.glossarySlice, 'canonical', []));
     if (input.carryState) sections.push(makeSection('carry_state', input.carryState, 'working', []));
     if (input.prevBody) sections.push(makeSectionTail('prev_ending', input.prevBody, PREV_ENDING_TAIL, 'canonical', [`reforge:${chapter - 1}`]));

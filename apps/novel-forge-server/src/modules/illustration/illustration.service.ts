@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
@@ -8,6 +8,8 @@ import { DatabaseService, StorageService } from '@shadow-library/modules';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+
+import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 
 interface IllustrationSession {
   sessionId: string;
@@ -30,6 +32,7 @@ export class IllustrationService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly storage: StorageService,
+    private readonly modelRouter: ModelRouterService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -43,13 +46,12 @@ export class IllustrationService {
 
   private async generateImage(instruction: string, projectId: bigint): Promise<Uint8Array> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    const isGrokOnly = project?.contentMode === 'grok_only';
 
     // Same gateway credential as chat — OpenRouter's unified image API proxies both vendors, so image
     // generation no longer needs its own vendor-specific key.
     const apiKey = Config.get('ai.openrouter.api.key');
     const url = `${Config.get('ai.openrouter.api.url')}/images`;
-    const model = isGrokOnly ? 'x-ai/grok-imagine-image-2.0' : 'openai/gpt-5.4-image-2';
+    const { model } = this.modelRouter.resolveModel('image', project as ProjectConfig | undefined);
     if (!apiKey) throw AppError.internal('Image generation is not configured — set AI_OPENROUTER_API_KEY');
 
     // The full prompt is sensitive/verbose — dev-only debug is where it belongs.
@@ -77,7 +79,7 @@ export class IllustrationService {
 
   async start(projectId: bigint, entityKey: string, options: { instruction?: string; noChat?: boolean }): Promise<{ sessionId: string; previewUrl: string }> {
     this.pruneExpired();
-    const entity = await this.db.query.entities.findFirst({ where: eq(schema.entities.entityKey, entityKey) });
+    const entity = await this.db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)) });
     const instruction = options.instruction ?? `Create a character portrait for "${entity?.name ?? entityKey}", a ${entity?.type ?? 'character'} in a fantasy novel.`;
 
     this.logger.info('illustration start', { projectId, entityKey });
@@ -110,7 +112,10 @@ export class IllustrationService {
 
     const ref = await this.storage.save(session.previewBytes, { contentType: 'image/png' });
 
-    await this.db.update(schema.entities).set({ imagePath: ref, updatedAt: new Date() }).where(eq(schema.entities.entityKey, session.entityKey));
+    await this.db
+      .update(schema.entities)
+      .set({ imagePath: ref, updatedAt: new Date() })
+      .where(and(eq(schema.entities.projectId, session.projectId), eq(schema.entities.entityKey, session.entityKey)));
 
     session.status = 'saved';
     this.logger.info('illustration saved', { sessionId, ref });
