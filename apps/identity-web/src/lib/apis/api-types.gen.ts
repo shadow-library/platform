@@ -267,7 +267,8 @@ export interface paths {
     get: operations['get_api_v1_me'];
     put?: never;
     post?: never;
-    delete?: never;
+    /** Close Account */
+    delete: operations['delete_api_v1_me'];
     options?: never;
     head?: never;
     patch?: never;
@@ -1073,6 +1074,23 @@ export interface paths {
     put?: never;
     /** Start Social Login */
     post: operations['post_api_v1_auth_social_provider_start'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/social/step-up/start': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start Federated Step Up */
+    post: operations['post_api_v1_auth_social_step_up_start'];
     delete?: never;
     options?: never;
     head?: never;
@@ -3086,6 +3104,13 @@ export interface components {
       /** @description Upstream authorization endpoint the browser must be sent to; it already carries state, nonce and the PKCE challenge. */
       authorizationUrl: string;
     };
+    StepUpFederatedStartBody: {
+      /** @description Application client for which the step-up is performed; only a claim naming the same client and resource may spend the window. */
+      clientId?: string;
+      /** @description Target resource for which the step-up is performed; omitting the client and resource opens a window usable only by the identity console. */
+      resource?: string;
+      deviceId?: string;
+    };
     MeSessionsResponse: {
       sessions: components['schemas']['MeSessionItem'][];
     };
@@ -3824,6 +3849,9 @@ export interface components {
       sentAt?: string;
       createdAt: string;
     };
+    AccountCloseResponse: {
+      success: boolean;
+    };
   };
   responses: never;
   parameters: never;
@@ -4554,6 +4582,44 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['MeResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_me: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountCloseResponse'];
         };
       };
       /** @description Default Response */
@@ -6763,6 +6829,48 @@ export interface operations {
     requestBody: {
       content: {
         'application/json': components['schemas']['SocialLoginStartBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SocialLoginStartResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_auth_social_step_up_start: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['StepUpFederatedStartBody'];
       };
     };
     responses: {
@@ -11349,6 +11457,7 @@ export type AuthMethodsResponse = components['schemas']['AuthMethodsResponse'];
 export type SocialProviderOptionDto = components['schemas']['SocialProviderOptionDto'];
 export type SocialLoginStartBody = components['schemas']['SocialLoginStartBody'];
 export type SocialLoginStartResponse = components['schemas']['SocialLoginStartResponse'];
+export type StepUpFederatedStartBody = components['schemas']['StepUpFederatedStartBody'];
 export type MeSessionsResponse = components['schemas']['MeSessionsResponse'];
 export type MeSessionItem = components['schemas']['MeSessionItem'];
 export type SessionsRevokedResponse = components['schemas']['SessionsRevokedResponse'];
@@ -11464,6 +11573,7 @@ export type UpdateWebhookBody = components['schemas']['UpdateWebhookBody'];
 export type RotatedWebhookSecretResponse = components['schemas']['RotatedWebhookSecretResponse'];
 export type WebhookDeliveriesResponse = components['schemas']['WebhookDeliveriesResponse'];
 export type WebhookDeliveryItem = components['schemas']['WebhookDeliveryItem'];
+export type AccountCloseResponse = components['schemas']['AccountCloseResponse'];
 export type ListPoliciesPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/policies']['get']['parameters']['path'], undefined>;
 export type AuthorizeQueryParams = Exclude<paths['/oauth2/authorize']['get']['parameters']['query'], undefined>;
 export type GetConsentPromptQueryParams = Exclude<paths['/api/v1/auth/consent']['get']['parameters']['query'], undefined>;
