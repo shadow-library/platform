@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { eq } from 'drizzle-orm';
+import { and, eq, type SQL } from 'drizzle-orm';
 import { type AnyPgColumn, type AnyPgTable } from 'drizzle-orm/pg-core';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
@@ -10,7 +10,7 @@ import { DatabaseService } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
-import { type PrimaryDatabase } from '@server/database';
+import { type DatabaseTransaction, type PrimaryDatabase, schema, syncStamped } from '@server/database';
 
 import { AccountContext } from './account-context';
 
@@ -20,6 +20,8 @@ import { AccountContext } from './account-context';
 
 /** A user-owned table: every row is scoped by a not-null `account_id` foreign key back to `accounts`. */
 export type OwnedTable = AnyPgTable & { accountId: AnyPgColumn };
+
+export type SqlExecutor = PrimaryDatabase | DatabaseTransaction;
 
 /**
  * Declaring the constants
@@ -58,11 +60,51 @@ export abstract class OwnerScopedRepository {
    * fully typed off the original, uncast `table`.
    */
   // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types -- Drizzle's generic PgSelect chain type isn't practical to spell out by hand
-  protected scoped<T extends OwnedTable>(table: T) {
-    return this.db
-      .select()
-      .from(table as unknown as AnyPgTable)
-      .where(eq(table.accountId, this.requireAccountId()));
+  protected scoped<T extends OwnedTable>(table: T, ...conditions: (SQL | undefined)[]) {
+    return this.using(this.db).scoped(table, ...conditions);
+  }
+
+  /**
+   * The only sanctioned UPDATE against a user-owned table, for two reasons that both have to hold on
+   * every write: the caller's `account_id` is ANDed into the predicate, and `sync_seq` is re-stamped so
+   * the mutated row lands ahead of every delta cursor (§12.2). Drizzle applies `.set()` before
+   * `.where()`, so the predicate is taken here as conditions rather than left to the caller to chain.
+   */
+  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types -- same as scoped() above
+  protected scopedUpdate<T extends OwnedTable>(table: T, values: Record<string, unknown>, ...conditions: (SQL | undefined)[]) {
+    return this.using(this.db).update(table, values, ...conditions);
+  }
+
+  protected transaction<T>(operation: (executor: DatabaseTransaction) => Promise<T>): Promise<T> {
+    return this.db.transaction(operation);
+  }
+
+  /**
+   * The same three owner-scoped writers bound to a caller-supplied executor, for work that has to commit
+   * with something else — a command's transaction, or a delete and the tombstone that announces it.
+   */
+  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types -- same as scoped() above
+  protected using(executor: SqlExecutor) {
+    const accountId = this.requireAccountId();
+    return {
+      scoped: <T extends OwnedTable>(table: T, ...conditions: (SQL | undefined)[]) =>
+        executor
+          .select()
+          .from(table as unknown as AnyPgTable)
+          .where(and(eq(table.accountId, accountId), ...conditions)),
+
+      update: <T extends OwnedTable>(table: T, values: Record<string, unknown>, ...conditions: (SQL | undefined)[]) =>
+        executor
+          .update(table as unknown as AnyPgTable)
+          .set(syncStamped(table, values))
+          .where(and(eq(table.accountId, accountId), ...conditions)),
+
+      delete: <T extends OwnedTable>(table: T, ...conditions: (SQL | undefined)[]) =>
+        executor.delete(table as unknown as AnyPgTable).where(and(eq(table.accountId, accountId), ...conditions)),
+
+      /** The deleting transaction's own announcement of the delete (§12.2); `recordId` is the client-visible key, stringified. */
+      tombstone: (tableName: string, recordId: string) => executor.insert(schema.deletedRecords).values({ accountId, tableName, recordId }),
+    };
   }
 
   /**
@@ -82,7 +124,7 @@ export abstract class OwnerScopedRepository {
     };
   }
 
-  private requireAccountId(): bigint {
+  protected requireAccountId(): bigint {
     const accountId = this.accountContext.getAccountId();
     if (accountId === null) throw AppError.internal('OwnerScopedRepository used without a resolved account context');
     return accountId;

@@ -39,6 +39,11 @@ export class AccountRepository {
     return account ?? null;
   }
 
+  async findById(accountId: bigint): Promise<Account.Row | null> {
+    const [account] = await this.db.select().from(schema.accounts).where(eq(schema.accounts.id, accountId));
+    return account ?? null;
+  }
+
   /** A cheap, primary-key-scoped read — deliberately never cached, so a deletion that just started is visible on the very next request. */
   async findDeletionState(accountId: bigint): Promise<Account.DeletionState | null> {
     const [account] = await this.db.select({ deletionState: schema.accounts.deletionState }).from(schema.accounts).where(eq(schema.accounts.id, accountId));

@@ -7,6 +7,10 @@ declare module '@shadow-library/common' {
 
     'account.context-ttl': number;
 
+    'sync.epoch': string;
+    'sync.page-size': number;
+    'sync.cursor-overlap': number;
+
     'scheduler.enabled': boolean;
     'scheduler.tick-interval-ms': number;
 
@@ -38,6 +42,18 @@ Config.load('server.host', { defaultValue: '0.0.0.0' });
 
 /** Seconds a resolved `sub -> account` mapping stays LRU-cached (à la `access.membership-ttl` on web-novel-server). */
 Config.load('account.context-ttl', { defaultValue: '60', validateType: 'number', reloadable: true });
+
+/** Bumping this invalidates every client cursor: the next delta pull sees a new epoch and full-resyncs from `since=0` (ARCHITECTURE §12.4). */
+Config.load('sync.epoch', { defaultValue: '1', reloadable: true });
+Config.load('sync.page-size', { defaultValue: '500', validateType: 'number', reloadable: true });
+
+/**
+ * How far behind the highest observed `sync_seq` a returned cursor lags, so a row whose sequence value
+ * was drawn before a concurrent transaction's but committed after it is still re-served (§12.2). Only
+ * applied once the pull has drained — mid-backlog the cursor is exact, or a page smaller than the
+ * overlap could never advance it.
+ */
+Config.load('sync.cursor-overlap', { defaultValue: '100', validateType: 'number', reloadable: true });
 
 /** Per ADR-0002: the API replica turns this off once the worker Deployment (`src/worker.ts`) takes over the scheduler. */
 Config.load('scheduler.enabled', { defaultValue: 'true', validateType: 'boolean', reloadable: true });

@@ -26,6 +26,6 @@ const DeferredAuthModule = forwardRef(() => AuthModule.forRoot({ routes: { baseP
   imports: [DeferredAuthModule, FastifyModule, DatabaseModule],
   providers: [AccountRepository, AccountContext],
   controllers: [AccountContextMiddleware],
-  exports: [AccountContext],
+  exports: [AccountContext, AccountRepository],
 })
 export class MemoirAuthModule {}

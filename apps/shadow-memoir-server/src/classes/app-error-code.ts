@@ -34,6 +34,20 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly CMD_001 = AppErrorCode.badRequest('CMD_001', "Unknown command type '{type}'");
 
   /*!
+   * Device Errors
+   */
+
+  /** No device with that id belongs to the caller; a foreign device id reads exactly like a nonexistent one */
+  static readonly DEV_001 = AppErrorCode.notFound('DEV_001', 'Device not found');
+
+  /*!
+   * Sync Errors
+   */
+
+  /** The delta request names a domain no module has registered a `DeltaSource` for */
+  static readonly SYN_001 = AppErrorCode.badRequest('SYN_001', "Unknown sync domain '{domain}'");
+
+  /*!
    * Hero Errors
    */
 
