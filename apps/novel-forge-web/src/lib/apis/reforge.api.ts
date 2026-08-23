@@ -191,6 +191,6 @@ export function useRerunReforgeChapterMutation(projectId: string): UseMutationRe
   });
 }
 
-export function fetchReforgeManuscript(projectId: string): Promise<{ markdown: string }> {
+export function fetchReforgeManuscript(projectId: string): Promise<{ markdown: string; failedChapters: number[] }> {
   return APIRequest.get(`/projects/${projectId}/reforge/manuscript`).execute();
 }

@@ -26,6 +26,8 @@ export namespace Reforge {
     minSpanChapters?: number;
     /** Transform mode: source chapters one output chapter may be written from (default 6) — the plan validator enforces it. */
     maxSpanSourceChapters?: number;
+    /** Max repair attempts before persisting as attention (default 1 — no behavior change). Shared with `Rebrand.Settings`. Chapter mode only — the transform graph is untouched. */
+    maxRepairs?: number;
   }
 }
 

@@ -1,4 +1,4 @@
-import { and, asc, eq, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -37,8 +37,34 @@ export interface SeedGlossaryResult {
   mappings: number;
 }
 
-const OPENING_CHAPTER_COUNT = 3;
+export interface Manuscript {
+  markdown: string;
+  failedChapters: number[];
+}
+
+const OPENING_CHAPTER_COUNT = 2;
 const OPENING_CHAPTER_TOKENS = 1_500;
+const SAMPLE_CHAPTER_COUNT = 6;
+const SAMPLE_CHAPTER_TOKENS = 800;
+
+/**
+ * Picks the chapters `seedGlossary` reads: the first `openingCount` (full setup context) plus up to
+ * `sampleCount` more spread evenly across whatever remains, so a major character introduced late in
+ * a long novel still lands in the seed bible instead of only ever surfacing as a repair-pass discovery.
+ */
+export function selectSeedSampleChapters(chapterNumbers: number[], openingCount = OPENING_CHAPTER_COUNT, sampleCount = SAMPLE_CHAPTER_COUNT): number[] {
+  const opening = chapterNumbers.slice(0, openingCount);
+  const rest = chapterNumbers.slice(openingCount);
+  if (rest.length === 0 || rest.length <= sampleCount) return [...opening, ...rest];
+  if (sampleCount <= 1) return [...opening, ...(rest[0] !== undefined ? [rest[0]] : [])];
+
+  const picked: number[] = [];
+  for (let i = 0; i < sampleCount; i++) {
+    const value = rest[Math.round((i * (rest.length - 1)) / (sampleCount - 1))];
+    if (value !== undefined && !picked.includes(value)) picked.push(value);
+  }
+  return [...opening, ...picked];
+}
 
 @Injectable()
 export class RebrandService {
@@ -140,12 +166,19 @@ export class RebrandService {
     return conversion;
   }
 
-  async renderManuscript(projectId: bigint): Promise<string> {
+  /** A gap is never silent: a failed chapter is both reported in `failedChapters` and called out inline. */
+  async renderManuscript(projectId: bigint): Promise<Manuscript> {
     const conversions = await this.db.query.chapterConversions.findMany({
-      where: and(eq(schema.chapterConversions.projectId, projectId), ne(schema.chapterConversions.status, 'failed')),
+      where: eq(schema.chapterConversions.projectId, projectId),
       orderBy: [asc(schema.chapterConversions.chapter)],
     });
-    return conversions.map(c => `# ${c.title ?? `Chapter ${c.chapter}`}\n\n${c.body}`).join('\n\n---\n\n');
+    const failedChapters = conversions.filter(c => c.status === 'failed').map(c => c.chapter);
+    const body = conversions
+      .filter(c => c.status !== 'failed')
+      .map(c => `# ${c.title ?? `Chapter ${c.chapter}`}\n\n${c.body}`)
+      .join('\n\n---\n\n');
+    const markdown = failedChapters.length > 0 ? `<!-- WARNING: chapter(s) ${failedChapters.join(', ')} failed conversion and are missing below -->\n\n${body}` : body;
+    return { markdown, failedChapters };
   }
 
   /**
@@ -160,13 +193,25 @@ export class RebrandService {
     }
     this.logger.info('seedGlossary: seeding world notes and name mappings', { projectId, jobId });
 
-    const [project, pack, openingRows] = await Promise.all([
+    const [project, pack, chapterNumberRows] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.contextAssembler.forRebrandSeed(projectId),
-      this.db.query.chapters.findMany({ where: eq(schema.chapters.projectId, projectId), orderBy: [asc(schema.chapters.number)], limit: OPENING_CHAPTER_COUNT }),
+      this.db.query.chapters.findMany({ where: eq(schema.chapters.projectId, projectId), orderBy: [asc(schema.chapters.number)], columns: { number: true } }),
     ]);
-    const openingChapters = openingRows
-      .map(ch => `Chapter ${ch.number}${ch.title ? ` — ${ch.title}` : ''}:\n${truncateAtParagraph(ch.content ?? '', OPENING_CHAPTER_TOKENS).text}`)
+    const sampleNumbers = selectSeedSampleChapters(chapterNumberRows.map(c => c.number));
+    const openingNumbers = new Set(sampleNumbers.slice(0, OPENING_CHAPTER_COUNT));
+    const sampleRows =
+      sampleNumbers.length > 0
+        ? await this.db.query.chapters.findMany({
+            where: and(eq(schema.chapters.projectId, projectId), inArray(schema.chapters.number, sampleNumbers)),
+            orderBy: [asc(schema.chapters.number)],
+          })
+        : [];
+    const openingChapters = sampleRows
+      .map(ch => {
+        const tokens = openingNumbers.has(ch.number) ? OPENING_CHAPTER_TOKENS : SAMPLE_CHAPTER_TOKENS;
+        return `Chapter ${ch.number}${ch.title ? ` — ${ch.title}` : ''}:\n${truncateAtParagraph(ch.content ?? '', tokens).text}`;
+      })
       .join('\n\n---\n\n');
 
     const prompt = PROMPT_REGISTRY['rebrand-glossary'];

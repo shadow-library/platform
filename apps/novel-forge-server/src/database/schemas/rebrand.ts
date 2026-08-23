@@ -14,10 +14,14 @@ export namespace Rebrand {
 
   /** Per-project knobs stored on `rebrands.settings`. */
   export interface Settings {
-    /** Extra residue-scan terms beyond BANNED_REAL_WORLD_TERMS. */
+    /** Extra residue-scan terms beyond the selected term packs. */
     bannedExtra?: string[];
     /** Skip the per-chapter AI audit call when false (deterministic scan always runs). */
     auditEnabled?: boolean;
+    /** Named banned-term packs to scan for (see `banned-terms.ts`); default `['east-asian']`. Reforge reuses this row's selection. */
+    termPacks?: string[];
+    /** Max repair attempts before persisting as attention (default 1 — no behavior change). Shared with `Reforge.Settings`. */
+    maxRepairs?: number;
   }
 }
 

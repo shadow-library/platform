@@ -92,7 +92,6 @@ export class RebrandController {
   @Get('/manuscript')
   @RespondFor(200, ManuscriptResponse)
   async getRebrandManuscript(@Params() params: RebrandParams): Promise<ManuscriptResponse> {
-    const markdown = await this.rebrandService.renderManuscript(params.projectId);
-    return { markdown };
+    return this.rebrandService.renderManuscript(params.projectId);
   }
 }

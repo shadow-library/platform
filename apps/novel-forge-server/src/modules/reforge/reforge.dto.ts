@@ -52,6 +52,9 @@ export class ReforgeSettingsBody {
 
   @Field(() => Integer, { optional: true, minimum: 1, description: 'Transform mode: source chapters one output chapter may be written from (default 6).' })
   maxSpanSourceChapters?: number;
+
+  @Field(() => Integer, { optional: true, minimum: 0, description: 'Chapter mode: max repair attempts before persisting as attention (default 1).' })
+  maxRepairs?: number;
 }
 
 @Schema()
@@ -275,6 +278,9 @@ export class ListReforgesResponse {
 export class ReforgeManuscriptResponse {
   @Field()
   markdown: string;
+
+  @Field(() => [Integer], { description: 'Chapters that failed reforging and are missing from the markdown below. Always empty in transform mode.' })
+  failedChapters: number[];
 }
 
 @Schema()

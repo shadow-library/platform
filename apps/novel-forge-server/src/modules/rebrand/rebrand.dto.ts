@@ -27,6 +27,15 @@ export class RebrandSettingsBody {
 
   @Field({ optional: true })
   auditEnabled?: boolean;
+
+  @Field(() => [String], {
+    optional: true,
+    description: "Named banned-term packs to scan for (see banned-terms.ts); default ['east-asian']. Reforge reuses this project's selection.",
+  })
+  termPacks?: string[];
+
+  @Field(() => Integer, { optional: true, minimum: 0, description: 'Max repair attempts before persisting as attention (default 1).' })
+  maxRepairs?: number;
 }
 
 @Schema()
@@ -215,4 +224,7 @@ export class ListConversionsResponse {
 export class ManuscriptResponse {
   @Field()
   markdown: string;
+
+  @Field(() => [Integer], { description: 'Chapters that failed conversion and are missing from the markdown below.' })
+  failedChapters: number[];
 }

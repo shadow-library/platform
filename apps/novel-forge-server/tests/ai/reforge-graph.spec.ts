@@ -93,11 +93,16 @@ describe.if(pgAvailable)('chapter-reforge graph', () => {
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
   describe('routeAfterFidelityJudge', () => {
-    it('should persist when clean, repair once on the first dirty attempt, and persist after', () => {
-      expect(routeAfterFidelityJudge({ residueIssues: [], judgeIssues: [], attempt: 0 })).toBe('persist');
-      expect(routeAfterFidelityJudge({ residueIssues: [residueIssue], judgeIssues: [], attempt: 0 })).toBe('repair');
-      expect(routeAfterFidelityJudge({ residueIssues: [], judgeIssues: [fidelityIssue], attempt: 0 })).toBe('repair');
-      expect(routeAfterFidelityJudge({ residueIssues: [residueIssue], judgeIssues: [fidelityIssue], attempt: 1 })).toBe('persist');
+    it('should persist when clean, repair once on the first dirty attempt (default maxRepairs), and persist after', () => {
+      expect(routeAfterFidelityJudge({ residueIssues: [], judgeIssues: [], attempt: 0, settings: {} })).toBe('persist');
+      expect(routeAfterFidelityJudge({ residueIssues: [residueIssue], judgeIssues: [], attempt: 0, settings: {} })).toBe('repair');
+      expect(routeAfterFidelityJudge({ residueIssues: [], judgeIssues: [fidelityIssue], attempt: 0, settings: {} })).toBe('repair');
+      expect(routeAfterFidelityJudge({ residueIssues: [residueIssue], judgeIssues: [fidelityIssue], attempt: 1, settings: {} })).toBe('persist');
+    });
+
+    it('should honor settings.maxRepairs beyond the default of one', () => {
+      expect(routeAfterFidelityJudge({ residueIssues: [residueIssue], judgeIssues: [], attempt: 1, settings: { maxRepairs: 2 } })).toBe('repair');
+      expect(routeAfterFidelityJudge({ residueIssues: [residueIssue], judgeIssues: [], attempt: 2, settings: { maxRepairs: 2 } })).toBe('persist');
     });
   });
 
@@ -259,5 +264,39 @@ describe.if(pgAvailable)('chapter-reforge graph', () => {
     // Judge disabled → the persisted fidelity verdict is null but the row is still reforged.
     const reforge = await db.query.chapterReforges.findFirst({ where: and(eq(schema.chapterReforges.projectId, projectId), eq(schema.chapterReforges.chapter, 1)) });
     expect(reforge).toMatchObject({ status: 'reforged', fidelity: null });
+  });
+
+  it('should honor settings.maxRepairs and keep repairing past the default of one', async () => {
+    const projectId = await seedProject(db, `reforge-graph-maxrepairs-${Date.now()}`, { maxRepairs: 2 });
+    const calls: ScriptedCall[] = [];
+    const dirtyJudge = { verdict: 'issues', coveredBeats: 1, totalBeats: 1, missingBeats: [], issues: [{ type: 'fidelity', detail: 'still off', excerpt: 'x' }] };
+    const writeOutputs = [
+      { title: 'Awakening', body: cleanBody('First pass.') },
+      { title: 'Awakening', body: cleanBody('Second pass.') },
+      { title: 'Awakening', body: cleanBody('Third pass.') },
+    ];
+    const graph = createChapterReforgeGraph(buildServices(db, checkpointer, [outline], writeOutputs, [dirtyJudge, dirtyJudge, dirtyJudge], calls));
+
+    const runId = randomUUID();
+    const state = (await graph.invoke({ projectId: String(projectId), chapter: 1, runId }, { configurable: { thread_id: runId } })) as { outcome: string | null };
+
+    expect(state.outcome).toBe('attention');
+    expect(calls.filter(c => c.key === 'reforge-write')).toHaveLength(3);
+    expect(calls.filter(c => c.key === 'reforge-judge')).toHaveLength(3);
+  });
+
+  it("should scan residue with the rebrand row's term packs, not just the default", async () => {
+    const projectId = await seedProject(db, `reforge-graph-termpacks-${Date.now()}`, null, { rebrandSettings: { termPacks: ['western'] } });
+    const calls: ScriptedCall[] = [];
+    const persiaBody = { title: 'Awakening', body: cleanBody('He recalled Persia fondly.') };
+    const writeOutputs = [persiaBody, persiaBody];
+    const graph = createChapterReforgeGraph(buildServices(db, checkpointer, [outline], writeOutputs, [cleanJudge, cleanJudge], calls));
+
+    const runId = randomUUID();
+    await graph.invoke({ projectId: String(projectId), chapter: 1, runId }, { configurable: { thread_id: runId } });
+
+    const reforge = await db.query.chapterReforges.findFirst({ where: and(eq(schema.chapterReforges.projectId, projectId), eq(schema.chapterReforges.chapter, 1)) });
+    expect(reforge?.status).toBe('attention');
+    expect(reforge?.issues).toMatchObject([{ type: 'banned_term', detail: 'real-world term "Persia" must not appear' }]);
   });
 });

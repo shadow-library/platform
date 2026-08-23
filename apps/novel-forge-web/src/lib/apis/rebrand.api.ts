@@ -156,6 +156,6 @@ export function useRerunRebrandChapterMutation(projectId: string): UseMutationRe
   });
 }
 
-export function fetchRebrandManuscript(projectId: string): Promise<{ markdown: string }> {
+export function fetchRebrandManuscript(projectId: string): Promise<{ markdown: string; failedChapters: number[] }> {
   return APIRequest.get(`/projects/${projectId}/rebrand/manuscript`).execute();
 }

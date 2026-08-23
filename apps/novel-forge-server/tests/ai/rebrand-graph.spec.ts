@@ -82,11 +82,17 @@ describe.if(pgAvailable)('chapter-rebrand graph', () => {
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
   describe('routeAfterAudit', () => {
-    it('should persist when clean, repair once on the first dirty attempt, and persist after', () => {
-      expect(routeAfterAudit({ residueIssues: [], auditIssues: [], attempt: 0 })).toBe('persist');
-      expect(routeAfterAudit({ residueIssues: [residueIssue], auditIssues: [], attempt: 0 })).toBe('repair');
-      expect(routeAfterAudit({ residueIssues: [], auditIssues: [auditIssue], attempt: 0 })).toBe('repair');
-      expect(routeAfterAudit({ residueIssues: [residueIssue], auditIssues: [auditIssue], attempt: 1 })).toBe('persist');
+    it('should persist when clean, repair once on the first dirty attempt (default maxRepairs), and persist after', () => {
+      expect(routeAfterAudit({ residueIssues: [], auditIssues: [], attempt: 0, settings: {} })).toBe('persist');
+      expect(routeAfterAudit({ residueIssues: [residueIssue], auditIssues: [], attempt: 0, settings: {} })).toBe('repair');
+      expect(routeAfterAudit({ residueIssues: [], auditIssues: [auditIssue], attempt: 0, settings: {} })).toBe('repair');
+      expect(routeAfterAudit({ residueIssues: [residueIssue], auditIssues: [auditIssue], attempt: 1, settings: {} })).toBe('persist');
+    });
+
+    it('should honor settings.maxRepairs beyond the default of one', () => {
+      expect(routeAfterAudit({ residueIssues: [residueIssue], auditIssues: [], attempt: 1, settings: { maxRepairs: 2 } })).toBe('repair');
+      expect(routeAfterAudit({ residueIssues: [residueIssue], auditIssues: [], attempt: 2, settings: { maxRepairs: 2 } })).toBe('persist');
+      expect(routeAfterAudit({ residueIssues: [residueIssue], auditIssues: [], attempt: 0, settings: { maxRepairs: 0 } })).toBe('persist');
     });
   });
 
@@ -169,5 +175,24 @@ describe.if(pgAvailable)('chapter-rebrand graph', () => {
     expect(liWei).toMatchObject({ replacement: 'Liam Vey', createdChapter: 1 });
     const yeFan = entries.find(e => e.sourceName === 'Ye Fan');
     expect(yeFan?.replacement).toBe('Evan Vale');
+  });
+
+  it('should honor settings.maxRepairs and keep repairing past the default of one', async () => {
+    const projectId = await seedProject(db, `rebrand-graph-maxrepairs-${Date.now()}`, { maxRepairs: 2 });
+    const calls: ScriptedCall[] = [];
+    const dirtyAudit = { verdict: 'issues', issues: [{ type: 'naming', detail: 'still wrong', excerpt: 'x' }] };
+    const convertOutputs = [
+      { title: 'Awakening', body: cleanBody('First pass.') },
+      { title: 'Awakening', body: cleanBody('Second pass.') },
+      { title: 'Awakening', body: cleanBody('Third pass.') },
+    ];
+    const graph = createChapterRebrandGraph(buildServices(db, checkpointer, convertOutputs, [dirtyAudit, dirtyAudit, dirtyAudit], calls));
+
+    const runId = randomUUID();
+    const state = (await graph.invoke({ projectId: String(projectId), chapter: 1, runId }, { configurable: { thread_id: runId } })) as { outcome: string | null };
+
+    expect(state.outcome).toBe('attention');
+    expect(calls.filter(c => c.key === 'rebrand-convert')).toHaveLength(3);
+    expect(calls.filter(c => c.key === 'rebrand-audit')).toHaveLength(3);
   });
 });

@@ -59,11 +59,12 @@ type RebrandState = typeof ChapterRebrandAnnotation.State;
 
 const logger = Logger.getLogger(APP_NAME, 'chapter-rebrand.graph');
 
-/** Clean → persist; dirty on the first attempt → one repair pass; still dirty → persist as attention. */
-export function routeAfterAudit(state: Pick<RebrandState, 'residueIssues' | 'auditIssues' | 'attempt'>): 'persist' | 'repair' {
+/** Clean → persist; dirty within the repair budget (`settings.maxRepairs`, default 1) → repair; still dirty → persist as attention. */
+export function routeAfterAudit(state: Pick<RebrandState, 'residueIssues' | 'auditIssues' | 'attempt' | 'settings'>): 'persist' | 'repair' {
   const dirty = state.residueIssues.length + state.auditIssues.length > 0;
   if (!dirty) return 'persist';
-  return state.attempt === 0 ? 'repair' : 'persist';
+  const maxRepairs = state.settings.maxRepairs ?? 1;
+  return state.attempt < maxRepairs ? 'repair' : 'persist';
 }
 
 function renderIssues(issues: ConversionIssue[]): string {
@@ -167,7 +168,7 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
   function residueScan(state: RebrandState) {
     if (!state.converted) return { residueIssues: [], nodeTrace: ['residueScan'] };
     const combined = [...state.glossary, ...(state.converted.discoveredNames ?? [])];
-    const residueIssues = scanResidue(state.converted.body, combined, state.settings.bannedExtra ?? []);
+    const residueIssues = scanResidue(state.converted.body, combined, state.settings.bannedExtra ?? [], state.settings.termPacks);
     if (residueIssues.length > 0) logger.debug('rebrand residueScan found issues', { runId: state.runId, chapter: state.chapter, issues: residueIssues });
     return { residueIssues, nodeTrace: ['residueScan'] };
   }

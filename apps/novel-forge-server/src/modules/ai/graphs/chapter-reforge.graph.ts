@@ -42,6 +42,7 @@ const ChapterReforgeAnnotation = Annotation.Root({
   settings: Annotation<Reforge.Settings>({ reducer: (_, n) => n, default: () => ({}) }),
   fidelityLevel: Annotation<ReforgeFidelityLevel>({ reducer: (_, n) => n, default: () => 'preserve' }),
   bannedExtra: Annotation<string[]>({ reducer: (_, n) => n, default: () => [] }),
+  termPacks: Annotation<string[] | undefined>({ reducer: (_, n) => n, default: () => undefined }),
   glossary: Annotation<GlossaryLike[]>({ reducer: (_, n) => n, default: () => [] }),
   glossarySlice: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   carryState: Annotation<Record<string, unknown> | null>({ reducer: (_, n) => n, default: () => null }),
@@ -66,14 +67,15 @@ type ReforgeState = typeof ChapterReforgeAnnotation.State;
 const logger = Logger.getLogger(APP_NAME, 'chapter-reforge.graph');
 
 /**
- * Clean → persist; dirty on the first attempt → one repair pass through write; still dirty → persist
- * as attention. Named `Fidelity` to stay distinct from chapter-generation's `routeAfterJudge` in the
- * shared graphs barrel.
+ * Clean → persist; dirty within the repair budget (`settings.maxRepairs`, default 1) → repair through
+ * write; still dirty → persist as attention. Named `Fidelity` to stay distinct from
+ * chapter-generation's `routeAfterJudge` in the shared graphs barrel.
  */
-export function routeAfterFidelityJudge(state: Pick<ReforgeState, 'residueIssues' | 'judgeIssues' | 'attempt'>): 'persist' | 'repair' {
+export function routeAfterFidelityJudge(state: Pick<ReforgeState, 'residueIssues' | 'judgeIssues' | 'attempt' | 'settings'>): 'persist' | 'repair' {
   const dirty = state.residueIssues.length + state.judgeIssues.length > 0;
   if (!dirty) return 'persist';
-  return state.attempt === 0 ? 'repair' : 'persist';
+  const maxRepairs = state.settings.maxRepairs ?? 1;
+  return state.attempt < maxRepairs ? 'repair' : 'persist';
 }
 
 function renderIssues(issues: ReforgeIssue[]): string {
@@ -140,8 +142,9 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
       instructions: reforge?.instructions ?? null,
       settings: (reforge?.settings ?? {}) as Reforge.Settings,
       fidelityLevel: (reforge?.fidelity ?? 'preserve') as ReforgeFidelityLevel,
-      // Residue terms are a property of the rename bible, which reforge shares with rebrand.
+      // Residue terms and term packs are a property of the rename bible, which reforge shares with rebrand.
       bannedExtra: ((rebrand.settings as Rebrand.Settings | null)?.bannedExtra ?? []) as string[],
+      termPacks: (rebrand.settings as Rebrand.Settings | null)?.termPacks,
       glossary: glossaryRows.map(g => ({ sourceName: g.sourceName, variants: g.variants as string[] | null, replacement: g.replacement, category: g.category, notes: g.notes })),
       carryState: (previous?.carryState as Record<string, unknown> | null) ?? null,
       prevBody: previous?.body || null,
@@ -233,9 +236,9 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
   function residueScan(state: ReforgeState) {
     if (!state.written) return { residueIssues: [], nodeTrace: ['residueScan'] };
     const combined = [...state.glossary, ...(state.written.discoveredNames ?? [])];
-    // The shared BANNED_REAL_WORLD_TERMS list lives inside scanResidue; bannedExtra comes from the
+    // The term-pack resolution lives inside scanResidue; bannedExtra/termPacks come from the
     // rebrand row, whose rename bible reforge shares.
-    const residueIssues = scanResidue(state.written.body, combined, state.bannedExtra);
+    const residueIssues = scanResidue(state.written.body, combined, state.bannedExtra, state.termPacks);
     if (residueIssues.length > 0) logger.debug('reforge residueScan found issues', { runId: state.runId, chapter: state.chapter, issues: residueIssues });
     return { residueIssues, nodeTrace: ['residueScan'] };
   }

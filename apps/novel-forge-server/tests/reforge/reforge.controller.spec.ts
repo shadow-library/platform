@@ -119,7 +119,9 @@ describe.if(pgAvailable)('Reforge API', () => {
 
       const manuscript = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${projectId}/reforge/manuscript`);
       expect(manuscript.statusCode).toBe(200);
-      expect(manuscript.json().markdown).toBe('# Awakening\n\nEvan Vale rose.');
+      expect(manuscript.json().failedChapters).toEqual([2]);
+      expect(manuscript.json().markdown).toContain('<!-- WARNING: chapter(s) 2 failed reforging');
+      expect(manuscript.json().markdown).toContain('# Awakening\n\nEvan Vale rose.');
     });
   });
 });

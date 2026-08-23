@@ -246,15 +246,22 @@ export class ReforgeService {
     return reforge;
   }
 
-  async renderManuscript(projectId: bigint): Promise<string> {
+  /** A gap is never silent: a failed chapter is both reported in `failedChapters` and called out inline. Transform mode is untouched — it never fails a chapter silently the same way, so it always reports none. */
+  async renderManuscript(projectId: bigint): Promise<{ markdown: string; failedChapters: number[] }> {
     const reforge = await this.db.query.reforges.findFirst({ where: eq(schema.reforges.projectId, projectId) });
-    if (reforge?.mode === 'transform') return this.renderTransformManuscript(projectId);
+    if (reforge?.mode === 'transform') return { markdown: await this.renderTransformManuscript(projectId), failedChapters: [] };
 
     const reforges = await this.db.query.chapterReforges.findMany({
-      where: and(eq(schema.chapterReforges.projectId, projectId), ne(schema.chapterReforges.status, 'failed')),
+      where: eq(schema.chapterReforges.projectId, projectId),
       orderBy: [asc(schema.chapterReforges.chapter)],
     });
-    return reforges.map(r => `# ${r.title ?? `Chapter ${r.chapter}`}\n\n${r.body}`).join('\n\n---\n\n');
+    const failedChapters = reforges.filter(r => r.status === 'failed').map(r => r.chapter);
+    const body = reforges
+      .filter(r => r.status !== 'failed')
+      .map(r => `# ${r.title ?? `Chapter ${r.chapter}`}\n\n${r.body}`)
+      .join('\n\n---\n\n');
+    const markdown = failedChapters.length > 0 ? `<!-- WARNING: chapter(s) ${failedChapters.join(', ')} failed reforging and are missing below -->\n\n${body}` : body;
+    return { markdown, failedChapters };
   }
 
   private async renderTransformManuscript(projectId: bigint): Promise<string> {

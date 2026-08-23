@@ -3789,6 +3789,10 @@ export interface components {
     RebrandSettingsBody: {
       bannedExtra?: string[];
       auditEnabled?: boolean;
+      /** @description Named banned-term packs to scan for (see banned-terms.ts); default ['east-asian']. Reforge reuses this project's selection. */
+      termPacks?: string[];
+      /** @description Max repair attempts before persisting as attention (default 1). */
+      maxRepairs?: number;
     };
     RebrandResponse: {
       id: string;
@@ -3872,6 +3876,8 @@ export interface components {
     };
     ManuscriptResponse: {
       markdown: string;
+      /** @description Chapters that failed conversion and are missing from the markdown below. */
+      failedChapters: number[];
     };
     ReforgeConfigBody: {
       instructions?: string | null;
@@ -3895,6 +3901,8 @@ export interface components {
       minSpanChapters?: number;
       /** @description Transform mode: source chapters one output chapter may be written from (default 6). */
       maxSpanSourceChapters?: number;
+      /** @description Chapter mode: max repair attempts before persisting as attention (default 1). */
+      maxRepairs?: number;
     };
     ReforgeResponse: {
       id: string;
@@ -4212,6 +4220,8 @@ export interface components {
     ReforgeCutDisposition: 'cut' | 'condensed' | 'resolved_early';
     ReforgeManuscriptResponse: {
       markdown: string;
+      /** @description Chapters that failed reforging and are missing from the markdown below. Always empty in transform mode. */
+      failedChapters: number[];
     };
     PublishNovelBody: {
       /** @description Immutable reader URL slug set on first publish; omission derives it from the title and later values are ignored. */

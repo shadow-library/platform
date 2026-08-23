@@ -226,7 +226,6 @@ export class ReforgeController {
   @Get('/manuscript')
   @RespondFor(200, ReforgeManuscriptResponse)
   async getReforgeManuscript(@Params() params: ReforgeParams): Promise<ReforgeManuscriptResponse> {
-    const markdown = await this.reforgeService.renderManuscript(params.projectId);
-    return { markdown };
+    return this.reforgeService.renderManuscript(params.projectId);
   }
 }
