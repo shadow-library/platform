@@ -73,4 +73,26 @@ export class AppErrorCode extends ServerErrorCode {
 
   /** The cosmetic is already unlocked for this account, so a repeat purchase must not charge again */
   static readonly CSM_001 = AppErrorCode.conflict('CSM_001', 'This cosmetic is already unlocked');
+
+  /*!
+   * Finance Errors
+   */
+
+  /** A category with this key already exists for the account */
+  static readonly FIN_001 = AppErrorCode.conflict('FIN_001', 'A category with this key already exists');
+
+  /** This subscription cycle has already produced its expense; a multi-device race converges here rather than duplicating */
+  static readonly FIN_002 = AppErrorCode.conflict('FIN_002', 'This billing cycle has already been confirmed');
+
+  /** No expense with that id belongs to the caller; a foreign expense id reads exactly like a nonexistent one */
+  static readonly FIN_003 = AppErrorCode.notFound('FIN_003', 'Expense not found');
+
+  /** No subscription with that id belongs to the caller */
+  static readonly FIN_004 = AppErrorCode.notFound('FIN_004', 'Subscription not found');
+
+  /** No category with that id belongs to the caller, or it is not one of the 9 built-ins */
+  static readonly FIN_005 = AppErrorCode.notFound('FIN_005', 'Category not found');
+
+  /** An expense edit tried to change the currency; the product models a currency change as delete+create so a new rate can be locked */
+  static readonly FIN_006 = AppErrorCode.badRequest('FIN_006', 'Currency cannot be changed on an existing expense; delete and re-create it instead');
 }

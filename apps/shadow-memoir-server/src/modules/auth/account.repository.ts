@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -55,6 +55,18 @@ export class AccountRepository {
   async findDeletionState(accountId: bigint): Promise<Account.DeletionState | null> {
     const [account] = await this.db.select({ deletionState: schema.accounts.deletionState }).from(schema.accounts).where(eq(schema.accounts.id, accountId));
     return account?.deletionState ?? null;
+  }
+
+  /** Machine path for the finance reconciliation sweep, which resolves FX for expenses across every account rather than one caller's own. */
+  async findDefaultCurrencies(accountIds: bigint[]): Promise<Map<bigint, string>> {
+    const map = new Map<bigint, string>();
+    if (accountIds.length === 0) return map;
+    const rows = await this.db
+      .select({ id: schema.accounts.id, defaultCurrency: schema.accounts.defaultCurrency })
+      .from(schema.accounts)
+      .where(inArray(schema.accounts.id, accountIds));
+    for (const row of rows) map.set(row.id, row.defaultCurrency);
+    return map;
   }
 
   /**

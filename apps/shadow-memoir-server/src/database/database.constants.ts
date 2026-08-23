@@ -13,4 +13,6 @@ export const constraintErrorMap: Record<string, AppError> = {
   accounts_identity_sub_unique: AppErrorCode.ACC_001.create(),
   reschedule_events_account_id_quest_id_date_unique: AppErrorCode.QST_001.create(),
   cosmetic_unlocks_account_id_cosmetic_id_unique: AppErrorCode.CSM_001.create(),
+  expense_categories_account_id_key_unique: AppErrorCode.FIN_001.create(),
+  expenses_account_id_linked_subscription_id_billing_cycle_date_unique: AppErrorCode.FIN_002.create(),
 };

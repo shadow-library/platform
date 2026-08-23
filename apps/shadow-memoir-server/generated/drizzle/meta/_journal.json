@@ -29,6 +29,20 @@
       "when": 1787523632188,
       "tag": "0003_shocking_jackpot",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787524211823,
+      "tag": "0004_unknown_tattoo",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787524217110,
+      "tag": "0005_add-finance-grants",
+      "breakpoints": true
     }
   ]
 }
