@@ -14,6 +14,9 @@ export type TimingBand = 'on_time' | 'late_0_2h' | 'late_2h_plus' | 'day_1' | 'd
 
 export type CompletionKind = 'full' | 'partial';
 
+/** Persisted terminal outcomes only; `upcoming` and `active` are display states and never reach the rules. */
+export type QuestLogState = 'completed' | 'partial' | 'late' | 'skipped' | 'missed' | 'postponed' | 'rescheduled' | 'recovery';
+
 export type OneShotModifier = 'none' | 'returner' | 'comeback';
 
 export type StreakTierId = 'none' | 'bronze' | 'silver' | 'gold' | 'platinum';

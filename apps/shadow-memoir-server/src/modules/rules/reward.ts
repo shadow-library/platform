@@ -25,6 +25,8 @@ export const streakTierFor = (ruleset: Ruleset, streakDays: number): StreakTier 
   return resolved;
 };
 
+export const streakTierMinDays = (ruleset: Ruleset, id: StreakTierId): number => ruleset.streaks.tiers.find(tier => tier.id === id)?.minDays ?? Number.POSITIVE_INFINITY;
+
 export const computeReward = (ruleset: Ruleset, input: RewardInput): RewardOutcome => {
   const { reward } = ruleset;
   const tableXp = reward.baseXp[input.strictness][input.band];
