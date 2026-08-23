@@ -11,12 +11,13 @@ complete** — this second round closed every remaining gap from the Codex re-ve
 
 ## Summary
 
-- Completed: 18
+- Completed: 19
 - In Progress: 0
 - Pending: 0
 - Blocked: 0
 
-**All three FINAL-01..FINAL-03 blockers from `harness-final-recommendation.md` §10 are now closed.**
+**All three FINAL-01..FINAL-03 blockers from `harness-final-recommendation.md` §10 were closed, then
+Codex found one further gap in FINAL-01's lease takeover: no ownership fencing. Tracked as FINAL-04.**
 
 **Round three**: `harness-final-recommendation.md` §10 identified three final blockers surviving the
 fifteen fixes above (concurrent duplicate finalization, `generateGrok` ancestor overwrite, mixed-
@@ -24,26 +25,27 @@ proposal replay). Tracked as FINAL-01..FINAL-03 below.
 
 ## Tasks
 
-| ID       | Severity | Task                                                                                                                                                         | Status    | Dependencies |
-| -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- | ------------ |
-| FIX-01   | CRITICAL | Make chapter finalization recoverable/idempotent across prose commit → extraction → apply → cursor                                                           | COMPLETED | —            |
-| FIX-02   | CRITICAL | Reject mutation/deletion of finalized drafts; fix cross-table renumbering invariant on delete                                                                | COMPLETED | —            |
-| FIX-03   | HIGH     | Read `character_states` + current relationships into `forChapter`; validate entity keys before applying extraction                                           | COMPLETED | —            |
-| FIX-04   | HIGH     | Render `brief.pov` into generation/judge brief; guarantee POV entity card priority                                                                           | COMPLETED | —            |
-| FIX-05   | HIGH     | Arc reconciliation observes events inside the current arc, not `arc.chapterStart`; protect/invalidate already-drafted descendants                            | COMPLETED | FIX-02       |
-| FIX-06   | HIGH     | Continuity extraction receives existing key vocabulary; validate relationship targets/evidence; route ambiguous mutations to review                          | COMPLETED | —            |
-| FIX-07   | HIGH     | Bible stage output instructions match schema; persist stage atomically; fix `bible_doc` ref format mismatch                                                  | COMPLETED | —            |
-| FIX-08   | HIGH     | Gate/cap the legacy whole-book `outline()` endpoint so it cannot overwrite protected arc briefs                                                              | COMPLETED | —            |
-| FIX-09   | MEDIUM   | Align `revealChapter` catalog semantics with the actual knowledge ledger                                                                                     | COMPLETED | —            |
-| FIX-10   | MEDIUM   | Require `briefCompliance` at runtime; fail closed if the judge omits it                                                                                      | COMPLETED | —            |
-| FIX-11   | MEDIUM   | Use one writing-style policy across generation, fix, and revision prompts                                                                                    | COMPLETED | —            |
-| FIX-12   | HIGH     | Cursor-only finalization retry must not re-extract or reapply continuity (residual gap in FIX-01)                                                            | COMPLETED | FIX-01       |
-| FIX-13   | HIGH     | Ancestor draft changes (update/import/revise) must invalidate drafted descendants (residual gap in FIX-05)                                                   | COMPLETED | FIX-05       |
-| FIX-14   | HIGH     | Low-confidence continuity entries must stay reachable for review, not marked applied (residual gap in FIX-06)                                                | COMPLETED | FIX-06       |
-| FIX-15   | HIGH     | Character-state merge must replace/clear fields per the extraction contract, not `COALESCE`-merge stale values (residual gap in FIX-03)                      | COMPLETED | FIX-03       |
-| FINAL-01 | CRITICAL | Concurrent duplicate finalization: two racing finalize calls can both pass the pre-application marker check and apply different continuity deltas            | COMPLETED | —            |
-| FINAL-02 | HIGH     | `generateGrok` can overwrite an ancestor chapter without invalidating non-final descendant drafts or honoring the finalized-chapter guard                    | COMPLETED | —            |
-| FINAL-03 | HIGH     | Review approval of a held (low-confidence) continuity entry replays already-applied high-confidence siblings from an older proposal, overwriting newer canon | COMPLETED | —            |
+| ID       | Severity | Task                                                                                                                                                              | Status    | Dependencies |
+| -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------ |
+| FIX-01   | CRITICAL | Make chapter finalization recoverable/idempotent across prose commit → extraction → apply → cursor                                                                | COMPLETED | —            |
+| FIX-02   | CRITICAL | Reject mutation/deletion of finalized drafts; fix cross-table renumbering invariant on delete                                                                     | COMPLETED | —            |
+| FIX-03   | HIGH     | Read `character_states` + current relationships into `forChapter`; validate entity keys before applying extraction                                                | COMPLETED | —            |
+| FIX-04   | HIGH     | Render `brief.pov` into generation/judge brief; guarantee POV entity card priority                                                                                | COMPLETED | —            |
+| FIX-05   | HIGH     | Arc reconciliation observes events inside the current arc, not `arc.chapterStart`; protect/invalidate already-drafted descendants                                 | COMPLETED | FIX-02       |
+| FIX-06   | HIGH     | Continuity extraction receives existing key vocabulary; validate relationship targets/evidence; route ambiguous mutations to review                               | COMPLETED | —            |
+| FIX-07   | HIGH     | Bible stage output instructions match schema; persist stage atomically; fix `bible_doc` ref format mismatch                                                       | COMPLETED | —            |
+| FIX-08   | HIGH     | Gate/cap the legacy whole-book `outline()` endpoint so it cannot overwrite protected arc briefs                                                                   | COMPLETED | —            |
+| FIX-09   | MEDIUM   | Align `revealChapter` catalog semantics with the actual knowledge ledger                                                                                          | COMPLETED | —            |
+| FIX-10   | MEDIUM   | Require `briefCompliance` at runtime; fail closed if the judge omits it                                                                                           | COMPLETED | —            |
+| FIX-11   | MEDIUM   | Use one writing-style policy across generation, fix, and revision prompts                                                                                         | COMPLETED | —            |
+| FIX-12   | HIGH     | Cursor-only finalization retry must not re-extract or reapply continuity (residual gap in FIX-01)                                                                 | COMPLETED | FIX-01       |
+| FIX-13   | HIGH     | Ancestor draft changes (update/import/revise) must invalidate drafted descendants (residual gap in FIX-05)                                                        | COMPLETED | FIX-05       |
+| FIX-14   | HIGH     | Low-confidence continuity entries must stay reachable for review, not marked applied (residual gap in FIX-06)                                                     | COMPLETED | FIX-06       |
+| FIX-15   | HIGH     | Character-state merge must replace/clear fields per the extraction contract, not `COALESCE`-merge stale values (residual gap in FIX-03)                           | COMPLETED | FIX-03       |
+| FINAL-01 | CRITICAL | Concurrent duplicate finalization: two racing finalize calls can both pass the pre-application marker check and apply different continuity deltas                 | COMPLETED | —            |
+| FINAL-02 | HIGH     | `generateGrok` can overwrite an ancestor chapter without invalidating non-final descendant drafts or honoring the finalized-chapter guard                         | COMPLETED | —            |
+| FINAL-03 | HIGH     | Review approval of a held (low-confidence) continuity entry replays already-applied high-confidence siblings from an older proposal, overwriting newer canon      | COMPLETED | —            |
+| FINAL-04 | CRITICAL | Continuity claim lease lacks ownership fencing: a stale owner whose lease expired can still persist/apply continuity and clear a new owner's claim after takeover | COMPLETED | FINAL-01     |
 
 Ordering rationale: data-integrity/recoverability (FIX-01, FIX-02) before state/context-correctness
 gaps that bias prose quality without corrupting data (FIX-03–06), before control-flow/integration
@@ -258,6 +260,76 @@ Files changed: `src/modules/ai/graphs/apply-continuity.ts`,
 
 Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
 1038 pass, 10 skip, 0 fail (independently re-run, not just trusted from the implementing sub-agent).
+
+Commit: `70271d61` (fast-forwarded to `main`).
+
+### FINAL-04 — Fence stale finalization claim owners
+
+Missing invariant: once a finalization claim is no longer owned by a run, that stale run must be
+incapable of persisting, applying, completing, or releasing authoritative continuity for that
+chapter/version. FINAL-01's lease (`continuityClaimedAt`/`continuityClaimedBy`) let a second caller
+take over after expiry, but nothing re-verified ownership before the original caller's proposal
+persistence, continuity application, completion, or release — a stale owner (Codex example: extraction
+running past the 5-minute lease) that finished its work after losing the lease could still write, and
+its failure-path release was unscoped and could clear the new owner's live claim.
+
+What changed:
+
+- `continuityClaimedBy` (already a unique per-run UUID, `state.runId`) becomes the load-bearing fencing
+  token — its schema comment was corrected to say so.
+- New `assertOwnsClaim(tx, projectId, chapter, runId, node)` helper in `chapter-finalization.graph.ts`:
+  a conditional `UPDATE chapters SET updatedAt WHERE projectId/number AND continuityClaimedBy = runId
+AND continuityApplied = false RETURNING id`, called as the FIRST statement inside a transaction. Being
+  an `UPDATE` rather than a `SELECT` matters: it takes and holds the row lock on that `chapters` row for
+  the rest of the enclosing transaction, so no concurrent takeover can commit until the transaction
+  resolves — turning "check ownership" into an atomic fence rather than a check-then-act race. A failed
+  check throws, rolling back everything the transaction had done, so a lost claim never leaves partial
+  canon.
+- `extractContinuity`'s previously-bare proposal upsert is now wrapped in its own transaction with
+  `assertOwnsClaim` as its first statement — closes the gap where a slow LLM call returning after
+  takeover could still persist a stale proposal.
+- `applyContinuity`'s existing transaction gained `assertOwnsClaim` as its first statement, before
+  `applyContinuityDelta` runs — the row lock it takes covers the delta writes and the
+  `continuityApplied = true` write later in the same transaction, so that final write needed no
+  redundant ownership condition of its own.
+- `releaseClaim` now requires the caller's `runId` and adds `continuityClaimedBy = ownerRunId` to its
+  WHERE clause — a stale owner's failure-path release is now a no-op once someone else owns the claim,
+  never clearing another run's live claim.
+
+Failure scenarios verified (real Postgres, deterministic — lease staleness simulated by backdating
+`continuityClaimedAt` directly, no real waits/timers):
+
+- **Stale owner cannot persist after takeover**: run A parks mid-extraction, its claim is backdated,
+  run B finalizes end-to-end for real with a conflicting delta, A then resumes and is rejected with a
+  fencing error; only B's entity/proposal/cursor state exists.
+- **Stale owner's release cannot clear the new owner's claim**: after the above sequence, the chapter's
+  `continuityClaimedBy`/`continuityClaimedAt` still reflect B's live claim, not nulled by A's unwind.
+- **Stale owner cannot apply after a takeover injected between extraction and application**: A extracts
+  and persists its own proposal (still legitimately owns the claim at that point), takeover is injected
+  before the application transaction; A is fenced there instead — `continuityApplied` stays `false`,
+  zero entities exist; B then finalizes normally and owns the result.
+- **Ordinary idempotent retry is unaffected**: the pre-existing single-owner and completed-retry tests
+  in this file pass unmodified — `assertOwnsClaim` never fires for a sole legitimate owner, since its
+  own `runId` always matches its own claim.
+- **Non-vacuousness**: verified each new test fails against a weakened `assertOwnsClaim` (no-op'd
+  entirely, or with the `continuityClaimedBy` condition dropped) and against an unconditional
+  `releaseClaim`, then confirmed all pass again with the real fix restored.
+
+Regression tests (`tests/ai/finalization-resume.spec.ts`, extended the existing real-Postgres harness
+with a `beforeTransaction(index)` seam on the test proxy for injecting a takeover between numbered
+transactions, and a `backdateClaim` helper):
+
+- `should refuse to persist continuity from a run whose claim was taken over after the lease expired`
+- `should leave the new owner claim intact when the superseded run unwinds`
+- `should refuse to apply continuity from a run that lost the claim between extraction and application`
+
+Files changed: `src/database/schemas/chapters.ts`,
+`src/modules/ai/graphs/chapter-finalization.graph.ts`, `tests/ai/finalization-resume.spec.ts`.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+1041 pass, 10 skip, 0 fail (independently re-run, not just trusted from the implementing sub-agent; one
+earlier run hit 2 transient failures from local Postgres connection-pool exhaustion, unrelated to this
+change — a clean immediate rerun passed).
 
 Commit: `<filled in after commit>`
 

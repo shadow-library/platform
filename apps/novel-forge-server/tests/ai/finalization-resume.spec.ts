@@ -36,25 +36,36 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
   });
 
-  function buildGraph(options: { structured?: () => Promise<unknown>; failCursor?: boolean } = {}): ReturnType<typeof createChapterFinalizationGraph> {
+  function buildGraph(
+    options: { structured?: () => Promise<unknown>; failCursor?: boolean; beforeTransaction?: (index: number) => Promise<void> } = {},
+  ): ReturnType<typeof createChapterFinalizationGraph> {
     const modelRouter = { structured: options.structured ?? (async () => delta), resolveModel: () => ({ model: 'test-model' }) };
     const indexingService = { addProse: async () => undefined, addLore: async () => undefined };
 
     // advanceCursor is the only node that updates `projects` outside a transaction, so trapping that one table
     // fails the run exactly where a cursor write would — extractContinuity's claim write must still go through.
-    const client = options.failCursor
-      ? new Proxy(db, {
-          get: (target, prop) => {
-            const value = Reflect.get(target, prop) as unknown;
-            if (prop === 'update')
-              return (table: unknown) => {
-                if (table === schema.projects) throw new Error('cursor update failed');
-                return (value as (t: unknown) => unknown).call(target, table);
-              };
-            return typeof value === 'function' ? value.bind(target) : value;
-          },
-        })
-      : db;
+    // `beforeTransaction` numbers the run's transactions (1 commitProse, 2 extractContinuity's proposal upsert,
+    // 3 applyContinuity), giving a test a deterministic seam to inject a takeover between two of them.
+    let transactions = 0;
+    const client =
+      options.failCursor || options.beforeTransaction
+        ? new Proxy(db, {
+            get: (target, prop) => {
+              const value = Reflect.get(target, prop) as unknown;
+              if (options.failCursor && prop === 'update')
+                return (table: unknown) => {
+                  if (table === schema.projects) throw new Error('cursor update failed');
+                  return (value as (t: unknown) => unknown).call(target, table);
+                };
+              if (options.beforeTransaction && prop === 'transaction')
+                return async (fn: unknown) => {
+                  await options.beforeTransaction?.((transactions += 1));
+                  return (value as (f: unknown) => unknown).call(target, fn);
+                };
+              return typeof value === 'function' ? value.bind(target) : value;
+            },
+          })
+        : db;
 
     return createChapterFinalizationGraph({ db: client, modelRouter, indexingService, checkpointer: new MemorySaver() } as unknown as FinalizationServices);
   }
@@ -69,6 +80,18 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
     const [draft] = await db.insert(schema.drafts).values({ projectId: project.id, chapter: 1, body: 'ch1', summary: 's1', status: 'final', reviewStatus }).returning();
     if (!draft) throw new Error('failed to seed draft');
     return { projectId: project.id, draftId: draft.id };
+  }
+
+  function readChapter(projectId: bigint): Promise<typeof schema.chapters.$inferSelect | undefined> {
+    return db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, 1)) });
+  }
+
+  function backdateClaim(projectId: bigint): Promise<unknown> {
+    // Well past CONTINUITY_CLAIM_LEASE_MS, so a takeover is deterministic instead of clock-dependent.
+    return db
+      .update(schema.chapters)
+      .set({ continuityClaimedAt: new Date(Date.now() - 60 * 60 * 1000) })
+      .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, 1)));
   }
 
   function invoke(projectId: bigint, draftId: bigint, options: Parameters<typeof buildGraph>[0] & { runId?: string } = {}): Promise<unknown> {
@@ -185,6 +208,85 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
     const hero = await db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, 'char_hero')) });
     expect(afterRetry?.continuityApplied).toBe(true);
     expect(hero?.name).toBe('Hero');
+  });
+
+  // Run A parks inside `structured` until its lease is backdated and run B has finalized the chapter for real,
+  // then resumes and tries to persist its own conflicting delta — the exact shape of a lease-timeout takeover.
+  async function runStaleTakeover(): Promise<{ projectId: bigint; draftId: bigint; staleRun: Promise<unknown> }> {
+    const { projectId, draftId } = await seedPartiallyFinalizedChapter('final');
+    let claimAcquired = (): void => undefined;
+    let resumeA = (): void => undefined;
+    const claimed = new Promise<void>(resolve => (claimAcquired = resolve));
+    const parked = new Promise<void>(resolve => (resumeA = resolve));
+
+    const staleRun = invoke(projectId, draftId, {
+      runId: 'run-a',
+      structured: async () => {
+        claimAcquired();
+        await parked;
+        return delta;
+      },
+    });
+
+    await claimed;
+    await backdateClaim(projectId);
+    await invoke(projectId, draftId, { structured: async () => deltaB, runId: 'run-b' });
+    resumeA();
+    return { projectId, draftId, staleRun };
+  }
+
+  it('should refuse to persist continuity from a run whose claim was taken over after the lease expired', async () => {
+    const { projectId, staleRun } = await runStaleTakeover();
+
+    await expect(staleRun).rejects.toThrow(/Lost the continuity claim|another run took ownership/);
+
+    const chapter = await readChapter(projectId);
+    const entities = await db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId) });
+    const proposal = await db.query.continuityProposals.findFirst({ where: and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, 1)) });
+    const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    expect(chapter?.continuityApplied).toBe(true);
+    expect(project?.storyCurrentChapter).toBe(1);
+    expect(entities.map(e => e.entityKey)).toEqual(['char_rival']);
+    expect(proposal?.proposal).toEqual(deltaB);
+  });
+
+  it('should leave the new owner claim intact when the superseded run unwinds', async () => {
+    const { projectId, staleRun } = await runStaleTakeover();
+    await expect(staleRun).rejects.toThrow(/Lost the continuity claim|another run took ownership/);
+
+    const chapter = await readChapter(projectId);
+    expect(chapter?.continuityClaimedBy).toBe('run-b');
+    expect(chapter?.continuityClaimedAt).not.toBeNull();
+  });
+
+  it('should refuse to apply continuity from a run that lost the claim between extraction and application', async () => {
+    const { projectId, draftId } = await seedPartiallyFinalizedChapter('final');
+
+    // Transaction 3 is applyContinuity's, so the takeover lands after run A extracted and persisted its
+    // proposal but before it can write any canon. Its claim is backdated too, so run B can claim it in turn.
+    const beforeTransaction = async (index: number): Promise<void> => {
+      if (index !== 3) return;
+      await db
+        .update(schema.chapters)
+        .set({ continuityClaimedBy: 'run-b' })
+        .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, 1)));
+      await backdateClaim(projectId);
+    };
+
+    await expect(invoke(projectId, draftId, { runId: 'run-a', beforeTransaction })).rejects.toThrow(/Lost the continuity claim|another run took ownership/);
+
+    const afterTakeover = await readChapter(projectId);
+    const afterTakeoverEntities = await db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId) });
+    expect(afterTakeover?.continuityApplied).toBe(false);
+    expect(afterTakeover?.continuityClaimedBy).toBe('run-b');
+    expect(afterTakeoverEntities).toHaveLength(0);
+
+    await invoke(projectId, draftId, { structured: async () => deltaB, runId: 'run-b' });
+
+    const afterOwner = await readChapter(projectId);
+    const entities = await db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId) });
+    expect(afterOwner?.continuityApplied).toBe(true);
+    expect(entities.map(e => e.entityKey)).toEqual(['char_rival']);
   });
 
   it('should still refuse a draft that was never approved', async () => {

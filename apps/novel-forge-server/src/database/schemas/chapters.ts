@@ -40,6 +40,8 @@ export const chapters = pgTable(
     // Durable lease over continuity extraction: a concurrent finalize that cannot claim it must not extract a
     // second, contradictory delta. Cleared on failure, and made moot by `continuityApplied` on success.
     continuityClaimedAt: timestamp('continuity_claimed_at'),
+    // The claim's fencing token (the finalization run's `runId`): every authoritative continuity write and the
+    // claim release are conditioned on it, so a run whose lease expired and was stolen can no longer write.
     continuityClaimedBy: text('continuity_claimed_by'),
     // Audit trail of translator parts merged into this chapter by the recombine pass; null = never merged.
     mergedFrom: jsonb('merged_from'),

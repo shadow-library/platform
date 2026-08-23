@@ -13,7 +13,7 @@ import { type IndexingService } from '../retrieval/indexing.service';
 import { type ContinuityOutput } from '../schemas';
 import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
-import { applyContinuityDelta, continuityHasHeldEntries, filterToHeldEntries } from './apply-continuity';
+import { applyContinuityDelta, continuityHasHeldEntries, type ContinuityTransaction, filterToHeldEntries } from './apply-continuity';
 
 export interface FinalizationServices {
   db: PrimaryDatabase;
@@ -122,11 +122,34 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     return { nodeTrace: ['commitProse'] };
   }
 
-  async function releaseClaim(projectId: bigint, chapter: number) {
+  // Conditioned on the caller still owning the claim: once the lease expired and another run took over, a late
+  // unwind from the previous owner is a no-op instead of wiping the new owner's live claim mid-extraction.
+  async function releaseClaim(projectId: bigint, chapter: number, ownerRunId: string) {
     await db
       .update(schema.chapters)
       .set({ continuityClaimedAt: null, continuityClaimedBy: null })
-      .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter)));
+      .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter), eq(schema.chapters.continuityClaimedBy, ownerRunId)));
+  }
+
+  // An UPDATE rather than a SELECT because it must take the `chapters` row lock and hold it for the rest of the
+  // enclosing transaction: no takeover UPDATE on that row can commit until this transaction resolves, which is
+  // what turns a check-then-act read into an atomic fence. Call it as the transaction's first statement, with
+  // that transaction's own `tx`, so the lock covers every authoritative write that follows; throwing here rolls
+  // the transaction back, so a lost claim can never leave partial canon behind.
+  async function assertOwnsClaim(tx: ContinuityTransaction, projectId: bigint, chapter: number, runId: string, node: string): Promise<void> {
+    const [owned] = await tx
+      .update(schema.chapters)
+      .set({ updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.chapters.projectId, projectId),
+          eq(schema.chapters.number, chapter),
+          eq(schema.chapters.continuityClaimedBy, runId),
+          eq(schema.chapters.continuityApplied, false),
+        ),
+      )
+      .returning({ id: schema.chapters.id });
+    if (!owned) throw AppError.internal(`[${node}] Lost the continuity claim for chapter ${chapter}; another run took ownership`);
   }
 
   async function extractContinuity(state: FinalizationState) {
@@ -187,17 +210,20 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
 
       // Upsert continuity proposal.
       const resolvedModel = modelRouter.resolveModel('continuity', projectRow as ProjectConfig | undefined);
-      await db
-        .insert(schema.continuityProposals)
-        .values({ projectId, chapter: state.chapter, proposal: delta as never, model: resolvedModel.model, status: 'pending' })
-        .onConflictDoUpdate({
-          target: [schema.continuityProposals.projectId, schema.continuityProposals.chapter],
-          set: { proposal: sql`EXCLUDED.proposal`, model: sql`EXCLUDED.model`, status: 'pending', updatedAt: new Date() },
-        });
+      await db.transaction(async tx => {
+        await assertOwnsClaim(tx, projectId, state.chapter, state.runId, 'extractContinuity');
+        await tx
+          .insert(schema.continuityProposals)
+          .values({ projectId, chapter: state.chapter, proposal: delta as never, model: resolvedModel.model, status: 'pending' })
+          .onConflictDoUpdate({
+            target: [schema.continuityProposals.projectId, schema.continuityProposals.chapter],
+            set: { proposal: sql`EXCLUDED.proposal`, model: sql`EXCLUDED.model`, status: 'pending', updatedAt: new Date() },
+          });
+      });
 
       return { continuityDelta: delta, nodeTrace: ['extractContinuity'] };
     } catch (err) {
-      await releaseClaim(projectId, state.chapter);
+      await releaseClaim(projectId, state.chapter, state.runId);
       throw err;
     }
   }
@@ -220,6 +246,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     // `continuityApplied` true, which makes the claim columns moot for every later read.
     try {
       await db.transaction(async tx => {
+        await assertOwnsClaim(tx, projectId, state.chapter, state.runId, 'applyContinuity');
         await applyContinuityDelta(tx, projectId, state.chapter, delta);
 
         await tx
@@ -233,7 +260,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
           .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter)));
       });
     } catch (err) {
-      await releaseClaim(projectId, state.chapter);
+      await releaseClaim(projectId, state.chapter, state.runId);
       throw err;
     }
 
