@@ -6,9 +6,9 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 
 ## Summary
 
-- Completed: 1
+- Completed: 2
 - In Progress: 0
-- Pending: 10
+- Pending: 9
 - Blocked: 0
 
 ## Tasks
@@ -16,7 +16,7 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 | ID     | Severity | Task                                                                                                                                | Status    | Dependencies |
 | ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------ |
 | FIX-01 | CRITICAL | Make chapter finalization recoverable/idempotent across prose commit → extraction → apply → cursor                                  | COMPLETED | —            |
-| FIX-02 | CRITICAL | Reject mutation/deletion of finalized drafts; fix cross-table renumbering invariant on delete                                       | PENDING   | —            |
+| FIX-02 | CRITICAL | Reject mutation/deletion of finalized drafts; fix cross-table renumbering invariant on delete                                       | COMPLETED | —            |
 | FIX-03 | HIGH     | Read `character_states` + current relationships into `forChapter`; validate entity keys before applying extraction                  | PENDING   | —            |
 | FIX-04 | HIGH     | Render `brief.pov` into generation/judge brief; guarantee POV entity card priority                                                  | PENDING   | —            |
 | FIX-05 | HIGH     | Arc reconciliation observes events inside the current arc, not `arc.chapterStart`; protect/invalidate already-drafted descendants   | PENDING   | FIX-02       |
@@ -77,7 +77,7 @@ None.
 
 ## Pending
 
-See table above. FIX-02 selected next.
+See table above. FIX-03 selected next.
 
 ## Blocked
 
@@ -126,5 +126,38 @@ against real Postgres with a stubbed router/indexer and `MemorySaver`). Confirme
 
 Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
 965 pass, 10 skip, 0 fail (independently re-run, not just trusted from the implementing sub-agent).
+
+Commit: `7aeb29ca`
+
+### FIX-02 — Reject mutation/deletion of finalized drafts; remove cross-table renumbering
+
+Source finding: `harness-post-implementation-review.md` C2 ("Draft mutation APIs can desynchronise
+canonical chapters, briefs, and numbering") + §18 row 2.
+
+What changed:
+
+- `updateDraft` and `importDraft` now look up the existing draft at `(projectId, chapter)` before
+  upserting; if it exists and `status === 'final'`, both reject with `DRF_002` instead of silently
+  overwriting prose behind a locked canonical chapter. Mirrors the guard `reviseDraft` already had.
+- `deleteDraft` rejects a `status: 'final'` draft with `DRF_002` instead of deleting it and orphaning
+  the locked `chapters` row.
+- `deleteDraft`'s gap-closing renumber (of `drafts`, `continuityProposals`, and — via
+  `ChapterImageService.onChapterDeleted` — `chapterImages`) was removed entirely, not extended to cover
+  briefs. **Decision, made in this pass since neither audit doc addresses it directly**: cascading the
+  renumber to `briefs` was rejected as materially riskier (briefs participate in arc range bookkeeping,
+  the hand-edited/finalized-chapter protection guard, and knowledge-contract/POV fields — correctly
+  renumbering all of that is a bigger change than this fix's scope). Leaving a hole at the deleted
+  chapter number is safe: that chapter's brief is untouched and still describes the correct chapter;
+  regenerating later creates a fresh, correctly-matched draft. This is a deliberate behavior change from
+  previously-tested renumbering — the old tests encoded the bug, not a requirement to preserve.
+
+Tests: `tests/generation/delete-draft.spec.ts` — the two renumbering-specific tests rewritten to assert
+the new no-renumber behavior; new test asserting a final draft rejects with `DRF_002` and leaves all
+chapters/numbers untouched. `tests/generation/chapter-image.spec.ts` updated to match (no image shift).
+New `tests/generation/draft-mutation-guards.spec.ts` (6 cases): `updateDraft`/`importDraft` reject-on-
+final (row unchanged), and both still work normally on non-final/absent drafts.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+972 pass, 10 skip, 0 fail (independently re-run).
 
 Commit: (recorded after commit, see git log)

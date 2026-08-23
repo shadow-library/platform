@@ -2,6 +2,7 @@ import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { and, asc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
+import { AppError } from '@shadow-library/common';
 
 import { ChapterImageService } from '@modules/generation/chapter-image.service';
 import { GenerationService } from '@modules/generation/generation.service';
@@ -22,6 +23,15 @@ const pgAvailable = await (async () => {
     return false;
   }
 })();
+
+async function codeOf(promise: Promise<unknown>): Promise<string> {
+  try {
+    await promise;
+    return 'NO_ERROR';
+  } catch (err) {
+    return err instanceof AppError ? err.code : String(err);
+  }
+}
 
 describe.if(pgAvailable)('GenerationService.deleteDraft', () => {
   let db: PrimaryDatabase;
@@ -63,24 +73,28 @@ describe.if(pgAvailable)('GenerationService.deleteDraft', () => {
   const chaptersOf = (projectId: bigint) =>
     db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), orderBy: asc(schema.drafts.chapter), columns: { chapter: true, body: true } });
 
-  it('renumbers later chapters to stay contiguous when deleting one in the middle', async () => {
+  it('should leave a hole rather than renumbering later chapters', async () => {
     const projectId = await seedChapters(['A', 'B', 'C', 'D']);
 
     await service.deleteDraft(projectId, 2);
 
     const rows = await chaptersOf(projectId);
-    expect(rows.map(r => r.chapter)).toEqual([1, 2, 3]);
+    expect(rows.map(r => r.chapter)).toEqual([1, 3, 4]);
     expect(rows.map(r => r.body)).toEqual(['A', 'C', 'D']);
   });
 
-  it('shifts the continuity review alongside its chapter', async () => {
+  it('should clear the deleted chapter’s continuity review and leave later ones in place', async () => {
     const projectId = await seedChapters(['A', 'B', 'C']);
-    await db.insert(schema.continuityProposals).values({ projectId, chapter: 3, status: 'pending', proposal: { note: 'ch3' } as never });
+    await db.insert(schema.continuityProposals).values([
+      { projectId, chapter: 1, status: 'pending', proposal: { note: 'ch1' } as never },
+      { projectId, chapter: 3, status: 'pending', proposal: { note: 'ch3' } as never },
+    ]);
 
     await service.deleteDraft(projectId, 1);
 
-    const proposal = await db.query.continuityProposals.findFirst({ where: and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, 2)) });
-    expect(proposal?.proposal).toEqual({ note: 'ch3' } as never);
+    const proposals = await db.query.continuityProposals.findMany({ where: eq(schema.continuityProposals.projectId, projectId), orderBy: asc(schema.continuityProposals.chapter) });
+    expect(proposals.map(p => p.chapter)).toEqual([3]);
+    expect(proposals[0]?.proposal).toEqual({ note: 'ch3' } as never);
   });
 
   it('throws when the chapter does not exist', async () => {
@@ -88,7 +102,21 @@ describe.if(pgAvailable)('GenerationService.deleteDraft', () => {
     expect(service.deleteDraft(projectId, 9)).rejects.toThrow();
   });
 
-  it('purges the deleted chapter’s scene images and shifts later chapters’ images down', async () => {
+  it('should reject deleting a finalized draft and leave every chapter untouched', async () => {
+    const projectId = await seedChapters(['A', 'B', 'C']);
+    await db
+      .update(schema.drafts)
+      .set({ status: 'final' })
+      .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, 2)));
+
+    expect(await codeOf(service.deleteDraft(projectId, 2))).toBe('DRF_002');
+
+    const rows = await chaptersOf(projectId);
+    expect(rows.map(r => r.chapter)).toEqual([1, 2, 3]);
+    expect(rows.map(r => r.body)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('should purge only the deleted chapter’s scene images', async () => {
     deleted.length = 0;
     const projectId = await seedChapters(['A', 'B', 'C']);
     await db.insert(schema.chapterImages).values([
@@ -98,11 +126,9 @@ describe.if(pgAvailable)('GenerationService.deleteDraft', () => {
 
     await service.deleteDraft(projectId, 2);
 
-    // Storage objects are content-addressed and may be shared across rows, so no object delete happens;
-    // only the DB rows are purged, and chapter 3's image follows its draft down to chapter 2.
+    // Storage objects are content-addressed and may be shared across rows, so no object delete happens.
     expect(deleted).toEqual([]);
-    const rows = await chapterImages.list(projectId, 2);
-    expect(rows.map(r => r.imagePath)).toEqual([`${projectId}/ch3.png`]);
-    expect(await chapterImages.list(projectId, 3)).toHaveLength(0);
+    expect(await chapterImages.list(projectId, 2)).toHaveLength(0);
+    expect((await chapterImages.list(projectId, 3)).map(r => r.imagePath)).toEqual([`${projectId}/ch3.png`]);
   });
 });

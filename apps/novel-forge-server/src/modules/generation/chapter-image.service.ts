@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, sql } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
@@ -72,17 +72,12 @@ export class ChapterImageService {
   }
 
   /**
-   * Keep scene images aligned to the drafter's chapter renumbering: when a chapter is deleted, its own
-   * images are dropped and every later chapter's images shift down one to track the draft that moved.
+   * Deleting a draft leaves a hole rather than renumbering the chapters after it, so only the deleted
+   * chapter's own image rows are purged — later chapters' images stay with their unmoved drafts.
    */
   async onChapterDeleted(projectId: bigint, deletedChapter: number): Promise<void> {
     const removed = await this.list(projectId, deletedChapter);
-    this.logger.debug('onChapterDeleted: purging scene image rows and shifting later chapters down', { projectId, deletedChapter, removed: removed.length });
+    this.logger.debug('onChapterDeleted: purging scene image rows', { projectId, deletedChapter, removed: removed.length });
     await this.db.delete(schema.chapterImages).where(and(eq(schema.chapterImages.projectId, projectId), eq(schema.chapterImages.chapter, deletedChapter)));
-
-    await this.db
-      .update(schema.chapterImages)
-      .set({ chapter: sql`${schema.chapterImages.chapter} - 1` })
-      .where(and(eq(schema.chapterImages.projectId, projectId), gt(schema.chapterImages.chapter, deletedChapter)));
   }
 }

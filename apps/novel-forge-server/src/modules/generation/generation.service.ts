@@ -536,6 +536,9 @@ export class GenerationService {
   }
 
   async updateDraft(projectId: bigint, chapter: number, body: UpdateDraftBody): Promise<Generation.Draft> {
+    const existing = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
+    if (existing?.status === 'final') throw AppErrorCode.DRF_002.create();
+
     const [draft] = await this.db
       .insert(schema.drafts)
       .values({
@@ -755,13 +758,16 @@ export class GenerationService {
   }
 
   /**
-   * Deletes a drafted chapter and closes the gap so the chapter list stays contiguous: every later
-   * chapter (and its continuity review) shifts down by one. The whole thing runs in a transaction so a
-   * failed shift can never leave the manuscript half-renumbered. Scope is the drafted chapters — the
-   * plan (briefs/arcs/volumes) and derived indexes are deliberately left alone.
+   * Deletes one drafted chapter and leaves a hole at that number. Later chapters are deliberately not
+   * renumbered: a draft's prose is written against the brief at the same chapter number, and briefs
+   * (plus the arc ranges and knowledge contracts keyed off them) are not shifted, so closing the gap
+   * would silently pair every later draft with someone else's brief.
    */
   async deleteDraft(projectId: bigint, chapter: number): Promise<void> {
-    this.logger.info('deleteDraft: deleting and renumbering', { projectId, chapter });
+    this.logger.info('deleteDraft: deleting draft', { projectId, chapter });
+    const draft = await this.getDraft(projectId, chapter);
+    if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
+
     await this.db.transaction(async tx => {
       const deleted = await tx
         .delete(schema.drafts)
@@ -771,32 +777,16 @@ export class GenerationService {
 
       // draft_revisions cascade via FK; the deleted chapter's continuity review is cleared here.
       await tx.delete(schema.continuityProposals).where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, chapter)));
-
-      // Shift later chapters down one at a time in ascending order, so each freed slot is reused
-      // immediately and the (project, chapter) unique constraint is never transiently violated.
-      const later = await tx
-        .select({ chapter: schema.drafts.chapter })
-        .from(schema.drafts)
-        .where(and(eq(schema.drafts.projectId, projectId), gt(schema.drafts.chapter, chapter)))
-        .orderBy(asc(schema.drafts.chapter));
-      for (const row of later) {
-        await tx
-          .update(schema.drafts)
-          .set({ chapter: row.chapter - 1, updatedAt: new Date() })
-          .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, row.chapter)));
-        await tx
-          .update(schema.continuityProposals)
-          .set({ chapter: row.chapter - 1, updatedAt: new Date() })
-          .where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, row.chapter)));
-      }
     });
 
-    // Scene images live outside the draft transaction (they touch disk); purge the deleted chapter's
-    // images and shift later chapters' images down to match the renumber above.
+    // Scene images live outside the draft transaction (they touch disk).
     await this.chapterImages.onChapterDeleted(projectId, chapter);
   }
 
   async importDraft(projectId: bigint, chapter: number, body: ImportDraftBody): Promise<Generation.Draft> {
+    const existing = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
+    if (existing?.status === 'final') throw AppErrorCode.DRF_002.create();
+
     const [draft] = await this.db
       .insert(schema.drafts)
       .values({ projectId, chapter, title: body.title, body: body.prose, summary: body.summary, status: 'draft', reviewStatus: 'needs_review', generator: 'human' })

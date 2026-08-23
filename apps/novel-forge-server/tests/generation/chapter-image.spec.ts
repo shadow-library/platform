@@ -101,14 +101,14 @@ describe.if(pgAvailable)('ChapterImageService', () => {
     expect(service.remove(projectId, 1, 9999n)).rejects.toThrow();
   });
 
-  it('purges the deleted chapter and shifts later chapters down on onChapterDeleted', async () => {
+  it('should purge only the deleted chapter’s images on onChapterDeleted', async () => {
     const projectId = await seedProject();
     await service.add(projectId, 1, 'AAAA', 'image/png');
     const kept = await service.add(projectId, 2, 'BBBB', 'image/png');
 
     await service.onChapterDeleted(projectId, 1);
 
-    expect(await service.list(projectId, 1)).toEqual([expect.objectContaining({ id: kept.id, chapter: 1 })]);
-    expect(await service.list(projectId, 2)).toHaveLength(0);
+    expect(await service.list(projectId, 1)).toHaveLength(0);
+    expect(await service.list(projectId, 2)).toEqual([expect.objectContaining({ id: kept.id, chapter: 2 })]);
   });
 });
