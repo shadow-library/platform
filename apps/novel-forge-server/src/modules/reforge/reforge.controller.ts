@@ -7,7 +7,9 @@ import { JobEnqueueResponse } from '../pipeline/pipeline.dto';
 import { ReforgeAnalysisService } from './reforge-analysis.service';
 import { ReforgePlanService } from './reforge-plan.service';
 import {
+  ListReforgeCutsResponse,
   ListReforgeFindingsResponse,
+  ListReforgeOutputsResponse,
   ListReforgesResponse,
   ReforgeAnalysisStatusResponse,
   ReforgeChapterParams,
@@ -15,6 +17,8 @@ import {
   ReforgeConfigBody,
   ReforgeFindingsQuery,
   ReforgeManuscriptResponse,
+  ReforgeOutputParams,
+  ReforgeOutputResponse,
   ReforgeParams,
   ReforgePlanApproveBody,
   ReforgePlanDetailResponse,
@@ -23,6 +27,7 @@ import {
   ReforgeResponse,
   ReforgeStartBody,
   ReforgeStatusResponse,
+  ReforgeTransformStartBody,
 } from './reforge.dto';
 import { ReforgeService } from './reforge.service';
 
@@ -152,6 +157,53 @@ export class ReforgeController {
   @RespondFor(200, ReforgePlanDetailResponse)
   approvePlan(@Params() params: ReforgeParams, @Body() body: ReforgePlanApproveBody): Promise<ReforgePlanDetailResponse> {
     return this.planService.approve(params.projectId, body.baseRevision) as Promise<ReforgePlanDetailResponse>;
+  }
+
+  @Post('/transform')
+  @HttpStatus(202)
+  @RespondFor(202, JobEnqueueResponse)
+  async startTransform(@Params() params: ReforgeParams, @Body() body: ReforgeTransformStartBody): Promise<JobEnqueueResponse> {
+    const { projectId } = params;
+    await this.reforgeService.getOrCreate(projectId);
+    // The gate runs before enqueue so an unapproved plan 400s instead of parking a job that cannot run.
+    await this.planService.getApproved(projectId);
+    const target = `reforge-${projectId}`;
+    const jobId = await this.jobService.enqueue(projectId, 'reforge', target, { stage: 'transform', outputs: body.outputs, force: body.force, limit: body.limit });
+    this.jobExecutor.dispatch(jobId).catch(() => undefined);
+    return { jobId, kind: 'reforge', status: 'pending', target };
+  }
+
+  @Get('/outputs')
+  @RespondFor(200, ListReforgeOutputsResponse)
+  async listOutputs(@Params() params: ReforgeParams): Promise<ListReforgeOutputsResponse> {
+    const items = await this.reforgeService.listOutputs(params.projectId);
+    return { items };
+  }
+
+  @Get('/outputs/:outputChapter')
+  @RespondFor(200, ReforgeOutputResponse)
+  getOutput(@Params() params: ReforgeOutputParams): Promise<ReforgeOutputResponse> {
+    return this.reforgeService.getOutput(params.projectId, params.outputChapter) as Promise<ReforgeOutputResponse>;
+  }
+
+  @Post('/outputs/:outputChapter')
+  @HttpStatus(202)
+  @RespondFor(202, JobEnqueueResponse)
+  async rerunOutput(@Params() params: ReforgeOutputParams): Promise<JobEnqueueResponse> {
+    const { projectId, outputChapter } = params;
+    await this.reforgeService.getOrCreate(projectId);
+    await this.planService.getApproved(projectId);
+    const target = `reforge-${projectId}-out-${outputChapter}`;
+    const jobId = await this.jobService.enqueue(projectId, 'reforge', target, { stage: 'transform', outputs: [outputChapter], force: true });
+    this.jobExecutor.dispatch(jobId).catch(() => undefined);
+    return { jobId, kind: 'reforge', status: 'pending', target };
+  }
+
+  @Get('/cuts')
+  @RespondFor(200, ListReforgeCutsResponse)
+  async listCuts(@Params() params: ReforgeParams): Promise<ListReforgeCutsResponse> {
+    const items = await this.reforgeService.listCuts(params.projectId);
+    return { items };
   }
 
   @Get('/manuscript')

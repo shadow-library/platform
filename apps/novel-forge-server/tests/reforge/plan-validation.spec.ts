@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { deriveOutputNumbering, type PlanSpanLike, spanKeyFor, validateTransformPlan } from '@modules/reforge/plan-validation';
+import { deriveOutputNumbering, locateOutputChapter, type PlanSpanLike, spanKeyFor, validateTransformPlan } from '@modules/reforge/plan-validation';
 
 function span(ordinal: number, from: number, to: number, action: PlanSpanLike['action'], targetChapters: number, extra: Partial<PlanSpanLike> = {}): PlanSpanLike {
   return { ordinal, fromChapter: from, toChapter: to, action, targetChapters, keptBeats: action === 'drop' ? [] : ['the duel lands'], ...extra };
@@ -130,5 +130,14 @@ describe('deriveOutputNumbering', () => {
     expect(spanKeyFor({ fromChapter: 5, toChapter: 12, action: 'condense', targetChapters: 3 })).not.toBe(
       spanKeyFor({ fromChapter: 5, toChapter: 12, action: 'merge', targetChapters: 1 }),
     );
+  });
+
+  it('should place an output chapter under the span the plan gives it', () => {
+    expect(locateOutputChapter(PLAN, 1)).toMatchObject({ span: { ordinal: 1 }, indexInSpan: 0 });
+    expect(locateOutputChapter(PLAN, 5)).toMatchObject({ span: { ordinal: 2 }, indexInSpan: 0 });
+    expect(locateOutputChapter(PLAN, 7)).toMatchObject({ span: { ordinal: 2 }, indexInSpan: 2 });
+    // The dropped span produces nothing, so output 8 belongs to the span after it.
+    expect(locateOutputChapter(PLAN, 8)).toMatchObject({ span: { ordinal: 4 }, indexInSpan: 0 });
+    expect(locateOutputChapter(PLAN, 12)).toBeNull();
   });
 });

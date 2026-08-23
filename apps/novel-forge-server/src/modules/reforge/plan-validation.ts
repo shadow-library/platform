@@ -122,3 +122,20 @@ export function deriveOutputNumbering(spans: PlanSpanLike[]): { spans: DerivedSp
 
   return { spans: derived, outputChapterCount: cursor };
 }
+
+/**
+ * Which span owns an output chapter, resolved from the plan's own running target sum — the writer and
+ * the executor both ask the plan rather than trusting a caller-supplied ordinal.
+ */
+export function locateOutputChapter<T extends PlanSpanLike>(spans: T[], outputChapter: number): { span: T; indexInSpan: number } | null {
+  const ordered = [...spans].sort((a, b) => a.ordinal - b.ordinal);
+  let cursor = 0;
+
+  for (const span of ordered) {
+    const first = cursor + 1;
+    cursor += span.targetChapters;
+    if (span.targetChapters > 0 && outputChapter >= first && outputChapter <= cursor) return { span, indexInSpan: outputChapter - first };
+  }
+
+  return null;
+}

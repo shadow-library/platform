@@ -9,6 +9,7 @@ import * as schema from '@server/database/schemas';
 // Direct file imports of DI-free pure functions — never a feature barrel, whose services import the AI module.
 import { type GlossaryLike, renderGlossarySlice, type ResidueIssue, scanResidue, selectGlossarySlice } from '../../rebrand/residue-scan';
 import { renderCutLedger, type ResurfacedCut, scanResurfacedCuts, selectCutSlice, slugifyCutKey } from '../../reforge/cut-ledger';
+import { locateOutputChapter } from '../../reforge/plan-validation';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
@@ -133,14 +134,9 @@ function buildSpanTransformGraph(services: SpanTransformServices) {
     if (plan.status !== 'approved') throw AppError.internal(`[loadSpan] Plan ${state.planId} is ${plan.status}, not approved — no write may run against it`);
     if (!rebrand?.worldNotes) throw AppError.internal(`[loadSpan] Rename bible is not seeded for project ${state.projectId}`);
 
-    let cursor = 0;
-    const located = spans.find(span => {
-      const first = cursor + 1;
-      cursor += span.targetChapters;
-      return span.targetChapters > 0 && state.outputChapter >= first && state.outputChapter <= cursor;
-    });
-    if (!located) throw AppError.internal(`[loadSpan] Output chapter ${state.outputChapter} is outside plan ${state.planId}`);
-    const indexInSpan = state.outputChapter - (cursor - located.targetChapters) - 1;
+    const location = locateOutputChapter(spans, state.outputChapter);
+    if (!location) throw AppError.internal(`[loadSpan] Output chapter ${state.outputChapter} is outside plan ${state.planId}`);
+    const { span: located, indexInSpan } = location;
 
     const sourceChapters = await db.query.chapters.findMany({
       where: and(eq(schema.chapters.projectId, projectId), sql`${schema.chapters.number} between ${located.fromChapter} and ${located.toChapter}`),

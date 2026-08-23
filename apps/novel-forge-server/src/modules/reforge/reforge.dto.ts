@@ -4,9 +4,13 @@ import { Transform } from '@shadow-library/fastify';
 import {
   ReforgeAnalysisStatus,
   ReforgeChapterStatus,
+  ReforgeCutDisposition,
+  ReforgeCutKind,
   ReforgeFidelity,
   ReforgeFindingSource,
   ReforgeFindingType,
+  ReforgeMode,
+  ReforgeOutputStatus,
   ReforgePlanStatus,
   ReforgeSpanAction,
   ReforgeStatus,
@@ -36,6 +40,18 @@ export class ReforgeSettingsBody {
 
   @Field(() => Integer, { optional: true, minimum: 1 })
   targetWords?: number;
+
+  @Field(() => Integer, { optional: true, minimum: 1, maximum: 50, description: 'Transform mode: source chapters per analysis window (default 15).' })
+  analysisWindow?: number;
+
+  @Field({ optional: true, minimum: 0.2, maximum: 1, description: 'Transform mode: whole-novel length ratio the plan drafter aims for — a hint, never a per-span rule.' })
+  targetCompression?: number;
+
+  @Field(() => Integer, { optional: true, minimum: 1, description: 'Transform mode: shortest span the plan may contain (default 1).' })
+  minSpanChapters?: number;
+
+  @Field(() => Integer, { optional: true, minimum: 1, description: 'Transform mode: source chapters one output chapter may be written from (default 6).' })
+  maxSpanSourceChapters?: number;
 }
 
 @Schema()
@@ -45,6 +61,9 @@ export class ReforgeConfigBody {
 
   @Field(() => ReforgeFidelity, { optional: true })
   fidelity?: 'preserve' | 'close' | 'loose';
+
+  @Field(() => ReforgeMode, { optional: true, description: 'chapter = the 1:1 re-author; transform = the plan-driven structural mode, which forces fidelity: loose.' })
+  mode?: 'chapter' | 'transform';
 
   @Field(() => ReforgeSettingsBody, { optional: true })
   settings?: ReforgeSettingsBody;
@@ -73,6 +92,9 @@ export class ReforgeResponse {
   @Field(() => ReforgeFidelity)
   fidelity: string;
 
+  @Field(() => ReforgeMode)
+  mode: string;
+
   @Field(() => Object, { optional: true, nullable: true, additionalProperties: true, description: 'Settings used for this reforge run.' })
   settings?: ReforgeSettingsBody | null;
 
@@ -96,6 +118,54 @@ export class ReforgeCountsResponse {
 }
 
 @Schema()
+export class ReforgeOutputCountsResponse {
+  @Field(() => Integer)
+  written: number;
+
+  @Field(() => Integer)
+  attention: number;
+
+  @Field(() => Integer)
+  failed: number;
+}
+
+@Schema()
+export class ReforgePlanHeaderResponse {
+  @Field(() => String)
+  id: bigint;
+
+  @Field(() => Integer)
+  revision: number;
+
+  @Field(() => ReforgePlanStatus)
+  status: string;
+
+  @Field(() => Integer)
+  sourceChapterCount: number;
+
+  @Field(() => Integer)
+  outputChapterCount: number;
+
+  @Field(() => String, { optional: true, nullable: true, format: 'date-time' })
+  approvedAt?: Date | null;
+
+  @Field(() => String, { optional: true, nullable: true })
+  promotedProjectId?: bigint | null;
+}
+
+@Schema()
+export class ReforgeTransformStatusResponse {
+  @Field(() => ReforgePlanHeaderResponse, { optional: true, description: 'The newest plan revision; outputs under an older one are stale.' })
+  plan?: ReforgePlanHeaderResponse;
+
+  @Field(() => ReforgeOutputCountsResponse)
+  counts: ReforgeOutputCountsResponse;
+
+  @Field(() => Integer)
+  cuts: number;
+}
+
+@Schema()
 export class ReforgeStatusResponse {
   @Field(() => ReforgeResponse)
   reforge: ReforgeResponse;
@@ -116,6 +186,9 @@ export class ReforgeStatusResponse {
     description: 'Latest reforge job, including its job-specific progress fields.',
   })
   job?: unknown;
+
+  @Field(() => ReforgeTransformStatusResponse, { optional: true, description: 'Present only in transform mode — the plan, its outputs, and its cut ledger.' })
+  transform?: ReforgeTransformStatusResponse;
 }
 
 @Schema({ additionalProperties: true, description: 'Model-reported audit issue whose fields vary by source.' })
@@ -415,6 +488,163 @@ export class ReforgePlanResponse {
 
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;
+}
+
+@Schema()
+export class ReforgeOutputParams {
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  projectId: bigint;
+
+  @Field(() => Integer, { minimum: 1 })
+  outputChapter: number;
+}
+
+@Schema()
+export class ReforgeTransformStartBody {
+  @Field(() => [Integer], { optional: true, minItems: 1, description: 'Output chapters to write; omitted means every output the plan derives that is not written yet.' })
+  outputs?: number[];
+
+  @Field({ optional: true, description: 'Rewrite outputs that already landed instead of only the missing ones.' })
+  force?: boolean;
+
+  @Field(() => Integer, { optional: true, minimum: 1, description: 'Cap on outputs written in this run — a trial before committing the book.' })
+  limit?: number;
+}
+
+@Schema()
+export class ReforgeOutputSummaryResponse {
+  @Field(() => Integer)
+  outputChapter: number;
+
+  @Field(() => Integer)
+  spanOrdinal: number;
+
+  @Field(() => Integer)
+  fromChapter: number;
+
+  @Field(() => Integer)
+  toChapter: number;
+
+  @Field(() => Integer, { description: '0-based slice of a condensed span.' })
+  indexInSpan: number;
+
+  @Field({ optional: true, nullable: true })
+  title?: string | null;
+
+  @Field(() => ReforgeOutputStatus)
+  status: string;
+
+  @Field(() => Integer)
+  issueCount: number;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  wordCount?: number | null;
+
+  @Field(() => Integer)
+  revision: number;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
+}
+
+@Schema()
+export class ListReforgeOutputsResponse {
+  @Field(() => [ReforgeOutputSummaryResponse])
+  items: ReforgeOutputSummaryResponse[];
+}
+
+@Schema()
+export class ReforgeOutputResponse {
+  @Field(() => Integer)
+  outputChapter: number;
+
+  @Field(() => Integer)
+  spanOrdinal: number;
+
+  @Field(() => Integer)
+  fromChapter: number;
+
+  @Field(() => Integer)
+  toChapter: number;
+
+  @Field(() => Integer)
+  indexInSpan: number;
+
+  @Field({ optional: true, nullable: true })
+  title?: string | null;
+
+  @Field(() => ReforgeOutputStatus)
+  status: string;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  wordCount?: number | null;
+
+  @Field(() => Integer)
+  revision: number;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
+
+  @Field()
+  body: string;
+
+  @Field({ optional: true, nullable: true })
+  summary?: string | null;
+
+  @Field(() => [String], { optional: true, nullable: true, description: 'The kept beats this chapter owed — the judge’s contract.' })
+  planBeats?: unknown;
+
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true, description: 'Changes the transform writer reported.' })
+  changes?: unknown;
+
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true, description: 'Plan-contract assessment from the transform judge.' })
+  fidelity?: unknown;
+
+  @Field(() => [ReforgeDetailItem], { optional: true, nullable: true })
+  issues?: unknown;
+}
+
+@Schema()
+export class ReforgeCutResponse {
+  @Field()
+  cutKey: string;
+
+  @Field(() => ReforgeCutKind)
+  kind: string;
+
+  @Field()
+  label: string;
+
+  @Field(() => [String], { optional: true, nullable: true })
+  aliases?: string[] | null;
+
+  @Field({ optional: true, nullable: true })
+  detail?: string | null;
+
+  @Field(() => ReforgeCutDisposition)
+  disposition: string;
+
+  @Field({ optional: true, nullable: true })
+  replacementNote?: string | null;
+
+  @Field(() => Integer)
+  originSpanOrdinal: number;
+
+  @Field(() => Integer)
+  firstSourceChapter: number;
+
+  @Field(() => Integer)
+  lastSourceChapter: number;
+
+  @Field(() => Integer, { description: 'The cut never resurfaces at or after this output chapter.' })
+  effectiveFromOutput: number;
+}
+
+@Schema()
+export class ListReforgeCutsResponse {
+  @Field(() => [ReforgeCutResponse])
+  items: ReforgeCutResponse[];
 }
 
 @Schema()

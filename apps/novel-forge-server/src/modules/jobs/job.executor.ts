@@ -4,12 +4,13 @@ import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 import { APP_NAME } from '@server/constants';
-import { type Job, type PrimaryDatabase, type Rebrand, type Reforge, schema } from '@server/database';
+import { type Job, type PrimaryDatabase, type Rebrand, type Reforge, type ReforgeTransform, schema } from '@server/database';
 
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { PublishRunner } from '../publishing/publish-runner';
 import { RebrandService } from '../rebrand/rebrand.service';
+import { locateOutputChapter } from '../reforge/plan-validation';
 import { ReforgeAnalysisService } from '../reforge/reforge-analysis.service';
 import { ReforgePlanService } from '../reforge/reforge-plan.service';
 import { RecombineService } from '../source/recombine.service';
@@ -37,6 +38,8 @@ interface ReforgePayload {
   /** Which of the reforge job's stages this row runs; absent means the shipped 1:1 chapter pipeline. */
   stage?: 'analyze' | 'plan' | 'transform' | 'promote';
   chapters?: number[];
+  /** Transform stage only: output chapters to write, in place of the data-derived selection. */
+  outputs?: number[];
   force?: boolean;
   limit?: number;
 }
@@ -258,6 +261,7 @@ export class JobExecutor {
     const payload = (job.payload ?? {}) as ReforgePayload;
     if (payload.stage === 'analyze') return this.runReforgeAnalyze(job);
     if (payload.stage === 'plan') return this.runReforgePlan(job);
+    if (payload.stage === 'transform') return this.runReforgeTransform(job, payload);
     return this.runChapterReforge(job, payload);
   }
 
@@ -287,6 +291,47 @@ export class JobExecutor {
     const { plan, outputChapterCount } = await this.reforgePlanService.draft(job.projectId, job.id);
     await this.jobService.progress(job.id, { done: 1, total: 1, current: 'done', phase: 'planning' });
     this.logger.info('runReforgePlan: complete', { jobId: job.id, projectId: job.projectId, planId: String(plan.id), revision: plan.revision, outputChapterCount });
+  }
+
+  // The N:M write. The approved plan is the only structural authority (hard rule 16), so the stage
+  // verifies it before anything is spent and derives its targets from the plan's own numbering rather
+  // than from the payload. Per-output failures flag-and-continue, identical to the 1:1 path.
+  private async runReforgeTransform(job: Job.Row, payload: ReforgePayload): Promise<void> {
+    const projectId = job.projectId;
+    this.logger.info('runReforgeTransform: starting', { jobId: job.id, projectId, force: payload.force, limit: payload.limit, outputs: payload.outputs });
+
+    try {
+      await this.jobService.progress(job.id, { done: 0, total: 0, current: 'plan', phase: 'verifying' });
+      const plan = await this.reforgePlanService.getApproved(projectId);
+      const spans = await this.reforgePlanService.listSpans(plan.id);
+
+      await this.setReforgeStatus(projectId, 'glossary');
+      await this.jobService.progress(job.id, { done: 0, total: 0, current: 'glossary', phase: 'glossary' });
+      await this.rebrandService.seedGlossary(projectId, job.id);
+
+      await this.setReforgeStatus(projectId, 'reforging');
+      const targets = await this.selectTransformOutputs(plan, payload);
+      const total = targets.length;
+      this.logger.info('runReforgeTransform: writing outputs', { jobId: job.id, projectId, planId: String(plan.id), revision: plan.revision, total });
+      let failed = 0;
+      for (const [i, outputChapter] of targets.entries()) {
+        await this.jobService.progress(job.id, { done: i, total, current: String(outputChapter), phase: 'transforming' });
+        const result = await this.workflowRunService.runSpanTransform({ projectId, planId: plan.id, outputChapter, jobId: job.id });
+        this.logger.debug('runReforgeTransform: output finished', { jobId: job.id, outputChapter, status: result.status, runId: result.runId });
+        if (result.status === 'failed') {
+          failed++;
+          await this.recordFailedOutput(projectId, plan.id, spans, outputChapter, result.runId);
+        }
+      }
+
+      await this.jobService.progress(job.id, { done: total, total, current: 'done', phase: 'transforming' });
+      await this.setReforgeStatus(projectId, 'done');
+      this.logger.info('runReforgeTransform: complete', { jobId: job.id, projectId, total, written: total - failed, failed });
+    } catch (err) {
+      this.logger.error('runReforgeTransform: failed', { jobId: job.id, projectId, err });
+      await this.setReforgeStatus(projectId, 'failed', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
   }
 
   private async runChapterReforge(job: Job.Row, payload: ReforgePayload): Promise<void> {
@@ -499,6 +544,61 @@ export class JobExecutor {
     }
 
     return payload.limit ? targets.slice(0, payload.limit) : targets;
+  }
+
+  // Data-derived exactly like selectReforgeChapters: the outputs of this plan not yet written or in
+  // attention, with failed ones always retried. The plan's derived numbering bounds the set, so a
+  // payload can never name an output the approved structure does not have.
+  private async selectTransformOutputs(plan: ReforgeTransform.Plan, payload: ReforgePayload): Promise<number[]> {
+    const all = Array.from({ length: plan.outputChapterCount }, (_, i) => i + 1);
+    let targets = payload.outputs?.length ? [...new Set(payload.outputs)].sort((a, b) => a - b).filter(n => n >= 1 && n <= plan.outputChapterCount) : all;
+
+    if (!payload.force) {
+      const done = await this.db
+        .select({ outputChapter: schema.reforgeOutputs.outputChapter })
+        .from(schema.reforgeOutputs)
+        .where(and(eq(schema.reforgeOutputs.planId, plan.id), ne(schema.reforgeOutputs.status, 'failed')));
+      const doneSet = new Set(done.map(d => d.outputChapter));
+      targets = targets.filter(n => !doneSet.has(n));
+    }
+
+    return payload.limit ? targets.slice(0, payload.limit) : targets;
+  }
+
+  // The span columns are not nullable, so a failed output is placed under the span the plan gives it —
+  // never a caller-supplied ordinal. Prose from an earlier success survives a failed forced re-run.
+  private async recordFailedOutput(projectId: bigint, planId: bigint, spans: ReforgeTransform.PlanSpan[], outputChapter: number, runId: string): Promise<void> {
+    const location = locateOutputChapter(spans, outputChapter);
+    if (!location) return;
+    const { span, indexInSpan } = location;
+    const issues = [{ source: 'run', type: 'run_failed', detail: `output chapter ${outputChapter} transform failed (run ${runId})` }];
+    await this.db
+      .insert(schema.reforgeOutputs)
+      .values({
+        projectId,
+        planId,
+        outputChapter,
+        spanOrdinal: span.ordinal,
+        spanKey: span.spanKey,
+        fromChapter: span.fromChapter,
+        toChapter: span.toChapter,
+        indexInSpan,
+        body: '',
+        status: 'failed',
+        issues,
+        runId,
+      })
+      .onConflictDoUpdate({
+        target: [schema.reforgeOutputs.planId, schema.reforgeOutputs.outputChapter],
+        set: {
+          status: sql`EXCLUDED.status`,
+          issues: sql`EXCLUDED.issues`,
+          runId: sql`EXCLUDED.run_id`,
+          revision: sql`${schema.reforgeOutputs.revision} + 1`,
+          updatedAt: new Date(),
+        },
+      })
+      .catch(err => this.logger.error('failed to record failed transform output', { err, outputChapter }));
   }
 
   // Insert an empty failed row for a fresh failure, but never clobber the body a previous successful

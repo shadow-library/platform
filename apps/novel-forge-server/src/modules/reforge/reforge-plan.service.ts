@@ -154,7 +154,7 @@ export class ReforgePlanService {
     if (baseRevision !== undefined && baseRevision !== plan.revision) throw AppErrorCode.REF_010.create({ revision: plan.revision });
     if (plan.status === 'approved') return this.load(plan);
 
-    const spans = await this.loadSpans(plan.id);
+    const spans = await this.listSpans(plan.id);
     const sourceChapterCount = await this.db.$count(schema.chapters, eq(schema.chapters.projectId, projectId));
     const issues = validateTransformPlan(spans, {
       sourceChapterCount,
@@ -232,12 +232,13 @@ export class ReforgePlanService {
     return this.load(plan);
   }
 
-  private async loadSpans(planId: bigint): Promise<ReforgeTransform.PlanSpan[]> {
+  /** The plan's spans in ordinal order — the executor needs them to place a failed output under its span. */
+  async listSpans(planId: bigint): Promise<ReforgeTransform.PlanSpan[]> {
     return this.db.query.reforgePlanSpans.findMany({ where: eq(schema.reforgePlanSpans.planId, planId), orderBy: [asc(schema.reforgePlanSpans.ordinal)] });
   }
 
   private async load(plan: ReforgeTransform.Plan): Promise<PlanResult> {
-    const spans = await this.loadSpans(plan.id);
+    const spans = await this.listSpans(plan.id);
     const derived = deriveOutputNumbering(spans);
     return {
       plan,
