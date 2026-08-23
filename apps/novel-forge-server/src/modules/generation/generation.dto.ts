@@ -264,6 +264,9 @@ export class DraftResponse {
   @Field(() => DraftReviewStatus)
   reviewStatus: Generation.DraftReviewStatus;
 
+  @Field({ optional: true, nullable: true })
+  staleReason?: string | null;
+
   @Field(() => String)
   generator: Generation.Draft['generator'];
 

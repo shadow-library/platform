@@ -40,6 +40,8 @@ export const drafts = pgTable(
     judge: judgeVerdict('judge'),
     judgeNote: text('judge_note'),
     reviewStatus: draftReviewStatus('review_status').notNull().default('generating'),
+    // Set when an ancestor chapter is mutated; approval is refused until the chapter is regenerated.
+    staleReason: varchar('stale_reason'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

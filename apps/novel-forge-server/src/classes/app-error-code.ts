@@ -66,6 +66,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly DRF_004 = AppErrorCode.badRequest('DRF_004', 'Draft is not approved — approve draft before finalizing');
   static readonly DRF_005 = AppErrorCode.badRequest('DRF_005', 'Chapter adds no new canon to the bible');
   static readonly DRF_006 = AppErrorCode.notFound('DRF_006', 'Chapter scene image not found');
+  static readonly DRF_007 = AppErrorCode.badRequest('DRF_007', 'Draft is stale — an ancestor chapter changed; regenerate before approving');
 
   /*!
    * Finalize Errors

@@ -562,6 +562,21 @@ export class GenerationService {
     return draft;
   }
 
+  /**
+   * A drafted chapter is written against its predecessor's prose and continuation state, so editing
+   * chapter N leaves every later non-final draft resting on content that no longer exists. Flag them
+   * and revoke any approval that was granted against the superseded ancestor.
+   */
+  private async markDescendantDraftsStale(projectId: bigint, chapter: number, reason: string): Promise<void> {
+    const descendants = and(eq(schema.drafts.projectId, projectId), gt(schema.drafts.chapter, chapter), ne(schema.drafts.status, 'final'));
+
+    await this.db.update(schema.drafts).set({ staleReason: reason, updatedAt: new Date() }).where(descendants);
+    await this.db
+      .update(schema.drafts)
+      .set({ reviewStatus: 'needs_review', updatedAt: new Date() })
+      .where(and(descendants, eq(schema.drafts.reviewStatus, 'approved')));
+  }
+
   async updateDraft(projectId: bigint, chapter: number, body: UpdateDraftBody): Promise<Generation.Draft> {
     const existing = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
     if (existing?.status === 'final') throw AppErrorCode.DRF_002.create();
@@ -577,6 +592,7 @@ export class GenerationService {
         state: body.state as never,
         status: 'draft',
         reviewStatus: 'needs_review',
+        staleReason: null,
         generator: 'human',
       })
       .onConflictDoUpdate({
@@ -588,6 +604,7 @@ export class GenerationService {
           state: body.state as never,
           revision: sql`${schema.drafts.revision} + 1`,
           reviewStatus: 'needs_review',
+          staleReason: null,
           updatedAt: new Date(),
         },
       })
@@ -598,6 +615,8 @@ export class GenerationService {
       .insert(schema.draftRevisions)
       .values({ projectId, draftId: draft.id, revision: draft.revision, source: 'hand_edited', body: draft.body, summary: draft.summary })
       .onConflictDoNothing();
+
+    await this.markDescendantDraftsStale(projectId, chapter, `ancestor chapter ${chapter} was hand_edited`);
 
     return draft;
   }
@@ -635,6 +654,7 @@ export class GenerationService {
         state: revised.state as never,
         revision: newRevision,
         reviewStatus: 'needs_review',
+        staleReason: null,
         updatedAt: new Date(),
       })
       .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)))
@@ -654,6 +674,8 @@ export class GenerationService {
         feedbackId: feedback?.id,
       })
       .onConflictDoNothing();
+
+    await this.markDescendantDraftsStale(projectId, chapter, `ancestor chapter ${chapter} was revised`);
 
     return updated;
   }
@@ -730,6 +752,7 @@ export class GenerationService {
   async approveDraft(projectId: bigint, chapter: number, options?: { reviewerId?: string; idempotencyKey?: string }): Promise<Generation.Draft> {
     const draft = await this.getDraft(projectId, chapter);
     if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
+    if (draft.staleReason) throw AppErrorCode.DRF_007.create();
 
     // Record the approval and flip the draft's review status in one transaction: a crash can never
     // leave an approval logged without the draft approved, or the draft approved with no audit row.
@@ -816,10 +839,28 @@ export class GenerationService {
 
     const [draft] = await this.db
       .insert(schema.drafts)
-      .values({ projectId, chapter, title: body.title, body: body.prose, summary: body.summary, status: 'draft', reviewStatus: 'needs_review', generator: 'human' })
+      .values({
+        projectId,
+        chapter,
+        title: body.title,
+        body: body.prose,
+        summary: body.summary,
+        status: 'draft',
+        reviewStatus: 'needs_review',
+        staleReason: null,
+        generator: 'human',
+      })
       .onConflictDoUpdate({
         target: [schema.drafts.projectId, schema.drafts.chapter],
-        set: { title: body.title, body: body.prose, summary: body.summary, revision: sql`${schema.drafts.revision} + 1`, reviewStatus: 'needs_review', updatedAt: new Date() },
+        set: {
+          title: body.title,
+          body: body.prose,
+          summary: body.summary,
+          revision: sql`${schema.drafts.revision} + 1`,
+          reviewStatus: 'needs_review',
+          staleReason: null,
+          updatedAt: new Date(),
+        },
       })
       .returning();
     if (!draft) throw AppErrorCode.DRF_001.create();
@@ -828,6 +869,8 @@ export class GenerationService {
       .insert(schema.draftRevisions)
       .values({ projectId, draftId: draft.id, revision: draft.revision, source: 'imported', body: draft.body, summary: draft.summary })
       .onConflictDoNothing();
+
+    await this.markDescendantDraftsStale(projectId, chapter, `ancestor chapter ${chapter} was imported`);
 
     return draft;
   }
@@ -1022,6 +1065,7 @@ export class GenerationService {
         state: result.state as never,
         generator: 'grok',
         reviewStatus: 'needs_review',
+        staleReason: null,
         status: 'draft',
       })
       .onConflictDoUpdate({
@@ -1034,6 +1078,7 @@ export class GenerationService {
           generator: 'grok',
           revision: sql`${schema.drafts.revision} + 1`,
           reviewStatus: 'needs_review',
+          staleReason: null,
           updatedAt: new Date(),
         },
       })

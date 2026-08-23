@@ -243,6 +243,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
           volumeKey: state.volumeKey || null,
           revision: 0,
           reviewStatus: 'generating',
+          staleReason: null,
         })
         .onConflictDoUpdate({
           target: [schema.drafts.projectId, schema.drafts.chapter],
@@ -252,6 +253,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
             summary: sql`EXCLUDED.summary`,
             state: sql`EXCLUDED.state`,
             revision: sql`drafts.revision + 1`,
+            staleReason: null,
             updatedAt: new Date(),
           },
         })
