@@ -179,6 +179,24 @@ describe.if(pgAvailable)('Reforge mode dispatch', () => {
       expect(manuscript.json().markdown).toBe('# The Duel\n\nEvan Vale drew.');
     });
 
+    it('should serialize the analysis metrics block', async () => {
+      const projectId = await createProject();
+      const db = testEnv.getPostgresClient();
+      await db.insert(schema.reforgeAnalyses).values({
+        projectId: BigInt(projectId),
+        status: 'done',
+        windowSize: 15,
+        chaptersAnalyzed: 40,
+        windowsFailed: 0,
+        metrics: { repetitionRatio: 0.21, stallRatio: 0.14, medianWords: 2100, arcCount: 4, deadThreadCount: 3 },
+        report: '# Source analysis',
+      });
+
+      const analysis = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${projectId}/reforge/analysis`);
+      expect(analysis.statusCode).toBe(200);
+      expect(analysis.json().analysis).toMatchObject({ status: 'done', chaptersAnalyzed: 40, metrics: { repetitionRatio: 0.21, arcCount: 4 } });
+    });
+
     it('should gate the transform stage on an approved plan', async () => {
       const projectId = await createProject();
       await testEnv.getRouter().mockRequest().put(`/api/v1/projects/${projectId}/reforge/config`).body({ mode: 'transform' });

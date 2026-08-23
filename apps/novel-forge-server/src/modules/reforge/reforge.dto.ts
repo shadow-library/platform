@@ -312,8 +312,8 @@ export class ReforgeAnalysisResponse {
   @Field(() => Integer, { description: 'Windows that failed and were flagged rather than aborting the run.' })
   windowsFailed: number;
 
-  @Field(() => ReforgeAnalysisMetricsResponse, { optional: true, nullable: true })
-  metrics?: ReforgeAnalysisMetricsResponse | null;
+  @Field(() => ReforgeAnalysisMetricsResponse, { optional: true })
+  metrics?: ReforgeAnalysisMetricsResponse;
 
   @Field({ optional: true, nullable: true })
   lastError?: string | null;

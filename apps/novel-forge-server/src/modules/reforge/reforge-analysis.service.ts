@@ -37,7 +37,8 @@ export interface AnalysisResult {
 }
 
 export interface AnalysisStatusResult {
-  analysis: ReforgeTransform.Analysis;
+  /** `metrics` is absent rather than null until the run lands, so the response stays a plain object. */
+  analysis: Omit<ReforgeTransform.Analysis, 'metrics'> & { metrics?: ReforgeTransform.AnalysisMetrics };
   findingCounts: Record<string, number>;
 }
 
@@ -91,7 +92,7 @@ export class ReforgeAnalysisService {
       .from(schema.reforgeFindings)
       .where(eq(schema.reforgeFindings.analysisId, analysis.id))
       .groupBy(schema.reforgeFindings.type);
-    return { analysis, findingCounts: Object.fromEntries(rows.map(r => [r.type, r.count])) };
+    return { analysis: { ...analysis, metrics: analysis.metrics ?? undefined }, findingCounts: Object.fromEntries(rows.map(r => [r.type, r.count])) };
   }
 
   async report(projectId: bigint): Promise<string> {
