@@ -4,11 +4,17 @@ Source: `harness-post-implementation-review.md` (verdict: NEEDS TARGETED FIXES),
 Before Evaluation", cross-checked against `harness-final-recommendation.md` for architectural
 alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P1 architecture.
 
+**All eleven required fixes are complete.** Per the audit's own framing (§18: "The first eight rows
+should be corrected before evaluation novels are used to judge architecture quality... The medium rows
+are small enough and directly related enough to include in the same pre-evaluation pass"), this closes
+every finding the audit classified as evaluation-blocking. See the classification section below for
+what was knowingly deferred and why.
+
 ## Summary
 
-- Completed: 10
+- Completed: 11
 - In Progress: 0
-- Pending: 1
+- Pending: 0
 - Blocked: 0
 
 ## Tasks
@@ -25,7 +31,7 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 | FIX-08 | HIGH     | Gate/cap the legacy whole-book `outline()` endpoint so it cannot overwrite protected arc briefs                                     | COMPLETED | —            |
 | FIX-09 | MEDIUM   | Align `revealChapter` catalog semantics with the actual knowledge ledger                                                            | COMPLETED | —            |
 | FIX-10 | MEDIUM   | Require `briefCompliance` at runtime; fail closed if the judge omits it                                                             | COMPLETED | —            |
-| FIX-11 | MEDIUM   | Use one writing-style policy across generation, fix, and revision prompts                                                           | PENDING   | —            |
+| FIX-11 | MEDIUM   | Use one writing-style policy across generation, fix, and revision prompts                                                           | COMPLETED | —            |
 
 Ordering rationale: data-integrity/recoverability (FIX-01, FIX-02) before state/context-correctness
 gaps that bias prose quality without corrupting data (FIX-03–06), before control-flow/integration
@@ -77,7 +83,7 @@ None.
 
 ## Pending
 
-See table above. FIX-11 selected next.
+All eleven required fixes are COMPLETED. Nothing left to select.
 
 ## Blocked
 
@@ -463,5 +469,44 @@ the new gate.
 
 Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
 1010 pass, 10 skip, 0 fail (independently re-run).
+
+Commit: `b487e862`
+
+### FIX-11 — Use one writing-style policy across generation, fix, and revision prompts
+
+Source finding: `harness-post-implementation-review.md` M3 ("Automated repair and revision reintroduce
+old style pressure") + §18 row 11 (the last required fix).
+
+What changed:
+
+`fix.prompt.ts` and `revision.prompt.ts` both prepended the old, full `AUTHORING_STYLE` house style
+into their system messages — the version a prior P0 pass (D30) deliberately moved away from for
+`generation.prompt.ts` (it contains flatly contradictory instructions: never state emotion directly,
+mandatory sensory grounding, every ending must compel a page turn — vs. `DEFAULT_WRITING_INSTRUCTIONS`'s
+brief-emotion-allowed, selective-detail, earned-closure stance). Both prompts already receive the
+current, editable `writing_style` section via their `{contextPack}` human-message var (same as
+`generation.prompt.ts`), so a clean first draft followed the approved style while an automated repair
+or human-requested revision received the conflicting old style as a higher-priority system instruction.
+
+Both files now import `AUTHORING_STYLE_PLANNING` (the trimmed POV/canon-consistency subset with no
+craft-rule conflicts) instead of the full `AUTHORING_STYLE` — preserving the still-useful, non-conflicting
+guidance (third-person-limited, character-voice consistency, canon-wins-over-drama) while removing the
+craft-rule contradiction. Versions bumped (`fix` 1.1.0→1.2.0, `revision` 1.0.0→1.1.0). The stale comment
+above `AUTHORING_STYLE_PLANNING`'s definition — which claimed `fix`/`revision`/`reforge-write`/
+`rebrand-convert` all "keep the full version" (already false for `generation.prompt.ts`, which uses
+neither constant) — was corrected to accurately describe every current importer.
+
+**Scope boundary, deliberate**: `reforge-write.prompt.ts`, `reforge-transform-write.prompt.ts`, and
+`rebrand-convert.prompt.ts` still use the full `AUTHORING_STYLE`, left untouched — they belong to
+separate re-authoring pipelines (`docs/reforge-pipeline-design.md`/`docs/rebrand-pipeline-design.md`)
+the audit's M3 finding and required-fix wording never named.
+
+Tests: `tests/ai/prompts.spec.ts` (+1): `fixPrompt.system`/`revisionPrompt.system` no longer contain
+the old style's conflicting bullets ("never state emotion directly", "compels turning the page",
+"Ground every scene with concrete sensory detail") and still contain the non-conflicting
+"Canon always wins over dramatic convenience" guidance.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+1011 pass, 10 skip, 0 fail (independently re-run).
 
 Commit: (recorded after commit, see git log)

@@ -2,10 +2,10 @@ import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 import { type FixOutput, FixSchema } from '../schemas/fix.schema';
-import { AUTHORING_STYLE } from './authoring-preamble';
+import { AUTHORING_STYLE_PLANNING } from './authoring-preamble';
 import { type PromptModule } from './types';
 
-const system = `${AUTHORING_STYLE}\n\nYou are a surgical editor tasked with repairing continuity contradictions in a chapter draft. You receive the draft, the judge's findings (with [HARD] severity markers), and the established canon. Choose: PATCH if the contradiction can be fixed with targeted find/replace operations (preferred — minimize disruption). REWRITE if the contradiction is structural and patches cannot fix it. For patches: find strings must be unique and verbatim; replace text must preserve prose style. Minimal intervention only — do not rewrite sections that are not contradicted.
+const system = `${AUTHORING_STYLE_PLANNING}\n\nYou are a surgical editor tasked with repairing continuity contradictions in a chapter draft. You receive the draft, the judge's findings (with [HARD] severity markers), and the established canon. Choose: PATCH if the contradiction can be fixed with targeted find/replace operations (preferred — minimize disruption). REWRITE if the contradiction is structural and patches cannot fix it. For patches: find strings must be unique and verbatim; replace text must preserve prose style. Minimal intervention only — do not rewrite sections that are not contradicted.
 
 Respond with ONLY one valid JSON object — nothing outside the JSON, no markdown fences — of exactly this shape:
 {"action": "patch" or "rewrite", "patches": [{"find": "...", "replace": "..."}] (patch only), "body": "..." (rewrite only)}`;
@@ -26,7 +26,7 @@ const fewShots = [
 
 export const fixPrompt: PromptModule<FixOutput> = {
   key: 'fix',
-  version: '1.1.0',
+  version: '1.2.0',
   kind: 'authoring',
   system,
   // Few-shots ride inside the template — a fewShots field the router never injects teaches nothing.

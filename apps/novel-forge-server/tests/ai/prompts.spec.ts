@@ -63,6 +63,14 @@ describe('Prompt modules', () => {
         expect(p.system).not.toContain(AUTHORING_STYLE.slice(0, 40));
       }
     });
+
+    it('fix and revision use the trimmed AUTHORING_STYLE_PLANNING, not the full house style', () => {
+      const oldStyleBullets = ['never state emotion directly', 'compels turning the page', 'Ground every scene with concrete sensory detail'];
+      for (const p of [PROMPT_REGISTRY.fix, PROMPT_REGISTRY.revision]) {
+        for (const bullet of oldStyleBullets) expect(p.system).not.toContain(bullet);
+        expect(p.system).toContain('Canon always wins over dramatic convenience');
+      }
+    });
   });
 
   describe('EndingContractSchema', () => {

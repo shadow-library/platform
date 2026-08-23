@@ -11,8 +11,12 @@ export const AUTHORING_STYLE = `AUTHORING GUIDELINES:
 
 // Planning-time subset of AUTHORING_STYLE: POV and canon-consistency rules still apply when plotting,
 // but sentence-length, paragraph, dialogue-mechanics, and description craft rules are noise before any
-// prose exists. Used by bible-build, plan, outline, arc-plan, premise-enhance, and chat-refine prompts;
-// the actual generation/repair prompts (fix, revision, reforge-write, rebrand-convert) keep the full version.
+// prose exists. Used by the bible-build, plan, outline, arc-plan, premise-enhance, and chat-refine prompts,
+// and also by fix and revision — repairs and revisions must not fight DEFAULT_WRITING_INSTRUCTIONS (arriving
+// via the context pack) with the old, conflicting craft bullets in the full AUTHORING_STYLE. Only
+// reforge-write, reforge-transform-write, and rebrand-convert — separate re-authoring pipelines — still keep
+// the full version. generation.prompt.ts uses neither constant; its craft rules come entirely from the
+// context pack's `writing_style` section.
 export const AUTHORING_STYLE_PLANNING = `AUTHORING GUIDELINES:
 - Write in third-person limited, past tense, from the POV character's perspective.
 - Maintain established character voice and speech patterns exactly as recorded in their entity card.
