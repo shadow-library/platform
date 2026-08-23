@@ -1,7 +1,9 @@
 import { type Bible } from '@server/database';
 
+import { HOOK_TYPES, type HookTypeValue } from '../ai/schemas/enums';
+
 export interface EndingContract {
-  hookType: 'cliffhanger' | 'revelation' | 'quiet_dread' | 'promise' | 'turn' | 'closure_with_momentum' | 'earned_rest';
+  hookType: HookTypeValue;
   emotionalBeat: string;
   openQuestion: string;
   handoffState: string;
@@ -260,7 +262,6 @@ interface OpSpec {
   optional: Record<string, FieldKind>;
 }
 
-const HOOK_TYPES = ['cliffhanger', 'revelation', 'quiet_dread', 'promise', 'turn', 'closure_with_momentum', 'earned_rest'];
 const BIBLE_SECTIONS = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
 const ENTITY_TYPES = ['character', 'faction', 'location', 'power_rule', 'item', 'concept'];
 
@@ -360,7 +361,7 @@ function isKind(value: unknown, kind: FieldKind): boolean {
 function validateEndingContract(value: unknown, path: string, errors: string[]): void {
   if (!isKind(value, 'object')) return void errors.push(`${path}: endingContract must be an object`);
   const contract = value as Record<string, unknown>;
-  if (typeof contract['hookType'] !== 'string' || !HOOK_TYPES.includes(contract['hookType']))
+  if (typeof contract['hookType'] !== 'string' || !(HOOK_TYPES as readonly string[]).includes(contract['hookType']))
     errors.push(`${path}: endingContract.hookType must be one of ${HOOK_TYPES.join(', ')}`);
   for (const key of ['emotionalBeat', 'openQuestion', 'handoffState']) {
     if (typeof contract[key] !== 'string' || contract[key] === '') errors.push(`${path}: endingContract.${key} must be a non-empty string`);

@@ -5,7 +5,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { renderBriefBody } from '@server/common';
+import { renderBriefBody, renderChapterBrief } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -590,7 +590,7 @@ export class GenerationService {
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.revision.key, promptVersion: PROMPT_REGISTRY.revision.version, role: PROMPT_REGISTRY.revision.key };
     const revised = (await this.modelRouter.structured(
       PROMPT_REGISTRY.revision,
-      { contextPack: pack.rendered, chapterBrief: brief?.body ?? '', draftBody: draft.body, feedback: body.note },
+      { contextPack: pack.rendered, chapterBrief: renderChapterBrief(brief), draftBody: draft.body, feedback: body.note },
       ctx,
       project as never,
     )) as { title: string; body: string; summary: string; state?: Record<string, string> };
@@ -960,7 +960,7 @@ export class GenerationService {
       {
         stableContext: pack.renderedStable,
         volatileContext: pack.renderedVolatile,
-        chapterBrief: brief?.body ?? '',
+        chapterBrief: renderChapterBrief(brief),
         endingContract: renderEndingContract(brief?.endingContract),
         guidance: body.guidance ?? '',
       },

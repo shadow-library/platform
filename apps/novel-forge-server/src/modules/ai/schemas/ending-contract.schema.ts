@@ -1,11 +1,11 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 
-import { HookType } from './enums';
+import { HookType, type HookTypeValue } from './enums';
 
 @Schema()
 export class EndingContractSchema {
   @Field(() => HookType, { description: 'the kind of hook the closing scene must land on' })
-  hookType: 'cliffhanger' | 'revelation' | 'quiet_dread' | 'promise' | 'turn' | 'closure_with_momentum' | 'earned_rest';
+  hookType: HookTypeValue;
 
   @Field({ minLength: 1, description: 'what the reader should feel on the last line' })
   emotionalBeat: string;

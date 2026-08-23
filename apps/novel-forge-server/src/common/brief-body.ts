@@ -19,3 +19,31 @@ export function renderBriefBody(c: BriefBodyInput): string {
   if (c.handoffBeat) lines.push(`Handoff beat: ${c.handoffBeat}`);
   return lines.join('\n');
 }
+
+export interface ChapterBriefInput {
+  body?: string | null;
+  chapterPurpose?: string | null;
+  readerValue?: unknown;
+  repetitionRisks?: unknown;
+}
+
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === 'string' && v.trim() !== '').map(v => v.trim());
+}
+
+// The single authority for the `chapterBrief` prompt variable. Briefs written before the outliner
+// authored these fields — and every imported plan — carry them as null, and must render byte-identically
+// to the stored body alone.
+export function renderChapterBrief(brief: ChapterBriefInput | null | undefined): string {
+  const body = brief?.body ?? '';
+  const guidance: string[] = [];
+  const purpose = brief?.chapterPurpose?.trim();
+  const readerValue = stringList(brief?.readerValue);
+  const repetitionRisks = stringList(brief?.repetitionRisks);
+  if (purpose) guidance.push(`Chapter purpose: ${purpose}`);
+  if (readerValue.length > 0) guidance.push(`This chapter must deliver: ${readerValue.join(', ')}`);
+  if (repetitionRisks.length > 0) guidance.push(`Avoid repeating recent patterns: ${repetitionRisks.join('; ')}`);
+  if (guidance.length === 0) return body;
+  return body ? `${body}\n\n${guidance.join('\n')}` : guidance.join('\n');
+}

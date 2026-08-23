@@ -3,6 +3,7 @@ import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@l
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
+import { renderChapterBrief } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -200,7 +201,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
 
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
-      { stableContext, volatileContext, chapterBrief: brief?.body ?? '', endingContract: renderEndingContract(brief?.endingContract), guidance: state.guidance },
+      { stableContext, volatileContext, chapterBrief: renderChapterBrief(brief), endingContract: renderEndingContract(brief?.endingContract), guidance: state.guidance },
       ctx,
       projectRow as ProjectConfig | undefined,
     )) as { title: string; body: string; summary: string; state?: Record<string, string> };
@@ -485,7 +486,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
 
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
-      { stableContext, volatileContext, chapterBrief: brief?.body ?? '', endingContract: renderEndingContract(brief?.endingContract), guidance },
+      { stableContext, volatileContext, chapterBrief: renderChapterBrief(brief), endingContract: renderEndingContract(brief?.endingContract), guidance },
       ctx,
       projectRow as ProjectConfig | undefined,
     )) as { title: string; body: string; summary: string; state?: Record<string, string> };
