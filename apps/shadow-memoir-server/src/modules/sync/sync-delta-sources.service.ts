@@ -23,17 +23,12 @@ import { type KeysetDeltaSource } from './sync.types';
 /**
  * The domains backed by tables the sync spine itself owns. Anything a later module adds — quest
  * occurrences it reshapes, expenses, quick logs, metrics — is registered by that module instead, which
- * is why `DeltaSourceRegistry` exists at all. `quests`, `quest_logs`, `daily_states` and `quest_streaks`
- * sit here for now because their owning modules (T-18, T-19) do not exist yet; each should move to its
- * module as that module lands, without the assembler changing. The `account` domain moved to
- * `@modules/account`'s `AccountService` (T-17), mirroring `DeviceService`'s self-registration.
+ * is why `DeltaSourceRegistry` exists at all. `quests`, `quest_logs` and `quest_streaks` moved to
+ * `modules/quests` (T-18); `account` moved to `@modules/account`'s `AccountService` (T-17), mirroring
+ * `DeviceService`'s self-registration. `daily_states` sits here for now because its owning module (T-19)
+ * does not exist yet, and should move the same way once it does.
  */
-const KEYSET_TABLES: [string, SyncableTable][] = [
-  ['quests', schema.quests],
-  ['quest_logs', schema.questLogs],
-  ['daily_states', schema.dailyStates],
-  ['quest_streaks', schema.questStreaks],
-];
+const KEYSET_TABLES: [string, SyncableTable][] = [['daily_states', schema.dailyStates]];
 
 @Injectable()
 export class SyncDeltaSources implements OnModuleInit {

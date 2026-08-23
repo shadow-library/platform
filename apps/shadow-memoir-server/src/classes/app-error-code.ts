@@ -67,6 +67,27 @@ export class AppErrorCode extends ServerErrorCode {
   /** This occurrence has already been moved; a reschedule is append-only and one per (quest, date) */
   static readonly QST_001 = AppErrorCode.conflict('QST_001', 'This occurrence has already been rescheduled');
 
+  /** No quest with that id belongs to the caller, or it has been soft-deleted; a foreign or deactivated id reads exactly like a nonexistent one */
+  static readonly QST_002 = AppErrorCode.notFound('QST_002', 'Quest not found');
+
+  /** Anchor scheduling is strict-time; a quest cannot become (or be created as) Anchor without a start time */
+  static readonly QST_003 = AppErrorCode.badRequest('QST_003', 'Anchor quests require a start time');
+
+  /** The quest's recurrence rule does not place an occurrence on the given date */
+  static readonly QST_004 = AppErrorCode.badRequest('QST_004', 'This quest has no occurrence on {date}');
+
+  /** Postpone is unavailable for Recovery and Optional quests (PRD §2.2) */
+  static readonly QST_005 = AppErrorCode.badRequest('QST_005', 'Postpone is not available for this quest');
+
+  /** Quest logs are editable for 7 days after the fact, then read-only (PRD §3.3/S10) */
+  static readonly QST_006 = AppErrorCode.forbidden('QST_006', 'This quest log is outside its 7-day edit window');
+
+  /** No quest log exists at the addressed occurrence, or it belongs to another account */
+  static readonly QST_007 = AppErrorCode.notFound('QST_007', 'Quest log not found');
+
+  /** Reschedule moves a scheduled time; day-level quests (Goal/Recovery/Optional) have none to move */
+  static readonly QST_008 = AppErrorCode.badRequest('QST_008', 'Reschedule is not available for this quest');
+
   /*!
    * Cosmetic Errors
    */

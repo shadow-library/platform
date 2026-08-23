@@ -13,6 +13,7 @@ import { DatabaseModule, DatabaseService } from '@shadow-library/modules';
 import { AccountModule } from '@modules/account';
 import { MemoirAuthModule, OwnerScopedRepository } from '@modules/auth';
 import { DevicesModule } from '@modules/devices';
+import { QuestsModule } from '@modules/quests';
 import { SyncModule } from '@modules/sync';
 import { DatastoreModule, type PrimaryDatabase, schema } from '@server/database';
 import { createDatabaseFromTemplate, dropDatabase } from '@tests/fixtures/template-db';
@@ -63,7 +64,7 @@ class TestQuestController {
 }
 
 const TestHttpModule = FastifyModule.forRoot({
-  imports: [MemoirAuthModule, SyncModule, DevicesModule, AccountModule, DatabaseModule],
+  imports: [MemoirAuthModule, SyncModule, DevicesModule, AccountModule, QuestsModule, DatabaseModule],
   controllers: [TestQuestController],
   providers: [TestQuestRepository],
   host: 'localhost',
