@@ -1,11 +1,11 @@
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AppError } from '@shadow-library/common';
 
 import { CatalogService } from '@modules/ai/context/catalog.service';
-import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
+import { CHAT_BOOTSTRAP_BUDGET, CHAT_HUB_BUDGET, ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
 import { ToolRegistryService } from '@modules/ai/tools';
 import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
@@ -205,6 +205,38 @@ describe.if(pgAvailable)('ChatService', () => {
     expect(input['scopeInstructions']).toContain('Lookup tools available');
     expect(input['stableContext']).toContain('CANON CATALOG');
     expect(input['volatileContext']).toContain('Story cursor');
+  });
+
+  it('interviews on an empty project and drops the bootstrap playbook once canon exists', async () => {
+    const [fresh] = await db
+      .insert(schema.projects)
+      .values({ name: `chat-bootstrap-${Date.now()}`, kind: 'new_novel' })
+      .returning();
+    if (!fresh) throw new Error('failed to seed project');
+
+    const lastTurn = async (): Promise<{ instructions: string; budgetTokens: number }> => {
+      const session = await chat.createSession(fresh.id, { scopeType: 'project' });
+      await chat.turn(fresh.id, session.id, 'I want to write something');
+      const input = structuredMock.mock.calls.at(-1)?.[1 as never] as unknown as Record<string, string>;
+      const pack = await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.projectId, fresh.id), orderBy: desc(schema.contextPacks.id) });
+      return { instructions: input['scopeInstructions'] ?? '', budgetTokens: pack?.budgetTokens ?? 0 };
+    };
+
+    const bootstrapTurn = await lastTurn();
+    expect(bootstrapTurn.instructions).toContain('Interview first');
+    expect(bootstrapTurn.instructions).toContain('power/progression-ladder');
+    expect(bootstrapTurn.budgetTokens).toBe(CHAT_BOOTSTRAP_BUDGET);
+
+    await db.insert(schema.bibleDocuments).values({ projectId: fresh.id, section: 'project', slug: 'premise', body: 'a swordsman without a sword' });
+    const withDocs = await lastTurn();
+    expect(withDocs.instructions).not.toContain('Interview first');
+    expect(withDocs.budgetTokens).toBe(CHAT_HUB_BUDGET);
+
+    await db.delete(schema.bibleDocuments).where(eq(schema.bibleDocuments.projectId, fresh.id));
+    await db.insert(schema.volumes).values({ projectId: fresh.id, volumeKey: 'v1', ordinal: 1, objective: 'find the sword', targetChapterCount: 10 });
+    const withVolumes = await lastTurn();
+    expect(withVolumes.instructions).not.toContain('Interview first');
+    expect(withVolumes.budgetTokens).toBe(CHAT_HUB_BUDGET);
   });
 
   it('hub auto turn applies the change-set in the same request with autoApplied provenance', async () => {

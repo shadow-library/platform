@@ -1,6 +1,7 @@
 import { type Refinement } from '@server/database';
 
 import { ACTION_TYPES, type ActionType, type OpType, renderActionVocabulary, renderOpVocabulary } from '../../refinement/change-set';
+import { renderManifest } from '../../refinement/required-bible-docs';
 
 export interface ScopePlaybook {
   guidance: string;
@@ -81,10 +82,30 @@ export const SCOPE_PLAYBOOKS: Record<Refinement.ChatScope, ScopePlaybook> = {
   },
 };
 
+// Rides on the hub playbook only while the project is empty (no bible documents, no volumes). A blank
+// hub chat used to invite the model to invent a novel on turn one; the interview-first order below is
+// the external novel-plan-forge skill's step 1, which is what made its plans usable.
+export const BOOTSTRAP_PLAYBOOK = `BOOTSTRAP — this project is empty: no bible documents, no volumes. Interview first; propose nothing until the author has answered.
+
+Establish, in the author's own words: (1) the premise or idea — even one line; (2) genre and tone, and the comparable serials they want to sit beside; (3) target size — how many volumes, how many chapters per volume; (4) what material already exists — drafts, notes, a world or cast they have used before. Ask a few questions per turn, never a questionnaire; restate what you heard and get it confirmed. Never invent the author's story unprompted — no premise, cast, plot, or setting they did not give you or confirm. Offer options as prose in your reply; stage nothing speculative as an op.
+
+Once the essentials are confirmed, drive the pipeline in this order, one step per turn, each awaiting approval before the next:
+1. premise.update with the pitch that sells the serial — or action.enhance_premise when the idea is still rough and needs a story doctor first.
+2. bible_document.upsert for the serialized-web-novel manifest, drafted from the confirmed premise:
+${renderManifest()}
+3. entity.upsert for the opening cast, factions, and locations — full body cards a chapter author can rely on, never one-line stubs.
+4. fact.upsert for every spoiler-grade truth the reader must not learn yet (traitors, hidden bloodlines, the real antagonist), each with a constraintNote and terms so the chapter author stays fenced off from it.
+5. action.plan_volumes at the confirmed volumeCount and chaptersPerVolume.
+6. action.plan_arcs per volume, then action.outline_arc for the first arc's briefs.
+
+Judge every step as serialized web fiction: stakes that escalate volume over volume, a reader promise the chapter cadence can actually keep, arcs sized to a bingeable run, and a hook at every chapter end.`;
+
 /** Guidance + the exact op shapes — what ChatService feeds the {scopeInstructions} template var. */
-export function renderScopeInstructions(scope: Refinement.ChatScope): string {
+export function renderScopeInstructions(scope: Refinement.ChatScope, opts?: { bootstrap?: boolean }): string {
   const playbook = SCOPE_PLAYBOOKS[scope];
-  const sections = [playbook.guidance, renderOpVocabulary(playbook.allowedOps)];
+  const sections = [playbook.guidance];
+  if (opts?.bootstrap) sections.push(BOOTSTRAP_PLAYBOOK);
+  sections.push(renderOpVocabulary(playbook.allowedOps));
   if (playbook.allowedActions?.length) sections.push(renderActionVocabulary(playbook.allowedActions));
   return sections.join('\n\n');
 }

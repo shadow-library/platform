@@ -11,7 +11,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
-import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
+import { CHAT_BOOTSTRAP_BUDGET, CHAT_BOOTSTRAP_HISTORY_BUDGET, CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
 import { type AiRole, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
@@ -251,17 +251,21 @@ export class ChatService {
     this.logger.info('chat turn', { projectId, sessionId, scopeType: session.scopeType, mode: session.mode });
     this.logger.debug('chat turn user message', { projectId, sessionId, content });
 
-    await this.compactIfNeeded(projectId, session);
+    const isHub = session.scopeType === 'project';
+    const bootstrap = isHub && (await this.isBootstrapProject(projectId));
+
+    await this.compactIfNeeded(projectId, session, bootstrap);
 
     const [pack, history, project] = await Promise.all([
-      this.contextAssembler.forChatTurn(projectId, session),
+      this.contextAssembler.forChatTurn(projectId, session, bootstrap ? { budgetTokens: CHAT_BOOTSTRAP_BUDGET } : undefined),
       this.buildHistory(session),
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
 
     const prompt = buildChatRefinePrompt(session.scopeType);
-    const isHub = session.scopeType === 'project';
-    const scopeInstructions = isHub ? `${renderScopeInstructions(session.scopeType)}\n\n${this.renderLookupVocabulary()}` : renderScopeInstructions(session.scopeType);
+    const scopeInstructions = isHub
+      ? `${renderScopeInstructions(session.scopeType, { bootstrap })}\n\n${this.renderLookupVocabulary()}`
+      : renderScopeInstructions(session.scopeType);
 
     // Resolve which model this turn runs on, then inject it as the `config.models.chat` override the
     // router already reads — the turn keeps the `chat` role for prompts/telemetry either way.
@@ -318,6 +322,15 @@ export class ChatService {
       this.logger.warn(`auto-apply of proposal ${proposal.id} failed: ${note}`);
       return { proposal: fresh, applyNote: note };
     }
+  }
+
+  /** A project with neither bible documents nor volumes has never been planned — the hub interviews instead of proposing. */
+  private async isBootstrapProject(projectId: bigint): Promise<boolean> {
+    const [doc, volume] = await Promise.all([
+      this.db.query.bibleDocuments.findFirst({ where: eq(schema.bibleDocuments.projectId, projectId), columns: { id: true } }),
+      this.db.query.volumes.findFirst({ where: eq(schema.volumes.projectId, projectId), columns: { id: true } }),
+    ]);
+    return !doc && !volume;
   }
 
   /** The lookup half of the hub playbook: names, argument shapes, and purposes of the read-only tools. */
@@ -472,7 +485,7 @@ export class ChatService {
    * verbatim window exceeds its token budget or MAX_VERBATIM_TURNS. Messages are never deleted — the
    * watermark is a read-time window over the intact transcript.
    */
-  private async compactIfNeeded(projectId: bigint, session: Refinement.ChatSession): Promise<void> {
+  private async compactIfNeeded(projectId: bigint, session: Refinement.ChatSession, bootstrap = false): Promise<void> {
     const verbatim = await this.db.query.chatMessages.findMany({
       where: and(eq(schema.chatMessages.sessionId, session.id), gt(schema.chatMessages.ordinal, session.summaryThroughOrdinal)),
       orderBy: asc(schema.chatMessages.ordinal),
@@ -480,7 +493,8 @@ export class ChatService {
     if (verbatim.length <= KEEP_VERBATIM_TURNS) return;
 
     const totalTokens = verbatim.reduce((sum, m) => sum + (m.tokens ?? countTokens(m.content)), 0);
-    if (totalTokens <= CHAT_HISTORY_BUDGET && verbatim.length <= MAX_VERBATIM_TURNS) return;
+    const historyBudget = bootstrap ? CHAT_BOOTSTRAP_HISTORY_BUDGET : CHAT_HISTORY_BUDGET;
+    if (totalTokens <= historyBudget && verbatim.length <= MAX_VERBATIM_TURNS) return;
 
     const toFold = verbatim.slice(0, verbatim.length - KEEP_VERBATIM_TURNS);
     const watermark = toFold[toFold.length - 1]?.ordinal ?? session.summaryThroughOrdinal;

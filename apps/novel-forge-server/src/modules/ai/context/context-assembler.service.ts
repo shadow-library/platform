@@ -33,7 +33,11 @@ export const CHAT_PACK_BUDGET = CHAT_STABLE_BUDGET + CHAT_VOLATILE_DELTA_BUDGET;
 // The hub sees the whole project (catalog + full plan + pipeline status), so it gets catalog headroom
 // over the scoped chat budget (chat-hub design §6.1).
 export const CHAT_HUB_BUDGET = 20_000;
+// A bootstrap hub turn IS the authoring session: the interview answers and the premise/bible/cast it
+// produces must all stay verbatim, because every later step is derived from them.
+export const CHAT_BOOTSTRAP_BUDGET = 32_000;
 export const CHAT_HISTORY_BUDGET = 6_000;
+export const CHAT_BOOTSTRAP_HISTORY_BUDGET = 10_000;
 export const CHAT_SUMMARY_BUDGET = 1_500;
 export const ARC_PLAN_BUDGET = 16_000;
 export const PREMISE_BUDGET = 8_000;

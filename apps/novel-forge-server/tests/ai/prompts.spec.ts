@@ -234,6 +234,20 @@ describe('Prompt modules', () => {
       expect(renderScopeInstructions('volume_plan')).not.toContain('knowledgeContract');
     });
 
+    it('renders the bootstrap interview playbook only when asked for it', () => {
+      const bootstrap = renderScopeInstructions('project', { bootstrap: true });
+      expect(bootstrap).toContain('Interview first');
+      expect(bootstrap).toContain('how many volumes, how many chapters per volume');
+      expect(bootstrap).toContain("Never invent the author's story unprompted");
+      expect(bootstrap).toContain('action.plan_volumes at the confirmed volumeCount');
+      expect(bootstrap).toContain('project/reader-promise');
+      expect(bootstrap).toContain('plot/escalation-map');
+      expect(bootstrap).toContain(SCOPE_PLAYBOOKS.project.guidance);
+
+      expect(renderScopeInstructions('project')).not.toContain('Interview first');
+      expect(renderScopeInstructions('project', { bootstrap: false })).not.toContain('BOOTSTRAP');
+    });
+
     it('accepts epistemic ops in the hub scope and rejects them elsewhere', () => {
       const hub = buildChatRefinePrompt('project');
       const changeSet = [
