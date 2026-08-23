@@ -1,0 +1,234 @@
+.page {
+  padding-block: 28px 60px;
+}
+
+.tabPanel {
+  padding-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.card {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--sh-text-body);
+  font-weight: 700;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-danger-text);
+}
+
+.report {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  padding: 18px 22px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.table {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  overflow: hidden;
+}
+
+.findingRow,
+.findingHead {
+  display: grid;
+  grid-template-columns: 130px 110px 1fr 90px 110px;
+  gap: 12px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  align-items: center;
+  font-size: var(--sh-text-body-sm);
+}
+
+.spanRow,
+.spanHead {
+  display: grid;
+  grid-template-columns: 48px 120px 130px 90px 110px 1fr;
+  gap: 12px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  align-items: center;
+  font-size: var(--sh-text-body-sm);
+}
+
+.outputRow,
+.outputHead {
+  display: grid;
+  grid-template-columns: 60px 1fr 140px 150px 150px;
+  gap: 12px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  align-items: center;
+  font-size: var(--sh-text-body-sm);
+}
+
+.cutRow,
+.cutHead {
+  display: grid;
+  grid-template-columns: 130px 1fr 120px 120px;
+  gap: 12px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  align-items: center;
+  font-size: var(--sh-text-body-sm);
+}
+
+.findingHead,
+.spanHead,
+.outputHead,
+.cutHead {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.findingRow:last-child,
+.spanRow:last-child,
+.outputRow:last-child,
+.cutRow:last-child {
+  border-bottom: none;
+}
+
+.mono {
+  font-family: var(--sh-font-mono);
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.rowActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.spanEditorRow {
+  padding: 12px 18px 18px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  background: var(--sh-bg-subtle, transparent);
+}
+
+.spanEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.filters {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.filterField {
+  min-width: 200px;
+}
+
+.reader {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.prose {
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.paneTitle {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.beats {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.issueBox {
+  border: 1px solid var(--sh-warning-border);
+  background: var(--sh-warning-bg-subtle);
+  border-radius: var(--sh-radius-md);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: var(--sh-text-body-sm);
+}
+
+.progressTrack {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--sh-bg-pressed);
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  background: var(--sh-info-solid);
+  transition: width 0.4s ease;
+}
+
+.promoteForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 520px;
+}
+
+.checkRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--sh-text-body-sm);
+  cursor: pointer;
+}

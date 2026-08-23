@@ -11,15 +11,22 @@ import { ApiError, APIRequest } from './transport';
  */
 
 export type ReforgeFidelity = 'preserve' | 'close' | 'loose';
+export type ReforgeMode = 'chapter' | 'transform';
 
 export interface ReforgeSettings {
   judgeEnabled?: boolean;
   targetWords?: number;
+  analysisWindow?: number;
+  targetCompression?: number;
+  minSpanChapters?: number;
+  maxSpanSourceChapters?: number;
 }
 
 export interface ReforgeConfigBody {
   instructions?: string | null;
   fidelity?: ReforgeFidelity;
+  /** Switching to `transform` forces `fidelity: 'loose'` — any other value is rejected. */
+  mode?: ReforgeMode;
   settings?: ReforgeSettings;
 }
 
@@ -36,6 +43,7 @@ export interface Reforge {
   status: ReforgePhase;
   instructions?: string | null;
   fidelity: ReforgeFidelity;
+  mode: ReforgeMode;
   settings?: ReforgeSettings | null;
   lastError?: string | null;
   updatedAt: string;
@@ -47,12 +55,28 @@ export interface ReforgeCounts {
   failed: number;
 }
 
+export interface ReforgeTransformStatus {
+  plan?: {
+    id: string;
+    revision: number;
+    status: 'draft' | 'pending' | 'approved' | 'superseded';
+    sourceChapterCount: number;
+    outputChapterCount: number;
+    approvedAt?: string | null;
+    promotedProjectId?: string | null;
+  };
+  counts: { written: number; attention: number; failed: number };
+  cuts: number;
+}
+
 export interface ReforgeOverview {
   reforge: Reforge;
   sourceChapters: number;
   glossaryCount: number;
   counts: ReforgeCounts;
   job?: JobResponse | null;
+  /** Present only in transform mode — the plan, its outputs, and its cut ledger. */
+  transform?: ReforgeTransformStatus;
 }
 
 export interface ReforgeSummary {

@@ -2037,6 +2037,212 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/reforge/analyze': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start Analysis */
+    post: operations['post_api_v1_projects_projectId_reforge_analyze'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/analysis': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Analysis */
+    get: operations['get_api_v1_projects_projectId_reforge_analysis'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/analysis/report': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Analysis Report */
+    get: operations['get_api_v1_projects_projectId_reforge_analysis_report'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/analysis/findings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Findings */
+    get: operations['get_api_v1_projects_projectId_reforge_analysis_findings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/plan': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Plan */
+    get: operations['get_api_v1_projects_projectId_reforge_plan'];
+    put?: never;
+    /** Start Plan */
+    post: operations['post_api_v1_projects_projectId_reforge_plan'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/plan/spans': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Replace Plan Spans */
+    put: operations['put_api_v1_projects_projectId_reforge_plan_spans'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/plan/approve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Approve Plan */
+    post: operations['post_api_v1_projects_projectId_reforge_plan_approve'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/transform': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start Transform */
+    post: operations['post_api_v1_projects_projectId_reforge_transform'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/outputs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Outputs */
+    get: operations['get_api_v1_projects_projectId_reforge_outputs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/outputs/{outputChapter}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Output */
+    get: operations['get_api_v1_projects_projectId_reforge_outputs_outputChapter'];
+    put?: never;
+    /** Rerun Output */
+    post: operations['post_api_v1_projects_projectId_reforge_outputs_outputChapter'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/promote': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start Promote */
+    post: operations['post_api_v1_projects_projectId_reforge_promote'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/cuts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Cuts */
+    get: operations['get_api_v1_projects_projectId_reforge_cuts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/reforge/manuscript': {
     parameters: {
       query?: never;
@@ -3670,19 +3876,32 @@ export interface components {
     ReforgeConfigBody: {
       instructions?: string | null;
       fidelity?: components['schemas']['ReforgeFidelity'];
+      /** @description chapter = the 1:1 re-author; transform = the plan-driven structural mode, which forces fidelity: loose. */
+      mode?: components['schemas']['ReforgeMode'];
       settings?: components['schemas']['ReforgeSettingsBody'];
     };
     /** @enum {string} */
     ReforgeFidelity: 'preserve' | 'close' | 'loose';
+    /** @enum {string} */
+    ReforgeMode: 'chapter' | 'transform';
     ReforgeSettingsBody: {
       judgeEnabled?: boolean;
       targetWords?: number;
+      /** @description Transform mode: source chapters per analysis window (default 15). */
+      analysisWindow?: number;
+      /** @description Transform mode: whole-novel length ratio the plan drafter aims for — a hint, never a per-span rule. */
+      targetCompression?: number;
+      /** @description Transform mode: shortest span the plan may contain (default 1). */
+      minSpanChapters?: number;
+      /** @description Transform mode: source chapters one output chapter may be written from (default 6). */
+      maxSpanSourceChapters?: number;
     };
     ReforgeResponse: {
       id: string;
       status: components['schemas']['ReforgeStatus'];
       instructions?: null | string;
       fidelity: components['schemas']['ReforgeFidelity'];
+      mode: components['schemas']['ReforgeMode'];
       /** @description Settings used for this reforge run. */
       settings?: null | {
         [key: string]: unknown;
@@ -3706,9 +3925,34 @@ export interface components {
       job?: null | {
         [key: string]: unknown;
       };
+      /** @description Present only in transform mode — the plan, its outputs, and its cut ledger. */
+      transform?: components['schemas']['ReforgeTransformStatusResponse'];
     };
     ReforgeCountsResponse: {
       reforged: number;
+      attention: number;
+      failed: number;
+    };
+    ReforgeTransformStatusResponse: {
+      /** @description The newest plan revision; outputs under an older one are stale. */
+      plan?: components['schemas']['ReforgePlanHeaderResponse'];
+      counts: components['schemas']['ReforgeOutputCountsResponse'];
+      cuts: number;
+    };
+    ReforgePlanHeaderResponse: {
+      id: string;
+      revision: number;
+      status: components['schemas']['ReforgePlanStatus'];
+      sourceChapterCount: number;
+      outputChapterCount: number;
+      /** Format: date-time */
+      approvedAt?: null | string;
+      promotedProjectId?: null | string;
+    };
+    /** @enum {string} */
+    ReforgePlanStatus: 'draft' | 'pending' | 'approved' | 'superseded';
+    ReforgeOutputCountsResponse: {
+      written: number;
       attention: number;
       failed: number;
     };
@@ -3757,6 +4001,215 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
+    ReforgeAnalysisStatusResponse: {
+      analysis: components['schemas']['ReforgeAnalysisResponse'];
+      /** @description Finding count per finding type. */
+      findingCounts: {
+        [key: string]: unknown;
+      };
+    };
+    ReforgeAnalysisResponse: {
+      id: string;
+      status: components['schemas']['ReforgeAnalysisStatus'];
+      windowSize: number;
+      chaptersAnalyzed: number;
+      /** @description Windows that failed and were flagged rather than aborting the run. */
+      windowsFailed: number;
+      metrics?: components['schemas']['ReforgeAnalysisMetricsResponse'];
+      lastError?: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    ReforgeAnalysisStatus: 'pending' | 'signals' | 'analyzing' | 'synthesizing' | 'done' | 'failed';
+    ReforgeAnalysisMetricsResponse: {
+      /** @description Share of source chapters that reuse scene material found elsewhere in the novel. */
+      repetitionRatio: number;
+      /** @description Share of source chapters the reading pass rated as not moving the story. */
+      stallRatio: number;
+      medianWords: number;
+      arcCount: number;
+      deadThreadCount: number;
+    };
+    ReforgeReportResponse: {
+      markdown: string;
+    };
+    /** @enum {string} */
+    ReforgeFindingType: 'filler' | 'repetition' | 'pacing_stall' | 'dead_subplot' | 'dropped_thread' | 'arc_boundary' | 'quality_outlier' | 'window_failed';
+    ListReforgeFindingsResponse: {
+      items: components['schemas']['ReforgeFindingResponse'][];
+      total: number;
+    };
+    ReforgeFindingResponse: {
+      id: string;
+      type: components['schemas']['ReforgeFindingType'];
+      fromChapter: number;
+      toChapter: number;
+      severity: number;
+      confidence: number;
+      /** @description signal = mechanical only, model = reading pass only, both = the reading pass confirmed a signal. */
+      detectedBy: components['schemas']['ReforgeFindingSource'];
+      label: string;
+      detail?: null | string;
+      /** @description Detector evidence behind the finding. */
+      evidence?: null | {
+        [key: string]: unknown;
+      };
+    };
+    /** @enum {string} */
+    ReforgeFindingSource: 'signal' | 'model' | 'both';
+    ReforgePlanDetailResponse: {
+      plan: components['schemas']['ReforgePlanResponse'];
+      spans: components['schemas']['ReforgePlanSpanResponse'][];
+      /** @description Derived from the running sum of targetChapters — never authored. */
+      outputChapterCount: number;
+    };
+    ReforgePlanResponse: {
+      id: string;
+      revision: number;
+      status: components['schemas']['ReforgePlanStatus'];
+      summary?: null | string;
+      sourceChapterCount: number;
+      outputChapterCount: number;
+      promotedProjectId?: null | string;
+      /** Format: date-time */
+      approvedAt?: null | string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ReforgePlanSpanResponse: {
+      ordinal: number;
+      fromChapter: number;
+      toChapter: number;
+      action: components['schemas']['ReforgeSpanAction'];
+      /** @description Output chapters this span produces; 0 only for a drop. */
+      targetChapters: number;
+      arcLabel?: null | string;
+      rationale?: null | string;
+      /** @description Beats every output chapter of this span owes — the judge’s contract. */
+      keptBeats?: null | string[];
+      /** @description Threads this span removes; each seeds a cut-ledger entry at approval. */
+      cutThreads?: null | string[];
+      /** @description Required on a span that follows a dropped span — the bridge across the seam. */
+      continuityNotes?: null | string;
+      findingIds?: null | string[];
+      /** @description Stable across revisions that leave the span’s bounds, action, and target untouched. */
+      spanKey: string;
+      /** @description First output chapter this span produces; null for a drop. */
+      firstOutputChapter?: null | number;
+      lastOutputChapter?: null | number;
+    };
+    /** @enum {string} */
+    ReforgeSpanAction: 'keep' | 'condense' | 'merge' | 'drop';
+    ReforgePlanSpansBody: {
+      spans: components['schemas']['ReforgePlanSpanBody'][];
+      /** @description The plan revision this edit was made against; a mismatch 409s rather than overwriting a newer one. */
+      baseRevision?: number;
+    };
+    ReforgePlanSpanBody: {
+      ordinal: number;
+      fromChapter: number;
+      toChapter: number;
+      action: components['schemas']['ReforgeSpanAction'];
+      /** @description Output chapters this span produces; 0 only for a drop. */
+      targetChapters: number;
+      arcLabel?: string | null;
+      rationale?: string | null;
+      /** @description Beats every output chapter of this span owes — the judge’s contract. */
+      keptBeats?: string[] | null;
+      /** @description Threads this span removes; each seeds a cut-ledger entry at approval. */
+      cutThreads?: string[] | null;
+      /** @description Required on a span that follows a dropped span — the bridge across the seam. */
+      continuityNotes?: string | null;
+      findingIds?: string[] | null;
+    };
+    ReforgePlanApproveBody: {
+      /** @description The plan revision being approved; a mismatch 409s rather than approving a plan the author never read. */
+      baseRevision?: number;
+    };
+    ReforgeTransformStartBody: {
+      /** @description Output chapters to write; omitted means every output the plan derives that is not written yet. */
+      outputs?: number[];
+      /** @description Rewrite outputs that already landed instead of only the missing ones. */
+      force?: boolean;
+      /** @description Cap on outputs written in this run — a trial before committing the book. */
+      limit?: number;
+    };
+    ListReforgeOutputsResponse: {
+      items: components['schemas']['ReforgeOutputSummaryResponse'][];
+    };
+    ReforgeOutputSummaryResponse: {
+      outputChapter: number;
+      spanOrdinal: number;
+      fromChapter: number;
+      toChapter: number;
+      /** @description 0-based slice of a condensed span. */
+      indexInSpan: number;
+      title?: null | string;
+      status: components['schemas']['ReforgeOutputStatus'];
+      issueCount: number;
+      wordCount?: null | number;
+      revision: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    ReforgeOutputStatus: 'written' | 'attention' | 'failed';
+    ReforgeOutputResponse: {
+      outputChapter: number;
+      spanOrdinal: number;
+      fromChapter: number;
+      toChapter: number;
+      indexInSpan: number;
+      title?: null | string;
+      status: components['schemas']['ReforgeOutputStatus'];
+      wordCount?: null | number;
+      revision: number;
+      /** Format: date-time */
+      updatedAt: string;
+      body: string;
+      summary?: null | string;
+      /** @description The kept beats this chapter owed — the judge’s contract. */
+      planBeats?: null | string[];
+      /** @description Changes the transform writer reported. */
+      changes?: null | {
+        [key: string]: unknown;
+      };
+      /** @description Plan-contract assessment from the transform judge. */
+      fidelity?: null | {
+        [key: string]: unknown;
+      };
+      issues?: null | components['schemas']['ReforgeDetailItem'][];
+    };
+    ReforgePromoteBody: {
+      /** @description Title of the promoted project; defaults to the source project’s. */
+      title?: string;
+      /** @description Write the plan’s arc boundaries as volumes so the promoted project is immediately plannable. */
+      seedVolumes?: boolean;
+    };
+    ListReforgeCutsResponse: {
+      items: components['schemas']['ReforgeCutResponse'][];
+    };
+    ReforgeCutResponse: {
+      cutKey: string;
+      kind: components['schemas']['ReforgeCutKind'];
+      label: string;
+      aliases?: null | string[];
+      detail?: null | string;
+      disposition: components['schemas']['ReforgeCutDisposition'];
+      replacementNote?: null | string;
+      originSpanOrdinal: number;
+      firstSourceChapter: number;
+      lastSourceChapter: number;
+      /** @description The cut never resurfaces at or after this output chapter. */
+      effectiveFromOutput: number;
+    };
+    /** @enum {string} */
+    ReforgeCutKind: 'subplot' | 'thread' | 'entity' | 'arc' | 'running_gag' | 'scene_pattern';
+    /** @enum {string} */
+    ReforgeCutDisposition: 'cut' | 'condensed' | 'resolved_early';
     ReforgeManuscriptResponse: {
       markdown: string;
     };
@@ -10277,6 +10730,589 @@ export interface operations {
       };
     };
   };
+  post_api_v1_projects_projectId_reforge_analyze: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_reforge_analysis: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReforgeAnalysisStatusResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_reforge_analysis_report: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReforgeReportResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_reforge_analysis_findings: {
+    parameters: {
+      query?: {
+        type?: components['schemas']['ReforgeFindingType'];
+        minSeverity?: number | string;
+        page?: number | string;
+        limit?: number | string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListReforgeFindingsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_reforge_plan: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReforgePlanDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_reforge_plan: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_reforge_plan_spans: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReforgePlanSpansBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReforgePlanDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_reforge_plan_approve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReforgePlanApproveBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReforgePlanDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_reforge_transform: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReforgeTransformStartBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_reforge_outputs: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListReforgeOutputsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_reforge_outputs_outputChapter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        outputChapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReforgeOutputResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_reforge_outputs_outputChapter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        outputChapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_reforge_promote: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReforgePromoteBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_reforge_cuts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListReforgeCutsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects_projectId_reforge_manuscript: {
     parameters: {
       query?: never;
@@ -10876,17 +11912,48 @@ export type ConversionDetailItem = components['schemas']['ConversionDetailItem']
 export type ManuscriptResponse = components['schemas']['ManuscriptResponse'];
 export type ReforgeConfigBody = components['schemas']['ReforgeConfigBody'];
 export type ReforgeFidelity = components['schemas']['ReforgeFidelity'];
+export type ReforgeMode = components['schemas']['ReforgeMode'];
 export type ReforgeSettingsBody = components['schemas']['ReforgeSettingsBody'];
 export type ReforgeResponse = components['schemas']['ReforgeResponse'];
 export type ReforgeStatus = components['schemas']['ReforgeStatus'];
 export type ReforgeStartBody = components['schemas']['ReforgeStartBody'];
 export type ReforgeStatusResponse = components['schemas']['ReforgeStatusResponse'];
 export type ReforgeCountsResponse = components['schemas']['ReforgeCountsResponse'];
+export type ReforgeTransformStatusResponse = components['schemas']['ReforgeTransformStatusResponse'];
+export type ReforgePlanHeaderResponse = components['schemas']['ReforgePlanHeaderResponse'];
+export type ReforgePlanStatus = components['schemas']['ReforgePlanStatus'];
+export type ReforgeOutputCountsResponse = components['schemas']['ReforgeOutputCountsResponse'];
 export type ListReforgesResponse = components['schemas']['ListReforgesResponse'];
 export type ReforgeSummaryResponse = components['schemas']['ReforgeSummaryResponse'];
 export type ReforgeChapterStatus = components['schemas']['ReforgeChapterStatus'];
 export type ReforgeChapterResponse = components['schemas']['ReforgeChapterResponse'];
 export type ReforgeDetailItem = components['schemas']['ReforgeDetailItem'];
+export type ReforgeAnalysisStatusResponse = components['schemas']['ReforgeAnalysisStatusResponse'];
+export type ReforgeAnalysisResponse = components['schemas']['ReforgeAnalysisResponse'];
+export type ReforgeAnalysisStatus = components['schemas']['ReforgeAnalysisStatus'];
+export type ReforgeAnalysisMetricsResponse = components['schemas']['ReforgeAnalysisMetricsResponse'];
+export type ReforgeReportResponse = components['schemas']['ReforgeReportResponse'];
+export type ReforgeFindingType = components['schemas']['ReforgeFindingType'];
+export type ListReforgeFindingsResponse = components['schemas']['ListReforgeFindingsResponse'];
+export type ReforgeFindingResponse = components['schemas']['ReforgeFindingResponse'];
+export type ReforgeFindingSource = components['schemas']['ReforgeFindingSource'];
+export type ReforgePlanDetailResponse = components['schemas']['ReforgePlanDetailResponse'];
+export type ReforgePlanResponse = components['schemas']['ReforgePlanResponse'];
+export type ReforgePlanSpanResponse = components['schemas']['ReforgePlanSpanResponse'];
+export type ReforgeSpanAction = components['schemas']['ReforgeSpanAction'];
+export type ReforgePlanSpansBody = components['schemas']['ReforgePlanSpansBody'];
+export type ReforgePlanSpanBody = components['schemas']['ReforgePlanSpanBody'];
+export type ReforgePlanApproveBody = components['schemas']['ReforgePlanApproveBody'];
+export type ReforgeTransformStartBody = components['schemas']['ReforgeTransformStartBody'];
+export type ListReforgeOutputsResponse = components['schemas']['ListReforgeOutputsResponse'];
+export type ReforgeOutputSummaryResponse = components['schemas']['ReforgeOutputSummaryResponse'];
+export type ReforgeOutputStatus = components['schemas']['ReforgeOutputStatus'];
+export type ReforgeOutputResponse = components['schemas']['ReforgeOutputResponse'];
+export type ReforgePromoteBody = components['schemas']['ReforgePromoteBody'];
+export type ListReforgeCutsResponse = components['schemas']['ListReforgeCutsResponse'];
+export type ReforgeCutResponse = components['schemas']['ReforgeCutResponse'];
+export type ReforgeCutKind = components['schemas']['ReforgeCutKind'];
+export type ReforgeCutDisposition = components['schemas']['ReforgeCutDisposition'];
 export type ReforgeManuscriptResponse = components['schemas']['ReforgeManuscriptResponse'];
 export type PublishNovelBody = components['schemas']['PublishNovelBody'];
 export type PublicationResponse = components['schemas']['PublicationResponse'];
@@ -10987,6 +12054,14 @@ export type GetRebrandManuscriptPathParams = Exclude<paths['/api/v1/projects/{pr
 export type GetReforgeStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge']['get']['parameters']['path'], undefined>;
 export type ListReforgesPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/chapters']['get']['parameters']['path'], undefined>;
 export type GetReforgePathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/chapters/{chapter}']['get']['parameters']['path'], undefined>;
+export type GetAnalysisPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/analysis']['get']['parameters']['path'], undefined>;
+export type GetAnalysisReportPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/analysis/report']['get']['parameters']['path'], undefined>;
+export type ListFindingsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/analysis/findings']['get']['parameters']['query'], undefined>;
+export type ListFindingsPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/analysis/findings']['get']['parameters']['path'], undefined>;
+export type GetPlanPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/plan']['get']['parameters']['path'], undefined>;
+export type ListOutputsPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/outputs']['get']['parameters']['path'], undefined>;
+export type GetOutputPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/outputs/{outputChapter}']['get']['parameters']['path'], undefined>;
+export type ListCutsPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/cuts']['get']['parameters']['path'], undefined>;
 export type GetReforgeManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/manuscript']['get']['parameters']['path'], undefined>;
 export type GetAccessPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications/access']['get']['parameters']['path'], undefined>;
 export type ListPublicationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications']['get']['parameters']['path'], undefined>;

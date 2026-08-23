@@ -350,7 +350,12 @@ Ordered so each task leaves the tree green on its own.
       that already promoted returns its project instead of landing a second book. `seedVolumes` groups consecutive spans sharing an
       `arcLabel` into one volume; spans without a label seed nothing. The cover carries over as the source's storage reference — the
       promoted project points at the same asset rather than duplicating it.
-- [ ] **RT10** — Web UI: analysis/plan/transform/cuts/promote tabs per §9. _Verify:_ web type-check + lint + build green; api-types regenerated per the monorepo's non-atomic-contract rule.
+- [x] **RT10** — Web UI: analysis/plan/transform/cuts/promote tabs per §9. _Verify:_ web type-check + lint + build green; api-types regenerated per the monorepo's non-atomic-contract rule.
+      The five tabs live on their own screen (`/novels/$novelId/transform`) rather than inside the shipped reforge panel, which stays exactly as it was — §5's "second reader
+      route in the web panel" as a second route. A project still in chapter mode gets the switch instead of the tabs. **No chapter heatmap:** §9 asks for one coloured by the
+      cards' `movement`, but no endpoint exposes `reforge_chapter_cards`, and adding one to draw a heatmap is not worth a table's worth of API; the analysis tab shows the
+      rendered report plus a filterable findings table. The plan editor re-implements the partition invariants client-side so Approve is blocked while the author edits rather
+      than after a round trip — the server re-validates regardless, twice. `api-types.gen.ts` was regenerated hermetically for this app alone.
 - [ ] **RT11** — Evaluation: run the full pipeline over a known-flawed sample (a ~300-chapter MTL cultivation serial with a documented filler arc), and record in this doc: chapter-count reduction, `repetitionRatio` and `stallRatio` before vs. after (the same shingle statistic, re-run over the promoted project's chapters), median chapter length, dead-thread count, judge issue rates, and a human read-through of 10 sampled seams. _Verify:_ the after-metrics improve on repetition and stall ratio without a rise in `seam_break` issues above 5% of outputs; results appended as §12.
 
 ## 11. What NOT to build

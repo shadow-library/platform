@@ -18,6 +18,7 @@ export * from './refinement.api';
 export * from './run.api';
 export * from './rebrand.api';
 export * from './reforge.api';
+export * from './reforge-transform.api';
 export * from './source.api';
 export * from './plan-import.api';
 export * from './novel-import.api';
@@ -31,5 +32,5 @@ export * from './publishing.api';
  * hand-authored shapes the app already builds on — migrating to the generated ones is a separate,
  * unrelated follow-up.
  */
-export type { ReforgeChapterStatus, ReforgeConfigBody, ReforgeFidelity, ReforgeStartBody } from './reforge.api';
+export type { ReforgeChapterStatus, ReforgeConfigBody, ReforgeFidelity, ReforgeMode, ReforgeStartBody } from './reforge.api';
 export type { ChapterPublicationStatus, PublicationStatus, PublishNovelBody } from './publishing.api';

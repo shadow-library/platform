@@ -234,6 +234,14 @@ export const SparkIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
+export const ScissorsIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <circle cx="6" cy="6" r="3" />
+    <circle cx="6" cy="18" r="3" />
+    <path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12" />
+  </SvgIcon>
+);
+
 export const MoreIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon fill="currentColor" stroke="none" {...p}>
     <circle cx="5" cy="12" r="1.6" />
