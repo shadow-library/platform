@@ -3,7 +3,7 @@ import { type ReactElement } from 'react';
 import { Alert, Badge, Button, Card, Progress, Skeleton, Statistic, toast } from '@shadow-library/ui';
 
 import { Screen, ScreenColumns, screenStyles } from '@/components/ScreenLayout';
-import { type IntensityMode, useHeroCommand, useRecovery } from '@/lib/data';
+import { type HeroIntensityMode, useHeroCommand, useRecovery } from '@/lib/data';
 
 import styles from './hero.module.css';
 
@@ -11,7 +11,7 @@ export function RecoveryScreen(): ReactElement {
   const recovery = useRecovery();
   const command = useHeroCommand();
 
-  const setIntensity = (mode: IntensityMode): void => {
+  const setIntensity = (mode: HeroIntensityMode): void => {
     command.mutate({ type: 'intensity.set', mode }, { onSuccess: result => toast.neutral(result.message) });
   };
 

@@ -1,6 +1,6 @@
 import { type SettledCommandResult } from './command.types';
 import { type Persona } from './fixtures';
-import { type Achievement, type Cosmetic, type HeroCommand, type HeroDeck, type HeroTitle, type IntensityMode, type RecoveryView } from './hero.types';
+import { type Achievement, type Cosmetic, type HeroCommand, type HeroDeck, type HeroIntensityMode, type HeroTitle, type RecoveryView } from './hero.types';
 import { type HeroState } from './view.types';
 
 export interface HeroProvider {
@@ -260,7 +260,7 @@ interface HeroFixtureState {
   displayedTitleId: string | null;
   owned: Set<string>;
   equipped: Record<Cosmetic['kind'], string | null>;
-  intensity: IntensityMode;
+  intensity: HeroIntensityMode;
 }
 
 export interface HeroFixtureOptions {

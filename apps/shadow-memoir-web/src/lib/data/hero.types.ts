@@ -1,7 +1,7 @@
 import { type StatAffinity } from './quest.types';
 import { type CrownPeriod, type HeroState } from './view.types';
 
-export type IntensityMode = 'gentle' | 'standard' | 'demanding';
+export type HeroIntensityMode = 'gentle' | 'standard' | 'demanding';
 
 /** Locked achievements carry a teaser and nothing countable — a progress number turns the catalogue into a chore (PRD §2.9). */
 export interface Achievement {
@@ -87,7 +87,7 @@ export interface RecoveryChoice {
 }
 
 export interface IntensityOption {
-  mode: IntensityMode;
+  mode: HeroIntensityMode;
   name: string;
   description: string;
 }
@@ -104,7 +104,7 @@ export interface RecoveryView {
   body: string;
   stats: { label: string; value: number; unit?: string }[];
   choices: RecoveryChoice[];
-  intensity: IntensityMode;
+  intensity: HeroIntensityMode;
   intensityOptions: IntensityOption[];
   missed: MissedWhileAway[];
   progressPercent: number;
@@ -118,4 +118,4 @@ export type HeroCommand =
   | { type: 'title.display'; titleId: string | null }
   | { type: 'cosmetic.purchase'; cosmeticId: string }
   | { type: 'cosmetic.equip'; cosmeticId: string }
-  | { type: 'intensity.set'; mode: IntensityMode };
+  | { type: 'intensity.set'; mode: HeroIntensityMode };

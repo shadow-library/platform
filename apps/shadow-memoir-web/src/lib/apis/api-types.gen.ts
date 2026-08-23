@@ -187,6 +187,75 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/account': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get */
+    get: operations['get_api_v1_account'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Patch */
+    patch: operations['patch_api_v1_account'];
+    trace?: never;
+  };
+  '/api/v1/account/onboarding': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Onboard */
+    post: operations['post_api_v1_account_onboarding'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ocr/parse': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Parse */
+    post: operations['post_api_v1_ocr_parse'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ocr/quota': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Quota */
+    get: operations['get_api_v1_ocr_quota'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -336,6 +405,145 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+    };
+    AccountResponseDto: {
+      id: string;
+      email?: null | string;
+      displayName?: null | string;
+      photoUrl?: null | string;
+      authProvider: components['schemas']['AuthProvider'];
+      /** @description ISO 4217 currency code; immutable once onboarding completes */
+      defaultCurrency: string;
+      enabledCurrencies: string[];
+      /** @description IANA timezone; the day-boundary authority for this account */
+      timezone: string;
+      /** @description Staged by PATCH, not yet live; takes effect at the next daily rollover */
+      pendingTimezone?: null | string;
+      scheduleStartMin: number;
+      scheduleEndMin: number;
+      theme: components['schemas']['Theme'];
+      weekStart: number;
+      intensityMode: components['schemas']['IntensityMode'];
+      /** @description Staged by PATCH, not yet live; takes effect at the next daily rollover */
+      pendingIntensityMode?: components['schemas']['IntensityMode'] | null;
+      returnerThresholdDays: number;
+      notificationPrefs: components['schemas']['NotificationPrefsDto'];
+      /**
+       * Format: date-time
+       * @description Null routes the client back into the forced-essentials onboarding flow
+       */
+      onboardingCompletedAt?: null | string;
+      level: number;
+      totalXp: string;
+      coins: number;
+      statDiscipline: number;
+      statBody: number;
+      statWealth: number;
+      statMind: number;
+      hpToday: number;
+      hpStartToday: number;
+      hpMax: number;
+      /** Format: date */
+      lastHpDate?: null | string;
+      /** Format: date */
+      lastActiveDate?: null | string;
+      capacityBaseline?: null | number;
+      warmthState: components['schemas']['WarmthState'];
+      /** Format: date */
+      crownPeriodStart?: null | string;
+      crownRemaining?: null | number;
+      crownCoinsRemaining?: null | number;
+      displayedTitleId?: null | string;
+      featureFlags: {
+        [key: string]: unknown;
+      };
+      /** Format: date */
+      ocrQuotaDate?: null | string;
+      ocrQuotaCount: number;
+      deletionState: components['schemas']['DeletionState'];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    AuthProvider: 'google' | 'apple';
+    /** @enum {string} */
+    Theme: 'system' | 'light' | 'dark';
+    /** @enum {string} */
+    IntensityMode: 'standard' | 'low_intensity' | 'high_intensity';
+    NotificationPrefsDto: {
+      /** @description Weekly-review digest email (Sunday, day/time configurable in a later phase) */
+      weeklyDigest: boolean;
+      /** @description AI-result-readiness email (Phase 2) */
+      aiReadiness: boolean;
+      /** @description Subscription billing-reminder email */
+      billingReminders: boolean;
+    };
+    /** @enum {string} */
+    WarmthState: 'cold' | 'steady' | 'warm';
+    /** @enum {string} */
+    DeletionState: 'none' | 'pending' | 'blobs_deleted' | 'data_deleted' | 'identity_closed' | 'done';
+    AccountPatchDto: {
+      authProvider?: string;
+      defaultCurrency?: string;
+      createdAt?: string;
+      updatedAt?: string;
+      /** @description Staged, not applied immediately — see `pendingTimezone` on the GET response */
+      timezone?: string;
+      scheduleStartMin?: number;
+      scheduleEndMin?: number;
+      theme?: components['schemas']['Theme'];
+      weekStart?: number;
+      /** @description Staged, not applied immediately — see `pendingIntensityMode` on the GET response */
+      intensityMode?: components['schemas']['IntensityMode'];
+      returnerThresholdDays?: number;
+      notificationPrefs?: components['schemas']['NotificationPrefsPatchDto'];
+    };
+    NotificationPrefsPatchDto: {
+      weeklyDigest?: boolean;
+      aiReadiness?: boolean;
+      billingReminders?: boolean;
+    };
+    OnboardingDto: {
+      defaultCurrency: string;
+      /** @description Additional enabled currencies beyond defaultCurrency, which is always included */
+      enabledCurrencies?: string[];
+      /** @description IANA timezone */
+      timezone: string;
+      scheduleStartMin: number;
+      scheduleEndMin: number;
+    };
+    OcrParseDto: {
+      /** @description On-device-extracted receipt text (ARCHITECTURE §14.3 step 1); the server never sees the receipt image itself */
+      extractedText: string;
+    };
+    OcrParseResponseDto: {
+      amount: string;
+      merchant?: null | string;
+      category?: null | string;
+      /** Format: date */
+      date?: null | string;
+      confidence: number;
+      /** @description Present only when the structuring call resolved individual line items; the client still offers full/total-only/mix at confirm time */
+      lineItems?: null | components['schemas']['OcrLineItemDto'][];
+    };
+    OcrLineItemDto: {
+      label: string;
+      amountText?: null | string;
+      amountMinor?: null | number;
+    };
+    OcrQuotaResponseDto: {
+      /** @description Daily scan cap (quotas.ocr-daily, tunable) */
+      cap: number;
+      /** @description Scans consumed so far for the account's current local day */
+      used: number;
+      remaining: number;
+      /**
+       * Format: date-time
+       * @description Next local midnight in the account timezone — when the count resets
+       */
+      resetAt: string;
     };
   };
   responses: never;
@@ -802,6 +1010,208 @@ export interface operations {
       };
     };
   };
+  get_api_v1_account: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_account: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AccountPatchDto'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_account_onboarding: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OnboardingDto'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_ocr_parse: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OcrParseDto'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OcrParseResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_ocr_quota: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OcrQuotaResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
 }
 export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
 export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
@@ -821,6 +1231,20 @@ export type SyncDeltaResponseDto = components['schemas']['SyncDeltaResponseDto']
 export type SyncTombstoneDto = components['schemas']['SyncTombstoneDto'];
 export type DeviceUpsertDto = components['schemas']['DeviceUpsertDto'];
 export type DeviceResponseDto = components['schemas']['DeviceResponseDto'];
+export type AccountResponseDto = components['schemas']['AccountResponseDto'];
+export type AuthProvider = components['schemas']['AuthProvider'];
+export type Theme = components['schemas']['Theme'];
+export type IntensityMode = components['schemas']['IntensityMode'];
+export type NotificationPrefsDto = components['schemas']['NotificationPrefsDto'];
+export type WarmthState = components['schemas']['WarmthState'];
+export type DeletionState = components['schemas']['DeletionState'];
+export type AccountPatchDto = components['schemas']['AccountPatchDto'];
+export type NotificationPrefsPatchDto = components['schemas']['NotificationPrefsPatchDto'];
+export type OnboardingDto = components['schemas']['OnboardingDto'];
+export type OcrParseDto = components['schemas']['OcrParseDto'];
+export type OcrParseResponseDto = components['schemas']['OcrParseResponseDto'];
+export type OcrLineItemDto = components['schemas']['OcrLineItemDto'];
+export type OcrQuotaResponseDto = components['schemas']['OcrQuotaResponseDto'];
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;

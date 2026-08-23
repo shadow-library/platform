@@ -98,6 +98,12 @@ export class OpenApiService {
           const resolvedRefId = this.resolveSchemaId(property.items.$ref);
           property.items.$ref = `#/components/schemas/${resolvedRefId}`;
         }
+
+        for (const option of property.anyOf ?? []) {
+          if (!option.$ref || option.$ref.startsWith('#/components/schemas/')) continue;
+          const resolvedRefId = this.resolveSchemaId(option.$ref);
+          option.$ref = `#/components/schemas/${resolvedRefId}`;
+        }
       }
     }
 
