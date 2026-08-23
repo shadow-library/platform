@@ -4,34 +4,37 @@ Source: `harness-post-implementation-review.md` (verdict: NEEDS TARGETED FIXES),
 Before Evaluation", cross-checked against `harness-final-recommendation.md` for architectural
 alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P1 architecture.
 
-**All eleven required fixes are complete.** Per the audit's own framing (§18: "The first eight rows
-should be corrected before evaluation novels are used to judge architecture quality... The medium rows
-are small enough and directly related enough to include in the same pre-evaluation pass"), this closes
-every finding the audit classified as evaluation-blocking. See the classification section below for
-what was knowingly deferred and why.
+**Eleven required fixes were completed, then re-verified by Codex** (`harness-targeted-fixes-
+verification.md`, verdict: NEEDS TARGETED FIXES). That pass found four remaining narrow gaps inside
+already-"complete" FIX-01/05/06/03, now tracked as FIX-12..FIX-15 below. Scope for this second round is
+corrective only, same as the first — no new subsystems, no reopening the architecture.
 
 ## Summary
 
-- Completed: 11
+- Completed: 12
 - In Progress: 0
-- Pending: 0
+- Pending: 3
 - Blocked: 0
 
 ## Tasks
 
-| ID     | Severity | Task                                                                                                                                | Status    | Dependencies |
-| ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------ |
-| FIX-01 | CRITICAL | Make chapter finalization recoverable/idempotent across prose commit → extraction → apply → cursor                                  | COMPLETED | —            |
-| FIX-02 | CRITICAL | Reject mutation/deletion of finalized drafts; fix cross-table renumbering invariant on delete                                       | COMPLETED | —            |
-| FIX-03 | HIGH     | Read `character_states` + current relationships into `forChapter`; validate entity keys before applying extraction                  | COMPLETED | —            |
-| FIX-04 | HIGH     | Render `brief.pov` into generation/judge brief; guarantee POV entity card priority                                                  | COMPLETED | —            |
-| FIX-05 | HIGH     | Arc reconciliation observes events inside the current arc, not `arc.chapterStart`; protect/invalidate already-drafted descendants   | COMPLETED | FIX-02       |
-| FIX-06 | HIGH     | Continuity extraction receives existing key vocabulary; validate relationship targets/evidence; route ambiguous mutations to review | COMPLETED | —            |
-| FIX-07 | HIGH     | Bible stage output instructions match schema; persist stage atomically; fix `bible_doc` ref format mismatch                         | COMPLETED | —            |
-| FIX-08 | HIGH     | Gate/cap the legacy whole-book `outline()` endpoint so it cannot overwrite protected arc briefs                                     | COMPLETED | —            |
-| FIX-09 | MEDIUM   | Align `revealChapter` catalog semantics with the actual knowledge ledger                                                            | COMPLETED | —            |
-| FIX-10 | MEDIUM   | Require `briefCompliance` at runtime; fail closed if the judge omits it                                                             | COMPLETED | —            |
-| FIX-11 | MEDIUM   | Use one writing-style policy across generation, fix, and revision prompts                                                           | COMPLETED | —            |
+| ID     | Severity | Task                                                                                                                                    | Status    | Dependencies |
+| ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------ |
+| FIX-01 | CRITICAL | Make chapter finalization recoverable/idempotent across prose commit → extraction → apply → cursor                                      | COMPLETED | —            |
+| FIX-02 | CRITICAL | Reject mutation/deletion of finalized drafts; fix cross-table renumbering invariant on delete                                           | COMPLETED | —            |
+| FIX-03 | HIGH     | Read `character_states` + current relationships into `forChapter`; validate entity keys before applying extraction                      | COMPLETED | —            |
+| FIX-04 | HIGH     | Render `brief.pov` into generation/judge brief; guarantee POV entity card priority                                                      | COMPLETED | —            |
+| FIX-05 | HIGH     | Arc reconciliation observes events inside the current arc, not `arc.chapterStart`; protect/invalidate already-drafted descendants       | COMPLETED | FIX-02       |
+| FIX-06 | HIGH     | Continuity extraction receives existing key vocabulary; validate relationship targets/evidence; route ambiguous mutations to review     | COMPLETED | —            |
+| FIX-07 | HIGH     | Bible stage output instructions match schema; persist stage atomically; fix `bible_doc` ref format mismatch                             | COMPLETED | —            |
+| FIX-08 | HIGH     | Gate/cap the legacy whole-book `outline()` endpoint so it cannot overwrite protected arc briefs                                         | COMPLETED | —            |
+| FIX-09 | MEDIUM   | Align `revealChapter` catalog semantics with the actual knowledge ledger                                                                | COMPLETED | —            |
+| FIX-10 | MEDIUM   | Require `briefCompliance` at runtime; fail closed if the judge omits it                                                                 | COMPLETED | —            |
+| FIX-11 | MEDIUM   | Use one writing-style policy across generation, fix, and revision prompts                                                               | COMPLETED | —            |
+| FIX-12 | HIGH     | Cursor-only finalization retry must not re-extract or reapply continuity (residual gap in FIX-01)                                       | COMPLETED | FIX-01       |
+| FIX-13 | HIGH     | Ancestor draft changes (update/import/revise) must invalidate drafted descendants (residual gap in FIX-05)                              | PENDING   | FIX-05       |
+| FIX-14 | HIGH     | Low-confidence continuity entries must stay reachable for review, not marked applied (residual gap in FIX-06)                           | PENDING   | FIX-06       |
+| FIX-15 | HIGH     | Character-state merge must replace/clear fields per the extraction contract, not `COALESCE`-merge stale values (residual gap in FIX-03) | PENDING   | FIX-03       |
 
 Ordering rationale: data-integrity/recoverability (FIX-01, FIX-02) before state/context-correctness
 gaps that bias prose quality without corrupting data (FIX-03–06), before control-flow/integration
@@ -83,7 +86,9 @@ None.
 
 ## Pending
 
-All eleven required fixes are COMPLETED. Nothing left to select.
+- FIX-13 — ancestor draft invalidation
+- FIX-14 — low-confidence continuity reviewability
+- FIX-15 — character-state stale merge semantics
 
 ## Blocked
 
@@ -510,3 +515,43 @@ Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type
 1011 pass, 10 skip, 0 fail (independently re-run).
 
 Commit: (recorded after commit, see git log)
+
+### FIX-12 — Cursor-only finalization retry no longer re-extracts/reapplies continuity
+
+Source finding: `harness-targeted-fixes-verification.md` C1 residual gap ("A second logical run
+re-extracts continuity via a fresh LLM call and reapplies a potentially different delta after a
+cursor-only failure").
+
+Root cause: FIX-01 made the finalization graph resumable by re-running the whole node chain
+(`guard → commitProse → extractContinuity → applyContinuity → updateIndexes → advanceCursor → finish`)
+from `START` on retry, relying on every node already being idempotent. `applyContinuity` correctly
+no-ops when handed a falsy `continuityDelta`, but `extractContinuity` itself was not idempotent — it
+called the LLM and unconditionally overwrote the `continuity_proposals` row via `onConflictDoUpdate`
+on every invocation, with no check of whether continuity for that chapter had already durably landed.
+So a retry after `continuityApplied=true` but a failed cursor write called the extraction LLM again,
+and because extraction is model output, the second delta need not equal the first — creating a second,
+possibly contradictory continuity mutation on top of the first.
+
+What changed: `extractContinuity` (`chapter-finalization.graph.ts`) now reads
+`chapters.continuityApplied` for `(projectId, chapter)` immediately after the existing grok early-return,
+before calling `modelRouter.structured` or touching `continuityProposals`. If already `true`, it returns
+`{ continuityDelta: null, nodeTrace: ['extractContinuity'] }` — the same shape as the grok skip — so
+`applyContinuity`'s existing falsy-delta guard carries the resume straight through to `updateIndexes`/
+`advanceCursor` with no LLM call and no proposal overwrite. No other node, edge, state field, table, or
+migration changed — the durable `continuityApplied` flag already written by `applyContinuity` was the
+correct resume marker; it was just never read by `extractContinuity`.
+
+Tests: `tests/ai/finalization-resume.spec.ts` (+1: `should not re-extract or reapply continuity when
+resuming after continuityApplied=true but cursor advancement failed`). Seeds a chapter through a first
+graph run that completes `applyContinuity` (`continuityApplied=true`, proposal = delta A) then fails at
+`advanceCursor` (a `db.update` proxy trap simulates the cursor-write failure); re-invokes the graph with
+a stub that would return a different delta B on a second extraction call; asserts the extraction stub
+was called exactly once total, `continuity_proposals` still holds delta A unchanged, no entity from
+delta B was created, and the cursor still advances correctly on the resumed run. Confirmed against
+pre-fix code (guard temporarily disabled): the test fails on `expect(calls).toBe(1)` (2 calls observed).
+Passes after the fix.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+1012 pass, 10 skip, 0 fail (independently re-run).
+
+Commit: `3e7ac933`
