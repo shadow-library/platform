@@ -1,6 +1,6 @@
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, lt } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { Config } from '@shadow-library/common';
 
@@ -49,13 +49,23 @@ describe.if(pgAvailable)('arc reconciliation on finalization', () => {
 
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
-  function buildService(): { service: GenerationService; structured: ReturnType<typeof mock>; finalization: ReturnType<typeof mock> } {
+  function buildService(): { service: GenerationService; structured: ReturnType<typeof mock>; forOutline: ReturnType<typeof mock>; finalization: ReturnType<typeof mock> } {
     const structured = mock(async (_prompt: unknown, vars: { startChapter: number; endChapter: number }) =>
       Array.from({ length: vars.endChapter - vars.startChapter + 1 }, (_, i) => modelBrief(vars.startChapter + i)),
     );
     const finalization = mock(async () => ({ runId: 'run-1', outcome: 'completed', status: 'completed' }));
+    // Mirrors the real assembler's "finalized chapters strictly before N" rule so the pack reflects the
+    // as-of chapter outlineArc chose.
+    const forOutline = mock(async (projectId: bigint, chapter: number) => {
+      const recent = await db.query.chapters.findMany({
+        where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), lt(schema.chapters.number, chapter)),
+        orderBy: desc(schema.chapters.number),
+        limit: 3,
+      });
+      return { rendered: ['CATALOG', ...recent.map(c => `Ch ${c.number}: ${c.summary ?? ''}`)].join('\n') };
+    });
     const contextAssembler = {
-      forOutline: async () => ({ rendered: 'CATALOG' }),
+      forOutline,
       resolveRefs: async (_projectId: bigint, refs: string[]) => ({ resolved: [], unresolved: refs }),
     } as never;
     const noop = {} as never;
@@ -73,7 +83,7 @@ describe.if(pgAvailable)('arc reconciliation on finalization', () => {
       noop,
       noop,
     );
-    return { service, structured, finalization };
+    return { service, structured, forOutline, finalization };
   }
 
   interface ArcFixture {
@@ -81,10 +91,20 @@ describe.if(pgAvailable)('arc reconciliation on finalization', () => {
     finalizedThrough?: number;
     staleChapters?: number[];
     handEditedChapters?: number[];
+    draftedChapters?: number[];
+    chapterSummaries?: Record<number, string>;
     arcStatus?: 'draft' | 'approved';
   }
 
-  async function seedArc({ chapterEnd = 10, finalizedThrough = 0, staleChapters = [], handEditedChapters = [], arcStatus = 'approved' }: ArcFixture = {}): Promise<bigint> {
+  async function seedArc({
+    chapterEnd = 10,
+    finalizedThrough = 0,
+    staleChapters = [],
+    handEditedChapters = [],
+    draftedChapters = [],
+    chapterSummaries = {},
+    arcStatus = 'approved',
+  }: ArcFixture = {}): Promise<bigint> {
     const [project] = await db
       .insert(schema.projects)
       .values({ name: `recon-${Date.now()}-${Math.random()}`, kind: 'new_novel' })
@@ -106,12 +126,25 @@ describe.if(pgAvailable)('arc reconciliation on finalization', () => {
       })),
     );
     if (finalizedThrough > 0) {
-      await db
-        .insert(schema.chapters)
-        .values(Array.from({ length: finalizedThrough }, (_, i) => ({ projectId, number: i + 1, content: `ch${i + 1}`, status: 'done' as const, locked: true })));
+      await db.insert(schema.chapters).values(
+        Array.from({ length: finalizedThrough }, (_, i) => ({
+          projectId,
+          number: i + 1,
+          content: `ch${i + 1}`,
+          summary: chapterSummaries[i + 1] ?? null,
+          status: 'done' as const,
+          locked: true,
+        })),
+      );
       await db
         .insert(schema.drafts)
         .values(Array.from({ length: finalizedThrough }, (_, i) => ({ projectId, chapter: i + 1, body: `d${i + 1}`, status: 'final' as const, reviewStatus: 'final' as const })));
+    }
+    const pending = draftedChapters.filter(c => c > finalizedThrough);
+    if (pending.length > 0) {
+      await db
+        .insert(schema.drafts)
+        .values(pending.map(chapter => ({ projectId, chapter, body: `pending draft ${chapter}`, status: 'draft' as const, reviewStatus: 'needs_review' as const })));
     }
     return projectId;
   }
@@ -215,6 +248,49 @@ describe.if(pgAvailable)('arc reconciliation on finalization', () => {
 
     await expect(service.finalize(projectId, { chapter: 5 })).resolves.toMatchObject({ runId: 'run-1' });
     expect(finalization).toHaveBeenCalledTimes(1);
+  });
+
+  it('should assemble the reconciliation pack as of the latest chapter finalized inside the arc', async () => {
+    const projectId = await seedArc({ finalizedThrough: 4, chapterSummaries: { 4: 'the mentor betrays the crew' } });
+    await db.insert(schema.drafts).values({ projectId, chapter: 5, body: 'd5', status: 'draft', reviewStatus: 'approved' });
+    const { service, structured, forOutline } = buildService();
+
+    await service.finalize(projectId, { chapter: 5 });
+
+    expect(forOutline).toHaveBeenCalledWith(projectId, 5);
+    expect(structured.mock.calls[0]?.[1]).toMatchObject({ catalog: expect.stringContaining('the mentor betrays the crew') });
+  });
+
+  it('should assemble a first outline as of the arc start when nothing in the arc is finalized', async () => {
+    const projectId = await seedArc({ finalizedThrough: 0 });
+    const { service, forOutline } = buildService();
+
+    await service.outlineArc(projectId, 'vol_1_arc_1', {});
+
+    expect(forOutline).toHaveBeenCalledWith(projectId, 1);
+  });
+
+  it('should skip persisting a brief whose chapter already has a non-final draft', async () => {
+    const projectId = await seedArc({ draftedChapters: [7] });
+    const { service } = buildService();
+
+    await service.outlineArc(projectId, 'vol_1_arc_1', {});
+
+    const persisted = await briefsOf(projectId);
+    expect(persisted.find(b => b.chapter === 7)?.body).toBe('original brief 7');
+    expect(persisted.find(b => b.chapter === 7)?.title).toBeNull();
+  });
+
+  it('should still re-outline a remaining chapter that has no draft, hand-edit, or finalization', async () => {
+    const projectId = await seedArc({ finalizedThrough: 4, draftedChapters: [6] });
+    await db.insert(schema.drafts).values({ projectId, chapter: 5, body: 'd5', status: 'draft', reviewStatus: 'approved' });
+    const { service } = buildService();
+
+    await service.finalize(projectId, { chapter: 5 });
+
+    const persisted = await briefsOf(projectId);
+    expect(persisted.find(b => b.chapter === 6)?.body).toBe('original brief 6');
+    expect(persisted.find(b => b.chapter === 7)?.title).toBe('Regenerated 7');
   });
 
   it('should mark a brief hand-edited when a human updates it directly', async () => {

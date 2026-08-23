@@ -6,9 +6,9 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 
 ## Summary
 
-- Completed: 4
+- Completed: 5
 - In Progress: 0
-- Pending: 7
+- Pending: 6
 - Blocked: 0
 
 ## Tasks
@@ -19,7 +19,7 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 | FIX-02 | CRITICAL | Reject mutation/deletion of finalized drafts; fix cross-table renumbering invariant on delete                                       | COMPLETED | —            |
 | FIX-03 | HIGH     | Read `character_states` + current relationships into `forChapter`; validate entity keys before applying extraction                  | COMPLETED | —            |
 | FIX-04 | HIGH     | Render `brief.pov` into generation/judge brief; guarantee POV entity card priority                                                  | COMPLETED | —            |
-| FIX-05 | HIGH     | Arc reconciliation observes events inside the current arc, not `arc.chapterStart`; protect/invalidate already-drafted descendants   | PENDING   | FIX-02       |
+| FIX-05 | HIGH     | Arc reconciliation observes events inside the current arc, not `arc.chapterStart`; protect/invalidate already-drafted descendants   | COMPLETED | FIX-02       |
 | FIX-06 | HIGH     | Continuity extraction receives existing key vocabulary; validate relationship targets/evidence; route ambiguous mutations to review | PENDING   | —            |
 | FIX-07 | HIGH     | Bible stage output instructions match schema; persist stage atomically; fix `bible_doc` ref format mismatch                         | PENDING   | —            |
 | FIX-08 | HIGH     | Gate/cap the legacy whole-book `outline()` endpoint so it cannot overwrite protected arc briefs                                     | PENDING   | —            |
@@ -77,7 +77,7 @@ None.
 
 ## Pending
 
-See table above. FIX-05 selected next.
+See table above. FIX-06 selected next.
 
 ## Blocked
 
@@ -242,5 +242,42 @@ code, pass after.
 
 Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
 986 pass, 10 skip, 0 fail (independently re-run).
+
+Commit: `d62022e4`
+
+### FIX-05 — Arc reconciliation observes in-arc events; protects already-drafted descendants
+
+Source finding: `harness-post-implementation-review.md` H3 ("Arc reconciliation does not reliably
+observe events inside the arc") + H4 ("Edited or re-planned ancestors do not invalidate drafted
+descendants") + §18 row 5.
+
+What changed:
+
+- `outlineArc` now queries the latest `chapters` row with `status = 'done'` inside `[arc.chapterStart,
+arc.chapterEnd]` and passes `latestFinalized.number + 1` (or `arc.chapterStart` when nothing in the
+  arc has finalized yet — the normal first-outline case, unchanged) as the "as of" chapter to
+  `ContextAssembler.forOutline`. Previously every call — including reconciliation calls fired after
+  several chapters inside the arc had already finalized — always used the arc's static
+  `chapterStart`, so `forOutline`'s "chapters before N" logic never saw anything the arc itself had
+  written. Reconciliation now actually reflects in-arc consequences, as the recommendation doc
+  requires.
+- `protectedBriefsInRange` (used by every `outlineArc` call, manual or automatic) now also protects any
+  chapter with an existing non-final `drafts` row, not just finalized/hand-edited chapters. Previously
+  reconciliation could silently rewrite a brief's objective/events/POV/knowledge-contract underneath
+  prose already drafted against the old version, leaving plan and prose disagreeing with no signal.
+  Protecting the brief (decision made in this pass): actively invalidating/flagging the existing draft
+  as stale instead was considered and rejected as the larger, riskier change for this fix's scope — no
+  "force re-outline over an existing draft" escape hatch was built.
+
+Tests: `tests/generation/arc-reconciliation.spec.ts` (+4): reconciliation's `forOutline` call and
+resulting `catalog` prompt content reflect the latest chapter finalized inside the arc; a fresh,
+never-outlined arc still anchors on `chapterStart`; a chapter with a non-final draft keeps its brief
+unchanged through `outlineArc`; end-to-end through actual reconciliation, a drafted chapter is
+preserved while an unprotected chapter is still regenerated. Confirmed against pre-fix code: 3 of the
+4 new tests fail (the fresh-arc test correctly passes on both, proving no regression on the normal
+path), all pass after.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+990 pass, 10 skip, 0 fail (independently re-run).
 
 Commit: (recorded after commit, see git log)

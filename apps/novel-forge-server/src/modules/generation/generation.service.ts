@@ -316,8 +316,22 @@ export class GenerationService {
     if (!arc) throw AppErrorCode.ARC_001.create();
     if (arc.chapterStart === null || arc.chapterEnd === null) throw AppErrorCode.ARC_002.create();
 
+    const latestFinalized = await this.db.query.chapters.findFirst({
+      where: and(
+        eq(schema.chapters.projectId, projectId),
+        eq(schema.chapters.status, 'done'),
+        gte(schema.chapters.number, arc.chapterStart),
+        lte(schema.chapters.number, arc.chapterEnd),
+      ),
+      orderBy: desc(schema.chapters.number),
+      columns: { number: true },
+    });
+    // Reconciliation re-outlines mid-arc, so the pack must be assembled as of what has actually been
+    // written inside the arc — anchoring on chapterStart would hide every chapter the arc already spent.
+    const asOfChapter = latestFinalized ? latestFinalized.number + 1 : arc.chapterStart;
+
     const [contextPack, siblings, project] = await Promise.all([
-      this.contextAssembler.forOutline(projectId, arc.chapterStart),
+      this.contextAssembler.forOutline(projectId, asOfChapter),
       this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.volumeKey, arc.volumeKey)), orderBy: asc(schema.arcs.ordinal) }),
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
@@ -399,12 +413,14 @@ export class GenerationService {
   }
 
   /**
-   * Chapters a re-outline must never overwrite: a human authored the brief, or the chapter is already
-   * written canon. The briefs map carries the rows as they stand so callers still see current state —
-   * a finalized chapter may have no brief row at all, hence the separate chapter set.
+   * Chapters a re-outline must never overwrite: a human authored the brief, the chapter is already
+   * written canon, or prose has been drafted against the brief as it stands — rewriting the plan under
+   * an existing draft leaves the two disagreeing with nothing to reconcile them. The briefs map carries
+   * the rows as they stand so callers still see current state — a finalized chapter may have no brief
+   * row at all, hence the separate chapter set.
    */
   private async protectedBriefsInRange(projectId: bigint, chapterStart: number, chapterEnd: number): Promise<{ chapters: Set<number>; briefs: Map<number, Generation.Brief> }> {
-    const [existing, finalized] = await Promise.all([
+    const [existing, finalized, drafted] = await Promise.all([
       this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), gte(schema.briefs.chapter, chapterStart), lte(schema.briefs.chapter, chapterEnd)) }),
       this.db.query.chapters.findMany({
         where: and(
@@ -415,9 +431,14 @@ export class GenerationService {
         ),
         columns: { number: true },
       }),
+      this.db.query.drafts.findMany({
+        where: and(eq(schema.drafts.projectId, projectId), gte(schema.drafts.chapter, chapterStart), lte(schema.drafts.chapter, chapterEnd)),
+        columns: { chapter: true },
+      }),
     ]);
 
     const chapters = new Set(finalized.map(c => c.number));
+    for (const draft of drafted) chapters.add(draft.chapter);
     for (const brief of existing) if (brief.handEdited) chapters.add(brief.chapter);
     return { chapters, briefs: new Map(existing.filter(b => chapters.has(b.chapter)).map(b => [b.chapter, b])) };
   }
