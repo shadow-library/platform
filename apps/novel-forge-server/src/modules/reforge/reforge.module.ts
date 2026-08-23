@@ -1,15 +1,18 @@
 import { Module } from '@shadow-library/app';
 import { DatabaseModule } from '@shadow-library/modules';
 
+import { AiModule } from '../ai/ai.module';
+import { ReforgeAnalysisService } from './reforge-analysis.service';
 import { ReforgeService } from './reforge.service';
 
-// ReforgeService is pure CRUD over the reforge tables — the rename-bible seed and per-chapter graph run
-// from the job executor via the already-wired RebrandService/WorkflowRunService, so no AiModule or
-// RebrandModule import is needed here. The reforge controller lives in PipelineModule (the HTTP seam),
-// keeping the module graph acyclic (Rebrand never imports Reforge).
+// ReforgeService is pure CRUD over the reforge tables; the transform analysis stage needs the AI
+// subsystem, so AiModule is imported here exactly as RebrandModule does. The rename-bible seed and the
+// per-chapter graph still run from the job executor via the already-wired RebrandService/
+// WorkflowRunService. The reforge controller lives in PipelineModule (the HTTP seam), keeping the
+// module graph acyclic (Rebrand and Ai never import Reforge).
 @Module({
-  imports: [DatabaseModule],
-  providers: [ReforgeService],
-  exports: [ReforgeService],
+  imports: [DatabaseModule, AiModule],
+  providers: [ReforgeService, ReforgeAnalysisService],
+  exports: [ReforgeService, ReforgeAnalysisService],
 })
 export class ReforgeModule {}

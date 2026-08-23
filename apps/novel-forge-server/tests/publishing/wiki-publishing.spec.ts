@@ -248,7 +248,18 @@ describe.if(pgAvailable)('Wiki publish pipeline (mocked reader service)', () => 
     reader.failWikiEntries.add('amara');
 
     const jobService = new JobService(databaseService);
-    const executor = new JobExecutor(jobService, new ConcurrencyController(), {} as never, {} as never, databaseService, {} as never, {} as never, runner, {} as never);
+    const executor = new JobExecutor(
+      jobService,
+      new ConcurrencyController(),
+      {} as never,
+      {} as never,
+      databaseService,
+      {} as never,
+      {} as never,
+      {} as never,
+      runner,
+      {} as never,
+    );
     const jobId = await jobService.enqueue(projectId, 'publish', `publish-${projectId}`);
     await executor.dispatch(jobId);
 

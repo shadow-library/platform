@@ -10,6 +10,7 @@ import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { PublishRunner } from '../publishing/publish-runner';
 import { RebrandService } from '../rebrand/rebrand.service';
+import { ReforgeAnalysisService } from '../reforge/reforge-analysis.service';
 import { RecombineService } from '../source/recombine.service';
 import { ConcurrencyController } from './concurrency.controller';
 import { JobService } from './job.service';
@@ -32,6 +33,8 @@ interface RebrandPayload {
 }
 
 interface ReforgePayload {
+  /** Which of the reforge job's stages this row runs; absent means the shipped 1:1 chapter pipeline. */
+  stage?: 'analyze' | 'plan' | 'transform' | 'promote';
   chapters?: number[];
   force?: boolean;
   limit?: number;
@@ -64,6 +67,7 @@ export class JobExecutor {
     private readonly indexingService: IndexingService,
     private readonly databaseService: DatabaseService,
     private readonly rebrandService: RebrandService,
+    private readonly reforgeAnalysisService: ReforgeAnalysisService,
     private readonly recombineService: RecombineService,
     private readonly publishRunner: PublishRunner,
     private readonly storage: StorageService,
@@ -249,8 +253,31 @@ export class JobExecutor {
   // state. Reuses the rebrand recombine/seed backbone verbatim, then re-authors each chapter through
   // the reforge graph. Per-chapter failures flag-and-continue, identical to runRebrand.
   private async runReforge(job: Job.Row): Promise<void> {
-    const projectId = job.projectId;
     const payload = (job.payload ?? {}) as ReforgePayload;
+    if (payload.stage === 'analyze') return this.runReforgeAnalyze(job);
+    return this.runChapterReforge(job, payload);
+  }
+
+  // The transform-mode source analysis (transform design §3.4). It shares the reforge job kind but
+  // touches none of the 1:1 path's tables, and its own phases are derived from the window loop.
+  private async runReforgeAnalyze(job: Job.Row): Promise<void> {
+    const projectId = job.projectId;
+    this.logger.info('runReforgeAnalyze: starting', { jobId: job.id, projectId });
+
+    await this.jobService.progress(job.id, { done: 0, total: 0, current: 'merging parts', phase: 'recombining' });
+    await this.recombineService.autoRecombine(projectId);
+
+    const result = await this.reforgeAnalysisService.analyze(projectId, {
+      jobId: job.id,
+      onProgress: progress => this.jobService.progress(job.id, progress),
+    });
+
+    await this.jobService.progress(job.id, { done: 1, total: 1, current: 'done', phase: 'synthesizing' });
+    this.logger.info('runReforgeAnalyze: complete', { jobId: job.id, projectId, ...result, analysisId: String(result.analysisId) });
+  }
+
+  private async runChapterReforge(job: Job.Row, payload: ReforgePayload): Promise<void> {
+    const projectId = job.projectId;
     this.logger.info('runReforge: starting', { jobId: job.id, projectId, force: payload.force, limit: payload.limit, chapters: payload.chapters });
 
     try {

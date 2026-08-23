@@ -79,6 +79,14 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
       },
     } as never;
 
+    const analysisService = {
+      analyze: async (_projectId: bigint, opts: { onProgress?: (p: { phase: string; done: number; total: number; current: string }) => Promise<void> }) => {
+        events.push('analyze');
+        await opts.onProgress?.({ phase: 'analyzing', done: 0, total: 1, current: '1-15' });
+        return { analysisId: 1n, chaptersAnalyzed: 40, windowsFailed: 0, findings: 3 };
+      },
+    } as never;
+
     const workflowRunService = {
       runChapterReforge: async ({ chapter }: { chapter: number }) => {
         events.push(chapter);
@@ -94,6 +102,7 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
       {} as never,
       { getPostgresClient: () => db } as never,
       rebrandService,
+      analysisService,
       recombineService,
       {} as never,
       {} as never,
@@ -118,6 +127,19 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
     expect(job?.status).toBe('done');
     const reforge = await db.query.reforges.findFirst({ where: eq(schema.reforges.projectId, projectId) });
     expect(reforge?.status).toBe('done');
+  });
+
+  it('should route the analyze stage to the analysis service without touching the 1:1 chapter path', async () => {
+    const projectId = await seedProject();
+    const harness = buildExecutor();
+
+    const jobId = await harness.jobService.enqueue(projectId, 'reforge', `reforge-analyze-${projectId}`, { stage: 'analyze' });
+    await harness.executor.dispatch(jobId);
+
+    expect(harness.events).toEqual(['recombine', 'analyze']);
+    expect((await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) }))?.status).toBe('done');
+    // The analysis never seeds the rename bible and never writes a chapter_reforges row.
+    expect(await db.query.chapterReforges.findMany({ where: eq(schema.chapterReforges.projectId, projectId) })).toHaveLength(0);
   });
 
   it('should skip reforged and attention chapters but always retry failed ones', async () => {

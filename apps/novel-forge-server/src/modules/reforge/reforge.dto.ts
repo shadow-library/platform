@@ -1,7 +1,7 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-import { ReforgeChapterStatus, ReforgeFidelity, ReforgeStatus } from '@server/common';
+import { ReforgeAnalysisStatus, ReforgeChapterStatus, ReforgeFidelity, ReforgeFindingSource, ReforgeFindingType, ReforgeStatus } from '@server/common';
 
 @Schema()
 export class ReforgeParams {
@@ -193,4 +193,124 @@ export class ListReforgesResponse {
 export class ReforgeManuscriptResponse {
   @Field()
   markdown: string;
+}
+
+@Schema()
+export class ReforgeAnalysisMetricsResponse {
+  @Field({ description: 'Share of source chapters that reuse scene material found elsewhere in the novel.' })
+  repetitionRatio: number;
+
+  @Field({ description: 'Share of source chapters the reading pass rated as not moving the story.' })
+  stallRatio: number;
+
+  @Field(() => Integer)
+  medianWords: number;
+
+  @Field(() => Integer)
+  arcCount: number;
+
+  @Field(() => Integer)
+  deadThreadCount: number;
+}
+
+@Schema()
+export class ReforgeAnalysisResponse {
+  @Field(() => String)
+  id: bigint;
+
+  @Field(() => ReforgeAnalysisStatus)
+  status: string;
+
+  @Field(() => Integer)
+  windowSize: number;
+
+  @Field(() => Integer)
+  chaptersAnalyzed: number;
+
+  @Field(() => Integer, { description: 'Windows that failed and were flagged rather than aborting the run.' })
+  windowsFailed: number;
+
+  @Field(() => ReforgeAnalysisMetricsResponse, { optional: true, nullable: true })
+  metrics?: ReforgeAnalysisMetricsResponse | null;
+
+  @Field({ optional: true, nullable: true })
+  lastError?: string | null;
+
+  @Field(() => String, { format: 'date-time' })
+  createdAt: Date;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
+}
+
+@Schema()
+export class ReforgeAnalysisStatusResponse {
+  @Field(() => ReforgeAnalysisResponse)
+  analysis: ReforgeAnalysisResponse;
+
+  @Field(() => Object, { additionalProperties: true, description: 'Finding count per finding type.' })
+  findingCounts: Record<string, number>;
+}
+
+@Schema()
+export class ReforgeReportResponse {
+  @Field()
+  markdown: string;
+}
+
+@Schema()
+export class ReforgeFindingResponse {
+  @Field(() => String)
+  id: bigint;
+
+  @Field(() => ReforgeFindingType)
+  type: string;
+
+  @Field(() => Integer)
+  fromChapter: number;
+
+  @Field(() => Integer)
+  toChapter: number;
+
+  @Field(() => Integer)
+  severity: number;
+
+  @Field()
+  confidence: number;
+
+  @Field(() => ReforgeFindingSource, { description: 'signal = mechanical only, model = reading pass only, both = the reading pass confirmed a signal.' })
+  detectedBy: string;
+
+  @Field()
+  label: string;
+
+  @Field({ optional: true, nullable: true })
+  detail?: string | null;
+
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true, description: 'Detector evidence behind the finding.' })
+  evidence?: unknown;
+}
+
+@Schema()
+export class ReforgeFindingsQuery {
+  @Field(() => ReforgeFindingType, { optional: true })
+  type?: string;
+
+  @Field(() => Integer, { optional: true, minimum: 1, maximum: 5 })
+  minSeverity?: number;
+
+  @Field(() => Integer, { optional: true, minimum: 1 })
+  page?: number;
+
+  @Field(() => Integer, { optional: true, minimum: 1, maximum: 200 })
+  limit?: number;
+}
+
+@Schema()
+export class ListReforgeFindingsResponse {
+  @Field(() => [ReforgeFindingResponse])
+  items: ReforgeFindingResponse[];
+
+  @Field(() => Integer)
+  total: number;
 }

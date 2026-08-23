@@ -18,6 +18,8 @@ export namespace Reforge {
     judgeEnabled?: boolean;
     /** Target word count for regenerated chapters; guides the writer prompt when set. */
     targetWords?: number;
+    /** Transform mode: source chapters per analysis window (default 15) — a comparative-judgment unit, not a context ceiling. */
+    analysisWindow?: number;
   }
 }
 

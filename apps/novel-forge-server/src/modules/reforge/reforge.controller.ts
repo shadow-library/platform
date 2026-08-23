@@ -1,16 +1,21 @@
 import { Authenticated } from '@shadow-library/auth/module';
-import { Body, Get, HttpController, HttpStatus, Params, Post, Put, RespondFor } from '@shadow-library/fastify';
+import { Body, Get, HttpController, HttpStatus, Params, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
 
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { JobEnqueueResponse } from '../pipeline/pipeline.dto';
+import { ReforgeAnalysisService } from './reforge-analysis.service';
 import {
+  ListReforgeFindingsResponse,
   ListReforgesResponse,
+  ReforgeAnalysisStatusResponse,
   ReforgeChapterParams,
   ReforgeChapterResponse,
   ReforgeConfigBody,
+  ReforgeFindingsQuery,
   ReforgeManuscriptResponse,
   ReforgeParams,
+  ReforgeReportResponse,
   ReforgeResponse,
   ReforgeStartBody,
   ReforgeStatusResponse,
@@ -22,6 +27,7 @@ import { ReforgeService } from './reforge.service';
 export class ReforgeController {
   constructor(
     private readonly reforgeService: ReforgeService,
+    private readonly analysisService: ReforgeAnalysisService,
     private readonly jobService: JobService,
     private readonly jobExecutor: JobExecutor,
   ) {}
@@ -78,6 +84,39 @@ export class ReforgeController {
     const jobId = await this.jobService.enqueue(projectId, 'reforge', target, { chapters: [chapter], force: true });
     this.jobExecutor.dispatch(jobId).catch(() => undefined);
     return { jobId, kind: 'reforge', status: 'pending', target };
+  }
+
+  @Post('/analyze')
+  @HttpStatus(202)
+  @RespondFor(202, JobEnqueueResponse)
+  async startAnalysis(@Params() params: ReforgeParams): Promise<JobEnqueueResponse> {
+    const { projectId } = params;
+    await this.reforgeService.getOrCreate(projectId);
+    // A stage-specific target lets the analysis coexist with a transform under the unique
+    // (projectId, kind, target) index; the per-project concurrency lock serialises them.
+    const target = `reforge-analyze-${projectId}`;
+    const jobId = await this.jobService.enqueue(projectId, 'reforge', target, { stage: 'analyze' });
+    this.jobExecutor.dispatch(jobId).catch(() => undefined);
+    return { jobId, kind: 'reforge', status: 'pending', target };
+  }
+
+  @Get('/analysis')
+  @RespondFor(200, ReforgeAnalysisStatusResponse)
+  getAnalysis(@Params() params: ReforgeParams): Promise<ReforgeAnalysisStatusResponse> {
+    return this.analysisService.status(params.projectId);
+  }
+
+  @Get('/analysis/report')
+  @RespondFor(200, ReforgeReportResponse)
+  async getAnalysisReport(@Params() params: ReforgeParams): Promise<ReforgeReportResponse> {
+    const markdown = await this.analysisService.report(params.projectId);
+    return { markdown };
+  }
+
+  @Get('/analysis/findings')
+  @RespondFor(200, ListReforgeFindingsResponse)
+  listFindings(@Params() params: ReforgeParams, @Query() query: ReforgeFindingsQuery): Promise<ListReforgeFindingsResponse> {
+    return this.analysisService.listFindings(params.projectId, query as never);
   }
 
   @Get('/manuscript')
