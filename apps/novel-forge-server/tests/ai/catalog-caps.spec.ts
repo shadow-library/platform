@@ -1,5 +1,6 @@
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { CatalogService } from '@modules/ai/context/catalog.service';
@@ -90,5 +91,25 @@ describe.if(pgAvailable)('catalog and validation-window caps', () => {
     const rendered = await catalog.render(projectId);
     expect(rendered).toContain('(+3 minor entities omitted)');
     for (let i = 0; i < majorCount; i++) expect(rendered).toContain(`major_${i}`);
+  });
+
+  it('includes a dormant_threads section in forArcPlanning when a thread has gone stale', async () => {
+    const projectId = await seedProject(`catalog-caps-dormant-${Date.now()}`);
+    await db.update(schema.projects).set({ storyCurrentChapter: 20 }).where(eq(schema.projects.id, projectId));
+    await db.insert(schema.volumes).values({ projectId, volumeKey: 'vol_01', ordinal: 1, title: 'Volume One' });
+    await db.insert(schema.plotThreads).values({ projectId, threadKey: 'the-ledger', status: 'open', openedChapter: 1, lastAdvancedChapter: 2 });
+
+    const pack = await assembler.forArcPlanning(projectId, 'vol_01');
+    expect(pack.rendered).toContain('Thread **the-ledger** — DORMANT');
+  });
+
+  it('omits the dormant_threads section from forArcPlanning when nothing is stale', async () => {
+    const projectId = await seedProject(`catalog-caps-dormant-clean-${Date.now()}`);
+    await db.update(schema.projects).set({ storyCurrentChapter: 3 }).where(eq(schema.projects.id, projectId));
+    await db.insert(schema.volumes).values({ projectId, volumeKey: 'vol_01', ordinal: 1, title: 'Volume One' });
+    await db.insert(schema.plotThreads).values({ projectId, threadKey: 'the-ledger', status: 'open', openedChapter: 1, lastAdvancedChapter: 2 });
+
+    const pack = await assembler.forArcPlanning(projectId, 'vol_01');
+    expect(pack.rendered).not.toContain('DORMANT');
   });
 });

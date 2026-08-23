@@ -11,6 +11,7 @@ import { loadKnowledgeView, parseKnowledgeContract, renderChapterReveals, render
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../prompts/authoring-preamble';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 import { CatalogService } from './catalog.service';
+import { computeDormantThreads, renderDormantThreads } from './dormant-threads';
 import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextSegment, type ContextTier, joinSections, renderSection, splitSegments } from './sections';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
 
@@ -842,10 +843,12 @@ export class ContextAssembler {
   async forArcPlanning(projectId: bigint, volumeKey: string, opts?: { budgetTokens?: number }): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? ARC_PLAN_BUDGET;
 
-    const [project, volumes, catalogText] = await Promise.all([
+    const [project, volumes, catalogText, openThreads, openMysteries] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
       this.catalogService.render(projectId),
+      this.db.query.plotThreads.findMany({ where: and(eq(schema.plotThreads.projectId, projectId), eq(schema.plotThreads.status, 'open')) }),
+      this.db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), eq(schema.mysteries.status, 'open')) }),
     ]);
     const volume = volumes.find(v => v.volumeKey === volumeKey);
     const prevVolume = volume ? volumes.filter(v => v.ordinal < volume.ordinal).at(-1) : undefined;
@@ -866,6 +869,9 @@ export class ContextAssembler {
       sections.push(asStable(makeSection('skeleton', skeleton, 'canonical', [])));
     }
     if (catalogText) sections.push(asStable(makeSection('catalog', catalogText, 'canonical', [])));
+
+    const dormantText = renderDormantThreads(computeDormantThreads(openThreads, openMysteries, project?.storyCurrentChapter ?? 0));
+    if (dormantText) sections.push(makeSection('dormant_threads', dormantText, 'working', []));
 
     return this.finalize(projectId, 'arc_plan', null, sections, [], budgetTokens, false);
   }

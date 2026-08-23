@@ -65,6 +65,7 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
         closedChapter: thread.status === 'closed' ? chapter : null,
         summary: thread.summary ?? null,
         intentionallyOpen: thread.intentionallyOpen ?? false,
+        lastAdvancedChapter: chapter,
       })
       .onConflictDoUpdate({
         target: [schema.plotThreads.projectId, schema.plotThreads.threadKey],
@@ -73,6 +74,7 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
           closedChapter: thread.status === 'closed' ? chapter : sql`plot_threads.closed_chapter`,
           summary: sql`COALESCE(EXCLUDED.summary, plot_threads.summary)`,
           intentionallyOpen: sql`EXCLUDED.intentionally_open`,
+          lastAdvancedChapter: chapter,
           updatedAt: new Date(),
         },
       });
@@ -90,6 +92,7 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
         resolvedChapter: mystery.status === 'resolved' ? chapter : null,
         intentionallyOpen: mystery.intentionallyOpen ?? false,
         truthFactKey: mystery.truthFactKey ?? null,
+        lastAdvancedChapter: chapter,
       })
       .onConflictDoUpdate({
         target: [schema.mysteries.projectId, schema.mysteries.mysteryKey],
@@ -99,6 +102,7 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
           question: sql`COALESCE(NULLIF(EXCLUDED.question, ''), mysteries.question)`,
           intentionallyOpen: sql`EXCLUDED.intentionally_open`,
           truthFactKey: sql`COALESCE(EXCLUDED.truth_fact_key, mysteries.truth_fact_key)`,
+          lastAdvancedChapter: chapter,
           updatedAt: new Date(),
         },
       });

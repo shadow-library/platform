@@ -196,4 +196,25 @@ describe.if(pgAvailable)('continuity delta application', () => {
     expect(appearance).toHaveLength(1);
     expect(appearance[0]).toMatchObject({ chapter: 1, firstChapter: 1, lastChapter: 1 });
   });
+
+  it('should track lastAdvancedChapter on threads and mysteries across insert and re-mention', async () => {
+    const projectId = await seedProject(`cont-advance-${Date.now()}`);
+    await applyViaEndpoint(
+      projectId,
+      delta({ threads: [{ threadKey: 'the-ledger', status: 'open' }], mysteries: [{ mysteryKey: 'who-took-it', status: 'open', question: 'Who took the ledger?' }] }),
+      1,
+    );
+
+    let thread = await db.query.plotThreads.findFirst({ where: eq(schema.plotThreads.projectId, projectId) });
+    let mystery = await db.query.mysteries.findFirst({ where: eq(schema.mysteries.projectId, projectId) });
+    expect(thread).toMatchObject({ lastAdvancedChapter: 1 });
+    expect(mystery).toMatchObject({ lastAdvancedChapter: 1 });
+
+    await applyViaEndpoint(projectId, delta({ threads: [{ threadKey: 'the-ledger', status: 'open' }], mysteries: [{ mysteryKey: 'who-took-it', status: 'open' }] }), 5);
+
+    thread = await db.query.plotThreads.findFirst({ where: eq(schema.plotThreads.projectId, projectId) });
+    mystery = await db.query.mysteries.findFirst({ where: eq(schema.mysteries.projectId, projectId) });
+    expect(thread).toMatchObject({ lastAdvancedChapter: 5, openedChapter: 1 });
+    expect(mystery).toMatchObject({ lastAdvancedChapter: 5, openedChapter: 1 });
+  });
 });

@@ -49,6 +49,12 @@ export const plotThreads = pgTable(
     summary: text('summary'),
     owner: varchar('owner'),
     payoff: text('payoff'),
+    // The most recent chapter whose continuity extraction named this thread — distinct from
+    // openedChapter/closedChapter, which only mark the endpoints. Drives dormant-thread detection.
+    lastAdvancedChapter: integer('last_advanced_chapter'),
+    // A single target chapter the thread is expected to pay off by. No automated writer yet — purely
+    // additive for future outliner/arc-plan authoring; the dormant-thread report uses it when present.
+    payoffWindow: integer('payoff_window'),
     // Marked by the outliner/continuity-extraction as a deliberate running thread, not an oversight —
     // novel-validation must not flag it as an unresolved-thread issue while this is true.
     intentionallyOpen: boolean('intentionally_open').notNull().default(false),
@@ -91,6 +97,10 @@ export const mysteries = pgTable(
     // The canon_facts.factKey holding the mystery's answer — a loose key like every other entity/fact
     // reference here, deliberately not an FK so a mystery can name its truth before the fact exists.
     truthFactKey: varchar('truth_fact_key'),
+    // The most recent chapter whose continuity extraction named this mystery — see plotThreads.lastAdvancedChapter.
+    lastAdvancedChapter: integer('last_advanced_chapter'),
+    // A single target chapter the mystery is expected to pay off by — see plotThreads.payoffWindow.
+    payoffWindow: integer('payoff_window'),
     // Marked by the outliner/continuity-extraction as a deliberate running mystery, not an oversight —
     // novel-validation must not flag it as an unresolved-mystery issue while this is true.
     intentionallyOpen: boolean('intentionally_open').notNull().default(false),
