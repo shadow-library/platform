@@ -27,6 +27,8 @@ import {
   ReforgeOutlineSchema,
   ReforgePlanSchema,
   ReforgeSynthesizeSchema,
+  ReforgeTransformJudgeSchema,
+  ReforgeTransformWriteSchema,
   ReforgeWriteSchema,
   validateArcCoverage,
   validateOutlineCoverage,
@@ -684,6 +686,80 @@ describe('Prompt modules', () => {
       const prompt = PROMPT_REGISTRY['reforge-plan'];
       expect(prompt.postValidate?.({ summary: 's', spans })).toEqual([]);
       expect(prompt.postValidate?.({ summary: 's', spans: [spans[0], { ...spans[1], fromChapter: 7 }] })[0]).toMatch(/must partition the source/);
+    });
+  });
+
+  describe('reforge transform write and judge prompts', () => {
+    it('registers the write on the reforge role and the judge on the judge role', () => {
+      expect(PROMPT_REGISTRY['reforge-transform-write']).toMatchObject({ version: '1.0.0', kind: 'authoring', role: 'reforge' });
+      expect(PROMPT_REGISTRY['reforge-transform-write'].system).toContain(AUTHORING_STYLE.slice(0, 40));
+      expect(PROMPT_REGISTRY['reforge-transform-write'].cacheStrategy?.stableVars).toEqual(['stableContext']);
+      expect(PROMPT_REGISTRY['reforge-transform-judge']).toMatchObject({ version: '1.0.0', kind: 'analytical', role: 'judge' });
+    });
+
+    it('tells the writer the plan is the only authority and the ledger is not background', () => {
+      const system = PROMPT_REGISTRY['reforge-transform-write'].system;
+      expect(system).toContain('Never add an output chapter');
+      expect(system).toContain('cutting slack is the job, not a deviation');
+      expect(system).toContain('It is not background you may allude to');
+    });
+
+    it('forbids the judge from calling condensation drift or judging prose', () => {
+      const system = PROMPT_REGISTRY['reforge-transform-judge'].system;
+      expect(system).toContain('CONDENSATION IS NOT DRIFT');
+      expect(system).toContain('Never report a beat as invented');
+      expect(system).toContain('FORBIDDEN from judging prose quality');
+    });
+
+    it('renders the write prompt in cache order with the span contract and source prose last', async () => {
+      const messages = await PROMPT_REGISTRY['reforge-transform-write'].template.formatMessages({
+        stableContext: 'STABLE-LEDGER',
+        volatileContext: 'VOLATILE-SPAN',
+        sourceProse: 'SOURCE',
+        repairNotes: 'fix the leftover name',
+      });
+      expect(messages).toHaveLength(3);
+      expect(String(messages[1]?.content)).toBe('STABLE-LEDGER');
+      const tail = String(messages[2]?.content);
+      expect(tail).toContain('VOLATILE-SPAN');
+      expect(tail).toContain('SOURCE');
+      expect(tail).toContain('fix the leftover name');
+    });
+
+    it('renders the judge prompt with the contract, the ledger, the pre-scan hits, and the prose last', async () => {
+      const messages = await PROMPT_REGISTRY['reforge-transform-judge'].template.formatMessages({
+        keptBeats: 'BEATS',
+        continuityNotes: 'NOTES',
+        bridge: 'BRIDGE',
+        cutLedger: 'LEDGER',
+        worldNotes: 'WORLD',
+        glossarySlice: 'SLICE',
+        scanHits: 'HITS',
+        writtenProse: 'PROSE',
+      });
+      const contract = String(messages[1]?.content);
+      for (const value of ['BEATS', 'NOTES', 'BRIDGE', 'LEDGER', 'SLICE', 'HITS']) expect(contract).toContain(value);
+      expect(String(messages[2]?.content)).toContain('PROSE');
+    });
+
+    it('validates the transform write and judge shapes', () => {
+      const body = 'p'.repeat(120);
+      expect(parseSchema(ReforgeTransformWriteSchema, { title: 'The Vale Gate', body }).success).toBe(true);
+      expect(parseSchema(ReforgeTransformWriteSchema, { title: 'Too short', body: 'tiny' }).success).toBe(false);
+      expect(parseSchema(ReforgeTransformWriteSchema, { title: 'T', body, cutDelta: [{ label: 'the tribunal', kind: 'subplot', aliases: ['tribunal'] }] }).success).toBe(true);
+
+      expect(parseSchema(ReforgeTransformJudgeSchema, { verdict: 'clean', coveredBeats: 2, totalBeats: 2, issues: [] }).success).toBe(true);
+      expect(parseSchema(ReforgeTransformJudgeSchema, { verdict: 'issues', coveredBeats: 1, totalBeats: 2, issues: [{ type: 'seam_break', detail: 'x' }] }).success).toBe(true);
+      // Condensation is not drift, so there is no invented-beat issue type to report.
+      expect(parseSchema(ReforgeTransformJudgeSchema, { verdict: 'issues', coveredBeats: 1, totalBeats: 2, issues: [{ type: 'invented_beat', detail: 'x' }] }).success).toBe(false);
+    });
+
+    it('forces the transform judge verdict and issues to agree', () => {
+      const judge = PROMPT_REGISTRY['reforge-transform-judge'];
+      expect(judge.postValidate?.({ verdict: 'clean', coveredBeats: 2, totalBeats: 2, issues: [] })).toEqual([]);
+      expect(judge.postValidate?.({ verdict: 'issues', coveredBeats: 2, totalBeats: 2, issues: [] })[0]).toMatch(/at least one issue/);
+      expect(judge.postValidate?.({ verdict: 'clean', coveredBeats: 2, totalBeats: 2, issues: [{ type: 'naming', detail: 'x' }] })[0]).toMatch(/empty issues list/);
+      expect(judge.postValidate?.({ verdict: 'clean', coveredBeats: 3, totalBeats: 2, issues: [] })[0]).toMatch(/cannot exceed totalBeats/);
     });
   });
 

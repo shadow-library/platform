@@ -29,6 +29,8 @@ import { reforgeJudgePrompt } from './reforge-judge.prompt';
 import { reforgeOutlinePrompt } from './reforge-outline.prompt';
 import { reforgePlanPrompt } from './reforge-plan.prompt';
 import { reforgeSynthesizePrompt } from './reforge-synthesize.prompt';
+import { reforgeTransformJudgePrompt } from './reforge-transform-judge.prompt';
+import { reforgeTransformWritePrompt } from './reforge-transform-write.prompt';
 import { reforgeWritePrompt } from './reforge-write.prompt';
 import { reviewPrompt } from './review.prompt';
 import { revisionPrompt } from './revision.prompt';
@@ -73,6 +75,8 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'reforge-analyze-window': reforgeAnalyzeWindowPrompt as PromptModule<unknown>,
   'reforge-synthesize': reforgeSynthesizePrompt as PromptModule<unknown>,
   'reforge-plan': reforgePlanPrompt as PromptModule<unknown>,
+  'reforge-transform-write': reforgeTransformWritePrompt as PromptModule<unknown>,
+  'reforge-transform-judge': reforgeTransformJudgePrompt as PromptModule<unknown>,
   recombine: recombinePrompt as PromptModule<unknown>,
   'illustration-compose': illustrationComposePrompt as PromptModule<unknown>,
 };

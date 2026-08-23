@@ -1,6 +1,8 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
-import { ReforgeFindingKind, ReforgeMovement, ReforgeSpanAction } from './enums';
+import { ReforgeCutDisposition, ReforgeCutKind, ReforgeFindingKind, ReforgeJudgeVerdict, ReforgeMovement, ReforgeSpanAction, ReforgeTransformIssueType } from './enums';
+import { RebrandCarryState, RebrandMapping } from './rebrand.schema';
+import { ReforgeChanges } from './reforge.schema';
 
 @Schema()
 export class ReforgeCardSchema {
@@ -176,3 +178,90 @@ export class ReforgePlanSchema {
 export type ReforgeAnalyzeWindowOutput = ReforgeAnalyzeWindowSchema;
 export type ReforgeSynthesizeOutput = ReforgeSynthesizeSchema;
 export type ReforgePlanOutput = ReforgePlanSchema;
+
+@Schema()
+export class ReforgeCutDeltaSchema {
+  @Field({ minLength: 1, maxLength: 300, description: 'what you cut, named the way a reader would recognise it' })
+  label: string;
+
+  @Field(() => ReforgeCutKind, { optional: true })
+  kind?: 'subplot' | 'thread' | 'entity' | 'arc' | 'running_gag' | 'scene_pattern';
+
+  @Field(() => [String], { optional: true, description: 'the names and phrases a later chapter would use if it resurfaced this — the scan targets' })
+  aliases?: string[];
+
+  @Field({ optional: true, description: 'what it was, in a sentence or two' })
+  detail?: string;
+
+  @Field(() => ReforgeCutDisposition, { optional: true })
+  disposition?: 'cut' | 'condensed' | 'resolved_early';
+
+  @Field({ optional: true, description: 'where its function is paid instead, when it is paid at all' })
+  replacementNote?: string;
+}
+
+@Schema()
+export class ReforgeTransformWriteSchema {
+  @Field({ minLength: 1, maxLength: 500, description: 'the output chapter’s title' })
+  title: string;
+
+  @Field({ minLength: 100, description: 'the full chapter prose in the house style' })
+  body: string;
+
+  @Field({ optional: true, description: '1-3 sentence summary of the finished chapter' })
+  summary?: string;
+
+  @Field(() => [RebrandMapping], { optional: true, description: 'mappings you had to invent for proper nouns not in the glossary' })
+  discoveredNames?: RebrandMapping[];
+
+  @Field(() => ReforgeChanges, { optional: true, description: 'what changed relative to the source span: renames, removals, added seams, prose notes' })
+  changes?: ReforgeChanges;
+
+  @Field(() => RebrandCarryState, { optional: true, description: 'continuity state the next output chapter opens with' })
+  carryState?: RebrandCarryState;
+
+  @Field(() => [ReforgeCutDeltaSchema], { optional: true, description: 'material this chapter had to cut that the plan did not already list — it joins the ledger permanently' })
+  cutDelta?: ReforgeCutDeltaSchema[];
+}
+
+@Schema()
+export class ReforgeTransformJudgeIssue {
+  @Field(() => ReforgeTransformIssueType)
+  type: 'missing_kept_beat' | 'resurfaced_cut' | 'seam_break' | 'naming' | 'nationalism' | 'discrimination' | 'real_world_reference';
+
+  @Field({ minLength: 1, description: 'what the violation is and where it appears' })
+  detail: string;
+
+  @Field({ optional: true, description: 'a short quote of the offending prose, or the kept beat that went missing' })
+  excerpt?: string;
+}
+
+@Schema()
+export class ReforgeTransformJudgeSchema {
+  @Field(() => ReforgeJudgeVerdict)
+  verdict: 'clean' | 'issues';
+
+  @Field(() => Integer, { minimum: 0, description: 'how many of the plan’s kept beats landed in the prose' })
+  coveredBeats: number;
+
+  @Field(() => Integer, { minimum: 0, description: 'how many beats the plan marked kept for this chapter' })
+  totalBeats: number;
+
+  @Field(() => [String], { optional: true, description: 'kept beats absent from the prose' })
+  missingBeats?: string[];
+
+  @Field(() => [ReforgeTransformJudgeIssue], { description: 'every contract violation found; empty when the verdict is clean' })
+  issues: ReforgeTransformJudgeIssue[];
+}
+
+/** A judge that says "clean" while listing issues, or claims more coverage than the contract has, sends a repair pass chasing nothing. */
+export function validateTransformJudge(data: ReforgeTransformJudgeSchema): string[] {
+  const issues: string[] = [];
+  if (data.verdict === 'issues' && data.issues.length === 0) issues.push('an "issues" verdict must list at least one issue');
+  if (data.verdict === 'clean' && data.issues.length > 0) issues.push('a "clean" verdict must carry an empty issues list');
+  if (data.coveredBeats > data.totalBeats) issues.push('coveredBeats cannot exceed totalBeats');
+  return issues;
+}
+
+export type ReforgeTransformWriteOutput = ReforgeTransformWriteSchema;
+export type ReforgeTransformJudgeOutput = ReforgeTransformJudgeSchema;

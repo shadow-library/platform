@@ -173,6 +173,53 @@ export function selectCutSlice(entries: CutEntryLike[], options: CutSliceOptions
   return fitting;
 }
 
+export interface ResurfacedCut {
+  source: 'cut';
+  type: 'resurfaced_cut';
+  cutKey: string;
+  detail: string;
+  excerpt: string;
+}
+
+// Shorter aliases collide with ordinary prose; "Ye" and "the" would flag every chapter.
+const MIN_ALIAS_LENGTH = 4;
+const EXCERPT_RADIUS = 60;
+
+function excerptAround(body: string, index: number, length: number): string {
+  const start = Math.max(0, index - EXCERPT_RADIUS);
+  const end = Math.min(body.length, index + length + EXCERPT_RADIUS);
+  return `${start > 0 ? '…' : ''}${body.slice(start, end)}${end < body.length ? '…' : ''}`;
+}
+
+/**
+ * Free and exact: every literal alias of a ledgered cut found in the written prose (§6.3). The model
+ * only adjudicates these hits and catches the paraphrased resurfacing a string match cannot see, which
+ * is why the scan runs first and its output travels into the judge prompt.
+ */
+export function scanResurfacedCuts(body: string, entries: CutEntryLike[], outputChapter: number): ResurfacedCut[] {
+  const haystack = body.toLowerCase();
+  const hits: ResurfacedCut[] = [];
+
+  for (const entry of entries) {
+    if (entry.effectiveFromOutput > outputChapter) continue;
+    for (const alias of [entry.label, ...(entry.aliases ?? [])]) {
+      if (alias.length < MIN_ALIAS_LENGTH) continue;
+      const index = haystack.indexOf(alias.toLowerCase());
+      if (index === -1) continue;
+      hits.push({
+        source: 'cut',
+        type: 'resurfaced_cut',
+        cutKey: entry.cutKey,
+        detail: `"${alias}" is cut material (${entry.label}) and must not appear`,
+        excerpt: excerptAround(body, index, alias.length),
+      });
+      break;
+    }
+  }
+
+  return hits;
+}
+
 /** One block per cut, in the order `selectCutSlice` ranked them — the rendering both ledger sections use. */
 export function renderCutLedger(entries: CutEntryLike[]): string {
   if (entries.length === 0) return 'Nothing has been cut yet.';

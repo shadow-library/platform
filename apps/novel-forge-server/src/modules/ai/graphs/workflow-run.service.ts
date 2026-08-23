@@ -18,6 +18,7 @@ import { createChapterFinalizationGraph, type FinalizationServices } from './cha
 import { createChapterGenerationGraph, type GraphServices } from './chapter-generation.graph';
 import { createChapterRebrandGraph, type RebrandGraphServices } from './chapter-rebrand.graph';
 import { createChapterReforgeGraph, type ReforgeGraphServices } from './chapter-reforge.graph';
+import { createSpanTransformGraph, type SpanTransformServices } from './span-transform.graph';
 import { createNovelValidationGraph, type ValidationServices } from './novel-validation.graph';
 import { createSourceExtractionGraph, type ExtractionServices } from './source-extraction.graph';
 
@@ -65,6 +66,13 @@ export interface RebrandChapterInput {
 export interface ReforgeChapterInput {
   projectId: bigint;
   chapter: number;
+  jobId?: string;
+}
+
+export interface SpanTransformInput {
+  projectId: bigint;
+  planId: bigint;
+  outputChapter: number;
   jobId?: string;
 }
 
@@ -322,6 +330,27 @@ export class WorkflowRunService {
       return { runId, outcome, status: 'completed' };
     } catch (err) {
       this.logger.error('runChapterReforge failed', { err, runId });
+      await this.failRun(runId, err);
+      return { runId, outcome: 'failed', status: 'failed' };
+    }
+  }
+
+  async runSpanTransform(input: SpanTransformInput): Promise<WorkflowRunResult> {
+    const runId = await this.createRun(input.projectId, 'span-transform', `output-${input.outputChapter}`, input, input.jobId);
+
+    try {
+      const graph = createSpanTransformGraph(this.graphServices as SpanTransformServices);
+      const rawState = await graph.invoke(
+        { projectId: String(input.projectId), planId: String(input.planId), outputChapter: input.outputChapter, runId },
+        { configurable: { thread_id: runId } },
+      );
+      const finalState = rawState as unknown as { outcome: string | null; nodeTrace?: string[] };
+      const outcome = finalState.outcome ?? 'written';
+
+      await this.completeRun(runId, outcome, 'completed', finalState.nodeTrace ?? []);
+      return { runId, outcome, status: 'completed' };
+    } catch (err) {
+      this.logger.error('runSpanTransform failed', { err, runId });
       await this.failRun(runId, err);
       return { runId, outcome: 'failed', status: 'failed' };
     }
