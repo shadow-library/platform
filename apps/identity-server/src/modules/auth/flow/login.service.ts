@@ -281,7 +281,13 @@ export class LoginService {
     const provider = await this.identityProviderService.getById(federated.identityProviderId);
     if (provider && !provider.allowSignUp) throw AppErrorCode.FED_006.create();
 
-    const created = await this.userService.createProvisionedUser({ email: identity.email, emailVerified: true, status: 'ACTIVE' });
+    const created = await this.userService.createProvisionedUser({
+      email: identity.email,
+      emailVerified: true,
+      status: 'ACTIVE',
+      firstName: identity.name?.firstName,
+      lastName: identity.name?.lastName,
+    });
     await this.joinProviderOrganisation(federated.identityProviderId, created.id);
     await this.federatedIdentityService.link(federated.identityProviderId, created.id, identity.subject);
     await this.auditService.record({

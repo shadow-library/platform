@@ -205,6 +205,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly FED_005 = AppErrorCode.validation('FED_005', 'Microsoft sign-in requires a tenant-scoped issuer', 400);
   /** The upstream account is unknown here and the provider does not permit new accounts */
   static readonly FED_006 = AppErrorCode.forbidden('FED_006', 'Sign-up through this provider is not allowed');
+  /** Apple sign-in needs the Developer Team ID and the `.p8` key's Key ID alongside the client secret */
+  static readonly FED_007 = AppErrorCode.validation('FED_007', 'Apple sign-in requires a team id and key id', 400);
 
   /*!
    * SAML Error Codes

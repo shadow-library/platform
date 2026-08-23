@@ -5,7 +5,7 @@ import { ElevationIntentFields } from '@server/modules/auth/mfa';
 
 @Schema()
 export class SocialProviderParams {
-  @Field(() => String, { enum: ['GOOGLE', 'MICROSOFT'] })
+  @Field(() => String, { enum: ['GOOGLE', 'MICROSOFT', 'APPLE'] })
   provider: SocialProviderKind;
 }
 
@@ -41,7 +41,7 @@ export class StepUpFederatedStartBody extends ElevationIntentFields {
 
 @Schema()
 export class SocialProviderOptionDto {
-  @Field(() => String, { enum: ['GOOGLE', 'MICROSOFT'] })
+  @Field(() => String, { enum: ['GOOGLE', 'MICROSOFT', 'APPLE'] })
   provider: SocialProviderKind;
 
   @Field()

@@ -55,6 +55,13 @@ export const AUTH_MODE_REGISTRY = {
     defaultEnabled: false,
     providerKind: 'MICROSOFT',
   },
+  APPLE: {
+    label: 'Apple',
+    description: 'Members sign in with Sign in with Apple. Needs a Services ID and a .p8 client-secret key from the Apple Developer portal.',
+    kind: 'SOCIAL',
+    defaultEnabled: false,
+    providerKind: 'APPLE',
+  },
 } as const satisfies Record<string, AuthModeDefinition>;
 
 export const AUTH_MODES = Object.keys(AUTH_MODE_REGISTRY) as AuthMode[];

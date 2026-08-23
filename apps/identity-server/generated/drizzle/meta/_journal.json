@@ -15,6 +15,13 @@
       "when": 1786260134760,
       "tag": "0001_useful_zodiak",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787503990351,
+      "tag": "0002_broad_loa",
+      "breakpoints": true
     }
   ]
 }

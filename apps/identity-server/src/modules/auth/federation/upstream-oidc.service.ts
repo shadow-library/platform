@@ -1,4 +1,4 @@
-import { createPublicKey, verify as cryptoVerify, type JsonWebKeyInput, KeyObject } from 'node:crypto';
+import { createPrivateKey, createPublicKey, sign as cryptoSign, verify as cryptoVerify, type JsonWebKeyInput, KeyObject } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger, LRUCache } from '@shadow-library/common';
@@ -14,9 +14,16 @@ export interface AuthorizationRequest {
   codeChallenge: string;
 }
 
+export interface UpstreamName {
+  firstName?: string;
+  lastName?: string;
+}
+
 export interface UpstreamIdentity {
   subject: string;
   email: string;
+  /** Apple only, and only present on the account's first authorization — carry it straight to JIT provisioning. */
+  name?: UpstreamName;
 }
 
 export class FederationError extends Error {
@@ -46,6 +53,8 @@ const CLOCK_SKEW_SECONDS = 60;
 const FETCH_TIMEOUT_MS = 10_000;
 const JWKS_CACHE_TTL_MS = 300_000;
 const JWKS_CACHE_CAPACITY = 32;
+const APPLE_TOKEN_AUDIENCE = 'https://appleid.apple.com';
+const APPLE_CLIENT_SECRET_TTL_SECONDS = 300;
 
 const decodeSegment = (segment: string): Record<string, unknown> | null => {
   try {
@@ -54,6 +63,8 @@ const decodeSegment = (segment: string): Record<string, unknown> | null => {
     return null;
   }
 };
+
+const base64url = (value: object): string => Buffer.from(JSON.stringify(value)).toString('base64url');
 
 @Injectable()
 export class UpstreamOidcService {
@@ -77,19 +88,21 @@ export class UpstreamOidcService {
     url.searchParams.set('nonce', request.nonce);
     url.searchParams.set('code_challenge', request.codeChallenge);
     url.searchParams.set('code_challenge_method', 'S256');
-    /** Social sign-in is a deliberate act; without this a signed-in browser is bounced straight back with whichever account it happens to hold. */
-    if (provider.kind !== 'OIDC') url.searchParams.set('prompt', 'select_account');
+    /** Social sign-in is a deliberate act; without this a signed-in browser is bounced straight back with whichever account it happens to hold. Apple has no such param. */
+    if (provider.kind !== 'OIDC' && provider.kind !== 'APPLE') url.searchParams.set('prompt', 'select_account');
+    /** Apple requires `response_mode=form_post` whenever the requested scope goes beyond bare `openid`, and always POSTs the callback rather than redirecting with a query string. */
+    if (provider.kind === 'APPLE') url.searchParams.set('response_mode', 'form_post');
     return url.toString();
   }
 
-  async exchangeAndVerify(provider: IdentityProvider, code: string, codeVerifier: string, nonce: string): Promise<UpstreamIdentity> {
+  async exchangeAndVerify(provider: IdentityProvider, code: string, codeVerifier: string, nonce: string, appleUser?: string): Promise<UpstreamIdentity> {
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       code,
       redirect_uri: this.callbackUrl,
       code_verifier: codeVerifier,
       client_id: provider.clientId,
-      client_secret: this.identityProviderService.decryptClientSecret(provider),
+      client_secret: provider.kind === 'APPLE' ? this.mintAppleClientSecret(provider) : this.identityProviderService.decryptClientSecret(provider),
     });
 
     let idToken: string;
@@ -108,10 +121,37 @@ export class UpstreamOidcService {
       if (error instanceof FederationError) throw error;
       throw new FederationError(`token exchange failed: ${error instanceof Error ? error.message : String(error)}`);
     }
-    return this.verifyIdToken(provider, idToken, nonce);
+    return this.verifyIdToken(provider, idToken, nonce, appleUser);
   }
 
-  private async verifyIdToken(provider: IdentityProvider, idToken: string, nonce: string): Promise<UpstreamIdentity> {
+  /**
+   * Apple's client secret is not a stored credential: it is an ES256 JWT minted per exchange from the
+   * admin-provisioned `.p8` key (held encrypted in `clientSecretCiphertext`, exactly like Google's static
+   * secret) and the provider's Developer Team ID / Key ID.
+   */
+  private mintAppleClientSecret(provider: IdentityProvider): string {
+    if (!provider.appleTeamId || !provider.appleKeyId) throw new FederationError('apple provider missing team id or key id');
+    const privateKey = createPrivateKey({ key: this.identityProviderService.decryptClientSecret(provider), format: 'pem' });
+    const now = Math.floor(Date.now() / 1000);
+    const header = { alg: 'ES256', kid: provider.appleKeyId };
+    const payload = { iss: provider.appleTeamId, iat: now, exp: now + APPLE_CLIENT_SECRET_TTL_SECONDS, aud: APPLE_TOKEN_AUDIENCE, sub: provider.clientId };
+    const signingInput = `${base64url(header)}.${base64url(payload)}`;
+    const signature = cryptoSign('sha256', Buffer.from(signingInput), { key: privateKey, dsaEncoding: 'ieee-p1363' });
+    return `${signingInput}.${signature.toString('base64url')}`;
+  }
+
+  private resolveName(provider: IdentityProvider, appleUser: string | undefined): UpstreamName | undefined {
+    if (provider.kind !== 'APPLE' || !appleUser) return undefined;
+    try {
+      const parsed = JSON.parse(appleUser) as { name?: { firstName?: string; lastName?: string } };
+      if (!parsed.name) return undefined;
+      return { firstName: parsed.name.firstName, lastName: parsed.name.lastName };
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async verifyIdToken(provider: IdentityProvider, idToken: string, nonce: string, appleUser?: string): Promise<UpstreamIdentity> {
     const [headerSegment, payloadSegment, signatureSegment] = idToken.split('.');
     if (!headerSegment || !payloadSegment || !signatureSegment) throw new FederationError('malformed id token');
 
@@ -135,7 +175,7 @@ export class UpstreamOidcService {
     if (claims['nonce'] !== nonce) throw new FederationError('nonce mismatch');
     if (typeof claims['sub'] !== 'string' || !claims['sub']) throw new FederationError('missing subject');
 
-    return { subject: claims['sub'], email: this.resolveEmail(provider, claims) };
+    return { subject: claims['sub'], email: this.resolveEmail(provider, claims), name: this.resolveName(provider, appleUser) };
   }
 
   /**
@@ -154,7 +194,9 @@ export class UpstreamOidcService {
     }
 
     if (!candidate) throw new FederationError('missing email claim');
-    if (claims['email_verified'] !== true) throw new FederationError('upstream email is not verified');
+    /** Apple has historically sent `email_verified` as the string `"true"`/`"false"` rather than a boolean. */
+    const verified = provider.kind === 'APPLE' ? claims['email_verified'] === true || claims['email_verified'] === 'true' : claims['email_verified'] === true;
+    if (!verified) throw new FederationError('upstream email is not verified');
     return candidate.toLowerCase();
   }
 

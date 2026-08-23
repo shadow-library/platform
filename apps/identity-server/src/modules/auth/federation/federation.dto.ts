@@ -106,3 +106,18 @@ export class FederatedCallbackQuery {
   @Field({ optional: true })
   error?: string;
 }
+
+@Schema()
+export class FederatedCallbackBody {
+  @Field({ optional: true })
+  state?: string;
+
+  @Field({ optional: true })
+  code?: string;
+
+  @Field({ optional: true })
+  error?: string;
+
+  @Field({ optional: true, description: "Apple only: a JSON-encoded {name,email} object, sent by Apple on the account's first authorization only." })
+  user?: string;
+}

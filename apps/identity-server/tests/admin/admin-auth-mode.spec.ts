@@ -48,7 +48,7 @@ describe('Admin auth mode APIs', () => {
 
       expect(response.statusCode).toBe(200);
       const items = response.json().items as { method: string; enabled: boolean; configured: boolean; kind: string }[];
-      expect(items.map(item => item.method)).toStrictEqual(['PASSWORD', 'WEBAUTHN', 'EMAIL_OTP', 'SMS_OTP', 'GOOGLE', 'MICROSOFT']);
+      expect(items.map(item => item.method)).toStrictEqual(['PASSWORD', 'WEBAUTHN', 'EMAIL_OTP', 'SMS_OTP', 'GOOGLE', 'MICROSOFT', 'APPLE']);
       expect(items.find(item => item.method === 'PASSWORD')).toMatchObject({ enabled: true, configured: true, kind: 'BUILT_IN' });
       expect(items.find(item => item.method === 'SMS_OTP')).toMatchObject({ enabled: false, configured: true });
       expect(items.find(item => item.method === 'GOOGLE')).toMatchObject({ enabled: false, configured: false, kind: 'SOCIAL' });

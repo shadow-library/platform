@@ -2,7 +2,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 import { AUTH_MODES, type AuthMode } from '@server/modules/system/auth-mode';
 
-export type SocialProviderKindValue = 'GOOGLE' | 'MICROSOFT';
+export type SocialProviderKindValue = 'GOOGLE' | 'MICROSOFT' | 'APPLE';
 
 @Schema()
 export class AuthModeParams {
@@ -27,7 +27,7 @@ export class GlobalIdentityProviderItem {
   @Field()
   id: string;
 
-  @Field(() => String, { enum: ['GOOGLE', 'MICROSOFT'] })
+  @Field(() => String, { enum: ['GOOGLE', 'MICROSOFT', 'APPLE'] })
   kind: SocialProviderKindValue;
 
   @Field()
@@ -50,6 +50,12 @@ export class GlobalIdentityProviderItem {
 
   @Field()
   createdAt: string;
+
+  @Field({ optional: true, description: 'Apple only: the Apple Developer Team ID.' })
+  appleTeamId?: string;
+
+  @Field({ optional: true, description: 'Apple only: the Key ID of the registered .p8 client-secret key.' })
+  appleKeyId?: string;
 }
 
 @Schema()
@@ -90,7 +96,7 @@ export class GlobalIdentityProviderListResponse {
 
 @Schema()
 export class CreateGlobalIdentityProviderBody {
-  @Field(() => String, { enum: ['GOOGLE', 'MICROSOFT'] })
+  @Field(() => String, { enum: ['GOOGLE', 'MICROSOFT', 'APPLE'] })
   kind: SocialProviderKindValue;
 
   @Field({ minLength: 1, maxLength: 255 })
@@ -99,14 +105,18 @@ export class CreateGlobalIdentityProviderBody {
   @Field({
     maxLength: 2048,
     description:
-      'Issuer url whose discovery document is fetched. Google is https://accounts.google.com; Microsoft must be a single tenant, https://login.microsoftonline.com/<tenant-id>/v2.0.',
+      'Issuer url whose discovery document is fetched. Google is https://accounts.google.com; Microsoft must be a single tenant, https://login.microsoftonline.com/<tenant-id>/v2.0; Apple is https://appleid.apple.com.',
   })
   issuer: string;
 
-  @Field({ minLength: 1, maxLength: 512 })
+  @Field({ minLength: 1, maxLength: 512, description: 'Apple: the Services ID configured for Sign in with Apple.' })
   clientId: string;
 
-  @Field({ minLength: 1, maxLength: 1024 })
+  @Field({
+    minLength: 1,
+    maxLength: 1024,
+    description: 'Apple: the PEM contents of the registered .p8 private key, not a static secret — it is used to mint a fresh client-secret JWT per sign-in.',
+  })
   clientSecret: string;
 
   @Field({ optional: true, maxLength: 255 })
@@ -114,6 +124,12 @@ export class CreateGlobalIdentityProviderBody {
 
   @Field({ optional: true, description: 'Whether an upstream account with no local match may create one. Turn it off to make the provider link-only.' })
   allowSignUp?: boolean;
+
+  @Field({ optional: true, maxLength: 64, description: 'Apple only, required for kind APPLE: the Apple Developer Team ID.' })
+  appleTeamId?: string;
+
+  @Field({ optional: true, maxLength: 64, description: 'Apple only, required for kind APPLE: the Key ID of the registered .p8 client-secret key.' })
+  appleKeyId?: string;
 }
 
 @Schema()
@@ -135,4 +151,10 @@ export class UpdateGlobalIdentityProviderBody {
 
   @Field({ optional: true })
   isActive?: boolean;
+
+  @Field({ optional: true, maxLength: 64, description: 'Apple only: the Apple Developer Team ID.' })
+  appleTeamId?: string;
+
+  @Field({ optional: true, maxLength: 64, description: 'Apple only: the Key ID of the registered .p8 client-secret key.' })
+  appleKeyId?: string;
 }

@@ -40,6 +40,8 @@ export class AdminAuthModeController {
       allowSignUp: provider.allowSignUp,
       isActive: provider.isActive,
       createdAt: provider.createdAt.toISOString(),
+      appleTeamId: provider.appleTeamId ?? undefined,
+      appleKeyId: provider.appleKeyId ?? undefined,
     };
   }
 

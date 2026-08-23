@@ -19,6 +19,8 @@ export interface UpstreamIdP {
   setClaims(claims: Record<string, unknown>): void;
   /** The nonce the flow generated, lifted out of the authorization url the start endpoint returned. */
   useNonceFrom(authorizationUrl: string): void;
+  /** The form body identity-server posted to the fake token endpoint on the most recent exchange — lets a test inspect the `client_secret` it minted. */
+  getLastTokenRequestBody(): Record<string, string> | undefined;
   restore(): void;
 }
 
@@ -40,6 +42,7 @@ export function installUpstreamIdP(options: UpstreamIdPOptions): UpstreamIdP {
 
   let claims: Record<string, unknown> = { sub: subject, email, email_verified: true };
   let nonce = '';
+  let lastTokenRequestBody: Record<string, string> | undefined;
 
   const originalFetch = globalThis.fetch;
   const respond = (body: unknown): Response => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -51,6 +54,7 @@ export function installUpstreamIdP(options: UpstreamIdPOptions): UpstreamIdP {
     }
     if (url === `${issuer}/jwks`) return respond({ keys: [jwk] });
     if (url === `${issuer}/token`) {
+      lastTokenRequestBody = Object.fromEntries(new URLSearchParams(typeof init?.body === 'string' ? init.body : ''));
       const now = Math.floor(Date.now() / 1000);
       const payload = { iss: issuer, aud: options.clientId, iat: now, exp: now + 300, nonce, ...claims };
       return respond({ id_token: sign(privateKey, { alg: 'RS256', kid, typ: 'JWT' }, payload) });
@@ -65,6 +69,7 @@ export function installUpstreamIdP(options: UpstreamIdPOptions): UpstreamIdP {
     email,
     setClaims: next => void (claims = next),
     useNonceFrom: authorizationUrl => void (nonce = new URL(authorizationUrl).searchParams.get('nonce') ?? ''),
+    getLastTokenRequestBody: () => lastTokenRequestBody,
     restore: () => void (globalThis.fetch = originalFetch),
   };
 }

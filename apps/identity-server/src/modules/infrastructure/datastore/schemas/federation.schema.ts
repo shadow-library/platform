@@ -13,11 +13,11 @@ export namespace IdentityProvider {
 
 /**
  * `OIDC` is enterprise SSO: one provider per organisation, reached by routing a verified email domain.
- * `GOOGLE`/`MICROSOFT` are platform-wide social sign-in, carry no organisation, and are chosen by the
- * user clicking a button — which is why the organisation column is nullable and the uniqueness rules
+ * `GOOGLE`/`MICROSOFT`/`APPLE` are platform-wide social sign-in, carry no organisation, and are chosen by
+ * the user clicking a button — which is why the organisation column is nullable and the uniqueness rules
  * below are split rather than shared.
  */
-export const identityProviderKind = pgEnum('identity_provider_kind', ['OIDC', 'GOOGLE', 'MICROSOFT']);
+export const identityProviderKind = pgEnum('identity_provider_kind', ['OIDC', 'GOOGLE', 'MICROSOFT', 'APPLE']);
 
 export const identityProviders = pgTable(
   'identity_providers',
@@ -33,6 +33,9 @@ export const identityProviders = pgTable(
     clientSecretAuthTag: text('client_secret_auth_tag').notNull(),
     kekVersion: integer('kek_version').notNull().default(1),
     scopes: varchar('scopes', { length: 255 }).notNull().default('openid email profile'),
+    /** Apple only: the Developer Team ID (`iss`) and the `.p8` key's Key ID (`kid`) needed to mint the ES256 client-secret JWT; the key itself rides `clientSecretCiphertext`. */
+    appleTeamId: varchar('apple_team_id', { length: 64 }),
+    appleKeyId: varchar('apple_key_id', { length: 64 }),
     authorizationEndpoint: text('authorization_endpoint').notNull(),
     tokenEndpoint: text('token_endpoint').notNull(),
     jwksUri: text('jwks_uri').notNull(),

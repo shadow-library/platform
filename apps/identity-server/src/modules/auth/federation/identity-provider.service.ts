@@ -28,6 +28,8 @@ export interface CreateIdentityProvider {
 export interface CreateGlobalIdentityProvider extends CreateIdentityProvider {
   kind: SocialProviderKind;
   allowSignUp?: boolean;
+  appleTeamId?: string;
+  appleKeyId?: string;
 }
 
 export interface UpdateIdentityProvider {
@@ -41,6 +43,8 @@ export interface UpdateIdentityProvider {
 
 export interface UpdateGlobalIdentityProvider extends Omit<UpdateIdentityProvider, 'enforced'> {
   allowSignUp?: boolean;
+  appleTeamId?: string;
+  appleKeyId?: string;
 }
 
 export type SocialProviderKind = Exclude<IdentityProvider.Kind, 'OIDC'>;
@@ -130,14 +134,18 @@ export class IdentityProviderService {
 
   async createGlobal(input: CreateGlobalIdentityProvider): Promise<IdentityProvider> {
     if (input.kind === 'MICROSOFT' && !MICROSOFT_TENANT_ISSUER.test(input.issuer.replace(/\/$/, ''))) throw AppErrorCode.FED_005.create();
+    if (input.kind === 'APPLE' && (!input.appleTeamId || !input.appleKeyId)) throw AppErrorCode.FED_007.create();
 
-    const provider = await this.insert({ organisationId: null, kind: input.kind, allowSignUp: input.allowSignUp ?? true }, input);
+    const provider = await this.insert(
+      { organisationId: null, kind: input.kind, allowSignUp: input.allowSignUp ?? true, appleTeamId: input.appleTeamId, appleKeyId: input.appleKeyId },
+      input,
+    );
     this.logger.info('social identity provider configured', { kind: provider.kind, issuer: provider.issuer });
     return provider;
   }
 
   private async insert(
-    scope: Pick<typeof schema.identityProviders.$inferInsert, 'organisationId' | 'kind' | 'enforced' | 'allowSignUp'>,
+    scope: Pick<typeof schema.identityProviders.$inferInsert, 'organisationId' | 'kind' | 'enforced' | 'allowSignUp' | 'appleTeamId' | 'appleKeyId'>,
     input: CreateIdentityProvider,
   ): Promise<IdentityProvider> {
     const endpoints = await this.discover(input.issuer);
@@ -190,7 +198,17 @@ export class IdentityProviderService {
     const secret = patch.clientSecret === undefined ? {} : this.toSecretColumns(patch.clientSecret);
     const [updated] = await this.db
       .update(schema.identityProviders)
-      .set({ name: patch.name, clientId: patch.clientId, scopes: patch.scopes, allowSignUp: patch.allowSignUp, isActive: patch.isActive, ...secret, updatedAt: new Date() })
+      .set({
+        name: patch.name,
+        clientId: patch.clientId,
+        scopes: patch.scopes,
+        allowSignUp: patch.allowSignUp,
+        isActive: patch.isActive,
+        appleTeamId: patch.appleTeamId,
+        appleKeyId: patch.appleKeyId,
+        ...secret,
+        updatedAt: new Date(),
+      })
       .where(and(eq(schema.identityProviders.id, id), isNull(schema.identityProviders.organisationId)))
       .returning();
     if (!updated) throw AppErrorCode.FED_002.create();
