@@ -6,14 +6,14 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 
 **Eleven required fixes were completed, then re-verified by Codex** (`harness-targeted-fixes-
 verification.md`, verdict: NEEDS TARGETED FIXES). That pass found four remaining narrow gaps inside
-already-"complete" FIX-01/05/06/03, now tracked as FIX-12..FIX-15 below. Scope for this second round is
-corrective only, same as the first — no new subsystems, no reopening the architecture.
+already-"complete" FIX-01/05/06/03, tracked as FIX-12..FIX-15 below. **All fifteen fixes are now
+complete** — this second round closed every remaining gap from the Codex re-verification pass.
 
 ## Summary
 
-- Completed: 14
+- Completed: 15
 - In Progress: 0
-- Pending: 1
+- Pending: 0
 - Blocked: 0
 
 ## Tasks
@@ -34,7 +34,7 @@ corrective only, same as the first — no new subsystems, no reopening the archi
 | FIX-12 | HIGH     | Cursor-only finalization retry must not re-extract or reapply continuity (residual gap in FIX-01)                                       | COMPLETED | FIX-01       |
 | FIX-13 | HIGH     | Ancestor draft changes (update/import/revise) must invalidate drafted descendants (residual gap in FIX-05)                              | COMPLETED | FIX-05       |
 | FIX-14 | HIGH     | Low-confidence continuity entries must stay reachable for review, not marked applied (residual gap in FIX-06)                           | COMPLETED | FIX-06       |
-| FIX-15 | HIGH     | Character-state merge must replace/clear fields per the extraction contract, not `COALESCE`-merge stale values (residual gap in FIX-03) | PENDING   | FIX-03       |
+| FIX-15 | HIGH     | Character-state merge must replace/clear fields per the extraction contract, not `COALESCE`-merge stale values (residual gap in FIX-03) | COMPLETED | FIX-03       |
 
 Ordering rationale: data-integrity/recoverability (FIX-01, FIX-02) before state/context-correctness
 gaps that bias prose quality without corrupting data (FIX-03–06), before control-flow/integration
@@ -86,7 +86,7 @@ None.
 
 ## Pending
 
-- FIX-15 — character-state stale merge semantics
+All fifteen fixes are COMPLETED. Nothing left to select.
 
 ## Blocked
 
@@ -652,3 +652,51 @@ Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type
 1023 pass, 10 skip, 0 fail (independently re-run).
 
 Commit: `a6fbe27e`
+
+### FIX-15 — Character-state merge replaces, not COALESCE-merges, stale fields
+
+Source finding: `harness-targeted-fixes-verification.md` H1 residual gap ("The prompt says a reported
+state replaces the old state and should contain only what is now true, but `COALESCE(EXCLUDED.field,
+old.field)` turns it into a partial merge... stale state is now repeatedly fed back to generation" —
+elevated to a live-context defect once FIX-03 wired `character_states` into `forChapter`).
+
+Root cause: the continuity extraction prompt (`continuity.prompt.ts`) is explicit that each reported
+character state is a full replacement snapshot — "Each state you report replaces the prior recorded
+state for that character — it is not merged or appended, so state only what is now true." But
+`applyContinuityDelta`'s `characterStates` upsert (`apply-continuity.ts`) wrote
+`COALESCE(EXCLUDED.field, character_states.field)` per field on conflict. Since the insert `.values()`
+already turns an omitted field into `null` (`characterState.location ?? null`), `EXCLUDED.field` was
+`null` whenever the model didn't restate a field, and `COALESCE(null, old.field)` fell back to the OLD
+value instead of clearing it — a healed injury, an abandoned goal, or a resolved status note persisted
+forever and, since FIX-03, was repeatedly re-fed into later chapter generation as current fact.
+
+What changed: the `onConflictDoUpdate.set` for `characterStates` now writes the extracted values
+directly (`characterState.location ?? null`, etc.) instead of `COALESCE`-ing against the prior row —
+a genuine full-snapshot overwrite, matching the prompt's documented contract exactly. `threads`,
+`mysteries`, and `relationships` in the same file were deliberately left untouched — their `COALESCE`
+usage is semantically correct for those tables (e.g. a thread status update legitimately preserves an
+unrelated summary the model didn't restate); only the character-state prompt establishes a "full
+replacement snapshot" contract. `renderCharacterState` (`context-assembler.service.ts`) needed no
+change — it already omits any null/empty field from the rendered block, so once the DB stopped
+carrying stale values, rendering became correct automatically.
+
+Tests: `tests/ai/continuity-apply.spec.ts` — corrected the one existing test that had locked in the
+bug (renamed to "should replace the whole character state snapshot, clearing fields omitted by a later
+chapter"; its final assertion changed from asserting `conditions`/`immediateGoal`/`statusNote` survived
+unchanged to asserting they are `null` after an update that omits them); added 3 new cases: a resolved
+injury clears `conditions` on a later location-only update, an abandoned goal clears on a later
+status-note-only update, and a complete new snapshot fully overwrites a complete prior one (every field
+matches the new values, none of the old ones survive — guards against an over-broad fix that clears
+unconditionally). `tests/ai/context-assembler.spec.ts` — one new test seeding a `character_states` row
+with cleared fields (`conditions: null, immediateGoal: null`) alongside set ones and asserting the
+rendered `character_state` section shows only the current fields, with no stale mention of the cleared
+value anywhere in the pack. Confirmed against pre-fix (`COALESCE`) code: the corrected existing test and
+both clearing tests fail with the stale values still present (16 pass / 3 fail in the file); the
+full-overwrite and rendering tests pass in both states (guard tests, not bug-reproducers, since
+`COALESCE` happens to pick `EXCLUDED` when every field is non-null and the renderer was already
+correct). All pass with the fix restored.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+1027 pass, 10 skip, 0 fail (independently re-run).
+
+Commit: `b765de21`
