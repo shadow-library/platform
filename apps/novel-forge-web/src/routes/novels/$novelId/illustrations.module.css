@@ -1,0 +1,247 @@
+.spacer {
+  flex: 1;
+}
+
+.paneScroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.railHead {
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.railTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.railTitle {
+  font-size: var(--sh-text-body);
+  font-weight: 700;
+}
+
+.railHint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--sh-text-tertiary);
+}
+
+.keyFilter {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sh-accent);
+  cursor: pointer;
+}
+
+.railList {
+  flex: 1;
+  padding: 2px 8px 8px;
+}
+
+.itemRow {
+  gap: 11px;
+  padding: 8px 10px;
+}
+
+.itemThumb,
+.itemThumbFallback {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--sh-radius-md);
+  object-fit: cover;
+}
+
+.itemThumbFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sh-surface-well);
+  color: var(--sh-text-tertiary);
+}
+
+.itemBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemName {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itemSub {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+  text-align: left;
+}
+
+.detailHead {
+  height: 60px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 24px;
+}
+
+.detailTitleWrap {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.detailTitle {
+  margin: 0;
+  font-size: var(--sh-text-h3);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.detailMeta {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+  white-space: nowrap;
+}
+
+.detailInner {
+  max-width: 820px;
+  padding: 20px 24px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.sectionLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+  margin-bottom: 8px;
+}
+
+.alertText {
+  margin: 0 0 10px;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.6;
+}
+
+.candidates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.candidate {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 2px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-well);
+  cursor: pointer;
+}
+
+.candidate[data-selected] {
+  border-color: var(--sh-accent);
+}
+
+.candidate:disabled {
+  cursor: default;
+}
+
+.candidateImg {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--sh-radius-md);
+}
+
+.candidateMeta {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.candidatePending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  aspect-ratio: 1;
+  border: 2px dashed var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+}
+
+.prompt {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-well);
+  font-family: var(--sh-font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--sh-text-secondary);
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.instructionRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.instructionRow > *:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.frozenInstructions {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.6;
+  color: var(--sh-text-secondary);
+}
+
+.emptyNote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.dialogForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}

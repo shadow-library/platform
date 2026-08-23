@@ -7,6 +7,7 @@ export * from './entity.api';
 export * from './volume.api';
 export * from './chapter.api';
 export * from './chapter-image.api';
+export * from './illustration.api';
 export * from './draft.api';
 export * from './brief.api';
 export * from './bible.api';

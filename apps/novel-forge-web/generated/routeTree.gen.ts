@@ -27,6 +27,7 @@ import { Route as NovelsNovelIdPublishRouteImport } from './../src/routes/novels
 import { Route as NovelsNovelIdProposalsRouteImport } from './../src/routes/novels/$novelId/proposals'
 import { Route as NovelsNovelIdOverviewRouteImport } from './../src/routes/novels/$novelId/overview'
 import { Route as NovelsNovelIdImportPlanRouteImport } from './../src/routes/novels/$novelId/import-plan'
+import { Route as NovelsNovelIdIllustrationsRouteImport } from './../src/routes/novels/$novelId/illustrations'
 import { Route as NovelsNovelIdChatRouteImport } from './../src/routes/novels/$novelId/chat'
 import { Route as NovelsNovelIdChaptersRouteImport } from './../src/routes/novels/$novelId/chapters'
 import { Route as NovelsNovelIdCanonFactsRouteImport } from './../src/routes/novels/$novelId/canon-facts'
@@ -120,6 +121,12 @@ const NovelsNovelIdImportPlanRoute = NovelsNovelIdImportPlanRouteImport.update({
   path: '/import-plan',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
+const NovelsNovelIdIllustrationsRoute =
+  NovelsNovelIdIllustrationsRouteImport.update({
+    id: '/illustrations',
+    path: '/illustrations',
+    getParentRoute: () => NovelsNovelIdRoute,
+  } as any)
 const NovelsNovelIdChatRoute = NovelsNovelIdChatRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -144,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/novels/$novelId/canon-facts': typeof NovelsNovelIdCanonFactsRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
   '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
+  '/novels/$novelId/illustrations': typeof NovelsNovelIdIllustrationsRoute
   '/novels/$novelId/import-plan': typeof NovelsNovelIdImportPlanRoute
   '/novels/$novelId/overview': typeof NovelsNovelIdOverviewRoute
   '/novels/$novelId/proposals': typeof NovelsNovelIdProposalsRoute
@@ -165,6 +173,7 @@ export interface FileRoutesByTo {
   '/novels/$novelId/canon-facts': typeof NovelsNovelIdCanonFactsRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
   '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
+  '/novels/$novelId/illustrations': typeof NovelsNovelIdIllustrationsRoute
   '/novels/$novelId/import-plan': typeof NovelsNovelIdImportPlanRoute
   '/novels/$novelId/overview': typeof NovelsNovelIdOverviewRoute
   '/novels/$novelId/proposals': typeof NovelsNovelIdProposalsRoute
@@ -189,6 +198,7 @@ export interface FileRoutesById {
   '/novels/$novelId/canon-facts': typeof NovelsNovelIdCanonFactsRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
   '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
+  '/novels/$novelId/illustrations': typeof NovelsNovelIdIllustrationsRoute
   '/novels/$novelId/import-plan': typeof NovelsNovelIdImportPlanRoute
   '/novels/$novelId/overview': typeof NovelsNovelIdOverviewRoute
   '/novels/$novelId/proposals': typeof NovelsNovelIdProposalsRoute
@@ -213,6 +223,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/canon-facts'
     | '/novels/$novelId/chapters'
     | '/novels/$novelId/chat'
+    | '/novels/$novelId/illustrations'
     | '/novels/$novelId/import-plan'
     | '/novels/$novelId/overview'
     | '/novels/$novelId/proposals'
@@ -234,6 +245,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/canon-facts'
     | '/novels/$novelId/chapters'
     | '/novels/$novelId/chat'
+    | '/novels/$novelId/illustrations'
     | '/novels/$novelId/import-plan'
     | '/novels/$novelId/overview'
     | '/novels/$novelId/proposals'
@@ -257,6 +269,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/canon-facts'
     | '/novels/$novelId/chapters'
     | '/novels/$novelId/chat'
+    | '/novels/$novelId/illustrations'
     | '/novels/$novelId/import-plan'
     | '/novels/$novelId/overview'
     | '/novels/$novelId/proposals'
@@ -406,6 +419,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NovelsNovelIdImportPlanRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
+    '/novels/$novelId/illustrations': {
+      id: '/novels/$novelId/illustrations'
+      path: '/illustrations'
+      fullPath: '/novels/$novelId/illustrations'
+      preLoaderRoute: typeof NovelsNovelIdIllustrationsRouteImport
+      parentRoute: typeof NovelsNovelIdRoute
+    }
     '/novels/$novelId/chat': {
       id: '/novels/$novelId/chat'
       path: '/chat'
@@ -446,6 +466,7 @@ interface NovelsNovelIdRouteChildren {
   NovelsNovelIdCanonFactsRoute: typeof NovelsNovelIdCanonFactsRoute
   NovelsNovelIdChaptersRoute: typeof NovelsNovelIdChaptersRoute
   NovelsNovelIdChatRoute: typeof NovelsNovelIdChatRoute
+  NovelsNovelIdIllustrationsRoute: typeof NovelsNovelIdIllustrationsRoute
   NovelsNovelIdImportPlanRoute: typeof NovelsNovelIdImportPlanRoute
   NovelsNovelIdOverviewRoute: typeof NovelsNovelIdOverviewRoute
   NovelsNovelIdProposalsRoute: typeof NovelsNovelIdProposalsRoute
@@ -465,6 +486,7 @@ const NovelsNovelIdRouteChildren: NovelsNovelIdRouteChildren = {
   NovelsNovelIdCanonFactsRoute: NovelsNovelIdCanonFactsRoute,
   NovelsNovelIdChaptersRoute: NovelsNovelIdChaptersRoute,
   NovelsNovelIdChatRoute: NovelsNovelIdChatRoute,
+  NovelsNovelIdIllustrationsRoute: NovelsNovelIdIllustrationsRoute,
   NovelsNovelIdImportPlanRoute: NovelsNovelIdImportPlanRoute,
   NovelsNovelIdOverviewRoute: NovelsNovelIdOverviewRoute,
   NovelsNovelIdProposalsRoute: NovelsNovelIdProposalsRoute,

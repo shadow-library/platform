@@ -1,10 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import DOMPurify from 'dompurify';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, ButtonGroup, Dialog, Drawer, DropdownMenu, IconButton, SegmentedControl, Spinner, toast, Tooltip } from '@shadow-library/ui';
 
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, TrashIcon, WarningIcon } from '@/components/icons';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, SparkIcon, TrashIcon, WarningIcon } from '@/components/icons';
 import { type ChipIntent, Markdown, PaneError, PaneLoader, QueryState, RowAction, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import { ImageGallery } from '@/components/nf/ImageGallery';
@@ -486,6 +486,7 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
   const approveDraft = useApproveDraftMutation(novelId);
   const judge = useJudgeDraftMutation(novelId, chapter);
   const extract = useExtractToBibleMutation(novelId, chapter);
+  const navigate = useNavigate();
   const sceneImagesQuery = useChapterImagesQuery(novelId, chapter);
   const addSceneImage = useAddChapterImageMutation(novelId, chapter);
   const removeSceneImage = useDeleteChapterImageMutation(novelId, chapter);
@@ -701,7 +702,17 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
               )}
 
               <section className={styles.sceneImages}>
-                <div className={styles.sceneImagesHead}>Scene images</div>
+                <div className={styles.sceneImagesHead}>
+                  Scene images
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    prefix={<SparkIcon />}
+                    onClick={() => navigate({ to: '/novels/$novelId/illustrations', params: { novelId }, search: { subject: 'chapter', key: String(chapter), start: true } })}
+                  >
+                    Generate scene art
+                  </Button>
+                </div>
                 <ImageGallery
                   images={(sceneImagesQuery.data?.items ?? []).map(img => ({ id: img.id, url: img.imageUrl, caption: img.caption }))}
                   busy={addSceneImage.isPending || removeSceneImage.isPending}

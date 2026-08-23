@@ -206,11 +206,12 @@ interface EntityFormState {
   status: string;
   notes: string;
   motivation: string;
+  appearance: string;
   body: string;
 }
 
 function emptyForm(type: EntityType): EntityFormState {
-  return { entityKey: '', name: '', type, significance: 'minor', status: '', notes: '', motivation: '', body: '' };
+  return { entityKey: '', name: '', type, significance: 'minor', status: '', notes: '', motivation: '', appearance: '', body: '' };
 }
 
 interface EntityDialogState {
@@ -289,6 +290,9 @@ function EntityDialog({ open, onOpenChange, mode, initial, onSubmit, pending }: 
             <FormField label="Motivation">
               <Textarea value={form.motivation} onValueChange={v => set('motivation', v)} minRows={2} autoGrow />
             </FormField>
+            <FormField label="Appearance" helper="The canonical visual description every generated illustration is anchored to, so re-rolls keep the same look.">
+              <Textarea value={form.appearance} onValueChange={v => set('appearance', v)} minRows={2} autoGrow />
+            </FormField>
             <FormField label="Notes">
               <Textarea value={form.notes} onValueChange={v => set('notes', v)} minRows={2} autoGrow />
             </FormField>
@@ -325,6 +329,7 @@ function stripEntityHeading(body: string, name: string): string {
 }
 
 function EntityDetail({ novelId, entityKey, onEdit }: EntityDetailProps): React.JSX.Element {
+  const navigate = useNavigate();
   const entityQuery = useEntityQuery(novelId, entityKey);
   const uploadImage = useUploadEntityImageMutation(novelId, entityKey);
   const removeImage = useDeleteEntityImageMutation(novelId, entityKey);
@@ -346,6 +351,13 @@ function EntityDetail({ novelId, entityKey, onEdit }: EntityDetailProps): React.
           </span>
         </div>
         <div className={styles.spacer} />
+        <Button
+          variant="secondary"
+          prefix={<SparkIcon />}
+          onClick={() => navigate({ to: '/novels/$novelId/illustrations', params: { novelId }, search: { subject: 'entity', key: entityKey, start: true } })}
+        >
+          Generate portrait
+        </Button>
         <Button variant="ghost" onClick={() => onEdit(entity)}>
           Edit
         </Button>
@@ -499,6 +511,7 @@ function StoryBibleScreen(): React.JSX.Element {
         status: form.status || undefined,
         notes: form.notes || undefined,
         motivation: form.motivation || undefined,
+        appearance: form.appearance || undefined,
         body: form.body || undefined,
       };
       createEntity.mutate(body, {
@@ -516,6 +529,7 @@ function StoryBibleScreen(): React.JSX.Element {
         status: form.status || undefined,
         notes: form.notes || undefined,
         motivation: form.motivation || undefined,
+        appearance: form.appearance || undefined,
         body: form.body || undefined,
       };
       updateEntity.mutate(body, {
@@ -637,6 +651,7 @@ function StoryBibleScreen(): React.JSX.Element {
                   status: entity.status ?? '',
                   notes: entity.notes ?? '',
                   motivation: entity.motivation ?? '',
+                  appearance: entity.appearance ?? '',
                   body: entity.body ?? '',
                 },
               })

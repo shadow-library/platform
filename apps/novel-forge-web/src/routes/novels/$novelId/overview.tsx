@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Alert, Button, Dialog, EmptyState, FormField, IconButton, Input, Select, Spinner, toast, Tooltip } from '@shadow-library/ui';
 
-import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon, ResetIcon } from '@/components/icons';
+import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon, ResetIcon, SparkIcon } from '@/components/icons';
 import { PageContainer, SectionCard, StatusChip } from '@/components/nf';
 import { ImageUpload } from '@/components/nf/ImageUpload';
 import {
@@ -334,6 +334,14 @@ function OverviewScreen(): React.JSX.Element {
                     // client only speaks JSON, so navigate to the endpoint directly.
                     window.location.assign(`/api/v1/projects/${novelId}/export/novel`);
                   }}
+                />
+              </Tooltip>
+              <Tooltip content="Compose a cover from the story bible">
+                <IconButton
+                  variant="secondary"
+                  aria-label="Generate cover"
+                  icon={<SparkIcon />}
+                  onClick={() => navigate({ to: '/novels/$novelId/illustrations', params: { novelId }, search: { subject: 'cover', start: true } })}
                 />
               </Tooltip>
               <Tooltip content="Clone project">
