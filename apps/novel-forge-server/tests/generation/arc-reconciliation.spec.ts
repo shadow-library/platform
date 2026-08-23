@@ -53,7 +53,7 @@ describe.if(pgAvailable)('arc reconciliation on finalization', () => {
     const structured = mock(async (_prompt: unknown, vars: { startChapter: number; endChapter: number }) =>
       Array.from({ length: vars.endChapter - vars.startChapter + 1 }, (_, i) => modelBrief(vars.startChapter + i)),
     );
-    const finalization = mock(async () => ({ runId: 'run-1' }));
+    const finalization = mock(async () => ({ runId: 'run-1', outcome: 'completed', status: 'completed' }));
     const contextAssembler = {
       forOutline: async () => ({ rendered: 'CATALOG' }),
       resolveRefs: async (_projectId: bigint, refs: string[]) => ({ resolved: [], unresolved: refs }),

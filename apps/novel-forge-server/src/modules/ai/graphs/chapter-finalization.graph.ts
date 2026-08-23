@@ -55,7 +55,10 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
       db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
 
-    if (!draftRow || draftRow.reviewStatus !== 'approved')
+    // `final` is accepted alongside `approved` so a run resumed after a mid-pipeline failure gets past
+    // its own commitProse, which already flipped the draft. The service layer establishes that a `final`
+    // draft is a genuine resume and not a duplicate finalize before it invokes the graph again.
+    if (!draftRow || (draftRow.reviewStatus !== 'approved' && draftRow.reviewStatus !== 'final'))
       throw AppError.internal(`[guard] Draft for chapter ${state.chapter} is not approved (status: ${draftRow?.reviewStatus ?? 'missing'})`);
 
     const currentChapter = projectRow?.storyCurrentChapter ?? 0;

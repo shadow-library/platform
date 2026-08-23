@@ -828,8 +828,10 @@ export class GenerationService {
     }
 
     if (!draft) throw AppErrorCode.DRF_001.create();
-    if (draft.reviewStatus !== 'approved') throw AppErrorCode.DRF_004.create();
-    if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
+    if (draft.status === 'final') {
+      if (await this.isChapterFinalized(projectId, draft.chapter, draft.generator)) throw AppErrorCode.DRF_002.create();
+      this.logger.warn('finalize: resuming a partially finalized chapter', { projectId, chapter: draft.chapter, draftId: draft.id });
+    } else if (draft.reviewStatus !== 'approved') throw AppErrorCode.DRF_004.create();
     this.logger.info('finalize: finalizing chapter', { projectId, chapter: draft.chapter, draftId: draft.id, generator: draft.generator });
 
     if (draft.chapter > 1) {
@@ -864,9 +866,28 @@ export class GenerationService {
       generator: draft.generator,
     });
 
+    if (result.status !== 'completed') return result;
+
     await this.maybeReconcileArc(projectId, draft.chapter);
     await this.maybeWriteVolumeEpitome(projectId, draft.chapter);
     return result;
+  }
+
+  /**
+   * Whether chapter N reached the *end* of the finalization pipeline, as opposed to only its first
+   * (prose-committing) node. `commitProse` flips the draft to `final` before continuity extraction and
+   * the cursor advance run, so a draft's own status cannot answer this — a failure anywhere downstream
+   * leaves a `final` draft over a half-finalized chapter that must be allowed to finish.
+   */
+  private async isChapterFinalized(projectId: bigint, chapter: number, generator: string): Promise<boolean> {
+    const [chapterRow, project] = await Promise.all([
+      this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter)) }),
+      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+    ]);
+    if (!chapterRow) return false;
+    // grok chapters bypass continuity extraction entirely, so their flag never turns true.
+    if (!chapterRow.continuityApplied && generator !== 'grok') return false;
+    return (project?.storyCurrentChapter ?? 0) >= chapter;
   }
 
   /**

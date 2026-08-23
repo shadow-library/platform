@@ -34,7 +34,7 @@ describe.if(pgAvailable)('volume epitome on finalization', () => {
 
   function buildService(): { service: GenerationService; structured: ReturnType<typeof mock>; finalization: ReturnType<typeof mock> } {
     const structured = mock(async () => ({ epitome: 'The ledger burned, Amara went into exile, and the forger stayed unnamed.' }));
-    const finalization = mock(async () => ({ runId: 'run-1' }));
+    const finalization = mock(async () => ({ runId: 'run-1', outcome: 'completed', status: 'completed' }));
     const noop = {} as never;
     const service = new GenerationService(
       { getPostgresClient: () => db } as never,
