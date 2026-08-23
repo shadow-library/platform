@@ -6,9 +6,9 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 
 ## Summary
 
-- Completed: 3
+- Completed: 4
 - In Progress: 0
-- Pending: 8
+- Pending: 7
 - Blocked: 0
 
 ## Tasks
@@ -18,7 +18,7 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 | FIX-01 | CRITICAL | Make chapter finalization recoverable/idempotent across prose commit → extraction → apply → cursor                                  | COMPLETED | —            |
 | FIX-02 | CRITICAL | Reject mutation/deletion of finalized drafts; fix cross-table renumbering invariant on delete                                       | COMPLETED | —            |
 | FIX-03 | HIGH     | Read `character_states` + current relationships into `forChapter`; validate entity keys before applying extraction                  | COMPLETED | —            |
-| FIX-04 | HIGH     | Render `brief.pov` into generation/judge brief; guarantee POV entity card priority                                                  | PENDING   | —            |
+| FIX-04 | HIGH     | Render `brief.pov` into generation/judge brief; guarantee POV entity card priority                                                  | COMPLETED | —            |
 | FIX-05 | HIGH     | Arc reconciliation observes events inside the current arc, not `arc.chapterStart`; protect/invalidate already-drafted descendants   | PENDING   | FIX-02       |
 | FIX-06 | HIGH     | Continuity extraction receives existing key vocabulary; validate relationship targets/evidence; route ambiguous mutations to review | PENDING   | —            |
 | FIX-07 | HIGH     | Bible stage output instructions match schema; persist stage atomically; fix `bible_doc` ref format mismatch                         | PENDING   | —            |
@@ -77,7 +77,7 @@ None.
 
 ## Pending
 
-See table above. FIX-04 selected next.
+See table above. FIX-05 selected next.
 
 ## Blocked
 
@@ -202,5 +202,45 @@ unresolvable `entityKey` writes no row while a sibling with a valid key still do
 Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
 979 pass, 10 skip, 0 fail (independently re-run after the NUL-byte fix, not just trusted from the
 implementing sub-agent).
+
+Commit: `5046e5f0`
+
+### FIX-04 — Render `brief.pov` into generation/judge brief; guarantee POV entity card priority
+
+Source finding: `harness-post-implementation-review.md` H2 ("Brief POV is persisted but never
+reaches the chapter writer") + §18 row 4.
+
+What changed:
+
+- `brief-body.ts`'s `ChapterBriefInput`/`renderChapterBrief` (the single authority for the
+  `chapterBrief` prompt variable used by both drafting and repair-rewrite) now render a leading
+  `POV: <entityKey>` guidance line when `brief.pov` is set; briefs without POV render byte-identically
+  to before.
+- The judge's separately-built `## BRIEF` block (`chapter-generation.graph.ts`, not routed through
+  `renderChapterBrief` by design — a deliberately different format) gained the same `POV: <entityKey>`
+  line, so the judge also knows whose perspective it's checking for head-hopping.
+- `ContextAssembler.forChapter`: the POV entity's card is now guaranteed present, full-text (not
+  truncated at the shared `ENTITY_CARD_BUDGET = 350` cap every other entity ref goes through), and
+  first in the `FULL_CAST_MAX` priority slice — even when the outliner forgot to list it in
+  `contextRefs`. Implemented without touching `resolveRefs`'s shared truncation/priority behavior
+  (which `forOutline`/`forChatTurn`/`forArcPlanning`/rebrand/reforge all depend on): the per-entity
+  card-rendering logic was factored out into a module-level `renderEntityCard(entity, maxTokens?)` —
+  omitting `maxTokens` renders the body in full, reserved for the POV card — and a new
+  `povEntitySection` resolves/renders it directly, unshifted ahead of the `contextRefs`-resolved entity
+  sections (de-duplicating if `contextRefs` already listed it) before the existing
+  `.slice(0, FULL_CAST_MAX)` runs unchanged. A `brief.pov` naming no real entity fails closed — no
+  section, `entity:<pov>` added to `unresolvedRefs` for auditability, matching the existing
+  unresolved-ref pattern.
+
+Tests: `tests/generation/brief-guidance.spec.ts` (+POV-line rendering, ordered ahead of chapter
+purpose, byte-identical omission when unset), `tests/ai/brief-fulfillment-graph.spec.ts` (+judge
+`## BRIEF` block contains `POV:` when set, explicit absence guard when not), `tests/ai/context-
+assembler.spec.ts` (+4: full untruncated POV body over 350 tokens, POV card present when absent from
+`contextRefs`, POV card survives the `FULL_CAST_MAX` boundary against 6 other entity refs, graceful
+degradation + `unresolvedRefs` entry for an unresolvable POV key). Confirmed all six fail on pre-fix
+code, pass after.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+986 pass, 10 skip, 0 fail (independently re-run).
 
 Commit: (recorded after commit, see git log)

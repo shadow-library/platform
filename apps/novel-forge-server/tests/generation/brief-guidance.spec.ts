@@ -58,6 +58,19 @@ describe('renderChapterBrief', () => {
     );
   });
 
+  it('should render the stored body byte-identically when pov is null or absent', () => {
+    expect(renderChapterBrief({ body: BRIEF_BODY, pov: null })).toBe(BRIEF_BODY);
+    expect(renderChapterBrief({ body: BRIEF_BODY, pov: '  ' })).toBe(BRIEF_BODY);
+    expect(renderChapterBrief({ body: BRIEF_BODY })).toBe(BRIEF_BODY);
+  });
+
+  it('should name the pov character ahead of the other guidance lines', () => {
+    expect(renderChapterBrief({ body: BRIEF_BODY, pov: 'li-wei' })).toBe(`${BRIEF_BODY}\n\nPOV: li-wei`);
+    expect(renderChapterBrief({ body: BRIEF_BODY, pov: 'li-wei', chapterPurpose: 'Establishes the stakes.' })).toBe(
+      `${BRIEF_BODY}\n\nPOV: li-wei\nChapter purpose: Establishes the stakes.`,
+    );
+  });
+
   it('should include only the fields that carry a value', () => {
     expect(renderChapterBrief({ body: BRIEF_BODY, readerValue: ['emotional_turn'] })).toBe(`${BRIEF_BODY}\n\nThis chapter must deliver: emotional_turn`);
   });

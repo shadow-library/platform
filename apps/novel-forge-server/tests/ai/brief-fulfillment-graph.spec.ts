@@ -61,18 +61,22 @@ describe.if(pgAvailable)('judge brief-fulfillment gate', () => {
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
   });
 
-  async function seedProject(): Promise<bigint> {
+  async function seedProject(pov?: string): Promise<bigint> {
     const [project] = await db
       .insert(schema.projects)
       .values({ name: `brief-fulfillment-${Date.now()}-${Math.random()}`, kind: 'new_novel' })
       .returning();
     if (!project) throw new Error('failed to seed project');
-    await db.insert(schema.briefs).values({ projectId: project.id, chapter: 1, title: 'The Manifest', body: BRIEF_BODY });
+    await db.insert(schema.briefs).values({ projectId: project.id, chapter: 1, title: 'The Manifest', body: BRIEF_BODY, pov: pov ?? null });
     return project.id;
   }
 
-  async function run(judgeReply: unknown, autoFix: boolean): Promise<{ outcome: string | null; briefCompliant: boolean; projectId: bigint; seenMessages: BaseMessage[][] }> {
-    const projectId = await seedProject();
+  async function run(
+    judgeReply: unknown,
+    autoFix: boolean,
+    pov?: string,
+  ): Promise<{ outcome: string | null; briefCompliant: boolean; projectId: bigint; seenMessages: BaseMessage[][] }> {
+    const projectId = await seedProject(pov);
     const seenMessages: BaseMessage[][] = [];
     const graph = createChapterGenerationGraph(buildServices(db, judgeReply, seenMessages));
     const runId = `brief-${projectId}-${autoFix}`;
@@ -130,5 +134,13 @@ describe.if(pgAvailable)('judge brief-fulfillment gate', () => {
     expect(humanMsg).toContain('## BRIEF');
     expect(humanMsg).toContain('Li Wei bribes the harbormaster for the manifest');
     expect(humanMsg).toContain('briefCompliance');
+    expect(humanMsg).not.toContain('POV:');
+  });
+
+  it('should name the pov character in the judge brief block when the brief carries one', async () => {
+    const { seenMessages } = await run({ verdict: 'consistent', findings: [], briefCompliance: { compliant: true, issues: [] } }, false, 'li-wei');
+
+    const humanMsg = String(seenMessages[0]?.filter(m => m.getType() === 'human').pop()?.content);
+    expect(humanMsg).toContain('## BRIEF\nPOV: li-wei\n');
   });
 });

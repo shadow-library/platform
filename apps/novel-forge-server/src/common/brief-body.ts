@@ -22,6 +22,7 @@ export function renderBriefBody(c: BriefBodyInput): string {
 
 export interface ChapterBriefInput {
   body?: string | null;
+  pov?: string | null;
   chapterPurpose?: string | null;
   readerValue?: unknown;
   repetitionRisks?: unknown;
@@ -38,9 +39,11 @@ function stringList(value: unknown): string[] {
 export function renderChapterBrief(brief: ChapterBriefInput | null | undefined): string {
   const body = brief?.body ?? '';
   const guidance: string[] = [];
+  const pov = brief?.pov?.trim();
   const purpose = brief?.chapterPurpose?.trim();
   const readerValue = stringList(brief?.readerValue);
   const repetitionRisks = stringList(brief?.repetitionRisks);
+  if (pov) guidance.push(`POV: ${pov}`);
   if (purpose) guidance.push(`Chapter purpose: ${purpose}`);
   if (readerValue.length > 0) guidance.push(`This chapter must deliver: ${readerValue.join(', ')}`);
   if (repetitionRisks.length > 0) guidance.push(`Avoid repeating recent patterns: ${repetitionRisks.join('; ')}`);

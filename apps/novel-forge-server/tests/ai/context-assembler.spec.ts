@@ -129,7 +129,7 @@ function makeDbStub(overrides: Record<string, unknown> = {}) {
     volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
     arcs: { findFirst: mock(async () => null), findMany: mock(async () => []) },
     drafts: { findFirst: mock(async () => null) },
-    entities: { findMany: mock(async () => []) },
+    entities: { findFirst: mock(async () => null), findMany: mock(async () => []) },
     worldFacts: { findMany: mock(async () => []) },
     plotThreads: { findMany: mock(async () => []) },
     mysteries: { findMany: mock(async () => []) },
@@ -531,16 +531,93 @@ describe('ContextAssembler.forChapter — FULL_CAST_MAX', () => {
   });
 });
 
+describe('ContextAssembler.forChapter — POV entity card', () => {
+  const POV_TAIL = 'THE_LAST_PARAGRAPH_OF_THE_POV_CARD';
+  const povBody = `${Array.from({ length: 12 }, (_, i) => `Paragraph ${i}. ${'Amara remembers the docks and the ledger and the rain. '.repeat(12)}`).join('\n\n')}\n\n${POV_TAIL}`;
+  const amara = { id: 10n, entityKey: 'amara', name: 'Amara', type: 'character', status: 'active', origin: 'extracted', body: povBody, notes: null, aliases: [] };
+
+  function povDb(contextRefs: string[], pov: string | null, entities: { entityKey: string }[] = [amara]) {
+    return {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, instructions: 'style', contentMode: 'standard' })) },
+        briefs: { findFirst: mock(async () => ({ id: 1n, projectId: 1n, chapter: 5, body: 'Brief body', contextRefs, pov })) },
+        entities: {
+          findFirst: mock(async () => entities.find(e => e.entityKey === pov) ?? null),
+          findMany: mock(async () => entities),
+        },
+      },
+    };
+  }
+
+  it('should render the POV card in full while other entity cards stay capped', async () => {
+    const assembler = makeAssembler(povDb(['entity:amara'], 'amara'));
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    const section = pack.sections.find(s => s.key === 'ref:entity:amara');
+    expect(countTokens(povBody)).toBeGreaterThan(350);
+    expect(section?.rendered).toContain(POV_TAIL);
+    expect(section?.segment).toBe('stable');
+
+    const capped = await makeAssembler(povDb(['entity:amara'], null)).forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+    expect(capped.sections.find(s => s.key === 'ref:entity:amara')?.rendered).not.toContain(POV_TAIL);
+  });
+
+  it('should include the POV card even when the brief never lists it as a context ref', async () => {
+    const assembler = makeAssembler(povDb([], 'amara'));
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    const section = pack.sections.find(s => s.key === 'ref:entity:amara');
+    expect(section).toBeDefined();
+    expect(section?.rendered).toContain('**Amara**');
+    expect(section?.rendered).toContain(POV_TAIL);
+  });
+
+  it('should keep the POV card in the priority slice when the brief already names FULL_CAST_MAX other entities', async () => {
+    const others = Array.from({ length: FULL_CAST_MAX + 1 }, (_, i) => ({
+      entityKey: `ent${i}`,
+      name: `Entity ${i}`,
+      type: 'character',
+      status: 'active',
+      origin: 'extracted',
+      body: `Body for entity ${i}`,
+      notes: null,
+      aliases: [],
+    }));
+    const refs = [...others.map(e => `entity:${e.entityKey}`), 'entity:amara'];
+    const assembler = makeAssembler(povDb(refs, 'amara', [...others, amara]));
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    const keys = pack.sections.map(s => s.key);
+    const povIdx = keys.indexOf('ref:entity:amara');
+    const memoryIdx = keys.indexOf('writing_style');
+    expect(povIdx).toBe(keys.findIndex(k => k.startsWith('ref:entity:')));
+    expect(povIdx).toBeLessThan(memoryIdx);
+    expect(pack.sections[povIdx]?.rendered).toContain(POV_TAIL);
+    expect(keys.filter(k => k.startsWith('ref:entity:')).length).toBe(FULL_CAST_MAX + 2);
+  });
+
+  it('should degrade gracefully when pov names an entity that does not exist', async () => {
+    const assembler = makeAssembler(povDb(['entity:amara'], 'ghost'));
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    expect(pack.sections.find(s => s.key === 'ref:entity:ghost')).toBeUndefined();
+    expect(pack.unresolvedRefs).toContain('entity:ghost');
+  });
+});
+
 describe('ContextAssembler.forChapter — dynamic cast state', () => {
   const amara = { id: 10n, entityKey: 'amara', name: 'Amara', type: 'character', status: 'active', origin: 'extracted', body: 'A smuggler.', notes: null, aliases: [] };
   const rook = { id: 11n, entityKey: 'rook', name: 'Rook', type: 'character', status: 'active', origin: 'extracted', body: 'A rival.', notes: null, aliases: [] };
 
-  function castDb(overrides: { contextRefs?: string[]; pov?: string | null; entities?: unknown[]; characterStates?: unknown[]; entityRelationships?: unknown[] }) {
+  function castDb(overrides: { contextRefs?: string[]; pov?: string | null; entities?: { entityKey: string }[]; characterStates?: unknown[]; entityRelationships?: unknown[] }) {
     return {
       query: {
         projects: { findFirst: mock(async () => ({ id: 1n, instructions: 'style', contentMode: 'standard' })) },
         briefs: { findFirst: mock(async () => ({ id: 1n, projectId: 1n, chapter: 5, body: 'Brief body', contextRefs: overrides.contextRefs ?? [], pov: overrides.pov ?? null })) },
-        entities: { findMany: mock(async () => overrides.entities ?? []) },
+        entities: {
+          findFirst: mock(async () => (overrides.entities ?? []).find(e => e.entityKey === overrides.pov) ?? null),
+          findMany: mock(async () => overrides.entities ?? []),
+        },
         characterStates: { findMany: mock(async () => overrides.characterStates ?? []) },
         entityRelationships: { findMany: mock(async () => overrides.entityRelationships ?? []) },
       },

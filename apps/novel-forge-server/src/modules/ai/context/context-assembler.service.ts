@@ -81,6 +81,23 @@ function asStable(section: ContextSection): ContextSection {
   return { ...section, segment: 'stable' };
 }
 
+export const ENTITY_CARD_BUDGET = 350;
+
+type EntityCardRow = Pick<typeof schema.entities.$inferSelect, 'name' | 'type' | 'status' | 'body' | 'notes'> & { aliases: { alias: string }[] };
+
+/** `maxTokens` omitted renders the entity's body in full — reserved for the POV character's card. */
+function renderEntityCard(entity: EntityCardRow, maxTokens?: number): string {
+  const aliasLine = entity.aliases.length > 0 ? `\nAliases: ${entity.aliases.map(a => a.alias).join(', ')}` : '';
+  const statusLine = entity.status != null ? `\nStatus: ${entity.status}` : '';
+  const bodyRaw = entity.body ?? entity.notes ?? '';
+  const body = maxTokens === undefined ? bodyRaw : truncateAtParagraph(bodyRaw, maxTokens).text;
+  return `**${entity.name}** (${entity.type}, ${entity.status ?? 'active'})\n${body}${aliasLine}${statusLine}`;
+}
+
+function entityCardTier(status: EntityCardRow['status']): ContextTier {
+  return status === 'planned' ? 'approved_intent' : 'canonical';
+}
+
 function firstLine(text: string | null): string {
   return (text ?? '').split('\n', 1)[0] ?? '';
 }
@@ -235,13 +252,7 @@ export class ContextAssembler {
             unresolved.push(ref);
             break;
           }
-          const aliasLine = entity.aliases.length > 0 ? `\nAliases: ${entity.aliases.map(a => a.alias).join(', ')}` : '';
-          const statusLine = entity.status != null ? `\nStatus: ${entity.status}` : '';
-          const bodyRaw = entity.body ?? entity.notes ?? '';
-          const { text: body } = truncateAtParagraph(bodyRaw, 350);
-          const cardContent = `**${entity.name}** (${entity.type}, ${entity.status ?? 'active'})\n${body}${aliasLine}${statusLine}`;
-          const tier: ContextTier = entity.status == null || entity.status === 'active' ? 'canonical' : entity.status === 'planned' ? 'approved_intent' : 'canonical';
-          resolved.push(makeSection(`ref:entity:${value}`, cardContent, tier, [ref]));
+          resolved.push(makeSection(`ref:entity:${value}`, renderEntityCard(entity, ENTITY_CARD_BUDGET), entityCardTier(entity.status), [ref]));
           break;
         }
         case 'world_fact': {
@@ -450,8 +461,15 @@ export class ContextAssembler {
       refSections = resolved;
     }
 
-    // Only the first FULL_CAST_MAX entity refs retain caller-requested priority; the rest move below memory and style.
-    const entityRefSections = refSections.filter(s => s.key.startsWith('ref:entity:'));
+    const pov = brief?.pov ?? null;
+    const povSection = pov ? await this.povEntitySection(projectId, pov) : null;
+    if (pov && !povSection && !unresolvedRefs.includes(`entity:${pov}`)) unresolvedRefs = [...unresolvedRefs, `entity:${pov}`];
+
+    // Only the first FULL_CAST_MAX entity refs retain caller-requested priority; the rest move below memory
+    // and style. The POV card leads that slice — whose head the chapter is in outranks every other card,
+    // and the outliner does not always remember to list it in contextRefs at all.
+    const resolvedEntitySections = refSections.filter(s => s.key.startsWith('ref:entity:'));
+    const entityRefSections = povSection ? [povSection, ...resolvedEntitySections.filter(s => s.key !== povSection.key)] : resolvedEntitySections;
     const nonEntityRefSections = refSections.filter(s => !s.key.startsWith('ref:entity:'));
     const priorityEntitySections = entityRefSections.slice(0, FULL_CAST_MAX).map(asStable);
     const excessEntitySections = entityRefSections.slice(FULL_CAST_MAX).map(asStable);
@@ -474,6 +492,14 @@ export class ContextAssembler {
     for (const s of excessEntitySections) sections.push(s);
 
     return this.finalize(projectId, 'generation', chapter, sections, unresolvedRefs, budgetTokens, opts?.dryRun);
+  }
+
+  // The POV character's card is the one entity card that never pays the shared ENTITY_CARD_BUDGET cap: the
+  // drafter writes from inside this head, so a truncated card is a truncated narrator.
+  private async povEntitySection(projectId: bigint, pov: string): Promise<ContextSection | null> {
+    const entity = await this.db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, pov)), with: { aliases: true } });
+    if (!entity) return null;
+    return makeSection(`ref:entity:${pov}`, renderEntityCard(entity), entityCardTier(entity.status), [`entity:${pov}`]);
   }
 
   // Per-chapter dynamic state — never stable, and never project-wide: it is scoped to the cast the brief

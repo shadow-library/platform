@@ -342,7 +342,8 @@ export function createChapterGenerationGraph(services: GraphServices) {
         ? `\n\n## FORBIDDEN KNOWLEDGE\n${renderForbiddenFacts(forbidden)}\n\nThe POV cast does not know these facts — assess the draft for leaks and include knowledgeCompliance in your JSON.`
         : '';
 
-    const briefBlock = `\n\n## BRIEF\n${brief?.body ?? ''}\n\nThis is the plan the chapter was written from — assess whether the draft delivers it and include briefCompliance in your JSON.`;
+    const povLine = brief?.pov ? `POV: ${brief.pov}\n` : '';
+    const briefBlock = `\n\n## BRIEF\n${povLine}${brief?.body ?? ''}\n\nThis is the plan the chapter was written from — assess whether the draft delivers it and include briefCompliance in your JSON.`;
 
     const systemMsg = new SystemMessage(PROMPT_REGISTRY.judge.system);
     const humanMsg = new HumanMessage(
