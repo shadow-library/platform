@@ -37,6 +37,7 @@ const ChapterFinalizationAnnotation = Annotation.Root({
   generator: Annotation<string>({ reducer: (_, n) => n, default: () => 'standard' }),
   continuityDelta: Annotation<ContinuityOutput | null>({ reducer: (_, n) => n, default: () => null }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  nodeTrace: Annotation<string[]>({ reducer: (a, n) => [...a, ...n], default: () => [] }),
 });
 
 type FinalizationState = typeof ChapterFinalizationAnnotation.State;
@@ -63,7 +64,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     }
 
     logger.debug('finalization guard passed', { runId: state.runId, chapter: state.chapter, currentChapter });
-    return {};
+    return { nodeTrace: ['guard'] };
   }
 
   async function commitProse(state: FinalizationState) {
@@ -111,12 +112,12 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
       }
     });
 
-    return {};
+    return { nodeTrace: ['commitProse'] };
   }
 
   async function extractContinuity(state: FinalizationState) {
     // grok chapters skip continuity extraction.
-    if (state.generator === 'grok') return { continuityDelta: null };
+    if (state.generator === 'grok') return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
 
     const projectId = BigInt(state.projectId);
 
@@ -147,11 +148,11 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
         set: { proposal: sql`EXCLUDED.proposal`, model: sql`EXCLUDED.model`, status: 'pending', updatedAt: new Date() },
       });
 
-    return { continuityDelta: delta };
+    return { continuityDelta: delta, nodeTrace: ['extractContinuity'] };
   }
 
   async function applyContinuity(state: FinalizationState) {
-    if (!state.continuityDelta) return {};
+    if (!state.continuityDelta) return { nodeTrace: ['applyContinuity'] };
 
     const projectId = BigInt(state.projectId);
     const delta = state.continuityDelta;
@@ -174,7 +175,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
         .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter)));
     });
 
-    return {};
+    return { nodeTrace: ['applyContinuity'] };
   }
 
   async function updateIndexes(state: FinalizationState) {
@@ -200,7 +201,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
       }
     }
 
-    return {};
+    return { nodeTrace: ['updateIndexes'] };
   }
 
   async function advanceCursor(state: FinalizationState) {
@@ -228,11 +229,11 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
       logger.debug('finalization advanceCursor', { runId: state.runId, chapter: state.chapter, previousCurrent: currentChapter });
     }
 
-    return {};
+    return { nodeTrace: ['advanceCursor'] };
   }
 
   function finish() {
-    return { outcome: 'completed' };
+    return { outcome: 'completed', nodeTrace: ['finish'] };
   }
 
   return new StateGraph(ChapterFinalizationAnnotation)

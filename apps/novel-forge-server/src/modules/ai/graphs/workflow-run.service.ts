@@ -199,7 +199,6 @@ export class WorkflowRunService {
 
   async runChapterGeneration(input: ChapterGenerationInput): Promise<WorkflowRunResult> {
     const runId = await this.createRun(input.projectId, 'chapter-generation', `chapter-${input.chapter}`, input, input.jobId);
-    const nodeTrace: string[] = [];
 
     try {
       const graph = createChapterGenerationGraph(this.graphServices);
@@ -215,12 +214,11 @@ export class WorkflowRunService {
         },
         { configurable: { thread_id: runId } },
       );
-      const finalState = rawState as unknown as { outcome: string | null };
+      const finalState = rawState as unknown as { outcome: string | null; nodeTrace?: string[] };
       const outcome = finalState.outcome ?? 'completed';
       const status: 'completed' | 'awaiting_review' = outcome === 'awaiting_review' ? 'awaiting_review' : 'completed';
-      nodeTrace.push('assembleContext', 'draftChapter', 'persistDraft', 'judge', 'finish');
 
-      await this.completeRun(runId, outcome, status, nodeTrace);
+      await this.completeRun(runId, outcome, status, finalState.nodeTrace ?? []);
       return { runId, outcome, status };
     } catch (err) {
       this.logger.error('runChapterGeneration failed', { err, runId });
@@ -231,11 +229,10 @@ export class WorkflowRunService {
 
   async runChapterFinalization(input: ChapterFinalizationInput): Promise<WorkflowRunResult> {
     const runId = await this.createRun(input.projectId, 'chapter-finalization', `chapter-${input.chapter}`, input, input.jobId);
-    const nodeTrace: string[] = [];
 
     try {
       const graph = createChapterFinalizationGraph(this.graphServices as FinalizationServices);
-      await graph.invoke(
+      const rawState = await graph.invoke(
         {
           projectId: String(input.projectId),
           chapter: input.chapter,
@@ -250,8 +247,8 @@ export class WorkflowRunService {
         { configurable: { thread_id: runId } },
       );
 
-      nodeTrace.push('guard', 'commitProse', 'extractContinuity', 'applyContinuity', 'updateIndexes', 'advanceCursor', 'finish');
-      await this.completeRun(runId, 'completed', 'completed', nodeTrace);
+      const finalState = rawState as unknown as { nodeTrace?: string[] };
+      await this.completeRun(runId, 'completed', 'completed', finalState.nodeTrace ?? []);
       return { runId, outcome: 'completed', status: 'completed' };
     } catch (err) {
       this.logger.error('runChapterFinalization failed', { err, runId });
@@ -262,14 +259,13 @@ export class WorkflowRunService {
 
   async runBibleBuilder(input: BibleBuilderInput): Promise<WorkflowRunResult> {
     const runId = await this.createRun(input.projectId, 'bible-builder', 'all-stages', input, input.jobId);
-    const nodeTrace: string[] = [];
 
     try {
       const graph = createBibleBuilderGraph(this.graphServices as BibleBuilderServices);
-      await graph.invoke({ projectId: String(input.projectId), brief: input.brief, force: input.force ?? false, runId }, { configurable: { thread_id: runId } });
+      const rawState = await graph.invoke({ projectId: String(input.projectId), brief: input.brief, force: input.force ?? false, runId }, { configurable: { thread_id: runId } });
 
-      nodeTrace.push('foundation', 'worldAndPower', 'factionsAndLocations', 'characters', 'plot', 'volumes', 'indexLore');
-      await this.completeRun(runId, 'completed', 'completed', nodeTrace);
+      const finalState = rawState as unknown as { nodeTrace?: string[] };
+      await this.completeRun(runId, 'completed', 'completed', finalState.nodeTrace ?? []);
       return { runId, outcome: 'completed', status: 'completed' };
     } catch (err) {
       this.logger.error('runBibleBuilder failed', { err, runId });
@@ -280,14 +276,13 @@ export class WorkflowRunService {
 
   async runSourceExtraction(input: SourceExtractionInput): Promise<WorkflowRunResult> {
     const runId = await this.createRun(input.projectId, 'source-extraction', `chapter-${input.chapter}`, input, input.jobId);
-    const nodeTrace: string[] = [];
 
     try {
       const graph = createSourceExtractionGraph(this.graphServices as ExtractionServices);
-      await graph.invoke({ projectId: String(input.projectId), chapter: input.chapter, runId }, { configurable: { thread_id: runId } });
+      const rawState = await graph.invoke({ projectId: String(input.projectId), chapter: input.chapter, runId }, { configurable: { thread_id: runId } });
 
-      nodeTrace.push('loadChapter', 'extractKnowledge', 'persistKnowledge', 'embedProse', 'finish');
-      await this.completeRun(runId, 'completed', 'completed', nodeTrace);
+      const finalState = rawState as unknown as { nodeTrace?: string[] };
+      await this.completeRun(runId, 'completed', 'completed', finalState.nodeTrace ?? []);
       return { runId, outcome: 'completed', status: 'completed' };
     } catch (err) {
       this.logger.error('runSourceExtraction failed', { err, runId });
@@ -298,15 +293,14 @@ export class WorkflowRunService {
 
   async runChapterRebrand(input: RebrandChapterInput): Promise<WorkflowRunResult> {
     const runId = await this.createRun(input.projectId, 'chapter-rebrand', `chapter-${input.chapter}`, input, input.jobId);
-    const nodeTrace: string[] = [];
 
     try {
       const graph = createChapterRebrandGraph(this.graphServices as RebrandGraphServices);
       const rawState = await graph.invoke({ projectId: String(input.projectId), chapter: input.chapter, runId }, { configurable: { thread_id: runId } });
-      const outcome = (rawState as unknown as { outcome: string | null }).outcome ?? 'converted';
+      const finalState = rawState as unknown as { outcome: string | null; nodeTrace?: string[] };
+      const outcome = finalState.outcome ?? 'converted';
 
-      nodeTrace.push('loadChapter', 'assembleContext', 'convert', 'residueScan', 'audit', 'persistConversion', 'mergeGlossary', 'finish');
-      await this.completeRun(runId, outcome, 'completed', nodeTrace);
+      await this.completeRun(runId, outcome, 'completed', finalState.nodeTrace ?? []);
       return { runId, outcome, status: 'completed' };
     } catch (err) {
       this.logger.error('runChapterRebrand failed', { err, runId });
@@ -317,15 +311,14 @@ export class WorkflowRunService {
 
   async runChapterReforge(input: ReforgeChapterInput): Promise<WorkflowRunResult> {
     const runId = await this.createRun(input.projectId, 'chapter-reforge', `chapter-${input.chapter}`, input, input.jobId);
-    const nodeTrace: string[] = [];
 
     try {
       const graph = createChapterReforgeGraph(this.graphServices as ReforgeGraphServices);
       const rawState = await graph.invoke({ projectId: String(input.projectId), chapter: input.chapter, runId }, { configurable: { thread_id: runId } });
-      const outcome = (rawState as unknown as { outcome: string | null }).outcome ?? 'reforged';
+      const finalState = rawState as unknown as { outcome: string | null; nodeTrace?: string[] };
+      const outcome = finalState.outcome ?? 'reforged';
 
-      nodeTrace.push('loadChapter', 'outlineContext', 'generateOutline', 'writeContext', 'write', 'residueScan', 'judge', 'persistReforge', 'mergeGlossary', 'finish');
-      await this.completeRun(runId, outcome, 'completed', nodeTrace);
+      await this.completeRun(runId, outcome, 'completed', finalState.nodeTrace ?? []);
       return { runId, outcome, status: 'completed' };
     } catch (err) {
       this.logger.error('runChapterReforge failed', { err, runId });
@@ -336,15 +329,14 @@ export class WorkflowRunService {
 
   async runNovelValidation(input: NovelValidationInput): Promise<WorkflowRunResult> {
     const runId = await this.createRun(input.projectId, 'novel-validation', 'full-novel', input, input.jobId);
-    const nodeTrace: string[] = [];
 
     try {
       const graph = createNovelValidationGraph(this.graphServices as ValidationServices);
       const rawState = await graph.invoke({ projectId: String(input.projectId), runId }, { configurable: { thread_id: runId } });
-      const outcome = (rawState as unknown as { outcome?: string | null }).outcome ?? 'completed';
-      nodeTrace.push('planWindows', 'validateWindows', 'mergeFindings', 'persistReport');
+      const finalState = rawState as unknown as { outcome?: string | null; nodeTrace?: string[] };
+      const outcome = finalState.outcome ?? 'completed';
 
-      await this.completeRun(runId, outcome, 'completed', nodeTrace);
+      await this.completeRun(runId, outcome, 'completed', finalState.nodeTrace ?? []);
       return { runId, outcome, status: 'completed' };
     } catch (err) {
       this.logger.error('runNovelValidation failed', { err, runId });

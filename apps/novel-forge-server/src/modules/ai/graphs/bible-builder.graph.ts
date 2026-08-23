@@ -32,6 +32,7 @@ const BibleBuilderAnnotation = Annotation.Root({
   stagesDone: Annotation<string[]>({ reducer: (_, n) => n, default: () => [] }),
   counts: Annotation<Record<string, number>>({ reducer: (_, n) => n, default: () => ({}) }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  nodeTrace: Annotation<string[]>({ reducer: (a, n) => [...a, ...n], default: () => [] }),
 });
 
 type BibleBuilderState = typeof BibleBuilderAnnotation.State;
@@ -83,7 +84,7 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
       });
       if (existing?.body) {
         logger.debug(`[bible-builder] Skipping ${stageName} — already has content`);
-        return { stagesDone: [...state.stagesDone, stageName], counts: { ...state.counts, [stageName]: 0 } };
+        return { stagesDone: [...state.stagesDone, stageName], counts: { ...state.counts, [stageName]: 0 }, nodeTrace: [stageName] };
       }
     }
 
@@ -192,6 +193,7 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
     return {
       stagesDone: [...state.stagesDone, stageName],
       counts: { ...state.counts, [stageName]: result.entities?.length ?? 1 },
+      nodeTrace: [stageName],
     };
   }
 
@@ -261,7 +263,7 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
       }
     }
 
-    return { outcome: 'completed' };
+    return { outcome: 'completed', nodeTrace: ['indexLore'] };
   }
 
   return new StateGraph(BibleBuilderAnnotation)

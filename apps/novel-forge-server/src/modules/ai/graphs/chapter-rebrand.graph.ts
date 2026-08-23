@@ -52,6 +52,7 @@ const ChapterRebrandAnnotation = Annotation.Root({
   attempt: Annotation<number>({ reducer: (_, n) => n, default: () => 0 }),
   repairNotes: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  nodeTrace: Annotation<string[]>({ reducer: (a, n) => [...a, ...n], default: () => [] }),
 });
 
 type RebrandState = typeof ChapterRebrandAnnotation.State;
@@ -110,6 +111,7 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
       glossary: glossaryRows.map(g => ({ sourceName: g.sourceName, variants: g.variants as string[] | null, replacement: g.replacement, category: g.category, notes: g.notes })),
       carryState: (previous?.carryState as Record<string, unknown> | null) ?? null,
       prevBody: previous?.body || null,
+      nodeTrace: ['loadChapter'],
     };
   }
 
@@ -127,7 +129,7 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     if (pack.id) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
 
     logger.debug('rebrand assembleContext', { runId: state.runId, chapter: state.chapter, glossarySliceLength: glossarySlice.length, contextPackLength: pack.rendered.length });
-    return { stableContext: pack.renderedStable, volatileContext: pack.renderedVolatile, glossarySlice };
+    return { stableContext: pack.renderedStable, volatileContext: pack.renderedVolatile, glossarySlice, nodeTrace: ['assembleContext'] };
   }
 
   async function convert(state: RebrandState) {
@@ -159,19 +161,19 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
       fixes: result.fixes?.length ?? 0,
       addedScenes: result.addedScenes?.length ?? 0,
     });
-    return { converted: result };
+    return { converted: result, nodeTrace: ['convert'] };
   }
 
   function residueScan(state: RebrandState) {
-    if (!state.converted) return { residueIssues: [] };
+    if (!state.converted) return { residueIssues: [], nodeTrace: ['residueScan'] };
     const combined = [...state.glossary, ...(state.converted.discoveredNames ?? [])];
     const residueIssues = scanResidue(state.converted.body, combined, state.settings.bannedExtra ?? []);
     if (residueIssues.length > 0) logger.debug('rebrand residueScan found issues', { runId: state.runId, chapter: state.chapter, issues: residueIssues });
-    return { residueIssues };
+    return { residueIssues, nodeTrace: ['residueScan'] };
   }
 
   async function audit(state: RebrandState) {
-    if (!state.converted || state.settings.auditEnabled === false) return { auditIssues: [] };
+    if (!state.converted || state.settings.auditEnabled === false) return { auditIssues: [], nodeTrace: ['audit'] };
 
     const projectId = BigInt(state.projectId);
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
@@ -188,13 +190,13 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     const auditIssues: RebrandAuditIssueRecord[] =
       result.verdict === 'issues' ? result.issues.map(i => ({ source: 'audit' as const, type: i.type, detail: i.detail, excerpt: i.excerpt })) : [];
     logger.debug('rebrand audit', { runId: state.runId, chapter: state.chapter, verdict: result.verdict, auditIssues: auditIssues.length });
-    return { auditIssues };
+    return { auditIssues, nodeTrace: ['audit'] };
   }
 
   function prepareRepair(state: RebrandState) {
     const issues: ConversionIssue[] = [...state.residueIssues, ...state.auditIssues];
     logger.debug('rebrand repair pass', { chapter: state.chapter, issues: issues.length });
-    return { attempt: state.attempt + 1, repairNotes: renderIssues(issues) };
+    return { attempt: state.attempt + 1, repairNotes: renderIssues(issues), nodeTrace: ['prepareRepair'] };
   }
 
   async function persistConversion(state: RebrandState) {
@@ -241,14 +243,14 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
         },
       });
 
-    return { outcome: status };
+    return { outcome: status, nodeTrace: ['persistConversion'] };
   }
 
   // Runs even for attention rows — later chapters need the discovered names either way. Conflicts
   // keep the existing mapping: a name is never re-mapped once made (design §2).
   async function mergeGlossary(state: RebrandState) {
     const discovered = state.converted?.discoveredNames ?? [];
-    if (discovered.length === 0) return {};
+    if (discovered.length === 0) return { nodeTrace: ['mergeGlossary'] };
     const projectId = BigInt(state.projectId);
 
     await db
@@ -267,11 +269,11 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
       .onConflictDoNothing()
       .catch(err => logger.warn('glossary merge error (non-fatal)', { err, chapter: state.chapter }));
 
-    return {};
+    return { nodeTrace: ['mergeGlossary'] };
   }
 
   function finish(state: RebrandState) {
-    return { outcome: state.outcome ?? 'converted' };
+    return { outcome: state.outcome ?? 'converted', nodeTrace: ['finish'] };
   }
 
   return new StateGraph(ChapterRebrandAnnotation)

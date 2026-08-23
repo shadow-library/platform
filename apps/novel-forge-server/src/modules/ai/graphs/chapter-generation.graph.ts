@@ -60,6 +60,9 @@ const ChapterGenAnnotation = Annotation.Root({
   // outcome
   draftId: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  // The real path taken through the graph, in execution order — each node appends its own name so
+  // repair-ladder detours (which a hardcoded happy-path list can never show) show up honestly.
+  nodeTrace: Annotation<string[]>({ reducer: (a, n) => [...a, ...n], default: () => [] }),
 });
 
 type ChapterGenState = typeof ChapterGenAnnotation.State;
@@ -169,7 +172,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const pack = await contextAssembler.forChapter(BigInt(state.projectId), state.chapter);
     // Link the pack to the run row so the run detail can show the prompt anatomy behind the tokens.
     if (pack.id !== null) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
-    return { contextPackId: pack.id ? String(pack.id) : null };
+    return { contextPackId: pack.id ? String(pack.id) : null, nodeTrace: ['assembleContext'] };
   }
 
   async function draftChapter(state: ChapterGenState) {
@@ -215,6 +218,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       title,
       summary: result.summary,
       continuationState: (result.state ?? {}) as Record<string, string>,
+      nodeTrace: ['draftChapter'],
     };
   }
 
@@ -271,7 +275,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       return row;
     });
 
-    return { draftId: String(draft.id) };
+    return { draftId: String(draft.id), nodeTrace: ['persistDraft'] };
   }
 
   const MECHANICAL_PRIOR_WINDOW = 10;
@@ -293,7 +297,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       findings: mechanicalFindings.length,
       mechanicallyCompliant,
     });
-    return { mechanicalFindings, mechanicallyCompliant };
+    return { mechanicalFindings, mechanicallyCompliant, nodeTrace: ['mechanicalCheck'] };
   }
 
   async function judge(state: ChapterGenState) {
@@ -401,7 +405,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
         .where(eq(schema.drafts.id, BigInt(state.draftId)));
     }
 
-    return { verdict, findings, endingCompliant, knowledgeCompliant: knowledge.knowledgeCompliant, briefCompliant };
+    return { verdict, findings, endingCompliant, knowledgeCompliant: knowledge.knowledgeCompliant, briefCompliant, nodeTrace: ['judge'] };
   }
 
   async function repairPatch(state: ChapterGenState) {
@@ -427,7 +431,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
     logger.debug('generation repairPatch', { runId: state.runId, chapter: state.chapter, attempt: state.attempt, action: result.action, patches: result.patches?.length ?? 0 });
 
     if (result.action === 'rewrite' && result.body) {
-      return { prose: result.body, repairMode: 'rewrite' as const, patchApplied: false };
+      return { prose: result.body, repairMode: 'rewrite' as const, patchApplied: false, nodeTrace: ['repairPatch'] };
     }
 
     if (result.action === 'patch' && result.patches && result.patches.length > 0) {
@@ -443,12 +447,14 @@ export function createChapterGenerationGraph(services: GraphServices) {
         patched = patched.replace(patch.find, patch.replace);
       }
 
-      if (allApplied) return { prose: patched, repairMode: 'patch' as const, patchApplied: true, attempt: state.attempt + 1, previousFindings: state.findings };
+      if (allApplied) {
+        return { prose: patched, repairMode: 'patch' as const, patchApplied: true, attempt: state.attempt + 1, previousFindings: state.findings, nodeTrace: ['repairPatch'] };
+      }
       logger.debug('generation repairPatch: a patch anchor was not uniquely found — falling back to rewrite', { runId: state.runId, chapter: state.chapter });
     }
 
     // Patch failed — fall through to rewrite.
-    return { repairMode: 'rewrite' as const, patchApplied: false };
+    return { repairMode: 'rewrite' as const, patchApplied: false, nodeTrace: ['repairPatch'] };
   }
 
   async function repairRewrite(state: ChapterGenState) {
@@ -492,6 +498,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       attempt: state.attempt + 1,
       previousFindings: state.findings,
       repairMode: 'patch' as const,
+      nodeTrace: ['repairRewrite'],
     };
   }
 
@@ -502,7 +509,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
         .set({ reviewStatus: 'needs_review', updatedAt: new Date() })
         .where(eq(schema.drafts.id, BigInt(state.draftId)));
     }
-    return { outcome: 'accepted' };
+    return { outcome: 'accepted', nodeTrace: ['accept'] };
   }
 
   async function acceptAsIs(state: ChapterGenState) {
@@ -512,7 +519,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
         .set({ reviewStatus: 'contradiction', updatedAt: new Date() })
         .where(eq(schema.drafts.id, BigInt(state.draftId)));
     }
-    return { outcome: 'accepted_with_findings' };
+    return { outcome: 'accepted_with_findings', nodeTrace: ['acceptAsIs'] };
   }
 
   async function awaitReview(state: ChapterGenState) {
@@ -522,11 +529,11 @@ export function createChapterGenerationGraph(services: GraphServices) {
         .set({ reviewStatus: 'contradiction', updatedAt: new Date() })
         .where(eq(schema.drafts.id, BigInt(state.draftId)));
     }
-    return { outcome: 'awaiting_review' };
+    return { outcome: 'awaiting_review', nodeTrace: ['awaitReview'] };
   }
 
   function finish(state: ChapterGenState) {
-    return { outcome: state.outcome };
+    return { outcome: state.outcome, nodeTrace: ['finish'] };
   }
 
   return new StateGraph(ChapterGenAnnotation)

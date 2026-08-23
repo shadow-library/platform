@@ -48,6 +48,7 @@ const NovelValidationAnnotation = Annotation.Root({
   failedWindows: Annotation<WindowSpec[]>({ reducer: (_, n) => n, default: () => [] }),
   report: Annotation<NovelValidationReport | null>({ reducer: (_, n) => n, default: () => null }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  nodeTrace: Annotation<string[]>({ reducer: (a, n) => [...a, ...n], default: () => [] }),
 });
 
 type ValidationState = typeof NovelValidationAnnotation.State;
@@ -104,7 +105,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
       columns: { number: true },
     });
 
-    if (chapterRows.length === 0) return { windows: [] };
+    if (chapterRows.length === 0) return { windows: [], nodeTrace: ['planWindows'] };
 
     const volumeRows = await db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal });
 
@@ -127,7 +128,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
     }
 
     logger.debug('validation planWindows', { runId: state.runId, chapters: chapterRows.length, windows: windows.length });
-    return { windows };
+    return { windows, nodeTrace: ['planWindows'] };
   }
 
   async function validateWindows(state: ValidationState) {
@@ -173,7 +174,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
       }
     }
 
-    return { windowFindings: allFindings, succeededWindows, failedWindows };
+    return { windowFindings: allFindings, succeededWindows, failedWindows, nodeTrace: ['validateWindows'] };
   }
 
   async function mergeFindings(state: ValidationState) {
@@ -211,7 +212,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
       issues: deduplicated.length,
       errors: deduplicated.filter(i => i.severity === 'error').length,
     });
-    return { report };
+    return { report, nodeTrace: ['mergeFindings'] };
   }
 
   async function persistReport(state: ValidationState) {
@@ -253,7 +254,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
       }
     }
 
-    return { outcome: JSON.stringify(state.report) };
+    return { outcome: JSON.stringify(state.report), nodeTrace: ['persistReport'] };
   }
 
   return new StateGraph(NovelValidationAnnotation)

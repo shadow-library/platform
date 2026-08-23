@@ -33,6 +33,7 @@ const SourceExtractionAnnotation = Annotation.Root({
   chapterGenerator: Annotation<string>({ reducer: (_, n) => n, default: () => 'standard' }),
   extracted: Annotation<ExtractionOutput | null>({ reducer: (_, n) => n, default: () => null }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  nodeTrace: Annotation<string[]>({ reducer: (a, n) => [...a, ...n], default: () => [] }),
 });
 
 type ExtractionState = typeof SourceExtractionAnnotation.State;
@@ -53,7 +54,7 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
     if (!ch) throw AppError.internal(`[loadChapter] Chapter ${state.chapter} not found for project ${state.projectId}`);
 
     logger.debug('extraction loadChapter', { runId: state.runId, chapter: state.chapter, chapterId: String(ch.id), contentLength: (ch.content ?? '').length });
-    return { chapterId: String(ch.id), chapterContent: ch.content ?? '', chapterGenerator: ch.generator };
+    return { chapterId: String(ch.id), chapterContent: ch.content ?? '', chapterGenerator: ch.generator, nodeTrace: ['loadChapter'] };
   }
 
   async function extractKnowledge(state: ExtractionState) {
@@ -86,11 +87,11 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
       worldFacts: result.worldFacts.length,
       mysteries: result.mysteries.length,
     });
-    return { extracted: result };
+    return { extracted: result, nodeTrace: ['extractKnowledge'] };
   }
 
   async function persistKnowledge(state: ExtractionState) {
-    if (!state.extracted) return {};
+    if (!state.extracted) return { nodeTrace: ['persistKnowledge'] };
 
     const projectId = BigInt(state.projectId);
     const extracted = state.extracted;
@@ -246,7 +247,7 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
         .where(eq(schema.chapters.id, BigInt(state.chapterId)));
     }
 
-    return {};
+    return { nodeTrace: ['persistKnowledge'] };
   }
 
   async function embedProse(state: ExtractionState) {
@@ -258,11 +259,11 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
     } catch (err) {
       logger.warn('embedProse: addProse failed (non-fatal)', { err });
     }
-    return {};
+    return { nodeTrace: ['embedProse'] };
   }
 
   function finish() {
-    return { outcome: 'completed' };
+    return { outcome: 'completed', nodeTrace: ['finish'] };
   }
 
   return new StateGraph(SourceExtractionAnnotation)

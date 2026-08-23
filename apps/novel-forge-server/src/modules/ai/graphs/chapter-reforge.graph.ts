@@ -56,6 +56,7 @@ const ChapterReforgeAnnotation = Annotation.Root({
   attempt: Annotation<number>({ reducer: (_, n) => n, default: () => 0 }),
   repairNotes: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  nodeTrace: Annotation<string[]>({ reducer: (a, n) => [...a, ...n], default: () => [] }),
 });
 
 type ReforgeState = typeof ChapterReforgeAnnotation.State;
@@ -139,6 +140,7 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
       glossary: glossaryRows.map(g => ({ sourceName: g.sourceName, variants: g.variants as string[] | null, replacement: g.replacement, category: g.category, notes: g.notes })),
       carryState: (previous?.carryState as Record<string, unknown> | null) ?? null,
       prevBody: previous?.body || null,
+      nodeTrace: ['loadChapter'],
     };
   }
 
@@ -149,7 +151,7 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     if (pack.id) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
 
     logger.debug('reforge outlineContext', { runId: state.runId, chapter: state.chapter, glossarySliceLength: glossarySlice.length, packLength: pack.rendered.length });
-    return { outlinePack: pack.rendered, glossarySlice };
+    return { outlinePack: pack.rendered, glossarySlice, nodeTrace: ['outlineContext'] };
   }
 
   async function outline(state: ReforgeState) {
@@ -166,7 +168,7 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     )) as ReforgeOutlineOutput;
 
     logger.debug('reforge outline', { runId: state.runId, chapter: state.chapter, beats: result.beats.length });
-    return { outline: result, renderedOutline: renderOutline(result) };
+    return { outline: result, renderedOutline: renderOutline(result), nodeTrace: ['generateOutline'] };
   }
 
   async function writeContext(state: ReforgeState) {
@@ -182,7 +184,7 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
     if (pack.id) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
 
     logger.debug('reforge writeContext', { runId: state.runId, chapter: state.chapter, packLength: pack.rendered.length });
-    return { writeStableContext: pack.renderedStable, writeVolatileContext: pack.renderedVolatile };
+    return { writeStableContext: pack.renderedStable, writeVolatileContext: pack.renderedVolatile, nodeTrace: ['writeContext'] };
   }
 
   async function write(state: ReforgeState) {
@@ -213,20 +215,20 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
       discoveredNames: result.discoveredNames?.length ?? 0,
       removals: result.changes?.removals?.length ?? 0,
     });
-    return { written: result };
+    return { written: result, nodeTrace: ['write'] };
   }
 
   function residueScan(state: ReforgeState) {
-    if (!state.written) return { residueIssues: [] };
+    if (!state.written) return { residueIssues: [], nodeTrace: ['residueScan'] };
     const combined = [...state.glossary, ...(state.written.discoveredNames ?? [])];
     // The shared BANNED_REAL_WORLD_TERMS list lives inside scanResidue; reforge adds no extra terms.
     const residueIssues = scanResidue(state.written.body, combined, []);
     if (residueIssues.length > 0) logger.debug('reforge residueScan found issues', { runId: state.runId, chapter: state.chapter, issues: residueIssues });
-    return { residueIssues };
+    return { residueIssues, nodeTrace: ['residueScan'] };
   }
 
   async function judge(state: ReforgeState) {
-    if (!state.written || state.settings.judgeEnabled === false) return { judgeIssues: [], fidelity: null };
+    if (!state.written || state.settings.judgeEnabled === false) return { judgeIssues: [], fidelity: null, nodeTrace: ['judge'] };
 
     const projectId = BigInt(state.projectId);
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
@@ -250,13 +252,13 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
       totalBeats: result.totalBeats,
       judgeIssues: judgeIssues.length,
     });
-    return { judgeIssues, fidelity: result };
+    return { judgeIssues, fidelity: result, nodeTrace: ['judge'] };
   }
 
   function prepareRepair(state: ReforgeState) {
     const issues: ReforgeIssue[] = [...state.residueIssues, ...state.judgeIssues];
     logger.debug('reforge repair pass', { chapter: state.chapter, issues: issues.length });
-    return { attempt: state.attempt + 1, repairNotes: renderIssues(issues) };
+    return { attempt: state.attempt + 1, repairNotes: renderIssues(issues), nodeTrace: ['prepareRepair'] };
   }
 
   async function persistReforge(state: ReforgeState) {
@@ -305,14 +307,14 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
         },
       });
 
-    return { outcome: status };
+    return { outcome: status, nodeTrace: ['persistReforge'] };
   }
 
   // Runs even for attention rows — later chapters need the discovered names either way. Conflicts
   // keep the existing mapping: a name is never re-mapped once made (design §2).
   async function mergeGlossary(state: ReforgeState) {
     const discovered = state.written?.discoveredNames ?? [];
-    if (discovered.length === 0) return {};
+    if (discovered.length === 0) return { nodeTrace: ['mergeGlossary'] };
     const projectId = BigInt(state.projectId);
 
     await db
@@ -331,11 +333,11 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
       .onConflictDoNothing()
       .catch(err => logger.warn('glossary merge error (non-fatal)', { err, chapter: state.chapter }));
 
-    return {};
+    return { nodeTrace: ['mergeGlossary'] };
   }
 
   function finish(state: ReforgeState) {
-    return { outcome: state.outcome ?? 'reforged' };
+    return { outcome: state.outcome ?? 'reforged', nodeTrace: ['finish'] };
   }
 
   return new StateGraph(ChapterReforgeAnnotation)
