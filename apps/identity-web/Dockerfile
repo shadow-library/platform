@@ -21,6 +21,7 @@ COPY apps/novel-forge-server/package.json apps/novel-forge-server/package.json
 COPY apps/novel-forge-web/package.json apps/novel-forge-web/package.json
 COPY apps/pulse-server/package.json apps/pulse-server/package.json
 COPY apps/pulse-web/package.json apps/pulse-web/package.json
+COPY apps/shadow-memoir-server/package.json apps/shadow-memoir-server/package.json
 COPY apps/web-novel-server/package.json apps/web-novel-server/package.json
 COPY apps/web-novel-web/package.json apps/web-novel-web/package.json
 COPY e2e/package.json e2e/package.json
