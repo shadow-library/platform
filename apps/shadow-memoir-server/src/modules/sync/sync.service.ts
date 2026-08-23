@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { AppError, Config } from '@shadow-library/common';
+import { AppError, Config, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -10,6 +10,8 @@ import { AppError, Config } from '@shadow-library/common';
 import { AccountContext } from '@modules/auth';
 import { CommandBus, type CommandEnvelope } from '@modules/commands';
 import { AppErrorCode } from '@server/classes';
+import { APP_NAME } from '@server/constants';
+import { logMetric, pseudoAccountId, TelemetryService } from '@server/telemetry';
 
 import { DeltaRepository } from './delta.repository';
 import { DeltaSourceRegistry } from './delta-source.registry';
@@ -39,11 +41,14 @@ export interface DeltaRequest {
 
 @Injectable()
 export class SyncService {
+  private readonly logger = Logger.getLogger(APP_NAME, SyncService.name);
+
   constructor(
     private readonly accountContext: AccountContext,
     private readonly commandBus: CommandBus,
     private readonly registry: DeltaSourceRegistry,
     private readonly deltaRepository: DeltaRepository,
+    private readonly telemetry: TelemetryService,
   ) {}
 
   /**
@@ -63,17 +68,35 @@ export class SyncService {
     for (const command of commands) if (!known.has(command.type)) throw AppErrorCode.CMD_001.create({ type: command.type });
 
     const outcomes: BatchOutcome[] = [];
-    for (const command of commands) {
-      try {
-        const outcome = await this.commandBus.execute(accountId, command);
-        outcomes.push({ commandId: outcome.commandId, status: outcome.status, result: outcome.result, replayed: outcome.replayed });
-      } catch (error) {
-        if (!AppError.is(error) || error.isInternal) throw error;
-        outcomes.push({ commandId: command.commandId, status: 'failed', result: {}, replayed: false, error: error.toResponse() });
-        break;
+    let failed = 0;
+    try {
+      for (const command of commands) {
+        try {
+          const outcome = await this.commandBus.execute(accountId, command);
+          outcomes.push({ commandId: outcome.commandId, status: outcome.status, result: outcome.result, replayed: outcome.replayed });
+        } catch (error) {
+          if (!AppError.is(error) || error.isInternal) throw error;
+          failed++;
+          outcomes.push({ commandId: command.commandId, status: 'failed', result: {}, replayed: false, error: error.toResponse() });
+          break;
+        }
+      }
+      return outcomes;
+    } finally {
+      if (commands.length > 0) {
+        const replayed = outcomes.filter(outcome => outcome.replayed).length;
+        logMetric(this.logger, 'Sync command batch submitted', 'sync.command_error_rate', failed / commands.length, { commandCount: commands.length, failed });
+        this.telemetry.emit({
+          name: 'sync_batch_submitted',
+          pseudoId: pseudoAccountId(accountId),
+          occurredAtMs: Date.now(),
+          commandCount: commands.length,
+          appliedCount: outcomes.length - failed,
+          failedCount: failed,
+          replayedCount: replayed,
+        });
       }
     }
-    return outcomes;
   }
 
   /**

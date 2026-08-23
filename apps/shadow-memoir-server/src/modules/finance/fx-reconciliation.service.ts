@@ -12,6 +12,8 @@ import { SchedulerService } from '@modules/scheduler';
 import { APP_NAME } from '@server/constants';
 import { type Expense } from '@server/database';
 
+import { logMetric } from '@server/telemetry';
+
 import { type CurrencyPair, HttpFxRateClient } from './fx-rate-client';
 import { ExpenseRepository } from './expense.repository';
 import { FxRateRepository } from './fx-rate.repository';
@@ -107,13 +109,21 @@ export class FxReconciliationService implements OnModuleInit {
     const unresolved = nulls.length - resolved;
     const staleUnresolved = nulls.filter(expense => Date.now() - expense.createdAt.getTime() >= UNRESOLVED_ALERT_HOURS * MS_PER_HOUR);
     if (staleUnresolved.length > 0) {
-      this.logger.warn('FX reconciliation: expenses unresolved past the alert threshold', {
-        metric: 'fx_reconciliation.unresolved_stale',
-        count: staleUnresolved.length,
-        thresholdHours: UNRESOLVED_ALERT_HOURS,
-      });
+      logMetric(
+        this.logger,
+        'FX reconciliation: expenses unresolved past the alert threshold',
+        'fx_reconciliation.unresolved_stale',
+        staleUnresolved.length,
+        { thresholdHours: UNRESOLVED_ALERT_HOURS },
+        'warn',
+      );
     }
 
-    this.logger.info('FX reconciliation sweep complete', { candidates: nulls.length, resolved, unresolved, pairsWarmed: warmed.length, historicalFetches: fetchedForHistory });
+    logMetric(this.logger, 'FX reconciliation sweep complete', 'fx_reconciliation.unresolved', unresolved, {
+      candidates: nulls.length,
+      resolved,
+      pairsWarmed: warmed.length,
+      historicalFetches: fetchedForHistory,
+    });
   }
 }

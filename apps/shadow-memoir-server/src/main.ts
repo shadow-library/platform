@@ -6,6 +6,7 @@ import { ShadowFactory } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
 import { AppModule } from './app.module';
+import { manifestLogRedactionFormat } from './database/log-redaction';
 
 const packageJsonPath = path.join(import.meta.dirname, 'package.json');
 const packageJsonFile = Bun.file(packageJsonPath);
@@ -17,7 +18,8 @@ if (await packageJsonFile.exists()) {
 }
 
 Logger.setDefaultMetadata({ gitCommit });
-if (Config.isProd()) Logger.attachTransport('console:json');
-else if (Config.isDev()) Logger.attachTransport('console:pretty').attachTransport('file:json');
+const redaction = manifestLogRedactionFormat();
+if (Config.isProd()) Logger.attachTransport('console:json', redaction);
+else if (Config.isDev()) Logger.attachTransport('console:pretty', redaction).attachTransport('file:json', redaction);
 
 ShadowFactory.create(AppModule).then(app => app.start());

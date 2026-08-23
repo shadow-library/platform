@@ -34,6 +34,8 @@ declare module '@shadow-library/common' {
 
     'fx.provider-url': string;
     'fx.reconciliation-interval-minutes': number;
+
+    'telemetry.pseudo-id-secret': string;
   }
 }
 
@@ -83,3 +85,6 @@ Config.load('billing.webhook-tolerance-seconds', { defaultValue: '300', validate
 
 Config.load('fx.provider-url', { defaultValue: 'https://api.exchangerate.host' });
 Config.load('fx.reconciliation-interval-minutes', { defaultValue: '60', validateType: 'number' });
+
+/** HMAC key for the analytics pseudo-id (§23) — an account id must never be recoverable from it. Ops-provisioned per env; the default is dev/test-only. */
+Config.load('telemetry.pseudo-id-secret', { defaultValue: 'dev-only-telemetry-pseudo-id-secret' });

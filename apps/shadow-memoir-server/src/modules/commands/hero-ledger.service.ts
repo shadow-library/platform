@@ -8,6 +8,7 @@ import { AppError } from '@shadow-library/common';
 import { currentRuleset, levelFor, type QuestLogState, type StatAffinity } from '@modules/rules';
 import { AppErrorCode } from '@server/classes';
 import { type DatabaseTransaction, type HeroEvent, schema } from '@server/database';
+import { pseudoAccountId, TelemetryService } from '@server/telemetry';
 
 /**
  * Defining types
@@ -62,6 +63,8 @@ interface AppliedGrant {
  */
 @Injectable()
 export class HeroLedger {
+  constructor(private readonly telemetry: TelemetryService) {}
+
   async grant(tx: DatabaseTransaction, accountId: bigint, intents: GrantIntent[]): Promise<GrantOutcome[]> {
     const outcomes: GrantOutcome[] = [];
     for (const intent of intents) {
@@ -143,6 +146,7 @@ export class HeroLedger {
       }
     }
 
+    const leveledUp = level > account.level;
     const outcome: GrantOutcome = {
       dedupeKey: intent.dedupeKey,
       status: 'applied',
@@ -152,8 +156,22 @@ export class HeroLedger {
       statAffinity: intent.statAffinity ?? null,
       statDelta,
       levelAfter: intent.levelAfter ?? level,
-      leveledUp: level > account.level,
+      leveledUp,
     };
+
+    this.telemetry.emit({
+      name: 'hero_event_recorded',
+      pseudoId: pseudoAccountId(accountId),
+      occurredAtMs: Date.now(),
+      eventType: intent.type,
+      xpDelta,
+      coinsDelta,
+      statAffinity: intent.statAffinity ?? null,
+      statDelta,
+      levelAfter: outcome.levelAfter,
+      leveledUp,
+    });
+
     return { outcome, levelUps };
   }
 

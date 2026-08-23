@@ -11,6 +11,7 @@ import { AppError, ValidationError } from '@shadow-library/common';
 import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
 import { AppErrorCode } from '@server/classes';
 import { type DatabaseTransaction, type Expense, schema, type Subscription } from '@server/database';
+import { pseudoAccountId, TelemetryService } from '@server/telemetry';
 
 import { ExpenseCategoryRepository } from './expense-category.repository';
 import { ExpenseRepository } from './expense.repository';
@@ -108,6 +109,7 @@ export class FinanceCommandsService implements OnModuleInit {
     private readonly expenseRepository: ExpenseRepository,
     private readonly subscriptionRepository: SubscriptionRepository,
     private readonly fxRateRepository: FxRateRepository,
+    private readonly telemetry: TelemetryService,
   ) {}
 
   onModuleInit(): void {
@@ -172,6 +174,15 @@ export class FinanceCommandsService implements OnModuleInit {
       linkedSubscriptionId: null,
       billingCycleDate: null,
       ...fx,
+    });
+
+    this.telemetry.emit({
+      name: 'expense_recorded',
+      pseudoId: pseudoAccountId(accountId),
+      occurredAtMs: Date.now(),
+      source,
+      hasReceipt: expense.receiptRef !== null,
+      hasFxConversion: expense.fxRate !== null,
     });
 
     return { status: 'applied', result: { id: expense.id } };
@@ -343,6 +354,7 @@ export class FinanceCommandsService implements OnModuleInit {
     } else {
       const nextDueDate = advanceDueDate(subscription, billingDate);
       await this.subscriptionRepository.advanceCycle(tx, subscriptionId, billingDate, nextDueDate);
+      this.telemetry.emit({ name: 'subscription_cycle_confirmed', pseudoId: pseudoAccountId(accountId), occurredAtMs: Date.now(), frequency: subscription.frequency });
     }
     if (!expense) throw AppErrorCode.FIN_002.create();
 

@@ -6,3 +6,11 @@ export interface Sweep {
   fn: SweepFn;
   lastRunAt: number;
 }
+
+/** A synchronous point-in-time reading (queue depth, orphan count, …) sampled once per heartbeat. */
+export type GaugeFn = () => number;
+
+export interface Gauge {
+  metric: string;
+  fn: GaugeFn;
+}

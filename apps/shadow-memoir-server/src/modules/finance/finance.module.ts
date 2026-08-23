@@ -5,6 +5,7 @@ import { MemoirAuthModule } from '@modules/auth';
 import { CommandsModule } from '@modules/commands';
 import { SchedulerModule } from '@modules/scheduler';
 import { SyncModule } from '@modules/sync';
+import { TelemetryModule } from '@server/telemetry';
 
 import { ExpenseCategoryRepository } from './expense-category.repository';
 import { ExpenseRepository } from './expense.repository';
@@ -16,7 +17,7 @@ import { FxReconciliationService } from './fx-reconciliation.service';
 import { SubscriptionRepository } from './subscription.repository';
 
 @Module({
-  imports: [DatabaseModule, MemoirAuthModule, CommandsModule, SchedulerModule, SyncModule],
+  imports: [DatabaseModule, MemoirAuthModule, CommandsModule, SchedulerModule, SyncModule, TelemetryModule],
   providers: [
     ExpenseCategoryRepository,
     ExpenseRepository,
