@@ -39,7 +39,7 @@ const HP_COST: Record<Strictness, number> = { anchor: 1, routine: 1, goal: 0, re
 const XP_CEILING = 25;
 const SOFT_CAPACITY_MINUTES = 150;
 
-interface LogRecord {
+export interface LogRecord {
   state: OccurrenceState;
   xpAwarded: number;
   coinsAwarded: number;
@@ -51,7 +51,12 @@ interface LogRecord {
   progress: number | null;
 }
 
-interface FixtureState {
+/**
+ * Everything the day, plan and quest screens are derived from. The fixtures seed one; the sync layer
+ * projects one out of the delta rows it has in IndexedDB. `MemoirEngine` never learns which it was given,
+ * which is what lets an offline write and a fixture write run through the same code.
+ */
+export interface MemoirWorldState {
   today: string;
   persona: Persona;
   quests: Quest[];
@@ -98,58 +103,68 @@ function relativeDayLabel(date: string, today: string): string {
   return parsed ? WEEKDAY_LABELS[WEEKDAYS[(parsed.getDay() + 6) % 7] as keyof typeof WEEKDAY_LABELS] : date;
 }
 
-export class FixtureProvider implements DataProvider {
-  private readonly state: FixtureState;
+function recordFor(quest: Quest, state: OccurrenceState): LogRecord {
+  const rewarded = state === 'completed' || state === 'partial';
+  const base = state === 'partial' ? Math.floor(BASE_XP[quest.strictness] * 0.5) : BASE_XP[quest.strictness];
+  return {
+    state,
+    xpAwarded: rewarded ? Math.min(XP_CEILING, base) : 0,
+    coinsAwarded: state === 'completed' ? BASE_COINS[quest.strictness] : 0,
+    reasonTag: state === 'partial' ? 'too_tired' : null,
+    reasonNote: null,
+    rescheduledToDate: null,
+    postponedTo: null,
+    shielded: false,
+    progress: null,
+  };
+}
 
-  constructor(options: FixtureProviderOptions = {}) {
-    const today = options.today ?? toISODate(new Date());
-    const persona = options.persona ?? 'active';
-    const seeded = seed(today, persona);
-    this.state = {
-      today,
-      persona,
-      quests: seeded.quests,
-      progress: seeded.progress,
-      logs: new Map(),
-      hero: seeded.hero,
-      activity: seeded.activity,
-      metrics: seeded.metrics,
-      locks: persona === 'active' ? new Set([today, shiftDate(today, 1)]) : new Set(),
-    };
-    this.seedHistory();
-  }
-
-  private seedHistory(): void {
-    for (const quest of this.state.quests) {
-      const outcomes = this.state.progress[quest.id]?.recentOutcomes ?? [];
-      for (let back = 1; back <= 30; back += 1) {
-        const date = shiftDate(this.state.today, -back);
-        if (!isScheduled(quest, date)) continue;
-        const state = outcomes[outcomes.length - back] ?? 'completed';
-        this.state.logs.set(occurrenceKey(quest.id, date), this.recordFor(quest, state));
-      }
+function seedHistory(state: MemoirWorldState): void {
+  for (const quest of state.quests) {
+    const outcomes = state.progress[quest.id]?.recentOutcomes ?? [];
+    for (let back = 1; back <= 30; back += 1) {
+      const date = shiftDate(state.today, -back);
+      if (!isScheduled(quest, date)) continue;
+      state.logs.set(occurrenceKey(quest.id, date), recordFor(quest, outcomes[outcomes.length - back] ?? 'completed'));
     }
-
-    if (this.state.persona !== 'active') return;
-    this.state.logs.set(occurrenceKey('evening-stretch', shiftDate(this.state.today, -1)), this.recordFor(this.questById('evening-stretch') as Quest, 'missed'));
-    const run = this.questById('morning-run');
-    if (run && isScheduled(run, this.state.today)) this.state.logs.set(occurrenceKey(run.id, this.state.today), this.recordFor(run, 'completed'));
   }
 
-  private recordFor(quest: Quest, state: OccurrenceState): LogRecord {
-    const rewarded = state === 'completed' || state === 'partial';
-    const base = state === 'partial' ? Math.floor(BASE_XP[quest.strictness] * 0.5) : BASE_XP[quest.strictness];
-    return {
-      state,
-      xpAwarded: rewarded ? Math.min(XP_CEILING, base) : 0,
-      coinsAwarded: state === 'completed' ? BASE_COINS[quest.strictness] : 0,
-      reasonTag: state === 'partial' ? 'too_tired' : null,
-      reasonNote: null,
-      rescheduledToDate: null,
-      postponedTo: null,
-      shielded: false,
-      progress: null,
-    };
+  if (state.persona !== 'active') return;
+  const stretch = state.quests.find(quest => quest.id === 'evening-stretch');
+  if (stretch) state.logs.set(occurrenceKey(stretch.id, shiftDate(state.today, -1)), recordFor(stretch, 'missed'));
+  const run = state.quests.find(quest => quest.id === 'morning-run');
+  if (run && isScheduled(run, state.today)) state.logs.set(occurrenceKey(run.id, state.today), recordFor(run, 'completed'));
+}
+
+export function seedWorldState(options: FixtureProviderOptions = {}): MemoirWorldState {
+  const today = options.today ?? toISODate(new Date());
+  const persona = options.persona ?? 'active';
+  const seeded = seed(today, persona);
+  const state: MemoirWorldState = {
+    today,
+    persona,
+    quests: seeded.quests,
+    progress: seeded.progress,
+    logs: new Map(),
+    hero: seeded.hero,
+    activity: seeded.activity,
+    metrics: seeded.metrics,
+    locks: persona === 'active' ? new Set([today, shiftDate(today, 1)]) : new Set(),
+  };
+  seedHistory(state);
+  return state;
+}
+
+/**
+ * The pure day-group engine: every read is derived from `MemoirWorldState` and every command mutates it.
+ * It is the whole of the fixture provider, and the whole of the synced provider's optimistic local apply —
+ * one implementation, so an offline completion and a fixture completion cannot disagree about the effect.
+ */
+export class MemoirEngine implements DataProvider {
+  constructor(private readonly state: MemoirWorldState) {}
+
+  get world(): MemoirWorldState {
+    return this.state;
   }
 
   private questById(questId: string): Quest | undefined {
@@ -640,5 +655,5 @@ async function recordInOwningDomain(command: Command, today: string): Promise<vo
 }
 
 export function createFixtureProvider(options?: FixtureProviderOptions): DataProvider {
-  return new FixtureProvider(options);
+  return new MemoirEngine(seedWorldState(options));
 }

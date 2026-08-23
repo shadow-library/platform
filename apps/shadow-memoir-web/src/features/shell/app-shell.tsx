@@ -10,6 +10,7 @@ import { logout, meQuery } from '@/lib/apis';
 
 import styles from './app-shell.module.css';
 import { DESKTOP_NAV, PHONE_NAV } from './nav';
+import { NetStrip } from './net-strip';
 import { QuickCapture } from './quick-capture';
 import { SystemOverlayProvider, useSystemOverlays } from './system-overlays';
 
@@ -84,6 +85,7 @@ function ShellChrome({ children }: AppShellProps): ReactElement {
       bottomNav={isPhone ? <PhoneNav /> : undefined}
       contentWidth="fluid"
     >
+      <NetStrip />
       {children}
       {isPhone && <Fab className={styles.fab} placement="static" icon={<LogIcon size={20} />} aria-label="Quick capture" onClick={() => setCaptureOpen(true)} />}
       <QuickCapture open={captureOpen} onOpenChange={setCaptureOpen} />

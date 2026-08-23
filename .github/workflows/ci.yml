@@ -153,6 +153,7 @@ jobs:
             "apps/identity-server": { "needsPostgres": true, "needsRedis": true, "createTemplateDb": false, "checkMigrations": true, "checkApiTypes": true },
             "apps/novel-forge-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": true, "checkApiTypes": true },
             "apps/pulse-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": false, "checkApiTypes": true },
+            "apps/shadow-memoir-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": true, "checkApiTypes": true },
             "apps/web-novel-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": false, "checkMigrations": true, "checkApiTypes": true }
           }
           JSON
@@ -217,13 +218,14 @@ jobs:
           matrix.workspace == 'apps/identity-server' && 'postgresql://postgres:postgres@localhost:5432/shadow_identity' ||
           matrix.workspace == 'apps/novel-forge-server' && 'postgresql://postgres:postgres@localhost:5432/novel_forge_test' ||
           matrix.workspace == 'apps/pulse-server' && 'postgresql://postgres:postgres@localhost:5432/shadow_pulse' ||
+          matrix.workspace == 'apps/shadow-memoir-server' && 'postgresql://postgres:postgres@localhost:5432/shadow_memoir' ||
           matrix.workspace == 'apps/web-novel-server' && 'postgresql://postgres:postgres@localhost:5432/shadow_webnovel' ||
           ''
         }}
       DATABASE_REDIS_URL: ${{ matrix.workspace == 'apps/identity-server' && 'redis://localhost:6379' || '' }}
       DATABASE_POSTGRES_LAZY_CONNECTION: >-
         ${{
-          (matrix.workspace == 'apps/identity-server' || matrix.workspace == 'apps/pulse-server' || matrix.workspace == 'apps/web-novel-server') && 'true' ||
+          (matrix.workspace == 'apps/identity-server' || matrix.workspace == 'apps/pulse-server' || matrix.workspace == 'apps/shadow-memoir-server' || matrix.workspace == 'apps/web-novel-server') && 'true' ||
           ''
         }}
       # CI-only fixture key, never a real secret — matches what the old identity-server workflow
@@ -252,7 +254,7 @@ jobs:
       # per leaked pool instead of several buys enough headroom for a full test run.
       DATABASE_POSTGRES_MAX_CONNECTIONS: >-
         ${{
-          (matrix.workspace == 'apps/identity-server' || matrix.workspace == 'apps/novel-forge-server' || matrix.workspace == 'apps/pulse-server' || matrix.workspace == 'apps/web-novel-server') && '1' ||
+          (matrix.workspace == 'apps/identity-server' || matrix.workspace == 'apps/novel-forge-server' || matrix.workspace == 'apps/pulse-server' || matrix.workspace == 'apps/shadow-memoir-server' || matrix.workspace == 'apps/web-novel-server') && '1' ||
           ''
         }}
 
@@ -338,7 +340,7 @@ jobs:
 
       # The server↔web API contract is not atomic (AGENTS.md) — a server DTO change with no matching
       # `api-types.gen.ts` regeneration in its paired web app is a silent break nothing else here would
-      # catch. Scoped to the 4 backend legs (matrix.checkApiTypes), each checking its own paired
+      # catch. Scoped to the backend legs (matrix.checkApiTypes), each checking its own paired
       # apps/*-web by naming convention (apps/<x>-server -> apps/<x>-web): that's exactly the affected
       # pair a server change touches, it's already inside this leg's own job (deps built, DB/mock infra
       # up, Verify just proved the server boots), and it needs no extra build step of its own — the

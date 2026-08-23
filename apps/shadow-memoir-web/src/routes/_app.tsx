@@ -1,9 +1,11 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
-import { type ReactElement } from 'react';
+import { type ReactElement, useMemo } from 'react';
 import { Spinner } from '@shadow-library/ui';
 
 import { AppShell } from '@/features/shell';
+import { MemoirDataProvider } from '@/lib/data';
 import { requireSession, useSessionGuard } from '@/lib/session';
+import { createSyncedMemoirData, SyncEngineProvider } from '@/lib/sync';
 
 export const Route = createFileRoute('/_app')({
   beforeLoad: ({ context, location }) => requireSession(context.queryClient, location.href),
@@ -17,6 +19,7 @@ export const Route = createFileRoute('/_app')({
  */
 function AuthenticatedShell(): ReactElement {
   const status = useSessionGuard();
+  const data = useMemo(() => createSyncedMemoirData(), []);
 
   if (status === 'redirecting')
     return (
@@ -26,8 +29,12 @@ function AuthenticatedShell(): ReactElement {
     );
 
   return (
-    <AppShell>
-      <Outlet />
-    </AppShell>
+    <MemoirDataProvider value={data}>
+      <SyncEngineProvider data={data}>
+        <AppShell>
+          <Outlet />
+        </AppShell>
+      </SyncEngineProvider>
+    </MemoirDataProvider>
   );
 }
