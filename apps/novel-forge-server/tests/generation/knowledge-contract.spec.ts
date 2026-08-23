@@ -184,7 +184,50 @@ describe.if(pgAvailable)('outliner-authored knowledge contracts', () => {
 
     expect(rendered).toContain('CANON FACTS:');
     expect(rendered).toContain('the_heir: Amara is the lost heir. (unrevealed)');
-    expect(rendered).toContain('the_pact: The covenant sold the city. (revealed ch 4)');
+    expect(rendered).toContain('the_pact: The covenant sold the city. (unrevealed; scheduled ch 4)');
+  });
+
+  it('should render a fact as revealed only when the character-knowledge ledger has a row for it, not from revealChapter alone', async () => {
+    const projectId = await seedProject({
+      facts: [
+        { factKey: 'the_heir', text: 'Amara is the lost heir.', revealChapter: 20 },
+        { factKey: 'the_pact', text: 'The covenant sold the city.' },
+      ],
+    });
+    const [entity] = await db.insert(schema.entities).values({ projectId, entityKey: 'amara', type: 'character', name: 'Amara' }).returning();
+    if (!entity) throw new Error('failed to seed entity');
+    const fact = await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, 'the_heir')) });
+    if (!fact) throw new Error('failed to seed fact');
+    await db.insert(schema.characterKnowledge).values({ projectId, factId: fact.id, entityId: entity.id, learnedInChapter: 5, source: 'brief' });
+    const catalog = new CatalogService({ getPostgresClient: () => db } as never);
+
+    const rendered = await catalog.render(projectId);
+
+    expect(rendered).toContain('the_heir: Amara is the lost heir. (revealed)');
+    expect(rendered).toContain('the_pact: The covenant sold the city. (unrevealed)');
+  });
+
+  it('should render a fact with no revealChapter and no ledger row as plain unrevealed', async () => {
+    const projectId = await seedProject({ facts: [{ factKey: 'the_pact', text: 'The covenant sold the city.' }] });
+    const catalog = new CatalogService({ getPostgresClient: () => db } as never);
+
+    const rendered = await catalog.render(projectId);
+
+    expect(rendered).toContain('the_pact: The covenant sold the city. (unrevealed)');
+  });
+
+  it('should render a fact with a ledger row but no revealChapter as revealed with no schedule hint', async () => {
+    const projectId = await seedProject({ facts: [{ factKey: 'the_pact', text: 'The covenant sold the city.' }] });
+    const [entity] = await db.insert(schema.entities).values({ projectId, entityKey: 'amara', type: 'character', name: 'Amara' }).returning();
+    if (!entity) throw new Error('failed to seed entity');
+    const fact = await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, 'the_pact')) });
+    if (!fact) throw new Error('failed to seed fact');
+    await db.insert(schema.characterKnowledge).values({ projectId, factId: fact.id, entityId: entity.id, learnedInChapter: 2, source: 'brief' });
+    const catalog = new CatalogService({ getPostgresClient: () => db } as never);
+
+    const rendered = await catalog.render(projectId);
+
+    expect(rendered).toContain('the_pact: The covenant sold the city. (revealed)');
   });
 
   it('should keep the canon-fact catalog out of the prose-generation pack', async () => {

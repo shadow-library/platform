@@ -24,7 +24,7 @@ export class CatalogService {
   // reaches planning contexts (outline, arc planning, chat hub) and never `forChapter`, the
   // prose-writing pack — the outliner cannot schedule a reveal it is not allowed to read.
   async render(projectId: bigint): Promise<string> {
-    const [chapters, volumes, entities, worldFacts, plotThreads, mysteries, canonFacts] = await Promise.all([
+    const [chapters, volumes, entities, worldFacts, plotThreads, mysteries, canonFacts, revealedRows] = await Promise.all([
       this.db.query.chapters.findMany({ where: eq(schema.chapters.projectId, projectId), orderBy: asc(schema.chapters.number) }),
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: asc(schema.volumes.ordinal) }),
       // Entity deletion is a hard delete; a `ne(origin, 'deleted')` filter here previously crashed
@@ -34,7 +34,9 @@ export class CatalogService {
       this.db.query.plotThreads.findMany({ where: and(eq(schema.plotThreads.projectId, projectId), eq(schema.plotThreads.status, 'open')) }),
       this.db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), eq(schema.mysteries.status, 'open')) }),
       this.db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId), orderBy: asc(schema.canonFacts.factKey) }),
+      this.db.query.characterKnowledge.findMany({ columns: { factId: true }, where: eq(schema.characterKnowledge.projectId, projectId) }),
     ]);
+    const revealedFactIds = new Set(revealedRows.map(row => row.factId));
 
     const parts: string[] = [];
 
@@ -100,8 +102,8 @@ export class CatalogService {
     if (canonFacts.length > 0) {
       const lines = canonFacts.map(f => {
         const text = f.text.replace(/\n/g, ' ').slice(0, 160);
-        const reveal = f.revealChapter != null ? ` (revealed ch ${f.revealChapter})` : ' (unrevealed)';
-        return `${f.factKey}: ${text}${reveal}`;
+        const status = revealedFactIds.has(f.id) ? ' (revealed)' : f.revealChapter != null ? ` (unrevealed; scheduled ch ${f.revealChapter})` : ' (unrevealed)';
+        return `${f.factKey}: ${text}${status}`;
       });
       parts.push('CANON FACTS:\n' + lines.join('\n'));
     }

@@ -6,9 +6,9 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 
 ## Summary
 
-- Completed: 8
+- Completed: 9
 - In Progress: 0
-- Pending: 3
+- Pending: 2
 - Blocked: 0
 
 ## Tasks
@@ -23,7 +23,7 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 | FIX-06 | HIGH     | Continuity extraction receives existing key vocabulary; validate relationship targets/evidence; route ambiguous mutations to review | COMPLETED | —            |
 | FIX-07 | HIGH     | Bible stage output instructions match schema; persist stage atomically; fix `bible_doc` ref format mismatch                         | COMPLETED | —            |
 | FIX-08 | HIGH     | Gate/cap the legacy whole-book `outline()` endpoint so it cannot overwrite protected arc briefs                                     | COMPLETED | —            |
-| FIX-09 | MEDIUM   | Align `revealChapter` catalog semantics with the actual knowledge ledger                                                            | PENDING   | —            |
+| FIX-09 | MEDIUM   | Align `revealChapter` catalog semantics with the actual knowledge ledger                                                            | COMPLETED | —            |
 | FIX-10 | MEDIUM   | Require `briefCompliance` at runtime; fail closed if the judge omits it                                                             | PENDING   | —            |
 | FIX-11 | MEDIUM   | Use one writing-style policy across generation, fix, and revision prompts                                                           | PENDING   | —            |
 
@@ -77,7 +77,7 @@ None.
 
 ## Pending
 
-See table above. FIX-09 selected next.
+See table above. FIX-10 selected next.
 
 ## Blocked
 
@@ -392,5 +392,37 @@ brief has `handEdited: false`/`staleReason: null` set.
 
 Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
 1006 pass, 10 skip, 0 fail (independently re-run).
+
+Commit: `ef098ed0`
+
+### FIX-09 — Align `revealChapter` catalog semantics with the knowledge ledger
+
+Source finding: `harness-post-implementation-review.md` M2 ("Planned reveal metadata and the actual
+knowledge ledger can disagree") + §18 row 9.
+
+What changed:
+
+`CatalogService.render`'s CANON FACTS line labeled any fact with a non-null `revealChapter` as
+`(revealed ch X)` — present tense, for what is only a schedule hint — regardless of whether anyone had
+actually learned it per `character_knowledge`, the system's real reveal authority (`loadKnowledgeView`
+reads that ledger, never `revealChapter`). A fact scheduled for chapter 20 showed as already revealed
+while outlining chapter 5, making the outliner skip authoring a `knowledgeContract` reveal for it —
+the intended reveal then never gets staged and never reaches the ledger.
+
+`render` now queries `character_knowledge` for the project and labels a fact `(revealed)` only when a
+ledger row actually exists for it — no chapter parameter needed, since a ledger row (written only at
+draft approval, per `applyBriefReveals` in `knowledge-view.ts`) can only ever exist for an
+already-approved, i.e. past, chapter. Otherwise the fact is `(unrevealed)`, with `revealChapter` — if
+set — appended as an explicit `scheduled ch X` hint rather than driving the "revealed" claim itself.
+
+Tests: `tests/generation/knowledge-contract.spec.ts` — updated the existing fixture assertion that
+pinned the buggy behavior (a `revealChapter`-only fact now asserts `(unrevealed; scheduled ch 4)`, not
+`(revealed ch 4)`); added 3 new cases: a fact with both `revealChapter` and a ledger row renders
+`(revealed)` (ledger, not the schedule hint, drives the label); a fact with neither renders plain
+`(unrevealed)`; a fact with a ledger row but no `revealChapter` renders `(revealed)` with no schedule
+hint.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+1009 pass, 10 skip, 0 fail (independently re-run).
 
 Commit: (recorded after commit, see git log)
