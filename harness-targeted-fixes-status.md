@@ -11,9 +11,9 @@ corrective only, same as the first — no new subsystems, no reopening the archi
 
 ## Summary
 
-- Completed: 13
+- Completed: 14
 - In Progress: 0
-- Pending: 2
+- Pending: 1
 - Blocked: 0
 
 ## Tasks
@@ -33,7 +33,7 @@ corrective only, same as the first — no new subsystems, no reopening the archi
 | FIX-11 | MEDIUM   | Use one writing-style policy across generation, fix, and revision prompts                                                               | COMPLETED | —            |
 | FIX-12 | HIGH     | Cursor-only finalization retry must not re-extract or reapply continuity (residual gap in FIX-01)                                       | COMPLETED | FIX-01       |
 | FIX-13 | HIGH     | Ancestor draft changes (update/import/revise) must invalidate drafted descendants (residual gap in FIX-05)                              | COMPLETED | FIX-05       |
-| FIX-14 | HIGH     | Low-confidence continuity entries must stay reachable for review, not marked applied (residual gap in FIX-06)                           | PENDING   | FIX-06       |
+| FIX-14 | HIGH     | Low-confidence continuity entries must stay reachable for review, not marked applied (residual gap in FIX-06)                           | COMPLETED | FIX-06       |
 | FIX-15 | HIGH     | Character-state merge must replace/clear fields per the extraction contract, not `COALESCE`-merge stale values (residual gap in FIX-03) | PENDING   | FIX-03       |
 
 Ordering rationale: data-integrity/recoverability (FIX-01, FIX-02) before state/context-correctness
@@ -86,7 +86,6 @@ None.
 
 ## Pending
 
-- FIX-14 — low-confidence continuity reviewability
 - FIX-15 — character-state stale merge semantics
 
 ## Blocked
@@ -602,3 +601,54 @@ Tightening this would mean adding transactional wrapping to methods that don't h
 broader change than this targeted fix's scope — left as a known limitation, not a fix-blocking gap.
 
 Commit: `868402b6`
+
+### FIX-14 — Low-confidence continuity entries stay reachable for review
+
+Source finding: `harness-targeted-fixes-verification.md` H5 residual gap ("`applyContinuityDelta`
+silently skips low-confidence rows, then `applyContinuity` marks the encompassing proposal `applied`.
+Since `getContinuityProposal` requires `status='pending'`, the normal review/update/apply endpoints
+cannot retrieve those held rows. They are retained only as inaccessible historical JSON, not staged
+review work").
+
+Root cause: `applyContinuityDelta` (`apply-continuity.ts`, already correct since FIX-06) skips writing
+`threads`/`mysteries`/`relationships`/`characterStates` entries marked `confidence: 'low'` to their
+durable tables. But both places that call it —
+`chapter-finalization.graph.ts`'s `applyContinuity` node and `GenerationService.applyContinuityProposal`
+— unconditionally flipped `continuity_proposals.status` to `'applied'` in the same transaction
+regardless of whether anything was held back. `getContinuityProposal`, `getReviewQueue`,
+`updateContinuityProposal`, and `discardContinuityProposal` all filter on `status = 'pending'`, so once
+status flipped, a proposal that held entries back became permanently unreachable through every normal
+review path — the raw JSON survived in the `proposal` column, but no endpoint could find it.
+
+What changed: a new exported pure helper, `continuityHasHeldEntries(delta)` in `apply-continuity.ts`,
+checks the four confidence-bearing arrays (`threads`, `mysteries`, `relationships`, `characterStates` —
+not `newEntities`/`timeline`/`power`/`knowledgeChanges`/`appeared`, which carry no confidence field) for
+any `confidence === 'low'` entry. Both apply sites now call it once before their transaction's proposal
+update: when it returns `true`, the proposal's `status`/`appliedAt` are left untouched (still `pending`,
+still `null`) — everything else (`applyContinuityDelta` itself, `chapters.continuityApplied = true`)
+proceeds exactly as before, unconditionally. Only when nothing was held back does the proposal flip to
+`applied`. This means a chapter can now be fully finalized (`continuityApplied = true`, cursor advanced,
+high-confidence canon durably written) while its continuity proposal stays `pending` — the intended
+state for "landed what we trusted, held back what we didn't." Re-applying that still-pending proposal
+later (e.g. after a human edits it via `updateContinuityProposal` to remove/upgrade the held entries) is
+safe and idempotent, unchanged from before — `applyContinuityDelta`'s upserts already guaranteed that.
+No new `continuity_proposal_status` enum value, no new schema, no migration — the existing
+`pending`/`applied`/`discarded` states were already sufficient; this fix is about _when_ status flips to
+`applied`, not about adding new states. `chapters.continuityApplied`/FIX-01's resume-idempotency gate is
+untouched and stays orthogonal to this review-reachability concern.
+
+Tests: `tests/ai/continuity-apply.spec.ts` (+4): a mixed-confidence delta through the finalization graph
+lands the high-confidence thread, skips the low-confidence thread and character state, sets
+`continuityApplied = true`, and leaves the proposal `pending`/reachable via `getContinuityProposal`; an
+all-high-confidence delta still flips to `applied` (regression guard against over-broadening the
+condition); the manual `applyContinuityProposal` endpoint leaves a held-entry proposal `pending` and
+visible in `getReviewQueue().proposals`; editing a held entry's confidence to `high` via
+`updateContinuityProposal` and re-calling `applyContinuityProposal` lands it and flips the proposal to
+`applied`. Confirmed against pre-fix code (conditional reverted to always `'applied'`): 3 of the 4 new
+tests fail (the all-high-confidence regression guard correctly still passes, proving it isolates the
+right behavior). All pass with the fix restored.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+1023 pass, 10 skip, 0 fail (independently re-run).
+
+Commit: `a6fbe27e`
