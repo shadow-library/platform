@@ -42,7 +42,14 @@ export class SkeletonService {
       .map(c => `Chapter ${c.number}: ${c.summary}`)
       .join('\n');
 
-    const projectBrief = [entityList && `Key entities:\n${entityList}`, chapterSummaries && `Chapter progression:\n${chapterSummaries}`].filter(Boolean).join('\n\n');
+    const projectBrief = [
+      projectRow?.premise && `Premise:\n${projectRow.premise}`,
+      projectRow?.brief && `Brief:\n${projectRow.brief}`,
+      entityList && `Key entities:\n${entityList}`,
+      chapterSummaries && `Chapter progression:\n${chapterSummaries}`,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
     const themes = Array.isArray(projectRow?.themes) ? (projectRow.themes as string[]).join(', ') : projectRow?.themes ? String(projectRow.themes) : '';
 
     const ctx: TelemetryContext = { projectId, runId: 'skeleton', node: 'skeleton', promptKey: 'skeleton', promptVersion: '1.0.0', role: 'skeleton' };
