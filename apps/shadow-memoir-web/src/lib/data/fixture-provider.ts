@@ -2,6 +2,10 @@ import { buildMonthMatrix, parseISODate, toISODate } from '@shadow-library/ui';
 
 import { type Command, type CommandResult } from './command.types';
 import { type DataProvider, type PlanRange, type QuestFilter } from './data-provider';
+import { getFinanceProvider } from './finance.provider';
+import { isCurrencyCode } from './finance.rules';
+import { getQuickLogProvider } from './quick-logs.provider';
+import { lbToKg } from './quick-logs.rules';
 import { type Persona, QUICK_LOG_TILES, seed } from './fixtures';
 import { formatDuration, formatMonth, formatRange, formatTime, shiftDate, startOfWeek, STATE_LABELS, STRICTNESS_LABELS, WEEKDAY_LABELS, weekdayOf, WEEKDAYS } from './labels';
 import {
@@ -557,7 +561,8 @@ export class FixtureProvider implements DataProvider {
     return { status: 'applied', message: locked ? 'The plan is committed for this week.' : 'The plan is open again.', xpAwarded: 0, coinsAwarded: 0 };
   }
 
-  private logCapture(command: Command): CommandResult {
+  private async logCapture(command: Command): Promise<CommandResult> {
+    await recordInOwningDomain(command, this.state.today);
     const described = this.describeCapture(command);
     this.pushActivity(described.text, described.xp > 0);
     this.state.hero = { ...this.state.hero, xp: this.state.hero.xp + described.xp, xpIntoLevel: this.state.hero.xpIntoLevel + described.xp };
@@ -588,6 +593,49 @@ export class FixtureProvider implements DataProvider {
 
   private pushActivity(text: string, rewarded: boolean): void {
     this.state.activity = [{ id: `act-${this.state.activity.length + 1}`, text, when: 'just now', rewarded }, ...this.state.activity].slice(0, 8);
+  }
+}
+
+/**
+ * Quick Capture parses into one Command union, but the record it produces belongs to whichever domain owns
+ * it — Money keeps expenses, the quick-log surfaces keep journal, weight, metrics and side quests. Without
+ * this hop a captured entry would reach the day's feed and never its own screen. The XP the palette reports
+ * stays this provider's, so forwarding cannot grant a second time.
+ */
+async function recordInOwningDomain(command: Command, today: string): Promise<void> {
+  switch (command.type) {
+    case 'expense.record':
+      await getFinanceProvider().dispatchCommand({
+        type: 'expense.create',
+        draft: {
+          amountText: (command.amountMinor / 100).toFixed(2),
+          currency: isCurrencyCode(command.currency) ? command.currency : 'EUR',
+          categoryId: 'uncat',
+          occurredOnDate: today,
+          note: command.note,
+        },
+      });
+      return;
+    case 'journal.record':
+      await getQuickLogProvider().dispatchCommand({ type: 'journal.save', draft: { date: today, text: command.text, mood: null } });
+      return;
+    case 'weight.record':
+      // The palette has nowhere to ask, and its own copy already promises the earlier value is kept.
+      await getQuickLogProvider().dispatchCommand({
+        type: 'weight.save',
+        date: today,
+        kg: command.unit === 'lb' ? lbToKg(command.value) : command.value,
+        confirmedReplacement: true,
+      });
+      return;
+    case 'sideQuest.record':
+      await getQuickLogProvider().dispatchCommand({ type: 'sidequest.log', draft: { date: today, name: command.text, statAffinity: command.statAffinity } });
+      return;
+    case 'metric.record':
+      await getQuickLogProvider().dispatchCommand({ type: 'health.save', key: command.metric, date: today, value: command.value });
+      return;
+    default:
+      return;
   }
 }
 

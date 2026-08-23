@@ -1,0 +1,7 @@
+.note {
+  margin: 10px 0 0;
+  font-size: var(--sh-text-caption);
+  line-height: 1.55;
+  color: var(--sh-text-tertiary);
+  text-wrap: pretty;
+}

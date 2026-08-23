@@ -22,10 +22,17 @@ import { Route as AppHistoryRouteImport } from './../src/routes/_app/history'
 import { Route as AppHeroRouteImport } from './../src/routes/_app/hero'
 import { Route as AppAiRouteImport } from './../src/routes/_app/ai'
 import { Route as AppQuestsIndexRouteImport } from './../src/routes/_app/quests.index'
+import { Route as AppLogIndexRouteImport } from './../src/routes/_app/log.index'
 import { Route as AppFinanceIndexRouteImport } from './../src/routes/_app/finance.index'
 import { Route as AppQuestsNewRouteImport } from './../src/routes/_app/quests.new'
 import { Route as AppQuestsQuestIdRouteImport } from './../src/routes/_app/quests.$questId'
+import { Route as AppLogWeightRouteImport } from './../src/routes/_app/log.weight'
+import { Route as AppLogSidequestsRouteImport } from './../src/routes/_app/log.sidequests'
+import { Route as AppLogMealsRouteImport } from './../src/routes/_app/log.meals'
+import { Route as AppLogHealthRouteImport } from './../src/routes/_app/log.health'
 import { Route as AppFinanceSubscriptionsRouteImport } from './../src/routes/_app/finance.subscriptions'
+import { Route as AppFinanceCategoriesRouteImport } from './../src/routes/_app/finance.categories'
+import { Route as AppFinanceExpensesExpenseIdRouteImport } from './../src/routes/_app/finance.expenses.$expenseId'
 
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
@@ -91,6 +98,11 @@ const AppQuestsIndexRoute = AppQuestsIndexRouteImport.update({
   path: '/quests/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppLogIndexRoute = AppLogIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppLogRoute,
+} as any)
 const AppFinanceIndexRoute = AppFinanceIndexRouteImport.update({
   id: '/finance/',
   path: '/finance/',
@@ -106,11 +118,42 @@ const AppQuestsQuestIdRoute = AppQuestsQuestIdRouteImport.update({
   path: '/quests/$questId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppLogWeightRoute = AppLogWeightRouteImport.update({
+  id: '/weight',
+  path: '/weight',
+  getParentRoute: () => AppLogRoute,
+} as any)
+const AppLogSidequestsRoute = AppLogSidequestsRouteImport.update({
+  id: '/sidequests',
+  path: '/sidequests',
+  getParentRoute: () => AppLogRoute,
+} as any)
+const AppLogMealsRoute = AppLogMealsRouteImport.update({
+  id: '/meals',
+  path: '/meals',
+  getParentRoute: () => AppLogRoute,
+} as any)
+const AppLogHealthRoute = AppLogHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => AppLogRoute,
+} as any)
 const AppFinanceSubscriptionsRoute = AppFinanceSubscriptionsRouteImport.update({
   id: '/finance/subscriptions',
   path: '/finance/subscriptions',
   getParentRoute: () => AppRoute,
 } as any)
+const AppFinanceCategoriesRoute = AppFinanceCategoriesRouteImport.update({
+  id: '/finance/categories',
+  path: '/finance/categories',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFinanceExpensesExpenseIdRoute =
+  AppFinanceExpensesExpenseIdRouteImport.update({
+    id: '/finance/expenses/$expenseId',
+    path: '/finance/expenses/$expenseId',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -119,16 +162,23 @@ export interface FileRoutesByFullPath {
   '/hero': typeof AppHeroRoute
   '/history': typeof AppHistoryRoute
   '/insights': typeof AppInsightsRoute
-  '/log': typeof AppLogRoute
+  '/log': typeof AppLogRouteWithChildren
   '/onboarding': typeof AppOnboardingRoute
   '/plan': typeof AppPlanRoute
   '/review': typeof AppReviewRoute
   '/settings': typeof AppSettingsRoute
+  '/finance/categories': typeof AppFinanceCategoriesRoute
   '/finance/subscriptions': typeof AppFinanceSubscriptionsRoute
+  '/log/health': typeof AppLogHealthRoute
+  '/log/meals': typeof AppLogMealsRoute
+  '/log/sidequests': typeof AppLogSidequestsRoute
+  '/log/weight': typeof AppLogWeightRoute
   '/quests/$questId': typeof AppQuestsQuestIdRoute
   '/quests/new': typeof AppQuestsNewRoute
   '/finance/': typeof AppFinanceIndexRoute
+  '/log/': typeof AppLogIndexRoute
   '/quests/': typeof AppQuestsIndexRoute
+  '/finance/expenses/$expenseId': typeof AppFinanceExpensesExpenseIdRoute
 }
 export interface FileRoutesByTo {
   '/welcome': typeof WelcomeRoute
@@ -136,17 +186,23 @@ export interface FileRoutesByTo {
   '/hero': typeof AppHeroRoute
   '/history': typeof AppHistoryRoute
   '/insights': typeof AppInsightsRoute
-  '/log': typeof AppLogRoute
   '/onboarding': typeof AppOnboardingRoute
   '/plan': typeof AppPlanRoute
   '/review': typeof AppReviewRoute
   '/settings': typeof AppSettingsRoute
   '/': typeof AppIndexRoute
+  '/finance/categories': typeof AppFinanceCategoriesRoute
   '/finance/subscriptions': typeof AppFinanceSubscriptionsRoute
+  '/log/health': typeof AppLogHealthRoute
+  '/log/meals': typeof AppLogMealsRoute
+  '/log/sidequests': typeof AppLogSidequestsRoute
+  '/log/weight': typeof AppLogWeightRoute
   '/quests/$questId': typeof AppQuestsQuestIdRoute
   '/quests/new': typeof AppQuestsNewRoute
   '/finance': typeof AppFinanceIndexRoute
+  '/log': typeof AppLogIndexRoute
   '/quests': typeof AppQuestsIndexRoute
+  '/finance/expenses/$expenseId': typeof AppFinanceExpensesExpenseIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -156,17 +212,24 @@ export interface FileRoutesById {
   '/_app/hero': typeof AppHeroRoute
   '/_app/history': typeof AppHistoryRoute
   '/_app/insights': typeof AppInsightsRoute
-  '/_app/log': typeof AppLogRoute
+  '/_app/log': typeof AppLogRouteWithChildren
   '/_app/onboarding': typeof AppOnboardingRoute
   '/_app/plan': typeof AppPlanRoute
   '/_app/review': typeof AppReviewRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/finance/categories': typeof AppFinanceCategoriesRoute
   '/_app/finance/subscriptions': typeof AppFinanceSubscriptionsRoute
+  '/_app/log/health': typeof AppLogHealthRoute
+  '/_app/log/meals': typeof AppLogMealsRoute
+  '/_app/log/sidequests': typeof AppLogSidequestsRoute
+  '/_app/log/weight': typeof AppLogWeightRoute
   '/_app/quests/$questId': typeof AppQuestsQuestIdRoute
   '/_app/quests/new': typeof AppQuestsNewRoute
   '/_app/finance/': typeof AppFinanceIndexRoute
+  '/_app/log/': typeof AppLogIndexRoute
   '/_app/quests/': typeof AppQuestsIndexRoute
+  '/_app/finance/expenses/$expenseId': typeof AppFinanceExpensesExpenseIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -182,11 +245,18 @@ export interface FileRouteTypes {
     | '/plan'
     | '/review'
     | '/settings'
+    | '/finance/categories'
     | '/finance/subscriptions'
+    | '/log/health'
+    | '/log/meals'
+    | '/log/sidequests'
+    | '/log/weight'
     | '/quests/$questId'
     | '/quests/new'
     | '/finance/'
+    | '/log/'
     | '/quests/'
+    | '/finance/expenses/$expenseId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/welcome'
@@ -194,17 +264,23 @@ export interface FileRouteTypes {
     | '/hero'
     | '/history'
     | '/insights'
-    | '/log'
     | '/onboarding'
     | '/plan'
     | '/review'
     | '/settings'
     | '/'
+    | '/finance/categories'
     | '/finance/subscriptions'
+    | '/log/health'
+    | '/log/meals'
+    | '/log/sidequests'
+    | '/log/weight'
     | '/quests/$questId'
     | '/quests/new'
     | '/finance'
+    | '/log'
     | '/quests'
+    | '/finance/expenses/$expenseId'
   id:
     | '__root__'
     | '/_app'
@@ -219,11 +295,18 @@ export interface FileRouteTypes {
     | '/_app/review'
     | '/_app/settings'
     | '/_app/'
+    | '/_app/finance/categories'
     | '/_app/finance/subscriptions'
+    | '/_app/log/health'
+    | '/_app/log/meals'
+    | '/_app/log/sidequests'
+    | '/_app/log/weight'
     | '/_app/quests/$questId'
     | '/_app/quests/new'
     | '/_app/finance/'
+    | '/_app/log/'
     | '/_app/quests/'
+    | '/_app/finance/expenses/$expenseId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -324,6 +407,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppQuestsIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/log/': {
+      id: '/_app/log/'
+      path: '/'
+      fullPath: '/log/'
+      preLoaderRoute: typeof AppLogIndexRouteImport
+      parentRoute: typeof AppLogRoute
+    }
     '/_app/finance/': {
       id: '/_app/finance/'
       path: '/finance'
@@ -345,6 +435,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppQuestsQuestIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/log/weight': {
+      id: '/_app/log/weight'
+      path: '/weight'
+      fullPath: '/log/weight'
+      preLoaderRoute: typeof AppLogWeightRouteImport
+      parentRoute: typeof AppLogRoute
+    }
+    '/_app/log/sidequests': {
+      id: '/_app/log/sidequests'
+      path: '/sidequests'
+      fullPath: '/log/sidequests'
+      preLoaderRoute: typeof AppLogSidequestsRouteImport
+      parentRoute: typeof AppLogRoute
+    }
+    '/_app/log/meals': {
+      id: '/_app/log/meals'
+      path: '/meals'
+      fullPath: '/log/meals'
+      preLoaderRoute: typeof AppLogMealsRouteImport
+      parentRoute: typeof AppLogRoute
+    }
+    '/_app/log/health': {
+      id: '/_app/log/health'
+      path: '/health'
+      fullPath: '/log/health'
+      preLoaderRoute: typeof AppLogHealthRouteImport
+      parentRoute: typeof AppLogRoute
+    }
     '/_app/finance/subscriptions': {
       id: '/_app/finance/subscriptions'
       path: '/finance/subscriptions'
@@ -352,25 +470,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFinanceSubscriptionsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/finance/categories': {
+      id: '/_app/finance/categories'
+      path: '/finance/categories'
+      fullPath: '/finance/categories'
+      preLoaderRoute: typeof AppFinanceCategoriesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/finance/expenses/$expenseId': {
+      id: '/_app/finance/expenses/$expenseId'
+      path: '/finance/expenses/$expenseId'
+      fullPath: '/finance/expenses/$expenseId'
+      preLoaderRoute: typeof AppFinanceExpensesExpenseIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
+
+interface AppLogRouteChildren {
+  AppLogHealthRoute: typeof AppLogHealthRoute
+  AppLogMealsRoute: typeof AppLogMealsRoute
+  AppLogSidequestsRoute: typeof AppLogSidequestsRoute
+  AppLogWeightRoute: typeof AppLogWeightRoute
+  AppLogIndexRoute: typeof AppLogIndexRoute
+}
+
+const AppLogRouteChildren: AppLogRouteChildren = {
+  AppLogHealthRoute: AppLogHealthRoute,
+  AppLogMealsRoute: AppLogMealsRoute,
+  AppLogSidequestsRoute: AppLogSidequestsRoute,
+  AppLogWeightRoute: AppLogWeightRoute,
+  AppLogIndexRoute: AppLogIndexRoute,
+}
+
+const AppLogRouteWithChildren =
+  AppLogRoute._addFileChildren(AppLogRouteChildren)
 
 interface AppRouteChildren {
   AppAiRoute: typeof AppAiRoute
   AppHeroRoute: typeof AppHeroRoute
   AppHistoryRoute: typeof AppHistoryRoute
   AppInsightsRoute: typeof AppInsightsRoute
-  AppLogRoute: typeof AppLogRoute
+  AppLogRoute: typeof AppLogRouteWithChildren
   AppOnboardingRoute: typeof AppOnboardingRoute
   AppPlanRoute: typeof AppPlanRoute
   AppReviewRoute: typeof AppReviewRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppFinanceCategoriesRoute: typeof AppFinanceCategoriesRoute
   AppFinanceSubscriptionsRoute: typeof AppFinanceSubscriptionsRoute
   AppQuestsQuestIdRoute: typeof AppQuestsQuestIdRoute
   AppQuestsNewRoute: typeof AppQuestsNewRoute
   AppFinanceIndexRoute: typeof AppFinanceIndexRoute
   AppQuestsIndexRoute: typeof AppQuestsIndexRoute
+  AppFinanceExpensesExpenseIdRoute: typeof AppFinanceExpensesExpenseIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -378,17 +531,19 @@ const AppRouteChildren: AppRouteChildren = {
   AppHeroRoute: AppHeroRoute,
   AppHistoryRoute: AppHistoryRoute,
   AppInsightsRoute: AppInsightsRoute,
-  AppLogRoute: AppLogRoute,
+  AppLogRoute: AppLogRouteWithChildren,
   AppOnboardingRoute: AppOnboardingRoute,
   AppPlanRoute: AppPlanRoute,
   AppReviewRoute: AppReviewRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
+  AppFinanceCategoriesRoute: AppFinanceCategoriesRoute,
   AppFinanceSubscriptionsRoute: AppFinanceSubscriptionsRoute,
   AppQuestsQuestIdRoute: AppQuestsQuestIdRoute,
   AppQuestsNewRoute: AppQuestsNewRoute,
   AppFinanceIndexRoute: AppFinanceIndexRoute,
   AppQuestsIndexRoute: AppQuestsIndexRoute,
+  AppFinanceExpensesExpenseIdRoute: AppFinanceExpensesExpenseIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

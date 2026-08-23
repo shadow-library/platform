@@ -1,55 +1,77 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router';
 import { render, type RenderResult } from '@testing-library/react';
 import { type ReactNode } from 'react';
 
 import { createFixtureProvider, type FixtureProviderOptions, type MemoirData, MemoirDataProvider } from '@/lib/data';
 
+/** Every destination the app can link to, so a screen's `Link`s resolve against the real route tree. */
 const PATHS = [
   '/plan',
   '/quests',
   '/quests/new',
   '/quests/$questId',
   '/log',
+  '/log/meals',
+  '/log/weight',
+  '/log/health',
+  '/log/sidequests',
   '/finance',
   '/finance/subscriptions',
-  '/hero',
+  '/finance/categories',
+  '/finance/expenses/$expenseId',
   '/history',
   '/insights',
   '/review',
   '/ai',
+  '/hero',
   '/settings',
   '/onboarding',
   '/welcome',
 ];
 
+export function testQueryClient(): QueryClient {
+  return new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+}
+
 export function createMemoirTestData(options: FixtureProviderOptions = {}): MemoirData {
-  return {
-    provider: createFixtureProvider({ today: '2026-08-22', ...options }),
-    queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }),
-    today: options.today ?? '2026-08-22',
-    currency: 'EUR',
-  };
+  const today = options.today ?? '2026-08-22';
+  return { provider: createFixtureProvider({ ...options, today }), queryClient: testQueryClient(), today, currency: 'EUR' };
+}
+
+/** For a component that reads a domain provider directly and never links anywhere. */
+export function renderWithQuery(ui: ReactNode): RenderResult {
+  return render(<QueryClientProvider client={testQueryClient()}>{ui}</QueryClientProvider>);
+}
+
+export interface RenderScreenOptions extends FixtureProviderOptions {
+  value?: MemoirData;
+  initialPath?: string;
 }
 
 /**
  * Screens link and navigate, so they need a router in the tree; the harness supplies one whose paths mirror
- * the app's route tree without booting the authenticated shell those routes sit inside.
+ * the app's route tree without booting the authenticated shell those routes sit inside. The seam's own
+ * QueryClient is also installed as the React Query provider, so the day group's `MemoirData` reads and the
+ * finance/quick-log hooks share one cache.
  */
-export function renderScreen(node: ReactNode, options: FixtureProviderOptions & { value?: MemoirData } = {}): RenderResult {
+export function renderScreen(node: ReactNode, options: RenderScreenOptions = {}): RenderResult {
+  const data = options.value ?? createMemoirTestData({ today: options.today, persona: options.persona });
   const rootRoute = createRootRoute({
     component: () => (
-      <MemoirDataProvider value={options.value} today={options.today} persona={options.persona}>
-        {node}
-        <Outlet />
-      </MemoirDataProvider>
+      <QueryClientProvider client={data.queryClient}>
+        <MemoirDataProvider value={data}>
+          {node}
+          <Outlet />
+        </MemoirDataProvider>
+      </QueryClientProvider>
     ),
   });
   const routes = [
     createRoute({ getParentRoute: () => rootRoute, path: '/', component: () => null }),
     ...PATHS.map(path => createRoute({ getParentRoute: () => rootRoute, path, component: () => null })),
   ];
-  const router = createRouter({ routeTree: rootRoute.addChildren(routes), history: createMemoryHistory({ initialEntries: ['/'] }) });
+  const router = createRouter({ routeTree: rootRoute.addChildren(routes), history: createMemoryHistory({ initialEntries: [options.initialPath ?? '/'] }) });
 
   return render(<RouterProvider router={router as never} />);
 }
