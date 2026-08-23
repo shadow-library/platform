@@ -1,0 +1,43 @@
+/*
+ * Shadow Memoir's product vocabulary, expressed entirely in terms of `@shadow-library/ui`'s `--sh-*` tokens
+ * so both themes and every density tier follow the platform automatically. Nothing here introduces a colour;
+ * each name binds a product meaning to a token the design system already resolves per theme.
+ *
+ * The ethical invariants of the PRD are encoded here rather than left to each screen: an overdue money item
+ * resolves to warning, never danger, and a depleted HP bar resolves to a neutral informational tone — a
+ * screen that reaches for `--sm-money-overdue` cannot accidentally render it red.
+ */
+:root {
+  --sm-stat-discipline: var(--sh-indigo-500);
+  --sm-stat-body: var(--sh-green-500);
+  --sm-stat-wealth: var(--sh-amber-500);
+  --sm-stat-mind: var(--sh-indigo-300);
+
+  --sm-quest-complete: var(--sh-success-solid);
+  --sm-quest-partial: var(--sh-info-solid);
+  --sm-quest-skipped: var(--sh-neutral-solid);
+  --sm-quest-missed: var(--sh-neutral-border);
+  --sm-quest-pending: var(--sh-border-strong);
+
+  --sm-money-overdue: var(--sh-warning-solid);
+  --sm-money-overdue-bg: var(--sh-warning-bg-subtle);
+  --sm-money-overdue-text: var(--sh-warning-text-on-subtle);
+
+  --sm-hp-full: var(--sh-success-solid);
+  --sm-hp-low: var(--sh-warning-solid);
+  --sm-hp-empty: var(--sh-neutral-solid);
+
+  --sm-sync-pending: var(--sh-text-tertiary);
+  --sm-sync-synced: var(--sh-success-text);
+
+  /* Reflection screens hold running prose; a readable measure is a property of the column, not the page. */
+  --sm-prose-max: 720px;
+  /* The capture column the phone surfaces centre on, so a tablet does not stretch a one-thumb form. */
+  --sm-capture-max: 560px;
+}
+
+/* Touch density makes the bottom bar taller than the shell's 56px default, and the shell reserves room for
+   the content region off this value — left unset, the last rows of every list sit under the bar. */
+[data-density='touch'] {
+  --sh-shell-bottom-nav-height: 60px;
+}

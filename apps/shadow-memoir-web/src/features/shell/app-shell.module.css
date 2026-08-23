@@ -1,0 +1,48 @@
+.paletteTrigger {
+  flex: 0 1 460px;
+  min-width: 0;
+  margin: 0 auto;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  border-radius: var(--sh-radius-lg);
+  border: 1px solid var(--sh-border-default);
+  background: var(--sh-surface-well);
+  color: var(--sh-text-placeholder);
+  cursor: text;
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.paletteTrigger:hover {
+  border-color: var(--sh-border-strong);
+}
+
+.paletteLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktopOnly {
+  display: inline-flex;
+}
+
+@media (max-width: 767px) {
+  .paletteKbd,
+  .desktopOnly {
+    display: none;
+  }
+}
+
+/* The promoted capture action sits above the bottom bar, clear of the home indicator. It exists only on
+   touch — on desktop the same action is Cmd+K, which needs no chrome. */
+.fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--sh-shell-bottom-nav-height, 60px) + var(--sh-safe-bottom) + 16px);
+  z-index: var(--sh-z-sticky);
+}

@@ -1,0 +1,69 @@
+.page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(24px, var(--sh-safe-top)) max(24px, var(--sh-safe-right)) max(24px, var(--sh-safe-bottom)) max(24px, var(--sh-safe-left));
+  background: var(--sh-surface-app);
+}
+
+.card {
+  width: 100%;
+  max-width: var(--sm-capture-max);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--sh-text-primary);
+}
+
+.mark {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--sh-radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(140deg, var(--sh-indigo-500), var(--sh-indigo-800));
+  color: var(--sh-neutral-white);
+}
+
+.name {
+  font-size: var(--sh-text-h3);
+  line-height: var(--sh-text-h3--line-height);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.headline {
+  font-size: var(--sh-text-h1);
+  line-height: var(--sh-text-h1--line-height);
+  font-weight: 650;
+  margin: 0;
+}
+
+.body {
+  font-size: var(--sh-text-body);
+  line-height: var(--sh-text-body--line-height);
+  color: var(--sh-text-secondary);
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footnote {
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  color: var(--sh-text-tertiary);
+  margin: 0;
+}

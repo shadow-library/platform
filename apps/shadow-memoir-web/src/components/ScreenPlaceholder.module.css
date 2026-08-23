@@ -1,0 +1,31 @@
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: var(--sm-prose-max);
+}
+
+.title {
+  font-size: var(--sh-text-h2);
+  line-height: var(--sh-text-h2--line-height);
+  font-weight: 650;
+  margin: 0;
+}
+
+.summary {
+  font-size: var(--sh-text-body);
+  line-height: var(--sh-text-body--line-height);
+  color: var(--sh-text-secondary);
+  margin: 0;
+}
+
+.pending {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px dashed var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-well);
+  color: var(--sh-text-tertiary);
+  font-size: var(--sh-text-body-sm);
+  line-height: var(--sh-text-body-sm--line-height);
+}

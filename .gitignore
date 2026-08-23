@@ -68,6 +68,7 @@ apps/pulse-web/dist-ssr
 apps/pulse-web/*.local
 apps/pulse-web/stats.html
 apps/pulse-web/count.txt
+apps/shadow-memoir-web/public/manifest.webmanifest
 apps/web-novel-web/public/manifest.webmanifest
 packages/ui/*storybook.log
 packages/ui/storybook-static
