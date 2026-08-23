@@ -5,6 +5,9 @@ declare module '@shadow-library/common' {
     'server.port': number;
     'server.host': string;
 
+    'scheduler.enabled': boolean;
+    'scheduler.tick-interval-ms': number;
+
     'rollover.catchup-max-days': number;
 
     'quotas.ocr-daily': number;
@@ -30,6 +33,10 @@ declare module '@shadow-library/common' {
 
 Config.load('server.port', { defaultValue: '8080', validateType: 'number' });
 Config.load('server.host', { defaultValue: '0.0.0.0' });
+
+/** Per ADR-0002: the API replica turns this off once the worker Deployment (`src/worker.ts`) takes over the scheduler. */
+Config.load('scheduler.enabled', { defaultValue: 'true', validateType: 'boolean', reloadable: true });
+Config.load('scheduler.tick-interval-ms', { defaultValue: '5000', validateType: 'number' });
 
 /** Bounds the per-account day-close walk (§13.3); days beyond it aren't terminalized, only cost-capped. Tunable, not a correctness parameter. */
 Config.load('rollover.catchup-max-days', { defaultValue: '90', validateType: 'number', reloadable: true });
