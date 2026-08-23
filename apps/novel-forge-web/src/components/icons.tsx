@@ -300,3 +300,25 @@ export const UploadIcon = (p: IconProps): React.JSX.Element => (
     <path d="M12 3v12" />
   </SvgIcon>
 );
+
+export const LockIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <rect x="3" y="11" width="18" height="11" rx="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </SvgIcon>
+);
+
+export const EyeIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </SvgIcon>
+);
+
+export const EyeOffIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M6.1 6.1C3.2 7.9 1 12 1 12s4 8 11 8a10.9 10.9 0 0 0 5.9-1.74" />
+    <path d="M9.53 9.53a3 3 0 0 0 4.24 4.24" />
+    <path d="M1 1l22 22" />
+  </SvgIcon>
+);

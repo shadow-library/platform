@@ -10,6 +10,7 @@ export * from './chapter-image.api';
 export * from './draft.api';
 export * from './brief.api';
 export * from './bible.api';
+export * from './fact.api';
 export * from './insight.api';
 export * from './proposal.api';
 export * from './refinement.api';

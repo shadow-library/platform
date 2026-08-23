@@ -47,7 +47,12 @@ function proposalTitle(p: ProposalResponse): string {
 export function opLabel(op: Record<string, unknown>): string {
   const type = String(op.op ?? 'unknown');
   const target =
-    op.volumeKey ?? op.arcKey ?? op.entityKey ?? (op.section !== undefined ? `${op.section}/${op.slug}` : undefined) ?? (op.chapter !== undefined ? `ch ${op.chapter}` : undefined);
+    op.volumeKey ??
+    op.arcKey ??
+    op.entityKey ??
+    op.factKey ??
+    (op.section !== undefined ? `${op.section}/${op.slug}` : undefined) ??
+    (op.chapter !== undefined ? `ch ${op.chapter}` : undefined);
   return target === undefined ? type : `${type} · ${target}`;
 }
 
