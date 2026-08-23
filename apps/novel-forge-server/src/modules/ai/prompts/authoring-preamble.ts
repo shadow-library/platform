@@ -88,4 +88,9 @@ Simple does not mean flat. Vary rhythm; let a strong moment land in a longer sen
 // Shared output directive for the bible-builder stage prompts: the models write section prose, but
 // it must arrive wrapped in the BibleStageSchema envelope or the parse fails outright.
 export const BIBLE_STAGE_OUTPUT_SHAPE =
-  'Respond with ONLY one valid JSON object — nothing outside the JSON, no markdown fences — of exactly this shape:\n{"body": "<the full section prose>", "entities": [{"entityKey": "<snake_case id>", "name": "...", "type": "character|faction|location|power_rule|item|concept", "significance": "major|minor", "notes": "..."}] (only when this section introduces entities)}';
+  'Respond with ONLY one valid JSON object — nothing outside the JSON, no markdown fences — using these fields:\n' +
+  '{"body": "<the full section prose>",\n' +
+  ' "entities": [{"entityKey": "<snake_case id>", "name": "...", "type": "character|faction|location|power_rule|item|concept", "significance": "major|minor", "notes": "...", "body": "<full entity card prose>"}],\n' +
+  ' "facts": [{"factKey": "<snake_case id>", "text": "...", "subjects": ["<entity key>"], "constraintNote": "...", "terms": ["..."], "revealChapter": <chapter number>}],\n' +
+  ' "worldFacts": [{"category": "...", "key": "<snake_case id>", "value": "...", "chapter": <chapter number>}]}\n' +
+  'Only "body" is always required. Include "entities", "facts", and "worldFacts" whenever the instructions above ask for them AND this section actually establishes that kind of content — omit the field or send [] otherwise. Never drop a field the instructions above asked for.';

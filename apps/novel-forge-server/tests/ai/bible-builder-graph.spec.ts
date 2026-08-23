@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { createBibleBuilderGraph } from '@modules/ai/graphs/bible-builder.graph';
+import { BIBLE_STAGE_OUTPUT_SHAPE } from '@modules/ai/prompts/authoring-preamble';
 import { type BibleStageOutput } from '@modules/ai/schemas';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -24,12 +25,12 @@ const pgAvailable = await (async () => {
   }
 })();
 
-function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, stageOutput: BibleStageOutput) {
+function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, stageOutput: BibleStageOutput, indexingService: object = {}) {
   const modelRouter = { structured: async () => stageOutput, resolveModel: () => ({ provider: 'test', model: 'test' }) };
   const contextAssembler = { forChapter: async () => ({ id: null }) };
   const toolRegistry = { forNode: () => [], getRaw: () => [] };
 
-  return { db, contextAssembler, modelRouter, telemetry: {}, toolRegistry, indexingService: {}, checkpointer } as never;
+  return { db, contextAssembler, modelRouter, telemetry: {}, toolRegistry, indexingService, checkpointer } as never;
 }
 
 describe.if(pgAvailable)('bible-builder.graph characters stage persistence', () => {
@@ -272,5 +273,92 @@ describe.if(pgAvailable)('bible-builder.graph world-power stage persistence', ()
       where: and(eq(schema.worldFacts.projectId, projectId), eq(schema.worldFacts.category, 'geography'), eq(schema.worldFacts.key, 'capital_city')),
     });
     expect(original?.value).toBe('Original.');
+  });
+});
+
+describe.if(pgAvailable)('bible-builder.graph stage atomicity and lore indexing', () => {
+  let db: PrimaryDatabase;
+  let checkpointer: PostgresSaver;
+
+  afterAll(() => (db as unknown as { $client: SQL }).$client.close());
+
+  beforeAll(async () => {
+    const url = await createDatabaseFromTemplate(`${dbName}_atomic`);
+    db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
+    checkpointer = PostgresSaver.fromConnString(url);
+    await checkpointer.setup();
+  });
+
+  async function seedProject(name: string): Promise<bigint> {
+    const [project] = await db.insert(schema.projects).values({ name, kind: 'new_novel' }).returning();
+    if (!project) throw new Error('failed to seed project');
+    return project.id;
+  }
+
+  async function runBibleBuilder(projectId: bigint, output: BibleStageOutput, force: boolean, threadSuffix: string, indexingService?: object): Promise<void> {
+    const graph = createBibleBuilderGraph(buildServices(db, checkpointer, output, indexingService));
+    const runId = `bible-builder-atomic-${projectId}-${threadSuffix}`;
+    await graph.invoke({ projectId: String(projectId), brief: 'A test brief.', force, runId }, { configurable: { thread_id: runId } });
+  }
+
+  it('rolls the whole stage back when a structured-record write fails, leaving no document body behind', async () => {
+    const projectId = await seedProject(`bible-atomic-${Date.now()}`);
+    const malformed: BibleStageOutput = {
+      body: 'Foundation bible prose.',
+      entities: [
+        { entityKey: 'amara', name: 'Detective Amara', type: 'character' },
+        { entityKey: 'broken', name: 'Broken Entity', type: 'not_a_real_entity_type' as never },
+      ],
+    };
+
+    await expect(runBibleBuilder(projectId, malformed, false, 'failing')).rejects.toThrow();
+
+    const docs = await db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId) });
+    expect(docs).toEqual([]);
+
+    const entity = await db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, 'amara')) });
+    expect(entity).toBeUndefined();
+  });
+
+  it('retries a rolled-back stage on a subsequent non-force run', async () => {
+    const projectId = await seedProject(`bible-atomic-retry-${Date.now()}`);
+    await expect(
+      runBibleBuilder(projectId, { body: 'Foundation bible prose.', entities: [{ entityKey: 'broken', name: 'Broken', type: 'nope' as never }] }, false, 'failing'),
+    ).rejects.toThrow();
+
+    await runBibleBuilder(projectId, { body: 'Foundation bible prose, retried.', entities: [{ entityKey: 'amara', name: 'Detective Amara', type: 'character' }] }, false, 'retry');
+
+    const doc = await db.query.bibleDocuments.findFirst({
+      where: and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, 'project'), eq(schema.bibleDocuments.slug, 'foundation')),
+    });
+    expect(doc?.body).toBe('Foundation bible prose, retried.');
+
+    const entity = await db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, 'amara')) });
+    expect(entity?.name).toBe('Detective Amara');
+  });
+
+  it('indexes bible documents under a slash-separated refKey so the retrieval label forms a resolvable bible_doc ref', async () => {
+    const projectId = await seedProject(`bible-lore-${Date.now()}`);
+    const labels: string[] = [];
+    const indexingService = { addLore: async (_projectId: bigint, kind: string, refKey: string) => void labels.push(`${kind}:${refKey}`) };
+
+    await runBibleBuilder(projectId, { body: 'Bible prose for every stage.' }, false, 'lore', indexingService);
+
+    expect(labels).toContain('bible_doc:ai/characters');
+    expect(labels).toContain('bible_doc:project/foundation');
+    for (const label of labels) expect(label.slice('bible_doc:'.length)).toContain('/');
+  });
+});
+
+describe('BIBLE_STAGE_OUTPUT_SHAPE', () => {
+  it('advertises every BibleStageSchema field without claiming body and entities are the only legal ones', () => {
+    expect(BIBLE_STAGE_OUTPUT_SHAPE).toContain('"body"');
+    expect(BIBLE_STAGE_OUTPUT_SHAPE).toContain('"entities"');
+    expect(BIBLE_STAGE_OUTPUT_SHAPE).toContain('"facts"');
+    expect(BIBLE_STAGE_OUTPUT_SHAPE).toContain('"worldFacts"');
+    expect(BIBLE_STAGE_OUTPUT_SHAPE).toContain('"constraintNote"');
+    expect(BIBLE_STAGE_OUTPUT_SHAPE).toContain('"revealChapter"');
+    expect(BIBLE_STAGE_OUTPUT_SHAPE).toContain('Never drop a field the instructions above asked for.');
+    expect(BIBLE_STAGE_OUTPUT_SHAPE).not.toContain('exactly this shape');
   });
 });

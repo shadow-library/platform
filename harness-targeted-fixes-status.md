@@ -6,9 +6,9 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 
 ## Summary
 
-- Completed: 6
+- Completed: 7
 - In Progress: 0
-- Pending: 5
+- Pending: 4
 - Blocked: 0
 
 ## Tasks
@@ -21,7 +21,7 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 | FIX-04 | HIGH     | Render `brief.pov` into generation/judge brief; guarantee POV entity card priority                                                  | COMPLETED | —            |
 | FIX-05 | HIGH     | Arc reconciliation observes events inside the current arc, not `arc.chapterStart`; protect/invalidate already-drafted descendants   | COMPLETED | FIX-02       |
 | FIX-06 | HIGH     | Continuity extraction receives existing key vocabulary; validate relationship targets/evidence; route ambiguous mutations to review | COMPLETED | —            |
-| FIX-07 | HIGH     | Bible stage output instructions match schema; persist stage atomically; fix `bible_doc` ref format mismatch                         | PENDING   | —            |
+| FIX-07 | HIGH     | Bible stage output instructions match schema; persist stage atomically; fix `bible_doc` ref format mismatch                         | COMPLETED | —            |
 | FIX-08 | HIGH     | Gate/cap the legacy whole-book `outline()` endpoint so it cannot overwrite protected arc briefs                                     | PENDING   | —            |
 | FIX-09 | MEDIUM   | Align `revealChapter` catalog semantics with the actual knowledge ledger                                                            | PENDING   | —            |
 | FIX-10 | MEDIUM   | Require `briefCompliance` at runtime; fail closed if the judge omits it                                                             | PENDING   | —            |
@@ -77,7 +77,7 @@ None.
 
 ## Pending
 
-See table above. FIX-07 selected next.
+See table above. FIX-08 selected next.
 
 ## Blocked
 
@@ -322,5 +322,46 @@ thread/mystery keys). `tests/ai/prompts.spec.ts` (+: `ContinuityRelationship` re
 
 Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
 997 pass, 10 skip, 0 fail (independently re-run).
+
+Commit: `a962aaaa`
+
+### FIX-07 — Bible stage output/schema alignment, atomic persistence, ref-format fix
+
+Source finding: `harness-post-implementation-review.md` H6 ("Bible structured generation is not
+reliable end-to-end") + §18 row 7. Three independent bugs sharing the bible-builder code area.
+
+What changed:
+
+- `BIBLE_STAGE_OUTPUT_SHAPE` (shared by all six bible-stage prompts + `new-novel.prompt.ts`) said the
+  response must be "exactly this shape" showing only `body`/`entities` — contradicting the
+  characters/world-power stage prompts' own instructions to also emit `facts`/`worldFacts`. A model
+  taking "exactly" literally could legally emit `{body, entities}` and still pass schema validation
+  (both fields are optional), silently dropping the stage-specific content. Rewritten to show all four
+  `BibleStageSchema` fields (including `entities[].body`) and state explicitly: include a field
+  whenever the stage's own instructions ask for it and the section establishes it; never drop a field
+  asked for above.
+- `indexLore`'s `addLore` call used `${section}:${slug}` as the lore-index refKey; `resolveRefs`'s
+  `bible_doc:` case parses refs as `section/slug` (slash-separated). Since retrieval hits render as
+  `[${kind}:${refKey}]`, a bible-doc hit was displayed to the model as `[bible_doc:foundation:overview]`
+  — a string a model imitating what it saw would produce as a `contextRefs` entry, permanently
+  unresolvable. Changed to `/` so the retrieval label naturally forms a valid, resolvable ref.
+- `runStage`'s document-body upsert and its three structured-record upsert loops (entities, canon
+  facts, world facts) are now one `db.transaction()`; the per-row `.catch(err => logger.warn(...))`
+  swallows on the structured writes are removed. Previously a single failed entity/fact/world-fact
+  write only logged a warning while the document body still committed — and since the `!force` skip
+  check only looks at whether the document has a body, that silent partial write was permanently
+  treated as a completed stage, with no way to retry it short of a non-deterministic full `force`
+  rebuild. Now any write failure rolls back the whole stage (document included), so a subsequent
+  non-force run correctly retries it.
+
+Tests: `tests/ai/bible-builder-graph.spec.ts` (+4): a forced structured-write failure rolls back the
+whole stage (zero `bibleDocuments`/entity rows persisted); a subsequent non-force run then retries and
+persists cleanly; `indexLore` labels use `/` not `:`; `BIBLE_STAGE_OUTPUT_SHAPE` contains
+`facts`/`worldFacts`/`constraintNote`/`revealChapter` and no longer says "exactly this shape".
+Confirmed against pre-fix code: reverting just the graph file fails both atomicity tests and the label
+test. All 9 pre-existing tests in the file pass unmodified.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+1001 pass, 10 skip, 0 fail (independently re-run).
 
 Commit: (recorded after commit, see git log)

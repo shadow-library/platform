@@ -99,19 +99,19 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
 
     const result = (await modelRouter.structured(prompt, promptInput, ctx, projectRow as ProjectConfig | undefined)) as BibleStageOutput;
 
-    // Upsert bible document.
-    await db
-      .insert(schema.bibleDocuments)
-      .values({ projectId, section, slug, body: result.body })
-      .onConflictDoUpdate({
-        target: [schema.bibleDocuments.projectId, schema.bibleDocuments.section, schema.bibleDocuments.slug],
-        set: { body: sql`EXCLUDED.body`, updatedAt: new Date() },
-      });
+    // A stage's document and its structured records are one unit: a partially-written stage would still
+    // satisfy the `existing?.body` skip-check above and never be retried by a non-force rebuild.
+    await db.transaction(async tx => {
+      await tx
+        .insert(schema.bibleDocuments)
+        .values({ projectId, section, slug, body: result.body })
+        .onConflictDoUpdate({
+          target: [schema.bibleDocuments.projectId, schema.bibleDocuments.section, schema.bibleDocuments.slug],
+          set: { body: sql`EXCLUDED.body`, updatedAt: new Date() },
+        });
 
-    // Upsert entities if present.
-    if (result.entities && result.entities.length > 0) {
-      for (const e of result.entities) {
-        await db
+      for (const e of result.entities ?? []) {
+        await tx
           .insert(schema.entities)
           .values({
             projectId,
@@ -132,15 +132,11 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
               body: sql`COALESCE(EXCLUDED.body, entities.body)`,
               updatedAt: new Date(),
             },
-          })
-          .catch(err => logger.warn(`bible-builder entity upsert error`, { err, entityKey: e.entityKey }));
+          });
       }
-    }
 
-    // Upsert canon facts if present.
-    if (result.facts && result.facts.length > 0) {
-      for (const f of result.facts) {
-        await db
+      for (const f of result.facts ?? []) {
+        await tx
           .insert(schema.canonFacts)
           .values({
             projectId,
@@ -161,15 +157,11 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
               revealChapter: sql`COALESCE(EXCLUDED.reveal_chapter, canon_facts.reveal_chapter)`,
               updatedAt: new Date(),
             },
-          })
-          .catch(err => logger.warn(`bible-builder fact upsert error`, { err, factKey: f.factKey }));
+          });
       }
-    }
 
-    // Upsert world facts if present.
-    if (result.worldFacts && result.worldFacts.length > 0) {
-      for (const wf of result.worldFacts) {
-        await db
+      for (const wf of result.worldFacts ?? []) {
+        await tx
           .insert(schema.worldFacts)
           .values({
             projectId,
@@ -185,10 +177,9 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
               chapter: sql`COALESCE(EXCLUDED.chapter, world_facts.chapter)`,
               updatedAt: new Date(),
             },
-          })
-          .catch(err => logger.warn(`bible-builder world fact upsert error`, { err, category: wf.category, key: wf.key }));
+          });
       }
-    }
+    });
 
     return {
       stagesDone: [...state.stagesDone, stageName],
@@ -257,7 +248,7 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
     for (const doc of docs) {
       if (!doc.body) continue;
       try {
-        await indexingService.addLore(projectId, 'bible_doc', `${doc.section}:${doc.slug}`, doc.body, doc.updatedAt ?? new Date());
+        await indexingService.addLore(projectId, 'bible_doc', `${doc.section}/${doc.slug}`, doc.body, doc.updatedAt ?? new Date());
       } catch (err) {
         logger.warn('indexLore: addLore failed (non-fatal)', { err, section: doc.section });
       }
