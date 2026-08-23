@@ -162,6 +162,10 @@ export class InstanceWrapper<T extends object = any> {
     return this.isAlias;
   }
 
+  isFactoryProvider(): boolean {
+    return this.isFactory;
+  }
+
   getAliasToken(): ProviderToken {
     const actualProvider = this.inject[0];
     assert(actualProvider, `Alias provider '${this.getTokenName()}' has no target token`);
@@ -225,7 +229,14 @@ export class InstanceWrapper<T extends object = any> {
       throw DIErrors.unexpected(`The dependency at index ${index} of '${this.getTokenName()}' is undefined`);
     }
 
-    if (!dependency.isResolved()) return await dependency.loadPrototype(metadata.contextId);
+    /**
+     * A factory provider has no prototype to hand out early for circular-dependency purposes — it
+     * produces a value, not a mutable instance `loadInstance` can later top up. When a module graph's
+     * topological order places a factory's dependent before the module that owns the factory (a real
+     * possibility once cycle-breaking picks a tie-break order), falling through to `loadInstance` here
+     * resolves the factory (and, recursively, its own dependencies) on demand instead of throwing.
+     */
+    if (!dependency.isResolved() && !dependency.isFactoryProvider()) return await dependency.loadPrototype(metadata.contextId);
     return await dependency.loadInstance(metadata.contextId);
   }
 

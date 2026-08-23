@@ -5,6 +5,8 @@ declare module '@shadow-library/common' {
     'server.port': number;
     'server.host': string;
 
+    'account.context-ttl': number;
+
     'scheduler.enabled': boolean;
     'scheduler.tick-interval-ms': number;
 
@@ -33,6 +35,9 @@ declare module '@shadow-library/common' {
 
 Config.load('server.port', { defaultValue: '8080', validateType: 'number' });
 Config.load('server.host', { defaultValue: '0.0.0.0' });
+
+/** Seconds a resolved `sub -> account` mapping stays LRU-cached (à la `access.membership-ttl` on web-novel-server). */
+Config.load('account.context-ttl', { defaultValue: '60', validateType: 'number', reloadable: true });
 
 /** Per ADR-0002: the API replica turns this off once the worker Deployment (`src/worker.ts`) takes over the scheduler. */
 Config.load('scheduler.enabled', { defaultValue: 'true', validateType: 'boolean', reloadable: true });

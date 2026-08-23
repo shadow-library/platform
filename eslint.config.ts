@@ -176,6 +176,29 @@ export default defineConfig([
     rules: { '@typescript-eslint/no-namespace': 'off' },
   },
 
+  /**
+   * shadow-memoir-server: `OwnerScopedRepository` (ARCHITECTURE §8.3, §5.3) is the only sanctioned entry
+   * point to user-owned tables — raw `DatabaseService.getPostgresClient()` access is confined to
+   * `*.repository.ts` files and `database/`, so a domain service reaching for the client directly (and
+   * skipping owner scoping) fails lint instead of only code review.
+   */
+  {
+    files: ['apps/shadow-memoir-server/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.property.name='getPostgresClient']",
+          message: 'getPostgresClient() is restricted to *.repository.ts files and database/ — reach user-owned tables through OwnerScopedRepository instead.',
+        },
+      ],
+    },
+  },
+  {
+    files: ['apps/shadow-memoir-server/**/*.repository.ts', 'apps/shadow-memoir-server/src/database/**/*.{ts,tsx}', 'apps/shadow-memoir-server/tests/**/*.{ts,tsx}'],
+    rules: { 'no-restricted-syntax': 'off' },
+  },
+
   /** identity-server also renders and ships the OIDC consent client from the same workspace: needs both global sets. */
   {
     files: ['apps/identity-server/**/*.{ts,tsx}'],

@@ -1,4 +1,4 @@
 [test]
-preload = ["./tests/env.ts"]
+preload = ["./tests/env.ts", "./tests/setup.ts"]
 coverageThreshold = 0
 coveragePathIgnorePatterns = ["**/dist/**", "**/index.ts", "**/*.interface.ts", "tests/**"]

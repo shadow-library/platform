@@ -7,3 +7,7 @@ process.env.NODE_ENV = 'development';
 process.env.HEALTH_ENABLED = 'true';
 process.env.HEALTH_HOST = 'localhost';
 process.env.HEALTH_PORT = '18081';
+
+/** `AUTH_ISSUER` is set by `tests/setup.ts` (preloaded after this file) once the mock IdP's ephemeral port is known. */
+process.env.AUTH_APP_ID = 'shadow-memoir';
+process.env.AUTH_CLIENT_SECRET = 'shadow-memoir-test-secret';
