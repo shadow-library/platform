@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { ACTION_TYPES, type ChangeOp, changeSetRefs, isActionOp, renderActionVocabulary, validateChangeSet } from '@modules/refinement';
+import { ACTION_TYPES, type ChangeOp, changeSetRefs, isActionOp, renderActionVocabulary, renderOpVocabulary, validateChangeSet } from '@modules/refinement';
 
 const validOps: ChangeOp[] = [
   { op: 'premise.update', premise: 'a cultivator returns from death', themes: ['revenge'] },
@@ -103,6 +103,57 @@ describe('hub ops and actions', () => {
   });
 });
 
+describe('epistemic ops', () => {
+  it('should accept well-formed fact ops and knowledge contracts', () => {
+    const ops: ChangeOp[] = [
+      {
+        op: 'fact.upsert',
+        factKey: 'heir_is_illegitimate',
+        body: 'the heir is not the duke’s son',
+        subjects: ['heir'],
+        constraintNote: 'never let the duke look at him twice',
+        terms: ['bastard', 'birth ledger'],
+        revealChapter: 41,
+      },
+      { op: 'fact.remove', factKey: 'stale_secret' },
+      { op: 'brief.update', chapter: 41, knowledgeContract: { pov: ['heir'], learns: [{ entityKey: 'heir', factKey: 'heir_is_illegitimate' }] } },
+      { op: 'brief.update', chapter: 42, knowledgeContract: { pov: ['heir', 'duchess'] } },
+      { op: 'brief.update', chapter: 43, knowledgeContract: null },
+    ];
+    expect(validateChangeSet(ops)).toEqual([]);
+  });
+
+  it('should reject malformed fact ops', () => {
+    expect(validateChangeSet([{ op: 'fact.upsert' }])[0]).toMatch(/required field 'factKey'/);
+    expect(validateChangeSet([{ op: 'fact.upsert', factKey: 'f1', terms: 'bastard' }])[0]).toMatch(/invalid field 'terms'/);
+    expect(validateChangeSet([{ op: 'fact.upsert', factKey: 'f1', revealChapter: 0 }])[0]).toMatch(/revealChapter must be >= 1/);
+    expect(validateChangeSet([{ op: 'fact.upsert', factKey: 'f1', source: 'brief_reveal' }])[0]).toMatch(/unexpected field 'source'/);
+    expect(validateChangeSet([{ op: 'fact.remove', factKey: 'f1', entityKey: 'heir' }])[0]).toMatch(/unexpected field 'entityKey'/);
+  });
+
+  it('should reject malformed knowledge contracts', () => {
+    const contractError = (knowledgeContract: unknown): string | undefined => validateChangeSet([{ op: 'brief.update', chapter: 1, knowledgeContract }])[0];
+    expect(contractError('heir')).toMatch(/invalid field 'knowledgeContract' \(expected object\|null\)/);
+    expect(contractError({ learns: [] })).toMatch(/knowledgeContract.pov must be a non-empty array/);
+    expect(contractError({ pov: [] })).toMatch(/knowledgeContract.pov must be a non-empty array/);
+    expect(contractError({ pov: [''] })).toMatch(/knowledgeContract.pov must be a non-empty array/);
+    expect(contractError({ pov: ['heir'], learns: {} })).toMatch(/knowledgeContract.learns must be an array/);
+    expect(contractError({ pov: ['heir'], learns: [{ entityKey: 'heir' }] })).toMatch(/learns\[0\].factKey must be a non-empty string/);
+    expect(contractError({ pov: ['heir'], learns: [{ entityKey: 'heir', factKey: 'f1', chapter: 3 }] })).toMatch(/learns\[0\]: unexpected field 'chapter'/);
+    expect(contractError({ pov: ['heir'], reveals: [] })).toMatch(/unexpected field 'knowledgeContract.reveals'/);
+  });
+
+  it('should render the fact and knowledge-contract vocabulary only for the scopes that allow them', () => {
+    const rendered = renderOpVocabulary(['fact.upsert', 'fact.remove', 'brief.update']);
+    expect(rendered).toContain('"op": "fact.upsert", "factKey": <string, required>');
+    expect(rendered).toContain('"pov": <non-empty array of entity keys>');
+    expect(rendered).toContain('NEVER in bible prose');
+    expect(rendered).toContain('the reveal schedule IS the plot');
+    expect(renderOpVocabulary(['volume.upsert'])).not.toContain('knowledgeContract');
+    expect(renderOpVocabulary(['brief.update'])).not.toContain('spoiler ledger');
+  });
+});
+
 describe('changeSetRefs', () => {
   it('should derive deduplicated artifact refs', () => {
     const refs = changeSetRefs([...validOps, { op: 'volume.remove', volumeKey: 'vol_1' }]);
@@ -117,5 +168,14 @@ describe('changeSetRefs', () => {
       { op: 'action.audit_bible' },
     ]);
     expect(refs).toEqual(['draft:4', 'chapter:9']);
+  });
+
+  it('should map fact ops to fact: refs', () => {
+    const refs = changeSetRefs([
+      { op: 'fact.upsert', factKey: 'heir_is_illegitimate', body: 'x' },
+      { op: 'fact.remove', factKey: 'heir_is_illegitimate' },
+      { op: 'fact.remove', factKey: 'stale_secret' },
+    ]);
+    expect(refs).toEqual(['fact:heir_is_illegitimate', 'fact:stale_secret']);
   });
 });

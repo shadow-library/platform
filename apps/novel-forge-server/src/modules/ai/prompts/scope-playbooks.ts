@@ -14,7 +14,7 @@ export interface ScopePlaybook {
 export const SCOPE_PLAYBOOKS: Record<Refinement.ChatScope, ScopePlaybook> = {
   project: {
     guidance:
-      "Scope: the entire project — you are the showrunner's right hand with full visibility and full editing power. Judge everything as a serialized web novel AND as a production pipeline: is the canon coherent, is the plan escalating, are drafts moving toward approval, is anything stale or blocked? You may reshape the premise, bible documents, the cast, volumes, arcs, chapter briefs, and draft prose (finalized chapters are locked — never propose edits to them), and you may run the pipeline itself through action operations. When the author's message lays out a volume or arc structure — a list of volumes, phases, or a stated chapters-per-volume figure — MATERIALIZE it as records, not prose: stage one volume.upsert per volume (ordinal, title, objective, conflict, payoff, and targetChapterCount taken from the stated count — for a range like '50–70 chapters' pick a concrete number in range) so the plan appears in the volumes section; a plot document that only narrates the volumes is not a substitute. Prefer the smallest complete change that achieves the author's intent — your change-sets apply to real canon, so propose whole-field values and nothing speculative.",
+      "Scope: the entire project — you are the showrunner's right hand with full visibility and full editing power. Judge everything as a serialized web novel AND as a production pipeline: is the canon coherent, is the plan escalating, are drafts moving toward approval, is anything stale or blocked? You may reshape the premise, bible documents, the cast, volumes, arcs, chapter briefs, and draft prose (finalized chapters are locked — never propose edits to them), and you may run the pipeline itself through action operations. When the author's message lays out a volume or arc structure — a list of volumes, phases, or a stated chapters-per-volume figure — MATERIALIZE it as records, not prose: stage one volume.upsert per volume (ordinal, title, objective, conflict, payoff, and targetChapterCount taken from the stated count — for a range like '50–70 chapters' pick a concrete number in range) so the plan appears in the volumes section; a plot document that only narrates the volumes is not a substitute. You also own the epistemic layer: canon facts hold the truths the reader must not learn yet, and each brief's knowledgeContract names the POV cast and the facts they learn on-page — that reveal schedule is the spine of a mystery, so build it as deliberately as the volume plan. Prefer the smallest complete change that achieves the author's intent — your change-sets apply to real canon, so propose whole-field values and nothing speculative.",
     allowedOps: [
       'premise.update',
       'bible_document.upsert',
@@ -29,13 +29,25 @@ export const SCOPE_PLAYBOOKS: Record<Refinement.ChatScope, ScopePlaybook> = {
       'draft.remove',
       'entity.upsert',
       'entity.remove',
+      'fact.upsert',
+      'fact.remove',
     ],
     allowedActions: ACTION_TYPES,
   },
   novel: {
     guidance:
-      'Scope: the whole novel. Judge everything as a serialized web novel: is the hook strong enough to survive chapter one? Are the stakes personal and escalating? Does the progression system give readers a visible ladder to anticipate? Does the premise leave room for hundreds of chapters without going stale? Push the author on reader-promise, update cadence assumptions, and genre conventions. You may reshape the premise, bible documents, the volume plan, and the cast — characters, factions, locations, and the other catalog entities. When the author describes a volume breakdown or a chapters-per-volume figure, stage volume.upsert ops (set targetChapterCount from the stated count) so it becomes the volume plan — do not leave it only as prose in a bible document.',
-    allowedOps: ['premise.update', 'bible_document.upsert', 'bible_document.remove', 'volume.upsert', 'volume.remove', 'entity.upsert', 'entity.remove'],
+      'Scope: the whole novel. Judge everything as a serialized web novel: is the hook strong enough to survive chapter one? Are the stakes personal and escalating? Does the progression system give readers a visible ladder to anticipate? Does the premise leave room for hundreds of chapters without going stale? Push the author on reader-promise, update cadence assumptions, and genre conventions. You may reshape the premise, bible documents, the volume plan, and the cast — characters, factions, locations, and the other catalog entities. When the author describes a volume breakdown or a chapters-per-volume figure, stage volume.upsert ops (set targetChapterCount from the stated count) so it becomes the volume plan — do not leave it only as prose in a bible document. Secrets are canon too: any truth the reader must not learn yet belongs in a canon fact, never in a bible document or an entity sheet — those are visible to the chapter author.',
+    allowedOps: [
+      'premise.update',
+      'bible_document.upsert',
+      'bible_document.remove',
+      'volume.upsert',
+      'volume.remove',
+      'entity.upsert',
+      'entity.remove',
+      'fact.upsert',
+      'fact.remove',
+    ],
   },
   bible_document: {
     guidance:
@@ -64,7 +76,7 @@ export const SCOPE_PLAYBOOKS: Record<Refinement.ChatScope, ScopePlaybook> = {
   },
   brief: {
     guidance:
-      'Scope: one chapter brief. The two things that make or break a serialized chapter: the ending contract (hookType, emotional beat, open question, handoff state — never a hurried, conclusive ending) and the declared context refs (everything the chapter author must see, most important first, chosen from the catalog — never invented). Refine the beats to fill one chapter exactly. Only this brief may change.',
+      'Scope: one chapter brief. The two things that make or break a serialized chapter: the ending contract (hookType, emotional beat, open question, handoff state — never a hurried, conclusive ending) and the declared context refs (everything the chapter author must see, most important first, chosen from the catalog — never invented). Refine the beats to fill one chapter exactly. Set a knowledgeContract only when the chapter turns on who knows what — pov bounds what the prose may state, learns records the facts discovered on-page; a chapter that reveals nothing previously hidden carries no contract. Only this brief may change.',
     allowedOps: ['brief.update'],
   },
 };

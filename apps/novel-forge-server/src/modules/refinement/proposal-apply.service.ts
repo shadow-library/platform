@@ -25,6 +25,8 @@ import {
   type DraftUpdateOp,
   type EntityRemoveOp,
   type EntityUpsertOp,
+  type FactRemoveOp,
+  type FactUpsertOp,
   isActionOp,
   type PremiseUpdateOp,
   type VolumeRemoveOp,
@@ -368,6 +370,8 @@ export class ProposalApplyService {
           arcKey: brief.arcKey ?? undefined,
           contextRefs: (brief.contextRefs as string[] | null) ?? undefined,
           endingContract: (brief.endingContract as BriefUpdateOp['endingContract'] | null) ?? undefined,
+          // Always explicit: an omitted contract would merge as "keep", leaving a reverted reveal in place.
+          knowledgeContract: (brief.knowledgeContract as BriefUpdateOp['knowledgeContract']) ?? null,
         };
       }
       case 'draft.update':
@@ -389,6 +393,20 @@ export class ProposalApplyService {
           motivation: entity.motivation ?? undefined,
           notes: entity.notes ?? undefined,
           body: entity.body ?? undefined,
+        };
+      }
+      case 'fact.upsert':
+      case 'fact.remove': {
+        const fact = await ctx.tx.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, ctx.projectId), eq(schema.canonFacts.factKey, op.factKey)) });
+        if (!fact) return op.op === 'fact.upsert' ? { op: 'fact.remove', factKey: op.factKey } : null;
+        return {
+          op: 'fact.upsert',
+          factKey: op.factKey,
+          body: fact.text,
+          subjects: (fact.subjects as string[] | null) ?? undefined,
+          constraintNote: fact.constraintNote ?? undefined,
+          terms: (fact.terms as string[] | null) ?? undefined,
+          revealChapter: fact.revealChapter ?? undefined,
         };
       }
     }
@@ -422,6 +440,10 @@ export class ProposalApplyService {
         return this.applyEntityUpsert(ctx, op);
       case 'entity.remove':
         return this.applyEntityRemove(ctx, op);
+      case 'fact.upsert':
+        return this.applyFactUpsert(ctx, op);
+      case 'fact.remove':
+        return this.applyFactRemove(ctx, op);
       default:
         // Actions never reach the content dispatcher — they are filtered out before apply and executed
         // post-commit (chat-hub design §5.3). Reaching here is a programming error, not bad input.
@@ -643,8 +665,7 @@ export class ProposalApplyService {
       arcKey: op.arcKey ?? existing?.arcKey ?? null,
       contextRefs: op.contextRefs ?? existing?.contextRefs ?? null,
       endingContract: op.endingContract ?? existing?.endingContract ?? null,
-      // Not editable via ops — carried through so the hash (which includes it) matches the row.
-      knowledgeContract: existing?.knowledgeContract ?? null,
+      knowledgeContract: op.knowledgeContract !== undefined ? op.knowledgeContract : (existing?.knowledgeContract ?? null),
     };
     const contentHash = briefContentHash({ chapter: op.chapter, ...merged });
     const revision = (existing?.revision ?? 0) + 1;
@@ -753,6 +774,46 @@ export class ProposalApplyService {
       .returning();
     if (deleted.length === 0) throw AppErrorCode.RFN_004.create();
     ctx.applied.push({ artifactRef: `entity:${op.entityKey}`, newRevision: null });
+  }
+
+  /** Mirrors FactService.upsert's field merge on the apply transaction — reveals stay out of the grammar. */
+  private async applyFactUpsert(ctx: ApplyContext, op: FactUpsertOp): Promise<void> {
+    const existing = await ctx.tx.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, ctx.projectId), eq(schema.canonFacts.factKey, op.factKey)) });
+    if (!existing && op.body === undefined) throw AppErrorCode.RFN_004.create();
+
+    const merged = {
+      text: op.body ?? existing?.text ?? '',
+      subjects: (op.subjects ?? existing?.subjects ?? null) as never,
+      constraintNote: op.constraintNote ?? existing?.constraintNote ?? null,
+      terms: (op.terms ?? existing?.terms ?? null) as never,
+      revealChapter: op.revealChapter ?? existing?.revealChapter ?? null,
+    };
+
+    if (existing) {
+      await ctx.tx
+        .update(schema.canonFacts)
+        .set({ ...merged, updatedAt: new Date() })
+        .where(eq(schema.canonFacts.id, existing.id));
+    } else {
+      await ctx.tx.insert(schema.canonFacts).values({ projectId: ctx.projectId, factKey: op.factKey, ...merged });
+    }
+    ctx.applied.push({ artifactRef: `fact:${op.factKey}`, newRevision: null });
+  }
+
+  /**
+   * Deleting a fact cascades its knowledge ledger, and the inverse op restores only the fact row — so
+   * a ledgered fact is refused rather than silently breaking the revert guarantee (hard rule 14).
+   * Retract the reveals first through the fact endpoints.
+   */
+  private async applyFactRemove(ctx: ApplyContext, op: FactRemoveOp): Promise<void> {
+    const existing = await ctx.tx.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, ctx.projectId), eq(schema.canonFacts.factKey, op.factKey)) });
+    if (!existing) throw AppErrorCode.FCT_001.create();
+
+    const ledgered = await ctx.tx.query.characterKnowledge.findFirst({ where: eq(schema.characterKnowledge.factId, existing.id) });
+    if (ledgered) throw AppErrorCode.FCT_003.create();
+
+    await ctx.tx.delete(schema.canonFacts).where(eq(schema.canonFacts.id, existing.id));
+    ctx.applied.push({ artifactRef: `fact:${op.factKey}`, newRevision: null });
   }
 
   /**

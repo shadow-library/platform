@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 
-import { buildChatRefinePrompt, buildOutlinePrompt, PROMPT_REGISTRY, renderReforgeFidelityGuidance, renderReforgeFidelityRule, SCOPE_PLAYBOOKS } from '@modules/ai/prompts';
+import {
+  buildChatRefinePrompt,
+  buildOutlinePrompt,
+  PROMPT_REGISTRY,
+  renderReforgeFidelityGuidance,
+  renderReforgeFidelityRule,
+  renderScopeInstructions,
+  SCOPE_PLAYBOOKS,
+} from '@modules/ai/prompts';
 import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
 import {
   BibleStageSchema,
@@ -208,6 +216,32 @@ describe('Prompt modules', () => {
       expect(hub.postValidate?.({ reply: 'checking', lookups } as never)).toEqual([]);
       expect(hub.postValidate?.({ reply: 'both', lookups, changeSet: [{ op: 'premise.update', premise: 'x' }] } as never)[0]).toMatch(/never both/);
       expect(hub.postValidate?.({ reply: 'acting', changeSet: [{ op: 'action.audit_bible' }] } as never)).toEqual([]);
+    });
+
+    it('renders the epistemic authoring vocabulary into the scopes that own it', () => {
+      const hub = renderScopeInstructions('project');
+      expect(hub).toContain('"op": "fact.upsert"');
+      expect(hub).toContain('"op": "fact.remove"');
+      expect(hub).toContain('the reveal schedule IS the plot');
+      expect(hub).toContain('"pov": <non-empty array of entity keys>');
+
+      const brief = renderScopeInstructions('brief');
+      expect(brief).toContain('knowledgeContract');
+      expect(brief).toContain('a chapter that reveals nothing previously hidden carries no contract');
+      expect(brief).not.toContain('"op": "fact.upsert"');
+
+      expect(renderScopeInstructions('novel')).toContain('never in a bible document or an entity sheet');
+      expect(renderScopeInstructions('volume_plan')).not.toContain('knowledgeContract');
+    });
+
+    it('accepts epistemic ops in the hub scope and rejects them elsewhere', () => {
+      const hub = buildChatRefinePrompt('project');
+      const changeSet = [
+        { op: 'fact.upsert', factKey: 'mentor_is_the_traitor', body: 'the mentor sold the sect out', terms: ['sect seal'] },
+        { op: 'brief.update', chapter: 41, knowledgeContract: { pov: ['hero'], learns: [{ entityKey: 'hero', factKey: 'mentor_is_the_traitor' }] } },
+      ];
+      expect(hub.postValidate?.({ reply: 'staged the reveal', changeSet } as never)).toEqual([]);
+      expect(buildChatRefinePrompt('brief').postValidate?.({ reply: 'x', changeSet } as never)[0]).toMatch(/not allowed for this scope/);
     });
 
     it('validates chat-refine output shape', () => {

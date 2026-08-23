@@ -17,12 +17,13 @@ interface ParsedRefs {
   chapters: number[];
   drafts: number[];
   entityKeys: string[];
+  factKeys: string[];
 }
 
 const MISSING: ArtifactState = { exists: false, revision: null, contentHash: null };
 
 function parseRefs(refs: string[]): ParsedRefs {
-  const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], arcKeys: [], chapters: [], drafts: [], entityKeys: [] };
+  const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], arcKeys: [], chapters: [], drafts: [], entityKeys: [], factKeys: [] };
   for (const ref of refs) {
     if (ref === 'premise') parsed.premise = true;
     else if (ref.startsWith('doc:')) {
@@ -33,6 +34,7 @@ function parseRefs(refs: string[]): ParsedRefs {
     else if (ref.startsWith('chapter:')) parsed.chapters.push(Number(ref.slice(8)));
     else if (ref.startsWith('draft:')) parsed.drafts.push(Number(ref.slice(6)));
     else if (ref.startsWith('entity:')) parsed.entityKeys.push(ref.slice(7));
+    else if (ref.startsWith('fact:')) parsed.factKeys.push(ref.slice(5));
   }
   return parsed;
 }
@@ -102,6 +104,14 @@ export async function loadArtifactStates(db: PrimaryDatabase, projectId: bigint,
     for (const row of rows) {
       const contentHash = computeContentHash({ name: row.name, type: row.type, status: row.status, motivation: row.motivation, notes: row.notes, body: row.body });
       states[`entity:${row.entityKey}`] = { exists: true, revision: null, contentHash };
+    }
+  }
+
+  if (parsed.factKeys.length > 0) {
+    const rows = await db.query.canonFacts.findMany({ where: and(eq(schema.canonFacts.projectId, projectId), inArray(schema.canonFacts.factKey, parsed.factKeys)) });
+    for (const row of rows) {
+      const contentHash = computeContentHash({ text: row.text, subjects: row.subjects, constraintNote: row.constraintNote, terms: row.terms, revealChapter: row.revealChapter });
+      states[`fact:${row.factKey}`] = { exists: true, revision: null, contentHash };
     }
   }
 

@@ -69,6 +69,16 @@ export interface ArcRemoveOp {
   arcKey: string;
 }
 
+export interface KnowledgeReveal {
+  entityKey: string;
+  factKey: string;
+}
+
+export interface KnowledgeContract {
+  pov: string[];
+  learns?: KnowledgeReveal[];
+}
+
 export interface BriefUpdateOp {
   op: 'brief.update';
   chapter: number;
@@ -78,6 +88,8 @@ export interface BriefUpdateOp {
   arcKey?: string;
   contextRefs?: string[];
   endingContract?: EndingContract;
+  /** Explicit `null` drops the chapter's contract — the only way to un-reveal without deleting the brief. */
+  knowledgeContract?: KnowledgeContract | null;
 }
 
 export interface BriefRemoveOp {
@@ -112,6 +124,27 @@ export interface EntityUpsertOp {
 export interface EntityRemoveOp {
   op: 'entity.remove';
   entityKey: string;
+}
+
+/**
+ * Spoiler-grade canon. `body` is the truth itself and never reaches a drafter who has not ledgered
+ * it; `constraintNote` is the POV-safe behaviour that stands in while the fact is hidden, and
+ * `terms` are the tell-tale strings the leak scan hunts for. Reveals are deliberately absent —
+ * a fact enters the ledger through a brief's knowledgeContract and draft approval, nowhere else.
+ */
+export interface FactUpsertOp {
+  op: 'fact.upsert';
+  factKey: string;
+  body?: string;
+  subjects?: string[];
+  constraintNote?: string;
+  terms?: string[];
+  revealChapter?: number;
+}
+
+export interface FactRemoveOp {
+  op: 'fact.remove';
+  factKey: string;
 }
 
 // Action ops drive the pipeline through existing service code (chat-hub design §4.2). They carry no
@@ -197,7 +230,9 @@ export type ContentOp =
   | DraftUpdateOp
   | DraftRemoveOp
   | EntityUpsertOp
-  | EntityRemoveOp;
+  | EntityRemoveOp
+  | FactUpsertOp
+  | FactRemoveOp;
 
 export type ActionOp =
   | GenerateChaptersAction
@@ -219,7 +254,7 @@ export type OpType = ChangeOp['op'];
 export type ContentOpType = ContentOp['op'];
 export type ActionType = ActionOp['op'];
 
-type FieldKind = 'string' | 'number' | 'string[]' | 'object';
+type FieldKind = 'string' | 'number' | 'string[]' | 'object' | 'object|null';
 interface OpSpec {
   required: Record<string, FieldKind>;
   optional: Record<string, FieldKind>;
@@ -256,7 +291,7 @@ const OP_SPECS: Record<OpType, OpSpec> = {
   'arc.remove': { required: { arcKey: 'string' }, optional: {} },
   'brief.update': {
     required: { chapter: 'number' },
-    optional: { title: 'string', body: 'string', volumeKey: 'string', arcKey: 'string', contextRefs: 'string[]', endingContract: 'object' },
+    optional: { title: 'string', body: 'string', volumeKey: 'string', arcKey: 'string', contextRefs: 'string[]', endingContract: 'object', knowledgeContract: 'object|null' },
   },
   'brief.remove': { required: { chapter: 'number' }, optional: {} },
   'draft.update': { required: { chapter: 'number' }, optional: { title: 'string', body: 'string', summary: 'string' } },
@@ -266,6 +301,11 @@ const OP_SPECS: Record<OpType, OpSpec> = {
     optional: { name: 'string', status: 'string', motivation: 'string', notes: 'string', body: 'string' },
   },
   'entity.remove': { required: { entityKey: 'string' }, optional: {} },
+  'fact.upsert': {
+    required: { factKey: 'string' },
+    optional: { body: 'string', subjects: 'string[]', constraintNote: 'string', terms: 'string[]', revealChapter: 'number' },
+  },
+  'fact.remove': { required: { factKey: 'string' }, optional: {} },
   'action.generate_chapters': { required: { count: 'number' }, optional: {} },
   'action.plan_volumes': { required: { volumeCount: 'number', chaptersPerVolume: 'number' }, optional: {} },
   'action.plan_arcs': { required: { volumeKey: 'string' }, optional: { arcCount: 'number' } },
@@ -313,6 +353,7 @@ function isKind(value: unknown, kind: FieldKind): boolean {
   if (kind === 'string') return typeof value === 'string';
   if (kind === 'number') return typeof value === 'number' && Number.isInteger(value);
   if (kind === 'string[]') return Array.isArray(value) && value.every(v => typeof v === 'string');
+  if (kind === 'object|null' && value === null) return true;
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -325,6 +366,34 @@ function validateEndingContract(value: unknown, path: string, errors: string[]):
     if (typeof contract[key] !== 'string' || contract[key] === '') errors.push(`${path}: endingContract.${key} must be a non-empty string`);
   }
   if (contract['mustNotResolve'] !== undefined && !isKind(contract['mustNotResolve'], 'string[]')) errors.push(`${path}: endingContract.mustNotResolve must be a string array`);
+}
+
+function validateKnowledgeContract(value: unknown, path: string, errors: string[]): void {
+  if (!isKind(value, 'object')) return void errors.push(`${path}: knowledgeContract must be an object`);
+  const contract = value as Record<string, unknown>;
+  for (const key of Object.keys(contract)) {
+    if (key !== 'pov' && key !== 'learns') errors.push(`${path}: unexpected field 'knowledgeContract.${key}'`);
+  }
+
+  const pov = contract['pov'];
+  if (!isKind(pov, 'string[]') || (pov as string[]).length === 0 || (pov as string[]).some(key => key === '')) {
+    errors.push(`${path}: knowledgeContract.pov must be a non-empty array of entity keys`);
+  }
+
+  const learns = contract['learns'];
+  if (learns === undefined) return;
+  if (!Array.isArray(learns)) return void errors.push(`${path}: knowledgeContract.learns must be an array`);
+  learns.forEach((reveal, index) => {
+    const at = `${path}: knowledgeContract.learns[${index}]`;
+    if (!isKind(reveal, 'object')) return void errors.push(`${at} must be an object`);
+    const record = reveal as Record<string, unknown>;
+    for (const key of ['entityKey', 'factKey']) {
+      if (typeof record[key] !== 'string' || record[key] === '') errors.push(`${at}.${key} must be a non-empty string`);
+    }
+    for (const key of Object.keys(record)) {
+      if (key !== 'entityKey' && key !== 'factKey') errors.push(`${at}: unexpected field '${key}'`);
+    }
+  });
 }
 
 /**
@@ -389,6 +458,8 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     if (op.startsWith('bible_document') && !BIBLE_SECTIONS.includes(record['section'] as string)) errors.push(`${path}: section must be one of ${BIBLE_SECTIONS.join(', ')}`);
     if (op === 'entity.upsert' && !ENTITY_TYPES.includes(record['type'] as string)) errors.push(`${path}: type must be one of ${ENTITY_TYPES.join(', ')}`);
     if (op === 'brief.update' && record['endingContract'] !== undefined) validateEndingContract(record['endingContract'], path, errors);
+    if (op === 'brief.update' && record['knowledgeContract'] != null) validateKnowledgeContract(record['knowledgeContract'], path, errors);
+    if (op === 'fact.upsert' && typeof record['revealChapter'] === 'number' && record['revealChapter'] < 1) errors.push(`${path}: revealChapter must be >= 1`);
     if (op === 'arc.upsert' && typeof record['chapterStart'] === 'number' && typeof record['chapterEnd'] === 'number' && record['chapterStart'] > record['chapterEnd']) {
       errors.push(`${path}: chapterStart must be <= chapterEnd`);
     }
@@ -416,7 +487,13 @@ export function renderOpVocabulary(ops: readonly OpType[]): string {
   const contractShape = ops.includes('brief.update')
     ? `\nendingContract, when present, must be exactly: {"hookType": <one of: ${HOOK_TYPES.join(' | ')}>, "emotionalBeat": <non-empty string>, "openQuestion": <non-empty string>, "handoffState": <non-empty string>, "mustNotResolve": <string[], optional>} — hookType is an enum, never free text.`
     : '';
-  return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}${contractShape}`;
+  const knowledgeShape = ops.includes('brief.update')
+    ? `\nknowledgeContract, when present, must be exactly: {"pov": <non-empty array of entity keys>, "learns": <optional array of {"entityKey": <string>, "factKey": <string>}>} — pov bounds what the chapter may state; learns names the facts discovered on-page. A chapter that reveals nothing previously hidden omits the contract entirely; pass null to drop one the brief already carries.`
+    : '';
+  const factRules = ops.includes('fact.upsert')
+    ? '\nCanon facts are the spoiler ledger: a truth the reader must not learn yet goes in fact.upsert body and NEVER in bible prose, an entity sheet, or a brief — those are visible to the drafter. constraintNote is the POV-safe behaviour that must hold while the fact is hidden; terms are the give-away names and phrases the leak scan blocks. In a mystery the reveal schedule IS the plot, so place each reveal deliberately: set revealChapter as the intended beat and stage the matching brief.update knowledgeContract.learns that pays it off.'
+    : '';
+  return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}${contractShape}${knowledgeShape}${factRules}`;
 }
 
 /** Action shapes + what each one does — the pipeline half of the hub playbook (chat-hub design §4.3). */
@@ -439,6 +516,7 @@ export function changeSetRefs(ops: ChangeOp[]): string[] {
     if (op.op === 'volume.upsert' || op.op === 'volume.remove') return [`volume:${op.volumeKey}`];
     if (op.op === 'arc.upsert' || op.op === 'arc.remove') return [`arc:${op.arcKey}`];
     if (op.op === 'entity.upsert' || op.op === 'entity.remove') return [`entity:${op.entityKey}`];
+    if (op.op === 'fact.upsert' || op.op === 'fact.remove') return [`fact:${op.factKey}`];
     if (op.op === 'draft.update' || op.op === 'draft.remove') return [`draft:${op.chapter}`];
     return [`chapter:${op.chapter}`];
   });

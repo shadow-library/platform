@@ -132,6 +132,79 @@ describe.if(pgAvailable)('apply engine v2: cherry-pick, actions, revert, rollbac
     }
   });
 
+  it('should author, edit, and revert canon facts through the op grammar', async () => {
+    const create = await createProposal([
+      {
+        op: 'fact.upsert',
+        factKey: 'heir_is_illegitimate',
+        body: 'the heir is not the duke’s son',
+        constraintNote: 'the duke never studies his face',
+        terms: ['bastard'],
+        revealChapter: 41,
+      },
+    ]);
+    await applier.apply(projectId, create.id);
+    const created = await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, 'heir_is_illegitimate')) });
+    expect(created).toMatchObject({ text: 'the heir is not the duke’s son', terms: ['bastard'], revealChapter: 41 });
+
+    const edit = await createProposal([
+      { op: 'fact.upsert', factKey: 'heir_is_illegitimate', constraintNote: 'the duke avoids the birth ledger', terms: ['bastard', 'birth ledger'] },
+    ]);
+    await applier.apply(projectId, edit.id);
+    const edited = await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, 'heir_is_illegitimate')) });
+    expect(edited).toMatchObject({ text: 'the heir is not the duke’s son', constraintNote: 'the duke avoids the birth ledger', terms: ['bastard', 'birth ledger'] });
+
+    await applier.revert(projectId, edit.id);
+    const rolledBack = await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, 'heir_is_illegitimate')) });
+    expect(rolledBack).toMatchObject({ constraintNote: 'the duke never studies his face', terms: ['bastard'] });
+
+    await applier.revert(projectId, create.id);
+    const gone = await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, 'heir_is_illegitimate')) });
+    expect(gone).toBeUndefined();
+  });
+
+  it('should restore a removed fact on revert and refuse to remove a ledgered one', async () => {
+    const seed = await createProposal([{ op: 'fact.upsert', factKey: 'sword_is_cursed', body: 'the sword drinks its wielder', terms: ['curse'] }]);
+    await applier.apply(projectId, seed.id);
+
+    const remove = await createProposal([{ op: 'fact.remove', factKey: 'sword_is_cursed' }]);
+    await applier.apply(projectId, remove.id);
+    expect(await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, 'sword_is_cursed')) })).toBeUndefined();
+
+    await applier.revert(projectId, remove.id);
+    const restored = await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, 'sword_is_cursed')) });
+    expect(restored).toMatchObject({ text: 'the sword drinks its wielder', terms: ['curse'] });
+
+    const hero = await db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, 'hero')) });
+    await db.insert(schema.characterKnowledge).values({ projectId, factId: restored?.id as bigint, entityId: hero?.id as bigint, learnedInChapter: 1, source: 'manual' });
+
+    const ledgered = await createProposal([{ op: 'fact.remove', factKey: 'sword_is_cursed' }]);
+    await expect(applier.apply(projectId, ledgered.id)).rejects.toThrow(/ledgered reveals/);
+    await proposals.discard(projectId, ledgered.id);
+  });
+
+  it('should persist a brief knowledge contract, fold it into the content hash, and revert it', async () => {
+    const seed = await createProposal([{ op: 'fact.upsert', factKey: 'mentor_is_the_traitor', body: 'the mentor sold the sect out' }]);
+    await applier.apply(projectId, seed.id);
+    const create = await createProposal([{ op: 'brief.update', chapter: 7, body: 'the vault confrontation' }]);
+    await applier.apply(projectId, create.id);
+    const before = await loadArtifactStates(db, projectId, ['chapter:7']);
+
+    const contract = { pov: ['hero'], learns: [{ entityKey: 'hero', factKey: 'mentor_is_the_traitor' }] };
+    const proposal = await createProposal([{ op: 'brief.update', chapter: 7, knowledgeContract: contract }]);
+    await applier.apply(projectId, proposal.id);
+
+    const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, 7)) });
+    expect(brief?.knowledgeContract).toEqual(contract);
+    expect(brief?.body).toBe('the vault confrontation');
+    expect(brief?.contentHash).not.toBe(before['chapter:7']?.contentHash);
+
+    await applier.revert(projectId, proposal.id);
+    const reverted = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, 7)) });
+    expect(reverted?.knowledgeContract).toBeNull();
+    expect((await loadArtifactStates(db, projectId, ['chapter:7']))['chapter:7']?.contentHash).toBe(before['chapter:7']?.contentHash as string);
+  });
+
   it('should refuse to revert when an artifact moved after the apply', async () => {
     const proposal = await createProposal([{ op: 'bible_document.upsert', section: 'project', slug: 'reader-promise', body: 'about to be overwritten' }]);
     await applier.apply(projectId, proposal.id);
