@@ -1,7 +1,7 @@
 # AI System Design — Novel Forge Server
 
 > **Purpose:** the definitive, implementation-ready blueprint for the AI subsystem of this server. A Claude Code session should be able to build the AI layer directly from this document.
-> **Scope:** the AI layer only. Application scaffolding, CRUD modules, source scraping, jobs/concurrency, and the HTTP conventions are defined by `docs/python-cli-to-node-api-migration-plan.md` and are **not** re-designed here.
+> **Scope:** the AI layer only. Application scaffolding, CRUD modules, source scraping, jobs/concurrency, and the HTTP conventions are defined by the implemented codebase (the migration plan that originally specified them has been retired now that the migration is complete) and are **not** re-designed here.
 > **Standalone:** this document is the single source of truth for the AI layer; it supersedes the earlier AI architecture review, which has been removed.
 > **Stack:** Bun + `@shadow-library/*` (Fastify, DI modules), PostgreSQL + Drizzle, pgvector.
 
@@ -405,7 +405,9 @@ Every structured call runs this ladder, implemented **once** in `ModelRouterServ
 3. Second failure ⇒ tolerant extraction (first balanced `{…}` block) → Zod parse.
 4. Still failing ⇒ `AiResponseError` → `AI_001`; the raw output is already persisted in `model_calls` (trace-first: raw output is written _before_ parsing).
 
-For prompt-directive providers (some Ollama models, subprocess CLIs) step 1 is a JSON directive appended to the prompt; steps 2–4 are identical. Cost: at most one extra call, only on failure — the insurance that matters most for local models.
+For prompt-directive providers (some Ollama models) step 1 is a JSON directive appended to the prompt; steps 2–4 are identical. Cost: at most one extra call, only on failure — the insurance that matters most for local models.
+
+Subprocess CLI providers (Claude Code / Codex CLIs as LLM backends via subscriptions) were considered but never implemented — every hosted call instead routes through the OpenRouter-compatible endpoint, and `AI_OPENROUTER_API_URL`/`ai.openrouter.api.url` is the seam for pointing that leg at a subscription-backed in-cluster gateway speaking the same protocol.
 
 **Zod discipline:** port every Python JSON schema to Zod **with the `.describe()` texts preserved** (descriptions steer the model). Add `z.enum` for closed sets, `.min(1)` on prose, and cross-field refinements only where the Python code enforced them post-hoc. Schemas are the single source for `withStructuredOutput`, output validation, mock fixtures, and DTO alignment. The outline schema adds `requiredContext: string[]` per brief, with a `.describe()` instructing selection from the catalog only, most-important first; it is post-validated against the catalog — invented refs are dropped and logged, and ordering is preserved (it doubles as the eviction priority, §3.5).
 
@@ -609,7 +611,7 @@ Every step is an API call over Postgres data — no grepping process logs to rec
 
 ## 10. Implementation Plan
 
-Prerequisites: migration-doc Phases 1–4 (scaffold, schema, domain CRUD, idempotent persistence). Each phase below ends green (`bun scripts/verify.ts apps/novel-forge-server` — format + lint + type-check + test); one commit per phase. Dependencies: A1 → A2/A3 (parallel-safe) → A4/A5/A6 → A7 → A8/A9 → A10 → A11.
+Prerequisites: scaffold, schema, domain CRUD, and idempotent persistence are already in place. Each phase below ends green (`bun scripts/verify.ts apps/novel-forge-server` — format + lint + type-check + test); one commit per phase. Dependencies: A1 → A2/A3 (parallel-safe) → A4/A5/A6 → A7 → A8/A9 → A10 → A11.
 
 New dependencies (installed in A1–A5 as needed): `langchain`, `@langchain/core`, `@langchain/anthropic`, `@langchain/openai`, `@langchain/xai`, `@langchain/ollama`, `@langchain/langgraph`, `@langchain/langgraph-checkpoint-postgres`, `llamaindex`, `@llamaindex/postgres`, `zod`, `js-tiktoken`.
 
@@ -666,7 +668,7 @@ _Result:_ `bun run ai:smoke` completes an end-to-end micro-novel on Ollama; tort
 _Tests:_ the 6 rung-3 scenarios.
 
 **Phase A11 — Hardening and docs.** _Objective:_ close the gaps; ship the long tail.
-_Tasks:_ sweep test coverage of the known failure modes (budget edges, tier leaks, ref-resolution corners, judge normalization corners, repair caps); wire all commands into CI; `/ai-usage` polish; LangSmith env seam; subprocess CLI providers **last** (env-gated, `capabilities: { tools: false }`); update `README.md`/`CLAUDE.md` with architecture, commands, env keys, and the §9.2 debugging playbook.
+_Tasks:_ sweep test coverage of the known failure modes (budget edges, tier leaks, ref-resolution corners, judge normalization corners, repair caps); wire all commands into CI; `/ai-usage` polish; LangSmith env seam; update `README.md`/`CLAUDE.md` with architecture, commands, env keys, and the §9.2 debugging playbook.
 _Result:_ `bun test` green; nightly green-or-skipped; docs current.
 
 ---
@@ -691,7 +693,7 @@ _Result:_ `bun test` green; nightly green-or-skipped; docs current.
 
 ## Appendix B: AI table reference
 
-New tables (Drizzle schemas under `src/database/schemas/`); domain tables from the migration doc are unchanged unless listed under column additions.
+New tables (Drizzle schemas under `src/database/schemas/`); pre-existing domain tables are unchanged unless listed under column additions.
 
 | Table             | Columns (key ones)                                                                                                                                                                                                                                                                                         | Constraints / indexes                                                        |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |

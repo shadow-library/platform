@@ -26,7 +26,7 @@ them for confirmation and auto mode executes them in-turn.
 
 1. **Hub powers:** content edits + mid-turn read-only lookups + pipeline actions. The full hub.
 2. **Prose:** the chat edits **draft** prose only. `chapters.locked` finalized prose stays immutable
-   (migration-doc §1.1 decision stands); briefs at/below `storyCurrentChapter` stay rejected.
+   (the now-retired migration plan's §1.1 decision stands); briefs at/below `storyCurrentChapter` stay rejected.
 3. **Revert model:** per-change revert **and** rollback-to-point. Both are built on inverse ops captured at
    apply time.
 4. **Hub vs scopes:** a new `project` (hub) chat scope joins the existing seven; scoped chats stay.

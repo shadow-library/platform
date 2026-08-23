@@ -1,6 +1,6 @@
 # Interactive Refinement Design — Novel Forge Server
 
-This document specifies the interactive-refinement subsystem: premise enhancement, bible structure audit, the chat refinement loop, the arc planning tier, ending-contract briefs, and provider prompt caching. It **amends** `python-cli-to-node-api-migration-plan.md` and `ai-system-design.md` where stated in §2; everywhere else those documents remain authoritative. Checklist tasks R1–R10 in `CLAUDE.md` implement this document.
+This document specifies the interactive-refinement subsystem: premise enhancement, bible structure audit, the chat refinement loop, the arc planning tier, ending-contract briefs, and provider prompt caching. It **amends** the now-retired migration plan and `ai-system-design.md` where stated in §2; everywhere else those documents remain authoritative. Checklist tasks R1–R10 in `CLAUDE.md` implement this document.
 
 ---
 
@@ -167,7 +167,7 @@ Indexes: `(projectId, status)`, `(sessionId)`, `(projectId, scopeType, scopeRef,
 
 ### 3.6 Error codes
 
-New `AppErrorCode` groups (per migration-doc §7.6 conventions): `ARC_0xx` (not found, coverage mismatch, volume not approved, arcs not approved), `CHT_0xx` (session not found, archived, invalid scope/scopeRef), `RFN_0xx` (proposal not found, not pending, baseline conflict, op not allowed for scope, finalized-chapter immutable), `PRM_0xx` (premise enhance preconditions).
+New `AppErrorCode` groups (per the established error-code conventions): `ARC_0xx` (not found, coverage mismatch, volume not approved, arcs not approved), `CHT_0xx` (session not found, archived, invalid scope/scopeRef), `RFN_0xx` (proposal not found, not pending, baseline conflict, op not allowed for scope, finalized-chapter immutable), `PRM_0xx` (premise enhance preconditions).
 
 ---
 
