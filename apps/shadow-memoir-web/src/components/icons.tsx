@@ -142,6 +142,13 @@ export const MoreIcon = glyph(
   </>,
 );
 
+export const BellIcon = glyph(
+  <>
+    <path d="M18 8a6 6 0 0 0-12 0c0 6-3 7-3 7h18s-3-1-3-7" />
+    <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+  </>,
+);
+
 export const ChevronLeftIcon = glyph(<path d="m14 6-6 6 6 6" />);
 
 export const ChevronRightIcon = glyph(<path d="m10 6 6 6-6 6" />);

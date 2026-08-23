@@ -1,0 +1,187 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lead {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.55;
+  color: var(--sh-text-secondary);
+}
+
+.facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--sh-text-body-sm);
+}
+
+.fact {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: var(--sh-text-secondary);
+}
+
+.tick {
+  color: var(--sh-accent);
+  flex: none;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  min-height: 44px;
+  padding: 12px;
+  border-radius: var(--sh-radius-lg);
+  border: 1px solid var(--sh-border-subtle);
+  background: var(--sh-surface-well);
+  color: inherit;
+  cursor: pointer;
+}
+
+.option:hover {
+  border-color: var(--sh-border-strong);
+}
+
+.optionSource {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.optionValue {
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-body);
+  font-weight: 600;
+}
+
+.optionWhen {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.queueRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  font-size: var(--sh-text-body-sm);
+}
+
+.queueRow:last-child {
+  border-bottom: none;
+}
+
+.queueWhen {
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.sectionLabel {
+  margin: 0;
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.notifications {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notification {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: none;
+  border-radius: var(--sh-radius-md);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification:hover {
+  background: var(--sh-surface-well);
+}
+
+.notification[data-unread='true'] {
+  background: var(--sh-accent-soft);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-border-strong);
+}
+
+.notification[data-unread='true'] .dot {
+  background: var(--sh-accent);
+}
+
+.notificationTitle {
+  display: block;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+}
+
+.notificationBody {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+  line-height: 1.45;
+}
+
+.notificationWhen {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.bell {
+  position: relative;
+  display: inline-flex;
+}
+
+.unread {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-accent);
+}

@@ -31,7 +31,10 @@ export const DESKTOP_NAV: NavConfig = {
     {
       label: 'Capture',
       items: [
-        { to: '/log', label: 'Quick log', icon: <LogIcon size={16} /> },
+        { to: '/log', label: 'Journal', icon: <LogIcon size={16} />, exact: true },
+        { to: '/log/meals', label: 'Meals', icon: <LogIcon size={16} /> },
+        { to: '/log/health', label: 'Body & health', icon: <LogIcon size={16} /> },
+        { to: '/log/sidequests', label: 'Side quests', icon: <LogIcon size={16} /> },
         { to: '/finance', label: 'Money', icon: <MoneyIcon size={16} /> },
       ],
     },

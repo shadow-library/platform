@@ -1,0 +1,139 @@
+.filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.search {
+  flex: 1;
+  min-width: 200px;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.count {
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+}
+
+.countNote {
+  margin: 2px 0 12px;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.groupDate {
+  margin: 0 0 4px;
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 52px auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 6px;
+  border: none;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-sm);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--sh-surface-well);
+}
+
+.row[aria-pressed='true'] {
+  background: var(--sh-accent-soft);
+}
+
+.time {
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.text {
+  font-size: var(--sh-text-body-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.value {
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+@media (max-width: 599px) {
+  .row {
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+  }
+
+  .row > :nth-child(2) {
+    grid-row: 2;
+    grid-column: 2 / -1;
+  }
+}
+
+.pager {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.detailKind {
+  font-size: var(--sh-text-caption);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+  font-weight: 600;
+}
+
+.detailTitle {
+  margin: 6px 0 2px;
+  font-size: var(--sh-text-body);
+  font-weight: 600;
+}
+
+.detailWhen {
+  margin: 0 0 12px;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.detailActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}

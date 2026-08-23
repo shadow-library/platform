@@ -1,0 +1,117 @@
+.consentRows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 16px 0;
+}
+
+.headline {
+  margin: 0 0 4px;
+  font-size: var(--sh-text-body);
+  font-weight: 650;
+}
+
+.lead {
+  margin: 0 0 12px;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.55;
+  color: var(--sh-text-secondary);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.composerHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.quotaLabel {
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.scopes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.scopeNote {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.stateHead {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.stateWhen {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.findings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 14px 0 0;
+}
+
+.findingHeading {
+  margin: 0 0 4px;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+}
+
+.findingBody {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.6;
+  color: var(--sh-text-secondary);
+}
+
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.historyRow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.historyRow:last-child {
+  border-bottom: none;
+}
+
+.historyTitle {
+  display: block;
+  font-size: var(--sh-text-body-sm);
+}
+
+.historyWhen {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}

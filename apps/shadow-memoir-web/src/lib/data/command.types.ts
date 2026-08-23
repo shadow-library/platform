@@ -47,6 +47,9 @@ export interface CommandRejection {
 
 export type CommandResult = CommandOutcome | CommandConfirmation | CommandRejection;
 
+/** The result of a command that has no confirmation step, so callers can read `message` without narrowing. */
+export type SettledCommandResult = CommandOutcome | CommandRejection;
+
 export function needsConfirmation(result: CommandResult): result is CommandConfirmation {
   return result.status === 'needs-confirmation';
 }

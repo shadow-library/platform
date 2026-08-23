@@ -1,0 +1,138 @@
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.periodNote {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.toolbarEnd {
+  margin-left: auto;
+}
+
+.kpis {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.pair {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+@media (min-width: 1080px) {
+  .pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.note {
+  margin: 12px 0 0;
+  font-size: var(--sh-text-caption);
+  line-height: 1.5;
+  color: var(--sh-text-tertiary);
+}
+
+.meters {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.meterHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: var(--sh-text-caption);
+  margin-bottom: 4px;
+}
+
+.meterValue {
+  font-family: var(--sh-font-mono);
+  color: var(--sh-text-tertiary);
+}
+
+.track {
+  height: 7px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-surface-well);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-accent);
+}
+
+.columns {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 148px;
+  margin-top: 4px;
+}
+
+.columnItem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+}
+
+.columnBar {
+  width: 100%;
+  border-radius: var(--sh-radius-sm) var(--sh-radius-sm) 0 0;
+  background: var(--sh-accent);
+  min-height: 3px;
+}
+
+.columnLabel {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+  white-space: nowrap;
+}
+
+.trends {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.trendHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: var(--sh-text-caption);
+  margin-bottom: 5px;
+}
+
+.spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 34px;
+}
+
+.sparkBar {
+  flex: 1;
+  border-radius: 1px;
+  background: var(--sh-accent);
+  opacity: 0.55;
+  min-height: 2px;
+}

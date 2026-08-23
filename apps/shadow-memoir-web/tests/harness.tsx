@@ -3,7 +3,7 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { render, type RenderResult } from '@testing-library/react';
 import { type ReactNode } from 'react';
 
-import { createFixtureProvider, type FixtureProviderOptions, type MemoirData, MemoirDataProvider } from '@/lib/data';
+import { createMemoirData, type FixtureProviderOptions, type MemoirData, MemoirDataProvider } from '@/lib/data';
 
 /** Every destination the app can link to, so a screen's `Link`s resolve against the real route tree. */
 const PATHS = [
@@ -25,7 +25,13 @@ const PATHS = [
   '/review',
   '/ai',
   '/hero',
+  '/hero/recovery',
   '/settings',
+  '/settings/notifications',
+  '/settings/billing',
+  '/settings/export',
+  '/settings/delete',
+  '/settings/app',
   '/onboarding',
   '/welcome',
 ];
@@ -36,7 +42,7 @@ export function testQueryClient(): QueryClient {
 
 export function createMemoirTestData(options: FixtureProviderOptions = {}): MemoirData {
   const today = options.today ?? '2026-08-22';
-  return { provider: createFixtureProvider({ ...options, today }), queryClient: testQueryClient(), today, currency: 'EUR' };
+  return { ...createMemoirData({ ...options, today }), queryClient: testQueryClient() };
 }
 
 /** For a component that reads a domain provider directly and never links anywhere. */

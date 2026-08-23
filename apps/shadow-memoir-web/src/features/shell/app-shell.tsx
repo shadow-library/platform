@@ -5,15 +5,24 @@ import { BottomNavigation, Fab, IconButton, Kbd, matchPath, Tooltip, useMediaQue
 import { AppShell as Chrome } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
 
-import { LogIcon, MemoirMark, MoonIcon, SearchIcon, SunIcon } from '@/components/icons';
+import { BellIcon, LogIcon, MemoirMark, MoonIcon, SearchIcon, SunIcon } from '@/components/icons';
 import { logout, meQuery } from '@/lib/apis';
 
 import styles from './app-shell.module.css';
 import { DESKTOP_NAV, PHONE_NAV } from './nav';
 import { QuickCapture } from './quick-capture';
+import { SystemOverlayProvider, useSystemOverlays } from './system-overlays';
 
 export interface AppShellProps {
   children?: ReactNode;
+}
+
+export function AppShell({ children }: AppShellProps): ReactElement {
+  return (
+    <SystemOverlayProvider>
+      <ShellChrome>{children}</ShellChrome>
+    </SystemOverlayProvider>
+  );
 }
 
 /**
@@ -22,12 +31,13 @@ export interface AppShellProps {
  * destinations and a promoted capture action within thumb reach. On desktop the same capture action is the
  * command palette, so the FAB and the palette trigger are mutually exclusive rather than duplicated.
  */
-export function AppShell({ children }: AppShellProps): ReactElement {
+function ShellChrome({ children }: AppShellProps): ReactElement {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const isPhone = useMediaQuery('(max-width: 767px)');
   const [captureOpen, setCaptureOpen] = useState(false);
   const me = useQuery(meQuery);
+  const overlays = useSystemOverlays();
 
   /**
    * Ends the app session server-side, then hands the browser on. Where the deployment configures
@@ -60,11 +70,16 @@ export function AppShell({ children }: AppShellProps): ReactElement {
         </button>
       }
       utility={
-        <span className={styles.desktopOnly}>
-          <Tooltip content="Toggle theme">
-            <IconButton variant="ghost" aria-label="Toggle theme" icon={theme === 'dark' ? <SunIcon size={18} /> : <MoonIcon size={18} />} onClick={toggleTheme} />
+        <>
+          <Tooltip content="Notifications">
+            <IconButton variant="ghost" aria-label="Notifications" icon={<BellIcon size={18} />} onClick={() => overlays.open('notifications')} />
           </Tooltip>
-        </span>
+          <span className={styles.desktopOnly}>
+            <Tooltip content="Toggle theme">
+              <IconButton variant="ghost" aria-label="Toggle theme" icon={theme === 'dark' ? <SunIcon size={18} /> : <MoonIcon size={18} />} onClick={toggleTheme} />
+            </Tooltip>
+          </span>
+        </>
       }
       bottomNav={isPhone ? <PhoneNav /> : undefined}
       contentWidth="fluid"
