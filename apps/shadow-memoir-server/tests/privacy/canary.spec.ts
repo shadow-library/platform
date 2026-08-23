@@ -52,33 +52,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/**
- * `packages/fastify`'s `DefaultErrorHandler` unconditionally logs the full error it is handling
- * (`this.logger.warn('Handling error', err)`, plus `this.logger.warn('Caused by', err.cause)` when a
- * cause is present). For a raw, unmapped Postgres constraint violation, that error's `.cause` chain is
- * drizzle's own "Failed query" error, whose `message`/`stack`/`params` embed the statement's bound
- * values textually — not as named fields a manifest-driven redactor can reach. That is a real,
- * cross-cutting gap in shared framework code (`packages/fastify`), out of T-28's
- * `apps/shadow-memoir-server`-only scope; it is called out in `docs/observability.md` and this suite's
- * report rather than silently passed over. This filter excludes exactly those two known lines so the
- * rest of the suite still proves what T-28 owns.
- */
-function excludeKnownFastifyErrorHandlerGap(text: string): string {
-  return text
-    .split('\n')
-    .filter(line => {
-      if (!line) return true;
-      try {
-        const parsed = JSON.parse(line);
-        const isDefaultErrorHandlerLine = parsed.namespace === '@shadow-library/fastify' && parsed.label === 'DefaultErrorHandler' && typeof parsed.message === 'string';
-        return !(isDefaultErrorHandlerLine && (parsed.message.startsWith('Handling error') || parsed.message.startsWith('Caused by')));
-      } catch {
-        return true;
-      }
-    })
-    .join('\n');
-}
-
 describe('Privacy canary suite (T-28)', () => {
   const originalUrl = (Config['cache'].get('database.postgres.url') as string | undefined) ?? baseConnectionString;
   const logDir = fs.mkdtempSync(path.join(os.tmpdir(), 'memoir-canary-'));
@@ -259,7 +232,7 @@ describe('Privacy canary suite (T-28)', () => {
     expect(info.value).not.toBe(CANARY);
   });
 
-  it('should not leak canary values through an unmapped constraint violation (duplicate expense id), aside from the known packages/fastify gap', async () => {
+  it('should not leak canary values through an unmapped constraint violation (duplicate expense id)', async () => {
     const id = Bun.randomUUIDv7();
     await submit([envelope('expense.create', { id, amountMinor: 100, amountText: '1.00', currency: 'USD', categoryId: 'food', occurredOn: DATE, merchant: CANARY })]);
 
@@ -269,10 +242,7 @@ describe('Privacy canary suite (T-28)', () => {
       ]);
       expect(result.status).toBe(500);
     });
-    expect(excludeKnownFastifyErrorHandlerGap(lines)).not.toContain(CANARY);
-
-    /** Documents the known gap explicitly rather than letting the filter above silently hide it: it must still be reproducible, so a follow-up task fixing `packages/fastify` has a failing case to point at. */
-    expect(lines).toContain(CANARY);
+    expect(lines).not.toContain(CANARY);
   });
 
   it('should not leak a canary through a validation error (missing required field)', async () => {

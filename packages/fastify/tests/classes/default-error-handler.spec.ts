@@ -8,7 +8,7 @@ import { AppError, Config, Logger, ValidationError } from '@shadow-library/commo
 /**
  * Importing user defined packages
  */
-import { DefaultErrorHandler, ServerErrorCode } from '@shadow-library/fastify';
+import { DefaultErrorHandler, sanitizeCause, ServerErrorCode } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -83,6 +83,27 @@ describe('DefaultErrorHandler', () => {
     expect(fn).toHaveBeenCalledWith('Caused by', error.cause);
   });
 
+  it('should redact bound SQL parameter values before logging a query-failure cause', () => {
+    const queryError = Object.assign(new Error('Failed query: insert into expenses (merchant) values ($1)\nparams: leaked-merchant'), {
+      query: 'insert into expenses (merchant) values ($1)',
+      params: ['leaked-merchant'],
+    });
+    const error = new AppError(ServerErrorCode.S001, undefined, queryError);
+    const fn = jest.spyOn(errorHandler['logger'], 'warn');
+    errorHandler.handle(error, request, response);
+
+    const [, loggedHandling] = fn.mock.calls[0] as [string, Record<string, unknown>];
+    const [, loggedCause] = fn.mock.calls[1] as [string, Record<string, unknown>];
+
+    for (const logged of [loggedHandling['cause'], loggedCause]) {
+      const cause = logged as Record<string, unknown>;
+      expect(cause['params']).toBe('[1 bound param(s) redacted]');
+      expect(cause['message']).not.toContain('leaked-merchant');
+      expect(cause['stack']).not.toContain('leaked-merchant');
+      expect(cause['message']).toContain('insert into expenses (merchant) values ($1)');
+    }
+  });
+
   it('should handle unknown error of type Error', () => {
     const error = new Error('Test Error');
     errorHandler.handle(error, request, response);
@@ -120,6 +141,52 @@ describe('DefaultErrorHandler', () => {
       new DefaultErrorHandler();
 
       expect(warn).toHaveBeenCalledWith('Stack trace logging is enabled in production');
+    });
+  });
+
+  describe('sanitizeCause', () => {
+    it('should redact bound params and elide them from message/stack of a query-failure cause', () => {
+      const queryError = Object.assign(new Error('Failed query: select * from accounts where email = $1\nparams: secret@example.com'), {
+        query: 'select * from accounts where email = $1',
+        params: ['secret@example.com'],
+      });
+
+      const sanitized = sanitizeCause(queryError) as Record<string, unknown>;
+
+      expect(sanitized['params']).toBe('[1 bound param(s) redacted]');
+      expect(sanitized['message']).toBe('Failed query: select * from accounts where email = $1 -- 1 bound param(s) redacted');
+      expect(sanitized['stack']).not.toContain('secret@example.com');
+    });
+
+    it('should walk nested causes and sanitize a query-failure error wrapped by a non-query error', () => {
+      const queryError = Object.assign(new Error('Failed query: delete from accounts where token = $1\nparams: my-secret-token'), {
+        query: 'delete from accounts where token = $1',
+        params: ['my-secret-token'],
+      });
+      const wrapper = new Error('constraint violation', { cause: queryError });
+
+      const sanitized = sanitizeCause(wrapper) as Record<string, unknown>;
+      const nestedCause = sanitized['cause'] as Record<string, unknown>;
+
+      expect(nestedCause['params']).toBe('[1 bound param(s) redacted]');
+      expect(JSON.stringify(sanitized)).not.toContain('my-secret-token');
+    });
+
+    it('should leave a cause chain unchanged when no query-failure error is present', () => {
+      const cause = new Error('plain failure');
+      expect(sanitizeCause(cause)).toBe(cause);
+    });
+
+    it('should return non-object causes unchanged', () => {
+      expect(sanitizeCause('plain string cause')).toBe('plain string cause');
+      expect(sanitizeCause(undefined)).toBeUndefined();
+    });
+
+    it('should not loop forever on a circular cause chain', () => {
+      const circular: Record<string, unknown> = { message: 'circular' };
+      circular['cause'] = circular;
+
+      expect(() => sanitizeCause(circular)).not.toThrow();
     });
   });
 });

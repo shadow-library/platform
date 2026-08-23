@@ -74,23 +74,14 @@ log identifier records, never entity objects — enforced by `tests/privacy/cana
 Adding a `sensitive()` column to any schema joins the redaction set and the canary suite's coverage
 automatically; no code outside the schema file changes.
 
-### Known gap: `packages/fastify`'s `DefaultErrorHandler` (out of T-28's scope)
-
-`tests/privacy/canary.spec.ts` found — and deliberately documents, rather than silently filtering away —
-a real leak that name-based redaction cannot reach: on an **unmapped** Postgres constraint violation (any
-constraint not in `constraintErrorMap`), `packages/modules`' `DatabaseService.translateError` wraps the
-driver's error as the new `AppError`'s `.cause`, and `packages/fastify`'s `DefaultErrorHandler.handle()`
-then logs both the handled error and its `.cause` chain verbatim (`logger.warn('Handling error', err)`,
-`logger.warn('Caused by', err.cause)`). For a drizzle "Failed query" cause, `message`/`stack`/`params`
-embed the statement's _bound values_ as text/array elements — not as named object fields — so a
-manifest-driven, field-name redactor structurally cannot scrub them.
-
-This is a shared-framework gap (`packages/fastify`), not something fixable from
-`apps/shadow-memoir-server`; T-28 owns this app only. The suite's constraint-violation test excludes
-exactly those two known log lines from its leak assertion, while a companion assertion in the same test
-confirms the gap is still reproducible (so it doesn't quietly stop being true). Flagged here for a
-follow-up task against `packages/fastify` — e.g. never log `.cause` verbatim, or redact `message`/`stack`/
-`params` before logging it.
+`packages/fastify`'s `DefaultErrorHandler` used to log an unmapped Postgres/drizzle query-failure error's
+`.cause` chain verbatim, and a drizzle "Failed query" cause embeds bound SQL parameter values in
+`message`/`stack`/`params` as positional text — not as named fields a manifest-driven redactor can reach.
+`DefaultErrorHandler` now runs every logged `.cause` chain through `sanitizeCause` (exported from
+`@shadow-library/fastify`), which walks the chain and rewrites any bound-query-error node's `message`,
+`stack`, and `params` to elide the bound values while keeping the SQL text (placeholders only). The
+constraint-violation test in `tests/privacy/canary.spec.ts` asserts no leak across this path with no
+exclusion.
 
 ## Telemetry (analytics events)
 
