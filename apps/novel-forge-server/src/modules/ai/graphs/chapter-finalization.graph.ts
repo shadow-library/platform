@@ -124,6 +124,18 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
 
     const projectId = BigInt(state.projectId);
 
+    // A resumed run re-enters from START, so re-extracting would overwrite the already-applied proposal with a
+    // fresh (non-deterministic) LLM delta and apply a second, contradictory canon mutation. `continuityApplied`
+    // is the durable marker that the delta already landed; skipping here leaves applyContinuity a no-op.
+    const chapterRow = await db.query.chapters.findFirst({
+      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter)),
+      columns: { continuityApplied: true },
+    });
+    if (chapterRow?.continuityApplied) {
+      logger.debug('finalization extractContinuity skipped: continuity already applied', { runId: state.runId, chapter: state.chapter });
+      return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
+    }
+
     const entityRows = await db.query.entities.findMany({
       where: eq(schema.entities.projectId, projectId),
       with: { aliases: true },

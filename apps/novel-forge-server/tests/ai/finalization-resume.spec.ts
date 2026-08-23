@@ -24,6 +24,7 @@ const pgAvailable = await (async () => {
 })();
 
 const delta = { newEntities: [{ entityKey: 'char_hero', name: 'Hero', type: 'character' }], appeared: ['char_hero'] };
+const deltaB = { newEntities: [{ entityKey: 'char_rival', name: 'Rival', type: 'character' }], appeared: ['char_rival'] };
 
 describe.if(pgAvailable)('chapter finalization graph resume', () => {
   let db: PrimaryDatabase;
@@ -35,10 +36,23 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
   });
 
-  function buildGraph(): ReturnType<typeof createChapterFinalizationGraph> {
-    const modelRouter = { structured: async () => delta, resolveModel: () => ({ model: 'test-model' }) };
+  function buildGraph(options: { structured?: () => Promise<unknown>; failCursor?: boolean } = {}): ReturnType<typeof createChapterFinalizationGraph> {
+    const modelRouter = { structured: options.structured ?? (async () => delta), resolveModel: () => ({ model: 'test-model' }) };
     const indexingService = { addProse: async () => undefined, addLore: async () => undefined };
-    return createChapterFinalizationGraph({ db, modelRouter, indexingService, checkpointer: new MemorySaver() } as unknown as FinalizationServices);
+
+    // advanceCursor is the only node that reaches for `db.update` outside a transaction, so trapping it fails
+    // the run exactly where a cursor write would.
+    const client = options.failCursor
+      ? new Proxy(db, {
+          get: (target, prop) => {
+            if (prop === 'update') throw new Error('cursor update failed');
+            const value = Reflect.get(target, prop) as unknown;
+            return typeof value === 'function' ? value.bind(target) : value;
+          },
+        })
+      : db;
+
+    return createChapterFinalizationGraph({ db: client, modelRouter, indexingService, checkpointer: new MemorySaver() } as unknown as FinalizationServices);
   }
 
   async function seedPartiallyFinalizedChapter(reviewStatus: 'final' | 'needs_review'): Promise<{ projectId: bigint; draftId: bigint }> {
@@ -53,8 +67,8 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
     return { projectId: project.id, draftId: draft.id };
   }
 
-  function invoke(projectId: bigint, draftId: bigint): Promise<unknown> {
-    return buildGraph().invoke(
+  function invoke(projectId: bigint, draftId: bigint, options: Parameters<typeof buildGraph>[0] = {}): Promise<unknown> {
+    return buildGraph(options).invoke(
       { projectId: String(projectId), chapter: 1, draftId: String(draftId), prose: 'ch1', summary: 's1', title: 'One', generator: 'standard', runId: 'run-resume' },
       { configurable: { thread_id: `resume-${draftId}` } },
     );
@@ -71,6 +85,30 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
     expect(chapter?.continuityApplied).toBe(true);
     expect(project?.storyCurrentChapter).toBe(1);
     expect(entity?.name).toBe('Hero');
+  });
+
+  it('should not re-extract or reapply continuity when resuming after continuityApplied=true but cursor advancement failed', async () => {
+    const { projectId, draftId } = await seedPartiallyFinalizedChapter('final');
+    let calls = 0;
+    const structured = async (): Promise<unknown> => {
+      calls += 1;
+      return calls === 1 ? delta : deltaB;
+    };
+
+    await expect(invoke(projectId, draftId, { structured, failCursor: true })).rejects.toThrow(/cursor update failed/);
+
+    const afterFailure = await db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, 1)) });
+    expect(afterFailure?.continuityApplied).toBe(true);
+
+    await invoke(projectId, draftId, { structured });
+
+    const proposal = await db.query.continuityProposals.findFirst({ where: and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, 1)) });
+    const rival = await db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, 'char_rival')) });
+    const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    expect(calls).toBe(1);
+    expect(proposal?.proposal).toEqual(delta);
+    expect(rival).toBeUndefined();
+    expect(project?.storyCurrentChapter).toBe(1);
   });
 
   it('should still refuse a draft that was never approved', async () => {
