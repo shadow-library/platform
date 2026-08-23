@@ -11,10 +11,12 @@ complete** — this second round closed every remaining gap from the Codex re-ve
 
 ## Summary
 
-- Completed: 17
+- Completed: 18
 - In Progress: 0
-- Pending: 1
+- Pending: 0
 - Blocked: 0
+
+**All three FINAL-01..FINAL-03 blockers from `harness-final-recommendation.md` §10 are now closed.**
 
 **Round three**: `harness-final-recommendation.md` §10 identified three final blockers surviving the
 fifteen fixes above (concurrent duplicate finalization, `generateGrok` ancestor overwrite, mixed-
@@ -41,7 +43,7 @@ proposal replay). Tracked as FINAL-01..FINAL-03 below.
 | FIX-15   | HIGH     | Character-state merge must replace/clear fields per the extraction contract, not `COALESCE`-merge stale values (residual gap in FIX-03)                      | COMPLETED | FIX-03       |
 | FINAL-01 | CRITICAL | Concurrent duplicate finalization: two racing finalize calls can both pass the pre-application marker check and apply different continuity deltas            | COMPLETED | —            |
 | FINAL-02 | HIGH     | `generateGrok` can overwrite an ancestor chapter without invalidating non-final descendant drafts or honoring the finalized-chapter guard                    | COMPLETED | —            |
-| FINAL-03 | HIGH     | Review approval of a held (low-confidence) continuity entry replays already-applied high-confidence siblings from an older proposal, overwriting newer canon | PENDING   | —            |
+| FINAL-03 | HIGH     | Review approval of a held (low-confidence) continuity entry replays already-applied high-confidence siblings from an older proposal, overwriting newer canon | COMPLETED | —            |
 
 Ordering rationale: data-integrity/recoverability (FIX-01, FIX-02) before state/context-correctness
 gaps that bias prose quality without corrupting data (FIX-03–06), before control-flow/integration
@@ -93,7 +95,7 @@ None.
 
 ## Pending
 
-- FINAL-03 — Mixed-proposal replay on review approval.
+None.
 
 ## Blocked
 
@@ -200,6 +202,62 @@ Files changed: `src/modules/generation/generation.service.ts`,
 
 Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
 1033 pass, 10 skip, 0 fail (independently re-run, not just trusted from the implementing sub-agent).
+
+Commit: `5202b0a8` (fast-forwarded to `main`).
+
+### FINAL-03 — Mixed-proposal replay
+
+Missing invariant: review approval must apply only the still-pending (held) subset of a proposal —
+never replay siblings already committed to canon — and must never let an older chapter's delta
+overwrite state a newer chapter has already advanced past. `applyContinuityProposal`
+(`generation.service.ts`) and the finalization graph's `applyContinuity` node
+(`chapter-finalization.graph.ts`) both re-run `applyContinuityDelta` against the _entire_ stored
+`continuityProposals.proposal` JSON — including the high-confidence siblings a prior auto-apply pass
+already committed. A human editing/approving a held low-confidence entry later therefore replays those
+already-applied siblings, overwriting canon that later, independently-finalized chapters have since
+advanced (reproduced: chapter 10's high-confidence `location`/`threadX` auto-apply plus a held low-
+confidence entry; chapter 12 independently advances `location`/`threadX`; approving chapter 10's held
+entry reverted both back to their chapter-10 values).
+
+What changed:
+
+- New `filterToHeldEntries(delta)` in `apply-continuity.ts`: returns a `ContinuityOutput` with
+  `newEntities`/`appeared`/`timeline`/`power`/`knowledgeChanges` zeroed (already durably applied or
+  deliberately never persisted — replaying them can only regress state) and each of the four
+  confidence-bearing arrays (`threads`/`mysteries`/`relationships`/`characterStates`) filtered down to
+  only their `confidence === 'low'` members.
+- Both call sites — the finalization graph's `applyContinuity` node and the service's
+  `applyContinuityProposal` — now `set({ proposal: filterToHeldEntries(delta), updatedAt })` instead of
+  leaving the stored proposal untouched whenever `hasHeldEntries` is true. A second, partial approval
+  (some entries fixed, others still held) shrinks the persisted proposal further each time, so nothing
+  already-applied is ever eligible for replay on a subsequent approval either.
+- A chronological guard added to `applyContinuityDelta`'s `threads`/`mysteries`/`characterStates` loops
+  (not `relationships`, which are already append-only per-chapter rows with no "current" row to
+  protect): before writing, each loop checks whether the existing row's tracking column
+  (`lastAdvancedChapter`/`lastUpdatedChapter`) is strictly greater than the incoming `chapter` — if so,
+  skip with a `logger.warn` matching the file's existing skip-and-log style, since applying would move
+  that key's canon backwards in time. Equal-chapter re-approval still applies (stays idempotent); the
+  guard never fires during ordinary chapter-by-chapter finalization, since the graph's own guard already
+  enforces strictly increasing chapter order.
+
+Regression tests (`tests/ai/continuity-apply.spec.ts`, real Postgres template DB):
+
+- The exact chapter-10/chapter-12 reproduction: approving chapter 10's held entry leaves chapter 12's
+  thread status and character location intact, and applies the held entry. Confirmed to fail against
+  pre-fix code (thread/location revert) via a targeted `git stash` of only `src/`.
+- Persisted proposal shrinks to only the held entry immediately after the graph's auto-apply pass.
+- A fully-applied proposal refuses a second approval (`CNT_001`) without corrupting canon.
+- Chronology guard: a held-at-chapter-5 entry approved after chapter 8 independently advanced the same
+  key does not move it backward; the chapter-8 value and tracking column survive.
+- Boundary case: re-approval at the exact chapter a key was last advanced still applies (guards against
+  an off-by-one `>=` mistake).
+
+Files changed: `src/modules/ai/graphs/apply-continuity.ts`,
+`src/modules/ai/graphs/chapter-finalization.graph.ts`, `src/modules/generation/generation.service.ts`,
+`tests/ai/continuity-apply.spec.ts`.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+1038 pass, 10 skip, 0 fail (independently re-run, not just trusted from the implementing sub-agent).
 
 Commit: `<filled in after commit>`
 

@@ -458,6 +458,141 @@ describe.if(pgAvailable)('continuity delta application', () => {
     expect(thread).toMatchObject({ threadKey: 'the-rumour', status: 'open' });
   });
 
+  async function readProposal(projectId: bigint, chapter: number): Promise<ContinuityOutput> {
+    const row = await db.query.continuityProposals.findFirst({
+      where: and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, chapter)),
+    });
+    if (!row) throw new Error(`no continuity proposal for chapter ${chapter}`);
+    return row.proposal as unknown as ContinuityOutput;
+  }
+
+  function upgraded(held: ContinuityOutput): ContinuityOutput {
+    return {
+      ...held,
+      threads: held.threads.map(thread => ({ ...thread, confidence: 'high' as const })),
+      mysteries: held.mysteries.map(mystery => ({ ...mystery, confidence: 'high' as const })),
+      relationships: held.relationships.map(relationship => ({ ...relationship, confidence: 'high' as const })),
+      characterStates: held.characterStates.map(characterState => ({ ...characterState, confidence: 'high' as const })),
+    };
+  }
+
+  it('should persist only the held subset on the proposal after the graph auto-applies', async () => {
+    const projectId = await seedProject(`cont-shrink-${Date.now()}`);
+    await db.insert(schema.entities).values({ projectId, entityKey: 'amara', name: 'Amara', type: 'character' });
+    await runFinalization(
+      projectId,
+      delta({
+        appeared: ['amara'],
+        threads: [{ threadKey: 'the-ledger', status: 'open', confidence: 'high' }],
+        mysteries: [{ mysteryKey: 'who-took-it', status: 'open', question: 'Who took the ledger?', confidence: 'high' }],
+        characterStates: [{ entityKey: 'amara', location: 'the tower', evidence: 'she might be there', confidence: 'low' }],
+      }),
+      'shrink',
+    );
+
+    const stored = await readProposal(projectId, 1);
+    expect(stored.threads).toEqual([]);
+    expect(stored.mysteries).toEqual([]);
+    expect(stored.appeared).toEqual([]);
+    expect(stored.characterStates.map(state => state.entityKey)).toEqual(['amara']);
+
+    const proposal = await db.query.continuityProposals.findFirst({ where: eq(schema.continuityProposals.projectId, projectId) });
+    expect(proposal?.status).toBe('pending');
+  });
+
+  it('should not replay already-applied siblings when a human approves a held entry from an older chapter', async () => {
+    const projectId = await seedProject(`cont-replay-${Date.now()}`);
+    await db.insert(schema.entities).values({ projectId, entityKey: 'amara', name: 'Amara', type: 'character' });
+
+    await applyViaEndpoint(
+      projectId,
+      delta({
+        threads: [{ threadKey: 'the-ledger', status: 'open', confidence: 'high' }],
+        characterStates: [{ entityKey: 'amara', location: 'City A', evidence: 'she crossed City A', confidence: 'high' }],
+        mysteries: [{ mysteryKey: 'the-secret', status: 'open', question: 'What is the secret?', confidence: 'low' }],
+      }),
+      10,
+    );
+
+    const held = await readProposal(projectId, 10);
+    expect(held.threads).toEqual([]);
+    expect(held.characterStates).toEqual([]);
+    expect(held.mysteries.map(mystery => mystery.mysteryKey)).toEqual(['the-secret']);
+
+    await applyViaEndpoint(
+      projectId,
+      delta({
+        threads: [{ threadKey: 'the-ledger', status: 'closed', confidence: 'high' }],
+        characterStates: [{ entityKey: 'amara', location: 'City B', evidence: 'she reached City B', confidence: 'high' }],
+      }),
+      12,
+    );
+    const chapter12 = await db.query.continuityProposals.findFirst({
+      where: and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, 12)),
+    });
+    expect(chapter12?.status).toBe('applied');
+
+    await service.updateContinuityProposal(projectId, 10, { proposal: upgraded(held) as never });
+    expect((await service.applyContinuityProposal(projectId, 10)).status).toBe('applied');
+
+    const thread = await db.query.plotThreads.findFirst({ where: eq(schema.plotThreads.projectId, projectId) });
+    expect(thread).toMatchObject({ threadKey: 'the-ledger', status: 'closed', lastAdvancedChapter: 12 });
+    expect(await readState(projectId)).toMatchObject({ location: 'City B', lastUpdatedChapter: 12 });
+    const mystery = await db.query.mysteries.findFirst({ where: eq(schema.mysteries.projectId, projectId) });
+    expect(mystery).toMatchObject({ mysteryKey: 'the-secret', status: 'open', lastAdvancedChapter: 10 });
+  });
+
+  it('should refuse a second approval of a proposal that already applied in full, leaving canon intact', async () => {
+    const projectId = await seedProject(`cont-retry-${Date.now()}`);
+    await applyViaEndpoint(projectId, delta({ threads: [{ threadKey: 'the-rumour', status: 'open', confidence: 'low' }] }), 1);
+
+    await service.updateContinuityProposal(projectId, 1, { proposal: upgraded(await readProposal(projectId, 1)) as never });
+    expect((await service.applyContinuityProposal(projectId, 1)).status).toBe('applied');
+
+    await expect(service.applyContinuityProposal(projectId, 1)).rejects.toThrow(/No pending continuity proposal/);
+
+    const threads = await db.query.plotThreads.findMany({ where: eq(schema.plotThreads.projectId, projectId) });
+    expect(threads).toHaveLength(1);
+    expect(threads[0]).toMatchObject({ threadKey: 'the-rumour', status: 'open', lastAdvancedChapter: 1 });
+  });
+
+  it('should not move a key backwards when a held entry is approved after a newer chapter advanced it', async () => {
+    const projectId = await seedProject(`cont-chronology-${Date.now()}`);
+    await applyViaEndpoint(projectId, delta({ threads: [{ threadKey: 'the-ledger', status: 'open', confidence: 'low' }] }), 5);
+    expect(await db.query.plotThreads.findMany({ where: eq(schema.plotThreads.projectId, projectId) })).toHaveLength(0);
+
+    await applyViaEndpoint(projectId, delta({ threads: [{ threadKey: 'the-ledger', status: 'closed', confidence: 'high' }] }), 8);
+
+    await service.updateContinuityProposal(projectId, 5, { proposal: upgraded(await readProposal(projectId, 5)) as never });
+    await service.applyContinuityProposal(projectId, 5);
+
+    const thread = await db.query.plotThreads.findFirst({ where: eq(schema.plotThreads.projectId, projectId) });
+    expect(thread).toMatchObject({ threadKey: 'the-ledger', status: 'closed', lastAdvancedChapter: 8, closedChapter: 8 });
+  });
+
+  it('should still apply a re-approved entry at the chapter its key was last advanced', async () => {
+    const projectId = await seedProject(`cont-same-chapter-${Date.now()}`);
+    await applyViaEndpoint(
+      projectId,
+      delta({
+        threads: [{ threadKey: 'the-ledger', status: 'open', confidence: 'high' }],
+        mysteries: [{ mysteryKey: 'who-took-it', status: 'open', question: 'Who took the ledger?', confidence: 'low' }],
+      }),
+      4,
+    );
+
+    const held = await readProposal(projectId, 4);
+    await service.updateContinuityProposal(projectId, 4, {
+      proposal: { ...upgraded(held), threads: [{ threadKey: 'the-ledger', status: 'closed', confidence: 'high' }] } as never,
+    });
+    expect((await service.applyContinuityProposal(projectId, 4)).status).toBe('applied');
+
+    const thread = await db.query.plotThreads.findFirst({ where: eq(schema.plotThreads.projectId, projectId) });
+    expect(thread).toMatchObject({ threadKey: 'the-ledger', status: 'closed', lastAdvancedChapter: 4, closedChapter: 4 });
+    const mystery = await db.query.mysteries.findFirst({ where: eq(schema.mysteries.projectId, projectId) });
+    expect(mystery).toMatchObject({ mysteryKey: 'who-took-it', status: 'open', lastAdvancedChapter: 4 });
+  });
+
   it('should show the extractor the existing thread and mystery keys', async () => {
     const projectId = await seedProject(`cont-vocabulary-${Date.now()}`);
     await db.insert(schema.entities).values({ projectId, entityKey: 'amara', name: 'Amara', type: 'character' });

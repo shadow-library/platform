@@ -16,6 +16,25 @@ export function continuityHasHeldEntries(delta: ContinuityOutput): boolean {
   return confidenceBearing.some(entry => entry.confidence === 'low');
 }
 
+// What a review approval may re-apply is only what was never applied: `newEntities`/`appeared` were durably
+// written on the original pass and `timeline`/`power`/`knowledgeChanges` are deliberately never persisted, so
+// replaying any of them can only overwrite canon a later chapter has since advanced. Only the four
+// confidence-bearing arrays can still hold unapplied entries, and only their `'low'` members are still pending.
+export function filterToHeldEntries(delta: ContinuityOutput): ContinuityOutput {
+  return {
+    appeared: [],
+    newEntities: [],
+    timeline: [],
+    power: [],
+    knowledgeChanges: [],
+    chapterSummary: delta.chapterSummary,
+    threads: (delta.threads ?? []).filter(thread => thread.confidence === 'low'),
+    mysteries: (delta.mysteries ?? []).filter(mystery => mystery.confidence === 'low'),
+    relationships: (delta.relationships ?? []).filter(relationship => relationship.confidence === 'low'),
+    characterStates: (delta.characterStates ?? []).filter(characterState => characterState.confidence === 'low'),
+  };
+}
+
 export async function applyContinuityDelta(tx: ContinuityTransaction, projectId: bigint, chapter: number, delta: ContinuityOutput): Promise<void> {
   const entityIds = new Map<string, bigint>();
 
@@ -64,6 +83,20 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
       logger.warn('applyContinuityDelta: low-confidence thread skipped for review', { projectId, chapter, threadKey: thread.threadKey });
       continue;
     }
+    // An approved-late proposal from an older chapter must not drag a thread back to the status it had then.
+    const existingThread = await tx.query.plotThreads.findFirst({
+      where: and(eq(schema.plotThreads.projectId, projectId), eq(schema.plotThreads.threadKey, thread.threadKey)),
+      columns: { lastAdvancedChapter: true },
+    });
+    if (existingThread?.lastAdvancedChapter != null && existingThread.lastAdvancedChapter > chapter) {
+      logger.warn('applyContinuityDelta: thread already advanced past this chapter, skipping', {
+        projectId,
+        chapter,
+        threadKey: thread.threadKey,
+        lastAdvancedChapter: existingThread.lastAdvancedChapter,
+      });
+      continue;
+    }
     await tx
       .insert(schema.plotThreads)
       .values({
@@ -92,6 +125,19 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
   for (const mystery of delta.mysteries ?? []) {
     if (mystery.confidence === 'low') {
       logger.warn('applyContinuityDelta: low-confidence mystery skipped for review', { projectId, chapter, mysteryKey: mystery.mysteryKey });
+      continue;
+    }
+    const existingMystery = await tx.query.mysteries.findFirst({
+      where: and(eq(schema.mysteries.projectId, projectId), eq(schema.mysteries.mysteryKey, mystery.mysteryKey)),
+      columns: { lastAdvancedChapter: true },
+    });
+    if (existingMystery?.lastAdvancedChapter != null && existingMystery.lastAdvancedChapter > chapter) {
+      logger.warn('applyContinuityDelta: mystery already advanced past this chapter, skipping', {
+        projectId,
+        chapter,
+        mysteryKey: mystery.mysteryKey,
+        lastAdvancedChapter: existingMystery.lastAdvancedChapter,
+      });
       continue;
     }
     await tx
@@ -168,6 +214,19 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
     const entityId = await resolveEntityId(characterState.entityKey);
     if (!entityId) {
       logger.warn('applyContinuityDelta: character state entity not found, skipping', { projectId, chapter, entityKey: characterState.entityKey });
+      continue;
+    }
+    const existingState = await tx.query.characterStates.findFirst({
+      where: and(eq(schema.characterStates.projectId, projectId), eq(schema.characterStates.entityKey, characterState.entityKey)),
+      columns: { lastUpdatedChapter: true },
+    });
+    if (existingState?.lastUpdatedChapter != null && existingState.lastUpdatedChapter > chapter) {
+      logger.warn('applyContinuityDelta: character state already updated past this chapter, skipping', {
+        projectId,
+        chapter,
+        entityKey: characterState.entityKey,
+        lastUpdatedChapter: existingState.lastUpdatedChapter,
+      });
       continue;
     }
     await tx

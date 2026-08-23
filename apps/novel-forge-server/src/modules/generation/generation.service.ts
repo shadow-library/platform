@@ -12,7 +12,7 @@ import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, ty
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { type ContextSection } from '../ai/context/sections';
 import { truncateAtParagraph } from '../ai/context/token-budget';
-import { applyContinuityDelta, continuityHasHeldEntries } from '../ai/graphs/apply-continuity';
+import { applyContinuityDelta, continuityHasHeldEntries, filterToHeldEntries } from '../ai/graphs/apply-continuity';
 import { type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService } from '../ai/model-router.service';
 import { buildOutlinePrompt, PROMPT_REGISTRY } from '../ai/prompts';
@@ -1205,7 +1205,7 @@ export class GenerationService {
 
       const [row] = await tx
         .update(schema.continuityProposals)
-        .set(hasHeldEntries ? { updatedAt: new Date() } : { status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
+        .set(hasHeldEntries ? { proposal: filterToHeldEntries(delta) as never, updatedAt: new Date() } : { status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
         .where(eq(schema.continuityProposals.id, proposalRow.id))
         .returning();
 

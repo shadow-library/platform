@@ -13,7 +13,7 @@ import { type IndexingService } from '../retrieval/indexing.service';
 import { type ContinuityOutput } from '../schemas';
 import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
-import { applyContinuityDelta, continuityHasHeldEntries } from './apply-continuity';
+import { applyContinuityDelta, continuityHasHeldEntries, filterToHeldEntries } from './apply-continuity';
 
 export interface FinalizationServices {
   db: PrimaryDatabase;
@@ -224,7 +224,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
 
         await tx
           .update(schema.continuityProposals)
-          .set(hasHeldEntries ? { updatedAt: new Date() } : { status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
+          .set(hasHeldEntries ? { proposal: filterToHeldEntries(delta) as never, updatedAt: new Date() } : { status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
           .where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, state.chapter)));
 
         await tx
