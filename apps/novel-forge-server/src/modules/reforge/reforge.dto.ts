@@ -1,7 +1,16 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-import { ReforgeAnalysisStatus, ReforgeChapterStatus, ReforgeFidelity, ReforgeFindingSource, ReforgeFindingType, ReforgeStatus } from '@server/common';
+import {
+  ReforgeAnalysisStatus,
+  ReforgeChapterStatus,
+  ReforgeFidelity,
+  ReforgeFindingSource,
+  ReforgeFindingType,
+  ReforgePlanStatus,
+  ReforgeSpanAction,
+  ReforgeStatus,
+} from '@server/common';
 
 @Schema()
 export class ReforgeParams {
@@ -313,4 +322,109 @@ export class ListReforgeFindingsResponse {
 
   @Field(() => Integer)
   total: number;
+}
+
+@Schema()
+export class ReforgePlanSpanBody {
+  @Field(() => Integer, { minimum: 1 })
+  ordinal: number;
+
+  @Field(() => Integer, { minimum: 1 })
+  fromChapter: number;
+
+  @Field(() => Integer, { minimum: 1 })
+  toChapter: number;
+
+  @Field(() => ReforgeSpanAction)
+  action: 'keep' | 'condense' | 'merge' | 'drop';
+
+  @Field(() => Integer, { minimum: 0, description: 'Output chapters this span produces; 0 only for a drop.' })
+  targetChapters: number;
+
+  @Field({ optional: true, nullable: true })
+  arcLabel?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  rationale?: string | null;
+
+  @Field(() => [String], { optional: true, nullable: true, description: 'Beats every output chapter of this span owes — the judge’s contract.' })
+  keptBeats?: string[] | null;
+
+  @Field(() => [String], { optional: true, nullable: true, description: 'Threads this span removes; each seeds a cut-ledger entry at approval.' })
+  cutThreads?: string[] | null;
+
+  @Field({ optional: true, nullable: true, description: 'Required on a span that follows a dropped span — the bridge across the seam.' })
+  continuityNotes?: string | null;
+
+  @Field(() => [String], { optional: true, nullable: true })
+  findingIds?: string[] | null;
+}
+
+@Schema()
+export class ReforgePlanSpansBody {
+  @Field(() => [ReforgePlanSpanBody], { minItems: 1 })
+  spans: ReforgePlanSpanBody[];
+
+  @Field(() => Integer, { optional: true, minimum: 1, description: 'The plan revision this edit was made against; a mismatch 409s rather than overwriting a newer one.' })
+  baseRevision?: number;
+}
+
+@Schema()
+export class ReforgePlanApproveBody {
+  @Field(() => Integer, { optional: true, minimum: 1, description: 'The plan revision being approved; a mismatch 409s rather than approving a plan the author never read.' })
+  baseRevision?: number;
+}
+
+@Schema()
+export class ReforgePlanSpanResponse extends ReforgePlanSpanBody {
+  @Field(() => String, { description: 'Stable across revisions that leave the span’s bounds, action, and target untouched.' })
+  spanKey: string;
+
+  @Field(() => Integer, { optional: true, nullable: true, description: 'First output chapter this span produces; null for a drop.' })
+  firstOutputChapter?: number | null;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  lastOutputChapter?: number | null;
+}
+
+@Schema()
+export class ReforgePlanResponse {
+  @Field(() => String)
+  id: bigint;
+
+  @Field(() => Integer)
+  revision: number;
+
+  @Field(() => ReforgePlanStatus)
+  status: string;
+
+  @Field({ optional: true, nullable: true })
+  summary?: string | null;
+
+  @Field(() => Integer)
+  sourceChapterCount: number;
+
+  @Field(() => Integer)
+  outputChapterCount: number;
+
+  @Field(() => String, { optional: true, nullable: true })
+  promotedProjectId?: bigint | null;
+
+  @Field(() => String, { optional: true, nullable: true, format: 'date-time' })
+  approvedAt?: Date | null;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
+}
+
+@Schema()
+export class ReforgePlanDetailResponse {
+  @Field(() => ReforgePlanResponse)
+  plan: ReforgePlanResponse;
+
+  @Field(() => [ReforgePlanSpanResponse])
+  spans: ReforgePlanSpanResponse[];
+
+  @Field(() => Integer, { description: 'Derived from the running sum of targetChapters — never authored.' })
+  outputChapterCount: number;
 }

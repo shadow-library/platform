@@ -257,6 +257,7 @@ describe.if(pgAvailable)('Wiki publish pipeline (mocked reader service)', () => 
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
       runner,
       {} as never,
     );

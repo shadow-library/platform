@@ -20,6 +20,12 @@ export namespace Reforge {
     targetWords?: number;
     /** Transform mode: source chapters per analysis window (default 15) — a comparative-judgment unit, not a context ceiling. */
     analysisWindow?: number;
+    /** Transform mode: whole-novel length ratio the plan drafter aims for, 0.2–1.0; a hint, never a per-span rule. */
+    targetCompression?: number;
+    /** Transform mode: shortest span the plan may contain (default 1) — a plan of 800 one-chapter spans is not reviewable. */
+    minSpanChapters?: number;
+    /** Transform mode: source chapters one output chapter may be written from (default 6) — the plan validator enforces it. */
+    maxSpanSourceChapters?: number;
   }
 }
 

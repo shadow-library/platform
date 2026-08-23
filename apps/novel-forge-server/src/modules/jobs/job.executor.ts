@@ -11,6 +11,7 @@ import { IndexingService } from '../ai/retrieval/indexing.service';
 import { PublishRunner } from '../publishing/publish-runner';
 import { RebrandService } from '../rebrand/rebrand.service';
 import { ReforgeAnalysisService } from '../reforge/reforge-analysis.service';
+import { ReforgePlanService } from '../reforge/reforge-plan.service';
 import { RecombineService } from '../source/recombine.service';
 import { ConcurrencyController } from './concurrency.controller';
 import { JobService } from './job.service';
@@ -68,6 +69,7 @@ export class JobExecutor {
     private readonly databaseService: DatabaseService,
     private readonly rebrandService: RebrandService,
     private readonly reforgeAnalysisService: ReforgeAnalysisService,
+    private readonly reforgePlanService: ReforgePlanService,
     private readonly recombineService: RecombineService,
     private readonly publishRunner: PublishRunner,
     private readonly storage: StorageService,
@@ -255,6 +257,7 @@ export class JobExecutor {
   private async runReforge(job: Job.Row): Promise<void> {
     const payload = (job.payload ?? {}) as ReforgePayload;
     if (payload.stage === 'analyze') return this.runReforgeAnalyze(job);
+    if (payload.stage === 'plan') return this.runReforgePlan(job);
     return this.runChapterReforge(job, payload);
   }
 
@@ -274,6 +277,16 @@ export class JobExecutor {
 
     await this.jobService.progress(job.id, { done: 1, total: 1, current: 'done', phase: 'synthesizing' });
     this.logger.info('runReforgeAnalyze: complete', { jobId: job.id, projectId, ...result, analysisId: String(result.analysisId) });
+  }
+
+  // Drafts the transformation plan from the persisted analysis. It ends in `draft`: the plan is always
+  // human-gated, and a "just run it end to end" button is the one feature that would make this mode
+  // untrustworthy (transform design §11).
+  private async runReforgePlan(job: Job.Row): Promise<void> {
+    await this.jobService.progress(job.id, { done: 0, total: 1, current: 'drafting', phase: 'planning' });
+    const { plan, outputChapterCount } = await this.reforgePlanService.draft(job.projectId, job.id);
+    await this.jobService.progress(job.id, { done: 1, total: 1, current: 'done', phase: 'planning' });
+    this.logger.info('runReforgePlan: complete', { jobId: job.id, projectId: job.projectId, planId: String(plan.id), revision: plan.revision, outputChapterCount });
   }
 
   private async runChapterReforge(job: Job.Row, payload: ReforgePayload): Promise<void> {

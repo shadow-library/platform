@@ -30,6 +30,7 @@ function makeExecutor(runChapterGeneration: (input: unknown) => Promise<Workflow
     databaseService,
     rebrandService,
     {} as never,
+    {} as never,
     recombineService,
     publishRunner,
     storage,

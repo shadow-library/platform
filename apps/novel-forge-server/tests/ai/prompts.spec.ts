@@ -25,6 +25,7 @@ import {
   ReforgeAnalyzeWindowSchema,
   ReforgeJudgeSchema,
   ReforgeOutlineSchema,
+  ReforgePlanSchema,
   ReforgeSynthesizeSchema,
   ReforgeWriteSchema,
   validateArcCoverage,
@@ -643,6 +644,46 @@ describe('Prompt modules', () => {
       expect(synthesizePrompt.postValidate?.({ summary: 's', arcs, findings: [] })).toEqual([]);
       expect(synthesizePrompt.postValidate?.({ summary: 's', arcs: [arcs[0], { ...arcs[1], fromChapter: 30 }], findings: [] })[0]).toMatch(/must not overlap/);
       expect(synthesizePrompt.postValidate?.({ summary: 's', arcs: [{ fromChapter: 40, toChapter: 1, label: 'Backwards' }], findings: [] })[0]).toMatch(/ends before it starts/);
+    });
+  });
+
+  describe('reforge transform plan prompt', () => {
+    const spans = [
+      { ordinal: 1, fromChapter: 1, toChapter: 4, action: 'keep' as const, targetChapters: 4, rationale: 'the opening works', keptBeats: ['Evan is exiled'] },
+      { ordinal: 2, fromChapter: 5, toChapter: 12, action: 'condense' as const, targetChapters: 3, rationale: 'eight chapters of tournament', keptBeats: ['the duel lands'] },
+    ];
+
+    it('registers the plan prompt on the planning role without borrowing the authoring voice', () => {
+      const prompt = PROMPT_REGISTRY['reforge-plan'];
+      expect(prompt.version).toBe('1.0.0');
+      expect(prompt.kind).toBe('analytical');
+      expect(prompt.role).toBe('plan');
+      expect(prompt.cacheStrategy?.stableVars).toEqual(['stableContext']);
+    });
+
+    it('renders the plan prompt from the report and cards, never from source prose', async () => {
+      const messages = await PROMPT_REGISTRY['reforge-plan'].template.formatMessages({
+        stableContext: 'STABLE-WORLD-NOTES',
+        report: 'REPORT',
+        cardIndex: 'CARDS',
+        planBrief: 'BRIEF',
+      });
+      expect(messages).toHaveLength(3);
+      expect(String(messages[1]?.content)).toBe('STABLE-WORLD-NOTES');
+      const tail = String(messages[2]?.content);
+      expect(tail).toContain('REPORT');
+      expect(tail).toContain('CARDS');
+      expect(tail).toContain('BRIEF');
+    });
+
+    it('validates the plan output shape and re-checks the partition after it parses', () => {
+      expect(parseSchema(ReforgePlanSchema, { summary: 'Twenty become eleven.', spans }).success).toBe(true);
+      expect(parseSchema(ReforgePlanSchema, { summary: 'Empty', spans: [] }).success).toBe(false);
+      expect(parseSchema(ReforgePlanSchema, { summary: 's', spans: [{ ...spans[0], action: 'rewrite' }] }).success).toBe(false);
+
+      const prompt = PROMPT_REGISTRY['reforge-plan'];
+      expect(prompt.postValidate?.({ summary: 's', spans })).toEqual([]);
+      expect(prompt.postValidate?.({ summary: 's', spans: [spans[0], { ...spans[1], fromChapter: 7 }] })[0]).toMatch(/must partition the source/);
     });
   });
 

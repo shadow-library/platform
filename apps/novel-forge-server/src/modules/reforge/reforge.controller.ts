@@ -5,6 +5,7 @@ import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { JobEnqueueResponse } from '../pipeline/pipeline.dto';
 import { ReforgeAnalysisService } from './reforge-analysis.service';
+import { ReforgePlanService } from './reforge-plan.service';
 import {
   ListReforgeFindingsResponse,
   ListReforgesResponse,
@@ -15,6 +16,9 @@ import {
   ReforgeFindingsQuery,
   ReforgeManuscriptResponse,
   ReforgeParams,
+  ReforgePlanApproveBody,
+  ReforgePlanDetailResponse,
+  ReforgePlanSpansBody,
   ReforgeReportResponse,
   ReforgeResponse,
   ReforgeStartBody,
@@ -28,6 +32,7 @@ export class ReforgeController {
   constructor(
     private readonly reforgeService: ReforgeService,
     private readonly analysisService: ReforgeAnalysisService,
+    private readonly planService: ReforgePlanService,
     private readonly jobService: JobService,
     private readonly jobExecutor: JobExecutor,
   ) {}
@@ -117,6 +122,36 @@ export class ReforgeController {
   @RespondFor(200, ListReforgeFindingsResponse)
   listFindings(@Params() params: ReforgeParams, @Query() query: ReforgeFindingsQuery): Promise<ListReforgeFindingsResponse> {
     return this.analysisService.listFindings(params.projectId, query as never);
+  }
+
+  @Post('/plan')
+  @HttpStatus(202)
+  @RespondFor(202, JobEnqueueResponse)
+  async startPlan(@Params() params: ReforgeParams): Promise<JobEnqueueResponse> {
+    const { projectId } = params;
+    await this.reforgeService.getOrCreate(projectId);
+    const target = `reforge-plan-${projectId}`;
+    const jobId = await this.jobService.enqueue(projectId, 'reforge', target, { stage: 'plan' });
+    this.jobExecutor.dispatch(jobId).catch(() => undefined);
+    return { jobId, kind: 'reforge', status: 'pending', target };
+  }
+
+  @Get('/plan')
+  @RespondFor(200, ReforgePlanDetailResponse)
+  getPlan(@Params() params: ReforgeParams): Promise<ReforgePlanDetailResponse> {
+    return this.planService.get(params.projectId) as Promise<ReforgePlanDetailResponse>;
+  }
+
+  @Put('/plan/spans')
+  @RespondFor(200, ReforgePlanDetailResponse)
+  replacePlanSpans(@Params() params: ReforgeParams, @Body() body: ReforgePlanSpansBody): Promise<ReforgePlanDetailResponse> {
+    return this.planService.replaceSpans(params.projectId, body.spans, body.baseRevision) as Promise<ReforgePlanDetailResponse>;
+  }
+
+  @Post('/plan/approve')
+  @RespondFor(200, ReforgePlanDetailResponse)
+  approvePlan(@Params() params: ReforgeParams, @Body() body: ReforgePlanApproveBody): Promise<ReforgePlanDetailResponse> {
+    return this.planService.approve(params.projectId, body.baseRevision) as Promise<ReforgePlanDetailResponse>;
   }
 
   @Get('/manuscript')

@@ -30,6 +30,7 @@ function makeExecutor(runSourceExtraction: (input: unknown) => Promise<WorkflowR
     databaseService,
     rebrandService,
     {} as never,
+    {} as never,
     recombineService,
     publishRunner,
     storage,

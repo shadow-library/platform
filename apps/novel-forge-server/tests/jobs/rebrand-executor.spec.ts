@@ -94,6 +94,7 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
       { getPostgresClient: () => db } as never,
       rebrandService,
       {} as never,
+      {} as never,
       recombineService,
       {} as never,
       {} as never,

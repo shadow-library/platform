@@ -1,6 +1,6 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
-import { ReforgeFindingKind, ReforgeMovement } from './enums';
+import { ReforgeFindingKind, ReforgeMovement, ReforgeSpanAction } from './enums';
 
 @Schema()
 export class ReforgeCardSchema {
@@ -128,5 +128,51 @@ export function validateArcOrder(data: ReforgeSynthesizeSchema): string[] {
   return issues;
 }
 
+@Schema()
+export class ReforgePlanSpanSchema {
+  @Field(() => Integer, { minimum: 1, description: 'position in reading order, starting at 1 and running without gaps' })
+  ordinal: number;
+
+  @Field(() => Integer, { minimum: 1, description: 'first source chapter of the span' })
+  fromChapter: number;
+
+  @Field(() => Integer, { minimum: 1, description: 'last source chapter of the span, inclusive' })
+  toChapter: number;
+
+  @Field(() => ReforgeSpanAction, { description: 'keep = as-is, condense = fewer chapters, merge = one chapter, drop = gone entirely' })
+  action: 'keep' | 'condense' | 'merge' | 'drop';
+
+  @Field(() => Integer, { minimum: 0, description: 'output chapters this span produces: the span length for keep, 1 for merge, 0 for drop, fewer than the length for condense' })
+  targetChapters: number;
+
+  @Field({ optional: true, description: 'the arc this span belongs to, from the analysis report' })
+  arcLabel?: string;
+
+  @Field({ minLength: 1, description: 'why this span gets this action — quoted into the report and shown in the plan editor' })
+  rationale: string;
+
+  @Field(() => [String], { description: 'the beats every output chapter of this span owes the reader; empty only for a drop' })
+  keptBeats: string[];
+
+  @Field(() => [String], { optional: true, description: 'threads, subplots, or running patterns this span removes — these seed the cut ledger at approval' })
+  cutThreads?: string[];
+
+  @Field({ optional: true, description: 'what must remain true across this span’s seam; required on a span that follows a drop' })
+  continuityNotes?: string;
+
+  @Field(() => [String], { optional: true, description: 'the analysis findings that justify this span' })
+  findingIds?: string[];
+}
+
+@Schema()
+export class ReforgePlanSchema {
+  @Field({ minLength: 1, description: 'what the transformed novel becomes, in a paragraph the author reads before approving' })
+  summary: string;
+
+  @Field(() => [ReforgePlanSpanSchema], { minItems: 1, description: 'the spans, in reading order, partitioning every source chapter exactly once' })
+  spans: ReforgePlanSpanSchema[];
+}
+
 export type ReforgeAnalyzeWindowOutput = ReforgeAnalyzeWindowSchema;
 export type ReforgeSynthesizeOutput = ReforgeSynthesizeSchema;
+export type ReforgePlanOutput = ReforgePlanSchema;

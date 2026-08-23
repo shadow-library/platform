@@ -3,6 +3,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 
 import { AiModule } from '../ai/ai.module';
 import { ReforgeAnalysisService } from './reforge-analysis.service';
+import { ReforgePlanService } from './reforge-plan.service';
 import { ReforgeService } from './reforge.service';
 
 // ReforgeService is pure CRUD over the reforge tables; the transform analysis stage needs the AI
@@ -12,7 +13,7 @@ import { ReforgeService } from './reforge.service';
 // module graph acyclic (Rebrand and Ai never import Reforge).
 @Module({
   imports: [DatabaseModule, AiModule],
-  providers: [ReforgeService, ReforgeAnalysisService],
-  exports: [ReforgeService, ReforgeAnalysisService],
+  providers: [ReforgeService, ReforgeAnalysisService, ReforgePlanService],
+  exports: [ReforgeService, ReforgeAnalysisService, ReforgePlanService],
 })
 export class ReforgeModule {}

@@ -87,6 +87,13 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
       },
     } as never;
 
+    const planService = {
+      draft: async () => {
+        events.push('plan');
+        return { plan: { id: 1n, revision: 1 }, spans: [], outputChapterCount: 12 };
+      },
+    } as never;
+
     const workflowRunService = {
       runChapterReforge: async ({ chapter }: { chapter: number }) => {
         events.push(chapter);
@@ -103,6 +110,7 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
       { getPostgresClient: () => db } as never,
       rebrandService,
       analysisService,
+      planService,
       recombineService,
       {} as never,
       {} as never,

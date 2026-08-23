@@ -83,6 +83,7 @@ describe.if(pgAvailable)('JobExecutor.runImport', () => {
       { getPostgresClient: () => db } as never,
       {} as never,
       {} as never,
+      {} as never,
       recombineService,
       {} as never,
       imageStorage,
