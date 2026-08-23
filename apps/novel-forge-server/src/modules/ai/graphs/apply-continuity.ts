@@ -183,11 +183,13 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
       })
       .onConflictDoUpdate({
         target: [schema.characterStates.projectId, schema.characterStates.entityKey],
+        // The continuity prompt contracts each reported state as a full replacement snapshot ("state only what is now true"),
+        // so an omitted field means the old value stopped being true — COALESCE here would resurrect healed injuries as current.
         set: {
-          location: sql`COALESCE(EXCLUDED.location, character_states.location)`,
-          conditions: sql`COALESCE(EXCLUDED.conditions, character_states.conditions)`,
-          immediateGoal: sql`COALESCE(EXCLUDED.immediate_goal, character_states.immediate_goal)`,
-          statusNote: sql`COALESCE(EXCLUDED.status_note, character_states.status_note)`,
+          location: characterState.location ?? null,
+          conditions: characterState.conditions ?? null,
+          immediateGoal: characterState.immediateGoal ?? null,
+          statusNote: characterState.statusNote ?? null,
           lastUpdatedChapter: chapter,
           updatedAt: new Date(),
         },

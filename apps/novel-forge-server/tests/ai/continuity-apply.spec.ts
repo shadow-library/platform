@@ -153,7 +153,11 @@ describe.if(pgAvailable)('continuity delta application', () => {
     expect(rows[0]?.targetKey).toBe('rook');
   });
 
-  it('should upsert character states and not null out fields omitted by a later chapter', async () => {
+  async function readState(projectId: bigint, entityKey = 'amara') {
+    return db.query.characterStates.findFirst({ where: and(eq(schema.characterStates.projectId, projectId), eq(schema.characterStates.entityKey, entityKey)) });
+  }
+
+  it('should replace the whole character state snapshot, clearing fields omitted by a later chapter', async () => {
     const projectId = await seedProject(`cont-state-${Date.now()}`);
     await db.insert(schema.entities).values({ projectId, entityKey: 'amara', name: 'Amara', type: 'character' });
     await applyViaEndpoint(
@@ -164,13 +168,62 @@ describe.if(pgAvailable)('continuity delta application', () => {
       1,
     );
 
-    let state = await db.query.characterStates.findFirst({ where: and(eq(schema.characterStates.projectId, projectId), eq(schema.characterStates.entityKey, 'amara')) });
-    expect(state).toMatchObject({ location: 'the docks', conditions: ['wounded'], immediateGoal: 'find the ledger', statusNote: 'shaken', lastUpdatedChapter: 1 });
+    expect(await readState(projectId)).toMatchObject({
+      location: 'the docks',
+      conditions: ['wounded'],
+      immediateGoal: 'find the ledger',
+      statusNote: 'shaken',
+      lastUpdatedChapter: 1,
+    });
 
     await applyViaEndpoint(projectId, delta({ characterStates: [{ entityKey: 'amara', location: 'the safehouse', evidence: 'she reached the door' }] }), 2);
 
-    state = await db.query.characterStates.findFirst({ where: and(eq(schema.characterStates.projectId, projectId), eq(schema.characterStates.entityKey, 'amara')) });
-    expect(state).toMatchObject({ location: 'the safehouse', conditions: ['wounded'], immediateGoal: 'find the ledger', statusNote: 'shaken', lastUpdatedChapter: 2 });
+    expect(await readState(projectId)).toMatchObject({ location: 'the safehouse', conditions: null, immediateGoal: null, statusNote: null, lastUpdatedChapter: 2 });
+  });
+
+  it('should clear a resolved injury when a later chapter reports the character without conditions', async () => {
+    const projectId = await seedProject(`cont-state-healed-${Date.now()}`);
+    await db.insert(schema.entities).values({ projectId, entityKey: 'amara', name: 'Amara', type: 'character' });
+    await applyViaEndpoint(projectId, delta({ characterStates: [{ entityKey: 'amara', location: 'the docks', conditions: ['injured'], evidence: 'she limped' }] }), 3);
+    await applyViaEndpoint(projectId, delta({ characterStates: [{ entityKey: 'amara', location: 'the market', evidence: 'she walked without a limp' }] }), 5);
+
+    expect(await readState(projectId)).toMatchObject({ location: 'the market', conditions: null, lastUpdatedChapter: 5 });
+  });
+
+  it('should clear an abandoned immediate goal when a later chapter reports only a status note', async () => {
+    const projectId = await seedProject(`cont-state-goal-${Date.now()}`);
+    await db.insert(schema.entities).values({ projectId, entityKey: 'amara', name: 'Amara', type: 'character' });
+    await applyViaEndpoint(projectId, delta({ characterStates: [{ entityKey: 'amara', immediateGoal: 'investigate the ledger', evidence: 'she said so' }] }), 2);
+    await applyViaEndpoint(projectId, delta({ characterStates: [{ entityKey: 'amara', statusNote: 'resigned to the truth', evidence: 'she stopped asking' }] }), 6);
+
+    expect(await readState(projectId)).toMatchObject({ location: null, conditions: null, immediateGoal: null, statusNote: 'resigned to the truth', lastUpdatedChapter: 6 });
+  });
+
+  it('should overwrite every field when a later chapter reports a complete new snapshot', async () => {
+    const projectId = await seedProject(`cont-state-full-${Date.now()}`);
+    await db.insert(schema.entities).values({ projectId, entityKey: 'amara', name: 'Amara', type: 'character' });
+    await applyViaEndpoint(
+      projectId,
+      delta({
+        characterStates: [{ entityKey: 'amara', location: 'the docks', conditions: ['wounded'], immediateGoal: 'find the ledger', statusNote: 'shaken', evidence: 'she limped' }],
+      }),
+      4,
+    );
+    await applyViaEndpoint(
+      projectId,
+      delta({
+        characterStates: [{ entityKey: 'amara', location: 'the tower', conditions: ['rested'], immediateGoal: 'confront Rook', statusNote: 'resolute', evidence: 'she climbed' }],
+      }),
+      5,
+    );
+
+    expect(await readState(projectId)).toMatchObject({
+      location: 'the tower',
+      conditions: ['rested'],
+      immediateGoal: 'confront Rook',
+      statusNote: 'resolute',
+      lastUpdatedChapter: 5,
+    });
   });
 
   it('should skip character states whose entity key resolves to no entity', async () => {

@@ -668,6 +668,24 @@ describe('ContextAssembler.forChapter — dynamic cast state', () => {
     expect(pack.sections.find(s => s.key === 'character_state')?.rendered).toContain('Location: the safehouse');
   });
 
+  it('should render only the still-current fields once a continuity update clears the others', async () => {
+    const assembler = makeAssembler(
+      castDb({
+        contextRefs: ['entity:amara'],
+        entities: [amara],
+        characterStates: [{ id: 1n, projectId: 1n, entityKey: 'amara', location: 'the market', conditions: null, immediateGoal: null, statusNote: 'wary', lastUpdatedChapter: 5 }],
+      }),
+    );
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    const section = pack.sections.find(s => s.key === 'character_state');
+    expect(section?.rendered).toContain('Location: the market');
+    expect(section?.rendered).toContain('Status: wary');
+    expect(section?.rendered).not.toContain('Conditions:');
+    expect(section?.rendered).not.toContain('Goal:');
+    expect(pack.rendered).not.toContain('injured');
+  });
+
   it('should exclude character state for an entity outside the chapter cast', async () => {
     const assembler = makeAssembler(
       castDb({
