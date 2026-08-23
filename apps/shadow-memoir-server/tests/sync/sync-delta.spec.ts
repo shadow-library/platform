@@ -10,6 +10,7 @@ import { Config } from '@shadow-library/common';
 import { Body, FastifyModule, type FastifyRouter, HttpController, HttpStatus, Params, Post, RespondFor, Transform } from '@shadow-library/fastify';
 import { DatabaseModule, DatabaseService } from '@shadow-library/modules';
 
+import { AccountModule } from '@modules/account';
 import { MemoirAuthModule, OwnerScopedRepository } from '@modules/auth';
 import { DevicesModule } from '@modules/devices';
 import { SyncModule } from '@modules/sync';
@@ -62,7 +63,7 @@ class TestQuestController {
 }
 
 const TestHttpModule = FastifyModule.forRoot({
-  imports: [MemoirAuthModule, SyncModule, DevicesModule, DatabaseModule],
+  imports: [MemoirAuthModule, SyncModule, DevicesModule, AccountModule, DatabaseModule],
   controllers: [TestQuestController],
   providers: [TestQuestRepository],
   host: 'localhost',

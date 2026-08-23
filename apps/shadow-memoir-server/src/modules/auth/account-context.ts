@@ -2,15 +2,17 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Config, LRUCache } from '@shadow-library/common';
+import { AuthClient } from '@shadow-library/auth';
+import { Config, Logger, LRUCache } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { APP_NAME } from '@server/constants';
 
-import { AccountRepository } from './account.repository';
+import { AccountRepository, type ProfileSnapshot } from './account.repository';
 
 /**
  * Defining types
@@ -34,18 +36,21 @@ const ACCOUNT_CONTEXT: unique symbol = Symbol('shadow-memoir:account-context');
  */
 @Injectable()
 export class AccountContext {
+  private readonly logger = Logger.getLogger(APP_NAME, AccountContext.name);
   private readonly accountIdCache = new LRUCache(ACCOUNT_ID_CACHE_CAPACITY, { ttl: Config.get('account.context-ttl') * 1000 });
 
   constructor(
     private readonly context: ContextService,
     private readonly accountRepository: AccountRepository,
+    private readonly authClient: AuthClient,
   ) {}
 
   /** Resolves (creating the account on first contact) and memoizes it for the remainder of the request. Throws if the account is mid-deletion. */
   async resolve(identitySub: string): Promise<void> {
     let accountId = this.accountIdCache.get<bigint>(identitySub);
     if (accountId === null || accountId === undefined) {
-      const account = await this.accountRepository.resolveOrCreate(identitySub);
+      const existing = await this.accountRepository.findByIdentitySub(identitySub);
+      const account = existing ?? (await this.accountRepository.create(identitySub, await this.captureProfile()));
       accountId = account.id;
       this.accountIdCache.set(identitySub, accountId);
     }
@@ -58,5 +63,26 @@ export class AccountContext {
   /** The resolved account id for the current request, or `null` if {@link resolve} has not run in it. */
   getAccountId(): bigint | null {
     return this.context.get<bigint>(ACCOUNT_CONTEXT);
+  }
+
+  /**
+   * Best-effort: the caller's own bearer token, when the request presented one, carries `getUserInfo`'s
+   * own claim — a session established before `profile`/`email` were consented returns `sub` alone, and
+   * a cookie-session caller has no bearer to read here at all, in which case the account is created with
+   * placeholder profile fields, same as before T-17. Never blocks account creation on identity being
+   * reachable.
+   */
+  private async captureProfile(): Promise<ProfileSnapshot> {
+    const header = this.context.getRequest(false)?.headers.authorization;
+    const token = typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : undefined;
+    if (!token) return {};
+
+    return this.authClient
+      .getUserInfo(token)
+      .then(info => ({ email: info.email ?? null, displayName: info.name ?? null, photoUrl: info.picture ?? null }))
+      .catch((error: Error) => {
+        this.logger.warn('profile capture failed on first contact; account created with placeholder profile', { reason: error.message });
+        return {};
+      });
   }
 }

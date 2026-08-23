@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -14,6 +14,13 @@ import { type Account, type PrimaryDatabase, schema } from '@server/database';
 /**
  * Defining types
  */
+
+/** Captured once, at first contact, from identity's userinfo (ARCHITECTURE §9.1, §10.2); never re-fetched. */
+export interface ProfileSnapshot {
+  email?: string | null;
+  displayName?: string | null;
+  photoUrl?: string | null;
+}
 
 /**
  * Declaring the constants
@@ -51,29 +58,51 @@ export class AccountRepository {
   }
 
   /**
-   * Upsert-on-first-contact: `INSERT ... ON CONFLICT DO NOTHING` then re-select, so two concurrent
-   * first-contact requests for the same `sub` converge on exactly one row — whichever insert wins, the
-   * loser's re-select observes it, instead of racing a plain read-then-insert into a unique violation.
+   * Insert-on-first-contact only: the caller (`AccountContext`) does its own `findByIdentitySub` first
+   * and only reaches this when that came back empty, so profile capture (T-17) happens at most once per
+   * account. `ON CONFLICT DO NOTHING` then re-select still guards the race between two concurrent
+   * first-contact requests for the same `sub` — whichever insert wins, the loser's re-select observes it.
    *
    * Defaults are placeholders pending onboarding (T-17): `authProvider` records `google` because it is
    * the only live provider (ARCHITECTURE §3.3 — Apple is not yet implemented at identity); currency and
    * timezone are the account's own onboarding-editable fields, seeded to values a first sync can run
-   * against immediately rather than left to block on a profile the identity `userinfo` endpoint does not
-   * carry (it has no upstream-provider claim to derive `authProvider` from either).
+   * against immediately, overridden by `profile` where identity's userinfo answered.
    */
-  async resolveOrCreate(identitySub: string): Promise<Account.Row> {
-    const existing = await this.findByIdentitySub(identitySub);
-    if (existing) return existing;
-
+  async create(identitySub: string, profile: ProfileSnapshot = {}): Promise<Account.Row> {
     const [inserted] = await this.db
       .insert(schema.accounts)
-      .values({ identitySub, authProvider: 'google', defaultCurrency: DEFAULT_CURRENCY, enabledCurrencies: [DEFAULT_CURRENCY], timezone: DEFAULT_TIMEZONE })
+      .values({ identitySub, authProvider: 'google', defaultCurrency: DEFAULT_CURRENCY, enabledCurrencies: [DEFAULT_CURRENCY], timezone: DEFAULT_TIMEZONE, ...profile })
       .onConflictDoNothing({ target: schema.accounts.identitySub })
       .returning();
     if (inserted) return inserted;
 
     const created = await this.findByIdentitySub(identitySub);
-    if (!created) throw AppError.internal(`account upsert-on-first-contact converged to no row for sub '${identitySub}'`);
+    if (!created) throw AppError.internal(`account create-on-first-contact converged to no row for sub '${identitySub}'`);
     return created;
+  }
+
+  /**
+   * The only sanctioned path for `PATCH /account` and `POST /account/onboarding` (T-17): `accounts` is
+   * keyed by `id`, not `account_id`, so it sits outside `OwnerScopedRepository`'s scoping and carries no
+   * `sync_seq` to re-stamp — the snapshot `DeltaSource` reads the fresh row on every pull instead.
+   */
+  async update(accountId: bigint, values: Partial<typeof schema.accounts.$inferInsert>): Promise<Account.Row> {
+    const [account] = await this.db
+      .update(schema.accounts)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(schema.accounts.id, accountId))
+      .returning();
+    if (!account) throw AppError.internal(`account update targeted a nonexistent account id '${accountId}'`);
+    return account;
+  }
+
+  /** Guarded by `onboardingCompletedAt IS NULL` so a second call is a structural no-op (0 rows) rather than a silent re-lock of `defaultCurrency`; the service reads the empty result as "already onboarded". */
+  async completeOnboarding(accountId: bigint, values: Partial<typeof schema.accounts.$inferInsert>): Promise<Account.Row | null> {
+    const [account] = await this.db
+      .update(schema.accounts)
+      .set({ ...values, onboardingCompletedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(schema.accounts.id, accountId), isNull(schema.accounts.onboardingCompletedAt)))
+      .returning();
+    return account ?? null;
   }
 }

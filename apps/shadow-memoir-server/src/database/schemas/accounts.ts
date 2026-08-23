@@ -31,11 +31,15 @@ export const accounts = pgTable(
     defaultCurrency: char('default_currency', { length: 3 }).notNull(),
     enabledCurrencies: char('enabled_currencies', { length: 3 }).array().notNull(),
     timezone: text('timezone').notNull(),
+    /** Staged by T-17's `PATCH /account`; applied and cleared by T-19's rollover at the start of "today" prep (ARCHITECTURE §12.5, §13.2) — a change is never live mid-day and never reopens a closed day. */
+    pendingTimezone: text('pending_timezone'),
     scheduleStartMin: smallint('schedule_start_min').notNull().default(360),
     scheduleEndMin: smallint('schedule_end_min').notNull().default(1380),
     theme: theme('theme').notNull().default('system'),
     weekStart: smallint('week_start').notNull().default(1),
     intensityMode: intensityMode('intensity_mode').notNull().default('standard'),
+    /** Same deferred-apply contract as {@link pendingTimezone}, for intensity mode. */
+    pendingIntensityMode: intensityMode('pending_intensity_mode'),
     returnerThresholdDays: integer('returner_threshold_days').notNull().default(7),
 
     level: integer('level').notNull().default(1),

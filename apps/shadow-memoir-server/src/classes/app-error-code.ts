@@ -26,6 +26,12 @@ export class AppErrorCode extends ServerErrorCode {
   /** The account is mid-deletion (§21); normal traffic is refused until the state machine finishes or is never started */
   static readonly ACC_002 = AppErrorCode.forbidden('ACC_002', 'This account is being deleted and cannot process this request');
 
+  /** `POST /account/onboarding` called a second time; `default_currency` is locked and essentials cannot be re-run */
+  static readonly ACC_003 = AppErrorCode.conflict('ACC_003', 'Onboarding has already been completed for this account');
+
+  /** `PATCH /account` named a field that is never writable through this route (auth_provider, default_currency, timestamps) — §5.5 */
+  static readonly ACC_004 = AppErrorCode.badRequest('ACC_004', "Field '{field}' is immutable and cannot be changed via PATCH");
+
   /*!
    * Command Errors
    */
