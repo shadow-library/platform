@@ -25,7 +25,7 @@ function toCategoryRow(category: ExpenseCategory.Row): Record<string, unknown> {
 
 /**
  * Registers the `expenses`/`subscriptions`/`categories` domains on the sync assembler (ARCHITECTURE
- * §12.2), mirroring `SyncDeltaSources`' keyset shape. `expense_categories` carries no `sync_seq` — a
+ * §12.2), mirroring `DeltaRepository`'s keyset shape. `expense_categories` carries no `sync_seq` — a
  * closed, near-static 9-row set per account, small enough that a snapshot (à la `devices`) is cheaper
  * than a watermark column.
  */

@@ -8,7 +8,7 @@ import { AppError, Config, Logger } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { AccountContext } from '@modules/auth';
-import { CommandBus, type CommandEnvelope } from '@modules/commands';
+import { CommandBus, type CommandEnvelope, RolloverGate } from '@modules/commands';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { logMetric, pseudoAccountId, TelemetryService } from '@server/telemetry';
@@ -46,6 +46,7 @@ export class SyncService {
   constructor(
     private readonly accountContext: AccountContext,
     private readonly commandBus: CommandBus,
+    private readonly rolloverGate: RolloverGate,
     private readonly registry: DeltaSourceRegistry,
     private readonly deltaRepository: DeltaRepository,
     private readonly telemetry: TelemetryService,
@@ -108,6 +109,7 @@ export class SyncService {
    * spanning fewer sequence values than the overlap could otherwise never advance the cursor at all.
    */
   async pullDelta(request: DeltaRequest): Promise<DeltaPage> {
+    await this.rolloverGate.ensureCurrent(this.requireAccountId());
     const limit = request.limit ?? Config.get('sync.page-size');
     const sources = this.registry.resolve(request.domains);
 

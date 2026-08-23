@@ -12,6 +12,7 @@ import { AppErrorCode } from '@server/classes';
 
 import { CommandLogRepository } from './command-log.repository';
 import { type CommandEnvelope, type CommandHandler, type CommandOutcome } from './command.types';
+import { RolloverGate } from './rollover-gate';
 
 /**
  * Every Hero-affecting write enters here (ARCHITECTURE §9.3, §11.2). One command is one transaction:
@@ -31,6 +32,7 @@ export class CommandBus {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly commandLog: CommandLogRepository,
+    private readonly rolloverGate: RolloverGate,
   ) {}
 
   registerHandler(type: string, handler: CommandHandler): void {
@@ -45,6 +47,9 @@ export class CommandBus {
   async execute(accountId: bigint, envelope: CommandEnvelope): Promise<CommandOutcome> {
     const handler = this.handlers.get(envelope.type);
     if (!handler) throw AppErrorCode.CMD_001.create({ type: envelope.type });
+
+    /** §13.1: elapsed days close before the command applies, in their own transactions ahead of this one — a 90-day walk cannot be nested inside a command's tx and still be resumable. */
+    await this.rolloverGate.ensureCurrent(accountId);
 
     try {
       return await this.commandLog.runSerialized(accountId, async tx => {

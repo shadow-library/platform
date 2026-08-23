@@ -14,6 +14,7 @@ import { AccountModule } from '@modules/account';
 import { MemoirAuthModule, OwnerScopedRepository } from '@modules/auth';
 import { DevicesModule } from '@modules/devices';
 import { QuestsModule } from '@modules/quests';
+import { RolloverModule } from '@modules/rollover';
 import { SyncModule } from '@modules/sync';
 import { DatastoreModule, type PrimaryDatabase, schema } from '@server/database';
 import { createDatabaseFromTemplate, dropDatabase } from '@tests/fixtures/template-db';
@@ -64,7 +65,7 @@ class TestQuestController {
 }
 
 const TestHttpModule = FastifyModule.forRoot({
-  imports: [MemoirAuthModule, SyncModule, DevicesModule, AccountModule, QuestsModule, DatabaseModule],
+  imports: [MemoirAuthModule, SyncModule, DevicesModule, AccountModule, QuestsModule, RolloverModule, DatabaseModule],
   controllers: [TestQuestController],
   providers: [TestQuestRepository],
   host: 'localhost',

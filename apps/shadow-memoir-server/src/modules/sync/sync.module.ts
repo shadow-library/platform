@@ -9,12 +9,11 @@ import { DeltaRepository } from './delta.repository';
 import { DeltaSourceRegistry } from './delta-source.registry';
 import { SyncController } from './sync.controller';
 import { SyncService } from './sync.service';
-import { SyncDeltaSources } from './sync-delta-sources.service';
 
 @Module({
   imports: [DatabaseModule, MemoirAuthModule, CommandsModule, TelemetryModule],
   controllers: [SyncController],
-  providers: [DeltaSourceRegistry, DeltaRepository, SyncDeltaSources, SyncService],
+  providers: [DeltaSourceRegistry, DeltaRepository, SyncService],
   exports: [DeltaSourceRegistry, DeltaRepository],
 })
 export class SyncModule {}

@@ -33,6 +33,12 @@ Two related but distinct things get logged:
 2. **Sweep-result / request-path lines** — a metric emitted directly by the subsystem that computed it
    (e.g. the FX reconciliation sweep, or a sync batch), logged alongside its own descriptive message.
 
+A subsystem whose failure is per-request rather than per-sweep logs the failure itself as untagged
+triage context and exposes the _level_ as a gauge — `RolloverService` is the worked example: each failed
+walk writes a `rollover_failed` error line carrying the account and cause, while `rollover.failures`
+reports how many accounts are currently behind. Only the gauge is alerted on, so a single retried
+failure does not page.
+
 ## Current counters
 
 | Metric                               | Kind                | Source                                   | Meaning                                                             | Alert threshold                                                                                |
@@ -41,6 +47,7 @@ Two related but distinct things get logged:
 | `fx_reconciliation.unresolved`       | sweep-result        | `FxReconciliationService.run`            | Expenses still carrying a null FX rate after the sweep              | Alert if `value > 0` for `>2` consecutive hourly sweeps                                        |
 | `fx_reconciliation.unresolved_stale` | sweep-result (warn) | `FxReconciliationService.run`            | Expenses unresolved past 48h (`UNRESOLVED_ALERT_HOURS`)             | Alert immediately — any occurrence is already past the in-app threshold                        |
 | `sync.command_error_rate`            | request-path        | `SyncService.submitBatch`                | `failed / commandCount` for the batch (0–1)                         | Alert if the rolling rate over a 15-minute window exceeds `0.05`                               |
+| `rollover.failures`                  | gauge               | `RolloverService`, per heartbeat         | Accounts whose day-close walk raised and has not since completed    | Alert on any `value > 0`                                                                       |
 
 ## Registered but not yet sourced
 
@@ -52,7 +59,6 @@ appear in the log stream until registered.**
 | Metric                               | Owning task                       | Meaning (once wired)                                                        | Suggested threshold                             |
 | ------------------------------------ | --------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------- |
 | `ai_tasks.pending_age_seconds`       | T-33 (AI batch executor)          | Oldest unclaimed `ai_tasks` row's age                                       | Alert if `> ai.task-timeout-minutes × 2`        |
-| `rollover.failures`                  | T-19 (daily rollover engine)      | Accounts whose day-close walk raised instead of completing                  | Alert on any `value > 0`                        |
 | `receipts.orphan_count`              | T-26 (receipt storage)            | Objects with no matching `receipts` row after a sweep                       | Alert if `value > 0` for `>1` consecutive sweep |
 | `account_deletion.stuck_age_seconds` | T-30 (resumable account deletion) | Oldest non-`done` deletion state older than the 15-minute resumption window | Alert if `> 30` minutes                         |
 

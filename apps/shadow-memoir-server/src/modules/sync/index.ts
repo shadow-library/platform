@@ -5,4 +5,3 @@ export * from './sync.dto';
 export * from './sync.module';
 export * from './sync.service';
 export * from './sync.types';
-export * from './sync-delta-sources.service';

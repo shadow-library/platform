@@ -4,3 +4,4 @@ export * from './command.dto';
 export * from './command.types';
 export * from './commands.module';
 export * from './hero-ledger.service';
+export * from './rollover-gate';
