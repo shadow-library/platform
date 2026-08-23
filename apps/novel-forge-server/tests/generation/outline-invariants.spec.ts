@@ -148,4 +148,62 @@ describe.if(pgAvailable)('outline invariant enforcement', () => {
     const vars = structured.mock.calls.at(-1)?.[1] as { startChapter: number; endChapter: number };
     expect(vars).toMatchObject({ startChapter: 1, endChapter: 3 });
   });
+
+  it('does not overwrite a hand-edited brief in the requested range', async () => {
+    const projectId = await createApprovedVolume(3);
+    await db.insert(schema.briefs).values({ projectId, chapter: 2, volumeKey: 'v1', title: 'Hand-edited title', body: 'hand-edited body', handEdited: true });
+    const { service } = buildSpanService();
+
+    await service.outline(projectId, { start: 1, count: 3 });
+
+    const persisted = await db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), orderBy: schema.briefs.chapter });
+    expect(persisted.find(b => b.chapter === 2)).toMatchObject({ title: 'Hand-edited title', body: 'hand-edited body', handEdited: true });
+    expect(persisted.find(b => b.chapter === 1)?.title).toBe('Chapter 1');
+  });
+
+  it('does not overwrite the brief for an already-finalized chapter', async () => {
+    const projectId = await createApprovedVolume(3);
+    await db.insert(schema.briefs).values({ projectId, chapter: 2, volumeKey: 'v1', title: 'Finalized brief', body: 'finalized body' });
+    await db.insert(schema.chapters).values({ projectId, number: 2, content: 'ch2', status: 'done', locked: true });
+    const { service } = buildSpanService();
+
+    await service.outline(projectId, { start: 1, count: 3 });
+
+    const persisted = await db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), orderBy: schema.briefs.chapter });
+    expect(persisted.find(b => b.chapter === 2)).toMatchObject({ title: 'Finalized brief', body: 'finalized body' });
+    expect(persisted.find(b => b.chapter === 1)?.title).toBe('Chapter 1');
+  });
+
+  it('does not overwrite the brief for a chapter with an existing non-final draft', async () => {
+    const projectId = await createApprovedVolume(3);
+    await db.insert(schema.briefs).values({ projectId, chapter: 2, volumeKey: 'v1', title: 'Drafted brief', body: 'drafted body' });
+    await db.insert(schema.drafts).values({ projectId, chapter: 2, body: 'in-progress prose', status: 'draft', reviewStatus: 'needs_review' });
+    const { service } = buildSpanService();
+
+    await service.outline(projectId, { start: 1, count: 3 });
+
+    const persisted = await db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), orderBy: schema.briefs.chapter });
+    expect(persisted.find(b => b.chapter === 2)).toMatchObject({ title: 'Drafted brief', body: 'drafted body' });
+    expect(persisted.find(b => b.chapter === 1)?.title).toBe('Chapter 1');
+  });
+
+  it('still writes a chapter with no draft, no hand-edit, and no finalization', async () => {
+    const projectId = await createApprovedVolume(3);
+    const { service } = buildSpanService();
+
+    await service.outline(projectId, { start: 1, count: 3 });
+
+    const persisted = await db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), orderBy: schema.briefs.chapter });
+    expect(persisted.map(b => b.title)).toEqual(['Chapter 1', 'Chapter 2', 'Chapter 3']);
+  });
+
+  it('marks a normally-upserted brief as not hand-edited with no stale reason', async () => {
+    const projectId = await createApprovedVolume(3);
+    const { service } = buildSpanService();
+
+    await service.outline(projectId, { start: 1, count: 3 });
+
+    const persisted = await db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), orderBy: schema.briefs.chapter });
+    for (const b of persisted) expect(b).toMatchObject({ handEdited: false, staleReason: null });
+  });
 });

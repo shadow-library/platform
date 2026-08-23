@@ -6,9 +6,9 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 
 ## Summary
 
-- Completed: 7
+- Completed: 8
 - In Progress: 0
-- Pending: 4
+- Pending: 3
 - Blocked: 0
 
 ## Tasks
@@ -22,7 +22,7 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 | FIX-05 | HIGH     | Arc reconciliation observes events inside the current arc, not `arc.chapterStart`; protect/invalidate already-drafted descendants   | COMPLETED | FIX-02       |
 | FIX-06 | HIGH     | Continuity extraction receives existing key vocabulary; validate relationship targets/evidence; route ambiguous mutations to review | COMPLETED | —            |
 | FIX-07 | HIGH     | Bible stage output instructions match schema; persist stage atomically; fix `bible_doc` ref format mismatch                         | COMPLETED | —            |
-| FIX-08 | HIGH     | Gate/cap the legacy whole-book `outline()` endpoint so it cannot overwrite protected arc briefs                                     | PENDING   | —            |
+| FIX-08 | HIGH     | Gate/cap the legacy whole-book `outline()` endpoint so it cannot overwrite protected arc briefs                                     | COMPLETED | —            |
 | FIX-09 | MEDIUM   | Align `revealChapter` catalog semantics with the actual knowledge ledger                                                            | PENDING   | —            |
 | FIX-10 | MEDIUM   | Require `briefCompliance` at runtime; fail closed if the judge omits it                                                             | PENDING   | —            |
 | FIX-11 | MEDIUM   | Use one writing-style policy across generation, fix, and revision prompts                                                           | PENDING   | —            |
@@ -77,7 +77,7 @@ None.
 
 ## Pending
 
-See table above. FIX-08 selected next.
+See table above. FIX-09 selected next.
 
 ## Blocked
 
@@ -363,5 +363,34 @@ test. All 9 pre-existing tests in the file pass unmodified.
 
 Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
 1001 pass, 10 skip, 0 fail (independently re-run).
+
+Commit: `35f50034`
+
+### FIX-08 — Gate the legacy whole-book `outline()` endpoint against protected briefs
+
+Source finding: `harness-post-implementation-review.md` H7 ("The public legacy whole-book outliner
+can overwrite protected arc briefs") + §18 row 8.
+
+What changed:
+
+`outline()` now calls the existing `protectedBriefsInRange` helper (already extended by FIX-05 to
+cover hand-edited briefs, finalized chapters, and chapters with an existing non-final draft) before
+its upsert loop, and skips any protected chapter exactly like `outlineArc` already does — returning
+the chapter's current row unchanged instead of overwriting it. Also brought `outline()`'s upsert
+`values` in line with `outlineArc`'s convention by setting `staleReason: null` and `handEdited: false`
+explicitly (previously set neither). No new arc-approval gate was added — `outline()` is deliberately
+arc-agnostic (it spans ranges across volumes without per-arc scoping, for projects that may not use
+the arc tier at all), so "obey arc gates" doesn't apply the way it does to `outlineArc`; the
+protection-rules half of the audit's either/or fix is what's implemented, reusing the already-tested
+helper rather than duplicating its logic.
+
+Tests: `tests/generation/outline-invariants.spec.ts` (+5): a hand-edited brief in range survives
+`outline()` unchanged; a finalized chapter's brief survives unchanged; a chapter with an existing
+non-final draft survives unchanged (proving the FIX-05 draft-protection extension applies here too,
+not just in `outlineArc`); an unprotected chapter is still normally written; a normally-upserted
+brief has `handEdited: false`/`staleReason: null` set.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+1006 pass, 10 skip, 0 fail (independently re-run).
 
 Commit: (recorded after commit, see git log)

@@ -278,8 +278,11 @@ export class GenerationService {
 
     await this.dropUnresolvedContextRefs(projectId, chapters);
 
+    const { chapters: protectedChapters, briefs: preservedBriefs } = await this.protectedBriefsInRange(projectId, start, end);
     const upserted = await Promise.all(
       chapters.map(c => {
+        if (protectedChapters.has(c.chapter)) return Promise.resolve(preservedBriefs.get(c.chapter));
+
         const briefBody = renderBriefBody(c);
         const values = {
           volumeKey: c.volumeKey,
@@ -292,6 +295,8 @@ export class GenerationService {
           chapterPurpose: c.chapterPurpose ?? null,
           readerValue: c.readerValue ?? null,
           repetitionRisks: c.repetitionRisks ?? null,
+          staleReason: null,
+          handEdited: false,
         };
         return this.db
           .insert(schema.briefs)
@@ -302,6 +307,7 @@ export class GenerationService {
       }),
     );
 
+    if (protectedChapters.size > 0) this.logger.info('outline: preserved protected briefs', { projectId, chapters: [...protectedChapters] });
     this.logger.info('outline: briefs upserted', { projectId, briefs: upserted.filter(Boolean).length });
     return { briefs: upserted.filter(Boolean) as Generation.Brief[] };
   }
