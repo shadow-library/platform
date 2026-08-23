@@ -332,6 +332,79 @@ describe.if(pgAvailable)('continuity delta application', () => {
     expect(await db.query.characterStates.findMany({ where: eq(schema.characterStates.projectId, projectId) })).toHaveLength(1);
   });
 
+  it('should keep the proposal pending when the graph holds low-confidence entries back', async () => {
+    const projectId = await seedProject(`cont-held-graph-${Date.now()}`);
+    await db.insert(schema.entities).values({ projectId, entityKey: 'amara', name: 'Amara', type: 'character' });
+    await runFinalization(
+      projectId,
+      delta({
+        threads: [
+          { threadKey: 'the-ledger', status: 'open', confidence: 'high' },
+          { threadKey: 'the-rumour', status: 'open', confidence: 'low' },
+        ],
+        characterStates: [{ entityKey: 'amara', location: 'the tower', evidence: 'she might be there', confidence: 'low' }],
+      }),
+      'held',
+    );
+
+    const threads = await db.query.plotThreads.findMany({ where: eq(schema.plotThreads.projectId, projectId) });
+    expect(threads.map(t => t.threadKey)).toEqual(['the-ledger']);
+    expect(await db.query.characterStates.findMany({ where: eq(schema.characterStates.projectId, projectId) })).toHaveLength(0);
+
+    const chapter = await db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, 1)) });
+    expect(chapter?.continuityApplied).toBe(true);
+
+    const proposal = await db.query.continuityProposals.findFirst({ where: eq(schema.continuityProposals.projectId, projectId) });
+    expect(proposal?.status).toBe('pending');
+    expect(proposal?.appliedAt).toBeNull();
+    expect((await service.getContinuityProposal(projectId, 1)).id).toBe(proposal!.id);
+  });
+
+  it('should mark the proposal applied when the graph holds nothing back', async () => {
+    const projectId = await seedProject(`cont-nothing-held-${Date.now()}`);
+    await runFinalization(projectId, delta({ threads: [{ threadKey: 'the-ledger', status: 'open', confidence: 'high' }] }), 'nothing-held');
+
+    const proposal = await db.query.continuityProposals.findFirst({ where: eq(schema.continuityProposals.projectId, projectId) });
+    expect(proposal?.status).toBe('applied');
+    expect(proposal?.appliedAt).not.toBeNull();
+  });
+
+  it('should keep a proposal with held entries reviewable after the manual endpoint applies it', async () => {
+    const projectId = await seedProject(`cont-held-manual-${Date.now()}`);
+    await applyViaEndpoint(
+      projectId,
+      delta({
+        threads: [
+          { threadKey: 'the-ledger', status: 'open', confidence: 'high' },
+          { threadKey: 'the-rumour', status: 'open', confidence: 'low' },
+        ],
+      }),
+    );
+
+    const threads = await db.query.plotThreads.findMany({ where: eq(schema.plotThreads.projectId, projectId) });
+    expect(threads.map(t => t.threadKey)).toEqual(['the-ledger']);
+
+    const proposal = await service.getContinuityProposal(projectId, 1);
+    expect(proposal.status).toBe('pending');
+    const queue = await service.getReviewQueue(projectId);
+    expect(queue.proposals.map(p => p.chapter)).toEqual([1]);
+  });
+
+  it('should apply a held entry and mark the proposal applied once a human upgrades its confidence', async () => {
+    const projectId = await seedProject(`cont-held-reapply-${Date.now()}`);
+    await applyViaEndpoint(projectId, delta({ threads: [{ threadKey: 'the-rumour', status: 'open', confidence: 'low' }] }));
+
+    expect(await db.query.plotThreads.findMany({ where: eq(schema.plotThreads.projectId, projectId) })).toHaveLength(0);
+    expect((await service.getContinuityProposal(projectId, 1)).status).toBe('pending');
+
+    await service.updateContinuityProposal(projectId, 1, { proposal: delta({ threads: [{ threadKey: 'the-rumour', status: 'open', confidence: 'high' }] }) as never });
+    const applied = await service.applyContinuityProposal(projectId, 1);
+
+    expect(applied.status).toBe('applied');
+    const thread = await db.query.plotThreads.findFirst({ where: eq(schema.plotThreads.projectId, projectId) });
+    expect(thread).toMatchObject({ threadKey: 'the-rumour', status: 'open' });
+  });
+
   it('should show the extractor the existing thread and mystery keys', async () => {
     const projectId = await seedProject(`cont-vocabulary-${Date.now()}`);
     await db.insert(schema.entities).values({ projectId, entityKey: 'amara', name: 'Amara', type: 'character' });

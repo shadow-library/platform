@@ -11,6 +11,11 @@ export type ContinuityTransaction = Parameters<Parameters<PrimaryDatabase['trans
 
 const logger = Logger.getLogger(APP_NAME, 'apply-continuity');
 
+export function continuityHasHeldEntries(delta: ContinuityOutput): boolean {
+  const confidenceBearing = [...(delta.threads ?? []), ...(delta.mysteries ?? []), ...(delta.relationships ?? []), ...(delta.characterStates ?? [])];
+  return confidenceBearing.some(entry => entry.confidence === 'low');
+}
+
 export async function applyContinuityDelta(tx: ContinuityTransaction, projectId: bigint, chapter: number, delta: ContinuityOutput): Promise<void> {
   const entityIds = new Map<string, bigint>();
 

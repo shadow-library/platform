@@ -13,7 +13,7 @@ import { type IndexingService } from '../retrieval/indexing.service';
 import { type ContinuityOutput } from '../schemas';
 import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
-import { applyContinuityDelta } from './apply-continuity';
+import { applyContinuityDelta, continuityHasHeldEntries } from './apply-continuity';
 
 export interface FinalizationServices {
   db: PrimaryDatabase;
@@ -186,12 +186,16 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     // single failed row rolls the whole delta back and leaves the proposal `pending` — never a partial
     // canon that reports success. Errors propagate so the run fails (and resumes) rather than silently
     // swallowing.
+    // A proposal holding low-confidence entries stays `pending` so it remains reachable for review — only a
+    // delta that applied in full becomes `applied`.
+    const hasHeldEntries = continuityHasHeldEntries(delta);
+
     await db.transaction(async tx => {
       await applyContinuityDelta(tx, projectId, state.chapter, delta);
 
       await tx
         .update(schema.continuityProposals)
-        .set({ status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
+        .set(hasHeldEntries ? { updatedAt: new Date() } : { status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, state.chapter)));
 
       await tx

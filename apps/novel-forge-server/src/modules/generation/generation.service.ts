@@ -12,7 +12,7 @@ import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, ty
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { type ContextSection } from '../ai/context/sections';
 import { truncateAtParagraph } from '../ai/context/token-budget';
-import { applyContinuityDelta } from '../ai/graphs/apply-continuity';
+import { applyContinuityDelta, continuityHasHeldEntries } from '../ai/graphs/apply-continuity';
 import { type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService } from '../ai/model-router.service';
 import { buildOutlinePrompt, PROMPT_REGISTRY } from '../ai/prompts';
@@ -1173,12 +1173,16 @@ export class GenerationService {
 
     // Apply every canon mutation, mark the proposal applied, and flag the chapter in one transaction:
     // a partial application must never be recorded as `applied`.
+    // A proposal holding low-confidence entries stays `pending` so it remains reachable for review — only a
+    // delta that applied in full becomes `applied`.
+    const hasHeldEntries = continuityHasHeldEntries(delta);
+
     const updated = await this.db.transaction(async tx => {
       await applyContinuityDelta(tx, projectId, chapter, delta);
 
       const [row] = await tx
         .update(schema.continuityProposals)
-        .set({ status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
+        .set(hasHeldEntries ? { updatedAt: new Date() } : { status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
         .where(eq(schema.continuityProposals.id, proposalRow.id))
         .returning();
 
