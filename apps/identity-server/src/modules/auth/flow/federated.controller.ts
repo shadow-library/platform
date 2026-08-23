@@ -7,6 +7,7 @@ import { Auth } from '@server/modules/access';
 import { FederatedCallbackQuery, FederationError, IdentityProviderService, UpstreamOidcService } from '@server/modules/auth/federation';
 
 import { AuthFlowService } from './auth-flow.service';
+import { FederatedStepUpService } from './federated-step-up.service';
 import { LoginService } from './login.service';
 
 @HttpController()
@@ -19,6 +20,7 @@ export class FederatedController {
     private readonly identityProviderService: IdentityProviderService,
     private readonly upstreamOidcService: UpstreamOidcService,
     private readonly loginService: LoginService,
+    private readonly federatedStepUpService: FederatedStepUpService,
   ) {}
 
   @Get('/api/v1/auth/federated/callback')
@@ -30,7 +32,7 @@ export class FederatedController {
     };
 
     const flow = query.state ? await this.authFlowService.get(query.state) : null;
-    if (!flow || flow.kind !== 'LOGIN' || !flow.federated) return fail('unknown or non-federated flow');
+    if (!flow || (flow.kind !== 'LOGIN' && flow.kind !== 'STEP_UP') || !flow.federated) return fail('unknown or non-federated flow');
     if (query.error || !query.code) return fail(`upstream error: ${query.error ?? 'missing code'}`);
 
     const provider = await this.identityProviderService.getById(flow.federated.identityProviderId);
@@ -38,6 +40,13 @@ export class FederatedController {
 
     try {
       const identity = await this.upstreamOidcService.exchangeAndVerify(provider, query.code, flow.federated.codeVerifier, flow.federated.nonce);
+
+      if (flow.kind === 'STEP_UP') {
+        const elevated = await this.federatedStepUpService.complete(flow, identity);
+        reply.status(302).redirect(`${this.loginUrl}?flow_id=${encodeURIComponent(flow.flowId)}&status=STEP_UP_COMPLETE&aal=${elevated.aal}`);
+        return;
+      }
+
       const result = await this.loginService.continueFederated(flow.flowId, identity);
 
       if (result.outcome === 'COMPLETED') {

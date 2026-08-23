@@ -2,6 +2,7 @@ import { Module } from '@shadow-library/app';
 
 import { FederationModule } from '@server/modules/auth/federation';
 import { MfaModule } from '@server/modules/auth/mfa';
+import { OAuthModule } from '@server/modules/auth/oauth';
 import { SessionModule } from '@server/modules/auth/session';
 import { TokenModule } from '@server/modules/auth/token';
 import { AuthzModule } from '@server/modules/authz';
@@ -20,6 +21,7 @@ import { AuthController } from './auth.controller';
 import { ChallengeFlowService } from './challenge-flow.service';
 import { ChallengeService } from './challenge.service';
 import { FederatedController } from './federated.controller';
+import { FederatedStepUpService } from './federated-step-up.service';
 import { LoginService } from './login.service';
 import { MeSessionsController } from './me-sessions.controller';
 import { MeSessionsService } from './me-sessions.service';
@@ -41,6 +43,7 @@ import { SuspiciousLoginService } from './suspicious-login.service';
     NotificationModule,
     SecurityModule,
     FederationModule,
+    OAuthModule,
     AuthzModule,
     OrganisationModule,
     AuthModeModule,
@@ -57,6 +60,7 @@ import { SuspiciousLoginService } from './suspicious-login.service';
     RecoveryService,
     MeSessionsService,
     SocialLoginService,
+    FederatedStepUpService,
   ],
   exports: [
     AuthFlowService,
@@ -68,6 +72,7 @@ import { SuspiciousLoginService } from './suspicious-login.service';
     RegistrationService,
     RecoveryService,
     SocialLoginService,
+    FederatedStepUpService,
   ],
 })
 export class AuthFlowModule {}

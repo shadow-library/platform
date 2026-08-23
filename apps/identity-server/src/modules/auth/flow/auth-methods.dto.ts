@@ -1,6 +1,7 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 
 import { type SocialProviderKind } from '@server/modules/auth/federation';
+import { ElevationIntentFields } from '@server/modules/auth/mfa';
 
 @Schema()
 export class SocialProviderParams {
@@ -30,6 +31,12 @@ export class SocialLoginStartResponse {
 
   @Field({ description: 'Upstream authorization endpoint the browser must be sent to; it already carries state, nonce and the PKCE challenge.' })
   authorizationUrl: string;
+}
+
+@Schema()
+export class StepUpFederatedStartBody extends ElevationIntentFields {
+  @Field({ optional: true })
+  deviceId?: string;
 }
 
 @Schema()

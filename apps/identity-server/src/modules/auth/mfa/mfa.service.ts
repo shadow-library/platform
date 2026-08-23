@@ -6,6 +6,7 @@ import { Config, Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
+import { FederatedIdentityService } from '@server/modules/auth/federation';
 import { KeyProvider } from '@server/modules/auth/keys';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
@@ -36,7 +37,7 @@ export interface MfaFactors {
   webauthn: boolean;
 }
 
-export type StepUpMethod = 'TOTP' | 'WEBAUTHN' | 'PASSWORD';
+export type StepUpMethod = 'TOTP' | 'WEBAUTHN' | 'PASSWORD' | 'FEDERATED';
 
 interface SerializedSecret {
   ciphertext: string;
@@ -64,6 +65,7 @@ export class MfaService {
     private readonly recoveryCodeService: RecoveryCodeService,
     private readonly passwordService: PasswordService,
     private readonly clientService: OAuthClientService,
+    private readonly federatedIdentityService: FederatedIdentityService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -87,7 +89,10 @@ export class MfaService {
     const methods: StepUpMethod[] = [];
     if (factors.totp) methods.push('TOTP');
     if (factors.webauthn) methods.push('WEBAUTHN');
-    if (!factors.totp && !factors.webauthn && (await this.passwordService.hasPassword(userId))) methods.push('PASSWORD');
+    if (!factors.totp && !factors.webauthn) {
+      if (await this.passwordService.hasPassword(userId)) methods.push('PASSWORD');
+      else if ((await this.federatedIdentityService.listForUser(userId)).length > 0) methods.push('FEDERATED');
+    }
     return methods;
   }
 

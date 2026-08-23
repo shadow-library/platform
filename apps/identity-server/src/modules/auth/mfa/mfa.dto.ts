@@ -99,7 +99,7 @@ export class StepUpIntentResponse {
 @Schema()
 export class StepUpMethodsResponse {
   @Field(() => [String], { description: 'Methods available for elevation; an empty array means the account must enroll a factor first.' })
-  methods: ('TOTP' | 'WEBAUTHN' | 'PASSWORD')[];
+  methods: ('TOTP' | 'WEBAUTHN' | 'PASSWORD' | 'FEDERATED')[];
 }
 
 @Schema()

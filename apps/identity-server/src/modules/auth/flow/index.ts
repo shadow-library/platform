@@ -8,6 +8,7 @@ export * from './auth.dto';
 export * from './challenge-flow.service';
 export * from './challenge.service';
 export * from './federated.controller';
+export * from './federated-step-up.service';
 export * from './flow.types';
 export * from './login.service';
 export * from './recovery.service';

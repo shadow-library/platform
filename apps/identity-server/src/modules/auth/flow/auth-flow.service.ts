@@ -4,9 +4,10 @@ import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
 
+import { type ElevationIntent } from '@server/modules/auth/session';
 import { DatabaseService } from '@server/modules/infrastructure/datastore';
 
-export type AuthFlowKind = 'LOGIN' | 'REGISTRATION' | 'RECOVERY';
+export type AuthFlowKind = 'LOGIN' | 'REGISTRATION' | 'RECOVERY' | 'STEP_UP';
 
 export interface DeviceContext {
   fingerprint?: string;
@@ -29,6 +30,8 @@ export interface AuthFlowContext {
   status: string;
   identifier: string;
   userId?: string;
+  /** Set only for STEP_UP flows — the session the completed flow elevates, distinct from `userId`'s login-flow role. */
+  sessionId?: string;
   authMethod?: string;
   failureCount: number;
   globalFailureCount: number;
@@ -38,6 +41,7 @@ export interface AuthFlowContext {
   lastOtpSentAt?: number;
   returnTo?: string;
   federated?: FederatedFlowState;
+  elevationIntent?: ElevationIntent;
   createdAt: number;
 }
 
@@ -61,13 +65,14 @@ export class AuthFlowService {
     return `auth_flow:${flowId}`;
   }
 
-  async create(kind: AuthFlowKind, status: string, data: Partial<AuthFlowContext> = {}): Promise<AuthFlowContext> {
+  async create(kind: AuthFlowKind, status: string, data: Partial<AuthFlowContext> = {}, ttlSeconds: number = this.ttlSeconds): Promise<AuthFlowContext> {
     const context: AuthFlowContext = {
       flowId: `flow_auth_${randomUUID()}`,
       kind,
       status,
       identifier: data.identifier ?? '',
       userId: data.userId,
+      sessionId: data.sessionId,
       authMethod: data.authMethod,
       failureCount: 0,
       globalFailureCount: 0,
@@ -77,9 +82,10 @@ export class AuthFlowService {
       lastOtpSentAt: data.lastOtpSentAt,
       returnTo: data.returnTo,
       federated: data.federated,
+      elevationIntent: data.elevationIntent,
       createdAt: Date.now(),
     };
-    await this.persist(context);
+    await this.persist(context, ttlSeconds);
     return context;
   }
 
@@ -98,7 +104,7 @@ export class AuthFlowService {
     await this.redis.del(this.key(flowId));
   }
 
-  private async persist(context: AuthFlowContext): Promise<void> {
-    await this.redis.set(this.key(context.flowId), JSON.stringify(context), 'EX', this.ttlSeconds);
+  private async persist(context: AuthFlowContext, ttlSeconds: number = this.ttlSeconds): Promise<void> {
+    await this.redis.set(this.key(context.flowId), JSON.stringify(context), 'EX', ttlSeconds);
   }
 }

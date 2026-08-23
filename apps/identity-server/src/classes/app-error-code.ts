@@ -94,6 +94,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly MFA_002 = AppErrorCode.unauthenticated('MFA_002', 'Invalid verification code');
   /** The MFA method is already enrolled */
   static readonly MFA_003 = AppErrorCode.conflict('MFA_003', 'MFA method already enrolled');
+  /** No usable linked identity provider exists for a federated step-up */
+  static readonly MFA_004 = AppErrorCode.notFound('MFA_004', 'No linked identity provider available for step-up');
 
   /*!
    * Security Error Codes

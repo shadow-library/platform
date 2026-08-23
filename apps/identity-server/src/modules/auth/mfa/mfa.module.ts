@@ -1,5 +1,6 @@
 import { Module } from '@shadow-library/app';
 
+import { FederationModule } from '@server/modules/auth/federation';
 import { KeyModule } from '@server/modules/auth/keys';
 import { OAuthModule } from '@server/modules/auth/oauth';
 import { SessionModule } from '@server/modules/auth/session';
@@ -16,7 +17,7 @@ import { WebauthnController } from './webauthn.controller';
 import { WebauthnService } from './webauthn.service';
 
 @Module({
-  imports: [DatabaseModule, KeyModule, OAuthModule, SessionModule, CredentialsModule, UserModule, AuditModule, NotificationModule],
+  imports: [DatabaseModule, KeyModule, OAuthModule, SessionModule, CredentialsModule, UserModule, AuditModule, NotificationModule, FederationModule],
   controllers: [MfaController, WebauthnController],
   providers: [MfaService, RecoveryCodeService, WebauthnService],
   exports: [MfaService, RecoveryCodeService, WebauthnService],
