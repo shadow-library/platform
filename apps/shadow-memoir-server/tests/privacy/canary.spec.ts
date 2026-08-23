@@ -16,6 +16,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { MemoirAuthModule } from '@modules/auth';
 import { CommandBus, CommandsModule } from '@modules/commands';
 import { FinanceModule } from '@modules/finance';
+import { MetricsModule } from '@modules/metrics';
 import { SyncModule } from '@modules/sync';
 import { DatastoreModule, getSensitivityManifest, type PrimaryDatabase, schema, sensitive } from '@server/database';
 import { manifestLogRedactionFormat } from '@server/database/log-redaction';
@@ -33,7 +34,7 @@ import { userToken } from '../test-idp';
 
 const TestHttpModule = FastifyModule.forRoot({ imports: [MemoirAuthModule, SyncModule], host: 'localhost', port: 0 });
 
-@Module({ imports: [DatastoreModule, TestHttpModule, FinanceModule, CommandsModule] })
+@Module({ imports: [DatastoreModule, TestHttpModule, FinanceModule, MetricsModule, CommandsModule] })
 class TestAppModule {}
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost:55433/shadow_memoir';
@@ -45,7 +46,7 @@ const CANARY = `CANARY${Bun.randomUUIDv7().replaceAll('-', '')}`;
 const SYNTHETIC_CRASH = 'test.synthetic_crash';
 
 /** The real, schema-registered manifest entries — excludes throwaway fixture tables other spec files register into the same process-global manifest. */
-const APP_TABLES = new Set(['reschedule_events', 'recovery_quests', 'quests', 'quest_logs', 'accounts', 'expenses', 'subscriptions']);
+const APP_TABLES = new Set(['reschedule_events', 'recovery_quests', 'quests', 'quest_logs', 'accounts', 'expenses', 'subscriptions', 'metrics', 'metric_entries']);
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -240,6 +241,22 @@ describe('Privacy canary suite (T-28)', () => {
     coveredKeys.add('recovery_quests.source_quest_name');
     coveredKeys.add('recovery_quests.reflection_text');
     expect(lines).not.toContain(CANARY);
+  });
+
+  it('should not leak a canary metric name through a metric.create command (T-23)', async () => {
+    const lines = await capture(async () => {
+      await submit([envelope('metric.create', { name: CANARY, valueType: 'number', direction: 'neutral' })]);
+    });
+    coveredKeys.add('metrics.name');
+    expect(lines).not.toContain(CANARY);
+  });
+
+  it("should redact metric_entries.value the same way as any other manifest column, driven at the formatter directly since it's numeric and cannot carry a canary string through the real command path (T-23)", () => {
+    const format = manifestLogRedactionFormat();
+    const info = { level: 'info', message: 'unrelated', value: CANARY };
+    format.transform(info, {});
+    coveredKeys.add('metric_entries.value');
+    expect(info.value).not.toBe(CANARY);
   });
 
   it('should not leak canary values through an unmapped constraint violation (duplicate expense id), aside from the known packages/fastify gap', async () => {

@@ -12,3 +12,4 @@ export * from './mechanic-events';
 export * from './grants';
 export * from './quest-streaks';
 export * from './finance';
+export * from './metrics';

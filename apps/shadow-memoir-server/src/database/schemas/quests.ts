@@ -4,6 +4,7 @@ import { bigint, bigserial, boolean, check, index, numeric, pgEnum, pgTable, sma
 import { sensitive } from '../sensitivity';
 import { accounts } from './accounts';
 import { jsonb } from './jsonb';
+import { metrics } from './metrics';
 
 export namespace Quest {
   export type Row = InferSelectModel<typeof quests>;
@@ -57,7 +58,6 @@ export const quests = pgTable(
   ],
 );
 
-/** `metric_id` gains its `metrics` foreign key in T-23, which is where that table lands (ARCHITECTURE §10.3). */
 export const questConsequences = pgTable(
   'quest_consequences',
   {
@@ -68,7 +68,9 @@ export const questConsequences = pgTable(
     questId: bigint('quest_id', { mode: 'bigint' })
       .notNull()
       .references(() => quests.id, { onDelete: 'cascade' }),
-    metricId: bigint('metric_id', { mode: 'bigint' }).notNull(),
+    metricId: bigint('metric_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => metrics.id),
     fullValue: numeric('full_value').notNull(),
     unit: text('unit'),
     partialMode: partialMode('partial_mode').notNull(),

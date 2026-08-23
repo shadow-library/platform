@@ -126,4 +126,20 @@ export class AppErrorCode extends ServerErrorCode {
 
   /** No `OcrStructuringClient` implementation is wired for this environment yet (real client lands with T-33) — the endpoint never fabricates a result */
   static readonly OCR_002 = AppErrorCode.unavailable('OCR_002', 'OCR structuring service is not configured');
+
+  /*!
+   * Metric Errors
+   */
+
+  /** A metric with this name already exists for the account (`metrics_account_id_name_unique`) */
+  static readonly MET_001 = AppErrorCode.conflict('MET_001', 'A metric with this name already exists');
+
+  /** No metric with that id belongs to the caller, or it has been deactivated; a foreign or deactivated id reads exactly like a nonexistent one */
+  static readonly MET_002 = AppErrorCode.notFound('MET_002', 'Metric not found');
+
+  /** A built-in metric's identity/classification cannot be edited or deleted through `metric.update`/`metric.delete` (PRD §3.8) */
+  static readonly MET_003 = AppErrorCode.forbidden('MET_003', 'Built-in metrics cannot be modified or deleted');
+
+  /** `metric.delete` on a metric still referenced by a quest's consequences requires `detach: true` (S6) — this is the warning, not a hard block */
+  static readonly MET_004 = AppErrorCode.conflict('MET_004', "This metric is used by {questCount} quest(s); pass 'detach: true' to remove those links and deactivate it");
 }
