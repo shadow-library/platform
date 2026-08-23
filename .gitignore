@@ -52,6 +52,9 @@ playwright/.auth/
 # graphify (do not commit — generated knowledge graphs, root and per-workspace)
 graphify-out/
 
+# Shadow Memoir working docs (local orchestrator reference, never committed)
+docs/shadow-memoir/
+
 # Claude local overrides (do not commit)
 CLAUDE.local.md
 
