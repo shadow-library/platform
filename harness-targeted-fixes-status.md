@@ -11,9 +11,9 @@ corrective only, same as the first — no new subsystems, no reopening the archi
 
 ## Summary
 
-- Completed: 12
+- Completed: 13
 - In Progress: 0
-- Pending: 3
+- Pending: 2
 - Blocked: 0
 
 ## Tasks
@@ -32,7 +32,7 @@ corrective only, same as the first — no new subsystems, no reopening the archi
 | FIX-10 | MEDIUM   | Require `briefCompliance` at runtime; fail closed if the judge omits it                                                                 | COMPLETED | —            |
 | FIX-11 | MEDIUM   | Use one writing-style policy across generation, fix, and revision prompts                                                               | COMPLETED | —            |
 | FIX-12 | HIGH     | Cursor-only finalization retry must not re-extract or reapply continuity (residual gap in FIX-01)                                       | COMPLETED | FIX-01       |
-| FIX-13 | HIGH     | Ancestor draft changes (update/import/revise) must invalidate drafted descendants (residual gap in FIX-05)                              | PENDING   | FIX-05       |
+| FIX-13 | HIGH     | Ancestor draft changes (update/import/revise) must invalidate drafted descendants (residual gap in FIX-05)                              | COMPLETED | FIX-05       |
 | FIX-14 | HIGH     | Low-confidence continuity entries must stay reachable for review, not marked applied (residual gap in FIX-06)                           | PENDING   | FIX-06       |
 | FIX-15 | HIGH     | Character-state merge must replace/clear fields per the extraction contract, not `COALESCE`-merge stale values (residual gap in FIX-03) | PENDING   | FIX-03       |
 
@@ -86,7 +86,6 @@ None.
 
 ## Pending
 
-- FIX-13 — ancestor draft invalidation
 - FIX-14 — low-confidence continuity reviewability
 - FIX-15 — character-state stale merge semantics
 
@@ -555,3 +554,51 @@ Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type
 1012 pass, 10 skip, 0 fail (independently re-run).
 
 Commit: `3e7ac933`
+
+### FIX-13 — Ancestor draft edits invalidate drafted descendants
+
+Source finding: `harness-targeted-fixes-verification.md` H4 residual gap ("`updateDraft`, `importDraft`,
+and `reviseDraft` still mutate chapter N without checking for or invalidating drafts N+1 and later. A
+later approved draft can therefore remain based on prose that no longer exists").
+
+Root cause: FIX-05 protected already-drafted chapters from being silently overwritten by arc
+reconciliation, but that is a different write path from `updateDraft`/`importDraft`/`reviseDraft` — the
+three human/AI-revision entry points that directly mutate a single chapter's draft row. None of the
+three looked past their own chapter. A descendant draft (e.g. chapter N+1, generated using chapter N's
+prose tail and continuation state as its predecessor context) had no mechanism to be told its ancestor
+had since changed, and could sail through `approveDraft` → `finalize` unchanged.
+
+What changed: added a nullable `drafts.staleReason` column (mirrors the existing `briefs.staleReason`
+pattern exactly). A new private `GenerationService.markDescendantDraftsStale(projectId, chapter,
+reason)` runs at the end of `updateDraft`/`importDraft`/`reviseDraft`: it sets `staleReason` on every
+OTHER draft in the project with `chapter > N` and `status <> 'final'` (finalized chapters are never
+touched — out of scope per the audit's own instruction not to auto-invalidate finalized history), then
+separately downgrades `reviewStatus` from `approved` back to `needs_review` only for descendants that
+were actually approved — a descendant already sitting in `needs_review`/`contradiction`/`generating` is
+left as-is, just flagged. `approveDraft` now refuses a stale draft outright (`DRF_007`, new error code)
+so a human can't re-approve a still-stale draft without regenerating it first — no new gate was needed
+at `finalize()` itself since it already requires `reviewStatus === 'approved'`. Regenerating a chapter
+(`persistDraft` in the generation graph, and `generateGrok`) explicitly writes `staleReason: null`,
+clearing the flag on fresh content. The three mutation methods also clear `staleReason` on their own
+chapter's row (a freshly hand-edited/imported/revised draft is not itself stale).
+
+Tests: `tests/generation/draft-mutation-guards.spec.ts` (+7, new `describe('descendant invalidation')`
+block): `updateDraft`/`importDraft`/`reviseDraft` each mark an approved descendant stale and downgrade it
+to `needs_review`; `approveDraft` rejects a stale draft with `DRF_007`; ancestors and other projects'
+drafts are left untouched; a descendant already in `contradiction` keeps that status while still getting
+flagged; a `final` descendant is never touched at all. Confirmed against pre-fix code (invalidation
+calls and the `DRF_007` guard temporarily removed): 5 of the 7 new tests fail; the two negative-only
+tests (unaffected drafts, final descendant) were separately confirmed to catch over-broad invalidation
+by widening the predicate to `chapter <> N` and observing them fail. All pass with the fix restored.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+1019 pass, 10 skip, 0 fail (independently re-run).
+
+Non-blocking note carried forward: `markDescendantDraftsStale` runs after the ancestor's own write and
+is not wrapped in the same transaction as it (matching the existing non-transactional shape of
+`updateDraft`/`importDraft`/`reviseDraft`, which also write `draftRevisions` non-transactionally today).
+A crash between the ancestor write and the descendant-marking update would leave descendants un-flagged.
+Tightening this would mean adding transactional wrapping to methods that don't have it today, which is a
+broader change than this targeted fix's scope — left as a known limitation, not a fix-blocking gap.
+
+Commit: `868402b6`
