@@ -6,9 +6,9 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 
 ## Summary
 
-- Completed: 2
+- Completed: 3
 - In Progress: 0
-- Pending: 9
+- Pending: 8
 - Blocked: 0
 
 ## Tasks
@@ -17,7 +17,7 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 | ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------ |
 | FIX-01 | CRITICAL | Make chapter finalization recoverable/idempotent across prose commit → extraction → apply → cursor                                  | COMPLETED | —            |
 | FIX-02 | CRITICAL | Reject mutation/deletion of finalized drafts; fix cross-table renumbering invariant on delete                                       | COMPLETED | —            |
-| FIX-03 | HIGH     | Read `character_states` + current relationships into `forChapter`; validate entity keys before applying extraction                  | PENDING   | —            |
+| FIX-03 | HIGH     | Read `character_states` + current relationships into `forChapter`; validate entity keys before applying extraction                  | COMPLETED | —            |
 | FIX-04 | HIGH     | Render `brief.pov` into generation/judge brief; guarantee POV entity card priority                                                  | PENDING   | —            |
 | FIX-05 | HIGH     | Arc reconciliation observes events inside the current arc, not `arc.chapterStart`; protect/invalidate already-drafted descendants   | PENDING   | FIX-02       |
 | FIX-06 | HIGH     | Continuity extraction receives existing key vocabulary; validate relationship targets/evidence; route ambiguous mutations to review | PENDING   | —            |
@@ -77,7 +77,7 @@ None.
 
 ## Pending
 
-See table above. FIX-03 selected next.
+See table above. FIX-04 selected next.
 
 ## Blocked
 
@@ -159,5 +159,48 @@ final (row unchanged), and both still work normally on non-final/absent drafts.
 
 Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
 972 pass, 10 skip, 0 fail (independently re-run).
+
+Commit: `2359c340`
+
+### FIX-03 — Complete the dynamic-state read path
+
+Source finding: `harness-post-implementation-review.md` H1 ("Dynamic character state is write-only")
+
+- §18 row 3.
+
+What changed:
+
+- `ContextAssembler.forChapter` gained a `dynamicCastSections` step, scoped to the chapter's cast
+  (entity keys already resolved from the brief's `contextRefs`, plus `brief.pov` when set) — never a
+  project-wide read. It queries `character_states` for those keys and renders a compact
+  location/conditions/goal/status block per character (`character_state` section), and queries
+  `entity_relationships` for the same cast's entity ids, reduced in application code to the
+  highest-`chapter` row per `(entityId, targetKey, kind)` — the append-only table's "current" state —
+  rendered as a `relationships` section. Both are volatile-tier (`makeSection(..., 'working', ...)`,
+  never `asStable()`'d) since they're per-chapter dynamic facts, not cacheable canon. Neither section
+  is pushed when the cast is empty or no rows match — no spurious empty sections.
+- `apply-continuity.ts`'s `characterStates` upsert loop now calls the existing `resolveEntityId` guard
+  before writing (matching the pattern already used by the `relationships`/`appeared` loops just above
+  it) and skips with a `logger.warn` when the extracted `entityKey` resolves to no entity — previously
+  it wrote whatever key the model produced unconditionally, letting a hallucinated character-state row
+  become a permanent orphan.
+
+**Corruption caught and fixed during review, not by the sub-agent**: the delivered
+`context-assembler.service.ts` contained two literal raw NUL bytes (`\x00`) used as a map-key delimiter
+inside `latestRelationships`'s `` `${row.entityId}\x00${row.targetKey}\x00${row.kind}` `` template —
+functionally inert in a JS string but made the file register as binary to `git diff`/`file`(1) and would
+break any text-based tooling (grep, some editors) that touches it. Replaced with a plain `::` delimiter
+before commit; re-verified `bun scripts/verify.ts apps/novel-forge-server` after the fix.
+
+Tests: `tests/ai/context-assembler.spec.ts` (+6: full character-state block rendering for a
+`contextRefs` cast member, POV-only cast, out-of-cast state excluded from both the section and
+`pack.rendered`, latest-wins relationship reduction across two chapters for the same
+entity/target/kind triple, no sections on an empty-cast brief, no sections when the cast has no
+matching rows), `tests/ai/continuity-apply.spec.ts` (+1: a `characterStates` delta entry with an
+unresolvable `entityKey` writes no row while a sibling with a valid key still does).
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+979 pass, 10 skip, 0 fail (independently re-run after the NUL-byte fix, not just trusted from the
+implementing sub-agent).
 
 Commit: (recorded after commit, see git log)

@@ -142,6 +142,7 @@ describe.if(pgAvailable)('continuity delta application', () => {
 
   it('should upsert character states and not null out fields omitted by a later chapter', async () => {
     const projectId = await seedProject(`cont-state-${Date.now()}`);
+    await db.insert(schema.entities).values({ projectId, entityKey: 'amara', name: 'Amara', type: 'character' });
     await applyViaEndpoint(
       projectId,
       delta({
@@ -157,6 +158,24 @@ describe.if(pgAvailable)('continuity delta application', () => {
 
     state = await db.query.characterStates.findFirst({ where: and(eq(schema.characterStates.projectId, projectId), eq(schema.characterStates.entityKey, 'amara')) });
     expect(state).toMatchObject({ location: 'the safehouse', conditions: ['wounded'], immediateGoal: 'find the ledger', statusNote: 'shaken', lastUpdatedChapter: 2 });
+  });
+
+  it('should skip character states whose entity key resolves to no entity', async () => {
+    const projectId = await seedProject(`cont-state-orphan-${Date.now()}`);
+    await db.insert(schema.entities).values({ projectId, entityKey: 'amara', name: 'Amara', type: 'character' });
+    await applyViaEndpoint(
+      projectId,
+      delta({
+        characterStates: [
+          { entityKey: 'amara', location: 'the docks', evidence: 'she limped' },
+          { entityKey: 'ghost', location: 'the void', evidence: 'hallucinated' },
+        ],
+      }),
+    );
+
+    const rows = await db.query.characterStates.findMany({ where: eq(schema.characterStates.projectId, projectId) });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.entityKey).toBe('amara');
   });
 
   it('should never write knowledge changes into the character-knowledge ledger', async () => {

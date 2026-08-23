@@ -130,6 +130,13 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
   }
 
   for (const characterState of delta.characterStates ?? []) {
+    // `character_states.entity_key` is a plain varchar, so an extracted key that names no entity would
+    // otherwise become a permanent orphan row that never resolves back to a character.
+    const entityId = await resolveEntityId(characterState.entityKey);
+    if (!entityId) {
+      logger.warn('applyContinuityDelta: character state entity not found, skipping', { projectId, chapter, entityKey: characterState.entityKey });
+      continue;
+    }
     await tx
       .insert(schema.characterStates)
       .values({

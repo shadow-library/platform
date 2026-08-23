@@ -133,6 +133,8 @@ function makeDbStub(overrides: Record<string, unknown> = {}) {
     worldFacts: { findMany: mock(async () => []) },
     plotThreads: { findMany: mock(async () => []) },
     mysteries: { findMany: mock(async () => []) },
+    characterStates: { findMany: mock(async () => []) },
+    entityRelationships: { findMany: mock(async () => []) },
     contextPacks: { findFirst: mock(async () => null) },
     userFeedback: { findMany: mock(async () => []) },
   };
@@ -146,9 +148,9 @@ function makeDbStub(overrides: Record<string, unknown> = {}) {
   }));
 
   return {
-    query: { ...defaultQuery, ...(overrides.query ?? {}) },
     insert,
     ...overrides,
+    query: { ...defaultQuery, ...(overrides.query ?? {}) },
   };
 }
 
@@ -526,6 +528,128 @@ describe('ContextAssembler.forChapter — FULL_CAST_MAX', () => {
       const idx = sectionKeys.indexOf(key);
       if (memoryIdx !== -1) expect(idx).toBeLessThan(memoryIdx);
     }
+  });
+});
+
+describe('ContextAssembler.forChapter — dynamic cast state', () => {
+  const amara = { id: 10n, entityKey: 'amara', name: 'Amara', type: 'character', status: 'active', origin: 'extracted', body: 'A smuggler.', notes: null, aliases: [] };
+  const rook = { id: 11n, entityKey: 'rook', name: 'Rook', type: 'character', status: 'active', origin: 'extracted', body: 'A rival.', notes: null, aliases: [] };
+
+  function castDb(overrides: { contextRefs?: string[]; pov?: string | null; entities?: unknown[]; characterStates?: unknown[]; entityRelationships?: unknown[] }) {
+    return {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, instructions: 'style', contentMode: 'standard' })) },
+        briefs: { findFirst: mock(async () => ({ id: 1n, projectId: 1n, chapter: 5, body: 'Brief body', contextRefs: overrides.contextRefs ?? [], pov: overrides.pov ?? null })) },
+        entities: { findMany: mock(async () => overrides.entities ?? []) },
+        characterStates: { findMany: mock(async () => overrides.characterStates ?? []) },
+        entityRelationships: { findMany: mock(async () => overrides.entityRelationships ?? []) },
+      },
+    };
+  }
+
+  it('should render the current location, conditions, goal and status for a character in the brief cast', async () => {
+    const assembler = makeAssembler(
+      castDb({
+        contextRefs: ['entity:amara'],
+        entities: [amara],
+        characterStates: [
+          {
+            id: 1n,
+            projectId: 1n,
+            entityKey: 'amara',
+            location: 'the docks',
+            conditions: ['wounded', 'hunted'],
+            immediateGoal: 'find the ledger',
+            statusNote: 'shaken',
+            lastUpdatedChapter: 4,
+          },
+        ],
+      }),
+    );
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    const section = pack.sections.find(s => s.key === 'character_state');
+    expect(section).toBeDefined();
+    expect(section?.segment).toBe('volatile');
+    expect(section?.rendered).toContain('**Amara** (as of ch 4)');
+    expect(section?.rendered).toContain('Location: the docks');
+    expect(section?.rendered).toContain('Conditions: wounded, hunted');
+    expect(section?.rendered).toContain('Goal: find the ledger');
+    expect(section?.rendered).toContain('Status: shaken');
+  });
+
+  it('should include the POV character state even when the brief lists no entity refs', async () => {
+    const assembler = makeAssembler(
+      castDb({
+        pov: 'amara',
+        entities: [amara],
+        characterStates: [{ id: 1n, projectId: 1n, entityKey: 'amara', location: 'the safehouse', conditions: null, immediateGoal: null, statusNote: null, lastUpdatedChapter: 4 }],
+      }),
+    );
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    expect(pack.sections.find(s => s.key === 'character_state')?.rendered).toContain('Location: the safehouse');
+  });
+
+  it('should exclude character state for an entity outside the chapter cast', async () => {
+    const assembler = makeAssembler(
+      castDb({
+        contextRefs: ['entity:amara'],
+        entities: [amara, rook],
+        characterStates: [
+          { id: 1n, projectId: 1n, entityKey: 'amara', location: 'the docks', conditions: null, immediateGoal: null, statusNote: null, lastUpdatedChapter: 4 },
+          { id: 2n, projectId: 1n, entityKey: 'rook', location: 'THE_STALE_TOWER', conditions: null, immediateGoal: null, statusNote: null, lastUpdatedChapter: 2 },
+        ],
+      }),
+    );
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    const section = pack.sections.find(s => s.key === 'character_state');
+    expect(section?.rendered).toContain('the docks');
+    expect(section?.rendered).not.toContain('THE_STALE_TOWER');
+    expect(pack.rendered).not.toContain('THE_STALE_TOWER');
+  });
+
+  it('should keep only the most recent relationship row per entity, target and kind', async () => {
+    const assembler = makeAssembler(
+      castDb({
+        contextRefs: ['entity:amara'],
+        entities: [amara],
+        entityRelationships: [
+          { id: 1n, projectId: 1n, entityId: 10n, targetKey: 'rook', kind: 'rival', note: 'STALE_TRADED_THREATS', chapter: 2 },
+          { id: 2n, projectId: 1n, entityId: 10n, targetKey: 'rook', kind: 'rival', note: 'CURRENT_UNEASY_ALLIANCE', chapter: 4 },
+        ],
+      }),
+    );
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    const section = pack.sections.find(s => s.key === 'relationships');
+    expect(section).toBeDefined();
+    expect(section?.segment).toBe('volatile');
+    expect(section?.rendered).toContain('Amara → rook (rival): CURRENT_UNEASY_ALLIANCE [ch 4]');
+    expect(section?.rendered).not.toContain('STALE_TRADED_THREATS');
+  });
+
+  it('should omit both dynamic sections when the cast has no state or relationship rows', async () => {
+    const assembler = makeAssembler(castDb({ contextRefs: ['entity:amara'], entities: [amara] }));
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    expect(pack.sections.find(s => s.key === 'character_state')).toBeUndefined();
+    expect(pack.sections.find(s => s.key === 'relationships')).toBeUndefined();
+  });
+
+  it('should omit both dynamic sections when the brief names no cast at all', async () => {
+    const assembler = makeAssembler(
+      castDb({
+        entities: [amara],
+        characterStates: [{ id: 1n, projectId: 1n, entityKey: 'amara', location: 'the docks', conditions: null, immediateGoal: null, statusNote: null, lastUpdatedChapter: 4 }],
+        entityRelationships: [{ id: 1n, projectId: 1n, entityId: 10n, targetKey: 'rook', kind: 'rival', note: 'n', chapter: 4 }],
+      }),
+    );
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    expect(pack.sections.find(s => s.key === 'character_state')).toBeUndefined();
+    expect(pack.sections.find(s => s.key === 'relationships')).toBeUndefined();
   });
 });
 

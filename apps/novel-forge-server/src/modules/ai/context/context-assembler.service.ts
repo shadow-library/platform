@@ -85,6 +85,31 @@ function firstLine(text: string | null): string {
   return (text ?? '').split('\n', 1)[0] ?? '';
 }
 
+type CharacterStateRow = typeof schema.characterStates.$inferSelect;
+type EntityRelationshipRow = typeof schema.entityRelationships.$inferSelect;
+
+function renderCharacterState(name: string, state: CharacterStateRow): string | null {
+  const lines: string[] = [];
+  if (state.location) lines.push(`Location: ${state.location}`);
+  if (state.conditions && state.conditions.length > 0) lines.push(`Conditions: ${state.conditions.join(', ')}`);
+  if (state.immediateGoal) lines.push(`Goal: ${state.immediateGoal}`);
+  if (state.statusNote) lines.push(`Status: ${state.statusNote}`);
+  if (lines.length === 0) return null;
+  return [`**${name}** (as of ch ${state.lastUpdatedChapter})`, ...lines].join('\n');
+}
+
+// `entity_relationships` is append-only — one row per chapter that observed the pair — so current state
+// is the highest-chapter row per (entityId, targetKey, kind), with the later insert winning a tie.
+function latestRelationships(rows: EntityRelationshipRow[]): EntityRelationshipRow[] {
+  const latest = new Map<string, EntityRelationshipRow>();
+  for (const row of rows) {
+    const key = `${row.entityId}::${row.targetKey}::${row.kind}`;
+    const current = latest.get(key);
+    if (!current || (row.chapter ?? -1) > (current.chapter ?? -1) || ((row.chapter ?? -1) === (current.chapter ?? -1) && row.id > current.id)) latest.set(key, row);
+  }
+  return [...latest.values()];
+}
+
 @Injectable()
 export class ContextAssembler {
   private readonly db: PrimaryDatabase;
@@ -433,6 +458,8 @@ export class ContextAssembler {
 
     for (const s of [...priorityEntitySections, ...nonEntityRefSections.map(asStable)]) sections.push(s);
 
+    for (const s of await this.dynamicCastSections(projectId, entityRefSections, brief?.pov ?? null)) sections.push(s);
+
     if (recentChapters.length > 0) {
       const lines = recentChapters
         .slice()
@@ -447,6 +474,57 @@ export class ContextAssembler {
     for (const s of excessEntitySections) sections.push(s);
 
     return this.finalize(projectId, 'generation', chapter, sections, unresolvedRefs, budgetTokens, opts?.dryRun);
+  }
+
+  // Per-chapter dynamic state — never stable, and never project-wide: it is scoped to the cast the brief
+  // already named plus its POV, so a hundred-character project still pays for only the characters on stage.
+  private async dynamicCastSections(projectId: bigint, entityRefSections: ContextSection[], pov: string | null): Promise<ContextSection[]> {
+    const castKeys = new Set(entityRefSections.map(s => s.key.slice('ref:entity:'.length)));
+    if (pov) castKeys.add(pov);
+    if (castKeys.size === 0) return [];
+
+    const cast = [...castKeys];
+    const [castEntities, states] = await Promise.all([
+      this.db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, cast)) }),
+      this.db.query.characterStates.findMany({ where: and(eq(schema.characterStates.projectId, projectId), inArray(schema.characterStates.entityKey, cast)) }),
+    ]);
+
+    const nameByKey = new Map(castEntities.map(e => [e.entityKey, e.name]));
+    const sections: ContextSection[] = [];
+
+    const inCast = states.filter(s => castKeys.has(s.entityKey)).sort((a, b) => a.entityKey.localeCompare(b.entityKey));
+    const blocks = inCast.map(s => renderCharacterState(nameByKey.get(s.entityKey) ?? s.entityKey, s)).filter((block): block is string => block !== null);
+    if (blocks.length > 0)
+      sections.push(
+        makeSection(
+          'character_state',
+          blocks.join('\n\n'),
+          'working',
+          inCast.map(s => `entity:${s.entityKey}`),
+        ),
+      );
+
+    const castIds = castEntities.filter(e => castKeys.has(e.entityKey)).map(e => e.id);
+    if (castIds.length === 0) return sections;
+
+    const nameById = new Map(castEntities.map(e => [e.id, e.name]));
+    const keyById = new Map(castEntities.map(e => [e.id, e.entityKey]));
+    const rows = await this.db.query.entityRelationships.findMany({
+      where: and(eq(schema.entityRelationships.projectId, projectId), inArray(schema.entityRelationships.entityId, castIds)),
+    });
+    const lines = latestRelationships(rows.filter(r => nameById.has(r.entityId)))
+      .map(r => {
+        const note = r.note ? `: ${r.note}` : '';
+        const at = r.chapter != null ? ` [ch ${r.chapter}]` : '';
+        return `${nameById.get(r.entityId) ?? r.entityId} → ${r.targetKey} (${r.kind})${note}${at}`;
+      })
+      .sort((a, b) => a.localeCompare(b));
+    if (lines.length > 0) {
+      const refs = [...new Set(rows.map(r => keyById.get(r.entityId)).filter((key): key is string => key !== undefined))].map(key => `entity:${key}`);
+      sections.push(makeSection('relationships', lines.join('\n'), 'working', refs));
+    }
+
+    return sections;
   }
 
   async forOutline(projectId: bigint, chapter: number, opts?: { budgetTokens?: number }): Promise<AssembledPack & { id: bigint | null }> {

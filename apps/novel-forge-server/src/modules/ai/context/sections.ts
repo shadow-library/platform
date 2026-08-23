@@ -58,6 +58,8 @@ export const SECTION_LABELS: Record<string, string> = {
   brief: '## CHAPTER BRIEF',
   volume_objective: '## VOLUME OBJECTIVE',
   arc_objective: '## ARC OBJECTIVE',
+  character_state: '## CHARACTER STATE (CURRENT)',
+  relationships: '## CHARACTER RELATIONSHIPS (CURRENT)',
   memory: '## RECENT SUMMARIES',
   writing_style: '## WRITING STYLE',
   catalog: '## CANON CATALOG',
