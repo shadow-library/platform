@@ -49,7 +49,8 @@ export interface UserAdminDetail {
 
 export interface AdminActionContext {
   actorId: string;
-  organisationId: string;
+  /** Absent for a self-service caller acting on their own account outside any admin organisation. */
+  organisationId?: string;
 }
 
 export type AdministrableStatus = Extract<User.Status, 'ACTIVE' | 'DISABLED' | 'SUSPENDED' | 'BLOCKED'>;

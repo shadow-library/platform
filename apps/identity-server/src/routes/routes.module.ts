@@ -13,6 +13,7 @@ import { SamlModule } from '@server/modules/auth/saml';
 import { SessionModule } from '@server/modules/auth/session';
 import { TokenModule } from '@server/modules/auth/token';
 import { AuthzModule } from '@server/modules/authz';
+import { AccountCloseModule } from '@server/modules/identity/account';
 import { ContactModule } from '@server/modules/identity/contact';
 import { DirectoryModule } from '@server/modules/identity/directory';
 import { OrganisationModule } from '@server/modules/identity/organisation';
@@ -64,6 +65,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     AuditModule,
     NotificationModule,
     AdminModule,
+    AccountCloseModule,
     ScimModule,
     PolicyModule,
     AccessModule,
