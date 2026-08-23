@@ -116,4 +116,14 @@ export class AppErrorCode extends ServerErrorCode {
 
   /** An expense edit tried to change the currency; the product models a currency change as delete+create so a new rate can be locked */
   static readonly FIN_006 = AppErrorCode.badRequest('FIN_006', 'Currency cannot be changed on an existing expense; delete and re-create it instead');
+
+  /*!
+   * OCR Errors
+   */
+
+  /** The account's daily OCR scan quota is exhausted; `resetAt` is the next local-midnight instant in the account timezone (ARCHITECTURE §14.3) */
+  static readonly OCR_001 = AppErrorCode.badRequest('OCR_001', 'Daily OCR scan quota exhausted; resets at {resetAt}', 429);
+
+  /** No `OcrStructuringClient` implementation is wired for this environment yet (real client lands with T-33) — the endpoint never fabricates a result */
+  static readonly OCR_002 = AppErrorCode.unavailable('OCR_002', 'OCR structuring service is not configured');
 }

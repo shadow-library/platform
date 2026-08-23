@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -114,6 +114,26 @@ export class AccountRepository {
       .update(schema.accounts)
       .set({ ...values, onboardingCompletedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(schema.accounts.id, accountId), isNull(schema.accounts.onboardingCompletedAt)))
+      .returning();
+    return account ?? null;
+  }
+
+  /**
+   * The atomic consume-before-work OCR quota guard (ARCHITECTURE §14.3): one `UPDATE ... RETURNING`
+   * resets the counter on a new local day or increments it on the same one, gated by the same WHERE
+   * clause that decides whether the row moves at all — so two concurrent requests against the same
+   * account serialize on Postgres's row lock and never both pass. An empty result means the cap was
+   * already reached for `today`; the caller reads that as quota-exhausted rather than retrying.
+   */
+  async consumeOcrQuota(accountId: bigint, today: string, cap: number): Promise<Account.Row | null> {
+    const [account] = await this.db
+      .update(schema.accounts)
+      .set({
+        ocrQuotaCount: sql`CASE WHEN ${schema.accounts.ocrQuotaDate} = ${today} THEN ${schema.accounts.ocrQuotaCount} + 1 ELSE 1 END`,
+        ocrQuotaDate: today,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(schema.accounts.id, accountId), or(ne(schema.accounts.ocrQuotaDate, today), lt(schema.accounts.ocrQuotaCount, cap))))
       .returning();
     return account ?? null;
   }

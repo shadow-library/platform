@@ -62,7 +62,8 @@ Config.load('scheduler.tick-interval-ms', { defaultValue: '5000', validateType: 
 /** Bounds the per-account day-close walk (§13.3); days beyond it aren't terminalized, only cost-capped. Tunable, not a correctness parameter. */
 Config.load('rollover.catchup-max-days', { defaultValue: '90', validateType: 'number', reloadable: true });
 
-Config.load('quotas.ocr-daily', { defaultValue: '5', validateType: 'number', reloadable: true });
+/** PRD §4.14/§2.5: 10 scans/user/day, tunable. */
+Config.load('quotas.ocr-daily', { defaultValue: '10', validateType: 'number', reloadable: true });
 Config.load('quotas.ai-free-monthly', { defaultValue: '2', validateType: 'number', reloadable: true });
 Config.load('quotas.ai-paid-daily', { defaultValue: '30', validateType: 'number', reloadable: true });
 Config.load('quotas.entry-daily-cap', { defaultValue: '200', validateType: 'number', reloadable: true });
