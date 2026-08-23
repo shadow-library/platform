@@ -31,7 +31,19 @@ export function computeBibleDocHash(frontmatter: unknown, body: unknown): string
 // (apply engine, CRUD services, planners) must hash the same fields or conflict detection misfires.
 const VOLUME_HASH_FIELDS = ['volumeKey', 'ordinal', 'title', 'objective', 'conflict', 'payoff', 'targetChapterCount', 'cast', 'body', 'startChapter', 'endChapter'] as const;
 const ARC_HASH_FIELDS = ['arcKey', 'volumeKey', 'ordinal', 'title', 'objective', 'escalation', 'payoff', 'hook', 'chapterStart', 'chapterEnd', 'cast', 'body'] as const;
-const BRIEF_HASH_FIELDS = ['chapter', 'volumeKey', 'arcKey', 'title', 'body', 'contextRefs', 'endingContract', 'knowledgeContract'] as const;
+const BRIEF_HASH_FIELDS = [
+  'chapter',
+  'volumeKey',
+  'arcKey',
+  'title',
+  'body',
+  'contextRefs',
+  'endingContract',
+  'knowledgeContract',
+  'chapterPurpose',
+  'readerValue',
+  'repetitionRisks',
+] as const;
 
 function pickAndHash(record: Record<string, unknown>, fields: readonly string[]): string {
   return computeContentHash(Object.fromEntries(fields.map(field => [field, record[field] ?? null])));

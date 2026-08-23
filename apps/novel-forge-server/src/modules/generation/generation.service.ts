@@ -271,6 +271,9 @@ export class GenerationService {
       handoffBeat?: string;
       endingContract?: Record<string, unknown>;
       knowledgeContract?: Record<string, unknown>;
+      chapterPurpose?: string;
+      readerValue?: string[];
+      repetitionRisks?: string[];
     }[];
 
     await this.dropUnresolvedContextRefs(projectId, chapters);
@@ -286,6 +289,9 @@ export class GenerationService {
           pov: c.pov ?? null,
           endingContract: c.endingContract,
           knowledgeContract: c.knowledgeContract ?? null,
+          chapterPurpose: c.chapterPurpose ?? null,
+          readerValue: c.readerValue ?? null,
+          repetitionRisks: c.repetitionRisks ?? null,
         };
         return this.db
           .insert(schema.briefs)
@@ -350,6 +356,9 @@ export class GenerationService {
         pov?: string;
         endingContract?: Record<string, unknown>;
         knowledgeContract?: Record<string, unknown>;
+        chapterPurpose?: string;
+        readerValue?: string[];
+        repetitionRisks?: string[];
       }[]
     ).filter(c => c.chapter >= (arc.chapterStart as number) && c.chapter <= (arc.chapterEnd as number));
 
@@ -370,6 +379,9 @@ export class GenerationService {
           pov: c.pov ?? null,
           endingContract: c.endingContract,
           knowledgeContract: c.knowledgeContract ?? null,
+          chapterPurpose: c.chapterPurpose ?? null,
+          readerValue: c.readerValue ?? null,
+          repetitionRisks: c.repetitionRisks ?? null,
           staleReason: null,
           handEdited: false,
         };

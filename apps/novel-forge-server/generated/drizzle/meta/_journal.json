@@ -71,6 +71,13 @@
       "when": 1787426541103,
       "tag": "0009_solid_darwin",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787462807814,
+      "tag": "0010_big_firelord",
+      "breakpoints": true
     }
   ]
 }

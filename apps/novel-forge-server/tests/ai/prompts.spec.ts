@@ -244,6 +244,8 @@ describe('Prompt modules', () => {
       events: ['e'],
       requiredContext: [],
       endingContract: { hookType: 'cliffhanger' as const, emotionalBeat: 'b', openQuestion: 'q', handoffState: 'h', mustNotResolve: [] },
+      chapterPurpose: 'p',
+      readerValue: ['new_information' as const],
       continuesIntoNextChapter: false,
       startsFromPreviousChapter: false,
       ...overrides,
@@ -285,6 +287,11 @@ describe('Prompt modules', () => {
       expect(prompt.key).toBe('outline');
       expect(prompt.postValidate?.([brief(10), brief(11), brief(12)])).toEqual([]);
       expect(prompt.postValidate?.([brief(10), brief(12)])[0]).toContain('chapter 11 is missing');
+    });
+
+    it('rejects a readerValue entry outside the fixed enum', () => {
+      const errors = validateOutlineCoverage([brief(5, { readerValue: ['not_a_real_value'] } as never), brief(6)], 5, 6);
+      expect(errors.some(e => e.includes("readerValue 'not_a_real_value' is not one of"))).toBe(true);
     });
   });
 
@@ -461,7 +468,12 @@ describe('Prompt modules', () => {
     it('outline v2 requires an ending contract per brief', () => {
       const brief = { chapter: 1, volumeKey: 'v1', title: 'T', objective: 'obj', events: ['e1'], requiredContext: [] };
       expect(parseSchema(PROMPT_REGISTRY.outline.schema, [brief]).success).toBe(false);
-      const withContract = { ...brief, endingContract: { hookType: 'cliffhanger', emotionalBeat: 'dread', openQuestion: 'who?', handoffState: 'cornered on the roof' } };
+      const withContract = {
+        ...brief,
+        endingContract: { hookType: 'cliffhanger', emotionalBeat: 'dread', openQuestion: 'who?', handoffState: 'cornered on the roof' },
+        chapterPurpose: 'p',
+        readerValue: ['emotional_turn'],
+      };
       expect(parseSchema(PROMPT_REGISTRY.outline.schema, [withContract]).success).toBe(true);
     });
 
@@ -520,7 +532,6 @@ describe('Prompt modules', () => {
     });
 
     it('outline v2.2 instructs the outliner to author contracts from catalog fact keys', () => {
-      expect(PROMPT_REGISTRY.outline.version).toBe('2.2.0');
       expect(PROMPT_REGISTRY.outline.system).toContain('CANON FACTS');
       expect(PROMPT_REGISTRY.outline.system).toContain('never invent one');
       expect(PROMPT_REGISTRY.outline.system).toContain('"knowledgeContract": {"pov": ["entity-key"]');
@@ -536,11 +547,50 @@ describe('Prompt modules', () => {
         requiredContext: [],
         pov: 'amara',
         endingContract: { hookType: 'cliffhanger', emotionalBeat: 'b', openQuestion: 'q', handoffState: 'h', mustNotResolve: [] },
+        chapterPurpose: 'Amara confirms the forger is inside the archive.',
+        readerValue: ['new_information'],
       };
       expect(parseSchema(PROMPT_REGISTRY.outline.schema, [brief]).success).toBe(true);
       const withContract = { ...brief, knowledgeContract: { pov: ['amara', 'rook'], learns: [{ entityKey: 'amara', factKey: 'the_heir' }] } };
       expect(parseSchema(PROMPT_REGISTRY.outline.schema, [withContract]).success).toBe(true);
       expect(parseSchema(PROMPT_REGISTRY.outline.schema, [{ ...brief, knowledgeContract: { pov: [] } }]).success).toBe(false);
+    });
+  });
+
+  describe('reader value and purpose (outline v2.3, harness-final-recommendation.md D16)', () => {
+    const baseBrief = {
+      chapter: 1,
+      volumeKey: 'vol_01',
+      title: 't',
+      objective: 'o',
+      events: ['e'],
+      requiredContext: [],
+      endingContract: { hookType: 'cliffhanger', emotionalBeat: 'b', openQuestion: 'q', handoffState: 'h', mustNotResolve: [] },
+    };
+
+    it('outline v2.3 instructs the outliner to name a falsifiable readerValue and forbids empty purpose', () => {
+      expect(PROMPT_REGISTRY.outline.version).toBe('2.3.0');
+      expect(PROMPT_REGISTRY.outline.system).toContain('chapterPurpose');
+      expect(PROMPT_REGISTRY.outline.system).toContain('readerValue');
+      expect(PROMPT_REGISTRY.outline.system).toContain('repetitionRisks');
+      expect(PROMPT_REGISTRY.outline.system).toContain('is not earning its place');
+    });
+
+    it('outline schema requires chapterPurpose and at least one readerValue entry', () => {
+      expect(parseSchema(PROMPT_REGISTRY.outline.schema, [baseBrief]).success).toBe(false);
+      expect(parseSchema(PROMPT_REGISTRY.outline.schema, [{ ...baseBrief, chapterPurpose: 'p', readerValue: [] }]).success).toBe(false);
+      expect(parseSchema(PROMPT_REGISTRY.outline.schema, [{ ...baseBrief, chapterPurpose: 'p', readerValue: ['emotional_turn'] }]).success).toBe(true);
+    });
+
+    it('readerValue enum membership is enforced by postValidate, not the JSON schema itself', () => {
+      // class-schema has no declarative "array of EnumType" field — schema-level, any non-empty string
+      // array satisfies readerValue; membership in the fixed set is checked by validateOutlineCoverage.
+      expect(parseSchema(PROMPT_REGISTRY.outline.schema, [{ ...baseBrief, chapterPurpose: 'p', readerValue: ['not_a_real_value'] }]).success).toBe(true);
+    });
+
+    it('outline schema accepts optional repetitionRisks', () => {
+      const brief = { ...baseBrief, chapterPurpose: 'p', readerValue: ['world_state_change'], repetitionRisks: ['another tavern negotiation'] };
+      expect(parseSchema(PROMPT_REGISTRY.outline.schema, [brief]).success).toBe(true);
     });
   });
 

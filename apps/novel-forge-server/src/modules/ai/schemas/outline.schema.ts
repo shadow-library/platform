@@ -3,6 +3,13 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { EndingContractSchema } from './ending-contract.schema';
 import { KnowledgeContractSchema } from './knowledge-contract.schema';
 
+// class-schema's @Field has no declarative "array of EnumType" overload (only a single scalar EnumType,
+// or an array of Schema classes) — so readerValue stays a plain string array here and its membership is
+// enforced in validateOutlineCoverage, the same postValidate seam that already enforces span/chaining
+// invariants JSON Schema can't express.
+export const READER_VALUE_CHANGES = ['new_information', 'relationship_change', 'power_or_stakes_change', 'goal_or_plan_change', 'world_state_change', 'emotional_turn'] as const;
+export type ReaderValueChange = (typeof READER_VALUE_CHANGES)[number];
+
 @Schema()
 export class ChapterBriefSchema {
   @Field(() => Integer)
@@ -56,6 +63,18 @@ export class ChapterBriefSchema {
     description: 'the cast whose ledgered knowledge bounds this chapter and the canon facts they learn on-page — omit when the chapter reveals nothing previously hidden',
   })
   knowledgeContract?: KnowledgeContractSchema;
+
+  @Field({ minLength: 1, description: "one sentence: why this chapter exists — its narrative job in the arc, not a restatement of the objective's events" })
+  chapterPurpose: string;
+
+  @Field(() => [String], {
+    minItems: 1,
+    description: `at least one concrete, falsifiable thing that changes this chapter, each drawn from: ${READER_VALUE_CHANGES.join(', ')} — forces real movement instead of a chapter that merely maintains the status quo`,
+  })
+  readerValue: ReaderValueChange[];
+
+  @Field(() => [String], { optional: true, description: 'scene patterns or beats this chapter must avoid repeating from recent chapters (e.g. "another tavern negotiation")' })
+  repetitionRisks?: string[];
 }
 
 export const OutlineSchema = [ChapterBriefSchema] as [typeof ChapterBriefSchema];
@@ -77,6 +96,9 @@ export function validateOutlineCoverage(briefs: ChapterBriefOutput[], startChapt
     if (byChapter.has(brief.chapter)) errors.push(`chapter ${brief.chapter} appears more than once in the outline`);
     else byChapter.set(brief.chapter, brief);
     if (brief.chapter < startChapter || brief.chapter > endChapter) errors.push(`chapter ${brief.chapter} is outside the requested span ${startChapter}-${endChapter}`);
+    for (const value of brief.readerValue ?? []) {
+      if (!READER_VALUE_CHANGES.includes(value)) errors.push(`chapter ${brief.chapter} readerValue '${value}' is not one of: ${READER_VALUE_CHANGES.join(', ')}`);
+    }
   }
 
   for (let chapter = startChapter; chapter <= endChapter; chapter++) {
