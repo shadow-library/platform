@@ -1,4 +1,14 @@
-import { type LogRecord, type MemoirWorldState, type Momentum, type Quest, type QuestProgress, type Recurrence, type StatAffinity, type Strictness } from '@/lib/data';
+import {
+  type LogRecord,
+  type MemoirWorldState,
+  type Momentum,
+  type Quest,
+  type QuestProgress,
+  type Recurrence,
+  type StatAffinity,
+  type Strictness,
+  type Weekday,
+} from '@/lib/data';
 
 import { type DeltaRow, type SyncDomain } from './sync.types';
 
@@ -35,6 +45,24 @@ function bool(row: DeltaRow, key: string, fallback = false): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
+const WEEKDAY_LOCAL: Record<number, Weekday> = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat', 7: 'sun' };
+
+/** The server persists the rules module's `RecurrenceRule` (numeric 1–7 weekdays, a monthly `pattern` discriminant); this reverses `toRecurrenceRule` in `command-wire.ts` back to the web's flatter `Recurrence` draft shape. */
+function toRecurrence(value: unknown): Recurrence {
+  const rule = (value ?? {}) as Record<string, unknown>;
+  const daysOfWeek = Array.isArray(rule['daysOfWeek']) ? (rule['daysOfWeek'] as number[]).map(day => WEEKDAY_LOCAL[day] ?? 'mon') : [];
+  const pattern = rule['pattern'] as { kind?: string; dayOfMonth?: number } | undefined;
+  return {
+    frequency: (rule['frequency'] as Recurrence['frequency']) ?? 'daily',
+    interval: typeof rule['interval'] === 'number' ? rule['interval'] : 1,
+    daysOfWeek,
+    dayOfMonth: pattern?.kind === 'day_of_month' && typeof pattern.dayOfMonth === 'number' ? pattern.dayOfMonth : null,
+    startDate: typeof rule['startDate'] === 'string' ? rule['startDate'] : '',
+    end: (rule['end'] as Recurrence['end']) ?? { kind: 'never' },
+    exceptions: Array.isArray(rule['exceptions']) ? (rule['exceptions'] as string[]) : [],
+  };
+}
+
 function toQuest(row: DeltaRow): Quest {
   const threshold = row['healthThreshold'] as Quest['healthThreshold'];
   return {
@@ -46,7 +74,7 @@ function toQuest(row: DeltaRow): Quest {
     statAffinity: (text(row, 'statAffinity') ?? 'discipline') as StatAffinity,
     strictness: (text(row, 'strictness') ?? 'routine') as Strictness,
     optionalStreakOptIn: bool(row, 'optionalStreakOptIn'),
-    recurrence: row['recurrence'] as Recurrence,
+    recurrence: toRecurrence(row['recurrence']),
     consequences: [],
     moduleLink: (text(row, 'moduleLink') ?? null) as Quest['moduleLink'],
     notification: { enabled: bool(row, 'reminderEnabled'), leadMinutes: number(row, 'reminderLeadMin') },
@@ -65,7 +93,7 @@ function toLogRecord(row: DeltaRow): LogRecord {
     coinsAwarded: number(row, 'coinsAwarded'),
     reasonTag: text(row, 'reasonTag') as LogRecord['reasonTag'],
     reasonNote: text(row, 'reasonNote'),
-    rescheduledToDate: null,
+    rescheduledToMin: row['rescheduledToMin'] === null || row['rescheduledToMin'] === undefined ? null : number(row, 'rescheduledToMin'),
     postponedTo: text(row, 'postponedToDate'),
     shielded: false,
     progress: null,

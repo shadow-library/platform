@@ -134,7 +134,7 @@ export interface QuestOccurrence {
   coinsAwarded: number;
   reasonTag: ReasonTag | null;
   reasonNote: string | null;
-  rescheduledToDate: string | null;
+  rescheduledToMin: number | null;
   postponedTo: string | null;
   streakDays: number;
   shields: number;

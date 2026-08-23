@@ -29,7 +29,7 @@ describe('Outbox', () => {
     for (const questId of ['a', 'b', 'c']) await outbox.enqueue(complete(`${questId}:${TODAY}`), TODAY);
 
     const pending = await outbox.pending();
-    expect(pending.map(entry => entry.payload['questId'])).toEqual(['a', 'b', 'c']);
+    expect(pending.map(entry => entry.payload['occurrenceId'])).toEqual([`a:${TODAY}`, `b:${TODAY}`, `c:${TODAY}`]);
     expect(pending.map(entry => entry.seq)).toEqual([1, 2, 3]);
   });
 

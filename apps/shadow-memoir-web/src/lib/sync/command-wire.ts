@@ -1,4 +1,6 @@
-import { type Command, type CommandType } from '@/lib/data';
+import { type Command, type CommandType, type QuestDraft, type Recurrence, type Weekday } from '@/lib/data';
+
+import { uuidv7 } from './uuid';
 
 export interface WireCommand {
   type: string;
@@ -6,29 +8,37 @@ export interface WireCommand {
 }
 
 /**
- * Every command type the server has a handler for. A type absent from this set is applied locally and
- * kept out of the outbox entirely: `POST /sync/commands` fails the *whole batch* on an unknown type, so
- * one command the server has not shipped yet would strand every command behind it.
+ * Every command type the server has a handler for (`QuestCommandsService.onModuleInit`) that the web's
+ * `Command` union also knows how to build. A type absent from this set is applied locally and kept out of
+ * the outbox entirely: `POST /sync/commands` fails the *whole batch* on an unknown type, so one command the
+ * server has not shipped yet would strand every command behind it. `quest.setActive` and `plan.setLock`
+ * have no server handler; finance/quick-log/hero/reflect/account commands are still fixture-backed on the
+ * web side (T-25 registered `expense.*`/`subscription.*` server-side, ready to flip on once the finance
+ * provider is sync-backed).
  */
-const SERVER_BACKED_TYPES = new Set<CommandType>([
-  'quest.complete',
-  'quest.partial',
-  'quest.skip',
-  'quest.postpone',
-  'quest.reschedule',
-  'quest.create',
-  'quest.update',
-  'quest.setActive',
-]);
+const SERVER_BACKED_TYPES = new Set<CommandType>(['quest.complete', 'quest.partial', 'quest.skip', 'quest.postpone', 'quest.reschedule', 'quest.create', 'quest.update']);
 
 export function isServerBacked(command: Command): boolean {
   return SERVER_BACKED_TYPES.has(command.type);
 }
 
-/** A local occurrence id is `${questId}:${date}`; the server addresses the same occurrence by its two parts. */
-function splitOccurrence(occurrenceId: string): { questId: string; date: string } {
-  const separator = occurrenceId.lastIndexOf(':');
-  return { questId: occurrenceId.slice(0, separator), date: occurrenceId.slice(separator + 1) };
+const WEEKDAY_WIRE: Record<Weekday, number> = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 7 };
+
+/** The rules module's `RecurrenceRule` (numeric 1–7 weekdays, a monthly `pattern` discriminant) rather than the web's flatter `Recurrence` draft. */
+function toRecurrenceRule(recurrence: Recurrence): Record<string, unknown> {
+  const base = { frequency: recurrence.frequency, interval: recurrence.interval, startDate: recurrence.startDate, end: recurrence.end, exceptions: recurrence.exceptions };
+  if (recurrence.frequency === 'weekly') return { ...base, daysOfWeek: recurrence.daysOfWeek.map(day => WEEKDAY_WIRE[day]) };
+  if (recurrence.frequency === 'monthly') return { ...base, pattern: { kind: 'day_of_month', dayOfMonth: recurrence.dayOfMonth ?? Number(recurrence.startDate.slice(-2)) } };
+  return base;
+}
+
+function toDraftWire(draft: QuestDraft): Record<string, unknown> {
+  return { ...draft, recurrence: toRecurrenceRule(draft.recurrence) };
+}
+
+function toPatchWire(patch: Partial<QuestDraft>): Record<string, unknown> {
+  if (patch.recurrence === undefined) return patch;
+  return { ...patch, recurrence: toRecurrenceRule(patch.recurrence) };
 }
 
 /**
@@ -39,21 +49,19 @@ function splitOccurrence(occurrenceId: string): { questId: string; date: string 
 export function toWireCommand(command: Command): WireCommand {
   switch (command.type) {
     case 'quest.complete':
-      return { type: command.type, payload: splitOccurrence(command.occurrenceId) };
+      return { type: command.type, payload: { occurrenceId: command.occurrenceId } };
     case 'quest.partial':
-      return { type: command.type, payload: { ...splitOccurrence(command.occurrenceId), progress: command.progress, reasonTag: command.reasonTag, note: command.note } };
+      return { type: command.type, payload: { occurrenceId: command.occurrenceId, progress: command.progress, reasonTag: command.reasonTag, note: command.note } };
     case 'quest.skip':
-      return { type: command.type, payload: { ...splitOccurrence(command.occurrenceId), reasonTag: command.reasonTag, note: command.note } };
+      return { type: command.type, payload: { occurrenceId: command.occurrenceId, reasonTag: command.reasonTag, note: command.note } };
     case 'quest.postpone':
-      return { type: command.type, payload: { ...splitOccurrence(command.occurrenceId), reasonTag: command.reasonTag } };
+      return { type: command.type, payload: { occurrenceId: command.occurrenceId, reasonTag: command.reasonTag } };
     case 'quest.reschedule':
-      return { type: command.type, payload: { ...splitOccurrence(command.occurrenceId), toDate: command.toDate, acceptBeyondCap: command.acceptBeyondCap ?? false } };
+      return { type: command.type, payload: { occurrenceId: command.occurrenceId, toMin: command.toMin, acceptBeyondCap: command.acceptBeyondCap ?? false } };
     case 'quest.create':
-      return { type: command.type, payload: { draft: command.draft } };
+      return { type: command.type, payload: { ...toDraftWire(command.draft), entityRef: uuidv7() } };
     case 'quest.update':
-      return { type: command.type, payload: { questId: command.questId, patch: command.patch } };
-    case 'quest.setActive':
-      return { type: command.type, payload: { questId: command.questId, active: command.active } };
+      return { type: command.type, payload: { questId: command.questId, patch: toPatchWire(command.patch) } };
     default:
       return { type: command.type, payload: { ...command, type: undefined } };
   }

@@ -6,7 +6,7 @@ export type Command =
   | { type: 'quest.partial'; occurrenceId: string; progress: number; reasonTag: ReasonTag; note?: string }
   | { type: 'quest.skip'; occurrenceId: string; reasonTag?: ReasonTag; note?: string }
   | { type: 'quest.postpone'; occurrenceId: string; reasonTag?: ReasonTag }
-  | { type: 'quest.reschedule'; occurrenceId: string; toDate: string; acceptBeyondCap?: boolean }
+  | { type: 'quest.reschedule'; occurrenceId: string; toMin: number; acceptBeyondCap?: boolean }
   | { type: 'quest.create'; draft: QuestDraft }
   | { type: 'quest.update'; questId: string; patch: Partial<QuestDraft> }
   | { type: 'quest.setActive'; questId: string; active: boolean }

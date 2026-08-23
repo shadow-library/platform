@@ -1,0 +1,112 @@
+[
+  {
+    "scenario": "quest.create",
+    "command": {
+      "type": "quest.create",
+      "draft": {
+        "name": "Wire proof quest",
+        "notes": null,
+        "startTimeMinutes": 480,
+        "durationMinutes": 25,
+        "statAffinity": "mind",
+        "strictness": "routine",
+        "optionalStreakOptIn": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "daysOfWeek": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+          "dayOfMonth": null,
+          "startDate": "2026-02-01",
+          "end": { "kind": "never" },
+          "exceptions": []
+        },
+        "consequences": [],
+        "moduleLink": null,
+        "notification": { "enabled": true, "leadMinutes": 10 },
+        "healthThreshold": null,
+        "preCommit": false,
+        "active": true
+      }
+    },
+    "wire": {
+      "type": "quest.create",
+      "payload": {
+        "name": "Wire proof quest",
+        "notes": null,
+        "startTimeMinutes": 480,
+        "durationMinutes": 25,
+        "statAffinity": "mind",
+        "strictness": "routine",
+        "optionalStreakOptIn": false,
+        "recurrence": { "frequency": "weekly", "interval": 1, "startDate": "2026-02-01", "end": { "kind": "never" }, "exceptions": [], "daysOfWeek": [1, 2, 3, 4, 5, 6, 7] },
+        "consequences": [],
+        "moduleLink": null,
+        "notification": { "enabled": true, "leadMinutes": 10 },
+        "healthThreshold": null,
+        "preCommit": false,
+        "active": true
+      }
+    }
+  },
+  {
+    "scenario": "quest.update",
+    "command": { "type": "quest.update", "questId": "{questId}", "patch": { "name": "Wire proof quest (renamed)", "durationMinutes": 30 } },
+    "wire": { "type": "quest.update", "payload": { "questId": "{questId}", "patch": { "name": "Wire proof quest (renamed)", "durationMinutes": 30 } } }
+  },
+  {
+    "scenario": "quest.updateRecurrence",
+    "command": {
+      "type": "quest.update",
+      "questId": "{questId}",
+      "patch": {
+        "recurrence": { "frequency": "monthly", "interval": 1, "daysOfWeek": [], "dayOfMonth": 15, "startDate": "2026-02-01", "end": { "kind": "never" }, "exceptions": [] }
+      }
+    },
+    "wire": {
+      "type": "quest.update",
+      "payload": {
+        "questId": "{questId}",
+        "patch": {
+          "recurrence": {
+            "frequency": "monthly",
+            "interval": 1,
+            "startDate": "2026-02-01",
+            "end": { "kind": "never" },
+            "exceptions": [],
+            "pattern": { "kind": "day_of_month", "dayOfMonth": 15 }
+          }
+        }
+      }
+    }
+  },
+  {
+    "scenario": "quest.complete",
+    "command": { "type": "quest.complete", "occurrenceId": "{questId}:2026-02-15" },
+    "wire": { "type": "quest.complete", "payload": { "occurrenceId": "{questId}:2026-02-15" } },
+    "performedAt": "2026-02-15T09:00:00.000Z"
+  },
+  {
+    "scenario": "quest.partial",
+    "command": { "type": "quest.partial", "occurrenceId": "{questId}:2026-02-16", "progress": 5, "reasonTag": "too_tired", "note": "tough day" },
+    "wire": { "type": "quest.partial", "payload": { "occurrenceId": "{questId}:2026-02-16", "progress": 5, "reasonTag": "too_tired", "note": "tough day" } },
+    "performedAt": "2026-02-16T09:00:00.000Z"
+  },
+  {
+    "scenario": "quest.skip",
+    "command": { "type": "quest.skip", "occurrenceId": "{questId}:2026-02-17", "reasonTag": "forgot", "note": "oops" },
+    "wire": { "type": "quest.skip", "payload": { "occurrenceId": "{questId}:2026-02-17", "reasonTag": "forgot", "note": "oops" } },
+    "performedAt": "2026-02-17T09:00:00.000Z"
+  },
+  {
+    "scenario": "quest.postpone",
+    "command": { "type": "quest.postpone", "occurrenceId": "{questId}:2026-02-18", "reasonTag": "schedule_conflict" },
+    "wire": { "type": "quest.postpone", "payload": { "occurrenceId": "{questId}:2026-02-18", "reasonTag": "schedule_conflict" } },
+    "performedAt": "2026-02-18T09:00:00.000Z"
+  },
+  {
+    "scenario": "quest.reschedule",
+    "command": { "type": "quest.reschedule", "occurrenceId": "{questId}:2026-02-19", "toMin": 540, "acceptBeyondCap": false },
+    "wire": { "type": "quest.reschedule", "payload": { "occurrenceId": "{questId}:2026-02-19", "toMin": 540, "acceptBeyondCap": false } },
+    "performedAt": "2026-02-19T09:00:00.000Z"
+  }
+]

@@ -45,7 +45,7 @@ export interface LogRecord {
   coinsAwarded: number;
   reasonTag: ReasonTag | null;
   reasonNote: string | null;
-  rescheduledToDate: string | null;
+  rescheduledToMin: number | null;
   postponedTo: string | null;
   shielded: boolean;
   progress: number | null;
@@ -112,7 +112,7 @@ function recordFor(quest: Quest, state: OccurrenceState): LogRecord {
     coinsAwarded: state === 'completed' ? BASE_COINS[quest.strictness] : 0,
     reasonTag: state === 'partial' ? 'too_tired' : null,
     reasonNote: null,
-    rescheduledToDate: null,
+    rescheduledToMin: null,
     postponedTo: null,
     shielded: false,
     progress: null,
@@ -189,7 +189,7 @@ export class MemoirEngine implements DataProvider {
       coinsAwarded: log?.coinsAwarded ?? 0,
       reasonTag: log?.reasonTag ?? null,
       reasonNote: log?.reasonNote ?? null,
-      rescheduledToDate: log?.rescheduledToDate ?? null,
+      rescheduledToMin: log?.rescheduledToMin ?? null,
       postponedTo: log?.postponedTo ?? null,
       streakDays: progress.currentStreakDays,
       shields: progress.shields,
@@ -431,7 +431,7 @@ export class MemoirEngine implements DataProvider {
       case 'quest.postpone':
         return this.resolve(command.occurrenceId, 'postponed', { reasonTag: command.reasonTag });
       case 'quest.reschedule':
-        return this.reschedule(command.occurrenceId, command.toDate, command.acceptBeyondCap ?? false);
+        return this.reschedule(command.occurrenceId, command.toMin, command.acceptBeyondCap ?? false);
       case 'quest.create':
         return this.createQuest(command.draft);
       case 'quest.update':
@@ -463,7 +463,7 @@ export class MemoirEngine implements DataProvider {
       coinsAwarded,
       reasonTag: extra.reasonTag ?? null,
       reasonNote: extra.note ?? null,
-      rescheduledToDate: null,
+      rescheduledToMin: null,
       postponedTo: state === 'postponed' ? shiftDate(date, 1) : null,
       shielded,
       progress: extra.progress ?? null,
@@ -498,11 +498,12 @@ export class MemoirEngine implements DataProvider {
     return `${name} recorded.`;
   }
 
-  private reschedule(occurrenceId: string, toDate: string, acceptBeyondCap: boolean): CommandResult {
+  private reschedule(occurrenceId: string, toMin: number, acceptBeyondCap: boolean): CommandResult {
     const [questId] = occurrenceId.split(':') as [string, string];
     const quest = this.questById(questId);
     if (!quest) return { status: 'rejected', message: 'That quest is no longer in your plan.' };
     const progress = this.state.progress[questId] as QuestProgress;
+    const toTime = formatTime(toMin);
 
     if (progress.reschedulesUsed >= progress.rescheduleCap && !acceptBeyondCap)
       return {
@@ -512,7 +513,7 @@ export class MemoirEngine implements DataProvider {
         body: `${progress.rescheduleCap} moves a week is the cap on ${STRICTNESS_LABELS[quest.strictness]} quests. Past it a move is recorded as a postpone with a reason instead of disappearing, so the history stays honest either way. The cap frees up on ${shiftDate(this.state.today, 7)}.`,
         confirmLabel: 'Move it anyway',
         cancelLabel: 'Keep the plan',
-        command: { type: 'quest.reschedule', occurrenceId, toDate, acceptBeyondCap: true },
+        command: { type: 'quest.reschedule', occurrenceId, toMin, acceptBeyondCap: true },
       };
 
     if (progress.reschedulesUsed >= progress.rescheduleCap) return this.resolve(occurrenceId, 'postponed');
@@ -524,14 +525,14 @@ export class MemoirEngine implements DataProvider {
       coinsAwarded: 0,
       reasonTag: null,
       reasonNote: null,
-      rescheduledToDate: toDate,
+      rescheduledToMin: toMin,
       postponedTo: null,
       shielded: false,
       progress: null,
     });
-    this.pushActivity(`${quest.name} moved to ${toDate}`, false);
+    this.pushActivity(`${quest.name} moved to ${toTime}`, false);
 
-    return { status: 'applied', message: `${quest.name} moved to ${toDate}. The streak is untouched.`, xpAwarded: 0, coinsAwarded: 0 };
+    return { status: 'applied', message: `${quest.name} moved to ${toTime}. The streak is untouched.`, xpAwarded: 0, coinsAwarded: 0 };
   }
 
   private createQuest(draft: QuestDraft): CommandResult {

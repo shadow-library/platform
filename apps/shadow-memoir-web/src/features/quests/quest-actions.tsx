@@ -1,16 +1,16 @@
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useState } from 'react';
-import { Button, DatePicker, DescriptionList, Slider, Textarea, toast } from '@shadow-library/ui';
+import { Button, DescriptionList, Slider, Textarea, TimePicker, toast } from '@shadow-library/ui';
 
 import { OverlaySurface } from '@/components/OverlaySurface';
 import {
   type Command,
   type CommandConfirmation,
+  formatTime,
   type QuestOccurrence,
   REASON_LABELS,
   REASON_TAGS,
   type ReasonTag,
-  shiftDate,
   STAT_LABELS,
   STRICTNESS_LABELS,
   STRICTNESS_RULES,
@@ -262,29 +262,34 @@ function PartialOverlay({ occurrence, onClose, dispatch }: OverlayProps): ReactE
   );
 }
 
+function toMinuteOfDay(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number);
+  return (hours ?? 0) * 60 + (minutes ?? 0);
+}
+
 function RescheduleOverlay({ occurrence, onClose, dispatch }: OverlayProps): ReactElement {
-  const [date, setDate] = useState(shiftDate(occurrence.date, 1));
+  const [time, setTime] = useState(formatTime(occurrence.startTimeMinutes) ?? '09:00');
 
   return (
     <OverlaySurface
       open
       onOpenChange={onClose}
       title={`Move ${occurrence.questName}`}
-      description="A reschedule moves only this occurrence. The recurring plan is never rewritten."
+      description="A reschedule moves this occurrence's time. It stays on the same day — the recurring plan is never rewritten."
       size="md"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             Keep the plan
           </Button>
-          <Button variant="primary" onClick={() => dispatch({ type: 'quest.reschedule', occurrenceId: occurrence.id, toDate: date })}>
+          <Button variant="primary" onClick={() => dispatch({ type: 'quest.reschedule', occurrenceId: occurrence.id, toMin: toMinuteOfDay(time) })}>
             Move it
           </Button>
         </>
       }
     >
       <div className={styles.partialBody}>
-        <DatePicker value={date} onValueChange={value => setDate(value ?? date)} min={occurrence.date} aria-label="Move to" />
+        <TimePicker value={time} onValueChange={value => setTime(value ?? time)} aria-label="Move to" />
         <DescriptionList layout="row" termWidth={150}>
           <DescriptionList.Item term="Streak">Kept — a move inside the cap does not break it</DescriptionList.Item>
           <DescriptionList.Item term="HP">Unchanged</DescriptionList.Item>
