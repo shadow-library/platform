@@ -1,0 +1,398 @@
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--sh-text-h3);
+  line-height: var(--sh-text-h3--line-height);
+  font-weight: 650;
+  letter-spacing: -0.012em;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+@media (min-width: 1000px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+}
+
+@media (min-width: 1240px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+.column,
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.actionRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.cardTitle {
+  margin: 0 0 5px;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+}
+
+.cardBody {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.6;
+  color: var(--sh-text-secondary);
+}
+
+.listHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 2px 2px 10px;
+}
+
+.listCount {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.listTail {
+  margin: 0;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.listCard {
+  padding: 0;
+  overflow: hidden;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.list > li:first-child {
+  border-top: 0;
+}
+
+.heroTop {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.crest {
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-accent-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.crestLevel {
+  font-family: var(--sh-font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--sh-accent);
+}
+
+.crestLabel {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sh-accent);
+}
+
+.heroMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.heroTitleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.heroTitle {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+}
+
+.coins {
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-secondary);
+}
+
+.heroProgress {
+  margin-top: 7px;
+}
+
+.heroFooter {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.mono {
+  font-family: var(--sh-font-mono);
+  color: var(--sh-text-secondary);
+}
+
+.heroStats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.hp {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pips {
+  display: flex;
+  gap: 3px;
+}
+
+.pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  border: 1px solid var(--sh-border-strong);
+}
+
+.pip[data-filled='true'] {
+  background: var(--sh-accent);
+  border-color: var(--sh-accent);
+}
+
+.heroMeta {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-secondary);
+}
+
+.heroMetaSoft {
+  color: var(--sh-text-tertiary);
+}
+
+.divider {
+  width: 1px;
+  height: 16px;
+  background: var(--sh-border-subtle);
+}
+
+.heroAction {
+  margin-left: auto;
+}
+
+.railTitle {
+  margin: 0 0 10px;
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+}
+
+.railHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.railHeader .railTitle {
+  margin-bottom: 10px;
+}
+
+.railFooter {
+  margin-top: 12px;
+}
+
+.railNote {
+  display: block;
+  margin: 2px 0 0;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.tileGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px;
+  min-height: 64px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-well);
+  color: inherit;
+}
+
+.tile:hover {
+  border-color: var(--sh-border-strong);
+  color: inherit;
+}
+
+.tileLabel {
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+}
+
+.tileValue {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.streakList,
+.upcomingList,
+.activityList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.streakHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.streakName {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.streakWeek {
+  display: flex;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.streakDay {
+  flex: 1;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--sh-surface-well);
+}
+
+.streakDay[data-tone='kept'] {
+  background: var(--sh-accent);
+}
+
+.streakDay[data-tone='partial'] {
+  background: var(--sh-accent);
+  opacity: 0.45;
+}
+
+.streakDay[data-tone='closed'] {
+  background: var(--sh-border-strong);
+}
+
+.upcomingRow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.upcomingWhen {
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+  width: 56px;
+  flex: none;
+  padding-top: 1px;
+}
+
+.upcomingTitle {
+  display: block;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+}
+
+.activityRow {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: var(--sh-radius-full);
+  margin-top: 6px;
+  background: var(--sh-border-strong);
+}
+
+.dot[data-rewarded='true'] {
+  background: var(--sh-accent);
+}
+
+.activityText {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--sh-text-caption);
+  line-height: 1.5;
+  color: var(--sh-text-secondary);
+}
+
+.activityWhen {
+  color: var(--sh-text-tertiary);
+}

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { type NavLeaf } from '@shadow-library/ui/router';
 
@@ -14,6 +14,8 @@ import { WeeklyReviewScreen } from '@/features/review';
 import { SettingsScreen } from '@/features/settings';
 import { DESKTOP_NAV, PHONE_NAV } from '@/features/shell';
 import { TodayScreen } from '@/features/today';
+
+import { renderScreen } from './harness';
 
 function desktopDestinations(): string[] {
   return DESKTOP_NAV.sections.flatMap(section => section.items).map(item => (item as NavLeaf).to);
@@ -52,8 +54,8 @@ describe('screen inventory', () => {
     ['Set up', OnboardingScreen],
   ];
 
-  it.each(screens)('should render the %s screen with its heading', (title, Screen) => {
-    render(<Screen />);
-    expect(screen.getByRole('heading', { name: title })).toBeDefined();
+  it.each(screens)('should render the %s screen with its heading', async (title, Screen) => {
+    renderScreen(<Screen />);
+    expect(await screen.findByRole('heading', { name: title })).toBeDefined();
   });
 });

@@ -21,6 +21,7 @@ import { Route as AppInsightsRouteImport } from './../src/routes/_app/insights'
 import { Route as AppHistoryRouteImport } from './../src/routes/_app/history'
 import { Route as AppHeroRouteImport } from './../src/routes/_app/hero'
 import { Route as AppAiRouteImport } from './../src/routes/_app/ai'
+import { Route as AppQuestsIndexRouteImport } from './../src/routes/_app/quests.index'
 import { Route as AppFinanceIndexRouteImport } from './../src/routes/_app/finance.index'
 import { Route as AppQuestsNewRouteImport } from './../src/routes/_app/quests.new'
 import { Route as AppQuestsQuestIdRouteImport } from './../src/routes/_app/quests.$questId'
@@ -85,6 +86,11 @@ const AppAiRoute = AppAiRouteImport.update({
   path: '/ai',
   getParentRoute: () => AppRoute,
 } as any)
+const AppQuestsIndexRoute = AppQuestsIndexRouteImport.update({
+  id: '/quests/',
+  path: '/quests/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppFinanceIndexRoute = AppFinanceIndexRouteImport.update({
   id: '/finance/',
   path: '/finance/',
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/quests/$questId': typeof AppQuestsQuestIdRoute
   '/quests/new': typeof AppQuestsNewRoute
   '/finance/': typeof AppFinanceIndexRoute
+  '/quests/': typeof AppQuestsIndexRoute
 }
 export interface FileRoutesByTo {
   '/welcome': typeof WelcomeRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/quests/$questId': typeof AppQuestsQuestIdRoute
   '/quests/new': typeof AppQuestsNewRoute
   '/finance': typeof AppFinanceIndexRoute
+  '/quests': typeof AppQuestsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/_app/quests/$questId': typeof AppQuestsQuestIdRoute
   '/_app/quests/new': typeof AppQuestsNewRoute
   '/_app/finance/': typeof AppFinanceIndexRoute
+  '/_app/quests/': typeof AppQuestsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -177,6 +186,7 @@ export interface FileRouteTypes {
     | '/quests/$questId'
     | '/quests/new'
     | '/finance/'
+    | '/quests/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/welcome'
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
     | '/quests/$questId'
     | '/quests/new'
     | '/finance'
+    | '/quests'
   id:
     | '__root__'
     | '/_app'
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/_app/quests/$questId'
     | '/_app/quests/new'
     | '/_app/finance/'
+    | '/_app/quests/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -305,6 +317,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAiRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/quests/': {
+      id: '/_app/quests/'
+      path: '/quests'
+      fullPath: '/quests/'
+      preLoaderRoute: typeof AppQuestsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/finance/': {
       id: '/_app/finance/'
       path: '/finance'
@@ -351,6 +370,7 @@ interface AppRouteChildren {
   AppQuestsQuestIdRoute: typeof AppQuestsQuestIdRoute
   AppQuestsNewRoute: typeof AppQuestsNewRoute
   AppFinanceIndexRoute: typeof AppFinanceIndexRoute
+  AppQuestsIndexRoute: typeof AppQuestsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -368,6 +388,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppQuestsQuestIdRoute: AppQuestsQuestIdRoute,
   AppQuestsNewRoute: AppQuestsNewRoute,
   AppFinanceIndexRoute: AppFinanceIndexRoute,
+  AppQuestsIndexRoute: AppQuestsIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

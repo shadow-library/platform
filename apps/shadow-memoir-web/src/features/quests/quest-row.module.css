@@ -1,0 +1,93 @@
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 15px;
+  min-height: var(--sh-row-height, 60px);
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.row[data-tone='closed'] {
+  background: var(--sh-surface-well);
+}
+
+.check {
+  flex: none;
+  width: var(--sh-tap-target);
+  height: var(--sh-tap-target);
+  margin: -9px -4px -9px -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--sh-radius-full);
+}
+
+.check:disabled {
+  cursor: default;
+}
+
+.checkMark {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--sh-radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  border: 1.5px solid var(--sm-quest-pending);
+  color: var(--sh-on-accent);
+}
+
+.row[data-tone='kept'] .checkMark,
+.row[data-tone='partial'] .checkMark {
+  background: var(--sh-accent);
+  border: 1px solid var(--sh-accent);
+}
+
+.row[data-tone='closed'] .checkMark {
+  border-style: dashed;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--sh-text-body);
+  font-weight: 500;
+}
+
+.row[data-tone='kept'] .title {
+  font-weight: 400;
+  color: var(--sh-text-secondary);
+  text-decoration: line-through;
+}
+
+.row[data-tone='partial'] .title,
+.row[data-tone='closed'] .title {
+  color: var(--sh-text-secondary);
+}
+
+.meta {
+  margin: 3px 0 0;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.threshold {
+  margin-top: 7px;
+  max-width: 260px;
+}
+
+.trailing {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

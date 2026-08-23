@@ -133,3 +133,15 @@ export const SunIcon = glyph(
 );
 
 export const MoonIcon = glyph(<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />);
+
+export const MoreIcon = glyph(
+  <>
+    <circle cx="5" cy="12" r="1" />
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="19" cy="12" r="1" />
+  </>,
+);
+
+export const ChevronLeftIcon = glyph(<path d="m14 6-6 6 6 6" />);
+
+export const ChevronRightIcon = glyph(<path d="m10 6 6 6-6 6" />);
