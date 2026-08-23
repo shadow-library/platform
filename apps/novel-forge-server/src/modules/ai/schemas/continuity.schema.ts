@@ -3,6 +3,8 @@ import { Field, Schema } from '@shadow-library/class-schema';
 import { EntityType, MysteryStatus, ThreadStatus } from '@server/common';
 import { type Knowledge, type Story } from '@server/database';
 
+import { ExtractionConfidence } from './enums';
+
 @Schema()
 export class ContinuityNewEntity {
   @Field({ minLength: 1 })
@@ -35,6 +37,12 @@ export class ContinuityThread {
     description: 'marked as a deliberate running thread, not an oversight — novel-validation must not flag it as unresolved',
   })
   intentionallyOpen?: boolean;
+
+  @Field(() => ExtractionConfidence, {
+    optional: true,
+    description: "'low' when this update is inferred rather than stated outright in the prose — low-confidence entries are staged for review instead of applied",
+  })
+  confidence?: 'high' | 'low';
 }
 
 @Schema()
@@ -57,6 +65,12 @@ export class ContinuityMystery {
 
   @Field({ optional: true, description: 'corresponds to a canon_facts.factKey — the hidden fact that answers this mystery, when the prose has revealed which one it is' })
   truthFactKey?: string;
+
+  @Field(() => ExtractionConfidence, {
+    optional: true,
+    description: "'low' when this update is inferred rather than stated outright in the prose — low-confidence entries are staged for review instead of applied",
+  })
+  confidence?: 'high' | 'low';
 }
 
 @Schema()
@@ -84,6 +98,15 @@ export class ContinuityRelationship {
 
   @Field({ optional: true })
   note?: string;
+
+  @Field({ minLength: 1, description: 'excerpt from the prose that justifies this relationship update' })
+  evidence: string;
+
+  @Field(() => ExtractionConfidence, {
+    optional: true,
+    description: "'low' when this update is inferred rather than stated outright in the prose — low-confidence entries are staged for review instead of applied",
+  })
+  confidence?: 'high' | 'low';
 }
 
 @Schema()
@@ -120,6 +143,12 @@ export class ContinuityCharacterState {
 
   @Field({ minLength: 1, description: 'excerpt from the prose that justifies this state extraction' })
   evidence: string;
+
+  @Field(() => ExtractionConfidence, {
+    optional: true,
+    description: "'low' when this state is inferred rather than stated outright in the prose — low-confidence entries are staged for review instead of applied",
+  })
+  confidence?: 'high' | 'low';
 }
 
 @Schema()

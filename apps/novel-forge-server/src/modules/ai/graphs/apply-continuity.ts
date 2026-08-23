@@ -55,6 +55,10 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
   }
 
   for (const thread of delta.threads ?? []) {
+    if (thread.confidence === 'low') {
+      logger.warn('applyContinuityDelta: low-confidence thread skipped for review', { projectId, chapter, threadKey: thread.threadKey });
+      continue;
+    }
     await tx
       .insert(schema.plotThreads)
       .values({
@@ -81,6 +85,10 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
   }
 
   for (const mystery of delta.mysteries ?? []) {
+    if (mystery.confidence === 'low') {
+      logger.warn('applyContinuityDelta: low-confidence mystery skipped for review', { projectId, chapter, mysteryKey: mystery.mysteryKey });
+      continue;
+    }
     await tx
       .insert(schema.mysteries)
       .values({
@@ -109,9 +117,25 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
   }
 
   for (const relationship of delta.relationships ?? []) {
+    if (relationship.confidence === 'low') {
+      logger.warn('applyContinuityDelta: low-confidence relationship skipped for review', {
+        projectId,
+        chapter,
+        entityKey: relationship.entityKey,
+        targetKey: relationship.targetKey,
+      });
+      continue;
+    }
     const entityId = await resolveEntityId(relationship.entityKey);
     if (!entityId) {
       logger.warn('applyContinuityDelta: relationship source entity not found, skipping', { projectId, chapter, entityKey: relationship.entityKey });
+      continue;
+    }
+    // `entity_relationships.target_key` is a plain varchar, so an unresolvable target would otherwise
+    // become a permanent edge pointing at a character that does not exist.
+    const targetId = await resolveEntityId(relationship.targetKey);
+    if (!targetId) {
+      logger.warn('applyContinuityDelta: relationship target entity not found, skipping', { projectId, chapter, targetKey: relationship.targetKey });
       continue;
     }
     await tx
@@ -130,6 +154,10 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
   }
 
   for (const characterState of delta.characterStates ?? []) {
+    if (characterState.confidence === 'low') {
+      logger.warn('applyContinuityDelta: low-confidence character state skipped for review', { projectId, chapter, entityKey: characterState.entityKey });
+      continue;
+    }
     // `character_states.entity_key` is a plain varchar, so an extracted key that names no entity would
     // otherwise become a permanent orphan row that never resolves back to a character.
     const entityId = await resolveEntityId(characterState.entityKey);
@@ -167,5 +195,7 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
   // trust to decide what a character may safely reference, so a hallucinated reveal would silently mark a
   // still-hidden fact as known. The raw delta stays visible on the continuity proposal for a human to act on
   // via the manual fact-reveal endpoint. `delta.timeline` and `delta.power` are likewise not persisted
-  // (recommendation §6).
+  // (recommendation §6). Entries the model marked `confidence: 'low'` follow the same route — skipped here,
+  // still on the proposal for a human to edit and re-apply. An absent `confidence` means auto-apply, so a
+  // model that never emits the field behaves exactly as before.
 }

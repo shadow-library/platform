@@ -131,12 +131,22 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     });
     const entityRoster = entityRows.map(e => `${e.entityKey} (${e.type}): ${e.name}`).join('\n');
 
+    // Thread and mystery keys are model-authored and upserted by key, so without the existing vocabulary the
+    // extractor coins a fresh key for a thread it already tracks and the same thread splits into two records.
+    const threadRows = await db.query.plotThreads.findMany({ where: eq(schema.plotThreads.projectId, projectId), columns: { threadKey: true, status: true, summary: true } });
+    const mysteryRows = await db.query.mysteries.findMany({ where: eq(schema.mysteries.projectId, projectId), columns: { mysteryKey: true, status: true, question: true } });
+    const threadRoster = threadRows.map(t => `${t.threadKey} (${t.status}): ${t.summary ?? ''}`).join('\n');
+    const mysteryRoster = mysteryRows.map(m => `${m.mysteryKey} (${m.status}): ${m.question}`).join('\n');
+    const contextPack = [`## ENTITY ROSTER\n${entityRoster || 'none'}`, `## EXISTING THREADS\n${threadRoster || 'none'}`, `## EXISTING MYSTERIES\n${mysteryRoster || 'none'}`].join(
+      '\n\n',
+    );
+
     const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'extractContinuity', promptKey: 'continuity', promptVersion: '1.0.0', role: 'continuity' };
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
     const delta = (await modelRouter.structured(
       PROMPT_REGISTRY.continuity,
-      { contextPack: `## ENTITY ROSTER\n${entityRoster || 'none'}`, chapterNumber: state.chapter, chapterProse: state.prose },
+      { contextPack, chapterNumber: state.chapter, chapterProse: state.prose },
       ctx,
       projectRow as ProjectConfig | undefined,
     )) as ContinuityOutput;

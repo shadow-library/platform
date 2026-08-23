@@ -950,6 +950,33 @@ describe('Prompt modules', () => {
       expect(parseSchema(ContinuitySchema, output).success).toBe(false);
     });
 
+    it('rejects a relationships entry missing the required evidence field', () => {
+      const output = {
+        ...base,
+        relationships: [{ entityKey: 'amara', targetKey: 'rook', kind: 'rival' }],
+      };
+      expect(parseSchema(ContinuitySchema, output).success).toBe(false);
+    });
+
+    it('parses a payload carrying confidence markers on threads, mysteries, relationships and characterStates', () => {
+      const output = {
+        ...base,
+        threads: [{ threadKey: 'the_ledger', status: 'open', confidence: 'low' }],
+        mysteries: [{ mysteryKey: 'missing_heir', status: 'open', question: 'Who is the heir?', confidence: 'high' }],
+        relationships: [{ entityKey: 'amara', targetKey: 'rook', kind: 'rival', evidence: 'they traded threats', confidence: 'low' }],
+        characterStates: [{ entityKey: 'amara', location: 'the city archive', evidence: 'she pressed the archive door', confidence: 'high' }],
+      };
+      expect(parseSchema(ContinuitySchema, output).success).toBe(true);
+    });
+
+    it('rejects a confidence value outside the high/low vocabulary', () => {
+      const output = {
+        ...base,
+        threads: [{ threadKey: 'the_ledger', status: 'open', confidence: 'maybe' }],
+      };
+      expect(parseSchema(ContinuitySchema, output).success).toBe(false);
+    });
+
     it('accepts empty characterStates and knowledgeChanges arrays as the nothing-to-report case', () => {
       expect(parseSchema(ContinuitySchema, base).success).toBe(true);
     });

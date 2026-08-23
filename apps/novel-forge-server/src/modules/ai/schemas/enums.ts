@@ -11,6 +11,7 @@ export const HOOK_TYPES = ['cliffhanger', 'revelation', 'quiet_dread', 'promise'
 export type HookTypeValue = (typeof HOOK_TYPES)[number];
 export const HookType = EnumType.create<HookTypeValue>('HookType', [...HOOK_TYPES]);
 export const AuditAction = EnumType.create('AuditAction', ['add', 'revise', 'remove', 'keep']);
+export const ExtractionConfidence = EnumType.create('ExtractionConfidence', ['high', 'low']);
 export const RebrandFixKind = EnumType.create('RebrandFixKind', ['name', 'attribution', 'grammar']);
 export const RebrandAuditVerdict = EnumType.create('RebrandAuditVerdict', ['clean', 'issues']);
 export const RebrandAuditIssueType = EnumType.create('RebrandAuditIssueType', ['nationalism', 'discrimination', 'naming', 'real_world_reference']);

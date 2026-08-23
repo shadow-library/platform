@@ -45,6 +45,7 @@ describe.if(pgAvailable)('continuity delta application', () => {
   let db: PrimaryDatabase;
   let checkpointer: PostgresSaver;
   let service: GenerationService;
+  let capturedVars: Record<string, unknown> | undefined;
 
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
@@ -70,7 +71,13 @@ describe.if(pgAvailable)('continuity delta application', () => {
     const services = {
       db,
       contextAssembler: {},
-      modelRouter: { structured: async () => output, resolveModel: () => ({ provider: 'test', model: 'test' }) },
+      modelRouter: {
+        structured: async (_prompt: unknown, vars: Record<string, unknown>) => {
+          capturedVars = vars;
+          return output;
+        },
+        resolveModel: () => ({ provider: 'test', model: 'test' }),
+      },
       telemetry: {},
       toolRegistry: {},
       indexingService: { addProse: async () => undefined, addLore: async () => undefined },
@@ -110,8 +117,11 @@ describe.if(pgAvailable)('continuity delta application', () => {
     await runFinalization(
       projectId,
       delta({
-        newEntities: [{ entityKey: 'amara', name: 'Amara', type: 'character' }],
-        relationships: [{ entityKey: 'amara', targetKey: 'rook', kind: 'rival', note: 'traded threats' }],
+        newEntities: [
+          { entityKey: 'amara', name: 'Amara', type: 'character' },
+          { entityKey: 'rook', name: 'Rook', type: 'character' },
+        ],
+        relationships: [{ entityKey: 'amara', targetKey: 'rook', kind: 'rival', note: 'traded threats', evidence: 'they traded threats' }],
       }),
       'rel',
     );
@@ -124,13 +134,16 @@ describe.if(pgAvailable)('continuity delta application', () => {
 
   it('should persist relationships from the manual endpoint and skip unresolvable entity keys', async () => {
     const projectId = await seedProject(`cont-rel-manual-${Date.now()}`);
-    await db.insert(schema.entities).values({ projectId, entityKey: 'amara', name: 'Amara', type: 'character' });
+    await db.insert(schema.entities).values([
+      { projectId, entityKey: 'amara', name: 'Amara', type: 'character' },
+      { projectId, entityKey: 'rook', name: 'Rook', type: 'character' },
+    ]);
     await applyViaEndpoint(
       projectId,
       delta({
         relationships: [
-          { entityKey: 'amara', targetKey: 'rook', kind: 'rival' },
-          { entityKey: 'ghost', targetKey: 'rook', kind: 'ally' },
+          { entityKey: 'amara', targetKey: 'rook', kind: 'rival', evidence: 'they traded threats' },
+          { entityKey: 'ghost', targetKey: 'rook', kind: 'ally', evidence: 'hallucinated' },
         ],
       }),
     );
@@ -235,5 +248,104 @@ describe.if(pgAvailable)('continuity delta application', () => {
     mystery = await db.query.mysteries.findFirst({ where: eq(schema.mysteries.projectId, projectId) });
     expect(thread).toMatchObject({ lastAdvancedChapter: 5, openedChapter: 1 });
     expect(mystery).toMatchObject({ lastAdvancedChapter: 5, openedChapter: 1 });
+  });
+
+  it('should skip relationships whose target key resolves to no entity', async () => {
+    const projectId = await seedProject(`cont-rel-target-${Date.now()}`);
+    await db.insert(schema.entities).values([
+      { projectId, entityKey: 'amara', name: 'Amara', type: 'character' },
+      { projectId, entityKey: 'rook', name: 'Rook', type: 'character' },
+    ]);
+    await applyViaEndpoint(
+      projectId,
+      delta({
+        relationships: [
+          { entityKey: 'amara', targetKey: 'rook', kind: 'rival', evidence: 'they traded threats' },
+          { entityKey: 'amara', targetKey: 'the-phantom', kind: 'ally', evidence: 'hallucinated' },
+        ],
+      }),
+    );
+
+    const rows = await db.query.entityRelationships.findMany({ where: eq(schema.entityRelationships.projectId, projectId) });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.targetKey).toBe('rook');
+  });
+
+  it('should skip low-confidence entries while applying their high-confidence siblings', async () => {
+    const projectId = await seedProject(`cont-confidence-${Date.now()}`);
+    await db.insert(schema.entities).values([
+      { projectId, entityKey: 'amara', name: 'Amara', type: 'character' },
+      { projectId, entityKey: 'rook', name: 'Rook', type: 'character' },
+    ]);
+    await applyViaEndpoint(
+      projectId,
+      delta({
+        threads: [
+          { threadKey: 'the-ledger', status: 'open', confidence: 'high' },
+          { threadKey: 'the-rumour', status: 'open', confidence: 'low' },
+        ],
+        mysteries: [
+          { mysteryKey: 'who-took-it', status: 'open', question: 'Who took the ledger?', confidence: 'high' },
+          { mysteryKey: 'why-the-fire', status: 'open', question: 'Why the fire?', confidence: 'low' },
+        ],
+        relationships: [
+          { entityKey: 'amara', targetKey: 'rook', kind: 'rival', evidence: 'they traded threats', confidence: 'high' },
+          { entityKey: 'rook', targetKey: 'amara', kind: 'protector', evidence: 'he lingered', confidence: 'low' },
+        ],
+        characterStates: [
+          { entityKey: 'amara', location: 'the docks', evidence: 'she limped', confidence: 'high' },
+          { entityKey: 'rook', location: 'the tower', evidence: 'he might be watching', confidence: 'low' },
+        ],
+      }),
+    );
+
+    const threads = await db.query.plotThreads.findMany({ where: eq(schema.plotThreads.projectId, projectId) });
+    const mysteries = await db.query.mysteries.findMany({ where: eq(schema.mysteries.projectId, projectId) });
+    const relationships = await db.query.entityRelationships.findMany({ where: eq(schema.entityRelationships.projectId, projectId) });
+    const states = await db.query.characterStates.findMany({ where: eq(schema.characterStates.projectId, projectId) });
+
+    expect(threads.map(t => t.threadKey)).toEqual(['the-ledger']);
+    expect(mysteries.map(m => m.mysteryKey)).toEqual(['who-took-it']);
+    expect(relationships.map(r => r.kind)).toEqual(['rival']);
+    expect(states.map(s => s.entityKey)).toEqual(['amara']);
+  });
+
+  it('should apply entries that omit confidence exactly as before the gate existed', async () => {
+    const projectId = await seedProject(`cont-confidence-absent-${Date.now()}`);
+    await db.insert(schema.entities).values([
+      { projectId, entityKey: 'amara', name: 'Amara', type: 'character' },
+      { projectId, entityKey: 'rook', name: 'Rook', type: 'character' },
+    ]);
+    await applyViaEndpoint(
+      projectId,
+      delta({
+        threads: [{ threadKey: 'the-ledger', status: 'open' }],
+        mysteries: [{ mysteryKey: 'who-took-it', status: 'open', question: 'Who took the ledger?' }],
+        relationships: [{ entityKey: 'amara', targetKey: 'rook', kind: 'rival', evidence: 'they traded threats' }],
+        characterStates: [{ entityKey: 'amara', location: 'the docks', evidence: 'she limped' }],
+      }),
+    );
+
+    expect(await db.query.plotThreads.findMany({ where: eq(schema.plotThreads.projectId, projectId) })).toHaveLength(1);
+    expect(await db.query.mysteries.findMany({ where: eq(schema.mysteries.projectId, projectId) })).toHaveLength(1);
+    expect(await db.query.entityRelationships.findMany({ where: eq(schema.entityRelationships.projectId, projectId) })).toHaveLength(1);
+    expect(await db.query.characterStates.findMany({ where: eq(schema.characterStates.projectId, projectId) })).toHaveLength(1);
+  });
+
+  it('should show the extractor the existing thread and mystery keys', async () => {
+    const projectId = await seedProject(`cont-vocabulary-${Date.now()}`);
+    await db.insert(schema.entities).values({ projectId, entityKey: 'amara', name: 'Amara', type: 'character' });
+    await db.insert(schema.plotThreads).values({ projectId, threadKey: 'the-missing-heir', status: 'open', summary: 'Amara hunts the heir.' });
+    await db.insert(schema.mysteries).values({ projectId, mysteryKey: 'who-burned-the-archive', status: 'open', question: 'Who burned the archive?' });
+
+    capturedVars = undefined;
+    await runFinalization(projectId, delta(), 'vocabulary');
+
+    const contextPack = String(capturedVars?.['contextPack']);
+    expect(contextPack).toContain('## EXISTING THREADS');
+    expect(contextPack).toContain('the-missing-heir');
+    expect(contextPack).toContain('## EXISTING MYSTERIES');
+    expect(contextPack).toContain('who-burned-the-archive');
+    expect(contextPack).toContain('amara');
   });
 });

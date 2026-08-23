@@ -6,9 +6,9 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 
 ## Summary
 
-- Completed: 5
+- Completed: 6
 - In Progress: 0
-- Pending: 6
+- Pending: 5
 - Blocked: 0
 
 ## Tasks
@@ -20,7 +20,7 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 | FIX-03 | HIGH     | Read `character_states` + current relationships into `forChapter`; validate entity keys before applying extraction                  | COMPLETED | —            |
 | FIX-04 | HIGH     | Render `brief.pov` into generation/judge brief; guarantee POV entity card priority                                                  | COMPLETED | —            |
 | FIX-05 | HIGH     | Arc reconciliation observes events inside the current arc, not `arc.chapterStart`; protect/invalidate already-drafted descendants   | COMPLETED | FIX-02       |
-| FIX-06 | HIGH     | Continuity extraction receives existing key vocabulary; validate relationship targets/evidence; route ambiguous mutations to review | PENDING   | —            |
+| FIX-06 | HIGH     | Continuity extraction receives existing key vocabulary; validate relationship targets/evidence; route ambiguous mutations to review | COMPLETED | —            |
 | FIX-07 | HIGH     | Bible stage output instructions match schema; persist stage atomically; fix `bible_doc` ref format mismatch                         | PENDING   | —            |
 | FIX-08 | HIGH     | Gate/cap the legacy whole-book `outline()` endpoint so it cannot overwrite protected arc briefs                                     | PENDING   | —            |
 | FIX-09 | MEDIUM   | Align `revealChapter` catalog semantics with the actual knowledge ledger                                                            | PENDING   | —            |
@@ -77,7 +77,7 @@ None.
 
 ## Pending
 
-See table above. FIX-06 selected next.
+See table above. FIX-07 selected next.
 
 ## Blocked
 
@@ -279,5 +279,48 @@ path), all pass after.
 
 Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
 990 pass, 10 skip, 0 fail (independently re-run).
+
+Commit: `54216149`
+
+### FIX-06 — Continuity extraction trust boundary
+
+Source finding: `harness-post-implementation-review.md` H5 ("Model-extracted state is promoted to
+durable canon without the approved trust boundary") + §18 row 6. (FIX-03, already merged, covered the
+`characterStates` entity-key validation half of H5 — this fix covers the remainder.)
+
+What changed:
+
+- `extractContinuity`'s model-call context now includes the project's existing `plotThreads` and
+  `mysteries` (key, status, summary/question) alongside the entity roster it already sent, as
+  `## EXISTING THREADS`/`## EXISTING MYSTERIES` sections. Previously only entities were shown, so the
+  extractor had no way to know it should reuse an existing thread/mystery key instead of coining a
+  variant — the exact key-fragmentation risk (`missing_heir` / `the_missing_heir` / `heir_mystery`
+  becoming three records) the audit named. The prompt (bumped `1.1.0` → `1.2.0`) now instructs the
+  model to reuse an exact listed key when an update concerns something already tracked.
+- `apply-continuity.ts`'s `relationships` loop now validates `targetKey` the same way it already
+  validated the source `entityKey` (via the existing `resolveEntityId` helper), skipping with a
+  `logger.warn` on an unresolvable target instead of writing an arbitrary string into
+  `entity_relationships.targetKey`.
+- `ContinuityRelationship` gained a required `evidence` field (same shape as
+  `ContinuityCharacterState.evidence`) — relationship claims previously carried no textual
+  justification requirement at all.
+- `ContinuityThread`/`ContinuityMystery`/`ContinuityRelationship`/`ContinuityCharacterState` — the
+  four types `applyContinuityDelta` writes to durable tables automatically — gained an optional
+  `confidence?: 'high' | 'low'` field via a new `ExtractionConfidence` enum. `applyContinuityDelta`
+  skips (does not write) any entry marked `confidence: 'low'`, logging it as held for review; the raw
+  delta stays on `continuity_proposals.proposal` regardless, the same review surface the existing
+  `knowledgeChanges` non-application already relies on. **An absent `confidence` field applies exactly
+  as before this fix** — this is additive gating, not a new default-deny posture, so a model/provider
+  that doesn't yet emit the field isn't silently blocked from writing anything.
+
+Tests: `tests/ai/continuity-apply.spec.ts` (+: unresolvable relationship target skipped while a
+resolvable sibling writes; low-confidence thread/mystery/relationship/characterState entries all
+dropped while high-confidence siblings land; confidence-omitted entries still apply to all four
+tables — explicit regression guard; `extractContinuity`'s `contextPack` contains seeded existing
+thread/mystery keys). `tests/ai/prompts.spec.ts` (+: `ContinuityRelationship` rejects a missing
+`evidence`; confidence markers parse on all four types; an out-of-enum confidence value is rejected).
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+997 pass, 10 skip, 0 fail (independently re-run).
 
 Commit: (recorded after commit, see git log)
