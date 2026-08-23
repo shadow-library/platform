@@ -27,6 +27,20 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ACC_002 = AppErrorCode.forbidden('ACC_002', 'This account is being deleted and cannot process this request');
 
   /*!
+   * Command Errors
+   */
+
+  /** The envelope names a command type this server has no registered handler for */
+  static readonly CMD_001 = AppErrorCode.badRequest('CMD_001', "Unknown command type '{type}'");
+
+  /*!
+   * Hero Errors
+   */
+
+  /** A coin spend exceeds the balance; the `accounts.coins >= 0` CHECK is the backstop, this is the surfaced refusal */
+  static readonly HRO_001 = AppErrorCode.conflict('HRO_001', 'Not enough coins for this purchase');
+
+  /*!
    * Quest Errors
    */
 

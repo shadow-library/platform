@@ -8,6 +8,8 @@ import * as schema from './schemas';
 
 export type PrimaryDatabase = BunSQLDatabase<typeof schema>;
 
+export type DatabaseTransaction = Parameters<Parameters<PrimaryDatabase['transaction']>[0]>[0];
+
 declare module '@shadow-library/modules' {
   interface DatabaseRecords {
     postgres: PrimaryDatabase;
