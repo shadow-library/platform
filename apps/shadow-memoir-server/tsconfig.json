@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.server.json",
+  "compilerOptions": {
+    "paths": {
+      "@modules/*": ["./src/modules/*"],
+      "@server/*": ["./src/*"],
+      "@tests/*": ["./tests/*"]
+    }
+  }
+}

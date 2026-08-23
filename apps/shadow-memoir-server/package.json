@@ -1,0 +1,48 @@
+{
+  "name": "@shadow-library/shadow-memoir-server",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Backend service for Shadow Memoir: gamified life-tracking (quests, hero progression, finance, AI insights) for the account's owner.",
+  "scripts": {
+    "dev": "bun run --watch src/main.ts"
+  },
+  "shadow": {
+    "entries": [
+      "src/worker.ts",
+      "src/migrate.ts"
+    ],
+    "assets": [
+      "generated/drizzle"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/shadow-library/platform.git",
+    "directory": "apps/shadow-memoir-server"
+  },
+  "author": "Leander Paul <leanderpaul97@outlook.com>",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/shadow-library/platform/issues"
+  },
+  "homepage": "https://github.com/shadow-library/platform#readme",
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "drizzle-kit": "catalog:",
+    "fastify": "catalog:",
+    "type-fest": "catalog:",
+    "typescript": "catalog:"
+  },
+  "dependencies": {
+    "@shadow-library/app": "workspace:*",
+    "@shadow-library/auth": "workspace:*",
+    "@shadow-library/class-schema": "workspace:*",
+    "@shadow-library/common": "workspace:*",
+    "@shadow-library/fastify": "workspace:*",
+    "@shadow-library/modules": "workspace:*",
+    "ajv": "catalog:",
+    "drizzle-orm": "catalog:",
+    "reflect-metadata": "catalog:"
+  }
+}

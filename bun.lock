@@ -209,6 +209,28 @@
         "vite": "catalog:",
       },
     },
+    "apps/shadow-memoir-server": {
+      "name": "@shadow-library/shadow-memoir-server",
+      "version": "0.0.0",
+      "dependencies": {
+        "@shadow-library/app": "workspace:*",
+        "@shadow-library/auth": "workspace:*",
+        "@shadow-library/class-schema": "workspace:*",
+        "@shadow-library/common": "workspace:*",
+        "@shadow-library/fastify": "workspace:*",
+        "@shadow-library/modules": "workspace:*",
+        "ajv": "catalog:",
+        "drizzle-orm": "catalog:",
+        "reflect-metadata": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "drizzle-kit": "catalog:",
+        "fastify": "catalog:",
+        "type-fest": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "apps/web-novel-server": {
       "name": "@shadow-library/web-novel-server",
       "version": "0.0.0",
@@ -1188,6 +1210,8 @@
     "@shadow-library/novel-forge-server": ["@shadow-library/novel-forge-server@workspace:apps/novel-forge-server"],
 
     "@shadow-library/pulse-server": ["@shadow-library/pulse-server@workspace:apps/pulse-server"],
+
+    "@shadow-library/shadow-memoir-server": ["@shadow-library/shadow-memoir-server@workspace:apps/shadow-memoir-server"],
 
     "@shadow-library/ui": ["@shadow-library/ui@workspace:packages/ui"],
 
