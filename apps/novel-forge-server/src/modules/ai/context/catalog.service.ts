@@ -5,6 +5,13 @@ import { DatabaseService } from '@shadow-library/modules';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
+// A long-running project's chapters/entities grow unboundedly; canon facts and world facts (already
+// keys-only) are left uncapped since planning correctness — reveal scheduling, ref resolution —
+// depends on the outliner seeing all of them. Recent chapters matter far more to planning continuity
+// than old ones, and a project's core cast rarely exceeds a couple hundred named entities.
+const CATALOG_CHAPTER_CAP = 50;
+const CATALOG_ENTITY_CAP = 150;
+
 @Injectable()
 export class CatalogService {
   private readonly db: PrimaryDatabase;
@@ -32,11 +39,14 @@ export class CatalogService {
     const parts: string[] = [];
 
     if (chapters.length > 0) {
-      const lines = chapters.map(ch => {
+      const omitted = Math.max(0, chapters.length - CATALOG_CHAPTER_CAP);
+      const shown = omitted > 0 ? chapters.slice(-CATALOG_CHAPTER_CAP) : chapters;
+      const lines = shown.map(ch => {
         const tag = ch.generator === 'grok' ? ' [grok]' : ch.status === 'done' ? '' : ' [draft]';
         const suffix = ch.status === 'done' && ch.summary && ch.summary.length <= 60 ? ` (${ch.summary})` : '';
         return `${ch.number} — ${ch.title ?? `Chapter ${ch.number}`}${tag}${suffix}`;
       });
+      if (omitted > 0) lines.unshift(`(+${omitted} earlier chapters omitted)`);
       parts.push('CHAPTERS:\n' + lines.join('\n'));
     }
 
@@ -50,11 +60,16 @@ export class CatalogService {
     }
 
     if (entities.length > 0) {
-      const lines = entities.map(e => {
+      const omitted = Math.max(0, entities.length - CATALOG_ENTITY_CAP);
+      // Major entities first (a project's core cast), preserving DB order as the tiebreak within each tier.
+      const ranked = omitted > 0 ? [...entities].sort((a, b) => (a.significance === 'major' ? 0 : 1) - (b.significance === 'major' ? 0 : 1)) : entities;
+      const shown = ranked.slice(0, CATALOG_ENTITY_CAP);
+      const lines = shown.map(e => {
         const descriptor = (e.body ?? e.notes ?? '').replace(/\n/g, ' ').slice(0, 80);
         const status = e.status ?? 'active';
         return `${e.entityKey} — ${e.type}: ${descriptor} (${status})`;
       });
+      if (omitted > 0) lines.unshift(`(+${omitted} minor entities omitted)`);
       parts.push('ENTITIES:\n' + lines.join('\n'));
     }
 

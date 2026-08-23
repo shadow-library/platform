@@ -625,17 +625,20 @@ export class ContextAssembler {
     }
 
     if (worldFactRows.length > 0) {
+      // Keys-only, not full values: world facts aren't chapter-scoped (no range to filter by), so
+      // every fact in the project lands in every validation window regardless of size — the same
+      // unbounded shape catalog.service.ts already solved for its own project-wide render.
       const byCategory = new Map<string, string[]>();
       for (const f of worldFactRows) {
         if (!byCategory.has(f.category)) byCategory.set(f.category, []);
-        const catEntries = byCategory.get(f.category);
-        if (catEntries) catEntries.push(`${f.key}: ${f.value}`);
+        const catKeys = byCategory.get(f.category);
+        if (catKeys) catKeys.push(f.key);
       }
       const lines: string[] = [];
-      for (const [cat, entries] of byCategory) {
-        lines.push(`${cat}:\n${entries.join('\n')}`);
+      for (const [cat, keys] of byCategory) {
+        lines.push(`${cat}: ${keys.join(' | ')}`);
       }
-      sections.push(makeSection('world_facts', lines.join('\n\n'), 'canonical', []));
+      sections.push(makeSection('world_facts', lines.join('\n'), 'canonical', []));
     }
 
     return this.finalize(projectId, 'validation', null, sections, [], budgetTokens, false);
