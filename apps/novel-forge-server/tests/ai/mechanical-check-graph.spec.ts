@@ -35,7 +35,9 @@ function buildServices(db: PrimaryDatabase, body: string) {
       return { title: 'Chapter Title' };
     },
     chatFor: () => ({
-      bindTools: () => ({ invoke: async () => new AIMessage(JSON.stringify({ verdict: 'consistent', findings: [] })) }),
+      bindTools: () => ({
+        invoke: async () => new AIMessage(JSON.stringify({ verdict: 'consistent', findings: [], briefCompliance: { compliant: true, issues: [] } })),
+      }),
     }),
     resolveModel: () => ({ provider: 'test', model: 'test' }),
   };

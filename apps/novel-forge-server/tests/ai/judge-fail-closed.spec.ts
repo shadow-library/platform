@@ -75,7 +75,7 @@ describe.if(pgAvailable)('judge fail-closed behavior', () => {
   it('retries the judge once and accepts on a valid retry reply', async () => {
     const projectId = await seedProject();
     const seenMessages: BaseMessage[][] = [];
-    const services = buildServices(db, [null, JSON.stringify({ verdict: 'consistent', findings: [] })], seenMessages);
+    const services = buildServices(db, [null, JSON.stringify({ verdict: 'consistent', findings: [], briefCompliance: { compliant: true, issues: [] } })], seenMessages);
     const graph = createChapterGenerationGraph(services);
 
     const runId = `judge-retry-${projectId}`;

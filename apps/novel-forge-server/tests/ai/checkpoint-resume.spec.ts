@@ -42,7 +42,7 @@ function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, calls: 
         invoke: async () => {
           calls.judge++;
           if (calls.judge === 1) throw new Error('simulated crash inside judge');
-          return new AIMessage(JSON.stringify({ verdict: 'consistent', findings: [] }));
+          return new AIMessage(JSON.stringify({ verdict: 'consistent', findings: [], briefCompliance: { compliant: true, issues: [] } }));
         },
       }),
     }),

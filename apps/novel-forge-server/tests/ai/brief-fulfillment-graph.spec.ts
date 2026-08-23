@@ -120,11 +120,20 @@ describe.if(pgAvailable)('judge brief-fulfillment gate', () => {
     expect(draft?.judgeNote).toBeNull();
   });
 
-  it('should fail open and accept when the judge omits briefCompliance entirely', async () => {
-    const { outcome, briefCompliant } = await run({ verdict: 'consistent', findings: [] }, false);
+  it('should fail closed when the judge omits briefCompliance entirely', async () => {
+    const { outcome, briefCompliant, projectId } = await run({ verdict: 'consistent', findings: [] }, false);
 
-    expect(briefCompliant).toBe(true);
-    expect(outcome).toBe('accepted');
+    expect(briefCompliant).toBe(false);
+    expect(outcome).not.toBe('accepted');
+    expect(outcome).toBe('awaiting_review');
+
+    const draft = await db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, 1)) });
+    expect(draft?.judgeNote).toContain('brief: judge omitted briefCompliance — treated as non-compliant');
+  });
+
+  it('should route into the repair ladder when autoFix is on and the judge omits briefCompliance', async () => {
+    const { outcome } = await run({ verdict: 'consistent', findings: [] }, true);
+    expect(outcome).toBe('accepted_with_findings');
   });
 
   it('should put the brief body in front of the judge under a ## BRIEF heading', async () => {

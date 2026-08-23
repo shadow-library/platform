@@ -40,7 +40,13 @@ function buildServices(db: PrimaryDatabase, seenMessages: BaseMessage[][]) {
           seenMessages.push(messages);
           const call = judgeCall;
           judgeCall++;
-          return new AIMessage(JSON.stringify({ verdict: 'contradiction', findings: [{ severity: 'hard', text: `distinct finding #${call}` }] }));
+          return new AIMessage(
+            JSON.stringify({
+              verdict: 'contradiction',
+              findings: [{ severity: 'hard', text: `distinct finding #${call}` }],
+              briefCompliance: { compliant: true, issues: [] },
+            }),
+          );
         },
       }),
     }),

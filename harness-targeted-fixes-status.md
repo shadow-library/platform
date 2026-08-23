@@ -6,9 +6,9 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 
 ## Summary
 
-- Completed: 9
+- Completed: 10
 - In Progress: 0
-- Pending: 2
+- Pending: 1
 - Blocked: 0
 
 ## Tasks
@@ -24,7 +24,7 @@ alignment. Scope is corrective only — no new subsystems, no re-litigating P0/P
 | FIX-07 | HIGH     | Bible stage output instructions match schema; persist stage atomically; fix `bible_doc` ref format mismatch                         | COMPLETED | —            |
 | FIX-08 | HIGH     | Gate/cap the legacy whole-book `outline()` endpoint so it cannot overwrite protected arc briefs                                     | COMPLETED | —            |
 | FIX-09 | MEDIUM   | Align `revealChapter` catalog semantics with the actual knowledge ledger                                                            | COMPLETED | —            |
-| FIX-10 | MEDIUM   | Require `briefCompliance` at runtime; fail closed if the judge omits it                                                             | PENDING   | —            |
+| FIX-10 | MEDIUM   | Require `briefCompliance` at runtime; fail closed if the judge omits it                                                             | COMPLETED | —            |
 | FIX-11 | MEDIUM   | Use one writing-style policy across generation, fix, and revision prompts                                                           | PENDING   | —            |
 
 Ordering rationale: data-integrity/recoverability (FIX-01, FIX-02) before state/context-correctness
@@ -77,7 +77,7 @@ None.
 
 ## Pending
 
-See table above. FIX-10 selected next.
+See table above. FIX-11 selected next.
 
 ## Blocked
 
@@ -424,5 +424,44 @@ hint.
 
 Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
 1009 pass, 10 skip, 0 fail (independently re-run).
+
+Commit: `9cc74caf`
+
+### FIX-10 — `briefCompliance` fails closed when the judge omits it
+
+Source finding: `harness-post-implementation-review.md` M1 ("Brief fulfilment fails open when the
+judge omits the required field") + §18 row 9 (medium).
+
+What changed:
+
+`chapter-generation.graph.ts`'s `judge()` asks the model to include `briefCompliance` in every
+response ("include briefCompliance in your JSON"), but previously defaulted a missing field to
+`compliant: true` — silently accepting exactly the malformed-but-schema-valid output the anti-filler
+check exists to catch. The fallback now defaults to `false` (fail closed), with a synthetic soft
+finding (`'brief: judge omitted briefCompliance — treated as non-compliant'`) so the repair
+ladder/human reviewer has something concrete to act on.
+
+**Decision made in this pass, not the audit's literal file list**: `JudgeSchema.briefCompliance`
+stays optional rather than becoming schema-required. Making it schema-required would fail parsing
+(triggering the existing retry → `evaluation_failed` → human-review path) for `GenerationService
+.judgeDraft` too — a separate manual endpoint (`POST /drafts/:n/judge`) sharing `JudgeSchema` but
+whose human message never includes a `## BRIEF` block or asks for `briefCompliance`, and which never
+reads or gates on a `briefCompliant` flag at all. A schema-level fix would have permanently broken
+that endpoint's every call. The application-level fallback flip is scoped exactly to the one place
+(`chapter-generation.graph.ts`'s judge, feeding `routeAfterJudge`'s accept gate) that actually asks
+for and depends on this field.
+
+Tests: `tests/ai/brief-fulfillment-graph.spec.ts` — the existing test that pinned the buggy
+fail-open behavior is renamed and its assertions flipped (`briefCompliant: false`, `outcome:
+'awaiting_review'`, `judgeNote` contains the synthetic finding); new test confirms the `autoFix: true`
+variant routes into the repair ladder (`accepted_with_findings`). Four unrelated spec files
+(`checkpoint-resume`, `judge-fail-closed`, `mechanical-check-graph`, `repair-ladder`) had judge-reply
+mocks that omitted `briefCompliance` while asserting on unrelated behavior (checkpoint resume, retry
+parsing, mechanical checks, finding-dedup) — each now supplies `briefCompliance: { compliant: true,
+issues: [] }` so those tests isolate what they're actually verifying instead of incidentally tripping
+the new gate.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+1010 pass, 10 skip, 0 fail (independently re-run).
 
 Commit: (recorded after commit, see git log)

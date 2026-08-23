@@ -378,8 +378,9 @@ export function createChapterGenerationGraph(services: GraphServices) {
     if (compliance && !compliance.compliant) findings.push(...compliance.issues.map(issue => ({ severity: 'soft' as const, text: `ending contract: ${issue}` })));
 
     const briefCompliance = judgeResult?.briefCompliance;
-    const briefCompliant = briefCompliance ? briefCompliance.compliant : true;
+    const briefCompliant = briefCompliance ? briefCompliance.compliant : false;
     if (briefCompliance && !briefCompliance.compliant) findings.push(...briefCompliance.issues.map(issue => ({ severity: 'soft' as const, text: `brief: ${issue}` })));
+    else if (!briefCompliance) findings.push({ severity: 'soft' as const, text: 'brief: judge omitted briefCompliance — treated as non-compliant' });
 
     const knowledge = mergeKnowledgeCompliance(
       forbidden.length > 0 ? judgeResult?.knowledgeCompliance : undefined,
