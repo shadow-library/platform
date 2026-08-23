@@ -16,6 +16,8 @@ export type SignalCandidateType = 'filler' | 'repetition' | 'pacing_stall' | 'dr
  * explains these; unconfirmed ones survive into the report at the confidence the detector assigned.
  */
 export interface SignalCandidate {
+  /** Stable within a digest; the model cites it in `signalRef` so a finding can be traced to its detector. */
+  id: string;
   type: SignalCandidateType;
   fromChapter: number;
   toChapter: number;
@@ -212,8 +214,9 @@ function findRoot(parent: number[], node: number): number {
 }
 
 type SignalSettings = Required<Omit<AnalysisSignalOptions, 'glossary'>>;
+type Candidate = Omit<SignalCandidate, 'id'>;
 
-function detectRepetition(chapters: SignalChapter[], tokenized: string[][], options: SignalSettings): { candidates: SignalCandidate[]; repeated: Set<number> } {
+function detectRepetition(chapters: SignalChapter[], tokenized: string[][], options: SignalSettings): { candidates: Candidate[]; repeated: Set<number> } {
   const prints = tokenized.map(tokens => fingerprint(tokens, options.shingleSize));
   const postings = new Map<number, number[]>();
   for (let index = 0; index < prints.length; index++) {
@@ -260,7 +263,7 @@ function detectRepetition(chapters: SignalChapter[], tokenized: string[][], opti
   }
 
   const repeated = new Set<number>();
-  const candidates: SignalCandidate[] = [];
+  const candidates: Candidate[] = [];
   for (const members of clusters.values()) {
     members.sort((a, b) => a - b);
     for (const member of members) repeated.add(member);
@@ -286,10 +289,10 @@ function detectRepetition(chapters: SignalChapter[], tokenized: string[][], opti
   return { candidates, repeated };
 }
 
-function detectLengthOutliers(chapters: SignalChapter[], words: number[]): { candidates: SignalCandidate[]; medianWords: number; madWords: number } {
+function detectLengthOutliers(chapters: SignalChapter[], words: number[]): { candidates: Candidate[]; medianWords: number; madWords: number } {
   const medianWords = median(words);
   const madWords = median(words.map(w => Math.abs(w - medianWords)));
-  const candidates: SignalCandidate[] = [];
+  const candidates: Candidate[] = [];
   if (medianWords === 0) return { candidates, medianWords, madWords };
 
   // A corpus of uniformly-sized chapters has a zero MAD, which would make every threshold degenerate.
@@ -400,7 +403,7 @@ export function computeAnalysisSignals(chapters: SignalChapter[], options: Analy
 
   const repetition = detectRepetition(ordered, tokenized, settings);
   const lengths = detectLengthOutliers(ordered, words);
-  const candidates: SignalCandidate[] = [...repetition.candidates, ...lengths.candidates];
+  const candidates: Candidate[] = [...repetition.candidates, ...lengths.candidates];
 
   const glossaryNames = new Map<string, string>();
   for (const entry of options.glossary ?? []) {
@@ -526,6 +529,7 @@ export function computeAnalysisSignals(chapters: SignalChapter[], options: Analy
   candidates.sort((a, b) => a.fromChapter - b.fromChapter || a.type.localeCompare(b.type));
 
   return {
+    candidates: candidates.map((candidate, index) => ({ id: `sig-${index + 1}`, ...candidate })),
     metrics: {
       chapterCount: ordered.length,
       medianWords: Math.round(lengths.medianWords),
@@ -535,6 +539,21 @@ export function computeAnalysisSignals(chapters: SignalChapter[], options: Analy
       arcBoundaryCount: boundaries.size,
       deadThreadCount,
     },
-    candidates,
   };
+}
+
+/**
+ * The digest the analysis prompts read (transform design §3.2). A range scopes it to one window's
+ * chapters — an overlapping candidate still shows, because a repetition cluster that starts before the
+ * window is exactly what the window needs to know about.
+ */
+export function renderSignalDigest(signals: AnalysisSignals, from?: number, to?: number): string {
+  const scoped = signals.candidates.filter(c => (from === undefined || c.toChapter >= from) && (to === undefined || c.fromChapter <= to));
+  if (scoped.length === 0) return 'No mechanical signals fired for these chapters.';
+  return scoped
+    .map(c => {
+      const range = c.fromChapter === c.toChapter ? `ch. ${c.fromChapter}` : `ch. ${c.fromChapter}-${c.toChapter}`;
+      return `[${c.id}] ${c.type} ${range} (severity ${c.severity}, confidence ${c.confidence.toFixed(2)}) — ${c.label}. ${c.detail}`;
+    })
+    .join('\n');
 }

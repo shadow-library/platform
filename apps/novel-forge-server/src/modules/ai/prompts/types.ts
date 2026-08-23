@@ -37,6 +37,8 @@ export type PromptKey =
   | 'reforge-outline'
   | 'reforge-write'
   | 'reforge-judge'
+  | 'reforge-analyze-window'
+  | 'reforge-synthesize'
   | 'recombine'
   | 'illustration-compose';
 

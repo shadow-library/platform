@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { computeAnalysisSignals, type SignalCandidate, type SignalChapter } from '@modules/reforge/analysis-signals';
+import { computeAnalysisSignals, renderSignalDigest, type SignalCandidate, type SignalChapter } from '@modules/reforge/analysis-signals';
 
 const NAMES = ['Ren', 'Kaia', 'Doran', 'Vesh', 'Miral', 'Torhen', 'Selis', 'Adran', 'Fenrick', 'Lomas'];
 const WORDS = `lantern ledger gate blade letter road weighed answered measured turned considered balanced watched cold rain iron salt
@@ -156,6 +156,22 @@ describe('computeAnalysisSignals', () => {
 
     const froms = computeAnalysisSignals(chapters).candidates.map(c => c.fromChapter);
     expect(froms).toEqual([...froms].sort((a, b) => a - b));
+  });
+
+  it('should scope the digest to a window while keeping ids stable and overlaps visible', () => {
+    const chapters: SignalChapter[] = [];
+    for (let i = 1; i <= 20; i++) {
+      const words = i >= 8 && i <= 11 ? 300 : 2000;
+      chapters.push(chapter(i, [4, 9, 14].includes(i) ? `${REPEATED_SCENE} ${livingChapter(i)}` : livingChapter(i), undefined, words));
+    }
+    const signals = computeAnalysisSignals(chapters);
+
+    expect(renderSignalDigest(signals, 1, 3)).toBe('No mechanical signals fired for these chapters.');
+    // The repetition cluster starts at chapter 4 and reaches 14 — a window on 8-11 still has to know.
+    const window = renderSignalDigest(signals, 8, 11);
+    expect(window).toContain('repetition ch. 4-14');
+    expect(window).toContain('filler ch. 8-11');
+    for (const line of window.split('\n')) expect(renderSignalDigest(signals)).toContain(line);
   });
 
   it('should finish a 2,000-chapter corpus at MTL chapter length inside the analysis budget', () => {

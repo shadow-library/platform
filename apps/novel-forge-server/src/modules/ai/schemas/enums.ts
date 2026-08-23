@@ -15,3 +15,15 @@ export const RebrandAuditIssueType = EnumType.create('RebrandAuditIssueType', ['
 export const RecombineVerdict = EnumType.create('RecombineVerdict', ['merge', 'split']);
 export const ReforgeJudgeVerdict = EnumType.create('ReforgeJudgeVerdict', ['clean', 'issues']);
 export const ReforgeJudgeIssueType = EnumType.create('ReforgeJudgeIssueType', ['missing_beat', 'invented_beat', 'naming', 'nationalism', 'discrimination', 'real_world_reference']);
+export const ReforgeMovement = EnumType.create('ReforgeMovement', ['advances', 'sidesteps', 'stalls']);
+// The model-facing subset of the `reforge_finding_type` DB enum: `window_failed` is recorded by the
+// stage when a window throws, never claimed by a model.
+export const ReforgeFindingKind = EnumType.create('ReforgeFindingKind', [
+  'filler',
+  'repetition',
+  'pacing_stall',
+  'dead_subplot',
+  'dropped_thread',
+  'arc_boundary',
+  'quality_outlier',
+]);

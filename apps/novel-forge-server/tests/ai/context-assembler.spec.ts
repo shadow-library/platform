@@ -714,6 +714,44 @@ describe('ContextAssembler.forReforge', () => {
   });
 });
 
+describe('ContextAssembler.forReforgeAnalysis', () => {
+  const input = {
+    worldNotes: 'Veldram replaces every real nation.',
+    glossarySlice: 'Ye Fan → Evan Vale [character]',
+    signalDigest: '[sig-3] repetition ch. 12-26 (severity 4, confidence 0.75) — the tournament repeats.',
+    carryState: 'Evan has left the sect; the tribunal thread is open.',
+  };
+
+  it('puts the rename bible in the stable segment and the per-window state in the volatile tail', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forReforgeAnalysis(1n, 3, input);
+
+    expect(pack.purpose).toBe('reforge_analysis');
+    expect(pack.chapter).toBe(3);
+    const segments = Object.fromEntries(pack.sections.map(s => [s.key, s.segment]));
+    expect(segments).toMatchObject({ world_notes: 'stable', glossary_slice: 'volatile', signal_digest: 'volatile', carry_state: 'volatile' });
+    expect(pack.renderedStable).toContain('Veldram replaces');
+    expect(pack.renderedVolatile).toContain('## DETERMINISTIC SIGNALS');
+    expect(pack.renderedVolatile).toContain('the tournament repeats');
+  });
+
+  it('keeps the stable segment byte-identical across windows so the cache prefix survives the whole run', async () => {
+    const assembler = makeAssembler();
+    const window1 = await assembler.forReforgeAnalysis(1n, 1, { ...input, carryState: null, signalDigest: 'No mechanical signals fired for these chapters.' });
+    const window2 = await assembler.forReforgeAnalysis(1n, 2, input);
+
+    expect(window1.renderedStable.length).toBeGreaterThan(0);
+    expect(window2.renderedStable).toBe(window1.renderedStable);
+  });
+
+  it('carries only the rename bible on a synthesis pass, where the card index travels as a template var', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forReforgeAnalysis(1n, null, { ...input, glossarySlice: null, carryState: null });
+    expect(pack.chapter).toBeNull();
+    expect(pack.sections.map(s => s.key)).toEqual(['world_notes', 'signal_digest']);
+  });
+});
+
 describe('ContextAssembler.forChapter — knowledge sections', () => {
   const facts = [
     { id: 1n, factKey: 'service_door', text: 'The killer used the service door.', constraintNote: null, terms: ['service door'] },

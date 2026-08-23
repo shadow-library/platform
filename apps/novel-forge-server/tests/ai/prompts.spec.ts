@@ -22,8 +22,10 @@ import {
   PlanSchema,
   RebrandAuditSchema,
   RebrandConvertSchema,
+  ReforgeAnalyzeWindowSchema,
   ReforgeJudgeSchema,
   ReforgeOutlineSchema,
+  ReforgeSynthesizeSchema,
   ReforgeWriteSchema,
   validateArcCoverage,
   validateOutlineCoverage,
@@ -564,6 +566,83 @@ describe('Prompt modules', () => {
       expect(judge.postValidate?.({ verdict: 'issues', coveredBeats: 3, totalBeats: 3, issues: [] })[0]).toMatch(/at least one issue/);
       expect(judge.postValidate?.({ verdict: 'clean', coveredBeats: 3, totalBeats: 3, issues: [{ type: 'naming', detail: 'x' }] })[0]).toMatch(/empty issues list/);
       expect(judge.postValidate?.({ verdict: 'clean', coveredBeats: 4, totalBeats: 3, issues: [] })[0]).toMatch(/cannot exceed totalBeats/);
+    });
+  });
+
+  describe('reforge transform analysis prompt modules', () => {
+    const card = { chapter: 12, summary: 'Evan loses the duel and learns nothing.', movement: 'stalls' as const };
+    const finding = { type: 'repetition' as const, fromChapter: 12, toChapter: 26, severity: 4, confidence: 0.7, label: 'the tournament repeats' };
+
+    it('registers both analysis prompt keys as analytical extraction work', () => {
+      for (const key of ['reforge-analyze-window', 'reforge-synthesize'] as const) {
+        expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
+        expect(PROMPT_REGISTRY[key].kind).toBe('analytical');
+        // No new AiRole: analysis reuses `extraction` so neither AI_PROFILE churns.
+        expect(PROMPT_REGISTRY[key].role).toBe('extraction');
+        expect(PROMPT_REGISTRY[key].cacheStrategy?.stableVars).toEqual(['stableContext']);
+      }
+    });
+
+    it('forbids both analysis prompts from judging prose', () => {
+      expect(PROMPT_REGISTRY['reforge-analyze-window'].system).toContain('Prose quality is not your business');
+      expect(PROMPT_REGISTRY['reforge-synthesize'].system).toContain('Say nothing about prose quality');
+    });
+
+    it('renders the window prompt in cache order: system, stable bible, volatile state with the source prose', async () => {
+      const messages = await PROMPT_REGISTRY['reforge-analyze-window'].template.formatMessages({
+        stableContext: 'STABLE-WORLD-NOTES',
+        volatileContext: 'VOLATILE-SIGNALS-AND-CARRY',
+        windowLabel: '16-30',
+        chapters: 'VOLATILE-SOURCE-PROSE',
+      });
+      expect(messages).toHaveLength(3);
+      expect(String(messages[1]?.content)).toBe('STABLE-WORLD-NOTES');
+      expect(String(messages[2]?.content)).toContain('VOLATILE-SIGNALS-AND-CARRY');
+      expect(String(messages[2]?.content)).toContain('16-30');
+      expect(String(messages[2]?.content)).toContain('VOLATILE-SOURCE-PROSE');
+    });
+
+    it('renders the synthesis prompt with its scope and card index in the volatile tail', async () => {
+      const messages = await PROMPT_REGISTRY['reforge-synthesize'].template.formatMessages({
+        stableContext: 'STABLE-WORLD-NOTES',
+        volatileContext: 'VOLATILE-SIGNALS',
+        scope: 'chapters 1-100 of 412',
+        cardIndex: 'VOLATILE-CARDS',
+      });
+      expect(String(messages[1]?.content)).toBe('STABLE-WORLD-NOTES');
+      expect(String(messages[2]?.content)).toContain('chapters 1-100 of 412');
+      expect(String(messages[2]?.content)).toContain('VOLATILE-CARDS');
+    });
+
+    it('validates the analysis output shapes', () => {
+      const window = { cards: [card], findings: [finding], carryState: { storySoFar: 'Evan left the sect.' } };
+      expect(parseSchema(ReforgeAnalyzeWindowSchema, window).success).toBe(true);
+      expect(parseSchema(ReforgeAnalyzeWindowSchema, { ...window, cards: [{ ...card, movement: 'meanders' }] }).success).toBe(false);
+      expect(parseSchema(ReforgeAnalyzeWindowSchema, { ...window, cards: [] }).success).toBe(false);
+      // `window_failed` is recorded by the stage, never claimed by a model.
+      expect(parseSchema(ReforgeAnalyzeWindowSchema, { ...window, findings: [{ ...finding, type: 'window_failed' }] }).success).toBe(false);
+      expect(parseSchema(ReforgeAnalyzeWindowSchema, { ...window, findings: [{ ...finding, severity: 9 }] }).success).toBe(false);
+
+      const synthesis = { summary: 'A 412-chapter serial with a dead middle.', arcs: [{ fromChapter: 1, toChapter: 40, label: 'The Sect Years' }], findings: [finding] };
+      expect(parseSchema(ReforgeSynthesizeSchema, synthesis).success).toBe(true);
+      expect(parseSchema(ReforgeSynthesizeSchema, { ...synthesis, summary: '' }).success).toBe(false);
+    });
+
+    it('rejects duplicated, out-of-order cards and overlapping arcs after the schema passes', () => {
+      const windowPrompt = PROMPT_REGISTRY['reforge-analyze-window'];
+      const carryState = { storySoFar: 'Evan left the sect.' };
+      expect(windowPrompt.postValidate?.({ cards: [card, { ...card, chapter: 13 }], findings: [], carryState })).toEqual([]);
+      expect(windowPrompt.postValidate?.({ cards: [card, card], findings: [], carryState })[0]).toMatch(/different source chapter/);
+      expect(windowPrompt.postValidate?.({ cards: [{ ...card, chapter: 13 }, card], findings: [], carryState })[0]).toMatch(/reading order/);
+
+      const synthesizePrompt = PROMPT_REGISTRY['reforge-synthesize'];
+      const arcs = [
+        { fromChapter: 1, toChapter: 40, label: 'The Sect Years' },
+        { fromChapter: 41, toChapter: 90, label: 'The Ash Court' },
+      ];
+      expect(synthesizePrompt.postValidate?.({ summary: 's', arcs, findings: [] })).toEqual([]);
+      expect(synthesizePrompt.postValidate?.({ summary: 's', arcs: [arcs[0], { ...arcs[1], fromChapter: 30 }], findings: [] })[0]).toMatch(/must not overlap/);
+      expect(synthesizePrompt.postValidate?.({ summary: 's', arcs: [{ fromChapter: 40, toChapter: 1, label: 'Backwards' }], findings: [] })[0]).toMatch(/ends before it starts/);
     });
   });
 

@@ -48,6 +48,9 @@ export const REBRAND_BUDGET = 12_000;
 // pack) both travel as template vars, not pack sections, so the pack itself stays rebrand-sized.
 export const REFORGE_OUTLINE_BUDGET = 12_000;
 export const REFORGE_BUDGET = 12_000;
+// The analysis window's chapters and the synthesis card index both travel as template vars, so the pack
+// only carries the rename bible, the window's signal digest, and the carry-forward state (§3.2).
+export const REFORGE_ANALYSIS_BUDGET = 12_000;
 // An image prompt is a paragraph: the composer needs the subject, the look, and nothing else.
 export const ILLUSTRATION_BUDGET = 6_000;
 export const ILLUSTRATION_WORLD_FACTS_MAX = 30;
@@ -955,6 +958,26 @@ export class ContextAssembler {
     sections.push(makeSection('glossary_slice', input.glossarySlice, 'canonical', []));
 
     return this.finalize(projectId, 'reforge_outline', chapter, sections, [], REFORGE_OUTLINE_BUDGET, false);
+  }
+
+  /**
+   * Pack for one source-analysis call — a window pass or a synthesis pass (transform design §3.2–3.3).
+   * Only the world notes are stable, so the cache prefix stays byte-identical across every window of a
+   * run; the glossary slice, the window's signal digest, and the carry-forward state are volatile. The
+   * window's source prose and the synthesis card index travel as template vars, never in the pack.
+   * `window` is the 1-based window ordinal, or null for a synthesis pass.
+   */
+  async forReforgeAnalysis(
+    projectId: bigint,
+    window: number | null,
+    input: { worldNotes: string; glossarySlice: string | null; signalDigest: string | null; carryState: string | null },
+  ): Promise<AssembledPack & { id: bigint | null }> {
+    const sections: ContextSection[] = [asStable(makeSection('world_notes', input.worldNotes, 'canonical', []))];
+    if (input.glossarySlice) sections.push(makeSection('glossary_slice', input.glossarySlice, 'canonical', []));
+    if (input.signalDigest) sections.push(makeSection('signal_digest', input.signalDigest, 'working', []));
+    if (input.carryState) sections.push(makeSection('carry_state', input.carryState, 'working', []));
+
+    return this.finalize(projectId, 'reforge_analysis', window, sections, [], REFORGE_ANALYSIS_BUDGET, false);
   }
 
   /**
