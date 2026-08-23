@@ -112,6 +112,11 @@ function ImportPlanScreen(): React.JSX.Element {
             subtitle="Load a plan bundle authored offline — bible documents, entities, volumes, arcs, and chapter briefs land in one transactional call."
           />
 
+          <Alert intent="warning" title="Deprecated">
+            Plan import exists for novels authored with the external planning skill. New novels should be planned in-app via the project chat. This screen will be removed once
+            legacy plans are migrated.
+          </Alert>
+
           {!isNewNovel ? (
             <Alert intent="info" title="Plan import is only for new-novel projects">
               Source projects derive their plan from the source pipeline instead.

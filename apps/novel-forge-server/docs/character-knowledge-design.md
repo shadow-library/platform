@@ -111,6 +111,6 @@ Mounted on `FactController` at `/projects/:projectId`:
 
 ## 8. Follow-ups (CK5, not in the initial cut)
 
-- Plan-import bundle: optional `facts` collection + `knowledgeContract` on brief items; `novel-plan-forge` skill templates + pack.mjs.
+- Plan-import bundle: optional `facts` collection + `knowledgeContract` on brief items (the `novel-plan-forge` skill this fed is now retired; plan-import-design.md §7).
 - Web UI: facts panel with per-character reveal timeline; knowledge-contract editor on briefs.
 - `forRevision` knowledge sections; arc-planner authoring of reveal schedules (`arc-plan` prompt emitting contracts); bible-audit check that flags spoiler prose living outside `canon_facts`.

@@ -46,7 +46,7 @@ export const PROJECT_SCREENS: ProjectScreen[] = [
   { segment: 'story-bible', to: '/novels/$novelId/story-bible', label: 'Story Bible', icon: <BookIcon /> },
   { segment: 'canon-facts', to: '/novels/$novelId/canon-facts', label: 'Canon Facts', icon: <LockIcon /> },
   { segment: 'volumes', to: '/novels/$novelId/volumes', label: 'Volumes & Arcs', icon: <ListIcon /> },
-  { segment: 'import-plan', to: '/novels/$novelId/import-plan', label: 'Import Plan', icon: <UploadIcon />, newNovelOnly: true },
+  { segment: 'import-plan', to: '/novels/$novelId/import-plan', label: 'Import Plan (deprecated)', icon: <UploadIcon />, newNovelOnly: true },
   { segment: 'chapters', to: '/novels/$novelId/chapters', label: 'Chapters', icon: <EditIcon /> },
   { segment: 'review', to: '/novels/$novelId/review', label: 'Review Queue', icon: <ReviewIcon /> },
   { segment: 'chat', to: '/novels/$novelId/chat', label: 'Refinement Chat', icon: <ChatIcon /> },

@@ -1,9 +1,10 @@
 # Plan Import Design
 
-A new-novel project's entire pre-generation plan — bible documents, entities, volumes, arcs, chapter briefs — can be authored offline by a CLI agent (Claude Code, Codex, …)
-driven by the external `novel-plan-forge` skill, then loaded in one transactional call. The skill produces a human-editable markdown workspace and packs it into a single JSON
-bundle; `POST /projects/:projectId/plan/import` validates the bundle as a whole and upserts it atomically, optionally running the exact approval logic the in-app gates use so
-chapter generation can start immediately after the upload. Drives tasks PI1–PI3 in CLAUDE.md.
+A new-novel project's entire pre-generation plan — bible documents, entities, volumes, arcs, chapter briefs — could historically be authored offline by a CLI agent
+(Claude Code, Codex, …) driven by the external `novel-plan-forge` skill, then loaded in one transactional call. That authoring path is now deprecated: in-app authoring
+(the hub bootstrap interview, chat ops, and the facts panel — chat-hub-design.md, character-knowledge-design.md) is the primary way to build a plan. The bundle format and
+`POST /projects/:projectId/plan/import` endpoint remain fully supported — they validate the bundle as a whole and upsert it atomically, optionally running the exact approval
+logic the in-app gates use — because existing novels were authored with the skill and may still need re-import. Drives tasks PI1–PI3 in CLAUDE.md.
 
 ## 1. Behavior
 
@@ -98,21 +99,14 @@ Project screen gains an **Import plan** entry: file picker for `bundle.json`, cl
 `overwrite` + `approve` toggles (overwrite gated behind an explicit confirmation), submit, then per-collection result chips (`created/updated/unchanged/pruned`), the approval
 summary, and the warnings list. A 400 with field errors renders as a scrollable issue list so the user can fix the workspace and re-pack.
 
-## 7. Authoring skill (PI3, external: `~/.claude/skills/novel-plan-forge/`)
+## 7. Authoring skill (PI3, retired — was external: `~/.claude/skills/novel-plan-forge/`)
 
-Lives outside this repo (personal skill, discoverable from any authoring directory; plain markdown + a zero-dependency script, so Codex-class agents can follow the same
-files). This section is the contract it targets; the bundle schema above is the source of truth.
+The external `novel-plan-forge` skill is retired. In-app authoring is now the primary path for building a plan: the hub bootstrap interview walks a fresh project through
+bible/entities/volumes/arcs/briefs (chat-hub-design.md), ongoing chat ops refine and extend them, and the facts panel manages the character-knowledge ledger
+(character-knowledge-design.md). Nothing here targets an offline markdown workspace anymore.
 
-- **Workspace** (`plan/` inside the user's novel directory): `bible/<section>/<slug>.md`, `entities/<entityKey>.md`, `volumes/<volumeKey>.md`, `arcs/<arcKey>.md`,
-  `briefs/ch-<NNN>.md`. Every file is markdown with a `---`-fenced **JSON-object frontmatter** (agents emit valid JSON far more reliably than YAML, and it parses with zero
-  dependencies); the markdown body maps to the item's prose field (`body` for bible/entities/volumes/arcs, `objective` for briefs).
-- **SKILL.md process**: interview the user (premise, genre, length, chapter count) → bible docs against the embedded `REQUIRED_BIBLE_DOCS` manifest → entities → volumes
-  (contiguous by ordinal, `targetChapterCount` each) → arcs per volume (exact coverage, hooks chaining) → briefs one per chapter (events in order, ending contracts whose
-  `handoffState` chains into the next brief, `requiredContext` limited to `entity:`/`volume:` refs) → pack → upload. Authoring guidance is distilled from the app's own
-  prompt modules (serial-webnovel pacing, hook types, escalation) so offline output matches what the in-app AI would produce.
-- **`scripts/pack.mjs`** (node, no deps): walks `plan/`, parses frontmatter, mirrors the §3 cross-checks (drift is caught server-side regardless), writes `bundle.json`, and
-  prints the counts plus upload instructions — the web **Import plan** screen or
-  `curl -X POST <server>/api/v1/projects/<id>/plan/import -H 'content-type: application/json' -d '{"bundle": <...>, "approve": true}'`.
+The bundle format (§1–6) and `POST /plan/import` remain fully supported and are unchanged — they exist to re-import plans that were authored with the skill before its
+retirement, and that path stays deprecated-but-functional for as long as those legacy novels need it. No new bundles should be hand-authored going forward.
 
 ## 8. Limitations
 
