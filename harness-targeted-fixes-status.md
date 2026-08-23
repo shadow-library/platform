@@ -11,9 +11,9 @@ complete** — this second round closed every remaining gap from the Codex re-ve
 
 ## Summary
 
-- Completed: 16
+- Completed: 17
 - In Progress: 0
-- Pending: 2
+- Pending: 1
 - Blocked: 0
 
 **Round three**: `harness-final-recommendation.md` §10 identified three final blockers surviving the
@@ -40,7 +40,7 @@ proposal replay). Tracked as FINAL-01..FINAL-03 below.
 | FIX-14   | HIGH     | Low-confidence continuity entries must stay reachable for review, not marked applied (residual gap in FIX-06)                                                | COMPLETED | FIX-06       |
 | FIX-15   | HIGH     | Character-state merge must replace/clear fields per the extraction contract, not `COALESCE`-merge stale values (residual gap in FIX-03)                      | COMPLETED | FIX-03       |
 | FINAL-01 | CRITICAL | Concurrent duplicate finalization: two racing finalize calls can both pass the pre-application marker check and apply different continuity deltas            | COMPLETED | —            |
-| FINAL-02 | HIGH     | `generateGrok` can overwrite an ancestor chapter without invalidating non-final descendant drafts or honoring the finalized-chapter guard                    | PENDING   | —            |
+| FINAL-02 | HIGH     | `generateGrok` can overwrite an ancestor chapter without invalidating non-final descendant drafts or honoring the finalized-chapter guard                    | COMPLETED | —            |
 | FINAL-03 | HIGH     | Review approval of a held (low-confidence) continuity entry replays already-applied high-confidence siblings from an older proposal, overwriting newer canon | PENDING   | —            |
 
 Ordering rationale: data-integrity/recoverability (FIX-01, FIX-02) before state/context-correctness
@@ -93,7 +93,6 @@ None.
 
 ## Pending
 
-- FINAL-02 — `generateGrok` ancestor overwrite.
 - FINAL-03 — Mixed-proposal replay on review approval.
 
 ## Blocked
@@ -151,6 +150,56 @@ Files changed: `src/database/schemas/chapters.ts`, `generated/drizzle/0015_perpe
 
 Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
 1029 pass, 10 skip, 0 fail (independently re-run, not just trusted from the implementing sub-agent).
+
+Commit: `848042e2` (fast-forwarded to `main`).
+
+### FINAL-02 — `generateGrok` ancestor overwrite
+
+Missing invariant: every chapter-replacement path must obey the same mutation guard (reject a
+finalized-chapter overwrite) and descendant-invalidation invariant (mark later non-final drafts stale)
+as `updateDraft`/`reviseDraft`/`importDraft`, with the replacement and invalidation committed
+atomically. `generateGrok` (`generation.service.ts`) upserted a draft with no final-status guard and
+never called `markDescendantDraftsStale` — it could silently overwrite a locked/finalized chapter, and
+regenerating a non-final chapter left later drafted chapters looking valid against superseded prose.
+
+What changed:
+
+- `markDescendantDraftsStale` gained an optional trailing DB-client parameter (`DraftWriter = Pick<PrimaryDatabase, 'update'>`,
+  defaulting to `this.db`) so it can run inside a caller's transaction. The three existing call sites
+  (`updateDraft`, `reviseDraft`, `importDraft`) are untouched — they still call it with three arguments
+  and run outside any transaction, exactly as before.
+- `generateGrok` gained a cheap pre-model-call guard (`existing?.status === 'final'` → `DRF_002`) to
+  fail fast before spending a model call on a doomed request — advisory only, not the correctness
+  guarantee.
+- The actual replacement now runs inside `this.db.transaction(async tx => {...})`: the `drafts` upsert
+  reuses the exact `onConflictDoUpdate({ setWhere: ne(status, 'final') })` compare-and-set pattern
+  already established in `chapter-finalization.graph.ts`'s `commitProse` for `chapters.locked` — a
+  single atomic statement, not a separate check-then-write. An empty `.returning()` is disambiguated by
+  re-reading inside the same transaction: `final` → `DRF_002`, otherwise → `DRF_001`. On success,
+  `markDescendantDraftsStale(..., tx)` runs in the same transaction before it commits, so a crash
+  between "chapter replaced" and "descendants invalidated" is impossible — either both land or neither
+  does.
+
+Regression tests (`tests/generation/draft-mutation-guards.spec.ts`, real Postgres template DB, new
+`describe('generateGrok')` block):
+
+- Final chapter rejected with `DRF_002`; draft row (body/title/summary/status/revision) unchanged.
+- Non-final chapter replaced; two later non-final descendants both get
+  `staleReason: 'ancestor chapter N was regenerated'`, and an `approved` descendant is downgraded to
+  `needs_review` — transitively, matching `markDescendantDraftsStale`'s existing `chapter > N`
+  predicate.
+- Atomicity: a `Proxy` traps `update` on the transaction handle so it throws between the upsert and
+  the invalidation writes (adapted from `finalization-resume.spec.ts`'s proxy pattern, lifted onto
+  `db.transaction` since a `db.update` trap is invisible inside a transaction). Asserts the ancestor
+  draft is completely unchanged afterward — the transaction rolled back, not "new ancestor committed,
+  descendants still looking valid," which was the exact bug.
+- Unrelated project and earlier chapter both untouched.
+
+Files changed: `src/modules/generation/generation.service.ts`,
+`tests/generation/draft-mutation-guards.spec.ts`.
+
+Validation: `bun scripts/verify.ts apps/novel-forge-server` — format/lint/type-check/test all green,
+1033 pass, 10 skip, 0 fail (independently re-run, not just trusted from the implementing sub-agent).
 
 Commit: `<filled in after commit>`
 

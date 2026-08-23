@@ -104,6 +104,9 @@ export interface JobEnqueueResult {
   target: string;
 }
 
+/** The narrow database surface staleness propagation needs — satisfied by both the client and a transaction. */
+type DraftWriter = Pick<PrimaryDatabase, 'update'>;
+
 const PLAN_BIBLE_DOC_TOKEN_CAP = 1_500;
 
 /**
@@ -567,11 +570,11 @@ export class GenerationService {
    * chapter N leaves every later non-final draft resting on content that no longer exists. Flag them
    * and revoke any approval that was granted against the superseded ancestor.
    */
-  private async markDescendantDraftsStale(projectId: bigint, chapter: number, reason: string): Promise<void> {
+  private async markDescendantDraftsStale(projectId: bigint, chapter: number, reason: string, db: DraftWriter = this.db): Promise<void> {
     const descendants = and(eq(schema.drafts.projectId, projectId), gt(schema.drafts.chapter, chapter), ne(schema.drafts.status, 'final'));
 
-    await this.db.update(schema.drafts).set({ staleReason: reason, updatedAt: new Date() }).where(descendants);
-    await this.db
+    await db.update(schema.drafts).set({ staleReason: reason, updatedAt: new Date() }).where(descendants);
+    await db
       .update(schema.drafts)
       .set({ reviewStatus: 'needs_review', updatedAt: new Date() })
       .where(and(descendants, eq(schema.drafts.reviewStatus, 'approved')));
@@ -1028,6 +1031,9 @@ export class GenerationService {
   }
 
   async generateGrok(projectId: bigint, chapter: number, body: GenerateGrokBody): Promise<Generation.Draft> {
+    const locked = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
+    if (locked?.status === 'final') throw AppErrorCode.DRF_002.create();
+
     const [brief, project] = await Promise.all([
       this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
@@ -1054,35 +1060,52 @@ export class GenerationService {
       state?: Record<string, string>;
     };
 
-    const [draft] = await this.db
-      .insert(schema.drafts)
-      .values({
-        projectId,
-        chapter,
-        title: result.title,
-        body: result.body,
-        summary: result.summary,
-        state: result.state as never,
-        generator: 'grok',
-        reviewStatus: 'needs_review',
-        staleReason: null,
-        status: 'draft',
-      })
-      .onConflictDoUpdate({
-        target: [schema.drafts.projectId, schema.drafts.chapter],
-        set: {
+    // The replacement and the descendant invalidation it forces commit together: a crash between them
+    // would leave later drafts looking valid against prose that no longer exists. `setWhere` re-checks
+    // finality as part of the write itself, closing the window the pre-model guard above cannot.
+    const draft = await this.db.transaction(async tx => {
+      const [row] = await tx
+        .insert(schema.drafts)
+        .values({
+          projectId,
+          chapter,
           title: result.title,
           body: result.body,
           summary: result.summary,
           state: result.state as never,
           generator: 'grok',
-          revision: sql`${schema.drafts.revision} + 1`,
           reviewStatus: 'needs_review',
           staleReason: null,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
+          status: 'draft',
+        })
+        .onConflictDoUpdate({
+          target: [schema.drafts.projectId, schema.drafts.chapter],
+          set: {
+            title: result.title,
+            body: result.body,
+            summary: result.summary,
+            state: result.state as never,
+            generator: 'grok',
+            revision: sql`${schema.drafts.revision} + 1`,
+            reviewStatus: 'needs_review',
+            staleReason: null,
+            updatedAt: new Date(),
+          },
+          setWhere: ne(schema.drafts.status, 'final'),
+        })
+        .returning();
+
+      if (!row) {
+        const blocked = await tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
+        if (blocked?.status === 'final') throw AppErrorCode.DRF_002.create();
+        throw AppErrorCode.DRF_001.create();
+      }
+
+      await this.markDescendantDraftsStale(projectId, chapter, `ancestor chapter ${chapter} was regenerated`, tx);
+
+      return row;
+    });
+
     if (!draft) throw AppErrorCode.DRF_001.create();
     return draft;
   }

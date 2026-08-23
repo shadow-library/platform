@@ -38,13 +38,17 @@ describe.if(pgAvailable)('GenerationService draft mutation guards', () => {
 
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
+  function buildService(client: PrimaryDatabase): GenerationService {
+    const noop = {} as never;
+    const modelRouter = { structured: async () => ({ title: 'revised title', body: 'revised body', summary: 'revised summary', state: {} }) } as never;
+    const contextAssembler = { forChapter: async () => ({ rendered: '', renderedStable: '', renderedVolatile: '' }) } as never;
+    return new GenerationService({ getPostgresClient: () => client } as never, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop);
+  }
+
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
-    const noop = {} as never;
-    const modelRouter = { structured: async () => ({ title: 'revised title', body: 'revised body', summary: 'revised summary', state: {} }) } as never;
-    const contextAssembler = { forChapter: async () => ({ rendered: '' }) } as never;
-    service = new GenerationService({ getPostgresClient: () => db } as never, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop);
+    service = buildService(db);
   });
 
   async function seedProject(): Promise<bigint> {
@@ -140,6 +144,110 @@ describe.if(pgAvailable)('GenerationService draft mutation guards', () => {
 
       expect(imported.chapter).toBe(2);
       expect(imported.body).toBe('fresh import');
+    });
+  });
+
+  describe('generateGrok', () => {
+    it('should reject a finalized draft and leave its prose untouched', async () => {
+      const projectId = await seedProject();
+      await seedDraft(projectId, 1, 'final');
+
+      expect(await codeOf(service.generateGrok(projectId, 1, {}))).toBe('DRF_002');
+
+      const draft = await draftAt(projectId, 1);
+      expect(draft?.body).toBe('original body');
+      expect(draft?.title).toBe('original title');
+      expect(draft?.summary).toBe('original summary');
+      expect(draft?.status).toBe('final');
+      expect(draft?.revision).toBe(0);
+    });
+
+    it('should replace a non-final draft and invalidate every later non-final draft', async () => {
+      const projectId = await seedProject();
+      await seedDraft(projectId, 1, 'draft', { reviewStatus: 'approved' });
+      await seedDraft(projectId, 2, 'draft', { reviewStatus: 'approved' });
+      await seedDraft(projectId, 3, 'draft', { reviewStatus: 'needs_review' });
+
+      const generated = await service.generateGrok(projectId, 1, {});
+
+      expect(generated.body).toBe('revised body');
+      expect(generated.title).toBe('revised title');
+      expect(generated.generator).toBe('grok');
+      expect(generated.reviewStatus).toBe('needs_review');
+      expect(generated.staleReason).toBeNull();
+      expect(generated.revision).toBe(1);
+
+      const first = await draftAt(projectId, 2);
+      expect(first?.staleReason).toBe('ancestor chapter 1 was regenerated');
+      expect(first?.reviewStatus).toBe('needs_review');
+
+      const second = await draftAt(projectId, 3);
+      expect(second?.staleReason).toBe('ancestor chapter 1 was regenerated');
+      expect(second?.reviewStatus).toBe('needs_review');
+    });
+
+    it('should roll the replacement back when descendant invalidation fails', async () => {
+      const projectId = await seedProject();
+      await seedDraft(projectId, 1, 'draft', { reviewStatus: 'approved' });
+      await seedDraft(projectId, 2, 'draft', { reviewStatus: 'approved' });
+
+      // Trapping `update` on the transaction handle fails the run precisely between the draft upsert
+      // and the staleness propagation — the window the transaction exists to close.
+      const failingDb = new Proxy(db, {
+        get: (target, prop) => {
+          const value = Reflect.get(target, prop) as unknown;
+          if (prop !== 'transaction') return typeof value === 'function' ? value.bind(target) : value;
+          return (fn: (tx: unknown) => unknown) =>
+            (value as (cb: (tx: unknown) => unknown) => unknown).call(target, tx =>
+              fn(
+                new Proxy(tx as object, {
+                  get: (txTarget, txProp) => {
+                    const txValue = Reflect.get(txTarget, txProp) as unknown;
+                    if (txProp === 'update')
+                      return (table: unknown) => {
+                        if (table === schema.drafts) throw new Error('descendant invalidation failed');
+                        return (txValue as (t: unknown) => unknown).call(txTarget, table);
+                      };
+                    return typeof txValue === 'function' ? txValue.bind(txTarget) : txValue;
+                  },
+                }),
+              ),
+            );
+        },
+      }) as PrimaryDatabase;
+
+      expect(await codeOf(buildService(failingDb).generateGrok(projectId, 1, {}))).toContain('descendant invalidation failed');
+
+      const ancestor = await draftAt(projectId, 1);
+      expect(ancestor?.body).toBe('original body');
+      expect(ancestor?.title).toBe('original title');
+      expect(ancestor?.revision).toBe(0);
+      expect(ancestor?.generator).not.toBe('grok');
+
+      const descendant = await draftAt(projectId, 2);
+      expect(descendant?.staleReason).toBeNull();
+      expect(descendant?.reviewStatus).toBe('approved');
+    });
+
+    it('should leave ancestors and other projects untouched', async () => {
+      const projectId = await seedProject();
+      const otherProjectId = await seedProject();
+      await seedDraft(projectId, 1, 'draft', { reviewStatus: 'approved' });
+      await seedDraft(projectId, 2, 'draft');
+      await seedDraft(otherProjectId, 2, 'draft', { reviewStatus: 'approved' });
+
+      await service.generateGrok(projectId, 2, {});
+
+      const ancestor = await draftAt(projectId, 1);
+      expect(ancestor?.body).toBe('original body');
+      expect(ancestor?.staleReason).toBeNull();
+      expect(ancestor?.reviewStatus).toBe('approved');
+
+      const other = await draftAt(otherProjectId, 2);
+      expect(other?.body).toBe('original body');
+      expect(other?.staleReason).toBeNull();
+      expect(other?.reviewStatus).toBe('approved');
+      expect(other?.revision).toBe(0);
     });
   });
 
