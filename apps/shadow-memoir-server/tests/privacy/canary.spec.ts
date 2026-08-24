@@ -17,6 +17,7 @@ import { MemoirAuthModule } from '@modules/auth';
 import { CommandBus, CommandsModule } from '@modules/commands';
 import { FinanceModule } from '@modules/finance';
 import { MetricsModule } from '@modules/metrics';
+import { QuickLogsModule } from '@modules/quick-logs';
 import { SyncModule } from '@modules/sync';
 import { DatastoreModule, getSensitivityManifest, type PrimaryDatabase, schema, sensitive } from '@server/database';
 import { manifestLogRedactionFormat } from '@server/database/log-redaction';
@@ -34,7 +35,7 @@ import { userToken } from '../test-idp';
 
 const TestHttpModule = FastifyModule.forRoot({ imports: [MemoirAuthModule, SyncModule], host: 'localhost', port: 0 });
 
-@Module({ imports: [DatastoreModule, TestHttpModule, FinanceModule, MetricsModule, CommandsModule] })
+@Module({ imports: [DatastoreModule, TestHttpModule, FinanceModule, MetricsModule, QuickLogsModule, CommandsModule] })
 class TestAppModule {}
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost:55433/shadow_memoir';
@@ -46,7 +47,22 @@ const CANARY = `CANARY${Bun.randomUUIDv7().replaceAll('-', '')}`;
 const SYNTHETIC_CRASH = 'test.synthetic_crash';
 
 /** The real, schema-registered manifest entries — excludes throwaway fixture tables other spec files register into the same process-global manifest. */
-const APP_TABLES = new Set(['reschedule_events', 'recovery_quests', 'quests', 'quest_logs', 'accounts', 'expenses', 'subscriptions', 'metrics', 'metric_entries']);
+const APP_TABLES = new Set([
+  'reschedule_events',
+  'recovery_quests',
+  'quests',
+  'quest_logs',
+  'accounts',
+  'expenses',
+  'subscriptions',
+  'metrics',
+  'metric_entries',
+  'journal_entries',
+  'meals',
+  'meal_presets',
+  'side_quests',
+  'weights',
+]);
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -230,6 +246,42 @@ describe('Privacy canary suite (T-28)', () => {
     format.transform(info, {});
     coveredKeys.add('metric_entries.value');
     expect(info.value).not.toBe(CANARY);
+  });
+
+  it('should not leak a canary journal body through a journal.save command (T-24)', async () => {
+    const lines = await capture(async () => {
+      await submit([envelope('journal.save', { id: Bun.randomUUIDv7(), draft: { date: DATE, text: CANARY, mood: 3 } })]);
+    });
+    coveredKeys.add('journal_entries.text');
+    expect(lines).not.toContain(CANARY);
+  });
+
+  it('should not leak a canary meal name/note through a meal.log command, and a preset name/note through meal.savePreset (T-24)', async () => {
+    const lines = await capture(async () => {
+      await submit([envelope('meal.log', { id: Bun.randomUUIDv7(), draft: { date: DATE, name: CANARY, calories: 400, mealType: 'cooked', note: CANARY } })]);
+      await submit([envelope('meal.savePreset', { preset: { name: CANARY, calories: 400, mealType: 'cooked', note: CANARY } })]);
+    });
+    coveredKeys.add('meals.name');
+    coveredKeys.add('meals.note');
+    coveredKeys.add('meal_presets.name');
+    coveredKeys.add('meal_presets.note');
+    expect(lines).not.toContain(CANARY);
+  });
+
+  it('should not leak a canary side quest name through a sidequest.log command (T-24)', async () => {
+    const lines = await capture(async () => {
+      await submit([envelope('sidequest.log', { id: Bun.randomUUIDv7(), draft: { date: DATE, name: CANARY, statAffinity: 'discipline' } })]);
+    });
+    coveredKeys.add('side_quests.name');
+    expect(lines).not.toContain(CANARY);
+  });
+
+  it("should redact weights.kg the same way as any other manifest column, driven at the formatter directly since it's numeric and cannot carry a canary string through the real command path (T-24)", () => {
+    const format = manifestLogRedactionFormat();
+    const info = { level: 'info', message: 'unrelated', kg: CANARY };
+    format.transform(info, {});
+    coveredKeys.add('weights.kg');
+    expect(info.kg).not.toBe(CANARY);
   });
 
   it('should not leak canary values through an unmapped constraint violation (duplicate expense id)', async () => {

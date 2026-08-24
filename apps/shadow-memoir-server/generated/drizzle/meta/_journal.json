@@ -64,6 +64,20 @@
       "when": 1787541797765,
       "tag": "0008_salty_bloodstorm",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787542883410,
+      "tag": "0009_curious_shiva",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787542883411,
+      "tag": "0010_add-quicklogs-grants",
+      "breakpoints": true
     }
   ]
 }

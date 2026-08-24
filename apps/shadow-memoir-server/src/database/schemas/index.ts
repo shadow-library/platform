@@ -14,3 +14,4 @@ export * from './quest-streaks';
 export * from './finance';
 export * from './metrics';
 export * from './progress-counters';
+export * from './quick-logs';

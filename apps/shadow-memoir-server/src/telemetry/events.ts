@@ -54,6 +54,14 @@ export interface MetricEntryRecordedEvent extends TelemetryEventBase {
 }
 
 /** A sync command batch was submitted, with its outcome shape only — never a command's payload. */
+export interface QuickLogRecordedEvent extends TelemetryEventBase {
+  name: 'quick_log_recorded';
+  module: 'journal' | 'meal' | 'weight' | 'side_quest';
+  rewarded: boolean;
+  backdated: boolean;
+  linked: boolean;
+}
+
 export interface SyncBatchSubmittedEvent extends TelemetryEventBase {
   name: 'sync_batch_submitted';
   commandCount: number;
@@ -67,4 +75,5 @@ export interface SyncBatchSubmittedEvent extends TelemetryEventBase {
  * numbers only, so a free-text value is structurally unrepresentable — there is no string-bag escape
  * hatch. Adding an event means adding a member here, not widening an existing one.
  */
-export type TelemetryEvent = HeroEventRecordedEvent | ExpenseRecordedEvent | SubscriptionCycleConfirmedEvent | MetricEntryRecordedEvent | SyncBatchSubmittedEvent;
+export type TelemetryEvent =
+  HeroEventRecordedEvent | ExpenseRecordedEvent | SubscriptionCycleConfirmedEvent | MetricEntryRecordedEvent | QuickLogRecordedEvent | SyncBatchSubmittedEvent;

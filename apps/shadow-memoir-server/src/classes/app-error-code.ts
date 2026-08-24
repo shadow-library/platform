@@ -158,4 +158,11 @@ export class AppErrorCode extends ServerErrorCode {
 
   /** `metric.delete` on a metric still referenced by a quest's consequences requires `detach: true` (S6) — this is the warning, not a hard block */
   static readonly MET_004 = AppErrorCode.conflict('MET_004', "This metric is used by {questCount} quest(s); pass 'detach: true' to remove those links and deactivate it");
+
+  /*!
+   * Quick-log Errors
+   */
+
+  /** No meal preset with that id belongs to the caller */
+  static readonly QLG_001 = AppErrorCode.notFound('QLG_001', 'Meal preset not found');
 }
