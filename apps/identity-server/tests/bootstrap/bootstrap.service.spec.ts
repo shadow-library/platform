@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService, ServiceAccessService } from '@server/modules/authz';
-import { BootstrapService, EcosystemSeedService } from '@server/modules/bootstrap';
+import { BootstrapService, ECOSYSTEM_SEED, EcosystemSeedService } from '@server/modules/bootstrap';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
@@ -211,5 +211,79 @@ describe('BootstrapService', () => {
 
     const roles = (await db.select().from(schema.applicationRoles)).filter(role => role.applicationId === pulse.id);
     expect(roles.map(role => role.roleName).sort()).toEqual(['PulseAdmin', 'PulseOperator', 'PulseViewer']);
+  });
+
+  const seedOperator = async () => {
+    const admin = await env.getService(UserService).getUser(ADMIN_EMAIL);
+    const organisation = await env.getService(OrganisationService).findTeamByName(PLATFORM_ORG_NAME);
+    return { adminUserId: admin!.id, platformOrganisationId: organisation!.id };
+  };
+
+  const resourceScopeId = async (resourceIdentifier: string, scopeName: string): Promise<string> => {
+    const db = env.getPostgresClient();
+    const resource = (await db.select().from(schema.apiResources)).find(row => row.identifier === resourceIdentifier);
+    const scope = resource && (await db.select().from(schema.scopes).where(eq(schema.scopes.apiResourceId, resource.id))).find(row => row.name === scopeName);
+    if (!scope) throw new Error(`scope '${scopeName}' not seeded on resource '${resourceIdentifier}'`);
+    return scope.id;
+  };
+  const platformScopeId = (scopeName: string) => resourceScopeId('shadow-identity', scopeName);
+
+  it('should restore a grant deleted directly from the database, reconciling an existing application', async () => {
+    const db = env.getPostgresClient();
+    const clientService = env.getService(OAuthClientService);
+    const scopeId = await platformScopeId('authz:check');
+
+    await db.delete(schema.oauthClientScopeGrants).where(and(eq(schema.oauthClientScopeGrants.clientId, 'shadow-memoir'), eq(schema.oauthClientScopeGrants.scopeId, scopeId)));
+    expect(await clientService.getGrantedScopeNames('shadow-memoir')).not.toContain('authz:check');
+
+    await env.getService(EcosystemSeedService).seed(await seedOperator());
+
+    expect(await clientService.getGrantedScopeNames('shadow-memoir')).toContain('authz:check');
+  });
+
+  it('should not create duplicate scope grants when seeded repeatedly', async () => {
+    const db = env.getPostgresClient();
+    const seedService = env.getService(EcosystemSeedService);
+    const operator = await seedOperator();
+
+    await seedService.seed(operator);
+    const before = (await db.select().from(schema.oauthClientScopeGrants)).filter(grant => grant.clientId === 'shadow-memoir');
+
+    await seedService.seed(operator);
+    const after = (await db.select().from(schema.oauthClientScopeGrants)).filter(grant => grant.clientId === 'shadow-memoir');
+
+    expect(after).toHaveLength(before.length);
+    expect(after.map(grant => grant.scopeId).sort()).toEqual(before.map(grant => grant.scopeId).sort());
+  });
+
+  it('should grant a scope added to an already-seeded application entry on the next boot', async () => {
+    const memoir = ECOSYSTEM_SEED.applications.find(application => application.name === 'shadow-memoir');
+    if (!memoir) throw new Error('shadow-memoir seed entry missing');
+    const grants = memoir.grants as { resource: string; scope: string }[];
+    const newGrant = { resource: 'shadow-identity', scope: 'authz:roles:sync' };
+    grants.push(newGrant);
+
+    try {
+      const clientService = env.getService(OAuthClientService);
+      expect(await clientService.getGrantedScopeNames('shadow-memoir')).not.toContain('authz:roles:sync');
+
+      await env.getService(EcosystemSeedService).seed(await seedOperator());
+
+      expect(await clientService.getGrantedScopeNames('shadow-memoir')).toContain('authz:roles:sync');
+    } finally {
+      grants.pop();
+    }
+  });
+
+  it('should preserve an operator-granted extra scope when reconciling an existing application', async () => {
+    const clientService = env.getService(OAuthClientService);
+    const scopeId = await resourceScopeId('api://web-novel', 'web-novel:publish');
+
+    await clientService.grantScope('shadow-memoir', scopeId);
+    expect(await clientService.getGrantedScopeNames('shadow-memoir')).toContain('web-novel:publish');
+
+    await env.getService(EcosystemSeedService).seed(await seedOperator());
+
+    expect(await clientService.getGrantedScopeNames('shadow-memoir')).toContain('web-novel:publish');
   });
 });

@@ -30,19 +30,19 @@ export class EcosystemSeedService {
   ) {}
 
   async seed(operator: EcosystemOperator): Promise<void> {
-    const applications = ECOSYSTEM_SEED.applications.filter(application => !this.applicationService.getApplication(application.name));
+    const newApplications = ECOSYSTEM_SEED.applications.filter(application => !this.applicationService.getApplication(application.name));
+    const existingApplications = ECOSYSTEM_SEED.applications.filter(application => this.applicationService.getApplication(application.name));
     const serviceClients: SeedServiceClient[] = [];
     for (const client of ECOSYSTEM_SEED.serviceClients) {
       if (!(await this.oauthClientService.getClient(client.id))) serviceClients.push(client);
     }
 
-    if (applications.length === 0 && serviceClients.length === 0) return;
-
     const scopes = await this.loadScopeCatalogue();
-    for (const application of applications) await this.createApplication(application, operator, scopes);
+    for (const application of newApplications) await this.createApplication(application, operator, scopes);
     for (const client of serviceClients) await this.createServiceClient(client);
 
-    for (const application of applications) await this.bindApplication(application, scopes);
+    for (const application of newApplications) await this.bindApplication(application, scopes);
+    for (const application of existingApplications) await this.reconcileApplication(application, scopes);
     for (const client of serviceClients) await this.grantScopes(client.id, client.grants, scopes);
   }
 
@@ -74,16 +74,20 @@ export class EcosystemSeedService {
       publicUrls: origins,
     });
 
-    const audience = applicationAudience(seed.name);
-    const resource = await this.oauthClientService.ensureResource(application.id, audience, seed.resourceName);
-    for (const scope of seed.scopes ?? []) {
-      const scopeId = await this.oauthClientService.createScope(resource.id, scope.name, scope.description, scope.isSensitive, scope.principalType);
-      scopes.set(scopeKey(audience, scope.name), scopeId);
-    }
-
+    await this.ensureResourceScopes(application.id, seed, scopes);
     await this.createRoles(application.id, seed, operator);
     await this.createClient(application.id, seed.name, origins);
     this.logger.info(`Seeded ecosystem application '${seed.name}'`, { applicationId: application.id });
+  }
+
+  private async ensureResourceScopes(applicationId: number, seed: SeedApplication, scopes: Map<string, string>): Promise<void> {
+    if (!seed.scopes?.length) return;
+    const audience = applicationAudience(seed.name);
+    const resource = await this.oauthClientService.ensureResource(applicationId, audience, seed.resourceName);
+    for (const scope of seed.scopes) {
+      const scopeId = await this.oauthClientService.createScope(resource.id, scope.name, scope.description, scope.isSensitive, scope.principalType);
+      scopes.set(scopeKey(audience, scope.name), scopeId);
+    }
   }
 
   private async createRoles(applicationId: number, seed: SeedApplication, operator: EcosystemOperator): Promise<void> {
@@ -149,5 +153,21 @@ export class EcosystemSeedService {
         throwError(AppError.internal(`Cannot grant '${grant.scope}' to '${clientId}': resource '${grant.resource}' does not expose it`));
       await this.oauthClientService.grantScope(clientId, scopeId);
     }
+  }
+
+  private async reconcileApplication(seed: SeedApplication, scopes: Map<string, string>): Promise<void> {
+    const application = this.applicationService.getApplicationOrThrow(seed.name);
+    await this.ensureResourceScopes(application.id, seed, scopes);
+    await this.bindApplication(seed, scopes);
+    await this.reconcileWorkloadSubject(seed.name);
+  }
+
+  private async reconcileWorkloadSubject(app: string): Promise<void> {
+    const client = await this.oauthClientService.getClient(app);
+    if (!client) return;
+    const required = workloadSubject(app);
+    const current = client.workloadSubjects ?? [];
+    if (current.includes(required)) return;
+    await this.oauthClientService.updateClient(client.id, { workloadSubjects: [...current, required] });
   }
 }
