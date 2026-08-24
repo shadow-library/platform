@@ -1,6 +1,22 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor } from '@testing-library/react';
+import { type ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 
-import { type DeltaPage, type KeyValueBacking, SyncedDataProvider, SyncedQuickLogProvider } from '@/lib/sync';
+import { MemoirDataProvider, useJournal } from '@/lib/data';
+import {
+  type DeltaPage,
+  type KeyValueBacking,
+  SyncedAccountProvider,
+  SyncedDataProvider,
+  SyncedFinanceProvider,
+  SyncedHeroProvider,
+  type SyncedMemoirData,
+  SyncedQuickLogProvider,
+  SyncedReflectProvider,
+  type SyncEngine,
+  SyncEngineProvider,
+} from '@/lib/sync';
 
 import { createTestEngine, sharedBacking } from './sync-harness';
 
@@ -33,6 +49,25 @@ function page(overrides: Partial<DeltaPage>): DeltaPage {
   return { cursor: '1', hasMore: false, domains: {}, tombstones: [], ...overrides };
 }
 
+function buildSyncedData(engine: SyncEngine): SyncedMemoirData {
+  const account = new SyncedAccountProvider(engine);
+  const finance = new SyncedFinanceProvider(engine);
+  const quickLogs = new SyncedQuickLogProvider(engine);
+  return {
+    engine,
+    provider: new SyncedDataProvider(engine),
+    hero: new SyncedHeroProvider(engine, account),
+    reflect: new SyncedReflectProvider(engine),
+    account,
+    finance,
+    quickLogs,
+    queryClient: new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } }),
+    today: engine.today,
+    currency: 'EUR',
+    persona: 'active',
+  };
+}
+
 /**
  * IndexedDB resolves on the task queue, not the microtask queue. A backing that resolves immediately hides
  * every ordering bug between a reprojection and the refetch a world listener triggers, which is why the
@@ -40,7 +75,7 @@ function page(overrides: Partial<DeltaPage>): DeltaPage {
  */
 function slowBacking(): KeyValueBacking {
   const inner = sharedBacking();
-  const defer = <T>(value: Promise<T>): Promise<T> => new Promise(resolve => setTimeout(() => void value.then(resolve), 0));
+  const defer = <T,>(value: Promise<T>): Promise<T> => new Promise(resolve => setTimeout(() => void value.then(resolve), 0));
   return {
     get: key => defer(inner.get(key)),
     put: (key, value) => defer(inner.put(key, value)),
@@ -94,5 +129,46 @@ describe('sync boot', () => {
     expect(tiles.find(tile => tile.id === 'expense')?.value).toBe('not yet');
     expect(tiles.find(tile => tile.id === 'steps')?.value).toBe('not yet');
     expect(tiles.find(tile => tile.id === 'journal')?.value).toMatch(/\d+ words/);
+  });
+
+  /**
+   * The finance/quick-log hooks used to read the ambient `useQueryClient()` — whatever `QueryClientProvider`
+   * happened to wrap them — while the sync engine's world listener always invalidates `data.queryClient`
+   * (see `SyncEngineProvider`). Production nests both under one tree with two different clients: the router
+   * installs its own ambient one, and `MemoirDataProvider` carries a second. A hook on the wrong client never
+   * saw the invalidation and rendered whatever it had fetched on mount forever. This mounts that exact shape —
+   * an ambient client that is NOT `data.queryClient` — so a hook reading the wrong one would hang stale here.
+   */
+  it('should refetch a quick-log query on the same client the sync engine invalidates after a delta pull', async () => {
+    const updatedText = 'Second pull replaced this entry.';
+    const { engine } = createTestEngine({
+      today: TODAY,
+      pages: [
+        page({ cursor: '1', domains: {} }),
+        page({ cursor: '2', domains: { journal_entries: [{ id: 'j1', date: TODAY, text: updatedText, mood: 3, loggedAt: `${TODAY}T08:00:00.000Z`, rewarded: true }] } }),
+      ],
+    });
+    const data = buildSyncedData(engine);
+    const ambientClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    function Wrapper({ children }: { children: ReactNode }): ReactNode {
+      return (
+        <QueryClientProvider client={ambientClient}>
+          <MemoirDataProvider value={data}>
+            <SyncEngineProvider data={data}>{children}</SyncEngineProvider>
+          </MemoirDataProvider>
+        </QueryClientProvider>
+      );
+    }
+
+    const { result } = renderHook(() => useJournal(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(engine.getSnapshot().state).toBe('online'));
+    await waitFor(() => expect(result.current.data?.today).toBeNull());
+
+    await engine.sync();
+
+    await waitFor(() => expect(result.current.data?.today?.text).toBe(updatedText));
+    expect(ambientClient.getQueryData(['memoir', 'quick-logs', 'journal'])).toBeUndefined();
   });
 });

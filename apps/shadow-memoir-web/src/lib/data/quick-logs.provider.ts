@@ -1,4 +1,3 @@
-import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { addDays, toISODate } from '@shadow-library/ui';
 
 import { deriveCapAdvisory } from './entry-caps';
@@ -538,53 +537,6 @@ export function setQuickLogProvider(next: QuickLogProvider): void {
 
 export function getQuickLogProvider(): QuickLogProvider {
   return provider;
-}
-
-export const quickLogKeys = {
-  all: ['quick-logs'] as const,
-  journal: () => ['quick-logs', 'journal'] as const,
-  meals: (date: string) => ['quick-logs', 'meals', date] as const,
-  weight: () => ['quick-logs', 'weight'] as const,
-  health: (date: string) => ['quick-logs', 'health', date] as const,
-  sideQuests: () => ['quick-logs', 'side-quests'] as const,
-};
-
-const journalQuery = () => queryOptions({ queryKey: quickLogKeys.journal(), queryFn: () => provider.journal() });
-
-const mealsQuery = (date: string) => queryOptions({ queryKey: quickLogKeys.meals(date), queryFn: () => provider.meals(date) });
-
-const weightQuery = () => queryOptions({ queryKey: quickLogKeys.weight(), queryFn: () => provider.weight() });
-
-const healthQuery = (date: string) => queryOptions({ queryKey: quickLogKeys.health(date), queryFn: () => provider.health(date) });
-
-const sideQuestsQuery = () => queryOptions({ queryKey: quickLogKeys.sideQuests(), queryFn: () => provider.sideQuests() });
-
-export function useJournal(): UseQueryResult<JournalView> {
-  return useQuery(journalQuery());
-}
-
-export function useMeals(date: string): UseQueryResult<MealsView> {
-  return useQuery(mealsQuery(date));
-}
-
-export function useWeight(): UseQueryResult<WeightView> {
-  return useQuery(weightQuery());
-}
-
-export function useHealth(date: string): UseQueryResult<HealthView> {
-  return useQuery(healthQuery(date));
-}
-
-export function useSideQuests(): UseQueryResult<SideQuestsView> {
-  return useQuery(sideQuestsQuery());
-}
-
-export function useQuickLogCommand(): UseMutationResult<QuickLogCommandResult, Error, QuickLogCommand> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (command: QuickLogCommand) => provider.dispatchCommand(command),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: quickLogKeys.all }),
-  });
 }
 
 export { today as todayISODate };

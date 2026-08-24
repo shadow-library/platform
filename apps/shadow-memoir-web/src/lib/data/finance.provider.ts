@@ -1,4 +1,3 @@
-import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { addDays, toISODate } from '@shadow-library/ui';
 
 import { deriveCapAdvisory } from './entry-caps';
@@ -592,53 +591,6 @@ export function setFinanceProvider(next: FinanceProvider): void {
 
 export function getFinanceProvider(): FinanceProvider {
   return provider;
-}
-
-export const financeKeys = {
-  all: ['finance'] as const,
-  summary: (range: FinanceRange) => ['finance', 'summary', range] as const,
-  expenses: (query: ExpenseQuery) => ['finance', 'expenses', query] as const,
-  expense: (id: string) => ['finance', 'expense', id] as const,
-  subscriptions: () => ['finance', 'subscriptions'] as const,
-  categories: () => ['finance', 'categories'] as const,
-};
-
-const financeSummaryQuery = (range: FinanceRange) => queryOptions({ queryKey: financeKeys.summary(range), queryFn: () => provider.summary(range) });
-
-const expensesQuery = (query: ExpenseQuery) => queryOptions({ queryKey: financeKeys.expenses(query), queryFn: () => provider.expenses(query) });
-
-const expenseQuery = (id: string) => queryOptions({ queryKey: financeKeys.expense(id), queryFn: () => provider.expense(id) });
-
-const subscriptionsQuery = () => queryOptions({ queryKey: financeKeys.subscriptions(), queryFn: () => provider.subscriptions() });
-
-const expenseCategoriesQuery = () => queryOptions({ queryKey: financeKeys.categories(), queryFn: () => provider.categories() });
-
-export function useFinanceSummary(range: FinanceRange): UseQueryResult<FinanceSummary> {
-  return useQuery(financeSummaryQuery(range));
-}
-
-export function useExpenses(query: ExpenseQuery): UseQueryResult<ExpensePage> {
-  return useQuery(expensesQuery(query));
-}
-
-export function useExpense(id: string): UseQueryResult<ExpenseDetail | null> {
-  return useQuery(expenseQuery(id));
-}
-
-export function useSubscriptions(): UseQueryResult<SubscriptionsView> {
-  return useQuery(subscriptionsQuery());
-}
-
-export function useExpenseCategories(): UseQueryResult<CategoriesView> {
-  return useQuery(expenseCategoriesQuery());
-}
-
-export function useFinanceCommand(): UseMutationResult<FinanceCommandResult, Error, FinanceCommand> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (command: FinanceCommand) => provider.dispatchCommand(command),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: financeKeys.all }),
-  });
 }
 
 export { HOME_CURRENCY };
