@@ -87,6 +87,20 @@ describe('Storage Module', () => {
     it('should reject presigned uploads on the local driver', () => {
       expect(() => storage.getPresignedUploadUrl('deadbeef.png', { contentType: 'image/png' })).toThrow('not supported');
     });
+
+    it('should reject presigned downloads on the local driver', () => {
+      expect(() => storage.getPresignedDownloadUrl('deadbeef.png')).toThrow('not supported');
+    });
+
+    it('should stat a stored object without transferring its bytes', async () => {
+      const ref = await storage.save(bytes, { contentType: 'image/png' });
+      const head = await storage.stat(ref);
+      expect(head).toEqual({ size: bytes.length, contentType: 'image/png' });
+    });
+
+    it('should throw OBJECT_NOT_FOUND when statting a missing ref', async () => {
+      await expect(storage.stat('deadbeef.png')).rejects.toThrow(StorageErrorCode.OBJECT_NOT_FOUND.message);
+    });
   });
 
   describe('S3 driver (presign)', () => {
@@ -124,6 +138,18 @@ describe('Storage Module', () => {
 
     it('should build the public URL from the configured origin', () => {
       expect(storage.getPublicUrl('abc123.png')).toBe(`${publicOrigin}/abc123.png`);
+    });
+
+    it('should presign a GET download against the external endpoint', () => {
+      const url = storage.getPresignedDownloadUrl('abc123.png', { expiresSeconds: 600 });
+      expect(url.startsWith('https://storage-api.example.test')).toBe(true);
+      expect(url).toContain('X-Amz-Signature');
+      expect(url).toContain('abc123.png');
+    });
+
+    it('should accept a caller-supplied non-content-addressed ref for presigning (ADR-0008)', () => {
+      const url = storage.getPresignedUploadUrl('r/42/018f1234-abcd-7000-8000-000000000000.jpg', { contentType: 'image/jpeg' });
+      expect(url).toContain('r/42/018f1234-abcd-7000-8000-000000000000.jpg');
     });
   });
 });

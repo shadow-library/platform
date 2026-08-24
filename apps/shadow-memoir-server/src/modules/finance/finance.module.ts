@@ -4,6 +4,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 import { MemoirAuthModule } from '@modules/auth';
 import { CommandsModule } from '@modules/commands';
 import { ProgressionModule } from '@modules/progression';
+import { ReceiptsModule } from '@modules/receipts';
 import { SchedulerModule } from '@modules/scheduler';
 import { SyncModule } from '@modules/sync';
 import { TelemetryModule } from '@server/telemetry';
@@ -18,7 +19,7 @@ import { FxReconciliationService } from './fx-reconciliation.service';
 import { SubscriptionRepository } from './subscription.repository';
 
 @Module({
-  imports: [DatabaseModule, MemoirAuthModule, CommandsModule, ProgressionModule, SchedulerModule, SyncModule, TelemetryModule],
+  imports: [DatabaseModule, MemoirAuthModule, CommandsModule, ProgressionModule, ReceiptsModule, SchedulerModule, SyncModule, TelemetryModule],
   providers: [
     ExpenseCategoryRepository,
     ExpenseRepository,

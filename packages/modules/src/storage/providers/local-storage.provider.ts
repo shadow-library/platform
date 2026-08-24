@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 
 import { AppError } from '@shadow-library/common';
@@ -10,7 +10,7 @@ import { AppError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { StorageErrorCode } from '../storage.errors';
-import { type StorageObject, type StorageProvider } from '../storage.types';
+import { type HeadResult, type StorageObject, type StorageProvider } from '../storage.types';
 import { contentTypeFromRef } from '../storage.utils';
 
 /**
@@ -59,6 +59,16 @@ export class LocalStorageProvider implements StorageProvider {
     return readFile(this.resolveRef(ref))
       .then(() => true)
       .catch(() => false);
+  }
+
+  async head(ref: string): Promise<HeadResult | null> {
+    try {
+      const stats = await stat(this.resolveRef(ref));
+      return { size: stats.size, contentType: contentTypeFromRef(ref) };
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') return null;
+      throw AppError.internal(`Failed to stat object '${ref}' in local storage`, error);
+    }
   }
 
   // A content-addressed ref is a bare filename; reject any separator so a crafted value can never escape the root.

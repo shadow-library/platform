@@ -9,7 +9,7 @@ import { AppError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { StorageErrorCode } from '../storage.errors';
-import { type StorageObject, type StorageProvider } from '../storage.types';
+import { type HeadResult, type StorageObject, type StorageProvider } from '../storage.types';
 import { contentTypeFromRef } from '../storage.utils';
 
 /**
@@ -85,8 +85,40 @@ export class S3StorageProvider implements StorageProvider {
     }
   }
 
+  async head(ref: string): Promise<HeadResult | null> {
+    const file = this.client.file(ref);
+    try {
+      const stat = await file.stat();
+      return { size: stat.size, contentType: stat.type || contentTypeFromRef(ref) };
+    } catch (error) {
+      if (await this.isMissing(file)) return null;
+      throw AppError.internal(`Failed to stat object '${ref}' in S3 storage`, error);
+    }
+  }
+
   presignUpload(ref: string, contentType: string, expiresSeconds: number): string {
     return this.presignClient.presign(ref, { method: 'PUT', expiresIn: expiresSeconds, type: contentType });
+  }
+
+  presignDownload(ref: string, expiresSeconds: number): string {
+    return this.presignClient.presign(ref, { method: 'GET', expiresIn: expiresSeconds });
+  }
+
+  async list(prefix: string): Promise<string[]> {
+    const keys: string[] = [];
+    try {
+      let startAfter: string | undefined;
+      for (;;) {
+        const page = await this.client.list({ prefix, maxKeys: 1000, ...(startAfter ? { startAfter } : {}) });
+        for (const object of page.contents ?? []) if (object.key) keys.push(object.key);
+        const last = page.contents?.at(-1)?.key;
+        if (!page.isTruncated || !last) break;
+        startAfter = last;
+      }
+      return keys;
+    } catch (error) {
+      throw AppError.internal(`Failed to list objects under prefix '${prefix}' in S3 storage`, error);
+    }
   }
 
   private async isMissing(file: ReturnType<S3Client['file']>): Promise<boolean> {

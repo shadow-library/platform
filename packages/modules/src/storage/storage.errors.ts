@@ -22,4 +22,7 @@ export class StorageErrorCode extends ErrorCode {
 
   /** Presigned uploads were requested from a driver that cannot mint them (the local-disk driver) */
   static readonly PRESIGN_UNSUPPORTED = StorageErrorCode.internal('STORAGE_PRESIGN_UNSUPPORTED', 'Presigned uploads are not supported by the {driver} storage driver');
+
+  /** A prefix listing was requested from a driver that cannot enumerate objects (the local-disk driver) */
+  static readonly LIST_UNSUPPORTED = StorageErrorCode.internal('STORAGE_LIST_UNSUPPORTED', 'Listing objects is not supported by the {driver} storage driver');
 }

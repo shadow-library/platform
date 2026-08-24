@@ -49,6 +49,17 @@ export interface PresignUploadOptions {
   expiresSeconds?: number;
 }
 
+export interface PresignDownloadOptions {
+  /** Seconds until the presigned URL expires (default 900) */
+  expiresSeconds?: number;
+}
+
+/** Metadata fetched without a body transfer (an S3 `HEAD`, or the local driver's file stat). */
+export interface HeadResult {
+  size: number;
+  contentType: string;
+}
+
 /**
  * The driver seam. Providers deal only in already-computed refs — content addressing, URL policy and
  * MIME/extension derivation live in `StorageService`, so a provider stays a thin bytes-in/bytes-out
@@ -67,8 +78,17 @@ export interface StorageProvider {
   /** Whether an object exists at `ref` */
   exists(ref: string): Promise<boolean>;
 
+  /** Metadata for the object at `ref` without transferring its bytes; `null` when absent */
+  head(ref: string): Promise<HeadResult | null>;
+
   /** Presigns a `PUT` upload URL, when the backend supports it; absent on local-disk storage */
   presignUpload?(ref: string, contentType: string, expiresSeconds: number): string;
+
+  /** Presigns a `GET` download URL, when the backend supports it; absent on local-disk storage */
+  presignDownload?(ref: string, expiresSeconds: number): string;
+
+  /** Lists every ref under `prefix`, when the backend supports it; absent on local-disk storage */
+  list?(prefix: string): Promise<string[]>;
 }
 
 export interface S3StorageOptions {

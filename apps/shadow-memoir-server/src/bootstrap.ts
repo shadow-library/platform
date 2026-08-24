@@ -28,6 +28,10 @@ declare module '@shadow-library/common' {
     'ai.task-timeout-minutes': number;
 
     'storage.receipts-bucket': string;
+    'storage.max-receipt-bytes': number;
+    'storage.orphan-sweep.pending-upload-max-age-minutes': number;
+    'storage.orphan-sweep.pending-upload-interval-minutes': number;
+    'storage.orphan-sweep.object-interval-minutes': number;
 
     'billing.provider': string;
     'billing.webhook-tolerance-seconds': number;
@@ -94,6 +98,16 @@ Config.load('ai.task-timeout-minutes', { defaultValue: '30', validateType: 'numb
 
 /** Garage bucket for receipt blobs (§19); provisioned per env by the T-04 operator checklist. */
 Config.load('storage.receipts-bucket', { defaultValue: 'memoir-receipts' });
+
+/** Application-level ceiling for an uploaded receipt (§19.2); the `receipts.size_bytes` CHECK (8 MB) is the hard backstop this can only tighten. */
+Config.load('storage.max-receipt-bytes', { defaultValue: '8388608', validateType: 'number', reloadable: true });
+
+/** §19.2 orphan sweep (a): a `pending_upload` row older than this never got confirmed — the object (if any) and the row are deleted. */
+Config.load('storage.orphan-sweep.pending-upload-max-age-minutes', { defaultValue: '1440', validateType: 'number', reloadable: true });
+Config.load('storage.orphan-sweep.pending-upload-interval-minutes', { defaultValue: '60', validateType: 'number', reloadable: true });
+
+/** §19.2 orphan sweep (b): weekly belt sweep — objects under an account's prefix with no `receipts` row are deleted. */
+Config.load('storage.orphan-sweep.object-interval-minutes', { defaultValue: '10080', validateType: 'number', reloadable: true });
 
 /** Owner decision A-6 (the concrete PSP) is unresolved: the shipped adapter is `GenericHmacBillingAdapter`, so this names it until a provider is chosen. */
 Config.load('billing.provider', { defaultValue: 'generic-hmac' });

@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { and, eq, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -67,6 +67,12 @@ export class AccountRepository {
       .where(inArray(schema.accounts.id, accountIds));
     for (const row of rows) map.set(row.id, row.defaultCurrency);
     return map;
+  }
+
+  /** Keyset-paginated account ids, for a machine sweep that has to visit every account (the receipts object-orphan sweep, §19.2) rather than one caller's own. */
+  async findAllIds(afterId: bigint, limit: number): Promise<bigint[]> {
+    const rows = await this.db.select({ id: schema.accounts.id }).from(schema.accounts).where(gt(schema.accounts.id, afterId)).orderBy(asc(schema.accounts.id)).limit(limit);
+    return rows.map(row => row.id);
   }
 
   /**

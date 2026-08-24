@@ -191,4 +191,20 @@ export class AppErrorCode extends ServerErrorCode {
 
   /** No webhook secret or hosted-checkout endpoint is configured for this environment; the billing surface never falls back to an unverified or fabricated one */
   static readonly BIL_003 = AppErrorCode.unavailable('BIL_003', 'Billing provider is not configured');
+
+  /*!
+   * Receipt Errors
+   */
+
+  /** No receipt with that ref belongs to the caller, is not yet confirmed, or has been deleted; a foreign ref reads exactly like a nonexistent one (§19.2) */
+  static readonly RCP_001 = AppErrorCode.notFound('RCP_001', 'Receipt not found');
+
+  /** `POST /receipts` named a content type outside {jpeg, png, webp, heic} */
+  static readonly RCP_002 = AppErrorCode.badRequest('RCP_002', "Unsupported content type '{contentType}'");
+
+  /** Declared or HEAD-verified size exceeds `storage.max-receipt-bytes`; on confirm, the object is deleted before this is thrown */
+  static readonly RCP_003 = AppErrorCode.badRequest('RCP_003', 'Receipt exceeds the {maxBytes}-byte size limit');
+
+  /** `POST /receipts/{ref}/confirm` found no object at the presigned key — the client never PUT, or the PUT failed */
+  static readonly RCP_004 = AppErrorCode.badRequest('RCP_004', 'No upload found for this receipt; PUT to the presigned URL before confirming');
 }

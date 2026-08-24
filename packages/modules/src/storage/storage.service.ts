@@ -11,7 +11,16 @@ import { LocalStorageProvider } from './providers/local-storage.provider';
 import { S3StorageProvider } from './providers/s3-storage.provider';
 import { DEFAULT_CONFIGS, LOGGER_NAMESPACE, STORAGE_MODULE_OPTIONS } from './storage.constants';
 import { StorageErrorCode } from './storage.errors';
-import { type PresignUploadOptions, type SaveOptions, type StorageDriver, type StorageModuleOptions, type StorageObject, type StorageProvider } from './storage.types';
+import {
+  type HeadResult,
+  type PresignDownloadOptions,
+  type PresignUploadOptions,
+  type SaveOptions,
+  type StorageDriver,
+  type StorageModuleOptions,
+  type StorageObject,
+  type StorageProvider,
+} from './storage.types';
 import { extFromContentType, sha256Hex } from './storage.utils';
 
 /**
@@ -69,6 +78,13 @@ export class StorageService implements OnModuleInit {
     return this.provider.exists(ref);
   }
 
+  /** Metadata for `ref` without transferring its bytes; throws `StorageErrorCode.OBJECT_NOT_FOUND` when it is absent. */
+  async stat(ref: string): Promise<HeadResult> {
+    const result = await this.provider.head(ref);
+    if (!result) throw StorageErrorCode.OBJECT_NOT_FOUND.create({ ref });
+    return result;
+  }
+
   /** The anonymous public download URL for `ref` (`<publicOrigin>/<ref>`); passthrough for a nullish ref eases DTO mapping. */
   getPublicUrl(ref: string): string;
   getPublicUrl(ref: null | undefined): undefined;
@@ -82,6 +98,18 @@ export class StorageService implements OnModuleInit {
   getPresignedUploadUrl(ref: string, options: PresignUploadOptions): string {
     if (!this.provider.presignUpload) throw StorageErrorCode.PRESIGN_UNSUPPORTED.create({ driver: this.driver });
     return this.provider.presignUpload(ref, options.contentType, options.expiresSeconds ?? 900);
+  }
+
+  /** Presigns a `GET` download URL against the external S3 endpoint; unsupported on the local driver. */
+  getPresignedDownloadUrl(ref: string, options: PresignDownloadOptions = {}): string {
+    if (!this.provider.presignDownload) throw StorageErrorCode.PRESIGN_UNSUPPORTED.create({ driver: this.driver });
+    return this.provider.presignDownload(ref, options.expiresSeconds ?? 900);
+  }
+
+  /** Lists every ref under `prefix` (a bounded prefix walk, ADR-0008); unsupported on the local driver. */
+  list(prefix: string): Promise<string[]> {
+    if (!this.provider.list) throw StorageErrorCode.LIST_UNSUPPORTED.create({ driver: this.driver });
+    return this.provider.list(prefix);
   }
 
   private buildS3Provider(): S3StorageProvider {

@@ -10,6 +10,7 @@ import { AppError, ValidationError } from '@shadow-library/common';
  */
 import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
 import { ProgressionService } from '@modules/progression';
+import { ReceiptService } from '@modules/receipts';
 import { AppErrorCode } from '@server/classes';
 import { type DatabaseTransaction, type Expense, schema, type Subscription } from '@server/database';
 import { pseudoAccountId, TelemetryService } from '@server/telemetry';
@@ -112,6 +113,7 @@ export class FinanceCommandsService implements OnModuleInit {
     private readonly subscriptionRepository: SubscriptionRepository,
     private readonly fxRateRepository: FxRateRepository,
     private readonly telemetry: TelemetryService,
+    private readonly receiptService: ReceiptService,
   ) {}
 
   onModuleInit(): void {
@@ -221,10 +223,13 @@ export class FinanceCommandsService implements OnModuleInit {
     return { status: 'applied', result: { id: updated.id } };
   }
 
+  /** Cascades to the receipt row + object (ARCHITECTURE §19.2 Lifecycle) — receipts are 1:1 with expenses, never shared. */
   private async deleteExpense({ envelope, tx }: CommandContext): Promise<CommandResult> {
     const id = requireString(envelope.payload, 'id');
+    const existing = await this.expenseRepository.findByIdInTx(tx, id);
     const removed = await this.expenseRepository.remove(tx, id);
     if (!removed) throw AppErrorCode.FIN_003.create();
+    if (existing?.receiptRef) await this.receiptService.deleteForExpense(tx, existing.receiptRef);
     return { status: 'applied', result: { id } };
   }
 
