@@ -92,7 +92,7 @@ export class AuthController {
   @EnableIf(() => isEnabled('login'))
   async login(@Query() query: AuthLoginQuery): Promise<void> {
     const response = this.context.getResponse();
-    const redirect = await this.sessions.beginLogin(query.return_to);
+    const redirect = await this.sessions.beginLogin(query.return_to, this.requestOrigin());
     this.send(response, redirect.cookies, redirect.url);
   }
 
@@ -102,7 +102,7 @@ export class AuthController {
   async callback(@Query() query: AuthCallbackQuery): Promise<void> {
     if (query.error) throw AuthErrorCode.EXCHANGE_FAILED.create({ reason: `identity refused the authorization: ${query.error_description ?? query.error}` });
 
-    const result = await this.sessions.completeLogin(query, this.cookies());
+    const result = await this.sessions.completeLogin(query, this.cookies(), this.requestOrigin());
     this.send(this.context.getResponse(), result.cookies, result.returnTo);
   }
 
@@ -241,6 +241,12 @@ export class AuthController {
 
   private cookies(): Record<string, string> {
     return parseCookies(this.context.getRequest().headers.cookie);
+  }
+
+  /** `protocol`/`hostname` honour `x-forwarded-*` when the deployment trusts its proxy, so this is the origin the browser actually reached */
+  private requestOrigin(): string {
+    const request = this.context.getRequest();
+    return `${request.protocol}://${request.hostname}`;
   }
 
   private send(response: HttpResponse, cookies: string[], redirectTo?: string): void {

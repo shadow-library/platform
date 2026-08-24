@@ -293,7 +293,7 @@ describe('BootstrapService', () => {
     }
   });
 
-  it('should add the corrected redirect URI to an application already seeded under the superseded hostname', async () => {
+  it('should replace the stale name-derived redirect URI with the corrected one on an application seeded under the superseded hostname', async () => {
     const db = env.getPostgresClient();
     const clientService = env.getService(OAuthClientService);
     const stale = 'https://novel-forge.shadow-apps.com/api/auth/callback';
@@ -305,7 +305,36 @@ describe('BootstrapService', () => {
 
     const redirects = (await clientService.getClientDetail('novel-forge'))?.redirectUris ?? [];
     expect(redirects).toContain('https://novelforge.shadow-apps.com/api/auth/callback');
-    expect(redirects).toContain(stale);
+    expect(redirects).not.toContain(stale);
+  });
+
+  it('should stay idempotent once the stale redirect URI has already been removed', async () => {
+    const clientService = env.getService(OAuthClientService);
+    const stale = 'https://novel-forge.shadow-apps.com/api/auth/callback';
+
+    await env.getService(EcosystemSeedService).seed(await seedOperator());
+    const first = (await clientService.getClientDetail('novel-forge'))?.redirectUris ?? [];
+    expect(first).not.toContain(stale);
+
+    await env.getService(EcosystemSeedService).seed(await seedOperator());
+    const second = (await clientService.getClientDetail('novel-forge'))?.redirectUris ?? [];
+    expect(second.sort()).toEqual(first.sort());
+  });
+
+  it('should never remove an operator-added redirect URI that merely shares the stale host', async () => {
+    const db = env.getPostgresClient();
+    const clientService = env.getService(OAuthClientService);
+    const operatorAdded = 'https://novel-forge.shadow-apps.com/api/auth/custom-callback';
+
+    await db.insert(schema.oauthClientRedirectUris).values({ clientId: 'novel-forge', uri: operatorAdded }).onConflictDoNothing();
+
+    await env.getService(EcosystemSeedService).seed(await seedOperator());
+
+    const redirects = (await clientService.getClientDetail('novel-forge'))?.redirectUris ?? [];
+    expect(redirects).toContain(operatorAdded);
+    expect(redirects).toContain('https://novelforge.shadow-apps.com/api/auth/callback');
+
+    await db.delete(schema.oauthClientRedirectUris).where(eq(schema.oauthClientRedirectUris.uri, operatorAdded));
   });
 
   it('should not duplicate redirect URIs when seeded repeatedly', async () => {

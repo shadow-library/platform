@@ -65,6 +65,13 @@ export class EcosystemSeedService {
     return this.appPublicOrigins(seed).origins.map(origin => `${origin}${OAUTH_CALLBACK_PATH}`);
   }
 
+  /** The URI the old name-derived rule would have seeded before `publicHost` existed; only ever deleted as an exact match. */
+  private staleSeedRedirectUri(seed: SeedApplication): string | null {
+    if (!seed.publicHost || seed.publicHost === seed.name) return null;
+    const root = new URL(Config.get('oauth.issuer')).hostname.split('.').slice(1).join('.');
+    return `https://${seed.name}.${root}${OAUTH_CALLBACK_PATH}`;
+  }
+
   private async createApplication(seed: SeedApplication, operator: EcosystemOperator, scopes: Map<string, string>): Promise<void> {
     const { primary, origins } = this.appPublicOrigins(seed);
     const application = await this.applicationService.createApplication({
@@ -166,11 +173,18 @@ export class EcosystemSeedService {
     await this.reconcileClient(seed);
   }
 
-  /** Additive only: a redirect URI seeded under a superseded hostname stays registered, since clients pinned to it would otherwise break mid-deploy. */
+  /**
+   * The corrected redirect URI is added unconditionally. The superseded one is removed only when it is
+   * exactly what the old name-derived rule would have seeded — never an operator-added URI, which this
+   * seed never wrote and therefore never recognises as stale.
+   */
   private async reconcileClient(seed: SeedApplication): Promise<void> {
     const client = await this.oauthClientService.getClient(seed.name);
     if (!client) return;
     await this.oauthClientService.ensureRedirectUris(client.id, this.redirectUris(seed));
+
+    const stale = this.staleSeedRedirectUri(seed);
+    if (stale) await this.oauthClientService.removeRedirectUri(client.id, stale);
 
     const required = workloadSubject(seed.name);
     const current = client.workloadSubjects ?? [];

@@ -75,6 +75,30 @@ describe('derived configuration', () => {
     auth.stop();
   });
 
+  it('should prefer the candidate whose origin matches the incoming request when several point at the callback route', async () => {
+    const auth = client();
+    const canary = 'https://canary.reports.test/auth/callback';
+    idp.setAppRegistration({ redirectUris: [REDIRECT_URI, canary] });
+
+    const started = await sessions(auth).beginLogin('/reports', 'https://canary.reports.test');
+    expect(new URL(started.url).searchParams.get('redirect_uri')).toBe(canary);
+
+    idp.setAppRegistration({ redirectUris: ['https://reports.test/legacy/callback', REDIRECT_URI] });
+    auth.stop();
+  });
+
+  it('should fall back to the first candidate, with a warning, when the request origin matches none of them', async () => {
+    const auth = client();
+    const canary = 'https://canary.reports.test/auth/callback';
+    idp.setAppRegistration({ redirectUris: [REDIRECT_URI, canary] });
+
+    const started = await sessions(auth).beginLogin('/reports', 'https://unrelated.test');
+    expect(new URL(started.url).searchParams.get('redirect_uri')).toBe(REDIRECT_URI);
+
+    idp.setAppRegistration({ redirectUris: ['https://reports.test/legacy/callback', REDIRECT_URI] });
+    auth.stop();
+  });
+
   it('should let a deployment pin the redirect uri when the registration cannot disambiguate it', async () => {
     const auth = client();
     const config = resolveBrowserAuthConfig({ issuer: idp.issuer, client: CLIENT }, resolveAuthRoutes(), { redirectUri: 'https://canary.reports.test/auth/callback' });

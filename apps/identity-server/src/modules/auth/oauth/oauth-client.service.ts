@@ -180,6 +180,10 @@ export class OAuthClientService {
     for (const uri of uris) await this.db.insert(schema.oauthClientRedirectUris).values({ clientId, uri }).onConflictDoNothing();
   }
 
+  async removeRedirectUri(clientId: string, uri: string): Promise<void> {
+    await this.db.delete(schema.oauthClientRedirectUris).where(and(eq(schema.oauthClientRedirectUris.clientId, clientId), eq(schema.oauthClientRedirectUris.uri, uri)));
+  }
+
   async grantScope(clientId: string, scopeId: string): Promise<void> {
     await this.db.insert(schema.oauthClientScopeGrants).values({ clientId, scopeId }).onConflictDoNothing();
   }

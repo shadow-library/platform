@@ -105,7 +105,7 @@ export class AppSessionService {
   private readonly grants = new Map<string, number>();
 
   /** The last runtime derived from a registration, kept so an unchanged registration costs nothing */
-  private derived: { registration: AppRegistration; runtime: BrowserAuthRuntime } | null = null;
+  private derived: { registration: AppRegistration; requestOrigin: string | undefined; runtime: BrowserAuthRuntime } | null = null;
 
   /**
    * Resolved profiles, keyed by session hash and expiring on their own.
@@ -129,7 +129,7 @@ export class AppSessionService {
    * login, and cheap afterwards — the registration is cached and refreshed on its own TTL.
    */
   async warmUp(): Promise<BrowserAuthRuntime> {
-    const runtime = await this.runtime();
+    const runtime = await this.runtime(undefined);
     if (this.config.validateScopes) await this.client.assertScopesSupported(runtime.scopes);
     this.warnOnRedirectUriMismatch(runtime.redirectUri);
     this.logger.info('browser auth resolved from the app registration', {
@@ -142,8 +142,8 @@ export class AppSessionService {
   }
 
   /** Starts a login: PKCE, `state`, `nonce` and `resource` out; the transient state rides in its own cookie */
-  async beginLogin(returnTo?: string): Promise<LoginRedirect> {
-    const [document, runtime] = await Promise.all([this.client.getDiscovery(), this.runtime()]);
+  async beginLogin(returnTo?: string, requestOrigin?: string): Promise<LoginRedirect> {
+    const [document, runtime] = await Promise.all([this.client.getDiscovery(), this.runtime(requestOrigin)]);
     const pkce = await createPkcePair();
     const state: LoginState = { state: randomUrlSafeString(16), nonce: randomUrlSafeString(16), codeVerifier: pkce.verifier, returnTo: this.resolveReturnTo(returnTo) };
 
@@ -163,13 +163,13 @@ export class AppSessionService {
   }
 
   /** Completes the callback: validates `state`, redeems the code for a handle, and sets the session cookie */
-  async completeLogin(query: { code?: string; state?: string }, cookies: Record<string, string>): Promise<LoginResult> {
+  async completeLogin(query: { code?: string; state?: string }, cookies: Record<string, string>, requestOrigin?: string): Promise<LoginResult> {
     const pending = decodeLoginState(cookies[this.config.stateCookieName]);
     if (!pending) throw this.logged(AuthErrorCode.LOGIN_STATE_INVALID.create({ reason: 'no in-flight login matched this callback' }));
     if (!query.code) throw this.logged(AuthErrorCode.LOGIN_STATE_INVALID.create({ reason: 'the callback carried no authorization code' }));
     if (!query.state || !matchesState(pending.state, query.state)) throw this.logged(AuthErrorCode.LOGIN_STATE_INVALID.create({ reason: 'the callback state did not match' }));
 
-    const { redirectUri } = await this.runtime();
+    const { redirectUri } = await this.runtime(requestOrigin);
     const session = await this.client.appSessions.createSession({ code: query.code, codeVerifier: pending.codeVerifier, redirectUri });
     const handleHash = hashSessionHandle(session.sessionHandle);
     this.registry.register(handleHash, session.userId, parseExpiry(session.expiresAt, Date.now() + FALLBACK_SESSION_TTL_MS));
@@ -225,7 +225,7 @@ export class AppSessionService {
     const handleHash = hashSessionHandle(handle);
     if (!this.registry.isActive(handleHash)) throw AuthErrorCode.SESSION_INVALID.create({ reason: 'session was ended by a back-channel logout' });
 
-    const runtime = await this.runtime();
+    const runtime = await this.runtime(undefined);
     const elevated = request.elevated ?? false;
     const key = { handleHash, audience: runtime.audience, elevated, scope: runtime.scopes.join(' ') || undefined };
     const cached = this.tokens.get(key);
@@ -265,7 +265,7 @@ export class AppSessionService {
    */
   async claimElevation(handle: string): Promise<void> {
     const handleHash = hashSessionHandle(handle);
-    const { audience } = await this.runtime();
+    const { audience } = await this.runtime(undefined);
     const elevation = await this.client.appSessions.claimElevation(handle, audience).catch((error: unknown) => this.forgetOnInvalidSession(handleHash, error));
     /** An unreadable grant window records as already closed, so nothing elevated is ever cached from it */
     this.grants.set(handleHash, parseExpiry(elevation.expiresAt, 0));
@@ -357,7 +357,7 @@ export class AppSessionService {
    * records who the step-up was for and refuses a claim from anybody else.
    */
   async identityStepUpUrl(returnTo: string): Promise<string> {
-    const runtime = await this.runtime();
+    const runtime = await this.runtime(undefined);
     const url = new URL(runtime.stepUpUrl);
     url.searchParams.set('client_id', runtime.clientId);
     url.searchParams.set('resource', runtime.audience);
@@ -380,7 +380,7 @@ export class AppSessionService {
     if (!endpoint) return this.resolveReturnTo(postLogout);
 
     const url = new URL(endpoint);
-    url.searchParams.set('client_id', (await this.runtime()).clientId);
+    url.searchParams.set('client_id', (await this.runtime(undefined)).clientId);
     url.searchParams.set('post_logout_redirect_uri', this.assertAllowedRedirect(postLogout));
     return url.toString();
   }
@@ -429,7 +429,7 @@ export class AppSessionService {
    * Merges what identity says about this application with the local overrides. Recomputed only when the
    * registration itself changes, so a request pays one map lookup rather than re-deriving on every call.
    */
-  private async runtime(): Promise<BrowserAuthRuntime> {
+  private async runtime(requestOrigin: string | undefined): Promise<BrowserAuthRuntime> {
     const [registration, audience, stepUpEndpoint] = await Promise.all([
       this.client.getAppRegistration(),
       this.client.getAudience(),
@@ -437,12 +437,13 @@ export class AppSessionService {
     ]);
 
     const cached = this.derived;
-    if (cached?.registration === registration && cached.runtime.audience === audience && cached.runtime.stepUpUrl === stepUpEndpoint) return cached.runtime;
+    if (cached?.registration === registration && cached.requestOrigin === requestOrigin && cached.runtime.audience === audience && cached.runtime.stepUpUrl === stepUpEndpoint)
+      return cached.runtime;
 
     const runtime: BrowserAuthRuntime = {
       clientId: registration.appId,
       audience,
-      redirectUri: this.config.redirectUri ?? this.callbackRedirectUri(registration.redirectUris),
+      redirectUri: this.config.redirectUri ?? this.callbackRedirectUri(registration.redirectUris, requestOrigin),
       /**
        * The protocol scopes lead, always. An application's registration lists the API capabilities it
        * owns and never the OIDC ones — those belong to the protocol, not to a resource server — so
@@ -453,22 +454,32 @@ export class AppSessionService {
       scopes: [...new Set([...PROTOCOL_SCOPES, ...(this.config.scopes ?? registration.scopes)])],
       stepUpUrl: stepUpEndpoint,
     };
-    this.derived = { registration, runtime };
+    this.derived = { registration, requestOrigin, runtime };
     return runtime;
   }
 
   /**
    * An application may have several registered redirect URIs. The one belonging to this deployment is
    * the one pointing at the callback route this process actually serves — which is all the SDK can
-   * know, since a service behind a proxy cannot see its own public origin. When that is still
-   * ambiguous the choice is arbitrary, so it says so and the deploy is expected to pin `redirectUri`.
+   * know, since a service behind a proxy cannot see its own public origin unless the request that
+   * reached it says so. When several candidates share the callback path, the one whose origin matches
+   * the incoming request's own origin wins, since a deployment serves exactly one origin. Only when
+   * that origin is unknown or matches none of them does the choice fall back to the first candidate —
+   * arbitrary, so it says so and the deploy is expected to pin `redirectUri`.
    */
-  private callbackRedirectUri(redirectUris: string[]): string {
+  private callbackRedirectUri(redirectUris: string[], requestOrigin?: string): string {
     const callbackPath = this.config.routes.callback ? `${this.config.routes.basePath}${this.config.routes.callback}` : '';
     const matches = redirectUris.filter(uri => URL.parse(uri)?.pathname === callbackPath);
+
+    if (matches.length > 1 && requestOrigin) {
+      const originMatch = matches.find(uri => URL.parse(uri)?.origin === requestOrigin);
+      if (originMatch) return originMatch;
+    }
+
     if (matches.length > 1) {
       this.logger.warn('several registered redirect uris point at the callback route; pin browser.redirectUri to say which origin this deployment serves', {
         candidates: matches,
+        requestOrigin,
       });
     }
 
