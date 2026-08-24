@@ -13,8 +13,8 @@ import { test } from '@playwright/test';
  * Defining types
  */
 
-/** One of the four platform products the e2e suite targets. */
-export type ProductKey = 'identity' | 'novelForge' | 'pulse' | 'webNovel';
+/** One of the five platform products the e2e suite targets. */
+export type ProductKey = 'identity' | 'memoir' | 'novelForge' | 'pulse' | 'webNovel';
 
 export interface ConfiguredProduct {
   readonly product: ProductKey;
@@ -37,6 +37,7 @@ export interface ConfiguredProduct {
 /** Human-readable name for test titles and skip reasons. */
 const PRODUCT_LABELS: Record<ProductKey, string> = {
   identity: 'Identity',
+  memoir: 'Shadow Memoir',
   novelForge: 'Novel Forge',
   pulse: 'Pulse',
   webNovel: 'Web Novel',
@@ -45,6 +46,7 @@ const PRODUCT_LABELS: Record<ProductKey, string> = {
 /** The env var each product's base URL is read from. */
 const PRODUCT_ENV_VARS: Record<ProductKey, string> = {
   identity: 'E2E_IDENTITY_URL',
+  memoir: 'E2E_MEMOIR_URL',
   novelForge: 'E2E_NOVEL_FORGE_URL',
   pulse: 'E2E_PULSE_URL',
   webNovel: 'E2E_WEB_NOVEL_URL',
@@ -53,13 +55,14 @@ const PRODUCT_ENV_VARS: Record<ProductKey, string> = {
 /** The local k3d dev ingress default for each product — confirmed reachable via `kubectl get ingress -A`. */
 const PRODUCT_DEFAULT_URLS: Record<ProductKey, string> = {
   identity: 'https://identity.shadow-apps.test',
+  memoir: 'https://shadow-memoir.shadow-apps.test',
   novelForge: 'https://novel-forge.shadow-apps.test',
   pulse: 'https://pulse.shadow-apps.test',
   webNovel: 'https://web-novel.shadow-apps.test',
 };
 
 /** Iteration order every spec loops in — stable so test titles/reports read the same across runs. */
-export const PRODUCTS: readonly ProductKey[] = ['identity', 'novelForge', 'pulse', 'webNovel'];
+export const PRODUCTS: readonly ProductKey[] = ['identity', 'memoir', 'novelForge', 'pulse', 'webNovel'];
 
 /** Strips a trailing slash so callers can safely template `${url}/path` without a doubled slash. */
 function normalizeBaseUrl(value: string): string {

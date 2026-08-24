@@ -28,14 +28,15 @@ import { AUTH_DIR, getProductUrl, type LoginPersona, type PersonaAccount, PERSON
  * the persona needs — if so, it skips untouched. That makes re-running the suite cheap and keeps a flapping test
  * run from exhausting the rate limit.
  *
- * Which apps each persona needs a session on: the two ordinary users get the consumer apps (Novel Forge and Web
- * Novel); Pulse is an INTERNAL ops console, so identity denies a non-privileged user a Pulse session (the OIDC
- * hop returns without a session cookie) — only the admin drives it. The admin's identity session is the
- * `__Host-sid` the login flow already established, so Pulse is the only app session it needs minted.
+ * Which apps each persona needs a session on: the two ordinary users get the consumer apps (Novel Forge, Web
+ * Novel, and Shadow Memoir); Pulse is an INTERNAL ops console, so identity denies a non-privileged user a Pulse
+ * session (the OIDC hop returns without a session cookie) — only the admin drives it. The admin's identity
+ * session is the `__Host-sid` the login flow already established, so Pulse is the only app session it needs
+ * minted.
  */
 const PERSONA_APPS: Record<LoginPersona, ProductKey[]> = {
-  user1: ['novelForge', 'webNovel'],
-  user2: ['novelForge', 'webNovel'],
+  user1: ['novelForge', 'webNovel', 'memoir'],
+  user2: ['novelForge', 'webNovel', 'memoir'],
   admin: ['pulse'],
 };
 

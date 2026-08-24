@@ -17,8 +17,8 @@ import { ADMIN_EMAIL, AUTH_DIR, type Persona, PERSONAS, SEED_MANIFEST_PATH, type
  * Defining types
  */
 
-/** The four platform databases this seed populates, keyed by logical name. */
-type DatabaseKey = 'identity' | 'pulse' | 'webNovel' | 'novelForge';
+/** The five platform databases this seed populates, keyed by logical name. */
+type DatabaseKey = 'identity' | 'memoir' | 'pulse' | 'webNovel' | 'novelForge';
 
 /**
  * Declaring the constants
@@ -35,11 +35,12 @@ type DatabaseKey = 'identity' | 'pulse' | 'webNovel' | 'novelForge';
  */
 
 /** Physical database name per key, for the default local URL. */
-const DATABASE_NAMES: Record<DatabaseKey, string> = { identity: 'identity', pulse: 'pulse', webNovel: 'web_novel', novelForge: 'novel_forge' };
+const DATABASE_NAMES: Record<DatabaseKey, string> = { identity: 'identity', memoir: 'shadow_memoir', pulse: 'pulse', webNovel: 'web_novel', novelForge: 'novel_forge' };
 
 /** The env var each database's connection string is read from. */
 const DATABASE_ENV_VARS: Record<DatabaseKey, string> = {
   identity: 'E2E_PG_URL_IDENTITY',
+  memoir: 'E2E_PG_URL_MEMOIR',
   pulse: 'E2E_PG_URL_PULSE',
   webNovel: 'E2E_PG_URL_WEB_NOVEL',
   novelForge: 'E2E_PG_URL_NOVEL_FORGE',
@@ -329,6 +330,23 @@ async function cleanNovelForge(url: string, subs: string[]): Promise<void> {
   }
 }
 
+/**
+ * Deletes `user2Sub`'s shadow-memoir account (cascade), so the onboarding e2e flow always finds an
+ * unprovisioned, never-onboarded account to walk through — the account row is otherwise created lazily on
+ * first authenticated request and would persist "onboarded" across every later run against this dev cluster.
+ * `user1` is left alone: the core-loop/quick-capture/settings specs want a persistent, already-onboarded
+ * account so they don't re-pay the onboarding wizard every run.
+ */
+async function cleanMemoir(url: string, user2Sub: string): Promise<void> {
+  const sql = connect(url);
+  try {
+    const deleted = await sql`DELETE FROM accounts WHERE identity_sub = ${user2Sub} RETURNING id`;
+    summary.push(`shadow_memoir: deleted ${deleted.count} account(s) for e2e user2 (keeps onboarding fresh)`);
+  } finally {
+    await sql.end();
+  }
+}
+
 /** Writes the computed ids/subs to the gitignored manifest the specs read. */
 function writeManifest(users: Record<Persona, SeedManifestUser>): void {
   const manifest: SeedManifest = { generatedAt: new Date().toISOString(), users, webNovel: { publicSlug: PUBLIC_NOVEL_SLUG, restrictedSlug: RESTRICTED_NOVEL_SLUG } };
@@ -355,6 +373,10 @@ async function main(): Promise<void> {
   const webNovelUrl = resolveUrl('webNovel');
   if (webNovelUrl && users) await seedWebNovel(webNovelUrl, users.user1.sub);
   else summary.push(`web_novel: skipped (${webNovelUrl ? 'no identity subs' : 'E2E_PG_URL_WEB_NOVEL blank'})`);
+
+  const memoirUrl = resolveUrl('memoir');
+  if (memoirUrl && users) await cleanMemoir(memoirUrl, users.user2.sub);
+  else summary.push(`shadow_memoir: skipped (${memoirUrl ? 'no identity subs' : 'E2E_PG_URL_MEMOIR blank'})`);
 
   const pulseUrl = resolveUrl('pulse');
   if (pulseUrl) await seedPulse(pulseUrl);

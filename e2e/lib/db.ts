@@ -11,8 +11,8 @@ import postgres, { type Sql } from 'postgres';
  * Defining types
  */
 
-/** The four platform databases, keyed by the logical name that maps to both an env override and a physical db name. */
-type DatabaseKey = 'identity' | 'pulse' | 'webNovel' | 'novelForge';
+/** The five platform databases, keyed by the logical name that maps to both an env override and a physical db name. */
+type DatabaseKey = 'identity' | 'memoir' | 'pulse' | 'webNovel' | 'novelForge';
 
 /**
  * Declaring the constants
@@ -31,6 +31,7 @@ type DatabaseKey = 'identity' | 'pulse' | 'webNovel' | 'novelForge';
 /** Physical database name for each key, used to build the default local URL. */
 const DATABASE_NAMES: Record<DatabaseKey, string> = {
   identity: 'identity',
+  memoir: 'shadow_memoir',
   pulse: 'pulse',
   webNovel: 'web_novel',
   novelForge: 'novel_forge',
@@ -39,6 +40,7 @@ const DATABASE_NAMES: Record<DatabaseKey, string> = {
 /** The env var each database's connection string is read from — matches the seed's overrides so one `.env` drives both. */
 const DATABASE_ENV_VARS: Record<DatabaseKey, string> = {
   identity: 'E2E_PG_URL_IDENTITY',
+  memoir: 'E2E_PG_URL_MEMOIR',
   pulse: 'E2E_PG_URL_PULSE',
   webNovel: 'E2E_PG_URL_WEB_NOVEL',
   novelForge: 'E2E_PG_URL_NOVEL_FORGE',
@@ -77,6 +79,11 @@ export function pulseDb(): Sql {
 /** The web-novel database — novels, chapters, grants, reading progress, library, wiki. */
 export function webNovelDb(): Sql {
   return db('webNovel');
+}
+
+/** The shadow-memoir database — accounts, quests, quest logs, finance, quick logs, sync/command log. */
+export function memoirDb(): Sql {
+  return db('memoir');
 }
 
 /** The novel-forge database — projects and their cascade of authoring state. */
