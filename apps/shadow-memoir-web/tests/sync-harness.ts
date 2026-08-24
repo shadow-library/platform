@@ -1,4 +1,19 @@
-import { type DeltaPage, type KeyValueBacking, MemoirStore, SyncClient, SyncEngine, type WireCommandOutcome } from '@/lib/sync';
+import { memoirQueryClient } from '@/lib/data';
+import {
+  type DeltaPage,
+  type KeyValueBacking,
+  MemoirStore,
+  SyncClient,
+  SyncedAccountProvider,
+  SyncedDataProvider,
+  SyncedFinanceProvider,
+  SyncedHeroProvider,
+  type SyncedMemoirData,
+  SyncedQuickLogProvider,
+  SyncedReflectProvider,
+  SyncEngine,
+  type WireCommandOutcome,
+} from '@/lib/sync';
 
 export interface RecordedBatch {
   commandIds: string[];
@@ -90,4 +105,24 @@ export function createTestEngine(options: FakeServerOptions & { backing?: KeyVal
   const store = new MemoirStore(options.backing ?? sharedBacking());
   const engine = new SyncEngine({ store, client: new SyncClient({ fetchImpl: server.fetchImpl }), today: options.today ?? '2026-08-24' });
   return { engine, store, server };
+}
+
+/** The same composition `createSyncedMemoirData` builds in the app, over a test engine — for a screen that has to read and write through the sync layer rather than the fixtures. */
+export function createSyncedTestData(engine: SyncEngine): SyncedMemoirData {
+  const account = new SyncedAccountProvider(engine);
+  const finance = new SyncedFinanceProvider(engine);
+  const quickLogs = new SyncedQuickLogProvider(engine);
+  return {
+    engine,
+    provider: new SyncedDataProvider(engine),
+    hero: new SyncedHeroProvider(engine, account),
+    reflect: new SyncedReflectProvider(engine),
+    account,
+    finance,
+    quickLogs,
+    queryClient: memoirQueryClient(),
+    today: engine.today,
+    currency: 'EUR',
+    persona: 'active',
+  };
 }

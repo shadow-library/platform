@@ -1,8 +1,7 @@
-import { QueryClient } from '@tanstack/react-query';
 import { createContext, type ReactElement, type ReactNode, useContext, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { Alert, Button, toISODate } from '@shadow-library/ui';
 
-import { type MemoirData, memoirKeys, setFinanceProvider, setQuickLogProvider } from '@/lib/data';
+import { type MemoirData, memoirKeys, memoirQueryClient, setFinanceProvider, setQuickLogProvider } from '@/lib/data';
 
 import { MemoirStore } from './memoir-store';
 import { SyncEngine } from './sync-engine';
@@ -64,7 +63,7 @@ export function createSyncedMemoirData(options: { today?: string; store?: Memoir
     account,
     finance,
     quickLogs,
-    queryClient: new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } }),
+    queryClient: memoirQueryClient(),
     today,
     currency,
     persona: 'active',

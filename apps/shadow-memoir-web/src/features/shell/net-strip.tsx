@@ -1,3 +1,4 @@
+import { useLocation } from '@tanstack/react-router';
 import { type ReactElement, useEffect } from 'react';
 import { toast } from '@shadow-library/ui';
 
@@ -22,6 +23,7 @@ export function NetStrip(): ReactElement | null {
   const status = useSyncStatus();
   const engine = useSyncEngine();
   const overlays = useSystemOverlays();
+  const { pathname } = useLocation();
 
   useEffect(() => {
     for (const notice of status.notices) {
@@ -30,9 +32,10 @@ export function NetStrip(): ReactElement | null {
     }
   }, [status.notices, engine]);
 
+  /** Onboarding is a forced flow the owner cannot leave, so a sheet over it takes the pointer with nothing behind it to go back to. */
   useEffect(() => {
-    if (status.state === 'signed-out') overlays.open('session-expired');
-  }, [status.state, overlays]);
+    if (status.state === 'signed-out' && pathname !== '/onboarding') overlays.open('session-expired');
+  }, [status.state, pathname, overlays]);
 
   if (!engine || status.state === 'online') return null;
 

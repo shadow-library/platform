@@ -26,6 +26,16 @@ export interface MemoirData {
 }
 
 /**
+ * `networkMode: 'always'` is load-bearing, not a preference: React Query's default pauses every query and
+ * mutation while the browser reports itself offline, and this app's reads and writes are a local engine and
+ * an outbox that must run exactly then (ADR-0006). Under the default, "Mark complete" offline dispatched
+ * nothing at all — no optimistic apply, no queued command, nothing to flush on reconnect.
+ */
+export function memoirQueryClient(): QueryClient {
+  return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0, networkMode: 'always' }, mutations: { networkMode: 'always' } } });
+}
+
+/**
  * Finance and quick logs are reached through module-level singletons rather than this context — their
  * query hooks predate it — so composing a `MemoirData` also installs them. Building the fixture data is
  * what puts the fixture providers back, which is how a story or a component test undoes a sync flip.
@@ -46,7 +56,7 @@ export function createMemoirData(options: FixtureProviderOptions = {}): MemoirDa
     account: createAccountProvider({ persona, currency }),
     finance,
     quickLogs,
-    queryClient: new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } }),
+    queryClient: memoirQueryClient(),
     today,
     currency,
     persona,

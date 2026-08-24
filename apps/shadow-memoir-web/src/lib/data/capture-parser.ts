@@ -28,11 +28,49 @@ export interface CaptureContext {
   occurrences: CaptureTarget[];
 }
 
-const AMOUNT = /(?:€|\$|£)?\s?(\d+(?:[.,]\d{1,2})?)/;
+/**
+ * A number is only an amount when it stands on its own: never glued to a letter (`e2e`, `2e5`), never part
+ * of a longer digit run (a millisecond timestamp, an IBAN), and never more than nine digits.
+ */
+const AMOUNT = /(^|[^\w.,])((?:€|\$|£)\s?)?(\d{1,9}(?:[.,]\d{1,2})?)(?![\w.,]*\d)(\s?(?:€|\$|£))?/g;
 const FOOD = /coffee|lunch|dinner|groceries|food|takeaway|snack|breakfast/i;
+
+interface AmountMatch {
+  start: number;
+  end: number;
+  value: number;
+  currencyAdjacent: boolean;
+  decimalFormatted: boolean;
+}
 
 function decimal(value: string): number {
   return Number(value.replace(',', '.'));
+}
+
+/** A currency-marked number wins, then the first written as a decimal, then the first number at all. */
+function findAmount(text: string): AmountMatch | null {
+  const candidates: AmountMatch[] = [];
+  for (const match of text.matchAll(AMOUNT)) {
+    const digits = match[3] as string;
+    const start = match.index + (match[1] as string).length;
+    candidates.push({
+      start,
+      end: match.index + match[0].length,
+      value: decimal(digits),
+      currencyAdjacent: match[2] !== undefined || match[4] !== undefined,
+      decimalFormatted: /[.,]/.test(digits),
+    });
+  }
+
+  return candidates.find(candidate => candidate.currencyAdjacent) ?? candidates.find(candidate => candidate.decimalFormatted) ?? candidates[0] ?? null;
+}
+
+/** The line as typed, minus the amount token alone — the seam's doubled space is closed, nothing else is touched. */
+function noteWithout(text: string, amount: AmountMatch): string {
+  const before = text.slice(0, amount.start);
+  const after = text.slice(amount.end);
+  const joined = /\s$/.test(before) && /^\s/.test(after) ? before + after.slice(1) : before + after;
+  return joined.trim();
 }
 
 function matchQuest(query: string, occurrences: CaptureTarget[]): CaptureTarget | null {
@@ -144,10 +182,10 @@ export function parseCapture(raw: string, context: CaptureContext): CaptureParse
   const named = matchQuest(text, context.occurrences);
   if (named) return { status: 'draft', draft: questDraft(named) };
 
-  match = AMOUNT.exec(text);
-  if (match) {
-    const note = text.replace(match[0], '').trim();
-    const amount = decimal(match[1] as string);
+  const found = findAmount(text);
+  if (found) {
+    const note = noteWithout(text, found);
+    const amount = found.value;
     return {
       status: 'draft',
       draft: {

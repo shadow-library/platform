@@ -2,7 +2,7 @@ import { csrfSetCookie, ensureCsrfToken, resolveCsrfConfig } from '@shadow-libra
 
 import { type CommandBatchResponse, type CommandEnvelope, type DeltaPage, type DeltaResponse, type SyncDomain } from './sync.types';
 
-export type SyncFailureKind = 'unauthorized' | 'offline' | 'rejected' | 'server';
+export type SyncFailureKind = 'unauthorized' | 'forbidden' | 'offline' | 'rejected' | 'server';
 
 /** Every non-2xx the sync layer can act on, named — the engine branches on `kind`, never on a status number. */
 export class SyncTransportError extends Error {
@@ -29,8 +29,10 @@ export interface DeltaRequest {
 
 const SYNC_EPOCH_HEADER = 'x-sync-epoch';
 
+/** Only a 401 means the session itself is gone. A 403 refuses this one request — a CSRF token the server did not recognise, a guard this route applies — and retrying is the honest answer to it. */
 function classify(status: number): SyncFailureKind {
-  if (status === 401 || status === 403) return 'unauthorized';
+  if (status === 401) return 'unauthorized';
+  if (status === 403) return 'forbidden';
   if (status >= 400 && status < 500) return 'rejected';
   return 'server';
 }

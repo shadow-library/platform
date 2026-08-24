@@ -7,7 +7,7 @@ import { expect, test } from '@playwright/test';
  * Importing user defined packages
  */
 import { apiContext, requireProductUrl, storageStateFor } from '../../lib';
-import { createDailyQuest, ensureOnboarded, pullDelta } from './helpers';
+import { createDailyQuest, ensureOnboarded, hasQuestLogFor, pullDelta } from './helpers';
 
 /**
  * Defining types
@@ -47,14 +47,10 @@ test.describe('shadow memoir offline outbox', () => {
     await expect(netStrip).toBeHidden({ timeout: 20_000 });
 
     await expect
-      .poll(
-        async () => {
-          const delta = await pullDelta(ctx);
-          const logs = (delta.domains['quest_logs'] ?? []) as { occurrenceId?: string; occurrence_id?: string }[];
-          return logs.some(log => log.occurrenceId === occurrenceId || log.occurrence_id === occurrenceId);
-        },
-        { message: 'expected the offline-queued completion to flush and appear in a quest_logs delta', timeout: 20_000 },
-      )
+      .poll(async () => hasQuestLogFor(await pullDelta(ctx), occurrenceId), {
+        message: 'expected the offline-queued completion to flush and appear in a quest_logs delta',
+        timeout: 20_000,
+      })
       .toBe(true);
 
     await page.reload();

@@ -4,21 +4,9 @@ import { type ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 
 import { MemoirDataProvider, useJournal } from '@/lib/data';
-import {
-  type DeltaPage,
-  type KeyValueBacking,
-  SyncedAccountProvider,
-  SyncedDataProvider,
-  SyncedFinanceProvider,
-  SyncedHeroProvider,
-  type SyncedMemoirData,
-  SyncedQuickLogProvider,
-  SyncedReflectProvider,
-  type SyncEngine,
-  SyncEngineProvider,
-} from '@/lib/sync';
+import { type DeltaPage, type KeyValueBacking, SyncedDataProvider, SyncedQuickLogProvider, SyncEngineProvider } from '@/lib/sync';
 
-import { createTestEngine, sharedBacking } from './sync-harness';
+import { createSyncedTestData, createTestEngine, sharedBacking } from './sync-harness';
 
 const TODAY = '2026-08-24';
 
@@ -47,25 +35,6 @@ function dailyQuestRow(id: string, name: string): Record<string, unknown> {
 
 function page(overrides: Partial<DeltaPage>): DeltaPage {
   return { cursor: '1', hasMore: false, domains: {}, tombstones: [], ...overrides };
-}
-
-function buildSyncedData(engine: SyncEngine): SyncedMemoirData {
-  const account = new SyncedAccountProvider(engine);
-  const finance = new SyncedFinanceProvider(engine);
-  const quickLogs = new SyncedQuickLogProvider(engine);
-  return {
-    engine,
-    provider: new SyncedDataProvider(engine),
-    hero: new SyncedHeroProvider(engine, account),
-    reflect: new SyncedReflectProvider(engine),
-    account,
-    finance,
-    quickLogs,
-    queryClient: new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } }),
-    today: engine.today,
-    currency: 'EUR',
-    persona: 'active',
-  };
 }
 
 /**
@@ -148,7 +117,7 @@ describe('sync boot', () => {
         page({ cursor: '2', domains: { journal_entries: [{ id: 'j1', date: TODAY, text: updatedText, mood: 3, loggedAt: `${TODAY}T08:00:00.000Z`, rewarded: true }] } }),
       ],
     });
-    const data = buildSyncedData(engine);
+    const data = createSyncedTestData(engine);
     const ambientClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     function Wrapper({ children }: { children: ReactNode }): ReactNode {

@@ -92,6 +92,15 @@ export async function pullDelta(ctx: APIRequestContext, since = '0'): Promise<De
   return (await response.json()) as DeltaPage;
 }
 
+/**
+ * `quest_logs` delta rows carry `questId` and `date` — there is no `occurrenceId` column — so an occurrence
+ * is looked up by reassembling the id the client sends, never by a field the wire does not have.
+ */
+export function hasQuestLogFor(delta: DeltaPage, occurrenceId: string): boolean {
+  const logs = delta.domains['quest_logs'] ?? [];
+  return logs.some(log => `${String(log['questId'])}:${String(log['date'])}` === occurrenceId);
+}
+
 export interface AccountView {
   id: string;
   onboardingCompletedAt: string | null;

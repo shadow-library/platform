@@ -69,6 +69,32 @@ describe('parseCapture', () => {
     expect(parse.draft.command).toEqual({ type: 'quest.complete', occurrenceId: 'read-pages:2026-08-22' });
   });
 
+  describe('amount selection', () => {
+    const expenses: [string, number, string][] = [
+      ['coffee 3.50', 350, 'coffee'],
+      ['€4.20 lunch', 420, 'lunch'],
+      ['e2e coffee 1787599032026 3.50', 350, 'e2e coffee 1787599032026'],
+      ['2e5 experiment 12.00', 1200, '2e5 experiment'],
+      ['transfer DE89370400440532013000 25.00', 2500, 'transfer DE89370400440532013000'],
+      ['coffee 3.50 tip 1.00', 350, 'coffee tip 1.00'],
+      ['lunch 12 with mark', 1200, 'lunch with mark'],
+      ['taxi 18 €', 1800, 'taxi'],
+    ];
+
+    it.each(expenses)('should read %s as %d minor units with the note kept intact', (text, amountMinor, note) => {
+      const parse = parseCapture(text, context);
+      expect(parse.status).toBe('draft');
+      if (parse.status !== 'draft') return;
+      expect(parse.draft.command).toEqual({ type: 'expense.record', amountMinor, currency: 'EUR', note });
+    });
+
+    it('should never read a millisecond timestamp as an amount', () => {
+      const parse = parseCapture('e2e coffee 1787599032026', context);
+      if (parse.status !== 'draft') throw new Error('expected a draft');
+      expect(parse.draft.kind).toBe('journal');
+    });
+  });
+
   it('should keep the weight unit the owner typed', () => {
     const parse = parseCapture('172.5 lb', context);
     if (parse.status !== 'draft') throw new Error('expected a draft');
