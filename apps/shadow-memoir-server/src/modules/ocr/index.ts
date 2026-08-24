@@ -1,3 +1,4 @@
+export * from './in-cluster-structuring.client';
 export * from './ocr.controller';
 export * from './ocr.dto';
 export * from './ocr.module';

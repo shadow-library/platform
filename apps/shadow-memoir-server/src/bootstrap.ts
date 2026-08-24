@@ -23,6 +23,17 @@ declare module '@shadow-library/common' {
     'quotas.reschedule-cap': number;
 
     'ai.batch-window': string;
+    'ai.batch-window-start': string;
+    'ai.batch-window-end': string;
+    'ai.batch-poll-interval-minutes': number;
+    'ai.retry-poll-interval-minutes': number;
+    'ai.stuck-sweep-interval-minutes': number;
+    'ai.held-resume-interval-minutes': number;
+    'ai.max-attempts': number;
+    'ai.claim-batch-size': number;
+    'ai.free-history-months': number;
+    'ai.inference-url': string;
+    'ai.inference-timeout-ms': number;
     'ai.model': string;
     'ai.prompt-version': string;
     'ai.task-timeout-minutes': number;
@@ -99,8 +110,37 @@ Config.load('quotas.ai-paid-daily', { defaultValue: '30', validateType: 'number'
 Config.load('quotas.entry-daily-cap', { defaultValue: '200', validateType: 'number', reloadable: true });
 Config.load('quotas.reschedule-cap', { defaultValue: '3', validateType: 'number', reloadable: true });
 
-/** Local time-of-day (account tz, HH:mm) the nightly AI batch executor opens its claim loop. */
+/** Local time-of-day (account tz, HH:mm) the submission path quotes back as "ready tonight" (§15.1). */
 Config.load('ai.batch-window', { defaultValue: '02:00', reloadable: true });
+
+/**
+ * The executor's own window (§15.2) is account-agnostic server time — a batch drain serves every
+ * account at once, so it cannot be expressed in any one account's timezone the way `ai.batch-window`'s
+ * per-account promise is.
+ */
+Config.load('ai.batch-window-start', { defaultValue: '02:00', reloadable: true });
+Config.load('ai.batch-window-end', { defaultValue: '06:00', reloadable: true });
+Config.load('ai.batch-poll-interval-minutes', { defaultValue: '5', validateType: 'number', reloadable: true });
+
+/** Off-window poll that picks up only tasks a previous attempt requeued, so a transient inference failure retries within the day rather than waiting for the next night. */
+Config.load('ai.retry-poll-interval-minutes', { defaultValue: '15', validateType: 'number', reloadable: true });
+Config.load('ai.stuck-sweep-interval-minutes', { defaultValue: '10', validateType: 'number', reloadable: true });
+Config.load('ai.held-resume-interval-minutes', { defaultValue: '60', validateType: 'number', reloadable: true });
+
+/** §15.2: a task claimed this many times without finishing is terminal — `failed`, quota refunded. */
+Config.load('ai.max-attempts', { defaultValue: '3', validateType: 'number', reloadable: true });
+Config.load('ai.claim-batch-size', { defaultValue: '50', validateType: 'number', reloadable: true });
+
+/** PRD §6.4: free tier reads a trailing 3 months, paid reads full history. */
+Config.load('ai.free-history-months', { defaultValue: '3', validateType: 'number', reloadable: true });
+
+/**
+ * D6: in-cluster inference only — the client refuses to start against a host outside the cluster on a
+ * production deployment. Unset means no inference is configured at all, which the AI executor and the
+ * OCR structuring path both surface as unavailability rather than a fabricated answer.
+ */
+Config.load('ai.inference-url', { defaultValue: '' });
+Config.load('ai.inference-timeout-ms', { defaultValue: '120000', validateType: 'number', reloadable: true });
 Config.load('ai.model', { defaultValue: 'llama3.1' });
 Config.load('ai.prompt-version', { defaultValue: 'v1' });
 Config.load('ai.task-timeout-minutes', { defaultValue: '30', validateType: 'number', reloadable: true });
