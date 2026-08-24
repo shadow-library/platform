@@ -46,8 +46,8 @@ test.describe('shadow memoir onboarding', () => {
     await page.getByRole('group', { name: 'Stat' }).getByRole('button', { name: 'Mind' }).click();
     await page.getByRole('button', { name: 'Continue' }).click();
 
-    // Step 3 — recurrence.
-    await page.getByRole('button', { name: 'Every day' }).click();
+    // Step 3 — recurrence. The frequency picker is a `SegmentedControl` (radiogroup of radios), not buttons.
+    await page.getByRole('radio', { name: 'Every day' }).click();
     await page.getByRole('button', { name: 'Continue' }).click();
 
     // Step 4 — strictness.

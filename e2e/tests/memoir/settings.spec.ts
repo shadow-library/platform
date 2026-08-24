@@ -27,7 +27,11 @@ test.describe('shadow memoir settings', () => {
     await page.goto(`${url}/settings/notifications`);
     const toggle = page.getByLabel('Billing reminders by email');
     await expect(toggle).toBeVisible();
-    await toggle.setChecked(nextBillingReminders);
+    // The switch is controlled from the account query, not toggled optimistically — it only flips once the
+    // `notification.set` command's PATCH round-trip refetches. `setChecked` only clicks once and checks
+    // immediately after, which races that round-trip, so click and then wait for the attribute directly.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-checked', String(nextBillingReminders));
 
     await expect
       .poll(async () => (await getAccount(ctx)).notificationPrefs?.billingReminders, { message: 'expected the toggle to persist to the account' })

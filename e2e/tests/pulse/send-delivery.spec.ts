@@ -88,18 +88,22 @@ test.describe('send + delivery', () => {
     await identityCtx.dispose();
   });
 
-  test('should reject an empty recipients object with a schema validation error regardless of caller', async () => {
-    // Deliberately anonymous: `recipients: {}` fails `@Schema({minProperties:1})` in a Fastify preValidation
-    // hook that runs *before* the `@RequireScope` auth guard — confirmed live against both an authenticated
-    // and an unauthenticated caller, both 422. This is not the 400 the task brief assumed; class-schema
-    // validation failures on this stack are 422 (`VALIDATION_ERROR`), not 400.
-    const ctx = await apiContext('pulse');
-    const response = await ctx.post('/api/v1/notifications', { data: { templateKey: 'auth.register.otp', recipients: {} } });
-    expect(response.status()).toBe(422);
-    const body = (await response.json()) as { code?: string; fields?: { field: string; msg: string }[] };
-    expect(body.code).toBe('VALIDATION_ERROR');
-    expect(body.fields?.some(f => f.field.includes('recipients'))).toBe(true);
-  });
+  test.fixme(
+    'an anonymous caller reaching `@Schema({minProperties:1})` validation on `recipients: {}` before the ' +
+      '`@RequireScope` auth guard is no longer reachable from e2e: the platform now authenticates before ' +
+      'validating (packages/auth AuthGuard moved ahead of the Fastify preValidation hook), so a credential-less ' +
+      'caller 401s IAM_001 first regardless of body shape — see the passing test right below. The 422 ' +
+      '`VALIDATION_ERROR` shape asserted here is still real, just only reachable by the identity-server service ' +
+      'credential (see the file-level doc comment and the `test.fixme` below it), which e2e cannot forge.',
+    async () => {
+      const ctx = await apiContext('pulse');
+      const response = await ctx.post('/api/v1/notifications', { data: { templateKey: 'auth.register.otp', recipients: {} } });
+      expect(response.status()).toBe(422);
+      const body = (await response.json()) as { code?: string; fields?: { field: string; msg: string }[] };
+      expect(body.code).toBe('VALIDATION_ERROR');
+      expect(body.fields?.some(f => f.field.includes('recipients'))).toBe(true);
+    },
+  );
 
   test('should 401 IAM_001 for a well-formed send with no credential at all', async () => {
     const ctx = await apiContext('pulse');
