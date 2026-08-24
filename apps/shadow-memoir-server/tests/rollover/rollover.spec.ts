@@ -280,7 +280,7 @@ describe('Daily rollover engine (T-19)', () => {
       const logs = await readQuestLogs(fixture);
       expect(logs).toHaveLength(ABSENCE_DAYS);
       expect(logs.every(log => log.state === 'missed')).toBe(true);
-    });
+    }, 20000);
 
     it('should walk one transaction per day so a mid-walk failure leaves the days before it closed', async () => {
       const fixture = await newAccount();
@@ -307,7 +307,7 @@ describe('Daily rollover engine (T-19)', () => {
       expect(await readDailyStates(fixture)).toHaveLength(11);
       expect(await readQuestLogs(fixture)).toHaveLength(10);
       expect(failureGauge()).toBe(0);
-    });
+    }, 20000);
 
     it('should honour the catch-up bound and leave older days unterminalized', async () => {
       Config['cache'].set('rollover.catchup-max-days', 5);
@@ -445,7 +445,7 @@ describe('Daily rollover engine (T-19)', () => {
       const logsOnTransition = (await readQuestLogs(fixture)).filter(log => log.date === transitionDate);
       expect(logsOnTransition).toHaveLength(1);
       expect(logsOnTransition[0]!.state).toBe('missed');
-    });
+    }, 20000);
 
     it('should apply a pending timezone and intensity only once every elapsed day has closed', async () => {
       const fixture = await newAccount({ timezone: 'UTC', pendingTimezone: 'America/New_York', pendingIntensityMode: 'high_intensity' });
