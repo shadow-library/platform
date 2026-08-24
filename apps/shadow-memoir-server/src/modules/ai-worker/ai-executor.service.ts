@@ -11,6 +11,7 @@ import { Config, Logger } from '@shadow-library/common';
  */
 import { EntitlementService } from '@modules/billing';
 import { InferenceClient } from '@modules/inference';
+import { NotificationClient } from '@modules/notifications';
 import { SchedulerService } from '@modules/scheduler';
 import { APP_NAME } from '@server/constants';
 import { type AiTask } from '@server/database';
@@ -76,6 +77,7 @@ export class AiExecutorService implements OnModuleInit {
     private readonly readAssembly: ReadAssemblyService,
     private readonly entitlements: EntitlementService,
     private readonly inference: InferenceClient,
+    private readonly notifications: NotificationClient,
   ) {}
 
   /** No `memoir_ai` pool configured means no credential to run as; the sweeps stay unregistered rather than failing every tick, mirroring `EntitlementLapseService`. */
@@ -168,7 +170,7 @@ export class AiExecutorService implements OnModuleInit {
     }
 
     const result = outcome.result;
-    await this.repository.completeWithResult({
+    const aiResult = await this.repository.completeWithResult({
       accountId: task.accountId,
       taskId: task.id,
       answer: result.answer,
@@ -180,6 +182,10 @@ export class AiExecutorService implements OnModuleInit {
       promptVersion: Config.get('ai.prompt-version'),
     });
     await this.repository.recordAudit(task.accountId, task.id, 'finished');
+
+    /** Content-free by construction (T-34): only the result's id and suggestion count ever leave this process, never the answer/patterns/suggestions text itself. Enqueue-only — a pulse outage never fails a completed AI task. */
+    const suggestionCount = Array.isArray(aiResult.suggestions) ? aiResult.suggestions.length : 0;
+    await this.notifications.enqueue(task.accountId, 'aiResultReady', `ai-result-${aiResult.id}`, { resultId: String(aiResult.id), suggestionCount });
     return 'done';
   }
 

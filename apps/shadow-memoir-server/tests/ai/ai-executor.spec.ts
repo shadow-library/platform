@@ -167,6 +167,34 @@ describe('AI batch executor (T-33, ARCHITECTURE §15.2-§15.7)', () => {
     });
   });
 
+  describe('AI-result-ready notification hook (T-34)', () => {
+    it('should enqueue a content-free notification outbox row after a completed task, when the account opted in', async () => {
+      const accountId = await createAccount();
+      await db
+        .update(schema.accounts)
+        .set({ notificationPrefs: { aiReadiness: true } })
+        .where(eq(schema.accounts.id, accountId));
+      const taskId = await submitTask(accountId);
+
+      await executor.drain();
+
+      const [result] = await db.select().from(schema.aiResults).where(eq(schema.aiResults.taskId, taskId));
+      const [row] = await db.select().from(schema.notificationOutbox).where(eq(schema.notificationOutbox.accountId, accountId));
+      expect(row).toBeDefined();
+      expect(row!.templateKey).toBe('memoir-ai-result-ready');
+      expect(row!.variables).toEqual({ resultId: String(result!.id), suggestionCount: (result!.suggestions as unknown[]).length });
+    });
+
+    it('should enqueue nothing when the account has not opted in (default OFF)', async () => {
+      const accountId = await createAccount();
+      await submitTask(accountId);
+
+      await executor.drain();
+
+      expect(await db.select().from(schema.notificationOutbox).where(eq(schema.notificationOutbox.accountId, accountId))).toHaveLength(0);
+    });
+  });
+
   describe('execution-time revalidation (§15.3)', () => {
     it("should drop a deletion-marked account's task and refund its quota rather than executing it", async () => {
       const accountId = await createAccount({ deletionState: 'pending' });

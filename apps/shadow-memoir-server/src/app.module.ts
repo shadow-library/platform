@@ -7,6 +7,7 @@ import { AiWorkerModule } from './modules/ai-worker';
 import { CommandsModule } from './modules/commands';
 import { FinanceModule } from './modules/finance';
 import { MetricsModule } from './modules/metrics';
+import { NotificationsModule } from './modules/notifications';
 import { ProgressionModule } from './modules/progression';
 import { QuestsModule } from './modules/quests';
 import { QuickLogsModule } from './modules/quick-logs';
@@ -29,6 +30,7 @@ import { HttpRouteModule } from './routes';
     QuickLogsModule,
     ReconciliationModule,
     AiWorkerModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

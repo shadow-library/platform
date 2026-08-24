@@ -3,6 +3,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 
 import { BillingModule } from '@modules/billing';
 import { InferenceModule } from '@modules/inference';
+import { NotificationsModule } from '@modules/notifications';
 import { SchedulerModule } from '@modules/scheduler';
 import { DatastoreModule } from '@server/database';
 
@@ -20,7 +21,7 @@ import { ScheduledQueryRepository } from './scheduled-query.repository';
  * through `EntitlementService` on the API pool.
  */
 @Module({
-  imports: [DatabaseModule, DatastoreModule, SchedulerModule, BillingModule, InferenceModule],
+  imports: [DatabaseModule, DatastoreModule, SchedulerModule, BillingModule, InferenceModule, NotificationsModule],
   providers: [AiWorkerRepository, AiReadRepository, ScheduledQueryRepository, ReadAssemblyService, AiExecutorService],
   exports: [AiExecutorService, ReadAssemblyService],
 })

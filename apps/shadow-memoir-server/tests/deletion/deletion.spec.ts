@@ -184,6 +184,9 @@ describe('Resumable account deletion (T-30, ARCHITECTURE §21)', () => {
     await db.insert(schema.aiScheduledQueries).values({ accountId, queryText: 'seeded standing question' });
     await db.insert(schema.aiConsents).values({ accountId, dataClass: 'journal_reflection_reason' });
     await db.insert(schema.exportJobs).values({ id: Bun.randomUUIDv7(), accountId });
+    await db
+      .insert(schema.notificationOutbox)
+      .values({ accountId, category: 'ai_result_ready', templateKey: 'memoir-ai-result-ready', dedupeKey: 'seeded', variables: { resultId: '1', suggestionCount: 1 } });
   }
 
   async function countRows(accountId: bigint): Promise<number> {
@@ -193,7 +196,8 @@ describe('Resumable account deletion (T-30, ARCHITECTURE §21)', () => {
     const journals = await db.select({ id: schema.journalEntries.id }).from(schema.journalEntries).where(eq(schema.journalEntries.accountId, accountId));
     const entries = await db.select({ id: schema.metricEntries.id }).from(schema.metricEntries).where(eq(schema.metricEntries.accountId, accountId));
     const exportJobs = await db.select({ id: schema.exportJobs.id }).from(schema.exportJobs).where(eq(schema.exportJobs.accountId, accountId));
-    return logs.length + events.length + expenses.length + journals.length + entries.length + exportJobs.length + (await countAiRows(accountId));
+    const notifications = await db.select({ id: schema.notificationOutbox.id }).from(schema.notificationOutbox).where(eq(schema.notificationOutbox.accountId, accountId));
+    return logs.length + events.length + expenses.length + journals.length + entries.length + exportJobs.length + notifications.length + (await countAiRows(accountId));
   }
 
   async function countAiRows(accountId: bigint): Promise<number> {

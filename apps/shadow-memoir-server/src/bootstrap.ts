@@ -83,6 +83,13 @@ declare module '@shadow-library/common' {
     'export.retention-days': number;
     'export.cleanup-interval-minutes': number;
     'export.download-presign-seconds': number;
+
+    'notifications.sender-poll-interval-minutes': number;
+    'notifications.sender-batch-size': number;
+    'notifications.sender-max-attempts': number;
+    'notifications.billing-sweep-interval-minutes': number;
+    'notifications.billing-reminder-lead-days': number;
+    'notifications.digest-sweep-interval-minutes': number;
   }
 }
 
@@ -227,3 +234,11 @@ Config.load('export.retention-days', { defaultValue: '7', validateType: 'number'
 Config.load('export.cleanup-interval-minutes', { defaultValue: '60', validateType: 'number', reloadable: true });
 /** TTL of the presigned GET the status endpoint mints for a `done` job's manifest. */
 Config.load('export.download-presign-seconds', { defaultValue: '900', validateType: 'number', reloadable: true });
+
+/** T-34 (ARCHITECTURE §17/§4.5): the outbox drain cadence/batch/retry cap, and the two producer sweeps' own cadences. `billing-reminder-lead-days` is how far ahead of a trial/renewal expiry the reminder fires; grace/lapse fire immediately, keyed by their own state+date dedupe. */
+Config.load('notifications.sender-poll-interval-minutes', { defaultValue: '1', validateType: 'number', reloadable: true });
+Config.load('notifications.sender-batch-size', { defaultValue: '50', validateType: 'number', reloadable: true });
+Config.load('notifications.sender-max-attempts', { defaultValue: '5', validateType: 'number', reloadable: true });
+Config.load('notifications.billing-sweep-interval-minutes', { defaultValue: '60', validateType: 'number', reloadable: true });
+Config.load('notifications.billing-reminder-lead-days', { defaultValue: '3', validateType: 'number', reloadable: true });
+Config.load('notifications.digest-sweep-interval-minutes', { defaultValue: '60', validateType: 'number', reloadable: true });
