@@ -116,11 +116,11 @@ export abstract class OwnerScopedRepository {
   protected forAccount(accountId: bigint) {
     return {
       accountId,
-      scoped: <T extends OwnedTable>(table: T) =>
+      scoped: <T extends OwnedTable>(table: T, ...conditions: (SQL | undefined)[]) =>
         this.db
           .select()
           .from(table as unknown as AnyPgTable)
-          .where(eq(table.accountId, accountId)),
+          .where(and(eq(table.accountId, accountId), ...conditions)),
     };
   }
 

@@ -63,6 +63,11 @@ export class StorageService implements OnModuleInit {
     return ref;
   }
 
+  /** Writes `bytes` at the caller-supplied `ref`, bypassing content-addressing — for objects a ref scheme other than `save`'s already keys (e.g. a per-job export manifest). A re-put at the same ref overwrites it. */
+  putAt(ref: string, bytes: Uint8Array, contentType: string): Promise<void> {
+    return this.provider.put(ref, bytes, contentType);
+  }
+
   /** Reads the object at `ref`; throws `StorageErrorCode.OBJECT_NOT_FOUND` when it is absent. */
   read(ref: string): Promise<StorageObject> {
     return this.provider.get(ref);

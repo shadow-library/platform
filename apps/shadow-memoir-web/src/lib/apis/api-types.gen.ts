@@ -446,6 +446,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/account/export': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Request */
+    post: operations['post_api_v1_account_export'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/account/export/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Status */
+    get: operations['get_api_v1_account_export_id'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -853,6 +887,23 @@ export interface components {
       /** @description Where the account sits in the irreversible deletion state machine. 'none' means no deletion has been started; 'done' also answers for an account whose row has already been removed. From anything other than 'none' every other API surface refuses this account with ACC_002. */
       deletionState: components['schemas']['DeletionState'];
     };
+    ExportJobResponseDto: {
+      id: string;
+      status: components['schemas']['ExportJobStatus'];
+      /** Format: date-time */
+      requestedAt: string;
+      /** Format: date-time */
+      completedAt?: null | string;
+      /** @description Presigned `GET` URL for the assembled manifest; present only once `status` is `done` */
+      downloadUrl?: null | string;
+      /**
+       * Format: date-time
+       * @description When the manifest object and this job row are removed by the cleanup sweep
+       */
+      expiresAt?: null | string;
+    };
+    /** @enum {string} */
+    ExportJobStatus: 'pending' | 'running' | 'done' | 'failed';
   };
   responses: never;
   parameters: never;
@@ -2082,6 +2133,85 @@ export interface operations {
       };
     };
   };
+  post_api_v1_account_export: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExportJobResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_account_export_id: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The export job id */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExportJobResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
 }
 export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
 export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
@@ -2133,8 +2263,11 @@ export type AiScheduledQueryResponseDto = components['schemas']['AiScheduledQuer
 export type AiApplySuggestionDto = components['schemas']['AiApplySuggestionDto'];
 export type AppliedSuggestionResponseDto = components['schemas']['AppliedSuggestionResponseDto'];
 export type DeletionStatusDto = components['schemas']['DeletionStatusDto'];
+export type ExportJobResponseDto = components['schemas']['ExportJobResponseDto'];
+export type ExportJobStatus = components['schemas']['ExportJobStatus'];
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
 export type PullDeltaQueryParams = Exclude<paths['/api/v1/sync/delta']['get']['parameters']['query'], undefined>;
 export type DownloadPathParams = Exclude<paths['/api/v1/receipts/{ref}/download']['get']['parameters']['path'], undefined>;
+export type StatusPathParams = Exclude<paths['/api/v1/account/export/{id}']['get']['parameters']['path'], undefined>;

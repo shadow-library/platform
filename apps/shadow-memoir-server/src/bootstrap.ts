@@ -75,6 +75,14 @@ declare module '@shadow-library/common' {
     'identity.close-scope': string;
 
     'telemetry.pseudo-id-secret': string;
+
+    'export.max-per-day': number;
+    'export.page-size': number;
+    'export.claim-batch-size': number;
+    'export.assembler-interval-minutes': number;
+    'export.retention-days': number;
+    'export.cleanup-interval-minutes': number;
+    'export.download-presign-seconds': number;
   }
 }
 
@@ -206,3 +214,16 @@ Config.load('identity.close-scope', { defaultValue: 'users:close' });
 
 /** HMAC key for the analytics pseudo-id (§23) — an account id must never be recoverable from it. Ops-provisioned per env; the default is dev/test-only. */
 Config.load('telemetry.pseudo-id-secret', { defaultValue: 'dev-only-telemetry-pseudo-id-secret' });
+
+/** ARCHITECTURE §20 abuse guard: `RequestExport` is refused once this many jobs were requested for the account in the trailing 24h. Tunable. */
+Config.load('export.max-per-day', { defaultValue: '1', validateType: 'number', reloadable: true });
+/** Rows fetched per keyset page while the assembler streams a table — bounds per-query memory regardless of table size. */
+Config.load('export.page-size', { defaultValue: '1000', validateType: 'number', reloadable: true });
+/** Jobs claimed per assembler sweep tick (`FOR UPDATE SKIP LOCKED`, multi-replica-safe). */
+Config.load('export.claim-batch-size', { defaultValue: '5', validateType: 'number', reloadable: true });
+Config.load('export.assembler-interval-minutes', { defaultValue: '1', validateType: 'number', reloadable: true });
+/** §20: exports are a delivery mechanism, not retention — the manifest object and its row are deleted this many days after assembly. */
+Config.load('export.retention-days', { defaultValue: '7', validateType: 'number', reloadable: true });
+Config.load('export.cleanup-interval-minutes', { defaultValue: '60', validateType: 'number', reloadable: true });
+/** TTL of the presigned GET the status endpoint mints for a `done` job's manifest. */
+Config.load('export.download-presign-seconds', { defaultValue: '900', validateType: 'number', reloadable: true });

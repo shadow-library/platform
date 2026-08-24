@@ -241,4 +241,14 @@ export class AppErrorCode extends ServerErrorCode {
 
   /** The §6.6 post-filter refused the model output; the task fails and its quota is refunded rather than shipping an answer that breaks a guardrail */
   static readonly AI_010 = AppErrorCode.unavailable('AI_010', 'The generated answer was refused by the output guardrails');
+
+  /*!
+   * Account Export Errors
+   */
+
+  /** No export job with that id belongs to the caller; a foreign or nonexistent id reads exactly like a nonexistent one */
+  static readonly EXP_001 = AppErrorCode.notFound('EXP_001', 'Export job not found');
+
+  /** ARCHITECTURE §20: 1/day/account abuse guard (`export.max-per-day`, tunable) */
+  static readonly EXP_002 = AppErrorCode.conflict('EXP_002', 'Export request limit reached for today; try again later');
 }

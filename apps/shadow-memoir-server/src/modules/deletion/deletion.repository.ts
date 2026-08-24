@@ -78,6 +78,7 @@ const PURGE_ORDER = [
   'progress_counters',
   'entitlements',
   'billing_events',
+  'export_jobs',
 ] as const;
 
 const TERMINAL_STATES: Account.DeletionState[] = ['none', 'done'];
