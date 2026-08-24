@@ -72,12 +72,12 @@ describe('BootstrapService', () => {
     expect(pulseApps).toHaveLength(1);
 
     const clients = await env.getPostgresClient().select().from(schema.oauthClients);
-    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'novel-forge', 'pulse', 'web-novel']);
+    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'novel-forge', 'pulse', 'shadow-memoir', 'web-novel']);
   });
 
   it('should seed the ecosystem applications, their clients and the notification access rule', async () => {
     const applications = await env.getPostgresClient().select().from(schema.applications);
-    expect(applications.map(app => app.name).sort()).toEqual(['novel-forge', 'pulse', 'shadow-identity', 'web-novel']);
+    expect(applications.map(app => app.name).sort()).toEqual(['novel-forge', 'pulse', 'shadow-identity', 'shadow-memoir', 'web-novel']);
 
     const pulse = env.getService(ApplicationService).getApplication('pulse');
     expect(pulse?.roles.map(role => role.roleName).sort()).toEqual(['PulseAdmin', 'PulseOperator', 'PulseViewer']);
@@ -86,7 +86,7 @@ describe('BootstrapService', () => {
     expect(pulsePermissions).toEqual(expect.arrayContaining(['pulse:templates:read', 'pulse:templates:write', 'pulse:templates:publish', 'pulse:layouts:write']));
 
     const clients = await env.getPostgresClient().select().from(schema.oauthClients);
-    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'novel-forge', 'pulse', 'web-novel']);
+    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'novel-forge', 'pulse', 'shadow-memoir', 'web-novel']);
 
     const pulseClient = clients.find(client => client.id === 'pulse');
     expect(pulseClient?.grantTypes).toEqual(expect.arrayContaining(['authorization_code', 'client_credentials', 'urn:ietf:params:oauth:grant-type:token-exchange']));
@@ -98,6 +98,27 @@ describe('BootstrapService', () => {
     const accessRules = await env.getPostgresClient().select().from(schema.serviceRouteAccess);
     const notificationRule = accessRules.find(rule => rule.callerClientId === 'identity-server' && rule.pathPattern === '/api/v1/notifications');
     expect(notificationRule?.method).toBe('POST');
+
+    const memoirNotificationRule = accessRules.find(rule => rule.callerClientId === 'shadow-memoir' && rule.pathPattern === '/api/v1/notifications');
+    expect(memoirNotificationRule?.method).toBe('POST');
+  });
+
+  it('should seed shadow-memoir with its own scopes, sensitive destructive scope, and platform grants', async () => {
+    const clientService = env.getService(OAuthClientService);
+    const description = await clientService.describeApplication('shadow-memoir');
+    const resource = (await env.getPostgresClient().select().from(schema.apiResources)).find(row => row.identifier === 'api://shadow-memoir');
+    expect(resource).not.toBeUndefined();
+
+    const scopes = resource ? await env.getPostgresClient().select().from(schema.scopes).where(eq(schema.scopes.apiResourceId, resource.id)) : [];
+    expect(scopes.map(scope => scope.name).sort()).toEqual(['memoir:account', 'memoir:destructive', 'memoir:sync']);
+    expect(scopes.find(scope => scope.name === 'memoir:destructive')?.isSensitive).toBe(true);
+    expect(scopes.find(scope => scope.name === 'memoir:sync')?.isSensitive).toBe(false);
+
+    const grantedScopes = await clientService.getGrantedScopeNames('shadow-memoir');
+    expect(grantedScopes).toEqual(expect.arrayContaining(['app-session:manage', 'users:resolve']));
+
+    const pulseGrant = description?.grants.find(grant => grant.audience === 'api://pulse');
+    expect(pulseGrant?.scopes).toContain('notifications:send');
   });
 
   it('should provision novel-forge and web-novel exactly like pulse (client, grants, token-exchange)', async () => {
@@ -145,6 +166,7 @@ describe('BootstrapService', () => {
     expect(subjectOf('pulse')).toEqual(['system:serviceaccount:pulse:pulse-server']);
     expect(subjectOf('novel-forge')).toEqual(['system:serviceaccount:novel-forge:novel-forge-server']);
     expect(subjectOf('web-novel')).toEqual(['system:serviceaccount:web-novel:web-novel-server']);
+    expect(subjectOf('shadow-memoir')).toEqual(['system:serviceaccount:shadow-memoir:shadow-memoir-server']);
 
     expect(clients.find(client => client.id === 'novel-forge-service')).toBeUndefined();
   });
@@ -159,11 +181,14 @@ describe('BootstrapService', () => {
   it('should derive each app relying party redirect URI from the issuer host', async () => {
     const redirects = (await env.getService(OAuthClientService).getClientDetail('pulse'))?.redirectUris ?? [];
     expect(redirects).toContain('https://pulse.shadow-apps.com/api/auth/callback');
+
+    const memoirRedirects = (await env.getService(OAuthClientService).getClientDetail('shadow-memoir'))?.redirectUris ?? [];
+    expect(memoirRedirects).toContain('https://shadow-memoir.shadow-apps.com/api/auth/callback');
   });
 
   it('should register first-party API resources and the service-only publish scope', async () => {
     const resources = await env.getPostgresClient().select().from(schema.apiResources);
-    expect(resources.map(resource => resource.identifier).sort()).toEqual(['api://novel-forge', 'api://pulse', 'api://web-novel', 'shadow-identity']);
+    expect(resources.map(resource => resource.identifier).sort()).toEqual(['api://novel-forge', 'api://pulse', 'api://shadow-memoir', 'api://web-novel', 'shadow-identity']);
 
     const publishScope = (await env.getPostgresClient().select().from(schema.scopes)).find(scope => scope.name === 'web-novel:publish');
     expect(publishScope?.principalType).toBe('SERVICE');

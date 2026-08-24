@@ -127,7 +127,10 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
         { name: 'PulseAdmin', description: 'Full control over pulse templates, senders and configuration', permissions: PULSE_ADMIN_PERMISSIONS, grantToBootstrapAdmin: true },
       ],
       grants: [AUTHZ_CHECK, AUTHZ_ROLES_SYNC, APP_SESSION],
-      serviceAccess: [{ callerClientId: 'identity-server', method: 'POST', pathPattern: '/api/v1/notifications' }],
+      serviceAccess: [
+        { callerClientId: 'identity-server', method: 'POST', pathPattern: '/api/v1/notifications' },
+        { callerClientId: 'shadow-memoir', method: 'POST', pathPattern: '/api/v1/notifications' },
+      ],
     },
     {
       name: 'novel-forge',
@@ -150,6 +153,18 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       ],
       grants: [AUTHZ_CHECK, APP_SESSION, USERS_RESOLVE],
       serviceAccess: [{ callerClientId: 'novel-forge', method: '*', pathPattern: '/internal/*' }],
+    },
+    {
+      name: 'shadow-memoir',
+      displayName: 'Shadow Memoir',
+      description: 'Personal finance and life-progression companion for the Shadow ecosystem',
+      resourceName: 'Shadow Memoir API',
+      scopes: [
+        { name: 'memoir:sync', description: 'Read and write client sync state and commands', principalType: 'USER' },
+        { name: 'memoir:account', description: 'Manage profile, settings, consents and data export', principalType: 'USER' },
+        { name: 'memoir:destructive', description: 'Delete the account and its data', isSensitive: true, principalType: 'USER' },
+      ],
+      grants: [APP_SESSION, USERS_RESOLVE, { resource: 'api://pulse', scope: 'notifications:send' }],
     },
   ],
   serviceClients: [
