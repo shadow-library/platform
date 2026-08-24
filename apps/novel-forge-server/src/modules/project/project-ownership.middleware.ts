@@ -11,8 +11,8 @@ import { type PrimaryDatabase, schema } from '@server/database';
 /**
  * Object-level authorization for every project-scoped route (audit finding NF-BOLA-01). The class-level
  * `@Authenticated()` on each controller proves *who* the caller is; this guard proves the caller *owns*
- * the project the route addresses. It runs just after the package `AuthGuard` (lower weight, same hook,
- * once the principal is in context) and, for any route that carries a project identifier in its path,
+ * the project the route addresses. It runs after the package `AuthGuard`, which authenticates a stage
+ * earlier on `preValidation`, and, for any route that carries a project identifier in its path,
  * loads that project's `owner_id` and rejects the request unless it matches the caller. A missing project
  * or a null `owner_id` is treated as a denial — the response is always a 404 (`PRJ_001`) so a probing
  * caller cannot distinguish "not yours" from "does not exist". Routes without a project param (project

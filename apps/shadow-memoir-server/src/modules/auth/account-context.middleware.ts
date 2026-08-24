@@ -28,10 +28,10 @@ const ALLOW_DURING_DELETION: unique symbol = Symbol('shadow-memoir:allow-during-
 export const AllowDuringDeletion = (): ClassDecorator & MethodDecorator => Handler({ [ALLOW_DURING_DELETION]: true });
 
 /**
- * Resolves the caller's account immediately after `AuthGuard` (weight 100) sets the principal, so
- * every downstream handler and `OwnerScopedRepository.scoped()` call can read it back synchronously. A
- * lower weight runs later on the same `preHandler` hook (the `ProjectOwnershipGuard` precedent, weight
- * 50, documents this explicitly), so this sits just under `AuthGuard`'s 100. Only user principals get
+ * Resolves the caller's account after `AuthGuard` sets the principal, so every downstream handler and
+ * `OwnerScopedRepository.scoped()` call can read it back synchronously. The guard runs a stage earlier,
+ * on `preValidation`, so the principal is already in context by the time any `preHandler` runs; the
+ * weight only orders this against the other `preHandler` middlewares. Only user principals get
  * an account — service callers reach user-owned tables exclusively through
  * `OwnerScopedRepository.forAccount()`, never this context, so a service token resolves nothing here.
  */

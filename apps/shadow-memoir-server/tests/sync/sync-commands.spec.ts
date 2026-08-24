@@ -189,4 +189,11 @@ describe('POST /api/v1/sync/commands (T-16)', () => {
       .body({ commands: [envelope(READ_COMMAND)] });
     expect(response.statusCode).toBe(401);
   });
+
+  it('should answer an unauthenticated request with 401 before validating its body', async () => {
+    const response = await router.mockRequest().post('/api/v1/sync/commands').body({ commands: [] });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).not.toHaveProperty('fields');
+  });
 });

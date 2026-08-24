@@ -9,8 +9,8 @@ import { APP_NAME } from '@server/constants';
  * Defence-in-depth over the scope guard for the `/internal/*` surface: `web-novel:publish` must only
  * ever ride an identity-issued M2M token, but the auth guard runs its service-access allowlist only
  * for service principals — a user-kind token that somehow carried the scope would pass on scope
- * alone. This preHandler runs just after the auth guard (lower weight, same phase, once the
- * principal is in context) and rejects any non-service principal before it can drive a mutation.
+ * alone. This preHandler runs after the auth guard — the guard authenticates a stage earlier, on
+ * `preValidation` — and rejects any non-service principal before it can drive a mutation.
  */
 
 @Middleware({ type: 'preHandler', weight: 50 })

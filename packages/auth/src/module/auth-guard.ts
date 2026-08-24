@@ -58,7 +58,16 @@ const isNavigation = (request: GuardedRequest, method: string): boolean => {
   return method.toUpperCase() === 'GET' && typeof accept === 'string' && accept.includes('text/html');
 };
 
-@Middleware({ type: 'preHandler', weight: 100 })
+/**
+ * Runs at `preValidation`, one lifecycle stage ahead of the schema validation Fastify wires through
+ * `setValidatorCompiler`. On `preHandler` the validator answered first, so an unauthenticated caller
+ * sending a malformed body got a 422 describing the route's schema instead of a 401 — a shape oracle
+ * for anyone who could reach the URL. The guard reads only headers, cookies and the route's static
+ * metadata, so it has nothing to gain from the parsed body and loses nothing by running earlier.
+ * Every other guard stays on `preHandler`: they read params, the body, or the principal this one
+ * puts in context, and the stage ordering keeps them strictly downstream of it.
+ */
+@Middleware({ type: 'preValidation', weight: 100 })
 export class AuthGuard {
   private readonly logger = Logger.getLogger(NAMESPACE, AuthGuard.name);
 
