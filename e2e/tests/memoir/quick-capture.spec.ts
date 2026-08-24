@@ -50,6 +50,8 @@ test.describe('shadow memoir quick capture', () => {
     await page.getByPlaceholder('Write as much or as little as you like. One line counts.').fill(entryText);
     await page.getByRole('button', { name: 'Save entry' }).click();
 
-    await expect(page.getByText(entryText)).toBeVisible();
+    // The saved entry legitimately renders twice — the list row and a preview excerpt elsewhere on the
+    // page — so an unscoped text match is ambiguous under strict mode; `.first()` just needs any instance.
+    await expect(page.getByText(entryText).first()).toBeVisible();
   });
 });

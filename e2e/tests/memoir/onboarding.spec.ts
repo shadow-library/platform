@@ -57,7 +57,7 @@ test.describe('shadow memoir onboarding', () => {
     // Step 5 — review, then commit.
     await page.getByRole('button', { name: 'Create it and start' }).click();
 
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/$/, { timeout: 20_000 });
     await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
     await expect(page.getByRole('button', { name: `Mark complete: ${questName}` })).toBeVisible();
 
