@@ -203,6 +203,7 @@ export function projectWorldState(rows: Partial<DomainRows>, today: string): Mem
       crown: { label: '', dayIndex: 0, dayCount: 7, keptPercent: 0 },
     },
     activity: [],
+    scheduleEndMinutes: account ? number(account, 'scheduleEndMin', 1380) : null,
     metrics: {},
     locks,
   };

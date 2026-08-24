@@ -1,14 +1,16 @@
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
-import { Alert, Badge, Button, Card, DescriptionList, FormField, Input, SegmentedControl, Select, Slider, Tag, TimePicker, toast } from '@shadow-library/ui';
+import { Alert, Badge, Button, Card, DescriptionList, FormField, Input, SegmentedControl, Select, Slider, Tag, TimePicker, toast, toISODate } from '@shadow-library/ui';
 
 import {
+  type QuestDraft,
   STAT_LABELS,
   type StatAffinity,
   type Strictness,
   STRICTNESS_LABELS,
   STRICTNESS_RULES,
   useAccountCommand,
+  useCommand,
   useDayPreferences,
   type Weekday,
   WEEKDAY_LABELS,
@@ -63,6 +65,7 @@ export function OnboardingScreen(): ReactElement {
   const navigate = useNavigate();
   const day = useDayPreferences();
   const command = useAccountCommand();
+  const questCommand = useCommand();
   const [step, setStep] = useState(0);
   const [currency, setCurrency] = useState('EUR');
   const [wakeTime, setWakeTime] = useState('06:30');
@@ -84,13 +87,43 @@ export function OnboardingScreen(): ReactElement {
     setDays(current => (current.includes(weekday) ? current.filter(item => item !== weekday) : [...current, weekday]));
   };
 
+  const draft = (): QuestDraft => ({
+    name: questName,
+    notes: null,
+    startTimeMinutes: null,
+    durationMinutes: 10,
+    statAffinity: stat,
+    strictness,
+    optionalStreakOptIn: strictness === 'optional',
+    recurrence: {
+      frequency: recurrence === 'chosen' ? 'weekly' : 'daily',
+      interval: 1,
+      daysOfWeek: recurrence === 'chosen' ? days : [],
+      dayOfMonth: null,
+      startDate: toISODate(new Date()),
+      end: { kind: 'never' },
+      exceptions: [],
+    },
+    consequences: [],
+    moduleLink: null,
+    notification: { enabled: false, leadMinutes: 0 },
+    healthThreshold: null,
+    preCommit: false,
+    active: true,
+  });
+
+  /** The quest is created after the account is onboarded, because the gate on `/` only lets go once `onboarding_completed_at` is set. */
   const finish = (): void => {
     command.mutate(
       { type: 'onboarding.complete', submission: { currency, timezone, wakeTime, sleepTime } },
       {
-        onSuccess: result => {
-          if (result.status === 'rejected') toast.neutral(result.message);
-          else void navigate({ to: '/' });
+        onSuccess: async result => {
+          if (result.status === 'rejected') {
+            toast.neutral(result.message);
+            return;
+          }
+          await questCommand.mutateAsync({ type: 'quest.create', draft: draft() });
+          await navigate({ to: '/' });
         },
       },
     );

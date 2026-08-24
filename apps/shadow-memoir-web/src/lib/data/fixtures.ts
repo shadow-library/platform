@@ -1,6 +1,6 @@
 import { type OccurrenceState, type Quest, type QuestProgress, type Recurrence, type StatAffinity, type Strictness, type Weekday } from './quest.types';
 import { shiftDate, WEEKDAYS } from './labels';
-import { type ActivityEntry, type HeroState, type QuickLogTile } from './view.types';
+import { type ActivityEntry, type HeroState } from './view.types';
 
 export type Persona = 'new' | 'active' | 'recovery';
 
@@ -328,15 +328,6 @@ const ACTIVITY_BY_PERSONA: Record<Persona, ActivityEntry[]> = {
     { id: 'a3', text: 'Returning after eight days away', when: '3 days ago', rewarded: false },
   ],
 };
-
-export const QUICK_LOG_TILES: QuickLogTile[] = [
-  { id: 'expense', label: 'Expense', value: '€18.40 today', to: '/finance' },
-  { id: 'meal', label: 'Meal', value: '1,860 kcal', to: '/log' },
-  { id: 'steps', label: 'Steps', value: '6,240', to: '/log' },
-  { id: 'water', label: 'Water', value: '1.4 l', to: '/log' },
-  { id: 'weight', label: 'Weight', value: '78.4 kg', to: '/log' },
-  { id: 'journal', label: 'Journal', value: 'not yet', to: '/log' },
-];
 
 export function seed(today: string, persona: Persona): SeedResult {
   const seeds = persona === 'new' ? [] : persona === 'recovery' ? RECOVERY_SEEDS : [...ACTIVE_SEEDS, ...INACTIVE_SEEDS];

@@ -49,7 +49,7 @@ export class SyncedHeroProvider implements HeroProvider {
   ) {
     this.grants = projectHeroGrants(sync.domains());
     this.narrative = createHeroProvider({ persona: 'active', hero: sync.world().hero });
-    sync.subscribeWorld(() => void (this.pending = this.pending.then(() => this.reproject())));
+    sync.subscribeProjection(() => (this.pending = this.pending.then(() => this.reproject())));
   }
 
   async reproject(): Promise<void> {

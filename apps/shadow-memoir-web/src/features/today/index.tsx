@@ -4,7 +4,7 @@ import { Alert, Button, Card, EmptyState, Skeleton } from '@shadow-library/ui';
 
 import { QuestRow } from '@/features/quests/quest-row';
 import { useQuestActions } from '@/features/quests/quest-actions';
-import { formatDayName, type QuestOccurrence, useCommand, useDay, useMemoirData } from '@/lib/data';
+import { formatDayName, type QuestOccurrence, useCommand, useDay, useMemoirData, useQuickLogTiles } from '@/lib/data';
 
 import { DayRail } from './day-rail';
 import { HeroCard } from './hero-card';
@@ -14,6 +14,7 @@ export function TodayScreen(): ReactElement {
   const { today } = useMemoirData();
   const navigate = useNavigate();
   const day = useDay();
+  const tiles = useQuickLogTiles();
   const command = useCommand();
   const actions = useQuestActions();
 
@@ -111,7 +112,7 @@ export function TodayScreen(): ReactElement {
             ) : null}
           </div>
 
-          <DayRail quickLogs={day.data.quickLogs} streaks={day.data.streaks} upcoming={day.data.upcoming} activity={day.data.activity} />
+          <DayRail quickLogs={tiles.data ?? []} streaks={day.data.streaks} upcoming={day.data.upcoming} activity={day.data.activity} />
         </div>
       ) : null}
 

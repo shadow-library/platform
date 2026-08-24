@@ -44,7 +44,7 @@ export class SyncedFinanceProvider implements FinanceProvider {
 
   constructor(private readonly sync: SyncEngine) {
     this.state = toState(projectFinanceRows(sync.domains()), sync.today);
-    sync.subscribeWorld(() => void (this.pending = this.pending.then(() => this.reproject())));
+    sync.subscribeProjection(() => (this.pending = this.pending.then(() => this.reproject())));
   }
 
   /** Rebuilds from the server's rows, then replays whatever is still queued over them — an acked command has left the queue, so the replay cannot double it. */

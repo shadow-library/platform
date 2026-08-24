@@ -47,10 +47,11 @@ export class SyncEngine {
   private readonly client: SyncClient;
   private readonly maxPages: number;
   private readonly listeners = new Set<() => void>();
+  private readonly projectionListeners = new Set<() => Promise<void>>();
   private readonly worldListeners = new Set<() => void>();
   private readonly rows: Partial<DomainRows> = {};
 
-  private snapshot: SyncSnapshot = { state: isOnline() ? 'online' : 'offline', queuedCount: 0, lastSyncedAt: null, notices: [] };
+  private snapshot: SyncSnapshot = { state: isOnline() ? 'online' : 'offline', queuedCount: 0, lastSyncedAt: null, notices: [], initError: null };
   private deviceId: string | undefined;
   private inFlight: Promise<void> | null = null;
 
@@ -77,6 +78,16 @@ export class SyncEngine {
     return () => void this.worldListeners.delete(listener);
   }
 
+  /**
+   * A provider's derived cache. These settle before any world listener runs, because a listener that
+   * refetches would otherwise read the projection the rows just replaced and cache the stale answer with
+   * nothing left to invalidate it.
+   */
+  subscribeProjection(listener: () => Promise<void>): () => void {
+    this.projectionListeners.add(listener);
+    return () => void this.projectionListeners.delete(listener);
+  }
+
   world(): ReturnType<typeof projectWorldState> {
     return projectWorldState(this.rows, this.options.today);
   }
@@ -90,9 +101,19 @@ export class SyncEngine {
     return this.options.today;
   }
 
-  /** Hydrates the projected world from IndexedDB, then attempts one sync pass. A cold offline launch stops after the hydrate. */
+  /**
+   * Hydrates the projected world from IndexedDB, then attempts one sync pass. A cold offline launch stops
+   * after the hydrate. A hydrate that throws — a browser that refuses storage, a mirror the projection
+   * cannot read — is recorded rather than left as a rejected promise, so the shell can say what happened
+   * instead of rendering an empty day forever.
+   */
   async start(): Promise<void> {
-    await this.hydrate();
+    try {
+      await this.hydrate();
+    } catch (error) {
+      return this.patch({ initError: error instanceof Error ? error.message : 'The local store could not be opened.' });
+    }
+    this.patch({ initError: null });
     await this.sync();
   }
 
@@ -208,6 +229,7 @@ export class SyncEngine {
 
   private async hydrateRows(): Promise<void> {
     for (const domain of SYNC_DOMAINS) this.rows[domain] = await this.store.readDomain(domain);
+    await Promise.all([...this.projectionListeners].map(listener => listener()));
     for (const listener of this.worldListeners) listener();
   }
 

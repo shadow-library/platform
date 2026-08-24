@@ -6,7 +6,7 @@ import { getFinanceProvider } from './finance.provider';
 import { isCurrencyCode } from './finance.rules';
 import { getQuickLogProvider } from './quick-logs.provider';
 import { lbToKg } from './quick-logs.rules';
-import { type Persona, QUICK_LOG_TILES, seed } from './fixtures';
+import { type Persona, seed } from './fixtures';
 import { formatDuration, formatMonth, formatRange, formatTime, shiftDate, startOfWeek, STATE_LABELS, STRICTNESS_LABELS, WEEKDAY_LABELS, weekdayOf, WEEKDAYS } from './labels';
 import {
   type OccurrenceState,
@@ -64,6 +64,8 @@ export interface MemoirWorldState {
   logs: Map<string, LogRecord>;
   hero: HeroState;
   activity: ActivityEntry[];
+  /** Minute of the local day the wake window closes, from the account row; null when no account has been mirrored yet. */
+  scheduleEndMinutes: number | null;
   metrics: Record<string, number>;
   locks: Set<string>;
 }
@@ -84,9 +86,15 @@ function occurrenceKey(questId: string, date: string): string {
   return `${questId}:${date}`;
 }
 
+/** `daysOfWeek` is a weekly-only field on the wire (`toRecurrenceRule`), so a daily or monthly quest carries none and must be matched on its frequency instead. */
 function isScheduled(quest: Quest, date: string): boolean {
-  if (quest.recurrence.exceptions.includes(date)) return false;
-  return quest.recurrence.daysOfWeek.includes(weekdayOf(date));
+  const { recurrence } = quest;
+  if (recurrence.exceptions.includes(date)) return false;
+  if (recurrence.startDate !== '' && date < recurrence.startDate) return false;
+  if (recurrence.end.kind === 'until' && date > recurrence.end.date) return false;
+  if (recurrence.frequency === 'daily') return true;
+  if (recurrence.frequency === 'monthly') return Number(date.slice(8)) === (recurrence.dayOfMonth ?? Number(recurrence.startDate.slice(8)));
+  return recurrence.daysOfWeek.includes(weekdayOf(date));
 }
 
 function scheduleSummary(quest: Quest): string {
@@ -148,6 +156,7 @@ export function seedWorldState(options: FixtureProviderOptions = {}): MemoirWorl
     logs: new Map(),
     hero: seeded.hero,
     activity: seeded.activity,
+    scheduleEndMinutes: null,
     metrics: seeded.metrics,
     locks: persona === 'active' ? new Set([today, shiftDate(today, 1)]) : new Set(),
   };
@@ -214,6 +223,15 @@ export class MemoirEngine implements DataProvider {
       .sort((a, b) => (a.startTimeMinutes ?? 1440) - (b.startTimeMinutes ?? 1440));
   }
 
+  /** Only today has a window still running down; another day's remaining time is not a fact about now. */
+  private wakeWindowNote(date: string): string {
+    const closesAt = this.state.scheduleEndMinutes;
+    if (closesAt === null || date !== this.state.today) return '';
+    const now = new Date();
+    const remaining = closesAt - (now.getHours() * 60 + now.getMinutes());
+    return remaining <= 0 ? 'the wake window has closed' : `about ${formatDuration(remaining)} of wake window left`;
+  }
+
   async getDay(date: string): Promise<DayView> {
     const occurrences = this.scheduledOn(date);
     const resolved = occurrences.filter(item => item.state !== 'upcoming');
@@ -232,8 +250,7 @@ export class MemoirEngine implements DataProvider {
               body: 'Your streaks from before the break are kept as history, and your XP was never touched. The load is reduced to three quests a day until Sunday, and two shields are active. You can lift the reduction whenever you want.',
             }
           : null,
-      wakeWindowNote: this.state.persona === 'recovery' ? 'no HP at stake today' : 'about 1h 20m of wake window left',
-      quickLogs: QUICK_LOG_TILES,
+      wakeWindowNote: this.state.persona === 'recovery' ? 'no HP at stake today' : this.wakeWindowNote(date),
       streaks: this.streakBoard(date),
       upcoming: this.upcoming(date),
       activity: this.state.activity,
@@ -245,8 +262,6 @@ export class MemoirEngine implements DataProvider {
               detail: [
                 `${completed.length} of ${occurrences.length} quests completed.`,
                 skipped.length > 0 ? `${skipped.length} skipped with a reason.` : null,
-                '2 quick logs.',
-                '€18.40 spent.',
                 `HP ${this.state.hero.hp} of ${this.state.hero.hpMax}.`,
               ]
                 .filter(Boolean)

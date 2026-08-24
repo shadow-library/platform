@@ -2,6 +2,8 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 import { addDays, toISODate } from '@shadow-library/ui';
 
 import { deriveCapAdvisory } from './entry-caps';
+import { type CurrencyCode } from './finance.types';
+import { type QuickLogTile } from './view.types';
 import {
   averageOf,
   deriveThresholdOffer,
@@ -11,6 +13,7 @@ import {
   journalExcerpt,
   journalWordCount,
   nextSideQuestReward,
+  quickLogTiles,
   rewardedSideQuestsOn,
   sameDayWeight,
   snapshotPresetToMeal,
@@ -37,6 +40,8 @@ import {
 } from './quick-logs.types';
 
 export interface QuickLogProvider {
+  /** The Today rail's counters for `date`, in the account's home currency. */
+  tiles(date: string, currency: CurrencyCode): Promise<QuickLogTile[]>;
   journal(): Promise<JournalView>;
   meals(date: string): Promise<MealsView>;
   weight(): Promise<WeightView>;
@@ -247,6 +252,10 @@ const METRIC_TRENDS: Record<HealthMetricKey, string> = {
 
 export class FixtureQuickLogProvider implements QuickLogProvider {
   private state = createState();
+
+  async tiles(date: string, currency: CurrencyCode): Promise<QuickLogTile[]> {
+    return quickLogTiles({ date, currency, expenses: [], meals: this.state.meals, metrics: this.state.metrics, weights: this.state.weights, journal: this.state.journal });
+  }
 
   async journal(): Promise<JournalView> {
     const todaysEntry = this.state.journal.find(entry => entry.date === today()) ?? null;

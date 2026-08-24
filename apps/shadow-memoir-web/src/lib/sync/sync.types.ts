@@ -123,6 +123,8 @@ export interface SyncSnapshot {
   queuedCount: number;
   lastSyncedAt: string | null;
   notices: SyncNotice[];
+  /** Set when the local mirror could not be opened at all. There is no data to render and no pass to retry into, so the shell says so instead of showing an empty day. */
+  initError: string | null;
 }
 
 export const SYNC_META_KEYS = {

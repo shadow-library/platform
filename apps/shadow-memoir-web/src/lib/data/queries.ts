@@ -4,7 +4,7 @@ import { type Command, type CommandResult } from './command.types';
 import { type PlanRange, type QuestFilter } from './data-provider';
 import { useMemoirData } from './data-context';
 import { type QuestDetail, type QuestDraft, type QuestSummary } from './quest.types';
-import { type CaptureTarget, type DayView, type PlanView, type QuestDraftPreview } from './view.types';
+import { type CaptureTarget, type DayView, type PlanView, type QuestDraftPreview, type QuickLogTile } from './view.types';
 
 export const memoirKeys = {
   all: ['memoir'] as const,
@@ -14,12 +14,20 @@ export const memoirKeys = {
   quest: (questId: string) => ['memoir', 'quest', questId] as const,
   draftPreview: (draft: QuestDraft) => ['memoir', 'draft-preview', draft.durationMinutes, draft.recurrence.daysOfWeek.join('')] as const,
   occurrences: (query: string, date: string) => ['memoir', 'occurrences', date, query] as const,
+  quickLogTiles: (date: string) => ['memoir', 'quick-log-tiles', date] as const,
 };
 
 export function useDay(date?: string): UseQueryResult<DayView> {
   const { provider, queryClient, today } = useMemoirData();
   const day = date ?? today;
   return useQuery({ queryKey: memoirKeys.day(day), queryFn: () => provider.getDay(day) }, queryClient);
+}
+
+/** Keyed under `memoirKeys` rather than `quickLogKeys` so a delta pull refreshes the rail with everything else it changed. */
+export function useQuickLogTiles(date?: string): UseQueryResult<QuickLogTile[]> {
+  const { quickLogs, queryClient, today, currency } = useMemoirData();
+  const day = date ?? today;
+  return useQuery({ queryKey: memoirKeys.quickLogTiles(day), queryFn: () => quickLogs.tiles(day, currency) }, queryClient);
 }
 
 export function usePlan(range: PlanRange): UseQueryResult<PlanView> {

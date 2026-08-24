@@ -3,6 +3,7 @@ import { addDays, toISODate } from '@shadow-library/ui';
 import {
   applyQuickLogCommand,
   averageOf,
+  type CurrencyCode,
   type DayValue,
   formatMetricValue,
   HEALTH_METRICS,
@@ -19,6 +20,8 @@ import {
   type QuickLogCommandResult,
   type QuickLogProvider,
   type QuickLogState,
+  type QuickLogTile,
+  quickLogTiles,
   rewardedSideQuestsOn,
   type SideQuestsView,
   type ThresholdOffer,
@@ -26,7 +29,7 @@ import {
 } from '@/lib/data';
 
 import { isQuickLogCommand, mintCommandIds } from './command-wire';
-import { projectQuickLogRows, type QuickLogRows } from './projection';
+import { projectFinanceRows, projectQuickLogRows, type QuickLogRows } from './projection';
 import { type SyncEngine } from './sync-engine';
 
 const COMPLETED_STATES: OccurrenceState[] = ['completed', 'partial', 'late'];
@@ -99,7 +102,7 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
   constructor(private readonly sync: SyncEngine) {
     this.state = toState(projectQuickLogRows(sync.domains()), sync.today);
     this.world = sync.world();
-    sync.subscribeWorld(() => void (this.pending = this.pending.then(() => this.reproject())));
+    sync.subscribeProjection(() => (this.pending = this.pending.then(() => this.reproject())));
   }
 
   async reproject(): Promise<void> {
@@ -107,6 +110,11 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
     for (const entry of await this.sync.outbox.pending()) if (isQuickLogCommand(entry.command)) applyQuickLogCommand(state, entry.command);
     this.state = state;
     this.world = this.sync.world();
+  }
+
+  async tiles(date: string, currency: CurrencyCode): Promise<QuickLogTile[]> {
+    const { expenses } = projectFinanceRows(this.sync.domains());
+    return quickLogTiles({ date, currency, expenses, meals: this.state.meals, metrics: this.state.metrics, weights: this.state.weights, journal: this.state.journal });
   }
 
   async journal(): Promise<JournalView> {

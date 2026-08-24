@@ -79,7 +79,7 @@ export function useOnboardingStatus(): UseQueryResult<OnboardingStatus> {
 export function useAccountCommand(): UseMutationResult<SettledCommandResult, Error, AccountCommand> {
   const { account, queryClient } = useMemoirData();
   return useMutation(
-    { mutationFn: (command: AccountCommand) => account.dispatchCommand(command), onSuccess: () => void queryClient.invalidateQueries({ queryKey: accountKeys.all }) },
+    { mutationFn: (command: AccountCommand) => account.dispatchCommand(command), onSuccess: () => queryClient.invalidateQueries({ queryKey: accountKeys.all }) },
     queryClient,
   );
 }

@@ -106,7 +106,7 @@ export class SyncedReflectProvider implements ReflectProvider {
     this.narrative = createReflectProvider({ today: sync.today, persona: 'active' });
     this.source = projectReflectSource(sync.domains(), sync.today);
     this.restored = this.restoreReview();
-    sync.subscribeWorld(() => void (this.pending = this.pending.then(() => this.reproject())));
+    sync.subscribeProjection(() => (this.pending = this.pending.then(() => this.reproject())));
   }
 
   async reproject(): Promise<void> {

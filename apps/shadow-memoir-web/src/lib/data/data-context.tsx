@@ -4,6 +4,7 @@ import { toISODate } from '@shadow-library/ui';
 
 import { type AccountProvider, createAccountProvider } from './account.provider';
 import { type DataProvider } from './data-provider';
+import { type CurrencyCode } from './finance.types';
 import { type FinanceProvider, FixtureFinanceProvider, setFinanceProvider } from './finance.provider';
 import { createFixtureProvider, type FixtureProviderOptions } from './fixture-provider';
 import { type Persona, seed } from './fixtures';
@@ -20,7 +21,7 @@ export interface MemoirData {
   quickLogs: QuickLogProvider;
   queryClient: QueryClient;
   today: string;
-  currency: string;
+  currency: CurrencyCode;
   persona: Persona;
 }
 

@@ -70,7 +70,6 @@ export interface DayView {
   occurrences: QuestOccurrence[];
   recovery: RecoveryNotice | null;
   wakeWindowNote: string;
-  quickLogs: QuickLogTile[];
   streaks: StreakBoardEntry[];
   upcoming: UpcomingEntry[];
   activity: ActivityEntry[];

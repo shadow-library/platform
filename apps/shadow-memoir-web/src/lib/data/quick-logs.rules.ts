@@ -1,5 +1,11 @@
+import { type CurrencyCode, type Expense } from './finance.types';
+import { formatMinor } from './finance.rules';
+import { type QuickLogTile } from './view.types';
 import {
   type HealthMetricDefinition,
+  type HealthMetricEntry,
+  type HealthMetricKey,
+  type JournalEntry,
   type Meal,
   type MealPreset,
   type MoodOption,
@@ -149,6 +155,46 @@ export function deriveThresholdOffer(definition: HealthMetricDefinition, value: 
 export function formatMetricValue(value: number, definition: HealthMetricDefinition): string {
   const formatted = definition.precision > 0 ? value.toFixed(definition.precision) : Math.round(value).toLocaleString('en-US');
   return definition.unit ? `${formatted} ${definition.unit}` : formatted;
+}
+
+export interface QuickLogTileSource {
+  date: string;
+  currency: CurrencyCode;
+  expenses: Expense[];
+  meals: Meal[];
+  metrics: HealthMetricEntry[];
+  weights: WeightEntry[];
+  journal: JournalEntry[];
+}
+
+/** Blank, not zero: a day with nothing logged says so rather than showing a total the owner never recorded. */
+const NOTHING_LOGGED = 'not yet';
+
+function metricTile(source: QuickLogTileSource, key: HealthMetricKey): string {
+  const definition = HEALTH_METRICS.find(item => item.key === key) as HealthMetricDefinition;
+  const entry = source.metrics.find(item => item.key === key && item.date === source.date);
+  return entry ? formatMetricValue(entry.value, definition) : NOTHING_LOGGED;
+}
+
+/** The Today rail's six counters, over whatever the owner has actually logged on `date`. */
+export function quickLogTiles(source: QuickLogTileSource): QuickLogTile[] {
+  const spentMinor = source.expenses
+    .filter(expense => expense.occurredOnDate === source.date)
+    .reduce((total, expense) => total + (expense.homeAmountMinor ?? expense.amountMinor), 0);
+  const spent = source.expenses.some(expense => expense.occurredOnDate === source.date);
+  const calories = source.meals.filter(meal => meal.date === source.date).reduce((total, meal) => total + meal.calories, 0);
+  const meals = source.meals.some(meal => meal.date === source.date);
+  const weight = source.weights.find(entry => entry.date === source.date);
+  const journal = source.journal.find(entry => entry.date === source.date);
+
+  return [
+    { id: 'expense', label: 'Expense', value: spent ? `${formatMinor(spentMinor, source.currency)} today` : NOTHING_LOGGED, to: '/finance' },
+    { id: 'meal', label: 'Meal', value: meals ? `${calories.toLocaleString('en-US')} kcal` : NOTHING_LOGGED, to: '/log' },
+    { id: 'steps', label: 'Steps', value: metricTile(source, 'steps'), to: '/log' },
+    { id: 'water', label: 'Water', value: metricTile(source, 'water'), to: '/log' },
+    { id: 'weight', label: 'Weight', value: weight ? `${weight.kg.toFixed(1)} kg` : NOTHING_LOGGED, to: '/log' },
+    { id: 'journal', label: 'Journal', value: journal ? `${journal.wordCount} words` : NOTHING_LOGGED, to: '/log' },
+  ];
 }
 
 export function kgToLb(kg: number): number {

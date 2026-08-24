@@ -33,7 +33,7 @@ export class SyncedDataProvider implements DataProvider {
   constructor(private readonly sync: SyncEngine) {
     this.world = sync.world();
     this.engine = new MemoirEngine(this.world);
-    sync.subscribeWorld(() => void (this.pending = this.pending.then(() => this.reproject())));
+    sync.subscribeProjection(() => (this.pending = this.pending.then(() => this.reproject())));
   }
 
   /**

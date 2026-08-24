@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { createContext, type ReactElement, type ReactNode, useContext, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { toISODate } from '@shadow-library/ui';
+import { Alert, Button, toISODate } from '@shadow-library/ui';
 
 import { type MemoirData, memoirKeys, setFinanceProvider, setQuickLogProvider } from '@/lib/data';
 
@@ -14,7 +14,7 @@ import { SyncedQuickLogProvider } from './synced-quick-log-provider';
 import { SyncedReflectProvider } from './synced-reflect-provider';
 import { type SyncSnapshot } from './sync.types';
 
-const OFFLINE_SNAPSHOT: SyncSnapshot = { state: 'offline', queuedCount: 0, lastSyncedAt: null, notices: [] };
+const OFFLINE_SNAPSHOT: SyncSnapshot = { state: 'offline', queuedCount: 0, lastSyncedAt: null, notices: [], initError: null };
 
 const SyncEngineContext = createContext<SyncEngine | null>(null);
 
@@ -96,5 +96,28 @@ export function SyncEngineProvider({ data, children }: SyncProviderProps): React
   }, [engine, queryClient]);
 
   const value = useMemo(() => engine, [engine]);
-  return <SyncEngineContext.Provider value={value}>{children}</SyncEngineContext.Provider>;
+  return (
+    <SyncEngineContext.Provider value={value}>
+      <StoreGate>{children}</StoreGate>
+    </SyncEngineContext.Provider>
+  );
+}
+
+/** An unopenable mirror is not an empty account: the app has nothing to render and must say so rather than show a day that looks merely new. */
+function StoreGate({ children }: { children: ReactNode }): ReactElement {
+  const engine = useSyncEngine();
+  const { initError } = useSyncStatus();
+  if (!initError) return <>{children}</>;
+
+  return (
+    <div className="flex items-center justify-center" style={{ minHeight: '100dvh', padding: '1.5rem' }}>
+      <Alert intent="danger" title="This device could not open its local store">
+        <p>Shadow Memoir keeps your day on the device and syncs it afterwards, so it cannot show anything until the store opens. Nothing you have logged is lost.</p>
+        <p>{initError}</p>
+        <Button variant="primary" onClick={() => void engine?.start()}>
+          Try again
+        </Button>
+      </Alert>
+    </div>
+  );
 }
