@@ -115,7 +115,7 @@ describe('BootstrapService', () => {
     expect(scopes.find(scope => scope.name === 'memoir:sync')?.isSensitive).toBe(false);
 
     const grantedScopes = await clientService.getGrantedScopeNames('shadow-memoir');
-    expect(grantedScopes).toEqual(expect.arrayContaining(['app-session:manage', 'users:resolve']));
+    expect(grantedScopes).toEqual(expect.arrayContaining(['authz:check', 'app-session:manage', 'users:resolve']));
 
     const pulseGrant = description?.grants.find(grant => grant.audience === 'api://pulse');
     expect(pulseGrant?.scopes).toContain('notifications:send');

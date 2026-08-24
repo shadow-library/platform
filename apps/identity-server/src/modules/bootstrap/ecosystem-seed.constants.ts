@@ -164,7 +164,7 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
         { name: 'memoir:account', description: 'Manage profile, settings, consents and data export', principalType: 'USER' },
         { name: 'memoir:destructive', description: 'Delete the account and its data', isSensitive: true, principalType: 'USER' },
       ],
-      grants: [APP_SESSION, USERS_RESOLVE, { resource: 'api://pulse', scope: 'notifications:send' }],
+      grants: [AUTHZ_CHECK, APP_SESSION, USERS_RESOLVE, { resource: 'api://pulse', scope: 'notifications:send' }],
     },
   ],
   serviceClients: [
