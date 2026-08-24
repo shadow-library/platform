@@ -8,6 +8,10 @@ import {
   type AiResult,
   type CoachView,
   createReflectProvider,
+  deriveHistory,
+  deriveInsights,
+  deriveRecord,
+  deriveReview,
   type HistoryDetail,
   type HistoryFilter,
   type HistoryView,
@@ -15,12 +19,15 @@ import {
   type InsightsView,
   type ReflectCommand,
   type ReflectProvider,
+  type ReflectSource,
+  type ReviewLocalState,
   type ReviewView,
   type SettledCommandResult,
 } from '@/lib/data';
 
-import { type AiResultRow, type AiTaskRow, projectAiRows, projectEntitlement } from './projection';
+import { type AiResultRow, type AiTaskRow, projectAiRows, projectEntitlement, projectReflectSource } from './projection';
 import { type SyncEngine } from './sync-engine';
+import { SYNC_META_KEYS } from './sync.types';
 import { uuidv7 } from './uuid';
 
 /** `quotas.ai-free-monthly`'s shipped default. Display copy only — the server refuses the third request whatever this says. */
@@ -83,30 +90,48 @@ function toResult(row: AiResultRow, task: AiTaskRow | undefined): AiResult {
  * delta mirror, so a submitted request appears on the next pull rather than being invented locally — the
  * worker owns everything after the submission and nothing here can honestly guess its outcome.
  *
- * History, insights and the weekly review are still the fixture provider's: the server exposes no read
- * model for any of the three, and inventing one from the mirror is a separate task, not a wire pass.
+ * History, insights and the weekly review are derivations over the same mirror: the server has no read model
+ * for any of the three, so they are computed locally from the rows the delta pull already landed. The
+ * review's own answers stay local for the same reason — there is no server model to write them to, so they
+ * live in the store's metadata beside the mirror.
  */
 export class SyncedReflectProvider implements ReflectProvider {
   private readonly narrative: ReflectProvider;
+  private source: ReflectSource;
+  private review: ReviewLocalState = { answers: {}, complete: false };
+  private pending: Promise<void> = Promise.resolve();
+  private readonly restored: Promise<void>;
 
   constructor(private readonly sync: SyncEngine) {
     this.narrative = createReflectProvider({ today: sync.today, persona: 'active' });
+    this.source = projectReflectSource(sync.domains(), sync.today);
+    this.restored = this.restoreReview();
+    sync.subscribeWorld(() => void (this.pending = this.pending.then(() => this.reproject())));
   }
 
-  getHistory(filter: HistoryFilter, query: string): Promise<HistoryView> {
-    return this.narrative.getHistory(filter, query);
+  async reproject(): Promise<void> {
+    const queuedIds = (await this.sync.outbox.pending()).flatMap(entry => {
+      const id = (entry.payload as Record<string, unknown>)['id'];
+      return typeof id === 'string' ? [id] : [];
+    });
+    this.source = projectReflectSource(this.sync.domains(), this.sync.today, queuedIds);
+  }
+
+  getHistory(filter: HistoryFilter, query: string, page = 1): Promise<HistoryView> {
+    return Promise.resolve(deriveHistory(this.source, filter, query, page));
   }
 
   getRecord(recordId: string): Promise<HistoryDetail> {
-    return this.narrative.getRecord(recordId);
+    return Promise.resolve(deriveRecord(this.source, recordId));
   }
 
   getInsights(period: InsightPeriod): Promise<InsightsView> {
-    return this.narrative.getInsights(period);
+    return Promise.resolve(deriveInsights(this.source, period));
   }
 
-  getReview(): Promise<ReviewView> {
-    return this.narrative.getReview();
+  async getReview(): Promise<ReviewView> {
+    await this.restored;
+    return deriveReview(this.source, this.review);
   }
 
   getCoach(): Promise<CoachView> {
@@ -187,9 +212,30 @@ export class SyncedReflectProvider implements ReflectProvider {
           return this.refusal(error, 'That offer could not be recorded.');
         }
 
+      case 'review.answer':
+        return this.updateReview(
+          current => ({ ...current, answers: { ...current.answers, [command.promptId]: command.answer } }),
+          'Saved with the review. Reflections stay on this device until the server has somewhere to put them.',
+        );
+
+      case 'review.complete':
+        return this.updateReview(current => ({ ...current, complete: true }), 'Week closed. The summary is kept locally alongside your mirrored history.');
+
       default:
         return this.narrative.dispatchCommand(command);
     }
+  }
+
+  private async restoreReview(): Promise<void> {
+    const stored = await this.sync.store.readMeta<ReviewLocalState>(SYNC_META_KEYS.weeklyReview);
+    if (stored) this.review = stored;
+  }
+
+  private async updateReview(next: (current: ReviewLocalState) => ReviewLocalState, message: string): Promise<SettledCommandResult> {
+    await this.restored;
+    this.review = next(this.review);
+    await this.sync.store.writeMeta(SYNC_META_KEYS.weeklyReview, this.review);
+    return applied(message);
   }
 
   private async setConsent(consent: { journal: boolean; health: boolean }): Promise<SettledCommandResult> {

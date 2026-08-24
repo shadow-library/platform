@@ -132,4 +132,5 @@ export const SYNC_META_KEYS = {
   lastSyncedAt: 'last-synced-at',
   outboxSeq: 'outbox-seq',
   exportJobId: 'export-job-id',
+  weeklyReview: 'weekly-review',
 } as const;

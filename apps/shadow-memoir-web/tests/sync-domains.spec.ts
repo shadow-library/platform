@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { type DeltaPage, SyncedAccountProvider, SyncedFinanceProvider, SyncedHeroProvider, SyncedQuickLogProvider } from '@/lib/sync';
+import { type DeltaPage, SyncedAccountProvider, SyncedFinanceProvider, SyncedHeroProvider, SyncedQuickLogProvider, SyncedReflectProvider } from '@/lib/sync';
 
 import { createTestEngine, type TestEngine } from './sync-harness';
 
@@ -331,5 +331,106 @@ describe('FE-5 replay convergence', () => {
 
     expect((await finance.expenses({ range: 'month' })).items).toHaveLength(2);
     expect(await harness.engine.outbox.size()).toBe(1);
+  });
+});
+
+const QUEST_ROW = { id: '5', name: 'Move 8,000 steps', statAffinity: 'body', strictness: 'routine', durationMin: 40, active: true, recurrence: {}, syncSeq: '8' };
+
+const LAST_WEEK = ['2026-08-17', '2026-08-18', '2026-08-19', '2026-08-20'];
+
+const QUEST_LOG_ROWS = [
+  ...LAST_WEEK.map((date, index) => ({
+    id: String(100 + index),
+    questId: '5',
+    date,
+    state: index === 3 ? 'missed' : 'completed',
+    xpAwarded: index === 3 ? 0 : 30,
+    coinsAwarded: 0,
+    statAffinity: 'body',
+    strictness: 'routine',
+    reasonTag: index === 3 ? 'work_emergency' : null,
+    performedAt: `${date}T19:02:00.000Z`,
+    syncSeq: '9',
+  })),
+  {
+    id: '200',
+    questId: '5',
+    date: TODAY,
+    state: 'partial',
+    xpAwarded: 15,
+    coinsAwarded: 0,
+    statAffinity: 'body',
+    strictness: 'routine',
+    reasonTag: 'too_tired',
+    performedAt: `${TODAY}T19:02:00.000Z`,
+    syncSeq: '10',
+  },
+];
+
+const QUEST_STREAK_ROW = { questId: '5', currentRunDays: 3, bestRunDays: 22, shieldsAvailable: 1, syncSeq: '11' };
+
+function reflectPage(): DeltaPage {
+  const page = fullPage();
+  page.domains['quests'] = [QUEST_ROW];
+  page.domains['quest_logs'] = QUEST_LOG_ROWS;
+  page.domains['quest_streaks'] = [QUEST_STREAK_ROW];
+  return page;
+}
+
+describe('FE-7 reflection derivation', () => {
+  beforeEach(() => setOnline(true));
+
+  it('should build the history feed out of the mirrored rows rather than a fixture', async () => {
+    const { engine } = await started(reflectPage());
+    const history = await new SyncedReflectProvider(engine).getHistory('all', '');
+
+    const today = history.groups.find(group => group.date === TODAY);
+    expect(today?.rows.map(row => row.text)).toContain('Move 8,000 steps · partial · too tired');
+    expect(today?.rows.map(row => row.text)).toContain('Food — Kaffebrenneriet');
+    expect(history.totals[0]).toBe('5 quest outcomes · 4 kept');
+  });
+
+  it('should filter the derived feed and search it without reaching the network', async () => {
+    const { engine, server } = await started(reflectPage());
+    const reflect = new SyncedReflectProvider(engine);
+    const before = server.deltaRequests.length;
+
+    expect((await reflect.getHistory('expense', '')).countLabel).toBe('1 matching record');
+    expect((await reflect.getHistory('all', 'work emergency')).groups.flatMap(group => group.rows)).toHaveLength(1);
+    expect(server.deltaRequests).toHaveLength(before);
+  });
+
+  it('should compute the insights from the same rows', async () => {
+    const { engine } = await started(reflectPage());
+    const insights = await new SyncedReflectProvider(engine).getInsights('30');
+
+    expect(insights.adherenceByQuest).toEqual([{ id: '5', label: 'Move 8,000 steps', value: 70, caption: '70%' }]);
+    expect(insights.reasons.map(bar => bar.id)).toEqual(['work_emergency', 'too_tired']);
+    expect(insights.kpis.find(kpi => kpi.id === 'streak')?.value).toBe(22);
+    expect(insights.kpis.find(kpi => kpi.id === 'spend')?.value).toBe(12.5);
+  });
+
+  it('should read the week that closed into the review', async () => {
+    const { engine } = await started(reflectPage());
+    const review = await new SyncedReflectProvider(engine).getReview();
+
+    expect(review.quests).toEqual([{ id: '5', title: 'Move 8,000 steps', result: '3 of 4', days: ['kept', 'kept', 'kept', 'missed', 'none', 'none', 'none'] }]);
+    expect(review.keptPattern).toContain('work emergency');
+  });
+
+  it('should keep the review answers local, since the server has no model to write them to', async () => {
+    const { engine, server } = await started(reflectPage());
+    const reflect = new SyncedReflectProvider(engine);
+
+    await reflect.dispatchCommand({ type: 'review.answer', promptId: 'better', answer: 'The mornings held.' });
+    await reflect.dispatchCommand({ type: 'review.complete' });
+
+    const review = await reflect.getReview();
+    expect(review.prompts.find(prompt => prompt.id === 'better')?.answer).toBe('The mornings held.');
+    expect(review.completion).not.toBeNull();
+    expect(await engine.outbox.size()).toBe(0);
+    expect(server.batches).toHaveLength(0);
+
+    expect((await new SyncedReflectProvider(engine).getReview()).completion).not.toBeNull();
   });
 });

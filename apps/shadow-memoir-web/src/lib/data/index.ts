@@ -20,6 +20,8 @@ export * from './quest.types';
 export * from './quick-logs.provider';
 export * from './quick-logs.rules';
 export * from './quick-logs.types';
+export * from './reflect.derive';
+export * from './reflect.fixtures';
 export * from './reflect.provider';
 export * from './reflect.queries';
 export * from './reflect.types';

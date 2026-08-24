@@ -1,6 +1,8 @@
 import {
+  ACHIEVEMENTS,
   BUILT_IN_CATEGORIES,
   type CosmeticKind,
+  COSMETICS,
   type CurrencyCode,
   type ExpenseCategory,
   type ExpenseCategoryId,
@@ -19,8 +21,14 @@ import {
   type Momentum,
   type MoodValence,
   type Quest,
+  type QuestLogState,
   type QuestProgress,
+  REASON_TAGS,
+  type ReasonTag,
   type Recurrence,
+  type ReflectGrant,
+  type ReflectQuestLog,
+  type ReflectSource,
   type ReminderLead,
   type SideQuest,
   type StatAffinity,
@@ -29,6 +37,7 @@ import {
   type SubscriptionCategoryId,
   type SubscriptionFrequency,
   type ThresholdOffer,
+  TITLES,
   UNCATEGORISED,
   type Weekday,
   type WeightEntry,
@@ -553,6 +562,78 @@ export function projectRecordCounts(rows: Partial<DomainRows>): { name: string; 
     { name: 'Body and health', meta: `${plural(count('weights'), 'weight')} · ${plural(count('meals'), 'meal')} · ${plural(count('metric_entries'), 'metric')}` },
     { name: 'Coaching results', meta: `${plural(count('ai_results'), 'result')} · ${plural(count('ai_tasks'), 'request')}` },
   ];
+}
+
+function toReflectGrants(rows: Partial<DomainRows>): ReflectGrant[] {
+  const named = (kind: ReflectGrant['kind'], id: string): string =>
+    (kind === 'achievement' ? ACHIEVEMENTS : kind === 'title' ? TITLES : COSMETICS).find(entry => entry.id === id)?.name ?? id;
+
+  return [
+    ...(rows.achievements_earned ?? []).map(row => ({ id: String(row['achievementId']), kind: 'achievement' as const, earnedAt: text(row, 'earnedAt') ?? '' })),
+    ...(rows.titles_earned ?? []).map(row => ({ id: String(row['titleId']), kind: 'title' as const, earnedAt: text(row, 'earnedAt') ?? '' })),
+    ...(rows.cosmetic_unlocks ?? []).map(row => ({ id: String(row['cosmeticId']), kind: 'cosmetic' as const, earnedAt: text(row, 'unlockedAt') ?? text(row, 'createdAt') ?? '' })),
+  ]
+    .filter(grant => grant.earnedAt.length > 0)
+    .map(grant => ({ ...grant, name: named(grant.kind, grant.id) }));
+}
+
+const QUEST_LOG_STATES: QuestLogState[] = ['completed', 'partial', 'skipped', 'missed', 'late', 'postponed', 'rescheduled', 'recovery'];
+
+function toReflectQuestLog(row: DeltaRow, questNames: Map<string, string>): ReflectQuestLog {
+  const questId = String(row['questId']);
+  return {
+    id: String(row['id']),
+    questId,
+    questName: questNames.get(questId) ?? 'Quest',
+    date: String(row['date']),
+    state: QUEST_LOG_STATES.find(candidate => candidate === text(row, 'state')) ?? 'completed',
+    xpAwarded: number(row, 'xpAwarded'),
+    coinsAwarded: number(row, 'coinsAwarded'),
+    reasonTag: (REASON_TAGS.find(candidate => candidate === text(row, 'reasonTag')) ?? null) as ReasonTag | null,
+    statAffinity: (text(row, 'statAffinity') ?? 'discipline') as StatAffinity,
+    performedAt: text(row, 'performedAt') ?? text(row, 'createdAt'),
+  };
+}
+
+/**
+ * The reflection world, assembled from the same mirrored rows every other screen reads. Nothing here calls
+ * the server: History, Insights and the Weekly Review are derivations over what the delta pull already left
+ * in IndexedDB, because the server exposes no read model for any of the three.
+ */
+export function projectReflectSource(rows: Partial<DomainRows>, today: string, queuedIds: string[] = []): ReflectSource {
+  const account = rows.account?.[0];
+  const questNames = new Map((rows.quests ?? []).map(row => [String(row['id']), text(row, 'name') ?? 'Quest']));
+  const finance = projectFinanceRows(rows);
+  const quickLogs = projectQuickLogRows(rows);
+
+  return {
+    today,
+    homeCurrency: (account ? (text(account, 'defaultCurrency') as CurrencyCode | null) : null) ?? 'EUR',
+    hero: {
+      level: account ? number(account, 'level', 1) : 1,
+      xp: account ? number(account, 'totalXp') : 0,
+      coins: account ? number(account, 'coins') : 0,
+      hp: account ? number(account, 'hpToday') : 0,
+      hpMax: account ? number(account, 'hpMax', 3) : 3,
+    },
+    logs: (rows.quest_logs ?? []).map(row => toReflectQuestLog(row, questNames)),
+    streaks: (rows.quest_streaks ?? []).map(row => ({
+      questId: String(row['questId']),
+      questName: questNames.get(String(row['questId'])) ?? 'Quest',
+      currentRunDays: number(row, 'currentRunDays'),
+      bestRunDays: number(row, 'bestRunDays'),
+    })),
+    expenses: finance.expenses,
+    categories: finance.categories,
+    subscriptions: finance.subscriptions,
+    journal: quickLogs.journal,
+    meals: quickLogs.meals,
+    weights: quickLogs.weights,
+    sideQuests: quickLogs.sideQuests,
+    metricEntries: quickLogs.metricEntries,
+    grants: toReflectGrants(rows),
+    queuedIds,
+  };
 }
 
 export function projectHeroGrants(rows: Partial<DomainRows>): HeroGrants {

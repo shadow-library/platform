@@ -15,16 +15,16 @@ import {
 
 export const reflectKeys = {
   all: ['memoir', 'reflect'] as const,
-  history: (filter: HistoryFilter, query: string) => ['memoir', 'reflect', 'history', filter, query] as const,
+  history: (filter: HistoryFilter, query: string, page: number) => ['memoir', 'reflect', 'history', filter, query, page] as const,
   record: (recordId: string) => ['memoir', 'reflect', 'record', recordId] as const,
   insights: (period: InsightPeriod) => ['memoir', 'reflect', 'insights', period] as const,
   review: ['memoir', 'reflect', 'review'] as const,
   coach: ['memoir', 'reflect', 'coach'] as const,
 };
 
-export function useHistory(filter: HistoryFilter, query: string): UseQueryResult<HistoryView> {
+export function useHistory(filter: HistoryFilter, query: string, page: number): UseQueryResult<HistoryView> {
   const { reflect, queryClient } = useMemoirData();
-  return useQuery({ queryKey: reflectKeys.history(filter, query), queryFn: () => reflect.getHistory(filter, query) }, queryClient);
+  return useQuery({ queryKey: reflectKeys.history(filter, query, page), queryFn: () => reflect.getHistory(filter, query, page) }, queryClient);
 }
 
 export function useHistoryRecord(recordId: string): UseQueryResult<HistoryDetail> {

@@ -6,6 +6,7 @@ import {
   averageOf,
   deriveThresholdOffer,
   firstOfDayReward,
+  HEALTH_METRICS,
   isFirstOfDay,
   journalExcerpt,
   journalWordCount,
@@ -16,7 +17,6 @@ import {
 } from './quick-logs.rules';
 import {
   type DayValue,
-  type HealthMetricDefinition,
   type HealthMetricEntry,
   type HealthMetricKey,
   type HealthView,
@@ -67,13 +67,6 @@ function series(count: number, seed: number, base: number, spread: number, blank
     value: blanks.includes(index) ? null : wave(index, seed, base, spread),
   }));
 }
-
-export const HEALTH_METRICS: HealthMetricDefinition[] = [
-  { key: 'steps', name: 'Steps', unit: '', step: 100, precision: 0, threshold: { value: 8000, questTitle: 'Move 8,000 steps', xp: 30 } },
-  { key: 'calories', name: 'Calories burned', unit: 'kcal', step: 10, precision: 0, threshold: null },
-  { key: 'sleep', name: 'Sleep', unit: 'h', step: 0.1, precision: 1, threshold: { value: 7, questTitle: null, xp: 0 } },
-  { key: 'water', name: 'Water', unit: 'l', step: 0.1, precision: 1, threshold: { value: 2, questTitle: 'Drink 2 litres', xp: 20 } },
-];
 
 /** The whole of what a quick-log provider holds. The fixtures seed it; the sync layer projects it from delta rows — {@link applyQuickLogCommand} is shared by both. */
 export interface QuickLogState {

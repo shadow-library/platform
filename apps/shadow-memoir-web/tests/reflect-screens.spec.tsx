@@ -21,15 +21,25 @@ describe('History screen', () => {
     expect(await screen.findByRole('heading', { name: 'History' })).toBeDefined();
     expect(await screen.findByText(/^Today · /)).toBeDefined();
 
-    fireEvent.click(await screen.findByText('Level 14 reached · 20 coins granted'));
-    expect(await screen.findByText('Never removed — a level once reached is kept')).toBeDefined();
+    fireEvent.click((await screen.findAllByText(/^Morning run — 5 km · /))[0] as HTMLElement);
+    expect(await screen.findByText('Outcome')).toBeDefined();
   });
 
   it('should filter the feed to one record type', async () => {
     renderScreen(<HistoryScreen />, { today: TODAY });
-    fireEvent.click(await screen.findByRole('button', { name: 'Expense' }));
-    expect(await screen.findByText('Coffee · from quick capture')).toBeDefined();
-    expect(screen.queryByText('Strength session kept')).toBeNull();
+    expect(await screen.findAllByText(/^Morning run — 5 km · /)).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expense' }));
+    expect(await screen.findByText(/matching records$/)).toBeDefined();
+    expect(screen.queryByText(/^Morning run — 5 km · /)).toBeNull();
+  });
+
+  it('should read a grant out of the hero feed', async () => {
+    renderScreen(<HistoryScreen />, { today: TODAY });
+    fireEvent.click(await screen.findByRole('button', { name: 'Hero' }));
+
+    fireEvent.click(await screen.findByText('Achievement — Level 14 reached'));
+    expect(await screen.findByText('Never removed — a grant once earned is kept')).toBeDefined();
   });
 
   it('should stay calm when a filter matches nothing', async () => {
@@ -61,7 +71,7 @@ describe('Weekly review', () => {
     expect(await screen.findByText('What you kept')).toBeDefined();
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(await screen.findByText('€312.40 across 23 expenses, €41 below your weekly average.')).toBeDefined();
+    expect(await screen.findByText(/below your weekly average\.$/)).toBeDefined();
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByText('Not enough water entries to say anything')).toBeDefined();
@@ -70,7 +80,7 @@ describe('Weekly review', () => {
     expect(await screen.findByText('Your reflection')).toBeDefined();
 
     fireEvent.click(screen.getByRole('button', { name: 'Finish the review' }));
-    expect(await screen.findByText('Week 34 closed')).toBeDefined();
+    expect(await screen.findByText(/^Week \d+ closed$/)).toBeDefined();
   });
 });
 

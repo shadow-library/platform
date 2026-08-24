@@ -11,6 +11,13 @@ import {
   type WeightEntry,
 } from './quick-logs.types';
 
+export const HEALTH_METRICS: HealthMetricDefinition[] = [
+  { key: 'steps', name: 'Steps', unit: '', step: 100, precision: 0, threshold: { value: 8000, questTitle: 'Move 8,000 steps', xp: 30 } },
+  { key: 'calories', name: 'Calories burned', unit: 'kcal', step: 10, precision: 0, threshold: null },
+  { key: 'sleep', name: 'Sleep', unit: 'h', step: 0.1, precision: 1, threshold: { value: 7, questTitle: null, xp: 0 } },
+  { key: 'water', name: 'Water', unit: 'l', step: 0.1, precision: 1, threshold: { value: 2, questTitle: 'Drink 2 litres', xp: 20 } },
+];
+
 export const SIDE_QUEST_DAILY_REWARD_LIMIT = 3;
 
 export const QUICK_LOG_REWARDS = {

@@ -14,8 +14,8 @@ export function HistoryScreen(): ReactElement {
   const [filter, setFilter] = useState<HistoryFilter>('all');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
-  const [selectedId, setSelectedId] = useState('r-run');
-  const history = useHistory(filter, query);
+  const [selectedId, setSelectedId] = useState('');
+  const history = useHistory(filter, query, page);
   const record = useHistoryRecord(selectedId);
 
   return (
