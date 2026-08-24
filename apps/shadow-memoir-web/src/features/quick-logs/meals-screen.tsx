@@ -2,8 +2,9 @@ import { type ReactElement, useState } from 'react';
 import { Alert, Button, Card, EmptyState, Skeleton, Statistic, toast } from '@shadow-library/ui';
 
 import { EntryCapNote } from '@/components/EntryCapNote';
+import { LinkageOfferNote } from '@/components/LinkageOfferNote';
 import { SparkBars } from '@/components/SparkBars';
-import { type EntryCapAdvisory, MEAL_TYPE_LABELS, todayISODate, useMeals, useQuickLogCommand } from '@/lib/data';
+import { type EntryCapAdvisory, MEAL_TYPE_LABELS, type QuestLinkageOffer, todayISODate, useMeals, useQuickLogCommand } from '@/lib/data';
 
 import { MealEntryPanel } from './meal-entry-panel';
 import styles from './quick-logs.module.css';
@@ -14,6 +15,7 @@ export function MealsScreen(): ReactElement {
   const command = useQuickLogCommand();
   const [formOpen, setFormOpen] = useState(false);
   const [advisory, setAdvisory] = useState<EntryCapAdvisory | null>(null);
+  const [linkage, setLinkage] = useState<QuestLinkageOffer | null>(null);
 
   const view = meals.data;
 
@@ -23,6 +25,7 @@ export function MealsScreen(): ReactElement {
       {
         onSuccess: result => {
           setAdvisory(result.advisory ?? null);
+          setLinkage(result.linkageOffer ?? null);
           toast.success(result.reward?.rewarded ? `${result.message} First meal today — +${result.reward.xp} XP.` : result.message);
         },
       },
@@ -78,6 +81,7 @@ export function MealsScreen(): ReactElement {
               </div>
 
               <EntryCapNote advisory={advisory} />
+              <LinkageOfferNote offer={linkage} />
             </div>
           </Card>
 

@@ -31,6 +31,20 @@ const DOMAIN_KEYS: Record<SyncDomain, (row: DeltaRow) => string> = {
   quest_streaks: row => String(row['questId']),
   account: () => 'self',
   devices: row => String(row['id']),
+  expenses: row => String(row['id']),
+  expense_categories: row => String(row['key']),
+  subscriptions: row => String(row['id']),
+  journal_entries: row => String(row['id']),
+  meals: row => String(row['id']),
+  meal_presets: row => String(row['id']),
+  weights: row => String(row['date']),
+  side_quests: row => String(row['id']),
+  metrics: row => String(row['id']),
+  metric_entries: row => String(row['id']),
+  health_offers: row => `${String(row['questId'])}:${String(row['metricId'])}:${String(row['date'])}`,
+  achievements_earned: row => String(row['achievementId']),
+  titles_earned: row => String(row['titleId']),
+  cosmetic_unlocks: row => String(row['cosmeticId']),
 };
 
 /** `OfflineStore` opens the database lazily, so a browser-created instance is inert until first use. */

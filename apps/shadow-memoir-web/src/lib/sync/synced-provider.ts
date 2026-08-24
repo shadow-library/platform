@@ -16,6 +16,7 @@ import {
   type QuestSummary,
 } from '@/lib/data';
 
+import { isQuestCommand } from './command-wire';
 import { type SyncEngine } from './sync-engine';
 
 /**
@@ -44,7 +45,7 @@ export class SyncedDataProvider implements DataProvider {
   async reproject(): Promise<void> {
     const world = this.sync.world();
     const engine = new MemoirEngine(world);
-    for (const entry of await this.sync.outbox.pending()) await engine.dispatchCommand(entry.command);
+    for (const entry of await this.sync.outbox.pending()) if (isQuestCommand(entry.command)) await engine.dispatchCommand(entry.command);
     this.world = world;
     this.engine = engine;
   }

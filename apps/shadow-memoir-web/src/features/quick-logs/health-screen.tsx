@@ -2,7 +2,7 @@ import { type ReactElement, useState } from 'react';
 import { Alert, Badge, Button, Card, Input, Progress, Skeleton, toast } from '@shadow-library/ui';
 
 import { SparkBars } from '@/components/SparkBars';
-import { formatMetricValue, type HealthMetricKey, type HealthMetricState, todayISODate, useHealth, useQuickLogCommand } from '@/lib/data';
+import { formatMetricValue, type HealthMetricState, needsConfirmation, type ThresholdOffer, todayISODate, useCommand, useHealth, useQuickLogCommand } from '@/lib/data';
 
 import styles from './quick-logs.module.css';
 
@@ -73,12 +73,25 @@ export function HealthMetricsScreen(): ReactElement {
   const date = todayISODate();
   const health = useHealth(date);
   const command = useQuickLogCommand();
+  const questCommand = useCommand();
 
   const view = health.data;
   const offers = view?.metrics.flatMap(metric => (metric.offer?.met ? [{ definition: metric.definition, offer: metric.offer }] : [])) ?? [];
 
-  const accept = (key: HealthMetricKey): void => {
-    command.mutate({ type: 'health.acceptOffer', key, date }, { onSuccess: result => toast.success(result.message) });
+  /**
+   * Consent, never automation (PRD §2.6): the offer the server derives names the quest, and accepting it
+   * dispatches the owner's own `quest.complete`. Without a server-side threshold behind the offer there is
+   * no occurrence to address, so the local acknowledgement is all that is left to do.
+   */
+  const accept = (offer: ThresholdOffer): void => {
+    if (offer.questId === null) {
+      command.mutate({ type: 'health.acceptOffer', key: offer.metricKey, date }, { onSuccess: result => toast.success(result.message) });
+      return;
+    }
+    questCommand.mutate(
+      { type: 'quest.complete', occurrenceId: `${offer.questId}:${date}` },
+      { onSuccess: result => void (needsConfirmation(result) || toast.success(result.message)) },
+    );
   };
 
   if (health.isLoading || !view) return <Skeleton.Card />;
@@ -94,7 +107,7 @@ export function HealthMetricsScreen(): ReactElement {
           key={definition.key}
           intent="success"
           title={`${formatMetricValue(offer.thresholdValue, definition)} reached — “${offer.questTitle}” can be completed`}
-          action={{ label: `Complete the quest · +${offer.xp} XP`, onClick: () => accept(definition.key) }}
+          action={{ label: offer.xp > 0 ? `Complete the quest · +${offer.xp} XP` : 'Complete the quest', onClick: () => accept(offer) }}
         >
           You logged {formatMetricValue(offer.currentValue, definition)}. The quest is yours to complete: Shadow Memoir never completes a quest for you, even when the threshold is
           met.

@@ -2,11 +2,14 @@ import { QueryClient } from '@tanstack/react-query';
 import { createContext, type ReactElement, type ReactNode, useContext, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { toISODate } from '@shadow-library/ui';
 
-import { createAccountProvider, createHeroProvider, createReflectProvider, type MemoirData, memoirKeys, seedWorldState } from '@/lib/data';
+import { createAccountProvider, createReflectProvider, type MemoirData, memoirKeys, setFinanceProvider, setQuickLogProvider } from '@/lib/data';
 
 import { MemoirStore } from './memoir-store';
 import { SyncEngine } from './sync-engine';
 import { SyncedDataProvider } from './synced-provider';
+import { SyncedFinanceProvider } from './synced-finance-provider';
+import { SyncedHeroProvider } from './synced-hero-provider';
+import { SyncedQuickLogProvider } from './synced-quick-log-provider';
 import { type SyncSnapshot } from './sync.types';
 
 const OFFLINE_SNAPSHOT: SyncSnapshot = { state: 'offline', queuedCount: 0, lastSyncedAt: null, notices: [] };
@@ -36,21 +39,28 @@ export interface SyncedMemoirData extends MemoirData {
 }
 
 /**
- * The synced counterpart of `createMemoirData`: the quest domain reads through IndexedDB and writes
- * through the outbox, while hero, reflect and account stay on their fixture providers until the server
- * grows a module for each. The seam is `MemoirData`, so a domain flips by swapping one field.
+ * The synced counterpart of `createMemoirData`: quests, finance, quick logs and the hero deck read
+ * through IndexedDB and write through the outbox, while reflect and account stay on their fixture
+ * providers until the server grows a module for each. The seam is `MemoirData`, so a domain flips by
+ * swapping one field.
  */
 export function createSyncedMemoirData(options: { today?: string; store?: MemoirStore } = {}): SyncedMemoirData {
   const today = options.today ?? toISODate(new Date());
   const currency = 'EUR';
   const engine = new SyncEngine({ store: options.store ?? new MemoirStore(), today });
+  const finance = new SyncedFinanceProvider(engine);
+  const quickLogs = new SyncedQuickLogProvider(engine);
+  setFinanceProvider(finance);
+  setQuickLogProvider(quickLogs);
 
   return {
     engine,
     provider: new SyncedDataProvider(engine),
-    hero: createHeroProvider({ persona: 'active', hero: seedWorldState({ today }).hero }),
+    hero: new SyncedHeroProvider(engine),
     reflect: createReflectProvider({ today, persona: 'active' }),
     account: createAccountProvider({ persona: 'active', currency }),
+    finance,
+    quickLogs,
     queryClient: new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } }),
     today,
     currency,

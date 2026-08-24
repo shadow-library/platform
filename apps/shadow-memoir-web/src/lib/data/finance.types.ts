@@ -113,6 +113,8 @@ export interface ExpenseDetail extends Expense {
 }
 
 export interface ExpenseDraft {
+  /** Client-minted UUIDv7 (ARCHITECTURE §12.4) — an expense created offline already carries its permanent identity. Minted at dispatch when a caller leaves it out. */
+  id?: string;
   amountText: string;
   currency: CurrencyCode;
   categoryId: ExpenseCategoryId;

@@ -126,6 +126,7 @@ export function deriveThresholdOffer(definition: HealthMetricDefinition, value: 
   const shortfall = Math.max(threshold.value - value, 0);
   return {
     metricKey: definition.key,
+    questId: null,
     questTitle: threshold.questTitle,
     thresholdValue: threshold.value,
     currentValue: value,

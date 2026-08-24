@@ -56,7 +56,8 @@ function at(days: number, time: string): string {
   return `${shiftDays(days)}T${time}:00`;
 }
 
-interface FinanceState {
+/** The whole of what a finance provider holds. The fixtures seed it; the sync layer projects it from delta rows — the readers and the command applier below are shared by both. */
+export interface FinanceState {
   expenses: ExpenseDetail[];
   subscriptions: Subscription[];
   categories: ExpenseCategory[];
@@ -371,55 +372,199 @@ function nextExpenseId(): string {
   return `exp-${Date.now().toString(36)}`;
 }
 
+export function financeSummary(state: FinanceState, range: FinanceRange): FinanceSummary {
+  const inRange = state.expenses.filter(expense => withinRange(expense, range));
+  const spentMinor = sumHomeMinor(inRange, HOME_CURRENCY);
+  const budgetMinor = range === 'month' ? 160_000 : null;
+  const daysLogged = new Set(inRange.map(expense => expense.occurredOnDate)).size;
+  const activeSubscriptions = state.subscriptions.filter(item => item.active);
+  const nextDue = [...activeSubscriptions].sort((a, b) => (a.nextDueDate < b.nextDueDate ? -1 : 1))[0];
+
+  return {
+    range,
+    periodLabel: RANGE_LABELS[range],
+    homeCurrency: HOME_CURRENCY,
+    spentMinor,
+    spentDeltaFraction: range === 'month' ? -0.08 : null,
+    comparisonLabel: range === 'month' ? 'vs the month before' : '',
+    budgetMinor,
+    budgetLeftMinor: budgetMinor === null ? null : budgetMinor - spentMinor,
+    daysRemaining: 30 - Math.min(daysLogged, 30),
+    subscriptionsMonthlyMinor: activeSubscriptions.reduce((total, item) => total + item.monthlyEquivalentMinor, 0),
+    activeSubscriptions: activeSubscriptions.length,
+    nextSubscriptionLabel: nextDue ? `next ${nextDue.name} on ${nextDue.nextDueDate}` : 'none scheduled',
+    averageDayMinor: daysLogged > 0 ? Math.round(spentMinor / daysLogged) : 0,
+    daysLogged,
+    totalExpenses: state.monthlyExpenseCount,
+    categories: categoryBreakdown(inRange, state.categories, HOME_CURRENCY).filter(slice => slice.count > 0),
+    fxRates: [
+      { from: 'NOK', to: 'EUR', rate: FX_NOK_EUR },
+      { from: 'USD', to: 'EUR', rate: FX_USD_EUR },
+      { from: 'GBP', to: 'EUR', rate: FX_GBP_EUR },
+    ],
+    receiptScansUsed: state.receiptScansUsed,
+    receiptScanLimit: 10,
+    receiptQuotaResetsOn: 'tomorrow',
+    queuedExpense: state.expenses.find(expense => expense.syncState === 'queued') ?? null,
+  };
+}
+
+export function financeExpensePage(state: FinanceState, query: ExpenseQuery): ExpensePage {
+  const matched = state.expenses
+    .filter(expense => withinRange(expense, query.range))
+    .filter(expense => matchesSearch(expense, query.search ?? ''))
+    .filter(expense => !query.categoryId || expense.categoryId === query.categoryId)
+    .sort(byRecency);
+
+  const items = query.limit ? matched.slice(0, query.limit) : matched;
+  return { items, shown: items.length, total: matched.length, periodLabel: RANGE_LABELS[query.range], homeCurrency: HOME_CURRENCY };
+}
+
+export function financeSubscriptionsView(state: FinanceState): SubscriptionsView {
+  const items = [...state.subscriptions].sort((a, b) => (a.nextDueDate < b.nextDueDate ? -1 : 1));
+  const active = items.filter(item => item.active);
+  const monthlyTotalMinor = active.reduce((total, item) => total + item.monthlyEquivalentMinor, 0);
+
+  const upcoming: UpcomingCharge[] = active
+    .filter(item => daysBetween(today(), item.nextDueDate) <= 30)
+    .map(item => ({ subscriptionId: item.id, name: item.name, dueDate: item.nextDueDate, amountMinor: item.amountMinor, currency: item.currency }));
+
+  const byDate = new Map<string, UpcomingCharge[]>();
+  for (const charge of upcoming) byDate.set(charge.dueDate, [...(byDate.get(charge.dueDate) ?? []), charge]);
+
+  const collisions = [...byDate.entries()]
+    .filter(([, charges]) => charges.length > 1)
+    .map(([date, charges]) => ({
+      date,
+      names: charges.map(charge => charge.name),
+      totalMinor: charges.reduce((total, charge) => total + (convertToHomeMinor(charge.amountMinor, charge.currency, lockedRate(charge.currency), HOME_CURRENCY) ?? 0), 0),
+    }));
+
+  return { items, homeCurrency: HOME_CURRENCY, activeCount: active.length, monthlyTotalMinor, yearlyTotalMinor: monthlyTotalMinor * 12, upcoming, collisions };
+}
+
+export function financeCategoriesView(state: FinanceState): CategoriesView {
+  const inRange = state.expenses.filter(expense => withinRange(expense, 'month'));
+  const items = categoryBreakdown(inRange, state.categories, HOME_CURRENCY);
+  const uncategorised = items.find(slice => slice.category.id === 'uncat');
+  return { items, homeCurrency: HOME_CURRENCY, uncategorised: { count: uncategorised?.count ?? 0, totalMinor: uncategorised?.totalMinor ?? 0 } };
+}
+
+function buildExpense(id: string, draft: ExpenseDraft): ExpenseDetail {
+  const amountMinor = parseAmountToMinor(draft.amountText, draft.currency) ?? 0;
+  const fxRate = lockedRate(draft.currency);
+  return {
+    id,
+    amountMinor,
+    amountText: draft.amountText,
+    currency: draft.currency,
+    fxRate,
+    homeAmountMinor: convertToHomeMinor(amountMinor, draft.currency, fxRate, HOME_CURRENCY),
+    categoryId: draft.categoryId,
+    merchant: draft.merchant,
+    note: draft.note,
+    occurredOnDate: draft.occurredOnDate,
+    loggedAt: new Date().toISOString(),
+    source: draft.source ?? 'manual',
+    syncState: 'synced',
+    audit: [{ text: 'Created', when: 'just now' }],
+  };
+}
+
+function createExpense(state: FinanceState, draft: ExpenseDraft): FinanceCommandResult {
+  const expense = buildExpense(draft.id ?? nextExpenseId(), draft);
+  state.expenses = [expense, ...state.expenses];
+  state.monthlyExpenseCount += 1;
+  if (draft.source === 'ocr') state.receiptScansUsed += 1;
+  return { id: expense.id, message: 'Expense saved.', advisory: deriveCapAdvisory('expenses', state.monthlyExpenseCount) };
+}
+
+function updateExpense(state: FinanceState, id: string, draft: ExpenseDraft): FinanceCommandResult {
+  state.expenses = state.expenses.map(expense =>
+    expense.id === id ? { ...buildExpense(id, draft), audit: [...expense.audit, { text: 'Edited', when: 'just now' }], loggedAt: expense.loggedAt } : expense,
+  );
+  return { id, message: 'Expense updated.' };
+}
+
+function createSubscription(state: FinanceState, draft: SubscriptionDraft): FinanceCommandResult {
+  const amountMinor = parseAmountToMinor(draft.amountText, draft.currency) ?? 0;
+  const created = subscription({
+    id: `sub-${Date.now().toString(36)}`,
+    name: draft.name,
+    note: draft.note,
+    amountMinor,
+    currency: draft.currency,
+    frequency: draft.frequency,
+    customIntervalDays: draft.customIntervalDays,
+    nextDueDate: draft.nextDueDate,
+    lastConfirmedDate: null,
+    categoryId: draft.categoryId,
+    reminderEnabled: draft.reminderEnabled,
+    reminderLead: draft.reminderLead,
+    active: true,
+  });
+  state.subscriptions = [...state.subscriptions, created];
+  return { id: created.id, message: 'Subscription added. It will prepare an expense for you to confirm when it comes due.' };
+}
+
+/**
+ * Confirm-on-fire, idempotent per cycle: a second confirmation of the same billing date finds the
+ * expense already written and reports it rather than logging the charge twice.
+ */
+function confirmCycle(state: FinanceState, id: string, billingDate: string): FinanceCommandResult {
+  const target = state.subscriptions.find(item => item.id === id);
+  if (!target) return { id, message: 'That subscription is no longer here.' };
+
+  const existing = state.expenses.find(expense => expense.linkedSubscriptionId === id && expense.occurredOnDate === billingDate);
+  if (existing) return { id: existing.id, message: 'Already confirmed for this cycle.' };
+
+  const expense = buildExpense(nextExpenseId(), {
+    amountText: target.amountText,
+    currency: target.currency,
+    categoryId: 'subs',
+    occurredOnDate: billingDate,
+    note: target.name,
+  });
+  state.expenses = [{ ...expense, linkedSubscriptionId: id }, ...state.expenses];
+  state.subscriptions = state.subscriptions.map(item => (item.id === id ? { ...item, lastConfirmedDate: billingDate } : item));
+  return { id: expense.id, message: `${target.name} confirmed for ${billingDate}.` };
+}
+
+/** The optimistic apply, shared by the fixtures and by the sync layer's replay of what is still queued. */
+export function applyFinanceCommand(state: FinanceState, command: FinanceCommand): FinanceCommandResult {
+  switch (command.type) {
+    case 'expense.create':
+      return createExpense(state, command.draft);
+    case 'expense.update':
+      return updateExpense(state, command.id, command.draft);
+    case 'expense.delete':
+      state.expenses = state.expenses.filter(expense => expense.id !== command.id);
+      return { id: command.id, message: 'Expense deleted.' };
+    case 'subscription.create':
+      return createSubscription(state, command.draft);
+    case 'subscription.setActive':
+      state.subscriptions = state.subscriptions.map(item => (item.id === command.id ? { ...item, active: command.active } : item));
+      return { id: command.id, message: command.active ? 'Subscription resumed.' : 'Subscription paused.' };
+    case 'subscription.confirmCycle':
+      return confirmCycle(state, command.id, command.billingDate);
+    case 'category.rename':
+      state.categories = state.categories.map(category => (category.id === command.id ? { ...category, name: command.name } : category));
+      return { id: command.id, message: 'Renamed. Every past expense follows the new name; the amounts are untouched.' };
+    case 'category.setArchived':
+      state.categories = state.categories.map(category => (category.id === command.id ? { ...category, archived: command.archived } : category));
+      return { id: command.id, message: command.archived ? 'Archived. It is hidden from new entries and kept in Insights.' : 'Restored.' };
+  }
+}
+
 export class FixtureFinanceProvider implements FinanceProvider {
-  private state = createState();
+  private readonly state = createState();
 
   async summary(range: FinanceRange): Promise<FinanceSummary> {
-    const inRange = this.state.expenses.filter(expense => withinRange(expense, range));
-    const spentMinor = sumHomeMinor(inRange, HOME_CURRENCY);
-    const budgetMinor = range === 'month' ? 160_000 : null;
-    const daysLogged = new Set(inRange.map(expense => expense.occurredOnDate)).size;
-    const activeSubscriptions = this.state.subscriptions.filter(item => item.active);
-    const nextDue = [...activeSubscriptions].sort((a, b) => (a.nextDueDate < b.nextDueDate ? -1 : 1))[0];
-
-    return {
-      range,
-      periodLabel: RANGE_LABELS[range],
-      homeCurrency: HOME_CURRENCY,
-      spentMinor,
-      spentDeltaFraction: range === 'month' ? -0.08 : null,
-      comparisonLabel: range === 'month' ? 'vs the month before' : '',
-      budgetMinor,
-      budgetLeftMinor: budgetMinor === null ? null : budgetMinor - spentMinor,
-      daysRemaining: 30 - Math.min(daysLogged, 30),
-      subscriptionsMonthlyMinor: activeSubscriptions.reduce((total, item) => total + item.monthlyEquivalentMinor, 0),
-      activeSubscriptions: activeSubscriptions.length,
-      nextSubscriptionLabel: nextDue ? `next ${nextDue.name} on ${nextDue.nextDueDate}` : 'none scheduled',
-      averageDayMinor: daysLogged > 0 ? Math.round(spentMinor / daysLogged) : 0,
-      daysLogged,
-      totalExpenses: this.state.monthlyExpenseCount,
-      categories: categoryBreakdown(inRange, this.state.categories, HOME_CURRENCY).filter(slice => slice.count > 0),
-      fxRates: [
-        { from: 'NOK', to: 'EUR', rate: FX_NOK_EUR },
-        { from: 'USD', to: 'EUR', rate: FX_USD_EUR },
-        { from: 'GBP', to: 'EUR', rate: FX_GBP_EUR },
-      ],
-      receiptScansUsed: this.state.receiptScansUsed,
-      receiptScanLimit: 10,
-      receiptQuotaResetsOn: 'tomorrow',
-      queuedExpense: this.state.expenses.find(expense => expense.syncState === 'queued') ?? null,
-    };
+    return financeSummary(this.state, range);
   }
 
   async expenses(query: ExpenseQuery): Promise<ExpensePage> {
-    const matched = this.state.expenses
-      .filter(expense => withinRange(expense, query.range))
-      .filter(expense => matchesSearch(expense, query.search ?? ''))
-      .filter(expense => !query.categoryId || expense.categoryId === query.categoryId)
-      .sort(byRecency);
-
-    const items = query.limit ? matched.slice(0, query.limit) : matched;
-    return { items, shown: items.length, total: matched.length, periodLabel: RANGE_LABELS[query.range], homeCurrency: HOME_CURRENCY };
+    return financeExpensePage(this.state, query);
   }
 
   async expense(id: string): Promise<ExpenseDetail | null> {
@@ -427,138 +572,15 @@ export class FixtureFinanceProvider implements FinanceProvider {
   }
 
   async subscriptions(): Promise<SubscriptionsView> {
-    const items = [...this.state.subscriptions].sort((a, b) => (a.nextDueDate < b.nextDueDate ? -1 : 1));
-    const active = items.filter(item => item.active);
-    const monthlyTotalMinor = active.reduce((total, item) => total + item.monthlyEquivalentMinor, 0);
-
-    const upcoming: UpcomingCharge[] = active
-      .filter(item => daysBetween(today(), item.nextDueDate) <= 30)
-      .map(item => ({ subscriptionId: item.id, name: item.name, dueDate: item.nextDueDate, amountMinor: item.amountMinor, currency: item.currency }));
-
-    const byDate = new Map<string, UpcomingCharge[]>();
-    for (const charge of upcoming) byDate.set(charge.dueDate, [...(byDate.get(charge.dueDate) ?? []), charge]);
-
-    const collisions = [...byDate.entries()]
-      .filter(([, charges]) => charges.length > 1)
-      .map(([date, charges]) => ({
-        date,
-        names: charges.map(charge => charge.name),
-        totalMinor: charges.reduce((total, charge) => total + (convertToHomeMinor(charge.amountMinor, charge.currency, lockedRate(charge.currency), HOME_CURRENCY) ?? 0), 0),
-      }));
-
-    return { items, homeCurrency: HOME_CURRENCY, activeCount: active.length, monthlyTotalMinor, yearlyTotalMinor: monthlyTotalMinor * 12, upcoming, collisions };
+    return financeSubscriptionsView(this.state);
   }
 
   async categories(): Promise<CategoriesView> {
-    const inRange = this.state.expenses.filter(expense => withinRange(expense, 'month'));
-    const items = categoryBreakdown(inRange, this.state.categories, HOME_CURRENCY);
-    const uncategorised = items.find(slice => slice.category.id === 'uncat');
-    return { items, homeCurrency: HOME_CURRENCY, uncategorised: { count: uncategorised?.count ?? 0, totalMinor: uncategorised?.totalMinor ?? 0 } };
+    return financeCategoriesView(this.state);
   }
 
   async dispatchCommand(command: FinanceCommand): Promise<FinanceCommandResult> {
-    switch (command.type) {
-      case 'expense.create':
-        return this.createExpense(command.draft);
-      case 'expense.update':
-        return this.updateExpense(command.id, command.draft);
-      case 'expense.delete':
-        this.state.expenses = this.state.expenses.filter(expense => expense.id !== command.id);
-        return { id: command.id, message: 'Expense deleted.' };
-      case 'subscription.create':
-        return this.createSubscription(command.draft);
-      case 'subscription.setActive':
-        this.state.subscriptions = this.state.subscriptions.map(item => (item.id === command.id ? { ...item, active: command.active } : item));
-        return { id: command.id, message: command.active ? 'Subscription resumed.' : 'Subscription paused.' };
-      case 'subscription.confirmCycle':
-        return this.confirmCycle(command.id, command.billingDate);
-      case 'category.rename':
-        this.state.categories = this.state.categories.map(category => (category.id === command.id ? { ...category, name: command.name } : category));
-        return { id: command.id, message: 'Renamed. Every past expense follows the new name; the amounts are untouched.' };
-      case 'category.setArchived':
-        this.state.categories = this.state.categories.map(category => (category.id === command.id ? { ...category, archived: command.archived } : category));
-        return { id: command.id, message: command.archived ? 'Archived. It is hidden from new entries and kept in Insights.' : 'Restored.' };
-    }
-  }
-
-  private buildExpense(id: string, draft: ExpenseDraft): ExpenseDetail {
-    const amountMinor = parseAmountToMinor(draft.amountText, draft.currency) ?? 0;
-    const fxRate = lockedRate(draft.currency);
-    return {
-      id,
-      amountMinor,
-      amountText: draft.amountText,
-      currency: draft.currency,
-      fxRate,
-      homeAmountMinor: convertToHomeMinor(amountMinor, draft.currency, fxRate, HOME_CURRENCY),
-      categoryId: draft.categoryId,
-      merchant: draft.merchant,
-      note: draft.note,
-      occurredOnDate: draft.occurredOnDate,
-      loggedAt: new Date().toISOString(),
-      source: draft.source ?? 'manual',
-      syncState: 'synced',
-      audit: [{ text: 'Created', when: 'just now' }],
-    };
-  }
-
-  private createExpense(draft: ExpenseDraft): FinanceCommandResult {
-    const expense = this.buildExpense(nextExpenseId(), draft);
-    this.state.expenses = [expense, ...this.state.expenses];
-    this.state.monthlyExpenseCount += 1;
-    if (draft.source === 'ocr') this.state.receiptScansUsed += 1;
-    return { id: expense.id, message: 'Expense saved.', advisory: deriveCapAdvisory('expenses', this.state.monthlyExpenseCount) };
-  }
-
-  private updateExpense(id: string, draft: ExpenseDraft): FinanceCommandResult {
-    this.state.expenses = this.state.expenses.map(expense =>
-      expense.id === id ? { ...this.buildExpense(id, draft), audit: [...expense.audit, { text: 'Edited', when: 'just now' }], loggedAt: expense.loggedAt } : expense,
-    );
-    return { id, message: 'Expense updated.' };
-  }
-
-  private createSubscription(draft: SubscriptionDraft): FinanceCommandResult {
-    const amountMinor = parseAmountToMinor(draft.amountText, draft.currency) ?? 0;
-    const created = subscription({
-      id: `sub-${Date.now().toString(36)}`,
-      name: draft.name,
-      note: draft.note,
-      amountMinor,
-      currency: draft.currency,
-      frequency: draft.frequency,
-      customIntervalDays: draft.customIntervalDays,
-      nextDueDate: draft.nextDueDate,
-      lastConfirmedDate: null,
-      categoryId: draft.categoryId,
-      reminderEnabled: draft.reminderEnabled,
-      reminderLead: draft.reminderLead,
-      active: true,
-    });
-    this.state.subscriptions = [...this.state.subscriptions, created];
-    return { id: created.id, message: 'Subscription added. It will prepare an expense for you to confirm when it comes due.' };
-  }
-
-  /**
-   * Confirm-on-fire, idempotent per cycle: a second confirmation of the same billing date finds the
-   * expense already written and reports it rather than logging the charge twice.
-   */
-  private confirmCycle(id: string, billingDate: string): FinanceCommandResult {
-    const target = this.state.subscriptions.find(item => item.id === id);
-    if (!target) return { id, message: 'That subscription is no longer here.' };
-
-    const existing = this.state.expenses.find(expense => expense.linkedSubscriptionId === id && expense.occurredOnDate === billingDate);
-    if (existing) return { id: existing.id, message: 'Already confirmed for this cycle.' };
-
-    const expense = this.buildExpense(nextExpenseId(), {
-      amountText: target.amountText,
-      currency: target.currency,
-      categoryId: 'subs',
-      occurredOnDate: billingDate,
-      note: target.name,
-    });
-    this.state.expenses = [{ ...expense, linkedSubscriptionId: id }, ...this.state.expenses];
-    this.state.subscriptions = this.state.subscriptions.map(item => (item.id === id ? { ...item, lastConfirmedDate: billingDate } : item));
-    return { id: expense.id, message: `${target.name} confirmed for ${billingDate}.` };
+    return applyFinanceCommand(this.state, command);
   }
 }
 

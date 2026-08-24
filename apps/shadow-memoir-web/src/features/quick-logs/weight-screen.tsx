@@ -2,8 +2,9 @@ import { type ReactElement, useState } from 'react';
 import { Button, Card, ConfirmDialog, EmptyState, NumberStepper, Skeleton, Statistic, toast } from '@shadow-library/ui';
 
 import { EntryCapNote } from '@/components/EntryCapNote';
+import { LinkageOfferNote } from '@/components/LinkageOfferNote';
 import { SparkBars } from '@/components/SparkBars';
-import { type EntryCapAdvisory, kgToLb, todayISODate, useQuickLogCommand, useWeight, type WeightEntry } from '@/lib/data';
+import { type EntryCapAdvisory, kgToLb, type QuestLinkageOffer, todayISODate, useQuickLogCommand, useWeight, type WeightEntry } from '@/lib/data';
 
 import styles from './quick-logs.module.css';
 
@@ -14,6 +15,7 @@ export function WeightScreen(): ReactElement {
   const [kg, setKg] = useState<number | null>(null);
   const [pendingReplacement, setPendingReplacement] = useState<WeightEntry | null>(null);
   const [advisory, setAdvisory] = useState<EntryCapAdvisory | null>(null);
+  const [linkage, setLinkage] = useState<QuestLinkageOffer | null>(null);
 
   const view = weight.data;
   const value = kg ?? view?.today?.kg ?? null;
@@ -27,6 +29,7 @@ export function WeightScreen(): ReactElement {
           if (result.needsConfirmation) return setPendingReplacement(result.needsConfirmation.existing);
           setPendingReplacement(null);
           setAdvisory(result.advisory ?? null);
+          setLinkage(result.linkageOffer ?? null);
           toast.success(result.message);
         },
       },
@@ -78,6 +81,7 @@ export function WeightScreen(): ReactElement {
               </div>
 
               <EntryCapNote advisory={advisory} />
+              <LinkageOfferNote offer={linkage} />
             </div>
           </Card>
 

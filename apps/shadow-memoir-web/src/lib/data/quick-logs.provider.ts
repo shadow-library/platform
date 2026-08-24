@@ -26,9 +26,11 @@ import {
   type Meal,
   type MealPreset,
   type MealsView,
+  type QuestLinkageOffer,
   type QuickLogCommand,
   type QuickLogCommandResult,
   type SideQuest,
+  type SideQuestDraft,
   type SideQuestsView,
   type WeightEntry,
   type WeightView,
@@ -73,7 +75,8 @@ export const HEALTH_METRICS: HealthMetricDefinition[] = [
   { key: 'water', name: 'Water', unit: 'l', step: 0.1, precision: 1, threshold: { value: 2, questTitle: 'Drink 2 litres', xp: 20 } },
 ];
 
-interface QuickLogState {
+/** The whole of what a quick-log provider holds. The fixtures seed it; the sync layer projects it from delta rows — {@link applyQuickLogCommand} is shared by both. */
+export interface QuickLogState {
   journal: JournalEntry[];
   promptDismissed: boolean;
   meals: Meal[];
@@ -371,127 +374,152 @@ export class FixtureQuickLogProvider implements QuickLogProvider {
   }
 
   async dispatchCommand(command: QuickLogCommand): Promise<QuickLogCommandResult> {
-    switch (command.type) {
-      case 'journal.save':
-        return this.saveJournal(command.draft);
-      case 'journal.dismissPrompt':
-        this.state.promptDismissed = true;
-        return { id: 'prompt', message: 'Put away for today.' };
-      case 'meal.log':
-        return this.logMeal({ ...command.draft, sourceLabel: 'Typed', proteinG: 0, carbsG: 0, fatG: 0 });
-      case 'meal.logPreset':
-        return this.logPreset(command.presetId, command.date);
-      case 'meal.savePreset':
-        return this.savePreset(command.preset);
-      case 'weight.save':
-        return this.saveWeight(command.date, command.kg, command.confirmedReplacement);
-      case 'sidequest.log':
-        return this.logSideQuest(command.draft);
-      case 'health.save':
-        return this.saveMetric(command.key, command.date, command.value);
-      case 'health.acceptOffer':
-        return { id: `${command.key}-${command.date}`, message: 'Quest completed. The reward is the quest’s own, not the log’s.' };
-    }
+    return applyQuickLogCommand(this.state, command);
   }
+}
 
-  private saveJournal(draft: JournalDraft): QuickLogCommandResult {
-    const alreadyLogged = !isFirstOfDay(this.state.journal, draft.date);
-    const entry: JournalEntry = {
-      id: `journal-${Date.now().toString(36)}`,
-      date: draft.date,
-      title: journalExcerpt(draft.text, 40) || 'Untitled',
-      text: draft.text,
-      mood: draft.mood,
-      tags: draft.tags ?? [],
-      wordCount: journalWordCount(draft.text),
-      loggedAt: new Date().toISOString(),
-      rewarded: !alreadyLogged,
-    };
-    this.state.journal = [entry, ...this.state.journal];
-    this.state.monthlyCounts.journal += 1;
-    return { id: entry.id, message: 'Entry saved.', reward: firstOfDayReward('journal', alreadyLogged), advisory: deriveCapAdvisory('journal', this.state.monthlyCounts.journal) };
-  }
+export interface QuickLogApplyContext {
+  /** The module-linked quest this entry could satisfy. Present means the entry's own reward is suppressed — the quest's reward is the owner's to claim (PRD §2.6). */
+  linkage?: QuestLinkageOffer | null;
+}
 
-  private logMeal(meal: Omit<Meal, 'id' | 'loggedAt' | 'rewarded'>): QuickLogCommandResult {
-    const alreadyLogged = !isFirstOfDay(this.state.meals, meal.date);
-    const saved: Meal = { ...meal, id: `meal-${Date.now().toString(36)}`, loggedAt: new Date().toISOString(), rewarded: !alreadyLogged };
-    this.state.meals = [...this.state.meals, saved];
-    this.state.monthlyCounts.meals += 1;
-    return {
-      id: saved.id,
-      message: `${saved.name} logged.`,
-      reward: firstOfDayReward('meal', alreadyLogged),
-      advisory: deriveCapAdvisory('meals', this.state.monthlyCounts.meals),
-    };
-  }
+function saveJournal(state: QuickLogState, draft: JournalDraft, context: QuickLogApplyContext): QuickLogCommandResult {
+  const suppressed = !isFirstOfDay(state.journal, draft.date) || Boolean(context.linkage);
+  const entry: JournalEntry = {
+    id: draft.id ?? `journal-${Date.now().toString(36)}`,
+    date: draft.date,
+    title: journalExcerpt(draft.text, 40) || 'Untitled',
+    text: draft.text,
+    mood: draft.mood,
+    tags: draft.tags ?? [],
+    wordCount: journalWordCount(draft.text),
+    loggedAt: new Date().toISOString(),
+    rewarded: !suppressed,
+  };
+  state.journal = [entry, ...state.journal];
+  state.monthlyCounts.journal += 1;
+  return {
+    id: entry.id,
+    message: 'Entry saved.',
+    reward: firstOfDayReward('journal', suppressed),
+    advisory: deriveCapAdvisory('journal', state.monthlyCounts.journal),
+    ...(context.linkage ? { linkageOffer: context.linkage } : {}),
+  };
+}
 
-  private logPreset(presetId: string, date: string): QuickLogCommandResult {
-    const preset = this.state.presets.find(item => item.id === presetId);
-    if (!preset) return { id: presetId, message: 'That preset is no longer here.' };
+function logMeal(state: QuickLogState, meal: Omit<Meal, 'loggedAt' | 'rewarded'>, context: QuickLogApplyContext): QuickLogCommandResult {
+  const suppressed = !isFirstOfDay(state.meals, meal.date) || Boolean(context.linkage);
+  const saved: Meal = { ...meal, loggedAt: new Date().toISOString(), rewarded: !suppressed };
+  state.meals = [...state.meals, saved];
+  state.monthlyCounts.meals += 1;
+  return {
+    id: saved.id,
+    message: `${saved.name} logged.`,
+    reward: firstOfDayReward('meal', suppressed),
+    advisory: deriveCapAdvisory('meals', state.monthlyCounts.meals),
+    ...(context.linkage ? { linkageOffer: context.linkage } : {}),
+  };
+}
 
-    const alreadyLogged = !isFirstOfDay(this.state.meals, date);
-    const meal = snapshotPresetToMeal(preset, { id: `meal-${Date.now().toString(36)}`, date, loggedAt: new Date().toISOString(), rewarded: !alreadyLogged });
-    this.state.meals = [...this.state.meals, meal];
-    this.state.presets = this.state.presets.map(item => (item.id === presetId ? { ...item, usageCount: item.usageCount + 1 } : item));
-    this.state.monthlyCounts.meals += 1;
-    return { id: meal.id, message: `${meal.name} logged.`, reward: firstOfDayReward('meal', alreadyLogged), advisory: deriveCapAdvisory('meals', this.state.monthlyCounts.meals) };
-  }
+function logPreset(state: QuickLogState, presetId: string, date: string, id: string | undefined, context: QuickLogApplyContext): QuickLogCommandResult {
+  const preset = state.presets.find(item => item.id === presetId);
+  if (!preset) return { id: presetId, message: 'That preset is no longer here.' };
 
-  private savePreset(preset: Omit<MealPreset, 'id' | 'usageCount'>): QuickLogCommandResult {
-    const saved: MealPreset = { ...preset, id: `preset-${Date.now().toString(36)}`, usageCount: 0 };
-    this.state.presets = [...this.state.presets, saved];
-    return { id: saved.id, message: `${saved.name} saved as a preset. Meals already logged keep the values they were logged with.` };
-  }
+  const suppressed = !isFirstOfDay(state.meals, date) || Boolean(context.linkage);
+  const meal = snapshotPresetToMeal(preset, { id: id ?? `meal-${Date.now().toString(36)}`, date, loggedAt: new Date().toISOString(), rewarded: !suppressed });
+  state.meals = [...state.meals, meal];
+  state.presets = state.presets.map(item => (item.id === presetId ? { ...item, usageCount: item.usageCount + 1 } : item));
+  state.monthlyCounts.meals += 1;
+  return {
+    id: meal.id,
+    message: `${meal.name} logged.`,
+    reward: firstOfDayReward('meal', suppressed),
+    advisory: deriveCapAdvisory('meals', state.monthlyCounts.meals),
+    ...(context.linkage ? { linkageOffer: context.linkage } : {}),
+  };
+}
 
-  private saveWeight(date: string, kg: number, confirmedReplacement: boolean): QuickLogCommandResult {
-    const existing = sameDayWeight(this.state.weights, date);
-    if (existing && !confirmedReplacement)
-      return { id: existing.id, message: 'One value a day — confirm to replace today’s.', needsConfirmation: { kind: 'weight-replace', existing } };
+function savePreset(state: QuickLogState, preset: Omit<MealPreset, 'id' | 'usageCount'>): QuickLogCommandResult {
+  const saved: MealPreset = { ...preset, id: `preset-${Date.now().toString(36)}`, usageCount: 0 };
+  state.presets = [...state.presets, saved];
+  return { id: saved.id, message: `${saved.name} saved as a preset. Meals already logged keep the values they were logged with.` };
+}
 
-    const entry: WeightEntry = {
-      id: existing?.id ?? `weight-${Date.now().toString(36)}`,
-      date,
-      kg,
-      loggedAt: new Date().toISOString(),
-      rewarded: existing ? existing.rewarded : true,
-      replacedKg: existing?.kg,
-      note: existing ? `Replaced ${existing.kg} kg` : undefined,
-    };
-    this.state.weights = existing ? this.state.weights.map(item => (item.id === existing.id ? entry : item)) : [entry, ...this.state.weights];
-    if (!existing) this.state.monthlyCounts.weight += 1;
+function saveWeight(state: QuickLogState, date: string, kg: number, confirmedReplacement: boolean, context: QuickLogApplyContext): QuickLogCommandResult {
+  const existing = sameDayWeight(state.weights, date);
+  if (existing && !confirmedReplacement)
+    return { id: existing.id, message: 'One value a day — confirm to replace today’s.', needsConfirmation: { kind: 'weight-replace', existing } };
 
-    return {
-      id: entry.id,
-      message: existing ? `Replaced ${existing.kg} kg with ${kg} kg. The old value stays in History.` : 'Weight saved.',
-      reward: firstOfDayReward('weight', Boolean(existing)),
-      advisory: deriveCapAdvisory('weight', this.state.monthlyCounts.weight),
-    };
-  }
+  const suppressed = Boolean(existing) || Boolean(context.linkage);
+  const entry: WeightEntry = {
+    id: existing?.id ?? date,
+    date,
+    kg,
+    loggedAt: new Date().toISOString(),
+    rewarded: existing ? existing.rewarded : !suppressed,
+    replacedKg: existing?.kg,
+    note: existing ? `Replaced ${existing.kg} kg` : undefined,
+  };
+  state.weights = existing ? state.weights.map(item => (item.id === existing.id ? entry : item)) : [entry, ...state.weights];
+  if (!existing) state.monthlyCounts.weight += 1;
 
-  private logSideQuest(draft: { date: string; name: string; statAffinity: SideQuest['statAffinity'] }): QuickLogCommandResult {
-    const reward = nextSideQuestReward(rewardedSideQuestsOn(this.state.sideQuests, draft.date));
-    const entry: SideQuest = {
-      id: `sq-${Date.now().toString(36)}`,
-      date: draft.date,
-      name: draft.name,
-      statAffinity: draft.statAffinity,
-      xpAwarded: reward.xp,
-      coinsAwarded: reward.coins,
-      statTicked: reward.statTicked,
-      rewarded: reward.rewarded,
-      loggedAt: new Date().toISOString(),
-      meta: 'Just now',
-    };
-    this.state.sideQuests = [entry, ...this.state.sideQuests];
-    this.state.monthlyCounts.sidequests += 1;
-    return { id: entry.id, message: `${entry.name} logged.`, reward, advisory: deriveCapAdvisory('sidequests', this.state.monthlyCounts.sidequests) };
-  }
+  return {
+    id: entry.id,
+    message: existing ? `Replaced ${existing.kg} kg with ${kg} kg. The old value stays in History.` : 'Weight saved.',
+    reward: firstOfDayReward('weight', suppressed),
+    advisory: deriveCapAdvisory('weight', state.monthlyCounts.weight),
+    ...(context.linkage ? { linkageOffer: context.linkage } : {}),
+  };
+}
 
-  private saveMetric(key: HealthMetricKey, date: string, value: number): QuickLogCommandResult {
-    const existing = this.state.metrics.find(item => item.key === key && item.date === date) ?? null;
-    const entry: HealthMetricEntry = { key, date, value, loggedAt: new Date().toISOString(), replacedValue: existing?.value ?? null, source: 'manual' };
-    this.state.metrics = existing ? this.state.metrics.map(item => (item === existing ? entry : item)) : [entry, ...this.state.metrics];
-    return { id: `${key}-${date}`, message: existing ? `Replaced ${existing.value} with ${value}.` : 'Saved.' };
+function logSideQuest(state: QuickLogState, draft: SideQuestDraft): QuickLogCommandResult {
+  const reward = nextSideQuestReward(rewardedSideQuestsOn(state.sideQuests, draft.date));
+  const entry: SideQuest = {
+    id: draft.id ?? `sq-${Date.now().toString(36)}`,
+    date: draft.date,
+    name: draft.name,
+    statAffinity: draft.statAffinity,
+    xpAwarded: reward.xp,
+    coinsAwarded: reward.coins,
+    statTicked: reward.statTicked,
+    rewarded: reward.rewarded,
+    loggedAt: new Date().toISOString(),
+    meta: 'Just now',
+  };
+  state.sideQuests = [entry, ...state.sideQuests];
+  state.monthlyCounts.sidequests += 1;
+  return { id: entry.id, message: `${entry.name} logged.`, reward, advisory: deriveCapAdvisory('sidequests', state.monthlyCounts.sidequests) };
+}
+
+function saveMetric(state: QuickLogState, key: HealthMetricKey, date: string, value: number): QuickLogCommandResult {
+  const existing = state.metrics.find(item => item.key === key && item.date === date) ?? null;
+  const entry: HealthMetricEntry = { key, date, value, loggedAt: new Date().toISOString(), replacedValue: existing?.value ?? null, source: 'manual' };
+  state.metrics = existing ? state.metrics.map(item => (item === existing ? entry : item)) : [entry, ...state.metrics];
+  return { id: `${key}-${date}`, message: existing ? `Replaced ${existing.value} with ${value}.` : 'Saved.' };
+}
+
+/** The optimistic apply, shared by the fixtures and by the sync layer's replay of what is still queued. */
+export function applyQuickLogCommand(state: QuickLogState, command: QuickLogCommand, context: QuickLogApplyContext = {}): QuickLogCommandResult {
+  switch (command.type) {
+    case 'journal.save':
+      return saveJournal(state, command.draft, context);
+    case 'journal.dismissPrompt':
+      state.promptDismissed = true;
+      return { id: 'prompt', message: 'Put away for today.' };
+    case 'meal.log':
+      return logMeal(state, { ...command.draft, id: command.draft.id ?? `meal-${Date.now().toString(36)}`, sourceLabel: 'Typed', proteinG: 0, carbsG: 0, fatG: 0 }, context);
+    case 'meal.logPreset':
+      return logPreset(state, command.presetId, command.date, command.id, context);
+    case 'meal.savePreset':
+      return savePreset(state, command.preset);
+    case 'weight.save':
+      return saveWeight(state, command.date, command.kg, command.confirmedReplacement, context);
+    case 'sidequest.log':
+      return logSideQuest(state, command.draft);
+    case 'health.save':
+      return saveMetric(state, command.key, command.date, command.value);
+    case 'health.acceptOffer':
+      return { id: `${command.key}-${command.date}`, message: 'Quest completed. The reward is the quest’s own, not the log’s.' };
   }
 }
 

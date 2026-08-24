@@ -1,10 +1,18 @@
-import { type Command } from '@/lib/data';
-
 import { type MemoirStore } from './memoir-store';
 import { type DomainRows, projectWorldState } from './projection';
 import { Outbox } from './outbox';
 import { SyncClient, SyncTransportError } from './sync-client';
-import { type CommandEnvelope, type DeltaPage, type OutboxEntry, SNAPSHOT_DOMAINS, SYNC_DOMAINS, SYNC_META_KEYS, type SyncNotice, type SyncSnapshot } from './sync.types';
+import {
+  type CommandEnvelope,
+  type DeltaPage,
+  type OutboxEntry,
+  SNAPSHOT_DOMAINS,
+  SYNC_DOMAINS,
+  SYNC_META_KEYS,
+  type SyncCommand,
+  type SyncNotice,
+  type SyncSnapshot,
+} from './sync.types';
 
 export interface SyncEngineOptions {
   store: MemoirStore;
@@ -72,6 +80,15 @@ export class SyncEngine {
     return projectWorldState(this.rows, this.options.today);
   }
 
+  /** The mirrored rows themselves, for the domain providers that project their own shapes rather than the quest world. */
+  domains(): Partial<DomainRows> {
+    return this.rows;
+  }
+
+  get today(): string {
+    return this.options.today;
+  }
+
   /** Hydrates the projected world from IndexedDB, then attempts one sync pass. A cold offline launch stops after the hydrate. */
   async start(): Promise<void> {
     await this.hydrate();
@@ -84,7 +101,7 @@ export class SyncEngine {
   }
 
   /** Enqueues a command for the server; the caller has already applied it locally. Purely-local commands return without queueing. */
-  async enqueue(command: Command, localDate: string): Promise<void> {
+  async enqueue(command: SyncCommand, localDate: string): Promise<void> {
     const entry = await this.outbox.enqueue(command, localDate);
     if (!entry) return;
     this.patch({ queuedCount: await this.outbox.size() });

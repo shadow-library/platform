@@ -1,13 +1,37 @@
 import {
+  BUILT_IN_CATEGORIES,
+  type CosmeticKind,
+  type CurrencyCode,
+  type ExpenseCategory,
+  type ExpenseCategoryId,
+  type ExpenseDetail,
+  HEALTH_METRIC_NAMES,
+  type HealthMetricEntry,
+  type HealthMetricKey,
+  type JournalEntry,
+  journalExcerpt,
+  journalWordCount,
   type LogRecord,
+  type Meal,
+  type MealPreset,
+  type MealType,
   type MemoirWorldState,
   type Momentum,
+  type MoodValence,
   type Quest,
   type QuestProgress,
   type Recurrence,
+  type ReminderLead,
+  type SideQuest,
   type StatAffinity,
   type Strictness,
+  type Subscription,
+  type SubscriptionCategoryId,
+  type SubscriptionFrequency,
+  type ThresholdOffer,
+  UNCATEGORISED,
   type Weekday,
+  type WeightEntry,
 } from '@/lib/data';
 
 import { type DeltaRow, type SyncDomain } from './sync.types';
@@ -182,4 +206,255 @@ export function projectWorldState(rows: Partial<DomainRows>, today: string): Mem
  */
 export function emptyWorldState(today: string): MemoirWorldState {
   return projectWorldState({}, today);
+}
+
+export interface FinanceRows {
+  expenses: ExpenseDetail[];
+  subscriptions: Subscription[];
+  categories: ExpenseCategory[];
+}
+
+export interface QuickLogRows {
+  journal: JournalEntry[];
+  meals: Meal[];
+  presets: MealPreset[];
+  weights: WeightEntry[];
+  sideQuests: SideQuest[];
+  metricEntries: HealthMetricEntry[];
+  /** The account's catalogue id per built-in health metric, matched on `isHealth` + `name` — what `health.save` needs to become a `metric.register`. */
+  metricIds: Partial<Record<HealthMetricKey, string>>;
+  offers: ThresholdOffer[];
+}
+
+export interface HeroGrants {
+  achievements: Record<string, string>;
+  titles: Record<string, string>;
+  ownedCosmetics: Set<string>;
+  equippedCosmetics: Partial<Record<CosmeticKind, string>>;
+  displayedTitleId: string | null;
+}
+
+function nullableText(row: DeltaRow, key: string): string | undefined {
+  const value = row[key];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function numberOrNull(row: DeltaRow, key: string): number | null {
+  const value = row[key];
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) return Number(value);
+  return null;
+}
+
+function toExpense(row: DeltaRow): ExpenseDetail {
+  const amountMinor = number(row, 'amountMinor');
+  return {
+    id: String(row['id']),
+    amountMinor,
+    amountText: text(row, 'amountText') ?? String(amountMinor / 100),
+    currency: (text(row, 'currency') ?? 'EUR') as CurrencyCode,
+    fxRate: numberOrNull(row, 'fxRate'),
+    homeAmountMinor: numberOrNull(row, 'homeAmountMinor'),
+    categoryId: (text(row, 'categoryId') ?? 'uncat') as ExpenseCategoryId,
+    merchant: nullableText(row, 'merchant'),
+    note: nullableText(row, 'note'),
+    occurredOnDate: text(row, 'occurredOn') ?? '',
+    loggedAt: text(row, 'loggedAt') ?? '',
+    source: (text(row, 'source') ?? 'manual') as ExpenseDetail['source'],
+    syncState: 'synced',
+    linkedSubscriptionId: nullableText(row, 'linkedSubscriptionId'),
+    audit: [],
+  };
+}
+
+function toExpenseCategory(row: DeltaRow): ExpenseCategory {
+  const key = (text(row, 'key') ?? 'uncat') as ExpenseCategoryId;
+  const builtin = BUILT_IN_CATEGORIES.find(category => category.id === key) ?? UNCATEGORISED;
+  return { ...builtin, id: key, name: text(row, 'label') ?? builtin.name, archived: !bool(row, 'active', true) };
+}
+
+const REMINDER_LEAD_LOCAL: Record<string, ReminderLead> = { on_day: 'on-day', '1_day': '1-day', '2_day': '2-day', '3_day': '3-day', '1_week': '1-week' };
+
+/** The inverse of `command-wire.ts`'s `subscriptionCategoryWire`, and lossy by construction: three subscription groupings share the `subs` expense key, so the whole class projects back as `tools`. */
+const SUBSCRIPTION_CATEGORY_LOCAL: Record<string, SubscriptionCategoryId> = { subs: 'tools', health: 'health', shopping: 'books' };
+
+function toSubscription(row: DeltaRow): Subscription {
+  const nextDueDate = text(row, 'nextDueDate') ?? '';
+  return {
+    id: String(row['id']),
+    name: text(row, 'name') ?? 'Subscription',
+    note: nullableText(row, 'note'),
+    amountMinor: number(row, 'amountMinor'),
+    amountText: text(row, 'amountText') ?? '',
+    currency: (text(row, 'currency') ?? 'EUR') as CurrencyCode,
+    frequency: (text(row, 'frequency') ?? 'monthly') as SubscriptionFrequency,
+    customIntervalDays: numberOrNull(row, 'customIntervalDays') ?? undefined,
+    billingDay: number(row, 'billingDay', Number(nextDueDate.slice(8, 10)) || 1),
+    nextDueDate,
+    lastConfirmedDate: text(row, 'lastConfirmedDate'),
+    categoryId: SUBSCRIPTION_CATEGORY_LOCAL[text(row, 'categoryId') ?? ''] ?? 'tools',
+    reminderEnabled: bool(row, 'reminderEnabled'),
+    reminderLead: REMINDER_LEAD_LOCAL[text(row, 'reminderLead') ?? ''] ?? 'on-day',
+    monthlyEquivalentMinor: number(row, 'monthlyEquivalentMinor'),
+    active: bool(row, 'active', true),
+    createdAt: text(row, 'createdAt') ?? '',
+  };
+}
+
+export function projectFinanceRows(rows: Partial<DomainRows>): FinanceRows {
+  const categories = (rows.expense_categories ?? []).map(toExpenseCategory);
+  return {
+    expenses: (rows.expenses ?? []).map(toExpense),
+    subscriptions: (rows.subscriptions ?? []).map(toSubscription),
+    categories: categories.length > 0 ? categories : [...BUILT_IN_CATEGORIES],
+  };
+}
+
+function toJournalEntry(row: DeltaRow): JournalEntry {
+  const body = text(row, 'text') ?? '';
+  return {
+    id: String(row['id']),
+    date: String(row['date']),
+    title: journalExcerpt(body, 40) || 'Untitled',
+    text: body,
+    mood: numberOrNull(row, 'mood') as MoodValence | null,
+    tags: Array.isArray(row['tags']) ? (row['tags'] as string[]) : [],
+    wordCount: journalWordCount(body),
+    loggedAt: text(row, 'loggedAt') ?? '',
+    rewarded: bool(row, 'rewarded'),
+  };
+}
+
+/** The server keeps calories and no macros (ARCHITECTURE §10.3), so a projected meal carries zeroes rather than invented grams. */
+function toMeal(row: DeltaRow): Meal {
+  const presetId = nullableText(row, 'presetId');
+  return {
+    id: String(row['id']),
+    date: String(row['date']),
+    name: text(row, 'name') ?? 'Meal',
+    calories: number(row, 'calories'),
+    mealType: (text(row, 'mealType') ?? 'cooked') as MealType,
+    note: nullableText(row, 'note'),
+    proteinG: 0,
+    carbsG: 0,
+    fatG: 0,
+    loggedAt: text(row, 'loggedAt') ?? '',
+    rewarded: bool(row, 'rewarded'),
+    ...(presetId ? { presetId } : {}),
+    sourceLabel: presetId ? 'Preset' : 'Typed',
+  };
+}
+
+function toMealPreset(row: DeltaRow): MealPreset {
+  return {
+    id: String(row['id']),
+    name: text(row, 'name') ?? 'Preset',
+    calories: number(row, 'calories'),
+    mealType: (text(row, 'mealType') ?? 'cooked') as MealType,
+    note: nullableText(row, 'note'),
+    proteinG: 0,
+    carbsG: 0,
+    fatG: 0,
+    usageCount: 0,
+  };
+}
+
+function toWeightEntry(row: DeltaRow): WeightEntry {
+  const date = String(row['date']);
+  return { id: date, date, kg: number(row, 'kg'), loggedAt: text(row, 'loggedAt') ?? '', rewarded: bool(row, 'rewarded') };
+}
+
+function toSideQuest(row: DeltaRow): SideQuest {
+  const date = String(row['date']);
+  return {
+    id: String(row['id']),
+    date,
+    name: text(row, 'name') ?? 'Side quest',
+    statAffinity: (text(row, 'statAffinity') ?? 'discipline') as StatAffinity,
+    xpAwarded: number(row, 'xpAwarded'),
+    coinsAwarded: number(row, 'coinsAwarded'),
+    statTicked: number(row, 'statTicked') > 0,
+    rewarded: bool(row, 'rewarded'),
+    loggedAt: text(row, 'loggedAt') ?? '',
+    meta: date,
+  };
+}
+
+function healthMetricIds(rows: DeltaRow[]): Partial<Record<HealthMetricKey, string>> {
+  const ids: Partial<Record<HealthMetricKey, string>> = {};
+  for (const row of rows) {
+    if (!bool(row, 'isHealth')) continue;
+    const name = text(row, 'name');
+    for (const [key, metricName] of Object.entries(HEALTH_METRIC_NAMES)) if (metricName === name) ids[key as HealthMetricKey] = String(row['id']);
+  }
+  return ids;
+}
+
+function toThresholdOffer(row: DeltaRow, keyOf: (metricId: string) => HealthMetricKey | null): ThresholdOffer | null {
+  const metricKey = keyOf(String(row['metricId']));
+  if (!metricKey) return null;
+
+  const thresholdValue = number(row, 'thresholdValue');
+  const currentValue = number(row, 'currentValue');
+  const questTitle = text(row, 'questName') ?? 'the quest';
+  return {
+    metricKey,
+    questId: String(row['questId']),
+    questTitle,
+    thresholdValue,
+    currentValue,
+    ratio: thresholdValue > 0 ? Math.min(currentValue / thresholdValue, 1) : 1,
+    met: true,
+    xp: 0,
+    note: `Threshold ${thresholdValue} reached — the quest is waiting for you.`,
+  };
+}
+
+export function projectQuickLogRows(rows: Partial<DomainRows>): QuickLogRows {
+  const metricIds = healthMetricIds(rows.metrics ?? []);
+  const keyOf = (metricId: string): HealthMetricKey | null => (Object.entries(metricIds).find(([, id]) => id === metricId)?.[0] as HealthMetricKey | undefined) ?? null;
+
+  return {
+    journal: (rows.journal_entries ?? []).map(toJournalEntry),
+    meals: (rows.meals ?? []).map(toMeal),
+    presets: (rows.meal_presets ?? []).map(toMealPreset),
+    weights: (rows.weights ?? []).map(toWeightEntry),
+    sideQuests: (rows.side_quests ?? []).map(toSideQuest),
+    metricEntries: (rows.metric_entries ?? []).flatMap(row => {
+      const key = keyOf(String(row['metricId']));
+      if (!key) return [];
+      const entry: HealthMetricEntry = {
+        key,
+        date: String(row['date']),
+        value: number(row, 'value'),
+        loggedAt: text(row, 'createdAt') ?? '',
+        replacedValue: null,
+        source: 'manual',
+      };
+      return [entry];
+    }),
+    metricIds,
+    offers: (rows.health_offers ?? []).flatMap(row => {
+      const offer = toThresholdOffer(row, keyOf);
+      return offer ? [offer] : [];
+    }),
+  };
+}
+
+export function projectHeroGrants(rows: Partial<DomainRows>): HeroGrants {
+  const achievements: Record<string, string> = {};
+  for (const row of rows.achievements_earned ?? []) achievements[String(row['achievementId'])] = text(row, 'earnedAt') ?? '';
+
+  const titles: Record<string, string> = {};
+  for (const row of rows.titles_earned ?? []) titles[String(row['titleId'])] = text(row, 'earnedAt') ?? '';
+
+  const ownedCosmetics = new Set<string>();
+  const equippedCosmetics: Partial<Record<CosmeticKind, string>> = {};
+  for (const row of rows.cosmetic_unlocks ?? []) {
+    const cosmeticId = String(row['cosmeticId']);
+    ownedCosmetics.add(cosmeticId);
+    if (bool(row, 'equipped')) equippedCosmetics[text(row, 'kind') as CosmeticKind] = cosmeticId;
+  }
+
+  return { achievements, titles, ownedCosmetics, equippedCosmetics, displayedTitleId: rows.account?.[0] ? text(rows.account[0], 'displayedTitleId') : null };
 }

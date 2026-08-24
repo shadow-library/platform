@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { type Command } from '@/lib/data';
-import { toWireCommand, type WireCommand } from '@/lib/sync';
+import { type SyncCommand, toWireCommand, type WireCommand } from '@/lib/sync';
 
 import fixtures from './fixtures/wire-commands.json';
 
@@ -9,13 +8,13 @@ const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 
 interface Scenario {
   scenario: string;
-  command: Command;
+  command: SyncCommand;
   wire: WireCommand;
   performedAt?: string;
 }
 
 /**
- * Pins `toWireCommand`'s output against `tests/fixtures/wire-commands.json`, a byte-identical copy of
+ * Pins `toWireCommand`'s output for every server-backed command in all four unions against `tests/fixtures/wire-commands.json`, a byte-identical copy of
  * which lives at `apps/shadow-memoir-server/tests/sync/fixtures/wire-commands.json` and is driven through
  * the real command endpoint by `wire-compat.spec.ts` there. Neither workspace can import the other's `src`
  * (the server's `tsconfig.json` has no path alias into the web app, and `command-wire.ts` pulls in the

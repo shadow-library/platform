@@ -17,12 +17,17 @@
           "daysOfWeek": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
           "dayOfMonth": null,
           "startDate": "2026-02-01",
-          "end": { "kind": "never" },
+          "end": {
+            "kind": "never"
+          },
           "exceptions": []
         },
         "consequences": [],
         "moduleLink": null,
-        "notification": { "enabled": true, "leadMinutes": 10 },
+        "notification": {
+          "enabled": true,
+          "leadMinutes": 10
+        },
         "healthThreshold": null,
         "preCommit": false,
         "active": true
@@ -38,10 +43,22 @@
         "statAffinity": "mind",
         "strictness": "routine",
         "optionalStreakOptIn": false,
-        "recurrence": { "frequency": "weekly", "interval": 1, "startDate": "2026-02-01", "end": { "kind": "never" }, "exceptions": [], "daysOfWeek": [1, 2, 3, 4, 5, 6, 7] },
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "startDate": "2026-02-01",
+          "end": {
+            "kind": "never"
+          },
+          "exceptions": [],
+          "daysOfWeek": [1, 2, 3, 4, 5, 6, 7]
+        },
         "consequences": [],
         "moduleLink": null,
-        "notification": { "enabled": true, "leadMinutes": 10 },
+        "notification": {
+          "enabled": true,
+          "leadMinutes": 10
+        },
         "healthThreshold": null,
         "preCommit": false,
         "active": true
@@ -50,8 +67,24 @@
   },
   {
     "scenario": "quest.update",
-    "command": { "type": "quest.update", "questId": "{questId}", "patch": { "name": "Wire proof quest (renamed)", "durationMinutes": 30 } },
-    "wire": { "type": "quest.update", "payload": { "questId": "{questId}", "patch": { "name": "Wire proof quest (renamed)", "durationMinutes": 30 } } }
+    "command": {
+      "type": "quest.update",
+      "questId": "{questId}",
+      "patch": {
+        "name": "Wire proof quest (renamed)",
+        "durationMinutes": 30
+      }
+    },
+    "wire": {
+      "type": "quest.update",
+      "payload": {
+        "questId": "{questId}",
+        "patch": {
+          "name": "Wire proof quest (renamed)",
+          "durationMinutes": 30
+        }
+      }
+    }
   },
   {
     "scenario": "quest.updateRecurrence",
@@ -59,7 +92,17 @@
       "type": "quest.update",
       "questId": "{questId}",
       "patch": {
-        "recurrence": { "frequency": "monthly", "interval": 1, "daysOfWeek": [], "dayOfMonth": 15, "startDate": "2026-02-01", "end": { "kind": "never" }, "exceptions": [] }
+        "recurrence": {
+          "frequency": "monthly",
+          "interval": 1,
+          "daysOfWeek": [],
+          "dayOfMonth": 15,
+          "startDate": "2026-02-01",
+          "end": {
+            "kind": "never"
+          },
+          "exceptions": []
+        }
       }
     },
     "wire": {
@@ -71,9 +114,14 @@
             "frequency": "monthly",
             "interval": 1,
             "startDate": "2026-02-01",
-            "end": { "kind": "never" },
+            "end": {
+              "kind": "never"
+            },
             "exceptions": [],
-            "pattern": { "kind": "day_of_month", "dayOfMonth": 15 }
+            "pattern": {
+              "kind": "day_of_month",
+              "dayOfMonth": 15
+            }
           }
         }
       }
@@ -81,32 +129,413 @@
   },
   {
     "scenario": "quest.complete",
-    "command": { "type": "quest.complete", "occurrenceId": "{questId}:2026-02-15" },
-    "wire": { "type": "quest.complete", "payload": { "occurrenceId": "{questId}:2026-02-15" } },
+    "command": {
+      "type": "quest.complete",
+      "occurrenceId": "{questId}:2026-02-15"
+    },
+    "wire": {
+      "type": "quest.complete",
+      "payload": {
+        "occurrenceId": "{questId}:2026-02-15"
+      }
+    },
     "performedAt": "2026-02-15T09:00:00.000Z"
   },
   {
     "scenario": "quest.partial",
-    "command": { "type": "quest.partial", "occurrenceId": "{questId}:2026-02-16", "progress": 5, "reasonTag": "too_tired", "note": "tough day" },
-    "wire": { "type": "quest.partial", "payload": { "occurrenceId": "{questId}:2026-02-16", "progress": 5, "reasonTag": "too_tired", "note": "tough day" } },
+    "command": {
+      "type": "quest.partial",
+      "occurrenceId": "{questId}:2026-02-16",
+      "progress": 5,
+      "reasonTag": "too_tired",
+      "note": "tough day"
+    },
+    "wire": {
+      "type": "quest.partial",
+      "payload": {
+        "occurrenceId": "{questId}:2026-02-16",
+        "progress": 5,
+        "reasonTag": "too_tired",
+        "note": "tough day"
+      }
+    },
     "performedAt": "2026-02-16T09:00:00.000Z"
   },
   {
     "scenario": "quest.skip",
-    "command": { "type": "quest.skip", "occurrenceId": "{questId}:2026-02-17", "reasonTag": "forgot", "note": "oops" },
-    "wire": { "type": "quest.skip", "payload": { "occurrenceId": "{questId}:2026-02-17", "reasonTag": "forgot", "note": "oops" } },
+    "command": {
+      "type": "quest.skip",
+      "occurrenceId": "{questId}:2026-02-17",
+      "reasonTag": "forgot",
+      "note": "oops"
+    },
+    "wire": {
+      "type": "quest.skip",
+      "payload": {
+        "occurrenceId": "{questId}:2026-02-17",
+        "reasonTag": "forgot",
+        "note": "oops"
+      }
+    },
     "performedAt": "2026-02-17T09:00:00.000Z"
   },
   {
     "scenario": "quest.postpone",
-    "command": { "type": "quest.postpone", "occurrenceId": "{questId}:2026-02-18", "reasonTag": "schedule_conflict" },
-    "wire": { "type": "quest.postpone", "payload": { "occurrenceId": "{questId}:2026-02-18", "reasonTag": "schedule_conflict" } },
+    "command": {
+      "type": "quest.postpone",
+      "occurrenceId": "{questId}:2026-02-18",
+      "reasonTag": "schedule_conflict"
+    },
+    "wire": {
+      "type": "quest.postpone",
+      "payload": {
+        "occurrenceId": "{questId}:2026-02-18",
+        "reasonTag": "schedule_conflict"
+      }
+    },
     "performedAt": "2026-02-18T09:00:00.000Z"
   },
   {
     "scenario": "quest.reschedule",
-    "command": { "type": "quest.reschedule", "occurrenceId": "{questId}:2026-02-19", "toMin": 540, "acceptBeyondCap": false },
-    "wire": { "type": "quest.reschedule", "payload": { "occurrenceId": "{questId}:2026-02-19", "toMin": 540, "acceptBeyondCap": false } },
+    "command": {
+      "type": "quest.reschedule",
+      "occurrenceId": "{questId}:2026-02-19",
+      "toMin": 540,
+      "acceptBeyondCap": false
+    },
+    "wire": {
+      "type": "quest.reschedule",
+      "payload": {
+        "occurrenceId": "{questId}:2026-02-19",
+        "toMin": 540,
+        "acceptBeyondCap": false
+      }
+    },
     "performedAt": "2026-02-19T09:00:00.000Z"
+  },
+  {
+    "scenario": "expense.create",
+    "command": {
+      "type": "expense.create",
+      "draft": {
+        "id": "0193c2a0-0000-7000-8000-000000000001",
+        "amountText": "12.50",
+        "currency": "EUR",
+        "categoryId": "food",
+        "occurredOnDate": "2026-02-15",
+        "merchant": "Kaffebrenneriet",
+        "note": "Coffee",
+        "source": "manual"
+      }
+    },
+    "wire": {
+      "type": "expense.create",
+      "payload": {
+        "id": "0193c2a0-0000-7000-8000-000000000001",
+        "amountMinor": 1250,
+        "amountText": "12.50",
+        "currency": "EUR",
+        "categoryId": "food",
+        "occurredOn": "2026-02-15",
+        "merchant": "Kaffebrenneriet",
+        "note": "Coffee",
+        "source": "manual"
+      }
+    }
+  },
+  {
+    "scenario": "expense.update",
+    "command": {
+      "type": "expense.update",
+      "id": "0193c2a0-0000-7000-8000-000000000001",
+      "draft": {
+        "amountText": "14.00",
+        "currency": "EUR",
+        "categoryId": "groceries",
+        "occurredOnDate": "2026-02-15",
+        "note": "Coffee and a bun"
+      }
+    },
+    "wire": {
+      "type": "expense.update",
+      "payload": {
+        "id": "0193c2a0-0000-7000-8000-000000000001",
+        "amountMinor": 1400,
+        "amountText": "14.00",
+        "currency": "EUR",
+        "categoryId": "groceries",
+        "occurredOn": "2026-02-15",
+        "note": "Coffee and a bun",
+        "source": "manual"
+      }
+    }
+  },
+  {
+    "scenario": "expense.delete",
+    "command": {
+      "type": "expense.delete",
+      "id": "0193c2a0-0000-7000-8000-000000000001"
+    },
+    "wire": {
+      "type": "expense.delete",
+      "payload": {
+        "id": "0193c2a0-0000-7000-8000-000000000001"
+      }
+    }
+  },
+  {
+    "scenario": "subscription.create",
+    "command": {
+      "type": "subscription.create",
+      "draft": {
+        "name": "Wire proof subscription",
+        "amountText": "9.99",
+        "currency": "EUR",
+        "frequency": "monthly",
+        "nextDueDate": "2026-03-01",
+        "categoryId": "tools",
+        "reminderEnabled": true,
+        "reminderLead": "1-day"
+      }
+    },
+    "wire": {
+      "type": "subscription.create",
+      "payload": {
+        "name": "Wire proof subscription",
+        "amountMinor": 999,
+        "amountText": "9.99",
+        "currency": "EUR",
+        "frequency": "monthly",
+        "customIntervalDays": null,
+        "billingDay": 1,
+        "nextDueDate": "2026-03-01",
+        "categoryId": "subs",
+        "reminderEnabled": true,
+        "reminderLead": "1_day"
+      }
+    }
+  },
+  {
+    "scenario": "subscription.confirmCycle",
+    "command": {
+      "type": "subscription.confirmCycle",
+      "id": "{subscriptionId}",
+      "billingDate": "2026-03-01"
+    },
+    "wire": {
+      "type": "subscription.confirmCycle",
+      "payload": {
+        "id": "{subscriptionId}",
+        "billingDate": "2026-03-01"
+      }
+    }
+  },
+  {
+    "scenario": "subscription.setActive",
+    "command": {
+      "type": "subscription.setActive",
+      "id": "{subscriptionId}",
+      "active": false
+    },
+    "wire": {
+      "type": "subscription.update",
+      "payload": {
+        "id": "{subscriptionId}",
+        "active": false
+      }
+    }
+  },
+  {
+    "scenario": "journal.save",
+    "command": {
+      "type": "journal.save",
+      "draft": {
+        "id": "0193c2a0-0000-7000-8000-000000000002",
+        "date": "2026-02-15",
+        "text": "A wire proof entry.",
+        "mood": 3,
+        "tags": ["proof"]
+      }
+    },
+    "wire": {
+      "type": "journal.save",
+      "payload": {
+        "id": "0193c2a0-0000-7000-8000-000000000002",
+        "draft": {
+          "date": "2026-02-15",
+          "text": "A wire proof entry.",
+          "mood": 3,
+          "tags": ["proof"]
+        }
+      }
+    }
+  },
+  {
+    "scenario": "meal.log",
+    "command": {
+      "type": "meal.log",
+      "draft": {
+        "id": "0193c2a0-0000-7000-8000-000000000003",
+        "date": "2026-02-15",
+        "name": "Wire proof meal",
+        "calories": 420,
+        "mealType": "cooked",
+        "note": "proof"
+      }
+    },
+    "wire": {
+      "type": "meal.log",
+      "payload": {
+        "id": "0193c2a0-0000-7000-8000-000000000003",
+        "draft": {
+          "date": "2026-02-15",
+          "name": "Wire proof meal",
+          "calories": 420,
+          "mealType": "cooked",
+          "note": "proof"
+        }
+      }
+    }
+  },
+  {
+    "scenario": "meal.savePreset",
+    "command": {
+      "type": "meal.savePreset",
+      "preset": {
+        "name": "Wire proof preset",
+        "calories": 380,
+        "mealType": "cooked",
+        "note": "proof",
+        "proteinG": 0,
+        "carbsG": 0,
+        "fatG": 0
+      }
+    },
+    "wire": {
+      "type": "meal.savePreset",
+      "payload": {
+        "preset": {
+          "name": "Wire proof preset",
+          "calories": 380,
+          "mealType": "cooked",
+          "note": "proof"
+        }
+      }
+    }
+  },
+  {
+    "scenario": "meal.logPreset",
+    "command": {
+      "type": "meal.logPreset",
+      "presetId": "{presetId}",
+      "date": "2026-02-15",
+      "id": "0193c2a0-0000-7000-8000-000000000004"
+    },
+    "wire": {
+      "type": "meal.logPreset",
+      "payload": {
+        "id": "0193c2a0-0000-7000-8000-000000000004",
+        "presetId": "{presetId}",
+        "date": "2026-02-15"
+      }
+    }
+  },
+  {
+    "scenario": "weight.save",
+    "command": {
+      "type": "weight.save",
+      "date": "2026-02-15",
+      "kg": 78.4,
+      "confirmedReplacement": false
+    },
+    "wire": {
+      "type": "weight.save",
+      "payload": {
+        "date": "2026-02-15",
+        "kg": 78.4,
+        "confirmedReplacement": false
+      }
+    }
+  },
+  {
+    "scenario": "sidequest.log",
+    "command": {
+      "type": "sidequest.log",
+      "draft": {
+        "id": "0193c2a0-0000-7000-8000-000000000005",
+        "date": "2026-02-15",
+        "name": "Wire proof side quest",
+        "statAffinity": "discipline"
+      }
+    },
+    "wire": {
+      "type": "sidequest.log",
+      "payload": {
+        "id": "0193c2a0-0000-7000-8000-000000000005",
+        "draft": {
+          "date": "2026-02-15",
+          "name": "Wire proof side quest",
+          "statAffinity": "discipline"
+        }
+      }
+    }
+  },
+  {
+    "scenario": "health.save",
+    "command": {
+      "type": "health.save",
+      "key": "steps",
+      "date": "2026-02-15",
+      "value": 8200,
+      "metricId": "{metricId}"
+    },
+    "wire": {
+      "type": "metric.register",
+      "payload": {
+        "metricId": "{metricId}",
+        "date": "2026-02-15",
+        "value": 8200,
+        "source": "manual"
+      }
+    }
+  },
+  {
+    "scenario": "title.display",
+    "command": {
+      "type": "title.display",
+      "titleId": null
+    },
+    "wire": {
+      "type": "title.display",
+      "payload": {
+        "titleId": null
+      }
+    }
+  },
+  {
+    "scenario": "cosmetic.purchase",
+    "command": {
+      "type": "cosmetic.purchase",
+      "cosmeticId": "badge_bronze"
+    },
+    "wire": {
+      "type": "cosmetic.purchase",
+      "payload": {
+        "cosmeticId": "badge_bronze"
+      }
+    }
+  },
+  {
+    "scenario": "cosmetic.equip",
+    "command": {
+      "type": "cosmetic.equip",
+      "cosmeticId": "badge_bronze"
+    },
+    "wire": {
+      "type": "cosmetic.equip",
+      "payload": {
+        "cosmeticId": "badge_bronze"
+      }
+    }
   }
 ]

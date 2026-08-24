@@ -1,13 +1,67 @@
 import { type CommandEnvelopeDto, type SyncCommandOutcomeDto, type SyncDeltaResponseDto, type SyncTombstoneDto } from '@/lib/apis/api-types.gen';
-import { type Command } from '@/lib/data';
+import { type Command, type FinanceCommand, type HeroCommand, type QuickLogCommand } from '@/lib/data';
 
 /** The delta domains shadow-memoir-server registers today. Each flips from fixture-backed to live independently. */
-export type SyncDomain = 'quests' | 'quest_logs' | 'daily_states' | 'quest_streaks' | 'account' | 'devices';
+export type SyncDomain =
+  | 'quests'
+  | 'quest_logs'
+  | 'daily_states'
+  | 'quest_streaks'
+  | 'account'
+  | 'devices'
+  | 'expenses'
+  | 'expense_categories'
+  | 'subscriptions'
+  | 'journal_entries'
+  | 'meals'
+  | 'meal_presets'
+  | 'weights'
+  | 'side_quests'
+  | 'metrics'
+  | 'metric_entries'
+  | 'health_offers'
+  | 'achievements_earned'
+  | 'titles_earned'
+  | 'cosmetic_unlocks';
 
-export const SYNC_DOMAINS: SyncDomain[] = ['quests', 'quest_logs', 'daily_states', 'quest_streaks', 'account', 'devices'];
+export const SYNC_DOMAINS: SyncDomain[] = [
+  'quests',
+  'quest_logs',
+  'daily_states',
+  'quest_streaks',
+  'account',
+  'devices',
+  'expenses',
+  'expense_categories',
+  'subscriptions',
+  'journal_entries',
+  'meals',
+  'meal_presets',
+  'weights',
+  'side_quests',
+  'metrics',
+  'metric_entries',
+  'health_offers',
+  'achievements_earned',
+  'titles_earned',
+  'cosmetic_unlocks',
+];
 
 /** Domains the server answers with the authoritative full set rather than a watermark — the local set is replaced, never merged. */
-export const SNAPSHOT_DOMAINS: SyncDomain[] = ['account', 'devices'];
+export const SNAPSHOT_DOMAINS: SyncDomain[] = [
+  'account',
+  'devices',
+  'expense_categories',
+  'meal_presets',
+  'metrics',
+  'health_offers',
+  'achievements_earned',
+  'titles_earned',
+  'cosmetic_unlocks',
+];
+
+/** Every command shape the outbox carries. The quest union is the `DataProvider`'s; the other three belong to their own providers. */
+export type SyncCommand = Command | FinanceCommand | QuickLogCommand | HeroCommand;
 
 export type DeltaRow = Record<string, unknown>;
 
@@ -42,7 +96,7 @@ export interface CommandBatchResponse {
 export interface OutboxEntry extends CommandEnvelope {
   seq: number;
   createdAt: string;
-  command: Command;
+  command: SyncCommand;
 }
 
 export type NetState = 'online' | 'offline' | 'syncing' | 'failed' | 'signed-out';

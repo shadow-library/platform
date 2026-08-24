@@ -47,11 +47,11 @@ describe('Hero screen', () => {
   });
 
   it('should refuse a cosmetic the coin balance cannot reach, without blame', async () => {
-    renderScreen(<HeroScreen />, { today: TODAY });
+    renderScreen(<HeroScreen />, { today: TODAY, persona: 'new' });
     fireEvent.click(await screen.findByRole('tab', { name: 'Cosmetics' }));
 
-    expect(await screen.findByText('400 coins, and you have 312. It waits here until the balance reaches it.')).toBeDefined();
-    const action = screen.getByRole('button', { name: '88 more coins' });
+    expect(await screen.findByText('150 coins, and you have 0. It waits here until the balance reaches it.')).toBeDefined();
+    const action = screen.getByRole('button', { name: '150 more coins' });
     expect((action as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -59,8 +59,8 @@ describe('Hero screen', () => {
     renderScreen(<HeroScreen />, { today: TODAY });
     fireEvent.click(await screen.findByRole('tab', { name: 'Cosmetics' }));
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Unlock for 120 ◈' }));
-    expect((await screen.findAllByText('◈ 192')).length).toBeGreaterThan(0);
+    fireEvent.click(await screen.findByRole('button', { name: 'Unlock for 100 ◈' }));
+    expect((await screen.findAllByText('◈ 212')).length).toBeGreaterThan(0);
   });
 
   it('should never price a cosmetic that comes from an achievement', async () => {

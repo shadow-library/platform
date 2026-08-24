@@ -30,6 +30,8 @@ export interface JournalEntry {
 }
 
 export interface JournalDraft {
+  /** Client-minted UUIDv7 — the server takes the entry's permanent identity from the command rather than assigning one. Minted at dispatch when a caller leaves it out. */
+  id?: string;
   date: string;
   text: string;
   mood: MoodValence | null;
@@ -96,6 +98,8 @@ export interface Meal extends Macros {
 }
 
 export interface MealDraft {
+  /** Client-minted UUIDv7, as on {@link JournalDraft}. */
+  id?: string;
   date: string;
   name: string;
   calories: number;
@@ -156,6 +160,8 @@ export interface SideQuest {
 }
 
 export interface SideQuestDraft {
+  /** Client-minted UUIDv7, as on {@link JournalDraft}. */
+  id?: string;
   date: string;
   name: string;
   statAffinity: StatAffinity;
@@ -172,6 +178,14 @@ export interface SideQuestsView {
 }
 
 export type HealthMetricKey = 'steps' | 'calories' | 'sleep' | 'water';
+
+/** `metrics.name` as the server seeds the built-in health catalogue — the only join between a local key and the account's catalogue row id. */
+export const HEALTH_METRIC_NAMES: Record<HealthMetricKey, string> = {
+  steps: 'Steps',
+  calories: 'Calories burned',
+  sleep: 'Sleep duration',
+  water: 'Water',
+};
 
 export interface HealthMetricDefinition {
   key: HealthMetricKey;
@@ -198,6 +212,8 @@ export interface HealthMetricEntry {
  */
 export interface ThresholdOffer {
   metricKey: HealthMetricKey;
+  /** The quest the offer would complete. Null while the offer is derived from the local metric catalogue rather than from a server-side threshold. */
+  questId: string | null;
   questTitle: string;
   thresholdValue: number;
   currentValue: number;
@@ -237,15 +253,27 @@ export interface QuickLogReward {
   reason: string;
 }
 
+/**
+ * The consent step PRD §2.6 requires around module-linked quests: a saved entry that could satisfy a
+ * quest scheduled for the same day reports the quest, and the owner completes it — the log never does.
+ */
+export interface QuestLinkageOffer {
+  status: 'offered' | 'already-completed';
+  questId: string;
+  questName: string;
+  date: string;
+}
+
 export type QuickLogCommand =
   | { type: 'journal.save'; draft: JournalDraft }
   | { type: 'journal.dismissPrompt' }
   | { type: 'meal.log'; draft: MealDraft }
-  | { type: 'meal.logPreset'; presetId: string; date: string }
+  | { type: 'meal.logPreset'; presetId: string; date: string; id?: string }
   | { type: 'meal.savePreset'; preset: Omit<MealPreset, 'id' | 'usageCount'> }
   | { type: 'weight.save'; date: string; kg: number; confirmedReplacement: boolean }
   | { type: 'sidequest.log'; draft: SideQuestDraft }
-  | { type: 'health.save'; key: HealthMetricKey; date: string; value: number }
+  /** `metricId` is the server's catalogue id for `key`, resolved at dispatch; without it the save stays local because no `metric.register` can address the metric. */
+  | { type: 'health.save'; key: HealthMetricKey; date: string; value: number; metricId?: string }
   | { type: 'health.acceptOffer'; key: HealthMetricKey; date: string };
 
 export interface QuickLogCommandResult {
@@ -255,4 +283,5 @@ export interface QuickLogCommandResult {
   advisory?: EntryCapAdvisory;
   /** Set when a same-day weight already exists and the save was not confirmed. Nothing was written. */
   needsConfirmation?: { kind: 'weight-replace'; existing: WeightEntry };
+  linkageOffer?: QuestLinkageOffer;
 }

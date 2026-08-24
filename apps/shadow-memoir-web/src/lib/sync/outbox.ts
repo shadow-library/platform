@@ -1,8 +1,6 @@
-import { type Command } from '@/lib/data';
-
 import { isServerBacked, toWireCommand } from './command-wire';
 import { type MemoirStore } from './memoir-store';
-import { type OutboxEntry, type SyncNotice, type WireCommandOutcome } from './sync.types';
+import { type OutboxEntry, type SyncCommand, type SyncNotice, type WireCommandOutcome } from './sync.types';
 import { uuidv7 } from './uuid';
 
 export const MAX_BATCH_SIZE = 100;
@@ -35,7 +33,7 @@ export class Outbox {
   }
 
   /** Returns the minted envelope, or null when the command has no server handler and stays purely local. */
-  async enqueue(command: Command, localDate: string): Promise<OutboxEntry | null> {
+  async enqueue(command: SyncCommand, localDate: string): Promise<OutboxEntry | null> {
     if (!isServerBacked(command)) return null;
 
     const wire = toWireCommand(command);

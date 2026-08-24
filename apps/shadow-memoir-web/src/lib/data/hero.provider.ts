@@ -9,7 +9,7 @@ export interface HeroProvider {
   dispatchCommand(command: HeroCommand): Promise<SettledCommandResult>;
 }
 
-interface AchievementSeed {
+export interface AchievementSeed {
   id: string;
   name: string;
   crest: string;
@@ -19,13 +19,13 @@ interface AchievementSeed {
 }
 
 /** The Phase 1 catalogue of seventeen, in the order PRD §4.7 lists them. */
-const ACHIEVEMENTS: AchievementSeed[] = [
-  { id: 'first_quest', name: 'First Promise', crest: '◈', teaser: 'Something about beginning', description: 'The first quest you completed.', reward: '+50 XP' },
-  { id: 'first_level', name: 'Second Level', crest: '▲', teaser: 'Something about the first climb', description: 'The first level you reached.', reward: '+50 XP · 10 coins' },
-  { id: 'streak_bronze', name: 'Three Days', crest: '·', teaser: 'Something about three days', description: 'A three-day run on any quest.', reward: '+60 XP' },
-  { id: 'streak_silver', name: 'Seven Days', crest: '∴', teaser: 'Something about a full week', description: 'A seven-day run on any quest.', reward: '+120 XP' },
+export const ACHIEVEMENTS: AchievementSeed[] = [
+  { id: 'first_quest_completed', name: 'First Promise', crest: '◈', teaser: 'Something about beginning', description: 'The first quest you completed.', reward: '+50 XP' },
+  { id: 'first_level_up', name: 'Second Level', crest: '▲', teaser: 'Something about the first climb', description: 'The first level you reached.', reward: '+50 XP · 10 coins' },
+  { id: 'first_bronze_streak', name: 'Three Days', crest: '·', teaser: 'Something about three days', description: 'A three-day run on any quest.', reward: '+60 XP' },
+  { id: 'first_silver_streak', name: 'Seven Days', crest: '∴', teaser: 'Something about a full week', description: 'A seven-day run on any quest.', reward: '+120 XP' },
   {
-    id: 'streak_gold',
+    id: 'first_gold_streak',
     name: 'Thirty Mornings',
     crest: '☀',
     teaser: 'Something about winter mornings',
@@ -33,7 +33,7 @@ const ACHIEVEMENTS: AchievementSeed[] = [
     reward: '+250 XP · title Anchor Holder',
   },
   {
-    id: 'streak_platinum',
+    id: 'first_platinum_streak',
     name: 'A Hundred Days',
     crest: '❖',
     teaser: 'Something about a hundred of anything',
@@ -43,7 +43,7 @@ const ACHIEVEMENTS: AchievementSeed[] = [
   { id: 'xp_100', name: 'First Hundred', crest: '◦', teaser: 'Something about the first hundred', description: 'A hundred experience earned.', reward: '+25 XP' },
   { id: 'xp_500', name: 'Five Hundred', crest: '◎', teaser: 'Something about five hundred', description: 'Five hundred experience earned.', reward: '+75 XP' },
   {
-    id: 'first_subscription',
+    id: 'first_subscription_confirmed',
     name: 'Named the Recurring',
     crest: '↻',
     teaser: 'Something about money that repeats',
@@ -51,7 +51,7 @@ const ACHIEVEMENTS: AchievementSeed[] = [
     reward: '+40 XP',
   },
   {
-    id: 'first_receipt',
+    id: 'first_receipt_scanned',
     name: 'Honest Ledger',
     crest: '◇',
     teaser: 'Something about a quiet month of spending',
@@ -59,16 +59,23 @@ const ACHIEVEMENTS: AchievementSeed[] = [
     reward: '+200 XP · title Wealth Disciplined',
   },
   {
-    id: 'all_stats',
+    id: 'all_stats_touched',
     name: 'Four Directions',
     crest: '✧',
     teaser: 'Something about being more than one thing',
     description: 'Body, mind, wealth and discipline all moved.',
     reward: '+150 XP',
   },
-  { id: 'full_hp_day', name: 'Whole Day', crest: '□', teaser: 'Something about a day with nothing dropped', description: 'A full day with no quest missed.', reward: '+80 XP' },
   {
-    id: 'first_crown',
+    id: 'first_full_hp_day',
+    name: 'Whole Day',
+    crest: '□',
+    teaser: 'Something about a day with nothing dropped',
+    description: 'A full day with no quest missed.',
+    reward: '+80 XP',
+  },
+  {
+    id: 'first_crown_banked',
     name: 'First Crown',
     crest: '♛',
     teaser: 'Something about a whole period',
@@ -76,16 +83,16 @@ const ACHIEVEMENTS: AchievementSeed[] = [
     reward: '+400 XP · 60 coins',
   },
   {
-    id: 'first_recovery',
+    id: 'first_recovery_completed',
     name: 'Lighter Version',
     crest: '◌',
     teaser: 'Something about starting smaller',
     description: 'The first recovery quest you completed.',
     reward: '+90 XP',
   },
-  { id: 'locked_day', name: 'Committed', crest: '⊞', teaser: 'Something about deciding in advance', description: 'A locked day cleared in full.', reward: '+120 XP' },
+  { id: 'first_locked_day_cleared', name: 'Committed', crest: '⊞', teaser: 'Something about deciding in advance', description: 'A locked day cleared in full.', reward: '+120 XP' },
   {
-    id: 'comeback',
+    id: 'first_comeback_claimed',
     name: 'Comeback',
     crest: '↺',
     teaser: 'Something you have not attempted yet',
@@ -93,7 +100,7 @@ const ACHIEVEMENTS: AchievementSeed[] = [
     reward: '+150 XP · 1 shield',
   },
   {
-    id: 'returner_ritual',
+    id: 'first_returner_ritual',
     name: 'The Returner',
     crest: '⟲',
     teaser: 'Something about coming back twice',
@@ -103,7 +110,7 @@ const ACHIEVEMENTS: AchievementSeed[] = [
 ];
 
 /** The Phase 1 title catalogue (PRD §4.8). Titles are earned, never chosen — only which one is displayed is a choice. */
-const TITLES: { id: string; name: string; earnedFrom: string }[] = [
+export const TITLES: { id: string; name: string; earnedFrom: string }[] = [
   { id: 'steady_builder', name: 'Steady Builder', earnedFrom: 'Discipline at sixty' },
   { id: 'body_tempered', name: 'Body Tempered', earnedFrom: 'Body at sixty' },
   { id: 'wealth_disciplined', name: 'Wealth Disciplined', earnedFrom: 'Wealth at sixty' },
@@ -123,7 +130,7 @@ const TITLES: { id: string; name: string; earnedFrom: string }[] = [
   { id: 'quiet_year', name: 'Quiet Year', earnedFrom: 'A year of days with something kept' },
 ];
 
-interface CosmeticSeed {
+export interface CosmeticSeed {
   id: string;
   name: string;
   glyph: string;
@@ -132,40 +139,42 @@ interface CosmeticSeed {
   note: string;
 }
 
-const COSMETICS: CosmeticSeed[] = [
-  { id: 'ink_crest', name: 'Ink crest', glyph: '✒', kind: 'badge', priceCoins: 0, note: 'The crest you started with.' },
-  { id: 'fjord_frame', name: 'Fjord frame', glyph: '❖', kind: 'hero_accent', priceCoins: 120, note: 'A cold blue edge on the hero card.' },
-  { id: 'midnight_card', name: 'Midnight card', glyph: '◐', kind: 'theme_accent', priceCoins: 200, note: 'A darker accent across every surface.' },
-  { id: 'iron_sigil', name: 'Iron sigil', glyph: '⛨', kind: 'badge', priceCoins: 400, note: 'Plain, heavy and slow to earn.' },
-  { id: 'winter_crest', name: 'Winter crest', glyph: '❄', kind: 'badge', priceCoins: null, note: 'Comes with an achievement, never with coins.' },
-  { id: 'second_crown', name: 'Second crown', glyph: '♛', kind: 'hero_accent', priceCoins: null, note: 'Comes with your third crown.' },
+export const COSMETICS: CosmeticSeed[] = [
+  { id: 'badge_bronze', name: 'Bronze badge', glyph: '✒', kind: 'badge', priceCoins: 50, note: 'The crest you started with.' },
+  { id: 'badge_silver', name: 'Silver badge', glyph: '⛨', kind: 'badge', priceCoins: 150, note: 'Plain, heavy and slow to earn.' },
+  { id: 'badge_gold_streak', name: 'Gold streak badge', glyph: '❄', kind: 'badge', priceCoins: null, note: 'Comes with an achievement, never with coins.' },
+  { id: 'accent_ember', name: 'Ember accent', glyph: '◐', kind: 'hero_accent', priceCoins: 100, note: 'A warm edge on the hero card.' },
+  { id: 'accent_frost', name: 'Frost accent', glyph: '❖', kind: 'hero_accent', priceCoins: 100, note: 'A cold blue edge on the hero card.' },
+  { id: 'accent_aurora_platinum', name: 'Aurora accent', glyph: '♛', kind: 'hero_accent', priceCoins: null, note: 'Comes with a hundred-day run.' },
+  { id: 'theme_sunrise', name: 'Sunrise theme', glyph: '☀', kind: 'theme_accent', priceCoins: 75, note: 'A lighter accent across every surface.' },
+  { id: 'theme_midnight', name: 'Midnight theme', glyph: '◑', kind: 'theme_accent', priceCoins: 75, note: 'A darker accent across every surface.' },
+  { id: 'theme_returner', name: 'Returner theme', glyph: '⟲', kind: 'theme_accent', priceCoins: null, note: 'Comes with the Returner ritual.' },
 ];
-
 const EARNED_BY_PERSONA: Record<Persona, Record<string, string>> = {
   new: {},
   active: {
-    first_quest: '2 February 2026',
-    first_level: '4 February 2026',
-    streak_bronze: '7 February 2026',
-    streak_silver: '11 February 2026',
-    streak_gold: '14 August 2026',
+    first_quest_completed: '2 February 2026',
+    first_level_up: '4 February 2026',
+    first_bronze_streak: '7 February 2026',
+    first_silver_streak: '11 February 2026',
+    first_gold_streak: '14 August 2026',
     xp_100: '3 February 2026',
     xp_500: '19 February 2026',
-    first_receipt: '2 August 2026',
-    all_stats: '28 February 2026',
-    first_crown: '31 July 2026',
-    comeback: '21 June 2026',
+    first_receipt_scanned: '2 August 2026',
+    all_stats_touched: '28 February 2026',
+    first_crown_banked: '31 July 2026',
+    first_comeback_claimed: '21 June 2026',
   },
   recovery: {
-    first_quest: '2 February 2026',
-    first_level: '4 February 2026',
-    streak_bronze: '7 February 2026',
-    streak_silver: '11 February 2026',
+    first_quest_completed: '2 February 2026',
+    first_level_up: '4 February 2026',
+    first_bronze_streak: '7 February 2026',
+    first_silver_streak: '11 February 2026',
     xp_100: '3 February 2026',
     xp_500: '19 February 2026',
-    first_recovery: '20 August 2026',
-    comeback: '21 June 2026',
-    returner_ritual: '21 August 2026',
+    first_recovery_completed: '20 August 2026',
+    first_comeback_claimed: '21 June 2026',
+    first_returner_ritual: '21 August 2026',
   },
 };
 
@@ -188,9 +197,9 @@ const TITLES_BY_PERSONA: Record<Persona, Record<string, string>> = {
 };
 
 const OWNED_BY_PERSONA: Record<Persona, string[]> = {
-  new: ['ink_crest'],
-  active: ['ink_crest', 'second_crown'],
-  recovery: ['ink_crest'],
+  new: ['badge_bronze'],
+  active: ['badge_bronze', 'accent_frost'],
+  recovery: ['badge_bronze'],
 };
 
 const LIFETIME_BY_PERSONA: Record<Persona, HeroDeck['lifetime']> = {
@@ -303,7 +312,7 @@ export function createHeroProvider({ persona = 'active', hero }: HeroFixtureOpti
     hero: { ...hero },
     displayedTitleId: titles.find(title => title.name === hero.title)?.id ?? titles.find(title => title.earnedOn !== null)?.id ?? null,
     owned: new Set(OWNED_BY_PERSONA[persona]),
-    equipped: { badge: 'ink_crest', hero_accent: null, theme_accent: null },
+    equipped: { badge: 'badge_bronze', hero_accent: null, theme_accent: null },
     intensity: persona === 'recovery' ? 'gentle' : 'standard',
   };
 

@@ -6,5 +6,8 @@ export * from './sync-client';
 export * from './sync-context';
 export * from './sync-engine';
 export * from './sync.types';
+export * from './synced-finance-provider';
+export * from './synced-hero-provider';
 export * from './synced-provider';
+export * from './synced-quick-log-provider';
 export * from './uuid';

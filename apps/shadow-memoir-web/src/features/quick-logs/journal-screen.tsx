@@ -2,6 +2,7 @@ import { type ReactElement, useRef, useState } from 'react';
 import { Button, Card, EmptyState, Input, Skeleton, Statistic, Textarea, toast } from '@shadow-library/ui';
 
 import { EntryCapNote } from '@/components/EntryCapNote';
+import { LinkageOfferNote } from '@/components/LinkageOfferNote';
 import { SparkBars } from '@/components/SparkBars';
 import { SearchIcon } from '@/components/icons';
 import {
@@ -11,6 +12,7 @@ import {
   type MarkdownTool,
   moodOption,
   type MoodValence,
+  type QuestLinkageOffer,
   todayISODate,
   useJournal,
   useQuickLogCommand,
@@ -35,6 +37,7 @@ export function JournalScreen(): ReactElement {
   const [mood, setMood] = useState<MoodValence | null>(3);
   const [search, setSearch] = useState('');
   const [advisory, setAdvisory] = useState<EntryCapAdvisory | null>(null);
+  const [linkage, setLinkage] = useState<QuestLinkageOffer | null>(null);
 
   const view = journal.data;
 
@@ -54,6 +57,7 @@ export function JournalScreen(): ReactElement {
       {
         onSuccess: result => {
           setAdvisory(result.advisory ?? null);
+          setLinkage(result.linkageOffer ?? null);
           toast.success(result.reward?.rewarded ? `${result.message} First of the day — +${result.reward.xp} XP.` : result.message);
           setText('');
         },
@@ -127,6 +131,7 @@ export function JournalScreen(): ReactElement {
               </div>
 
               <EntryCapNote advisory={advisory} />
+              <LinkageOfferNote offer={linkage} />
             </div>
           </Card>
 
