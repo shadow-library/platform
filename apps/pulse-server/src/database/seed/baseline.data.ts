@@ -501,4 +501,81 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
       },
     ],
   },
+
+  {
+    templateKey: 'memoir-ai-result-ready',
+    name: 'Memoir: AI review ready',
+    description: 'Notice that a Shadow Memoir AI review has finished and is ready to read',
+    messageType: 'TRANSACTIONAL',
+    priority: 'MEDIUM',
+    category: 'memoir',
+    variables: { resultId: variable('string', true, 'ar_2f9c1d8b3a'), suggestionCount: variable('number', true, '3') },
+    channels: [
+      {
+        channel: 'EMAIL',
+        subject: 'Your AI review is ready',
+        layoutKey: DEFAULT_LAYOUT_KEY,
+        body: `<h1 class="email-h1">Your AI review is ready</h1>
+<p class="email-text">Your Shadow Memoir AI review has finished, with <span class="email-strong">{{ suggestionCount }}</span> suggestion(s) to look over.</p>
+<p class="email-muted">Reference: {{ resultId }}. Open the app to read the full review.</p>`,
+      },
+    ],
+  },
+  {
+    templateKey: 'memoir-weekly-digest',
+    name: 'Memoir: weekly review digest',
+    description: 'Opt-in weekly review summary of quest, money, and body-trend aggregates',
+    messageType: 'TRANSACTIONAL',
+    priority: 'LOW',
+    category: 'memoir',
+    variables: {
+      weekStartDate: variable('string', true, '2026-08-17'),
+      weekEndDate: variable('string', true, '2026-08-23'),
+      questsCompletedCount: variable('number', true, '11'),
+      questsScheduledCount: variable('number', true, '14'),
+      netAmount: variable('number', true, '182.5'),
+      currencyCode: variable('string', true, 'USD'),
+      reasonTagCode: variable('string', false, 'TIME_CONSTRAINT'),
+    },
+    channels: [
+      {
+        channel: 'EMAIL',
+        subject: 'Your weekly review is ready',
+        layoutKey: DEFAULT_LAYOUT_KEY,
+        body: `<h1 class="email-h1">Your weekly review</h1>
+<p class="email-text">Summary for {{ weekStartDate }} to {{ weekEndDate }}.</p>
+<table class="email-meta" role="presentation" cellpadding="0" cellspacing="0">
+<tr><td class="email-meta-label">Quests completed</td><td>{{ questsCompletedCount }} of {{ questsScheduledCount }}</td></tr>
+<tr><td class="email-meta-label">Net amount</td><td>{{ netAmount }} {{ currencyCode }}</td></tr>
+{% if reasonTagCode != '' %}<tr><td class="email-meta-label">Recurring pattern</td><td>{{ reasonTagCode }}</td></tr>{% endif %}
+</table>
+<p class="email-muted">Open the app for the full review and next week's plan.</p>`,
+      },
+    ],
+  },
+  {
+    templateKey: 'memoir-billing-reminder',
+    name: 'Memoir: billing reminder',
+    description: 'Reminder of upcoming or changed subscription billing state',
+    messageType: 'TRANSACTIONAL',
+    priority: 'MEDIUM',
+    category: 'memoir',
+    variables: {
+      state: variable('string', true, 'active'),
+      expiresAtDate: variable('string', true, '2026-09-01'),
+      amount: variable('number', false, '4.99'),
+      currencyCode: variable('string', false, 'USD'),
+    },
+    channels: [
+      {
+        channel: 'EMAIL',
+        subject: 'About your Shadow Memoir subscription',
+        layoutKey: DEFAULT_LAYOUT_KEY,
+        body: `<h1 class="email-h1">Your subscription status</h1>
+<p class="email-text">Your Shadow Memoir subscription status is <span class="email-strong">{{ state }}</span>, with the current billing date on <span class="email-strong">{{ expiresAtDate }}</span>.</p>
+{% if amount != 0 %}<p class="email-text">Renewal amount: {{ amount }} {{ currencyCode }}</p>{% endif %}
+<p class="email-muted">Manage your subscription any time from account settings.</p>`,
+      },
+    ],
+  },
 ];

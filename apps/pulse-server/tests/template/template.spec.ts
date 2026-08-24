@@ -48,7 +48,7 @@ describe('Template', () => {
       const response = await router().get('/api/v1/templates');
 
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toMatchObject({ total: 19, limit: 20, offset: 0 });
+      expect(response.json()).toMatchObject({ total: 22, limit: 20, offset: 0 });
     });
 
     it('should filter templates by key', async () => {
