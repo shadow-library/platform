@@ -15,6 +15,7 @@ import { MemoirAuthModule, OwnerScopedRepository } from '@modules/auth';
 import { DevicesModule } from '@modules/devices';
 import { QuestsModule } from '@modules/quests';
 import { RolloverModule } from '@modules/rollover';
+import { addDays, formatLocalDate, localDateAt } from '@modules/rules';
 import { SyncModule } from '@modules/sync';
 import { DatastoreModule, type PrimaryDatabase, schema } from '@server/database';
 import { createDatabaseFromTemplate, dropDatabase } from '@tests/fixtures/template-db';
@@ -79,7 +80,8 @@ const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql
 const baseUrl = baseConnectionString.replace(/\/[^/]*$/, '');
 const databaseName = `${baseConnectionString.split('/').pop()}_sync_delta_spec`;
 
-const DATE = '2026-08-24';
+/** Yesterday relative to the wall clock, in UTC (the fixture accounts' timezone) — the lazy rollover gate stamps a fresh account's daily_states row on today, so a literal date would collide with it once a run's real "today" caught up to it. */
+const DATE = formatLocalDate(addDays(localDateAt(Date.now(), 'UTC'), -1));
 
 interface DeltaBody {
   cursor: string;
