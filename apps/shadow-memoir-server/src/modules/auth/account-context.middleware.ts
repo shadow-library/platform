@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type HandlerMetadata } from '@shadow-library/app';
+import { Handler, type HandlerMetadata } from '@shadow-library/app';
 import { AUTH_ROUTE_METADATA, type AuthRouteMetadata } from '@shadow-library/auth/module';
 import { type AsyncRouteHandler, ContextService, Middleware } from '@shadow-library/fastify';
 
@@ -17,6 +17,15 @@ import { AccountContext } from './account-context';
 /**
  * Declaring the constants
  */
+const ALLOW_DURING_DELETION: unique symbol = Symbol('shadow-memoir:allow-during-deletion');
+
+/**
+ * Opts a route out of the `ACC_002` refusal every other authenticated surface gets once
+ * `accounts.deletion_state` leaves `none` (ARCHITECTURE §21). Only the deletion surface itself may
+ * carry it — a started deletion has to stay observable and a repeat start has to answer with the
+ * current state rather than a refusal.
+ */
+export const AllowDuringDeletion = (): ClassDecorator & MethodDecorator => Handler({ [ALLOW_DURING_DELETION]: true });
 
 /**
  * Resolves the caller's account immediately after `AuthGuard` (weight 100) sets the principal, so
@@ -41,10 +50,11 @@ export class AccountContextMiddleware {
     const auth = metadata[AUTH_ROUTE_METADATA] as AuthRouteMetadata | undefined;
     if (!auth?.authenticated) return undefined;
 
+    const allowDuringDeletion = metadata[ALLOW_DURING_DELETION] === true;
     return async (): Promise<void> => {
       const principal = this.context.getAuthPrincipalOrNull();
       if (!principal || principal.kind !== 'user') return;
-      await this.accountContext.resolve(principal.sub);
+      await this.accountContext.resolve(principal.sub, allowDuringDeletion);
     };
   }
 }

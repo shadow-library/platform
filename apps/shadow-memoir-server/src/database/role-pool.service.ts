@@ -5,29 +5,35 @@ import { AppError, Config } from '@shadow-library/common';
 
 import * as schema from './schemas';
 
-export type MemoirRole = 'memoir_ai' | 'memoir_billing';
+export type MemoirRole = 'memoir_ai' | 'memoir_billing' | 'memoir_deleter';
 
 type RoleDatabase = BunSQLDatabase<typeof schema>;
+
+type RoleUrlKey = 'database.postgres.ai-url' | 'database.postgres.billing-url' | 'database.postgres.deleter-url';
 
 declare module '@shadow-library/common' {
   interface ConfigRecords {
     'database.postgres.ai-url'?: string;
     'database.postgres.billing-url'?: string;
+    'database.postgres.deleter-url'?: string;
   }
 }
 
 Config.load('database.postgres.ai-url');
 Config.load('database.postgres.billing-url');
+Config.load('database.postgres.deleter-url');
 
-const CONFIG_KEY: Record<MemoirRole, 'database.postgres.ai-url' | 'database.postgres.billing-url'> = {
+const CONFIG_KEY: Record<MemoirRole, RoleUrlKey> = {
   memoir_ai: 'database.postgres.ai-url',
   memoir_billing: 'database.postgres.billing-url',
+  memoir_deleter: 'database.postgres.deleter-url',
 };
 
 /**
- * Dedicated per-role connection pools (ARCHITECTURE §5.4): the AI batch module and the billing webhook
- * module each read/write through a separate physical connection pool bound to their own least-privilege
- * Postgres role, rather than the API path's default `memoir_api` pool. One `BunSQLDatabase` client per
+ * Dedicated per-role connection pools (ARCHITECTURE §5.4): the AI batch module, the billing webhook
+ * module and the account-deletion state machine each read/write through a separate physical connection
+ * pool bound to their own least-privilege Postgres role, rather than the API path's default
+ * `memoir_api` pool. One `BunSQLDatabase` client per
  * role, created lazily on first request and cached so a module's repeated `getPool(role)` calls share
  * one underlying connection pool. In-process today (ARCHITECTURE §29); the worker split later moves the
  * `memoir_ai` pool into its own Deployment without changing this contract, since callers already resolve

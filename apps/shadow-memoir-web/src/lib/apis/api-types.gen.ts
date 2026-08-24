@@ -256,6 +256,196 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/billing/checkout': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Checkout */
+    post: operations['post_api_v1_billing_checkout'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/billing/webhooks/{provider}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Webhook */
+    post: operations['post_api_v1_billing_webhooks_provider'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/receipts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Create */
+    post: operations['post_api_v1_receipts'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/receipts/{ref}/confirm': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Confirm */
+    post: operations['post_api_v1_receipts_ref_confirm'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/receipts/{ref}/download': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Download */
+    get: operations['get_api_v1_receipts_ref_download'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ai/tasks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Submit Task */
+    post: operations['post_api_v1_ai_tasks'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ai/tasks/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancel Task */
+    post: operations['post_api_v1_ai_tasks_id_cancel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ai/consents': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Consents */
+    get: operations['get_api_v1_ai_consents'];
+    /** Put Consents */
+    put: operations['put_api_v1_ai_consents'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ai/scheduled-query': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Put Scheduled Query */
+    put: operations['put_api_v1_ai_scheduled_query'];
+    post?: never;
+    /** Remove Scheduled Query */
+    delete: operations['delete_api_v1_ai_scheduled_query'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ai/results/{id}/apply': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Apply Suggestion */
+    post: operations['post_api_v1_ai_results_id_apply'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/account/deletion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Status */
+    get: operations['get_api_v1_account_deletion'];
+    put?: never;
+    /** Start */
+    post: operations['post_api_v1_account_deletion'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -544,6 +734,124 @@ export interface components {
        * @description Next local midnight in the account timezone — when the count resets
        */
       resetAt: string;
+    };
+    CheckoutDto: {
+      /**
+       * @description Billing period to purchase; pricing per period is environment config (PRD §6.9)
+       * @enum {string}
+       */
+      plan: 'monthly' | 'yearly';
+    };
+    CheckoutResponseDto: {
+      /** @description The payment provider's hosted checkout URL to redirect to; it already carries this account's purchase token as client reference */
+      url: string;
+      /**
+       * Format: date-time
+       * @description When the hosted session stops accepting payment and a new one must be created
+       */
+      expiresAt: string;
+    };
+    WebhookResponseDto: {
+      /** @description Always true for any delivery that verified — duplicates, stale events and unmatched purchase tokens are acknowledged rather than retried */
+      received: boolean;
+    };
+    ReceiptCreateDto: {
+      /** @description MIME type the client will upload; one of image/jpeg, image/png, image/webp, image/heic */
+      contentType: string;
+      /** @description Declared upload size in bytes; the confirm step HEAD-verifies the actual size against `storage.max-receipt-bytes` */
+      sizeBytes: number;
+    };
+    ReceiptCreateResponseDto: {
+      /** @description The minted receipt ref — also the storage object key; pass it back to `expense.create`/`expense.update` as `receiptRef` */
+      ref: string;
+      /** @description Presigned `PUT` URL, content-type pinned; expires at `expiresAt` */
+      uploadUrl: string;
+      /** Format: date-time */
+      expiresAt: string;
+    };
+    ReceiptConfirmResponseDto: {
+      ref: string;
+      status: string;
+    };
+    ReceiptDownloadResponseDto: {
+      /** @description Presigned `GET` URL; expires at `expiresAt` */
+      url: string;
+      /** Format: date-time */
+      expiresAt: string;
+    };
+    AiTaskSubmitDto: {
+      /** @description Client-minted task id; resubmitting the same id converges on the first submission rather than creating a second task or consuming quota twice */
+      id: string;
+      /** @description The natural-language question (most-sensitive class, ARCHITECTURE §23) */
+      queryText: string;
+    };
+    AiTaskResponseDto: {
+      id: string;
+      /** @enum {string} */
+      status: 'pending' | 'running' | 'done' | 'failed' | 'cancelled' | 'held_upgrade';
+      /** @enum {string} */
+      kind: 'adhoc' | 'scheduled';
+      /** Format: date-time */
+      submittedAt: string;
+      /**
+       * Format: date-time
+       * @description Drives the "ready tonight" pending-state copy
+       */
+      expectedBy: string;
+      error?: null | string;
+    };
+    AiConsentListResponseDto: {
+      /** @description One entry per known consent data class, including classes that have never been granted */
+      consents: components['schemas']['AiConsentResponseDto'][];
+    };
+    AiConsentResponseDto: {
+      /** @enum {string} */
+      dataClass: 'journal_reflection_reason' | 'health';
+      granted: boolean;
+      /**
+       * Format: date-time
+       * @description Absent when this data class has never been granted
+       */
+      grantedAt?: null | string;
+      /** Format: date-time */
+      withdrawnAt?: null | string;
+    };
+    AiConsentUpdateDto: {
+      grants: components['schemas']['AiConsentGrantDto'][];
+    };
+    AiConsentGrantDto: {
+      /** @enum {string} */
+      dataClass: 'journal_reflection_reason' | 'health';
+      /** @description true grants (or re-grants) the class; false withdraws it — withdrawal excludes the class from future reads only, past answers already incorporating it are unaffected (PRD §6.7) */
+      granted: boolean;
+    };
+    AiScheduledQueryUpsertDto: {
+      /** @description The one standing question the worker answers every night */
+      queryText: string;
+      /** @default true */
+      active: boolean;
+    };
+    AiScheduledQueryResponseDto: {
+      queryText: string;
+      active: boolean;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    AiApplySuggestionDto: {
+      /** @description Index into the result's `suggestions` array (0 or 1 — every result carries 1-2 suggestions) */
+      suggestionIndex: number;
+    };
+    AppliedSuggestionResponseDto: {
+      id: string;
+      resultId: string;
+      suggestionIndex: number;
+      questId: string;
+      /** Format: date-time */
+      appliedAt: string;
+    };
+    DeletionStatusDto: {
+      /** @description Where the account sits in the irreversible deletion state machine. 'none' means no deletion has been started; 'done' also answers for an account whose row has already been removed. From anything other than 'none' every other API surface refuses this account with ACC_002. */
+      deletionState: components['schemas']['DeletionState'];
     };
   };
   responses: never;
@@ -1212,6 +1520,568 @@ export interface operations {
       };
     };
   };
+  post_api_v1_billing_checkout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CheckoutDto'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CheckoutResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_billing_webhooks_provider: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Adapter id of the payment provider delivering this event */
+        provider: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WebhookResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_receipts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReceiptCreateDto'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReceiptCreateResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_receipts_ref_confirm: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The receipt ref (the storage object key); URL-encode the embedded slashes */
+        ref: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReceiptConfirmResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_receipts_ref_download: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The receipt ref (the storage object key); URL-encode the embedded slashes */
+        ref: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReceiptDownloadResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_ai_tasks: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AiTaskSubmitDto'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AiTaskResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_ai_tasks_id_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Client-minted task id */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AiTaskResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_ai_consents: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AiConsentListResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_ai_consents: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AiConsentUpdateDto'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AiConsentListResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_ai_scheduled_query: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AiScheduledQueryUpsertDto'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AiScheduledQueryResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_ai_scheduled_query: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_ai_results_id_apply: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description ai_results.id */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AiApplySuggestionDto'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppliedSuggestionResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_account_deletion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DeletionStatusDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_account_deletion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DeletionStatusDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
 }
 export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
 export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
@@ -1245,7 +2115,26 @@ export type OcrParseDto = components['schemas']['OcrParseDto'];
 export type OcrParseResponseDto = components['schemas']['OcrParseResponseDto'];
 export type OcrLineItemDto = components['schemas']['OcrLineItemDto'];
 export type OcrQuotaResponseDto = components['schemas']['OcrQuotaResponseDto'];
+export type CheckoutDto = components['schemas']['CheckoutDto'];
+export type CheckoutResponseDto = components['schemas']['CheckoutResponseDto'];
+export type WebhookResponseDto = components['schemas']['WebhookResponseDto'];
+export type ReceiptCreateDto = components['schemas']['ReceiptCreateDto'];
+export type ReceiptCreateResponseDto = components['schemas']['ReceiptCreateResponseDto'];
+export type ReceiptConfirmResponseDto = components['schemas']['ReceiptConfirmResponseDto'];
+export type ReceiptDownloadResponseDto = components['schemas']['ReceiptDownloadResponseDto'];
+export type AiTaskSubmitDto = components['schemas']['AiTaskSubmitDto'];
+export type AiTaskResponseDto = components['schemas']['AiTaskResponseDto'];
+export type AiConsentListResponseDto = components['schemas']['AiConsentListResponseDto'];
+export type AiConsentResponseDto = components['schemas']['AiConsentResponseDto'];
+export type AiConsentUpdateDto = components['schemas']['AiConsentUpdateDto'];
+export type AiConsentGrantDto = components['schemas']['AiConsentGrantDto'];
+export type AiScheduledQueryUpsertDto = components['schemas']['AiScheduledQueryUpsertDto'];
+export type AiScheduledQueryResponseDto = components['schemas']['AiScheduledQueryResponseDto'];
+export type AiApplySuggestionDto = components['schemas']['AiApplySuggestionDto'];
+export type AppliedSuggestionResponseDto = components['schemas']['AppliedSuggestionResponseDto'];
+export type DeletionStatusDto = components['schemas']['DeletionStatusDto'];
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
 export type PullDeltaQueryParams = Exclude<paths['/api/v1/sync/delta']['get']['parameters']['query'], undefined>;
+export type DownloadPathParams = Exclude<paths['/api/v1/receipts/{ref}/download']['get']['parameters']['path'], undefined>;

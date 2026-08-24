@@ -6,6 +6,7 @@ import { AccountModule } from '@server/modules/account';
 import { AiModule } from '@server/modules/ai';
 import { MemoirAuthModule } from '@server/modules/auth';
 import { BillingModule } from '@server/modules/billing';
+import { DeletionModule } from '@server/modules/deletion';
 import { DevicesModule } from '@server/modules/devices';
 import { OcrModule } from '@server/modules/ocr';
 import { ReceiptsModule } from '@server/modules/receipts';
@@ -16,7 +17,7 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({
 });
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, MemoirAuthModule, SyncModule, DevicesModule, AccountModule, OcrModule, BillingModule, ReceiptsModule, AiModule],
+  imports: [AppHttpCoreModule, MemoirAuthModule, SyncModule, DevicesModule, AccountModule, OcrModule, BillingModule, ReceiptsModule, AiModule, DeletionModule],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),

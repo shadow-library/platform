@@ -45,8 +45,8 @@ export class AccountContext {
     private readonly authClient: AuthClient,
   ) {}
 
-  /** Resolves (creating the account on first contact) and memoizes it for the remainder of the request. Throws if the account is mid-deletion. */
-  async resolve(identitySub: string): Promise<void> {
+  /** Resolves (creating the account on first contact) and memoizes it for the remainder of the request. Throws `ACC_002` if the account is mid-deletion, unless the route opted out via `@AllowDuringDeletion()`. */
+  async resolve(identitySub: string, allowDuringDeletion = false): Promise<void> {
     let accountId = this.accountIdCache.get<bigint>(identitySub);
     if (accountId === null || accountId === undefined) {
       const existing = await this.accountRepository.findByIdentitySub(identitySub);
@@ -56,7 +56,7 @@ export class AccountContext {
     }
 
     const deletionState = await this.accountRepository.findDeletionState(accountId);
-    if (deletionState !== 'none') throw AppErrorCode.ACC_002.create();
+    if (deletionState !== 'none' && !allowDuringDeletion) throw AppErrorCode.ACC_002.create();
     this.context.set(ACCOUNT_CONTEXT, accountId);
   }
 

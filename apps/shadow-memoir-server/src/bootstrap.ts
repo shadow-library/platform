@@ -54,6 +54,15 @@ declare module '@shadow-library/common' {
     'reconciliation.command-log-prune-batch-size': number;
     'reconciliation.command-log-prune-max-batches': number;
 
+    'deletion.sweep-interval-minutes': number;
+    'deletion.resume-after-minutes': number;
+    'deletion.purge-batch-size': number;
+    'deletion.purge-max-batches': number;
+
+    'identity.close-service': string;
+    'identity.close-path': string;
+    'identity.close-scope': string;
+
     'telemetry.pseudo-id-secret': string;
   }
 }
@@ -136,6 +145,24 @@ Config.load('reconciliation.wedged-last-hp-lag-days', { defaultValue: '3', valid
 Config.load('reconciliation.command-log-retention-days', { defaultValue: '90', validateType: 'number', reloadable: true });
 Config.load('reconciliation.command-log-prune-batch-size', { defaultValue: '1000', validateType: 'number', reloadable: true });
 Config.load('reconciliation.command-log-prune-max-batches', { defaultValue: '20', validateType: 'number', reloadable: true });
+
+/** §21: how often the resumption sweep looks for a stalled deletion, and how long a non-`done` state may sit untouched before it is re-driven. */
+Config.load('deletion.sweep-interval-minutes', { defaultValue: '5', validateType: 'number', reloadable: true });
+Config.load('deletion.resume-after-minutes', { defaultValue: '15', validateType: 'number', reloadable: true });
+
+/** Bounds one relational-purge pass: rows deleted per statement, and the number of statements before the pass yields and lets the sweep resume it. */
+Config.load('deletion.purge-batch-size', { defaultValue: '1000', validateType: 'number', reloadable: true });
+Config.load('deletion.purge-max-batches', { defaultValue: '1000', validateType: 'number', reloadable: true });
+
+/**
+ * §21.3: the machine-side identity close. Unset `identity.close-path` means no such surface is granted
+ * to this client yet — deletion then halts at `data_deleted` and emits the operator-runbook signal
+ * rather than pretending the identity record is gone. `{sub}` in the path is replaced by the account's
+ * identity subject.
+ */
+Config.load('identity.close-service', { defaultValue: 'shadow-identity' });
+Config.load('identity.close-path', { defaultValue: '' });
+Config.load('identity.close-scope', { defaultValue: 'users:close' });
 
 /** HMAC key for the analytics pseudo-id (§23) — an account id must never be recoverable from it. Ops-provisioned per env; the default is dev/test-only. */
 Config.load('telemetry.pseudo-id-secret', { defaultValue: 'dev-only-telemetry-pseudo-id-secret' });
