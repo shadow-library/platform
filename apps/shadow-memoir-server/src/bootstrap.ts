@@ -31,6 +31,14 @@ declare module '@shadow-library/common' {
 
     'billing.provider': string;
     'billing.webhook-tolerance-seconds': number;
+    'billing.webhook-secret': string;
+    'billing.checkout-url': string;
+    'billing.trial-days': number;
+    'billing.grace-days': number;
+    'billing.price-monthly-minor': number;
+    'billing.price-yearly-minor': number;
+    'billing.currency': string;
+    'billing.lapse-sweep-interval-minutes': number;
 
     'fx.provider-url': string;
     'fx.reconciliation-interval-minutes': number;
@@ -87,8 +95,21 @@ Config.load('ai.task-timeout-minutes', { defaultValue: '30', validateType: 'numb
 /** Garage bucket for receipt blobs (§19); provisioned per env by the T-04 operator checklist. */
 Config.load('storage.receipts-bucket', { defaultValue: 'memoir-receipts' });
 
-Config.load('billing.provider', { defaultValue: 'stripe' });
+/** Owner decision A-6 (the concrete PSP) is unresolved: the shipped adapter is `GenericHmacBillingAdapter`, so this names it until a provider is chosen. */
+Config.load('billing.provider', { defaultValue: 'generic-hmac' });
 Config.load('billing.webhook-tolerance-seconds', { defaultValue: '300', validateType: 'number' });
+
+/** Shared secret the provider signs webhook bodies with; ops-provisioned per env (SOPS). Empty means the webhook route refuses every delivery rather than accepting an unverifiable one. */
+Config.load('billing.webhook-secret', { defaultValue: '' });
+Config.load('billing.checkout-url', { defaultValue: '' });
+
+/** PRD §6.9: $10/month, $100/year, 7-day trial — all tunable without redeploy. The grace window the PRD leaves open is set here too. */
+Config.load('billing.trial-days', { defaultValue: '7', validateType: 'number', reloadable: true });
+Config.load('billing.grace-days', { defaultValue: '7', validateType: 'number', reloadable: true });
+Config.load('billing.price-monthly-minor', { defaultValue: '1000', validateType: 'number', reloadable: true });
+Config.load('billing.price-yearly-minor', { defaultValue: '10000', validateType: 'number', reloadable: true });
+Config.load('billing.currency', { defaultValue: 'USD', reloadable: true });
+Config.load('billing.lapse-sweep-interval-minutes', { defaultValue: '60', validateType: 'number', reloadable: true });
 
 Config.load('fx.provider-url', { defaultValue: 'https://api.exchangerate.host' });
 Config.load('fx.reconciliation-interval-minutes', { defaultValue: '60', validateType: 'number' });

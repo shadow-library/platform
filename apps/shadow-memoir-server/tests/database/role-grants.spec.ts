@@ -157,6 +157,52 @@ describe('DB roles & grants (T-14, ARCHITECTURE §5.4/§10.4/§28.4)', () => {
     expect(scoped).toHaveLength(1);
   });
 
+  it('should let memoir_billing write entitlements and append billing_events — the surfaces §5.4 gives it and no others', async () => {
+    await billingSql`INSERT INTO entitlements (account_id) VALUES (${accountId}) ON CONFLICT DO NOTHING`;
+    const updated = await billingSql`UPDATE entitlements SET tier = 'paid', state = 'active' WHERE account_id = ${accountId} RETURNING account_id`;
+    expect(updated).toHaveLength(1);
+
+    const event =
+      await billingSql`INSERT INTO billing_events (provider, provider_event_id, account_id, type, payload, occurred_at) VALUES ('generic-hmac', 'evt-grants-1', ${accountId}, 'subscription.activated', '{}', now()) RETURNING id`;
+    expect(event).toHaveLength(1);
+
+    const matched = await billingSql`UPDATE billing_events SET processed = true, quarantined = false WHERE id = ${event[0].id} RETURNING id`;
+    expect(matched).toHaveLength(1);
+  });
+
+  it('should deny memoir_billing every write outside the entitlement tables (billing-writes-quests stays impossible with the tables in place)', async () => {
+    await expectDenied(billingSql`UPDATE quests SET name = 'billing tampered' WHERE id = ${questId}`);
+    await expectDenied(billingSql`INSERT INTO quest_logs (account_id, quest_id, date, state, ruleset_version) VALUES (${accountId}, ${questId}, now(), 'completed', 1)`);
+    await expectDenied(
+      billingSql`INSERT INTO hero_events (account_id, dedupe_key, type, xp_delta, coins_delta, date, ruleset_version) VALUES (${accountId}, 'dk-billing', 'quest_complete', 10, 5, now(), 1)`,
+    );
+    await expectDenied(billingSql`DELETE FROM billing_events WHERE account_id = ${accountId}`);
+    await expectDenied(billingSql`UPDATE billing_events SET payload = '{"tampered":true}' WHERE account_id = ${accountId}`);
+  });
+
+  it('should deny memoir_api any write to entitlements or billing_events (user-role-writes-entitlements stays impossible)', async () => {
+    await expectDenied(apiSql`UPDATE entitlements SET tier = 'paid' WHERE account_id = ${accountId}`);
+    await expectDenied(apiSql`INSERT INTO entitlements (account_id, tier, state) VALUES (${accountId}, 'paid', 'active')`);
+    await expectDenied(apiSql`DELETE FROM entitlements WHERE account_id = ${accountId}`);
+    await expectDenied(
+      apiSql`INSERT INTO billing_events (provider, provider_event_id, type, payload, occurred_at) VALUES ('generic-hmac', 'evt-api-forged', 'subscription.activated', '{}', now())`,
+    );
+
+    const readable = await apiSql`SELECT tier, state FROM entitlements WHERE account_id = ${accountId}`;
+    expect(readable).toHaveLength(1);
+  });
+
+  it('should deny memoir_ai any access to entitlements — §5.4 grants it zero privileges there', async () => {
+    await expectDenied(aiSql`SELECT tier FROM entitlements WHERE account_id = ${accountId}`);
+    await expectDenied(aiSql`UPDATE entitlements SET tier = 'paid' WHERE account_id = ${accountId}`);
+  });
+
+  it('should limit the billing role read of accounts to (id, identity_sub, purchase_token)', async () => {
+    const scoped = await billingSql`SELECT id, identity_sub, purchase_token FROM accounts WHERE id = ${accountId}`;
+    expect(scoped).toHaveLength(1);
+    await expectDenied(billingSql`SELECT display_name FROM accounts WHERE id = ${accountId}`);
+  });
+
   it('should let memoir_deleter delete rows across user-owned and append-only tables alike', async () => {
     const [account] = await databaseService.run(() =>
       db

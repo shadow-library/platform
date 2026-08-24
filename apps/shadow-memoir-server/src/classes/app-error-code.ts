@@ -178,4 +178,17 @@ export class AppErrorCode extends ServerErrorCode {
 
   /** No meal preset with that id belongs to the caller */
   static readonly QLG_001 = AppErrorCode.notFound('QLG_001', 'Meal preset not found');
+
+  /*!
+   * Billing Errors
+   */
+
+  /** The webhook's signature did not verify, or its timestamp fell outside the configured tolerance — the route has no identity auth, so this is the whole authentication decision (ARCHITECTURE §16.1) */
+  static readonly BIL_001 = AppErrorCode.unauthenticated('BIL_001', 'Webhook signature verification failed');
+
+  /** The `{provider}` path segment names no configured adapter */
+  static readonly BIL_002 = AppErrorCode.notFound('BIL_002', "Unknown billing provider '{provider}'");
+
+  /** No webhook secret or hosted-checkout endpoint is configured for this environment; the billing surface never falls back to an unverified or fabricated one */
+  static readonly BIL_003 = AppErrorCode.unavailable('BIL_003', 'Billing provider is not configured');
 }

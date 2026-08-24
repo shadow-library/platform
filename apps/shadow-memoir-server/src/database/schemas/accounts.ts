@@ -1,5 +1,5 @@
 import { type InferEnum, type InferSelectModel, sql } from 'drizzle-orm';
-import { bigint, bigserial, char, check, date, integer, pgEnum, pgTable, smallint, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, char, check, date, integer, pgEnum, pgTable, smallint, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
 import { sensitive } from '../sensitivity';
 import { jsonb } from './jsonb';
@@ -70,6 +70,9 @@ export const accounts = pgTable(
     ocrQuotaCount: smallint('ocr_quota_count').notNull().default(0),
     notificationPrefs: jsonb('notification_prefs').notNull().default({}),
 
+    /** The opaque handle the hosted checkout session carries as client reference and the provider echoes on every webhook (ARCHITECTURE §16.2) — server-minted, never the identity sub. */
+    purchaseToken: uuid('purchase_token').notNull().defaultRandom(),
+
     onboardingCompletedAt: timestamp('onboarding_completed_at', { withTimezone: true }),
     deletionState: deletionState('deletion_state').notNull().default('none'),
     deletionStartedAt: timestamp('deletion_started_at', { withTimezone: true }),
@@ -79,6 +82,7 @@ export const accounts = pgTable(
   },
   t => [
     unique('accounts_identity_sub_unique').on(t.identitySub),
+    unique('accounts_purchase_token_unique').on(t.purchaseToken),
     check('accounts_level_check', sql`${t.level} >= 1`),
     check('accounts_total_xp_check', sql`${t.totalXp} >= 0`),
     check('accounts_coins_check', sql`${t.coins} >= 0`),

@@ -211,6 +211,8 @@ describe('rules module purity', () => {
       expect(content).not.toMatch(/entitlement/i);
       expect(content).not.toMatch(/\bpaid\b/i);
       expect(content).not.toMatch(/'free'/);
+      expect(content).not.toMatch(/billing/i);
+      expect(content).not.toMatch(/\btrial\b/i);
     });
 
     it(`should keep runtime environment access out of ${file}`, () => {
