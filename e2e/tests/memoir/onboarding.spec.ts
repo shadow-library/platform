@@ -34,8 +34,10 @@ test.describe('shadow memoir onboarding', () => {
     // Step 1 — essentials: wake/sleep window, timezone, home currency.
     await page.getByLabel('Wake time').fill('07:00');
     await page.getByLabel('Sleep time').fill('23:00');
-    await page.getByLabel('Timezone').selectOption('UTC');
-    await page.getByLabel('Home currency').selectOption('USD');
+    await page.getByLabel('Timezone').click();
+    await page.getByRole('option', { name: 'Europe/London' }).click();
+    await page.getByLabel('Home currency').click();
+    await page.getByRole('option', { name: 'USD $' }).click();
     await page.getByRole('button', { name: 'Continue' }).click();
 
     // Step 2 — first quest: use the offered example rather than free text, then pick a stat affinity.
