@@ -2,14 +2,16 @@ import { QueryClient } from '@tanstack/react-query';
 import { createContext, type ReactElement, type ReactNode, useContext, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { toISODate } from '@shadow-library/ui';
 
-import { createAccountProvider, createReflectProvider, type MemoirData, memoirKeys, setFinanceProvider, setQuickLogProvider } from '@/lib/data';
+import { type MemoirData, memoirKeys, setFinanceProvider, setQuickLogProvider } from '@/lib/data';
 
 import { MemoirStore } from './memoir-store';
 import { SyncEngine } from './sync-engine';
+import { SyncedAccountProvider } from './synced-account-provider';
 import { SyncedDataProvider } from './synced-provider';
 import { SyncedFinanceProvider } from './synced-finance-provider';
 import { SyncedHeroProvider } from './synced-hero-provider';
 import { SyncedQuickLogProvider } from './synced-quick-log-provider';
+import { SyncedReflectProvider } from './synced-reflect-provider';
 import { type SyncSnapshot } from './sync.types';
 
 const OFFLINE_SNAPSHOT: SyncSnapshot = { state: 'offline', queuedCount: 0, lastSyncedAt: null, notices: [] };
@@ -39,15 +41,16 @@ export interface SyncedMemoirData extends MemoirData {
 }
 
 /**
- * The synced counterpart of `createMemoirData`: quests, finance, quick logs and the hero deck read
- * through IndexedDB and write through the outbox, while reflect and account stay on their fixture
- * providers until the server grows a module for each. The seam is `MemoirData`, so a domain flips by
- * swapping one field.
+ * The synced counterpart of `createMemoirData`. Quests, finance, quick logs and the hero deck read through
+ * IndexedDB and write through the outbox; account and coaching read and write over HTTP, because neither is
+ * something an offline owner can be told succeeded. What is left on a fixture provider is history, insights
+ * and the weekly review — the server exposes no read model for any of the three.
  */
 export function createSyncedMemoirData(options: { today?: string; store?: MemoirStore } = {}): SyncedMemoirData {
   const today = options.today ?? toISODate(new Date());
   const currency = 'EUR';
   const engine = new SyncEngine({ store: options.store ?? new MemoirStore(), today });
+  const account = new SyncedAccountProvider(engine);
   const finance = new SyncedFinanceProvider(engine);
   const quickLogs = new SyncedQuickLogProvider(engine);
   setFinanceProvider(finance);
@@ -56,9 +59,9 @@ export function createSyncedMemoirData(options: { today?: string; store?: Memoir
   return {
     engine,
     provider: new SyncedDataProvider(engine),
-    hero: new SyncedHeroProvider(engine),
-    reflect: createReflectProvider({ today, persona: 'active' }),
-    account: createAccountProvider({ persona: 'active', currency }),
+    hero: new SyncedHeroProvider(engine, account),
+    reflect: new SyncedReflectProvider(engine),
+    account,
     finance,
     quickLogs,
     queryClient: new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } }),

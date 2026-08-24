@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
-import { Alert, Badge, Button, Card, DescriptionList, Skeleton } from '@shadow-library/ui';
+import { Badge, Button, Card, DescriptionList, Skeleton } from '@shadow-library/ui';
 
 import { Screen, screenStyles } from '@/components/ScreenLayout';
 import { useAccountCommand, useBilling } from '@/lib/data';
@@ -51,14 +51,20 @@ export function BillingScreen(): ReactElement {
                     </li>
                   ))}
                 </ul>
-                <Button
-                  fullWidth
-                  variant={plan.current ? 'secondary' : 'primary'}
-                  disabled={plan.current}
-                  onClick={() => command.mutate({ type: plan.id === 'coach' ? 'billing.startTrial' : 'billing.cancel' })}
-                >
-                  {plan.current ? 'Current plan' : plan.id === 'coach' ? 'Start the fourteen-day trial' : 'Return to Free at renewal'}
-                </Button>
+                {plan.id === 'coach' ? (
+                  <div className={styles.actions}>
+                    <Button variant="primary" disabled={plan.current} onClick={() => command.mutate({ type: 'billing.checkout', plan: 'monthly' })}>
+                      {plan.current ? 'Current plan' : 'Pay monthly'}
+                    </Button>
+                    <Button variant="secondary" disabled={plan.current} onClick={() => command.mutate({ type: 'billing.checkout', plan: 'yearly' })}>
+                      Pay yearly
+                    </Button>
+                  </div>
+                ) : (
+                  <Button fullWidth variant="secondary" disabled>
+                    {plan.current ? 'Current plan' : 'Included'}
+                  </Button>
+                )}
               </Card>
             ))}
           </div>
@@ -71,19 +77,7 @@ export function BillingScreen(): ReactElement {
               <DescriptionList.Item term="Coaching quota">{billing.data.quotaLine}</DescriptionList.Item>
               <DescriptionList.Item term="Invoices">{billing.data.invoicesLine}</DescriptionList.Item>
             </DescriptionList>
-            <div className={styles.actions}>
-              <Button size="sm" variant="secondary">
-                Manage the subscription
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => command.mutate({ type: 'billing.cancel' })}>
-                Cancel the plan
-              </Button>
-            </div>
-            {billing.data.cancellationNote ? (
-              <Alert intent="info" title="Cancelling keeps everything except the coaching volume">
-                {billing.data.cancellationNote}
-              </Alert>
-            ) : null}
+            <p className={styles.sectionNote}>{billing.data.manageNote}</p>
           </Card>
 
           <Card padding="md">

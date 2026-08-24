@@ -3,8 +3,9 @@ import { type ReactElement } from 'react';
 import { Badge, Button, Card, EmptyState, Skeleton, Statistic } from '@shadow-library/ui';
 
 import { Screen, ScreenColumns, screenStyles } from '@/components/ScreenLayout';
-import { useAppSync } from '@/lib/data';
+import { useAccountCommand, useAppSync } from '@/lib/data';
 import { useSystemOverlays } from '@/features/shell';
+import { useSyncEngine } from '@/lib/sync';
 
 import styles from './settings.module.css';
 
@@ -14,6 +15,8 @@ const QUEUE_LABELS = { queued: 'Queued', sent: 'Sent', retrying: 'Retrying', con
 
 export function AppSyncScreen(): ReactElement {
   const sync = useAppSync();
+  const command = useAccountCommand();
+  const engine = useSyncEngine();
   const overlays = useSystemOverlays();
 
   return (
@@ -64,22 +67,18 @@ export function AppSyncScreen(): ReactElement {
                 <p className={styles.sectionNote}>{sync.data.body}</p>
               </div>
               <div className={styles.actions}>
-                <Button size="sm" variant="secondary">
+                <Button size="sm" variant="secondary" onClick={() => void engine?.sync()}>
                   Sync now
                 </Button>
-                {sync.data.conflictCount > 0 ? (
-                  <Button size="sm" variant="ghost" onClick={() => overlays.open('sync-conflict')}>
-                    Resolve the conflict
-                  </Button>
-                ) : null}
               </div>
             </div>
             <div className={styles.stats}>
               <Statistic label="Queued changes" value={sync.data.queuedCount} size="sm" />
-              <Statistic label="Last synced" value={sync.data.lastSyncedMinutes} unit="min ago" size="sm" />
-              <Statistic label="Offline cache" value={sync.data.cacheMegabytes} unit="MB" size="sm" />
-              <Statistic label="Conflicts" value={sync.data.conflictCount} size="sm" comparison={sync.data.conflictCount > 0 ? 'weight, today' : 'none'} />
+              <Statistic label="Registered devices" value={sync.data.devices.length} size="sm" />
             </div>
+            <p className={screenStyles.cardBody}>
+              {sync.data.lastSyncedAt ? `Last synced ${new Date(sync.data.lastSyncedAt).toLocaleString()}.` : 'This device has not completed a sync yet.'}
+            </p>
           </Card>
 
           <Card padding="md">
@@ -98,11 +97,6 @@ export function AppSyncScreen(): ReactElement {
                         <span className={styles.rowTitle}>{entry.text}</span>
                         <span className={styles.rowMeta}>{entry.meta}</span>
                       </span>
-                      {entry.retryable ? (
-                        <Button size="sm" variant="ghost">
-                          Retry
-                        </Button>
-                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -110,6 +104,27 @@ export function AppSyncScreen(): ReactElement {
                   Queued actions apply in the order you made them. Nothing in this list can be lost by closing the app, restarting the device or losing the session.
                 </p>
               </>
+            )}
+          </Card>
+
+          <Card padding="md">
+            <h2 className={screenStyles.cardTitle}>Devices</h2>
+            {sync.data.devices.length === 0 ? (
+              <EmptyState size="inline" title="No devices yet" description="A device registers itself the first time it syncs." />
+            ) : (
+              <ul className={styles.deviceRows}>
+                {sync.data.devices.map(device => (
+                  <li key={device.id} className={styles.deviceRow}>
+                    <span>
+                      <span className={styles.rowTitle}>{device.name}</span>
+                      <span className={styles.rowMeta}>{device.current ? `This device · ${device.meta.toLowerCase()}` : device.meta}</span>
+                    </span>
+                    <Button size="sm" variant="ghost" disabled={device.current} onClick={() => command.mutate({ type: 'device.remove', deviceId: device.id })}>
+                      {device.current ? 'In use' : 'Remove'}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
             )}
           </Card>
 

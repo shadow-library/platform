@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode } from 'react';
-import { Avatar, Button, Card, FormField, Input, SegmentedControl, Select, Skeleton, Switch, type ThemeMode, TimePicker, toast, useTheme } from '@shadow-library/ui';
+import { Avatar, Button, Card, FormField, SegmentedControl, Select, Skeleton, Switch, type ThemeMode, TimePicker, toast, useTheme } from '@shadow-library/ui';
 import { userDisplayName } from '@shadow-library/web';
 
 import { Screen, ScreenColumns, screenStyles } from '@/components/ScreenLayout';
 import { meQuery } from '@/lib/apis';
 import {
   type BehaviourPreferences,
+  type HeroIntensityMode,
   type SettledCommandResult,
   useAccountCommand,
   useAppSync,
@@ -28,6 +29,14 @@ const CURRENCIES = [
 
 const TIMEZONES = ['Europe/Oslo', 'Europe/London', 'Europe/Lisbon', 'Europe/Berlin'];
 
+const INTENSITIES: { value: HeroIntensityMode; label: string }[] = [
+  { value: 'gentle', label: 'Gentle' },
+  { value: 'standard', label: 'Standard' },
+  { value: 'demanding', label: 'Demanding' },
+];
+
+const DEFERRED_HELP = 'Staged rather than applied — it takes effect at your next daily rollover, so the day in progress is never rewritten.';
+
 const BEHAVIOUR_ROWS: { key: keyof BehaviourPreferences; label: string; help: string }[] = [
   { key: 'compactDensity', label: 'Compact density', help: 'Tighter rows on a desktop. Touch targets on a phone never shrink.' },
   { key: 'reduceMotion', label: 'Reduce motion', help: 'Removes experience fills and sheet transitions.' },
@@ -38,7 +47,13 @@ const BEHAVIOUR_ROWS: { key: keyof BehaviourPreferences; label: string; help: st
 const DATA_ROWS: { id: string; label: string; help: string; action: string; to: string }[] = [
   { id: 'ai', label: 'Coaching consent', help: 'What the coach may read, per data class, each withdrawable on its own.', action: 'Manage', to: '/ai' },
   { id: 'export', label: 'Export your data', help: 'Everything you have logged, in formats you can open without this app.', action: 'Export', to: '/settings/export' },
-  { id: 'notifications', label: 'Notification preferences', help: 'Push and email, per category, all off until you turn them on.', action: 'Open', to: '/settings/notifications' },
+  {
+    id: 'notifications',
+    label: 'Notification preferences',
+    help: 'Email per category and push per device, all off until you turn them on.',
+    action: 'Open',
+    to: '/settings/notifications',
+  },
   { id: 'delete', label: 'Delete your data', help: 'A thirty-day grace period, confirmed on your Shadow account.', action: 'Delete', to: '/settings/delete' },
 ];
 
@@ -68,15 +83,14 @@ export function SettingsScreen(): ReactElement {
               <nav className={styles.jump}>
                 <Link to="/settings/notifications" className={styles.jumpItem}>
                   <span>Notifications</span>
-                  <span className={styles.jumpMeta}>6 categories</span>
+                  <span className={styles.jumpMeta}>all off by default</span>
                 </Link>
                 <Link to="/settings/billing" className={styles.jumpItem}>
                   <span>Plan and billing</span>
-                  <span className={styles.jumpMeta}>Free</span>
                 </Link>
                 <Link to="/settings/export" className={styles.jumpItem}>
                   <span>Data export</span>
-                  <span className={styles.jumpMeta}>1,284 records</span>
+                  <span className={styles.jumpMeta}>everything you have logged</span>
                 </Link>
                 <Link to="/settings/app" className={styles.jumpItem}>
                   <span>App and sync</span>
@@ -91,8 +105,8 @@ export function SettingsScreen(): ReactElement {
             <Card padding="md">
               <h2 className={screenStyles.cardTitle}>App</h2>
               <ul className={screenStyles.list}>
-                <li>{appSync.data ? `${appSync.data.title.toLowerCase()} · offline cache ${appSync.data.cacheMegabytes} MB` : 'Checking this device'}</li>
-                <li>Installed as an app on this device</li>
+                <li>{appSync.data ? appSync.data.title.toLowerCase() : 'Checking this device'}</li>
+                <li>{appSync.data ? `${appSync.data.devices.length} device${appSync.data.devices.length === 1 ? '' : 's'} registered` : 'Checking this device'}</li>
                 <li>Everything below works with no connection</li>
               </ul>
               <div className={styles.actions}>
@@ -113,26 +127,24 @@ export function SettingsScreen(): ReactElement {
               <p className={styles.identityMeta}>Signed in through the platform · account details are managed there</p>
             </div>
           </div>
-          <div className={styles.fields}>
-            <FormField label="Hero name" helper="Shown on your Hero screen and nowhere else.">
-              <Input defaultValue="Rune" onBlur={event => command.mutate({ type: 'profile.setHeroName', heroName: event.target.value }, { onSuccess: notify })} />
-            </FormField>
-            <FormField label="Displayed title" helper="Titles are earned rather than chosen. This picks which earned one is shown.">
-              <Select
-                value={deck.data?.displayedTitleId ?? 'none'}
-                aria-label="Displayed title"
-                disabled={earnedTitles.length === 0}
-                onValueChange={value => heroCommand.mutate({ type: 'title.display', titleId: value === 'none' ? null : value }, { onSuccess: notify })}
-              >
-                {earnedTitles.map(title => (
-                  <Select.Item key={title.id} value={title.id}>
-                    {title.name}
-                  </Select.Item>
-                ))}
-                <Select.Item value="none">No title</Select.Item>
-              </Select>
-            </FormField>
-          </div>
+          <p className={styles.sectionNote}>
+            Your name, email and picture come from your Shadow account and are managed there. Nothing on this screen changes them, and Shadow Memoir stores only a copy for display.
+          </p>
+          <FormField label="Displayed title" helper="Titles are earned rather than chosen. This picks which earned one is shown.">
+            <Select
+              value={deck.data?.displayedTitleId ?? 'none'}
+              aria-label="Displayed title"
+              disabled={earnedTitles.length === 0}
+              onValueChange={value => heroCommand.mutate({ type: 'title.display', titleId: value === 'none' ? null : value }, { onSuccess: notify })}
+            >
+              {earnedTitles.map(title => (
+                <Select.Item key={title.id} value={title.id}>
+                  {title.name}
+                </Select.Item>
+              ))}
+              <Select.Item value="none">No title</Select.Item>
+            </Select>
+          </FormField>
         </Card>
 
         <Card padding="lg">
@@ -154,15 +166,34 @@ export function SettingsScreen(): ReactElement {
                   onValueChange={value => command.mutate({ type: 'day.set', patch: { sleepTime: value ?? '' } }, { onSuccess: notify })}
                 />
               </FormField>
-              <FormField label="Timezone" helper="Travel does not shift your day unless you change it here.">
+              <FormField
+                label="Timezone"
+                helper={day.data.pendingTimezone ? `${day.data.pendingTimezone} is waiting. ${DEFERRED_HELP}` : 'Travel does not shift your day unless you change it here.'}
+              >
                 <Select
-                  value={day.data.timezone}
+                  value={day.data.pendingTimezone ?? day.data.timezone}
                   aria-label="Timezone"
                   onValueChange={value => command.mutate({ type: 'day.set', patch: { timezone: value } }, { onSuccess: notify })}
                 >
                   {TIMEZONES.map(zone => (
                     <Select.Item key={zone} value={zone}>
                       {zone}
+                    </Select.Item>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField
+                label="Intensity"
+                helper={day.data.pendingIntensity ? `A change is waiting. ${DEFERRED_HELP}` : 'How much a missed day costs. Lowering it is never punished.'}
+              >
+                <Select
+                  value={day.data.pendingIntensity ?? day.data.intensity}
+                  aria-label="Intensity"
+                  onValueChange={value => command.mutate({ type: 'day.set', patch: { intensity: value as HeroIntensityMode } }, { onSuccess: notify })}
+                >
+                  {INTENSITIES.map(option => (
+                    <Select.Item key={option.value} value={option.value}>
+                      {option.label}
                     </Select.Item>
                   ))}
                 </Select>

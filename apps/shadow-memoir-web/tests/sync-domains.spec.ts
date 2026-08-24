@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { type DeltaPage, SyncedFinanceProvider, SyncedHeroProvider, SyncedQuickLogProvider } from '@/lib/sync';
+import { type DeltaPage, SyncedAccountProvider, SyncedFinanceProvider, SyncedHeroProvider, SyncedQuickLogProvider } from '@/lib/sync';
 
 import { createTestEngine, type TestEngine } from './sync-harness';
 
@@ -197,7 +197,7 @@ describe('FE-5 domain projection', () => {
 
   it('should project the earned grants and the equipped cosmetic onto the hero deck', async () => {
     const { engine } = await started();
-    const deck = await new SyncedHeroProvider(engine).getDeck();
+    const deck = await new SyncedHeroProvider(engine, new SyncedAccountProvider(engine)).getDeck();
 
     expect(deck.hero.title).toBe('Anchor Holder');
     expect(deck.achievements.find(item => item.id === 'first_quest_completed')?.earnedOn).toBe('2026-02-02T09:00:00.000Z');
@@ -255,7 +255,7 @@ describe('FE-5 optimistic apply', () => {
 
   it('should spend the account coins on a purchase and refuse one the balance cannot reach', async () => {
     const { engine, server } = await started();
-    const hero = new SyncedHeroProvider(engine);
+    const hero = new SyncedHeroProvider(engine, new SyncedAccountProvider(engine));
 
     const purchase = await hero.dispatchCommand({ type: 'cosmetic.purchase', cosmeticId: 'badge_silver' });
     expect(purchase.status).toBe('applied');
@@ -303,7 +303,7 @@ describe('FE-5 replay convergence', () => {
 
     const finance = new SyncedFinanceProvider(harness.engine);
     const quickLogs = new SyncedQuickLogProvider(harness.engine);
-    const hero = new SyncedHeroProvider(harness.engine);
+    const hero = new SyncedHeroProvider(harness.engine, new SyncedAccountProvider(harness.engine));
 
     await finance.dispatchCommand({ type: 'expense.create', draft: { amountText: '4.20', currency: 'EUR', categoryId: 'food', occurredOnDate: TODAY } });
     await quickLogs.dispatchCommand({ type: 'sidequest.log', draft: { date: TODAY, name: 'Tidied the workshop', statAffinity: 'discipline' } });

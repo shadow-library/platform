@@ -10,9 +10,9 @@ import { renderScreen } from './harness';
 
 const TODAY = '2026-08-22';
 
-async function turnCoachingOn(): Promise<void> {
-  fireEvent.click(await screen.findByRole('switch', { name: /Quests, planning and money/ }));
-  fireEvent.click(screen.getByRole('button', { name: 'Turn on coaching' }));
+async function passTheConsentGate(): Promise<void> {
+  fireEvent.click(await screen.findByRole('switch', { name: /Journal reflections and reasons/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
 }
 
 describe('History screen', () => {
@@ -75,45 +75,41 @@ describe('Weekly review', () => {
 });
 
 describe('Coach screen', () => {
-  it('should ask for consent before anything can be submitted', async () => {
+  it('should ask for a consent decision before anything can be submitted', async () => {
     renderScreen(<AiScreen />, { today: TODAY });
     expect(await screen.findByRole('heading', { name: 'Ask' })).toBeDefined();
     expect(await screen.findByText('Before the coach reads anything')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Submit request' })).toBeNull();
   });
 
-  it('should keep the consent button inert until a data class is granted', async () => {
+  it('should show the remaining quota once the gate is passed', async () => {
     renderScreen(<AiScreen />, { today: TODAY });
-    const confirm = await screen.findByRole('button', { name: 'Turn on coaching' });
-    expect((confirm as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it('should show the remaining quota once coaching is on', async () => {
-    renderScreen(<AiScreen />, { today: TODAY });
-    await turnCoachingOn();
+    await passTheConsentGate();
     expect(await screen.findByText('1 of 2 requests left this month')).toBeDefined();
     expect(screen.getByText(/Free includes 2 requests a month/)).toBeDefined();
   });
 
-  it('should refuse a health-scoped request while health consent is off', async () => {
+  it('should queue a request and spend one of the quota', async () => {
     renderScreen(<AiScreen />, { today: TODAY });
-    await turnCoachingOn();
-
-    fireEvent.change(await screen.findByLabelText('Your question'), { target: { value: 'Why do Thursdays keep failing?' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Body and health' }));
-
-    expect(await screen.findByText(/Health data is a separate consent and it is off/)).toBeDefined();
-    expect((screen.getByRole('button', { name: 'Submit request' }) as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it('should queue a request within scope and spend one of the quota', async () => {
-    renderScreen(<AiScreen />, { today: TODAY });
-    await turnCoachingOn();
+    await passTheConsentGate();
 
     fireEvent.change(await screen.findByLabelText('Your question'), { target: { value: 'Why do Thursdays keep failing?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
 
     expect(await screen.findByText('Queued')).toBeDefined();
     expect(await screen.findByText('0 of 2 requests left this month')).toBeDefined();
+  });
+
+  it('should refuse the third request of the month and point at the plans', async () => {
+    renderScreen(<AiScreen />, { today: TODAY });
+    await passTheConsentGate();
+
+    for (const question of ['One', 'Two']) {
+      fireEvent.change(await screen.findByLabelText('Your question'), { target: { value: question } });
+      fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+    }
+
+    expect(await screen.findByText(/Both requests this month are used/)).toBeDefined();
+    expect((screen.getByRole('button', { name: 'Submit request' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

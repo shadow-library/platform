@@ -441,6 +441,120 @@ export function projectQuickLogRows(rows: Partial<DomainRows>): QuickLogRows {
   };
 }
 
+export interface AiTaskRow {
+  id: string;
+  queryText: string;
+  status: 'pending' | 'running' | 'done' | 'failed' | 'cancelled' | 'held_upgrade';
+  kind: 'adhoc' | 'scheduled';
+  submittedAt: string;
+  expectedBy: string;
+  /** The `YYYY-MM` the row was charged against, or null when it consumed no ad-hoc quota. */
+  quotaMonth: string | null;
+  quotaConsumed: boolean;
+  error: string | null;
+}
+
+export interface AiResultRow {
+  id: string;
+  taskId: string;
+  answer: string;
+  patterns: string[];
+  suggestions: { kind: string; questId: string; text: string }[];
+  limitationNote: string | null;
+  createdAt: string;
+}
+
+export interface AiRows {
+  tasks: AiTaskRow[];
+  results: AiResultRow[];
+  /** Granted classes only — a withdrawn row is present with `withdrawnAt` set, which is what makes "decided" different from "granted". */
+  grantedClasses: Set<string>;
+  decidedClasses: Set<string>;
+  scheduledQuery: { queryText: string; active: boolean } | null;
+}
+
+export interface EntitlementRow {
+  tier: 'free' | 'paid';
+  state: string;
+  expiresAt: string | null;
+  trialUsed: boolean;
+}
+
+const AI_TASK_STATUSES: AiTaskRow['status'][] = ['pending', 'running', 'done', 'failed', 'cancelled', 'held_upgrade'];
+
+function toAiTask(row: DeltaRow): AiTaskRow {
+  const status = AI_TASK_STATUSES.find(candidate => candidate === text(row, 'status')) ?? 'pending';
+  return {
+    id: String(row['id']),
+    queryText: text(row, 'queryText') ?? '',
+    status,
+    kind: text(row, 'kind') === 'scheduled' ? 'scheduled' : 'adhoc',
+    submittedAt: text(row, 'submittedAt') ?? '',
+    expectedBy: text(row, 'expectedBy') ?? '',
+    quotaMonth: text(row, 'quotaMonth'),
+    quotaConsumed: bool(row, 'quotaConsumed'),
+    error: text(row, 'error'),
+  };
+}
+
+function toAiResult(row: DeltaRow): AiResultRow {
+  const suggestions = Array.isArray(row['suggestions']) ? (row['suggestions'] as Record<string, unknown>[]) : [];
+  return {
+    id: String(row['id']),
+    taskId: String(row['taskId']),
+    answer: text(row, 'answer') ?? '',
+    patterns: Array.isArray(row['patterns']) ? (row['patterns'] as unknown[]).map(String) : [],
+    suggestions: suggestions.map(suggestion => ({
+      kind: String(suggestion['kind'] ?? ''),
+      questId: String(suggestion['questId'] ?? ''),
+      text: String(suggestion['text'] ?? ''),
+    })),
+    limitationNote: text(row, 'limitationNote'),
+    createdAt: text(row, 'createdAt') ?? '',
+  };
+}
+
+export function projectAiRows(rows: Partial<DomainRows>): AiRows {
+  const grantedClasses = new Set<string>();
+  const decidedClasses = new Set<string>();
+  for (const row of rows.ai_consents ?? []) {
+    const dataClass = text(row, 'dataClass');
+    if (!dataClass) continue;
+    decidedClasses.add(dataClass);
+    if (row['withdrawnAt'] === null || row['withdrawnAt'] === undefined) grantedClasses.add(dataClass);
+  }
+
+  const scheduled = rows.ai_scheduled_queries?.[0];
+  return {
+    tasks: (rows.ai_tasks ?? []).map(toAiTask).sort((left, right) => right.submittedAt.localeCompare(left.submittedAt)),
+    results: (rows.ai_results ?? []).map(toAiResult).sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+    grantedClasses,
+    decidedClasses,
+    scheduledQuery: scheduled ? { queryText: text(scheduled, 'queryText') ?? '', active: bool(scheduled, 'active', true) } : null,
+  };
+}
+
+export function projectEntitlement(rows: Partial<DomainRows>): EntitlementRow {
+  const row = rows.entitlement?.[0];
+  if (!row) return { tier: 'free', state: 'free', expiresAt: null, trialUsed: false };
+  return { tier: text(row, 'tier') === 'paid' ? 'paid' : 'free', state: text(row, 'state') ?? 'free', expiresAt: text(row, 'expiresAt'), trialUsed: bool(row, 'trialUsed') };
+}
+
+/** Counts per delta domain, for the export and deletion screens' "what this covers" list — the only honest source, since neither endpoint enumerates them. */
+export function projectRecordCounts(rows: Partial<DomainRows>): { name: string; meta: string }[] {
+  const count = (domain: SyncDomain): number => (rows[domain] ?? []).length;
+  const plural = (value: number, noun: string): string => `${value} ${noun}${value === 1 ? '' : 's'}`;
+
+  return [
+    { name: 'Quests and history', meta: `${plural(count('quests'), 'quest')} · ${plural(count('quest_logs'), 'outcome')}` },
+    { name: 'Hero and progression', meta: `${plural(count('achievements_earned'), 'achievement')} · ${plural(count('titles_earned'), 'title')}` },
+    { name: 'Money', meta: `${plural(count('expenses'), 'expense')} · ${plural(count('subscriptions'), 'subscription')}` },
+    { name: 'Journal', meta: `${count('journal_entries')} ${count('journal_entries') === 1 ? 'entry' : 'entries'}` },
+    { name: 'Body and health', meta: `${plural(count('weights'), 'weight')} · ${plural(count('meals'), 'meal')} · ${plural(count('metric_entries'), 'metric')}` },
+    { name: 'Coaching results', meta: `${plural(count('ai_results'), 'result')} · ${plural(count('ai_tasks'), 'request')}` },
+  ];
+}
+
 export function projectHeroGrants(rows: Partial<DomainRows>): HeroGrants {
   const achievements: Record<string, string> = {};
   for (const row of rows.achievements_earned ?? []) achievements[String(row['achievementId'])] = text(row, 'earnedAt') ?? '';

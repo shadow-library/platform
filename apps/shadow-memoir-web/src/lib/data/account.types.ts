@@ -1,14 +1,13 @@
-export interface AccountProfile {
-  displayName: string;
-  email: string;
-  heroName: string;
-  displayedTitleId: string | null;
-}
+import { type HeroIntensityMode } from './hero.types';
 
 export interface DayPreferences {
   wakeTime: string;
   sleepTime: string;
   timezone: string;
+  /** Staged by the server and applied at the next daily rollover, so a mid-day change never rewrites the day in progress. */
+  pendingTimezone: string | null;
+  intensity: HeroIntensityMode;
+  pendingIntensity: HeroIntensityMode | null;
   currency: string;
   /** Set once during onboarding and read-only afterwards — past expenses keep the currency they were logged in. */
   currencyLocked: boolean;
@@ -21,31 +20,33 @@ export interface BehaviourPreferences {
   showCosmetics: boolean;
 }
 
-export type NotificationChannel = 'push' | 'email';
+/** The three email categories the account row carries. Push is not per-category — it is one opt-in per registered device. */
+export type NotificationPrefKey = 'weeklyDigest' | 'aiReadiness' | 'billingReminders';
 
 export interface NotificationPreference {
-  id: string;
+  id: NotificationPrefKey;
   label: string;
   help: string;
-  push: boolean;
   email: boolean;
 }
 
-export interface PushDevice {
+export interface NotificationSettings {
+  pushPermission: 'granted' | 'default' | 'denied';
+  permissionNote: string;
+  pushOptIn: boolean;
+  preferences: NotificationPreference[];
+}
+
+export interface AccountDevice {
   id: string;
   name: string;
   meta: string;
   current: boolean;
 }
 
-export interface NotificationSettings {
-  pushPermission: 'granted' | 'default' | 'denied';
-  permissionNote: string;
-  preferences: NotificationPreference[];
-  devices: PushDevice[];
-}
-
 export type PlanId = 'free' | 'coach';
+
+export type BillingPeriod = 'monthly' | 'yearly';
 
 export interface BillingPlan {
   id: PlanId;
@@ -63,11 +64,9 @@ export interface BillingView {
   quotaLine: string;
   trialLine: string;
   invoicesLine: string;
-  /** Set once a cancellation has been started; the plan runs to the end of the paid period. */
-  cancellationNote: string | null;
+  /** Cancellation and invoices live with the payment provider; Shadow Memoir has no route that writes an entitlement. */
+  manageNote: string;
 }
-
-export type ExportFormat = 'json-csv' | 'csv' | 'markdown';
 
 export type ExportStage = 'idle' | 'preparing' | 'ready' | 'failed';
 
@@ -75,25 +74,17 @@ export interface ExportJob {
   stage: ExportStage;
   when: string;
   body: string;
-  progressPercent: number | null;
-}
-
-export interface PastExport {
-  id: string;
-  date: string;
-  meta: string;
-  expired: boolean;
+  downloadUrl: string | null;
 }
 
 export interface ExportView {
   sets: { name: string; meta: string }[];
   job: ExportJob;
-  past: PastExport[];
 }
 
 /**
  * Deletion never reaches `scheduled` from inside the app: the elevated re-authentication happens on the
- * Shadow account, and only its confirmation can schedule anything (PRD §2.10).
+ * Shadow account, and only its confirmation can start anything (PRD §2.10).
  */
 export type DeletionStage = 'idle' | 'awaiting-reauth' | 'scheduled';
 
@@ -106,12 +97,13 @@ export interface ReauthHandoff {
   title: string;
   body: string;
   continueLabel: string;
+  /** A full-page navigation into the identity step-up prompt, not a router destination. */
   continueTo: string;
 }
 
 export interface DeletionView {
   stage: DeletionStage;
-  scheduledFor: string | null;
+  stateNote: string | null;
   sets: { name: string; meta: string }[];
   acknowledgements: DeletionAcknowledgement[];
   acknowledged: string[];
@@ -146,26 +138,36 @@ export interface AppSyncView {
   title: string;
   body: string;
   queuedCount: number;
-  lastSyncedMinutes: number;
-  cacheMegabytes: number;
-  conflictCount: number;
+  lastSyncedAt: string | null;
   queue: QueueEntry[];
+  devices: AccountDevice[];
   installRows: InstallRow[];
   offlineCapabilities: string[];
   onlineOnly: string;
   sessionNote: string;
 }
 
+export interface OnboardingStatus {
+  completed: boolean;
+}
+
+export interface OnboardingSubmission {
+  currency: string;
+  timezone: string;
+  wakeTime: string;
+  sleepTime: string;
+}
+
 export type AccountCommand =
-  | { type: 'profile.setHeroName'; heroName: string }
-  | { type: 'day.set'; patch: Partial<Omit<DayPreferences, 'currencyLocked'>> }
+  | { type: 'day.set'; patch: Partial<Pick<DayPreferences, 'wakeTime' | 'sleepTime' | 'timezone' | 'intensity'>> }
   | { type: 'behaviour.set'; patch: Partial<BehaviourPreferences> }
-  | { type: 'notification.set'; preferenceId: string; channel: NotificationChannel; enabled: boolean }
-  | { type: 'notification.removeDevice'; deviceId: string }
-  | { type: 'billing.startTrial' }
-  | { type: 'billing.cancel' }
-  | { type: 'export.prepare'; format: ExportFormat }
-  | { type: 'export.cancel' }
+  | { type: 'onboarding.complete'; submission: OnboardingSubmission }
+  | { type: 'notification.set'; preferenceId: NotificationPrefKey; enabled: boolean }
+  | { type: 'notification.setPush'; enabled: boolean }
+  | { type: 'device.remove'; deviceId: string }
+  | { type: 'billing.checkout'; plan: BillingPeriod }
+  | { type: 'export.prepare' }
+  | { type: 'export.dismiss' }
   | { type: 'deletion.acknowledge'; acknowledgementId: string; acknowledged: boolean }
   | { type: 'deletion.begin' }
   | { type: 'deletion.abandon' };

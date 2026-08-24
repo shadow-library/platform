@@ -5,7 +5,6 @@ import {
   type AiConsent,
   type AiRequest,
   type AiResult,
-  type AiScope,
   type CoachView,
   type HistoryDetail,
   type HistoryFilter,
@@ -40,13 +39,6 @@ export const HISTORY_KIND_LABELS: Record<HistoryKind, string> = {
 };
 
 export const HISTORY_KINDS: HistoryFilter[] = ['all', 'quest', 'hero', 'expense', 'journal', 'meal', 'weight', 'health', 'side-quest', 'recovery'];
-
-export const AI_SCOPE_LABELS: Record<AiScope, string> = {
-  activity: 'Quests and planning',
-  money: 'Money',
-  health: 'Body and health',
-  everything: 'Everything',
-};
 
 interface RecordSeed {
   id: string;
@@ -394,9 +386,10 @@ const RESULT: AiResult = {
     },
   ],
   suggestions: [
-    { id: 'move-strength', label: 'Move the strength session off Thursday', to: '/plan' },
-    { id: 'lighten-stretch', label: 'Drop the evening stretch to five days a week', to: '/quests' },
+    { id: 'result-nightly:0', index: 0, label: 'Move the strength session off Thursday', to: '/quests' },
+    { id: 'result-nightly:1', index: 1, label: 'Drop the evening stretch to five days a week', to: '/quests' },
   ],
+  limitationNote: null,
 };
 
 const REQUEST_COPY: Record<AiRequest['state'], { when: string; body: string }> = {
@@ -409,6 +402,7 @@ const REQUEST_COPY: Record<AiRequest['state'], { when: string; body: string }> =
     body: 'Reading the window you chose. You can close the app — the result will be waiting here, and a notification arrives only if you asked for one.',
   },
   ready: { when: 'ready', body: 'The answer is below.' },
+  held: { when: 'waiting on a plan change', body: 'The request is held until the plan question is settled. Nothing has been charged.' },
   failed: {
     when: 'failed · no request used',
     body: 'The run could not finish. Nothing was charged against your quota and none of your data was left half-read. Retrying is safe.',
@@ -461,15 +455,12 @@ function historyGroups(state: ReflectFixtureState, filter: HistoryFilter, query:
     .filter(group => group.rows.length > 0);
 }
 
-/**
- * The fixture reflection seam. Consent is enforced here rather than only in the screen, so a request with a
- * health scope and no health consent is refused by the provider the way the server will refuse it.
- */
+/** The fixture reflection seam, kept for stories and component tests. */
 export function createReflectProvider({ today, persona = 'active' }: ReflectFixtureOptions): ReflectProvider {
   const state: ReflectFixtureState = {
     persona,
     today,
-    consent: { activity: false, health: false },
+    consent: { journal: false, health: false, decided: false },
     quotaUsed: persona === 'new' ? 0 : 1,
     active: null,
     answers: {},
@@ -486,7 +477,7 @@ export function createReflectProvider({ today, persona = 'active' }: ReflectFixt
       note: `Free includes ${FREE_MONTHLY_REQUESTS} requests a month. Coach adds sixty a month, the nightly summary and a weekly deep read — and nothing else.`,
     },
     active: state.active,
-    latest: state.consent.activity && state.persona !== 'new' ? RESULT : null,
+    latest: state.consent.decided && state.persona !== 'new' ? RESULT : null,
     history: state.persona === 'new' ? [] : HISTORY_ENTRIES,
   });
 
@@ -577,14 +568,11 @@ export function createReflectProvider({ today, persona = 'active' }: ReflectFixt
     getCoach: () => Promise.resolve(coach()),
     dispatchCommand: command => {
       if (command.type === 'ai.setConsent') {
-        state.consent = { ...command.consent };
-        return Promise.resolve(applied(state.consent.activity ? 'Coaching is on. You can withdraw either consent at any time.' : 'Coaching is off. Nothing is read.'));
+        state.consent = { ...command.consent, decided: true };
+        return Promise.resolve(applied('Saved. You can withdraw either consent at any time.'));
       }
 
       if (command.type === 'ai.submit') {
-        if (!state.consent.activity) return Promise.resolve({ status: 'rejected', message: 'The coach reads nothing until you turn coaching on.' });
-        if ((command.scope === 'health' || command.scope === 'everything') && !state.consent.health)
-          return Promise.resolve({ status: 'rejected', message: 'Health data is a separate consent, and it is off. Turn it on to include weight, sleep, steps, water and meals.' });
         if (command.question.trim().length === 0) return Promise.resolve({ status: 'rejected', message: 'A question is needed before anything is queued.' });
         if (state.quotaUsed >= FREE_MONTHLY_REQUESTS)
           return Promise.resolve({
@@ -592,7 +580,7 @@ export function createReflectProvider({ today, persona = 'active' }: ReflectFixt
             message: `Free covers ${FREE_MONTHLY_REQUESTS} requests a month and both are used. The count resets on 1 September, and Coach raises it.`,
           });
         state.quotaUsed += 1;
-        state.active = { id: `req-${state.quotaUsed}`, question: command.question.trim(), scope: command.scope, state: 'queued', ...REQUEST_COPY.queued };
+        state.active = { id: `req-${state.quotaUsed}`, question: command.question.trim(), state: 'queued', ...REQUEST_COPY.queued };
         return Promise.resolve(applied('Queued. The answer will be here within a few hours.'));
       }
 
@@ -608,8 +596,8 @@ export function createReflectProvider({ today, persona = 'active' }: ReflectFixt
       }
 
       if (command.type === 'ai.applySuggestion') {
-        const suggestion = RESULT.suggestions.find(item => item.id === command.suggestionId);
-        return Promise.resolve(applied(suggestion ? `Opening the board with ${suggestion.label.toLowerCase()} pre-filled.` : 'Nothing to apply.'));
+        const suggestion = RESULT.suggestions[command.suggestionIndex];
+        return Promise.resolve(applied(suggestion ? 'Recorded. Opening the quest so you can make the change yourself.' : 'Nothing to apply.'));
       }
 
       if (command.type === 'review.answer') {

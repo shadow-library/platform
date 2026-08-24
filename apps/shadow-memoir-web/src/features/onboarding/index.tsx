@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
-import { Alert, Badge, Button, Card, DescriptionList, FormField, Input, SegmentedControl, Select, Slider, Tag, TimePicker } from '@shadow-library/ui';
+import { Alert, Badge, Button, Card, DescriptionList, FormField, Input, SegmentedControl, Select, Slider, Tag, TimePicker, toast } from '@shadow-library/ui';
 
 import {
   STAT_LABELS,
@@ -65,6 +65,9 @@ export function OnboardingScreen(): ReactElement {
   const command = useAccountCommand();
   const [step, setStep] = useState(0);
   const [currency, setCurrency] = useState('EUR');
+  const [wakeTime, setWakeTime] = useState('06:30');
+  const [sleepTime, setSleepTime] = useState('22:30');
+  const [timezone, setTimezone] = useState(TIMEZONES[0] as string);
   const [name, setName] = useState('');
   const [stat, setStat] = useState<StatAffinity>('mind');
   const [strictness, setStrictness] = useState<Strictness>('goal');
@@ -82,8 +85,15 @@ export function OnboardingScreen(): ReactElement {
   };
 
   const finish = (): void => {
-    command.mutate({ type: 'day.set', patch: { currency } });
-    void navigate({ to: '/' });
+    command.mutate(
+      { type: 'onboarding.complete', submission: { currency, timezone, wakeTime, sleepTime } },
+      {
+        onSuccess: result => {
+          if (result.status === 'rejected') toast.neutral(result.message);
+          else void navigate({ to: '/' });
+        },
+      },
+    );
   };
 
   return (
@@ -117,13 +127,13 @@ export function OnboardingScreen(): ReactElement {
             </p>
             <div className={styles.fields}>
               <FormField label="Wake time" helper="Quests scheduled before this are not counted late.">
-                <TimePicker defaultValue="06:30" />
+                <TimePicker value={wakeTime} onValueChange={value => setWakeTime(value ?? wakeTime)} />
               </FormField>
               <FormField label="Sleep time" helper="Your day closes here — logs after it still belong to today.">
-                <TimePicker defaultValue="22:30" />
+                <TimePicker value={sleepTime} onValueChange={value => setSleepTime(value ?? sleepTime)} />
               </FormField>
               <FormField label="Timezone" helper="Detected from your browser. Travel will not move your day unless you change it.">
-                <Select defaultValue="Europe/Oslo" aria-label="Timezone">
+                <Select value={timezone} aria-label="Timezone" onValueChange={setTimezone}>
                   {TIMEZONES.map(zone => (
                     <Select.Item key={zone} value={zone}>
                       {zone}

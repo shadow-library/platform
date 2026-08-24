@@ -8,8 +8,9 @@ import { useAccountCommand, useDeletion } from '@/lib/data';
 import styles from './settings.module.css';
 
 /**
- * The screen ends at the re-authentication handoff on purpose. Erasure is confirmed on the Shadow account,
- * so nothing here can schedule one and nothing here should look as though it did (PRD §2.10).
+ * The screen ends at the re-authentication handoff on purpose. `POST /account/deletion` needs an elevated
+ * principal, and an XHR is not a navigation the guard can bounce — so it answers `IAM_003`, and the owner
+ * walks into the step-up prompt themselves. Nothing here can start an erasure (PRD §2.10).
  */
 export function DeleteAccountScreen(): ReactElement {
   const deletion = useDeletion();
@@ -54,13 +55,19 @@ export function DeleteAccountScreen(): ReactElement {
             </Card>
           }
         >
-          {deletion.data.stage === 'awaiting-reauth' ? (
+          {deletion.data.stage === 'scheduled' ? (
+            <Card padding="lg">
+              <h2 className={styles.sectionTitle}>The erasure has started</h2>
+              <p className={styles.sectionNote}>{deletion.data.stateNote}</p>
+              <p className={styles.sectionNote}>{deletion.data.gracePeriodNote}</p>
+            </Card>
+          ) : deletion.data.stage === 'awaiting-reauth' ? (
             <Card padding="lg">
               <h2 className={styles.sectionTitle}>{deletion.data.reauth.title}</h2>
               <p className={styles.sectionNote}>{deletion.data.reauth.body}</p>
               <div className={styles.actions}>
                 <Button variant="primary" asChild>
-                  <Link to={deletion.data.reauth.continueTo}>{deletion.data.reauth.continueLabel}</Link>
+                  <a href={deletion.data.reauth.continueTo}>{deletion.data.reauth.continueLabel}</a>
                 </Button>
                 <Button variant="ghost" onClick={() => command.mutate({ type: 'deletion.abandon' })}>
                   Stop here

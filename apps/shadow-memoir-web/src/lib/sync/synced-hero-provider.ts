@@ -1,4 +1,5 @@
 import {
+  type AccountProvider,
   type Achievement,
   ACHIEVEMENTS,
   type Cosmetic,
@@ -33,16 +34,19 @@ function cosmeticsFor(grants: HeroGrants, coins: number): Cosmetic[] {
 
 /**
  * The hero deck read from the account row and the three progression snapshot domains, with purchases,
- * equips and title display written through the outbox. `getRecovery` and `intensity.set` stay on the
- * fixture provider — the server has no recovery module or intensity command yet, and the outbox drops
- * anything it cannot address (`command-wire.ts`).
+ * equips and title display written through the outbox. `intensity.set` is an account setting rather than a
+ * hero command, so it goes out as the same deferred `PATCH /account` the settings screen uses; the recovery
+ * narrative around it stays on the fixture provider, which the server has no module for.
  */
 export class SyncedHeroProvider implements HeroProvider {
   private grants: HeroGrants;
   private pending: Promise<void> = Promise.resolve();
   private readonly narrative: HeroProvider;
 
-  constructor(private readonly sync: SyncEngine) {
+  constructor(
+    private readonly sync: SyncEngine,
+    private readonly account: AccountProvider,
+  ) {
     this.grants = projectHeroGrants(sync.domains());
     this.narrative = createHeroProvider({ persona: 'active', hero: sync.world().hero });
     sync.subscribeWorld(() => void (this.pending = this.pending.then(() => this.reproject())));
@@ -84,7 +88,7 @@ export class SyncedHeroProvider implements HeroProvider {
       return applied(`${seed.name} equipped.`);
     }
 
-    return applied('Intensity set. Experience already earned is untouched.');
+    return applied('');
   }
 
   async getDeck(): Promise<HeroDeck> {
@@ -112,12 +116,13 @@ export class SyncedHeroProvider implements HeroProvider {
     };
   }
 
-  getRecovery(): Promise<RecoveryView> {
-    return this.narrative.getRecovery();
+  async getRecovery(): Promise<RecoveryView> {
+    const [recovery, day] = await Promise.all([this.narrative.getRecovery(), this.account.getDay()]);
+    return { ...recovery, intensity: day.pendingIntensity ?? day.intensity };
   }
 
   async dispatchCommand(command: HeroCommand): Promise<SettledCommandResult> {
-    if (command.type === 'intensity.set') return this.narrative.dispatchCommand(command);
+    if (command.type === 'intensity.set') return this.account.dispatchCommand({ type: 'day.set', patch: { intensity: command.mode } });
 
     const result = this.applyLocally(this.grants, command);
     if (result.status === 'rejected') return result;

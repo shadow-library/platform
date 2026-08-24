@@ -9,6 +9,7 @@ import {
   type DeletionView,
   type ExportView,
   type NotificationSettings,
+  type OnboardingStatus,
 } from './account.types';
 import { type SettledCommandResult } from './command.types';
 import { useMemoirData } from './data-context';
@@ -22,7 +23,10 @@ export const accountKeys = {
   export: ['memoir', 'account', 'export'] as const,
   deletion: ['memoir', 'account', 'deletion'] as const,
   appSync: ['memoir', 'account', 'app-sync'] as const,
+  onboarding: ['memoir', 'account', 'onboarding'] as const,
 };
+
+const EXPORT_POLL_MS = 3_000;
 
 export function useDayPreferences(): UseQueryResult<DayPreferences> {
   const { account, queryClient } = useMemoirData();
@@ -44,9 +48,17 @@ export function useBilling(): UseQueryResult<BillingView> {
   return useQuery({ queryKey: accountKeys.billing, queryFn: () => account.getBilling() }, queryClient);
 }
 
+/** An assembling archive is the one account read that polls: the job finishes on a worker, not on this request. */
 export function useExportView(): UseQueryResult<ExportView> {
   const { account, queryClient } = useMemoirData();
-  return useQuery({ queryKey: accountKeys.export, queryFn: () => account.getExport() }, queryClient);
+  return useQuery(
+    {
+      queryKey: accountKeys.export,
+      queryFn: () => account.getExport(),
+      refetchInterval: query => (query.state.data?.job.stage === 'preparing' ? EXPORT_POLL_MS : false),
+    },
+    queryClient,
+  );
 }
 
 export function useDeletion(): UseQueryResult<DeletionView> {
@@ -57,6 +69,11 @@ export function useDeletion(): UseQueryResult<DeletionView> {
 export function useAppSync(): UseQueryResult<AppSyncView> {
   const { account, queryClient } = useMemoirData();
   return useQuery({ queryKey: accountKeys.appSync, queryFn: () => account.getAppSync() }, queryClient);
+}
+
+export function useOnboardingStatus(): UseQueryResult<OnboardingStatus> {
+  const { account, queryClient } = useMemoirData();
+  return useQuery({ queryKey: accountKeys.onboarding, queryFn: () => account.getOnboarding() }, queryClient);
 }
 
 export function useAccountCommand(): UseMutationResult<SettledCommandResult, Error, AccountCommand> {

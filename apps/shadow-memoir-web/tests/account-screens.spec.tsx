@@ -1,8 +1,9 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { OnboardingScreen } from '@/features/onboarding';
 import { AppSyncScreen, BillingScreen, DeleteAccountScreen, ExportScreen, NotificationSettingsScreen, SettingsScreen } from '@/features/settings';
+import { OnboardingGate } from '@/routes/_app';
 
 import { renderScreen } from './harness';
 
@@ -31,16 +32,16 @@ describe('Notification preferences', () => {
     expect(await screen.findByRole('heading', { name: 'Notifications' })).toBeDefined();
 
     const switches = await screen.findAllByRole('switch');
-    expect(switches.length).toBe(12);
+    expect(switches.length).toBe(4);
     for (const control of switches) expect(control.getAttribute('aria-checked')).toBe('false');
   });
 
-  it('should turn one channel on without touching the others', async () => {
+  it('should turn one category on without touching the others', async () => {
     renderScreen(<NotificationSettingsScreen />, { today: TODAY });
-    fireEvent.click(await screen.findByRole('switch', { name: 'Quest reminders by push' }));
+    fireEvent.click(await screen.findByRole('switch', { name: 'Weekly review by email' }));
 
-    expect((await screen.findByRole('switch', { name: 'Quest reminders by push' })).getAttribute('aria-checked')).toBe('true');
-    expect(screen.getByRole('switch', { name: 'Quest reminders by email' }).getAttribute('aria-checked')).toBe('false');
+    expect((await screen.findByRole('switch', { name: 'Weekly review by email' })).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('switch', { name: 'Billing reminders by email' }).getAttribute('aria-checked')).toBe('false');
   });
 
   it('should promise never to notify about a missed quest', async () => {
@@ -57,10 +58,10 @@ describe('Plan and billing', () => {
     expect(screen.getByText('No XP, HP, shields or cosmetics — not now, not later')).toBeDefined();
   });
 
-  it('should explain that cancelling keeps everything but the quota', async () => {
+  it('should send cancellation to the payment provider rather than pretending to own it', async () => {
     renderScreen(<BillingScreen />, { today: TODAY });
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel the plan' }));
-    expect(await screen.findByText('Cancelling keeps everything except the coaching volume')).toBeDefined();
+    expect(await screen.findByText(/no route that can write your plan/)).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Cancel the plan' })).toBeNull();
   });
 });
 
@@ -100,10 +101,11 @@ describe('Account deletion', () => {
 });
 
 describe('App and sync', () => {
-  it('should show the queue and what still works offline', async () => {
+  it('should show the queue, the devices and what still works offline', async () => {
     renderScreen(<AppSyncScreen />, { today: TODAY });
     expect(await screen.findByRole('heading', { name: 'App and sync' })).toBeDefined();
     expect(await screen.findByText('Expense €18.40 · Groceries')).toBeDefined();
+    expect(screen.getByText('Chrome · MacBook')).toBeDefined();
     expect(screen.getByText('What works offline')).toBeDefined();
   });
 
@@ -133,6 +135,28 @@ describe('Onboarding', () => {
     expect(await screen.findByText('Walk 20 minutes')).toBeDefined();
     expect(screen.getByText('Step 5 of 5')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Create it and start' })).toBeDefined();
+  });
+
+  it('should route an un-onboarded account to setup before anything else renders', async () => {
+    const { router } = renderScreen(
+      <OnboardingGate>
+        <div>Today screen</div>
+      </OnboardingGate>,
+      { today: TODAY, persona: 'new' },
+    );
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/onboarding'));
+  });
+
+  it('should let an onboarded account through the gate untouched', async () => {
+    renderScreen(
+      <OnboardingGate>
+        <div>Today screen</div>
+      </OnboardingGate>,
+      { today: TODAY },
+    );
+
+    expect(await screen.findByText('Today screen')).toBeDefined();
   });
 
   it('should let a new account choose its home currency', async () => {

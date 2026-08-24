@@ -3,11 +3,9 @@ import { type ReactElement, useState } from 'react';
 import { Badge, Button, Card, Progress, Skeleton, Spinner, Switch, Textarea, toast } from '@shadow-library/ui';
 
 import { Screen, ScreenColumns, screenStyles } from '@/components/ScreenLayout';
-import { AI_SCOPE_LABELS, type AiRequestState, type AiScope, type CoachView, useCoach, useReflectCommand } from '@/lib/data';
+import { type AiRequestState, type AiSuggestion, type CoachView, useCoach, useReflectCommand } from '@/lib/data';
 
 import styles from './ai.module.css';
-
-const SCOPES: AiScope[] = ['activity', 'money', 'health', 'everything'];
 
 const STATE_INTENT: Record<AiRequestState, 'neutral' | 'info' | 'success' | 'warning'> = {
   queued: 'neutral',
@@ -15,6 +13,7 @@ const STATE_INTENT: Record<AiRequestState, 'neutral' | 'info' | 'success' | 'war
   ready: 'success',
   failed: 'warning',
   cancelled: 'neutral',
+  held: 'warning',
 };
 
 const STATE_LABELS: Record<AiRequestState, string> = {
@@ -23,6 +22,7 @@ const STATE_LABELS: Record<AiRequestState, string> = {
   ready: 'Ready',
   failed: 'Did not finish',
   cancelled: 'Cancelled',
+  held: 'Held',
 };
 
 export function AiScreen(): ReactElement {
@@ -41,10 +41,18 @@ export function AiScreen(): ReactElement {
             <>
               <Card padding="md">
                 <h2 className={screenStyles.cardTitle}>Usage</h2>
-                <Progress value={coach.data.quota.used} max={coach.data.quota.limit} size="md" label="Requests used this month" />
-                <p className={screenStyles.cardBody}>
-                  {coach.data.quota.used} of {coach.data.quota.limit} requests used on {coach.data.quota.planName}. The count resets on {coach.data.quota.resetsOn}.
-                </p>
+                {coach.data.quota.limit === null ? (
+                  <p className={screenStyles.cardBody}>
+                    {coach.data.quota.used} requests this month on {coach.data.quota.planName}.
+                  </p>
+                ) : (
+                  <>
+                    <Progress value={coach.data.quota.used} max={coach.data.quota.limit} size="md" label="Requests used this month" />
+                    <p className={screenStyles.cardBody}>
+                      {coach.data.quota.used} of {coach.data.quota.limit} requests used on {coach.data.quota.planName}. The count resets on {coach.data.quota.resetsOn}.
+                    </p>
+                  </>
+                )}
                 <p className={screenStyles.cardBody}>{coach.data.quota.note}</p>
                 <div className={styles.actions}>
                   <Button size="sm" variant="secondary" asChild>
@@ -90,7 +98,7 @@ export function AiScreen(): ReactElement {
             </>
           }
         >
-          {coach.data.consent.activity ? <Composer coach={coach.data} /> : <ConsentGate coach={coach.data} />}
+          {coach.data.consent.decided ? <Composer coach={coach.data} /> : <ConsentGate coach={coach.data} />}
         </ScreenColumns>
       ) : null}
     </Screen>
@@ -99,22 +107,22 @@ export function AiScreen(): ReactElement {
 
 function ConsentGate({ coach }: { coach: CoachView }): ReactElement {
   const command = useReflectCommand();
-  const [activity, setActivity] = useState(coach.consent.activity);
+  const [journal, setJournal] = useState(coach.consent.journal);
   const [health, setHealth] = useState(coach.consent.health);
 
   return (
     <Card padding="lg">
       <h2 className={styles.headline}>Before the coach reads anything</h2>
       <p className={styles.lead}>
-        Coaching is asynchronous: you ask a question, it is answered within a few hours, and the answer waits for you here. Nothing leaves this app until you turn these on, and
-        each one can be withdrawn on its own.
+        Coaching is asynchronous: you ask a question, it is answered within a few hours, and the answer waits for you here. Your quests, planning and money are what it reads by
+        default. The two below are separate decisions, each withdrawable on its own.
       </p>
       <div className={styles.consentRows}>
         <Switch
-          checked={activity}
-          onCheckedChange={setActivity}
-          label="Quests, planning and money"
-          description="Adherence, streaks, reasons, expense categories and totals. No note text unless you attach it to a question."
+          checked={journal}
+          onCheckedChange={setJournal}
+          label="Journal reflections and reasons"
+          description="The text you write when you reflect, and the reason you attach to a miss. Off by default."
         />
         <Switch
           checked={health}
@@ -124,12 +132,8 @@ function ConsentGate({ coach }: { coach: CoachView }): ReactElement {
         />
       </div>
       <div className={styles.actions}>
-        <Button
-          variant="primary"
-          disabled={!activity}
-          onClick={() => command.mutate({ type: 'ai.setConsent', consent: { activity, health } }, { onSuccess: result => toast.neutral(result.message) })}
-        >
-          Turn on coaching
+        <Button variant="primary" onClick={() => command.mutate({ type: 'ai.setConsent', consent: { journal, health } }, { onSuccess: result => toast.neutral(result.message) })}>
+          Save and continue
         </Button>
         <Button variant="ghost" asChild>
           <Link to="/settings">Read the data policy</Link>
@@ -143,29 +147,34 @@ function Composer({ coach }: { coach: CoachView }): ReactElement {
   const command = useReflectCommand();
   const navigate = useNavigate();
   const [question, setQuestion] = useState('');
-  const [scope, setScope] = useState<AiScope>('activity');
   const [refusal, setRefusal] = useState<string | null>(null);
 
-  const scopeNeedsHealth = (scope === 'health' || scope === 'everything') && !coach.consent.health;
-  const quotaSpent = coach.quota.used >= coach.quota.limit;
+  const quotaSpent = coach.quota.limit !== null && coach.quota.used >= coach.quota.limit;
 
   const submit = (): void => {
     command.mutate(
-      { type: 'ai.submit', question, scope },
+      { type: 'ai.submit', question },
       {
         onSuccess: result => {
           if (result.status === 'rejected') return setRefusal(result.message);
           setRefusal(null);
           setQuestion('');
-          if (result.status === 'applied') toast.neutral(result.message);
+          toast.neutral(result.message);
         },
       },
     );
   };
 
-  const apply = (suggestionId: string, to: string): void => {
-    command.mutate({ type: 'ai.applySuggestion', suggestionId }, { onSuccess: result => toast.neutral(result.message) });
-    void navigate({ to });
+  const apply = (suggestion: AiSuggestion, resultId: string): void => {
+    command.mutate(
+      { type: 'ai.applySuggestion', resultId, suggestionIndex: suggestion.index },
+      {
+        onSuccess: result => {
+          toast.neutral(result.message);
+          if (result.status === 'applied') void navigate({ to: suggestion.to });
+        },
+      },
+    );
   };
 
   return (
@@ -174,7 +183,7 @@ function Composer({ coach }: { coach: CoachView }): ReactElement {
         <div className={styles.composerHead}>
           <h2 className={styles.headline}>Ask a question</h2>
           <span className={styles.quotaLabel}>
-            {Math.max(0, coach.quota.limit - coach.quota.used)} of {coach.quota.limit} requests left this month
+            {coach.quota.limit === null ? 'A daily allowance on Coach' : `${Math.max(0, coach.quota.limit - coach.quota.used)} of ${coach.quota.limit} requests left this month`}
           </span>
         </div>
         <Textarea
@@ -184,29 +193,27 @@ function Composer({ coach }: { coach: CoachView }): ReactElement {
           aria-label="Your question"
           placeholder="Why do Thursdays keep failing, and what would you change about next week?"
         />
-        <div className={styles.scopes} role="group" aria-label="What the coach may read for this request">
-          {SCOPES.map(item => (
-            <Button key={item} size="sm" variant={scope === item ? 'secondary' : 'ghost'} aria-pressed={scope === item} onClick={() => setScope(item)}>
-              {AI_SCOPE_LABELS[item]}
-            </Button>
-          ))}
-        </div>
         <div className={styles.actions}>
-          <Button variant="primary" disabled={question.trim().length === 0 || quotaSpent || scopeNeedsHealth} onClick={submit}>
+          <Button variant="primary" disabled={question.trim().length === 0 || quotaSpent} onClick={submit}>
             Submit request
           </Button>
           <Button variant="ghost" onClick={() => setQuestion('')}>
             Clear
           </Button>
           <span className={styles.scopeNote}>
-            {scopeNeedsHealth
-              ? 'Health data is a separate consent and it is off, so that scope is unavailable for now.'
-              : quotaSpent
-                ? `Both requests this month are used. The count resets on ${coach.quota.resetsOn}.`
-                : 'The scope decides what the coach may read for this one request.'}
+            {quotaSpent
+              ? `Both requests this month are used. The count resets on ${coach.quota.resetsOn}.`
+              : 'What the coach may read is decided by your consents, not by this question.'}
           </span>
         </div>
-        {refusal ? <p className={styles.lead}>{refusal}</p> : null}
+        {refusal ? (
+          <div className={styles.actions}>
+            <p className={styles.lead}>{refusal}</p>
+            <Button size="sm" variant="secondary" asChild>
+              <Link to="/settings/billing">See the plans</Link>
+            </Button>
+          </div>
+        ) : null}
       </Card>
 
       {coach.active ? (
@@ -222,13 +229,21 @@ function Composer({ coach }: { coach: CoachView }): ReactElement {
           <p className={styles.lead}>{coach.active.body}</p>
           <div className={styles.actions}>
             {coach.active.state === 'queued' ? (
-              <Button size="sm" variant="ghost" onClick={() => command.mutate({ type: 'ai.cancel', requestId: coach.active?.id ?? '' })}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => command.mutate({ type: 'ai.cancel', requestId: coach.active?.id ?? '' }, { onSuccess: result => toast.neutral(result.message) })}
+              >
                 Cancel the request
               </Button>
             ) : null}
             {coach.active.state === 'failed' ? (
-              <Button size="sm" variant="primary" onClick={() => command.mutate({ type: 'ai.retry', requestId: coach.active?.id ?? '' })}>
-                Run it again
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => command.mutate({ type: 'ai.retry', requestId: coach.active?.id ?? '' }, { onSuccess: result => toast.neutral(result.message) })}
+              >
+                Ask it again
               </Button>
             ) : null}
           </div>
@@ -247,15 +262,13 @@ function Composer({ coach }: { coach: CoachView }): ReactElement {
               </div>
             ))}
           </div>
+          {coach.latest.limitationNote ? <p className={styles.lead}>{coach.latest.limitationNote}</p> : null}
           <div className={styles.actions}>
             {coach.latest.suggestions.map(suggestion => (
-              <Button key={suggestion.id} size="sm" variant="secondary" onClick={() => apply(suggestion.id, suggestion.to)}>
+              <Button key={suggestion.id} size="sm" variant="secondary" onClick={() => apply(suggestion, coach.latest?.id ?? '')}>
                 {suggestion.label}
               </Button>
             ))}
-            <Button size="sm" variant="ghost">
-              Not useful
-            </Button>
           </div>
         </Card>
       ) : null}

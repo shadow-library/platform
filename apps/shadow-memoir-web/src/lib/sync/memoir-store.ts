@@ -45,6 +45,11 @@ const DOMAIN_KEYS: Record<SyncDomain, (row: DeltaRow) => string> = {
   achievements_earned: row => String(row['achievementId']),
   titles_earned: row => String(row['titleId']),
   cosmetic_unlocks: row => String(row['cosmeticId']),
+  entitlement: () => 'self',
+  ai_tasks: row => String(row['id']),
+  ai_results: row => String(row['id']),
+  ai_scheduled_queries: () => 'self',
+  ai_consents: row => String(row['dataClass']),
 };
 
 /** `OfflineStore` opens the database lazily, so a browser-created instance is inert until first use. */

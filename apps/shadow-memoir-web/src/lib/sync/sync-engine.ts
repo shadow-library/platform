@@ -41,8 +41,9 @@ function toEnvelope(entry: OutboxEntry): CommandEnvelope {
  */
 export class SyncEngine {
   readonly outbox: Outbox;
+  /** The local mirror, for the providers that persist their own bookkeeping beside it — the export job id, so far. */
+  readonly store: MemoirStore;
 
-  private readonly store: MemoirStore;
   private readonly client: SyncClient;
   private readonly maxPages: number;
   private readonly listeners = new Set<() => void>();

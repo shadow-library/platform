@@ -118,29 +118,35 @@ export interface ReviewView {
   carried: string;
 }
 
-export interface AiConsent {
-  /** Quests, planning and money. */
-  activity: boolean;
+/** The two data classes the server gates behind consent. Quests, planning and money need none — they are the coach's baseline read. */
+export type AiDataClass = 'journal_reflection_reason' | 'health';
+
+export interface AiConsentGrants {
+  /** Reflection text and the reasons attached to a miss (PRD §6.7). */
+  journal: boolean;
   /** Weight, sleep, steps, water and meals — a separate decision, revocable on its own (PRD §3.10). */
   health: boolean;
 }
 
-export type AiScope = 'activity' | 'money' | 'health' | 'everything';
+export interface AiConsent extends AiConsentGrants {
+  /** False until either class has ever been decided, which is what puts a first-time owner in front of the gate. */
+  decided: boolean;
+}
 
 export interface AiQuota {
   used: number;
-  limit: number;
+  /** Null on a paid plan: the allowance is a daily soft cap the server holds, not a monthly count the client can render. */
+  limit: number | null;
   planName: string;
   resetsOn: string;
   note: string;
 }
 
-export type AiRequestState = 'queued' | 'processing' | 'ready' | 'failed' | 'cancelled';
+export type AiRequestState = 'queued' | 'processing' | 'ready' | 'failed' | 'cancelled' | 'held';
 
 export interface AiRequest {
   id: string;
   question: string;
-  scope: AiScope;
   state: AiRequestState;
   when: string;
   body: string;
@@ -148,7 +154,9 @@ export interface AiRequest {
 
 export interface AiSuggestion {
   id: string;
+  index: number;
   label: string;
+  /** The quest the offer names; applying records the offer and opens it, and the owner's own edit is what changes anything. */
   to: string;
 }
 
@@ -158,6 +166,7 @@ export interface AiResult {
   meta: string;
   findings: { heading: string; body: string }[];
   suggestions: AiSuggestion[];
+  limitationNote: string | null;
 }
 
 export interface AiHistoryEntry {
@@ -176,10 +185,10 @@ export interface CoachView {
 }
 
 export type ReflectCommand =
-  | { type: 'ai.setConsent'; consent: AiConsent }
-  | { type: 'ai.submit'; question: string; scope: AiScope }
+  | { type: 'ai.setConsent'; consent: AiConsentGrants }
+  | { type: 'ai.submit'; question: string }
   | { type: 'ai.cancel'; requestId: string }
   | { type: 'ai.retry'; requestId: string }
-  | { type: 'ai.applySuggestion'; suggestionId: string }
+  | { type: 'ai.applySuggestion'; resultId: string; suggestionIndex: number }
   | { type: 'review.answer'; promptId: string; answer: string }
   | { type: 'review.complete' };

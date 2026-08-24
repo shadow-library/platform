@@ -22,7 +22,12 @@ export type SyncDomain =
   | 'health_offers'
   | 'achievements_earned'
   | 'titles_earned'
-  | 'cosmetic_unlocks';
+  | 'cosmetic_unlocks'
+  | 'entitlement'
+  | 'ai_tasks'
+  | 'ai_results'
+  | 'ai_scheduled_queries'
+  | 'ai_consents';
 
 export const SYNC_DOMAINS: SyncDomain[] = [
   'quests',
@@ -45,6 +50,11 @@ export const SYNC_DOMAINS: SyncDomain[] = [
   'achievements_earned',
   'titles_earned',
   'cosmetic_unlocks',
+  'entitlement',
+  'ai_tasks',
+  'ai_results',
+  'ai_scheduled_queries',
+  'ai_consents',
 ];
 
 /** Domains the server answers with the authoritative full set rather than a watermark — the local set is replaced, never merged. */
@@ -58,6 +68,7 @@ export const SNAPSHOT_DOMAINS: SyncDomain[] = [
   'achievements_earned',
   'titles_earned',
   'cosmetic_unlocks',
+  'entitlement',
 ];
 
 /** Every command shape the outbox carries. The quest union is the `DataProvider`'s; the other three belong to their own providers. */
@@ -114,4 +125,11 @@ export interface SyncSnapshot {
   notices: SyncNotice[];
 }
 
-export const SYNC_META_KEYS = { cursor: 'cursor', epoch: 'sync-epoch', deviceId: 'device-id', lastSyncedAt: 'last-synced-at', outboxSeq: 'outbox-seq' } as const;
+export const SYNC_META_KEYS = {
+  cursor: 'cursor',
+  epoch: 'sync-epoch',
+  deviceId: 'device-id',
+  lastSyncedAt: 'last-synced-at',
+  outboxSeq: 'outbox-seq',
+  exportJobId: 'export-job-id',
+} as const;

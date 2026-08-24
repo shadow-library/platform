@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router';
+import { type AnyRouter, createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router';
 import { render, type RenderResult } from '@testing-library/react';
 import { type ReactNode } from 'react';
 
@@ -61,7 +61,7 @@ export interface RenderScreenOptions extends FixtureProviderOptions {
  * QueryClient is also installed as the React Query provider, so the day group's `MemoirData` reads and the
  * finance/quick-log hooks share one cache.
  */
-export function renderScreen(node: ReactNode, options: RenderScreenOptions = {}): RenderResult {
+export function renderScreen(node: ReactNode, options: RenderScreenOptions = {}): RenderResult & { router: AnyRouter } {
   const data = options.value ?? createMemoirTestData({ today: options.today, persona: options.persona });
   const rootRoute = createRootRoute({
     component: () => (
@@ -79,5 +79,5 @@ export function renderScreen(node: ReactNode, options: RenderScreenOptions = {})
   ];
   const router = createRouter({ routeTree: rootRoute.addChildren(routes), history: createMemoryHistory({ initialEntries: [options.initialPath ?? '/'] }) });
 
-  return render(<RouterProvider router={router as never} />);
+  return { ...render(<RouterProvider router={router as never} />), router: router as AnyRouter };
 }
