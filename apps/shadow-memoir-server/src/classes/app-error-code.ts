@@ -207,4 +207,32 @@ export class AppErrorCode extends ServerErrorCode {
 
   /** `POST /receipts/{ref}/confirm` found no object at the presigned key — the client never PUT, or the PUT failed */
   static readonly RCP_004 = AppErrorCode.badRequest('RCP_004', 'No upload found for this receipt; PUT to the presigned URL before confirming');
+
+  /*!
+   * AI Errors
+   */
+
+  /** Free tier's monthly AI quota is exhausted; the third submission of the calendar month is refused before any `ai_tasks` row is written (ARCHITECTURE §15.1, PRD §6.8) */
+  static readonly AI_001 = AppErrorCode.forbidden('AI_001', 'Free-tier AI quota exhausted for this month; upgrade to submit more questions', 402);
+
+  /** Paid tier's daily soft cap is exhausted (ARCHITECTURE §15.1, tunable via `quotas.ai-paid-daily`) */
+  static readonly AI_002 = AppErrorCode.badRequest('AI_002', 'Daily AI quota exhausted; try again tomorrow', 429);
+
+  /** No AI task with that id belongs to the caller; a foreign or nonexistent id reads exactly like a nonexistent one */
+  static readonly AI_003 = AppErrorCode.notFound('AI_003', 'AI task not found');
+
+  /** The task has already been claimed by the worker (or finished); the cancel-vs-claim race resolves in the worker's favor (ARCHITECTURE §15.1) */
+  static readonly AI_004 = AppErrorCode.conflict('AI_004', 'This task is no longer pending and cannot be cancelled');
+
+  /** The scheduled daily query is a paid-only surface (ARCHITECTURE §25, PRD §6.9) */
+  static readonly AI_005 = AppErrorCode.forbidden('AI_005', 'A scheduled daily query requires a paid subscription', 402);
+
+  /** No AI result with that id belongs to the caller */
+  static readonly AI_006 = AppErrorCode.notFound('AI_006', 'AI result not found');
+
+  /** `suggestionIndex` addressed a position outside the result's `suggestions` array */
+  static readonly AI_007 = AppErrorCode.badRequest('AI_007', 'This result has no suggestion at index {suggestionIndex}');
+
+  /** The addressed suggestion's deep-link quest id does not belong to the caller, or no longer exists */
+  static readonly AI_008 = AppErrorCode.notFound('AI_008', 'The quest this suggestion targets was not found');
 }

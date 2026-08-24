@@ -230,6 +230,46 @@ describe('DB roles & grants (T-14, ARCHITECTURE §5.4/§10.4/§28.4)', () => {
     expect(deletedAccount).toHaveLength(1);
   });
 
+  it('should let memoir_api INSERT/SELECT ai_tasks and cancel via the column-limited UPDATE, but never touch ai_results (T-32, §5.4)', async () => {
+    const taskId = Bun.randomUUIDv7();
+    const inserted =
+      await apiSql`INSERT INTO ai_tasks (id, account_id, query_text, expected_by, quota_month, quota_consumed) VALUES (${taskId}, ${accountId}, 'why do I miss evening quests?', now(), '2026-08', true) RETURNING id`;
+    expect(inserted).toHaveLength(1);
+
+    const cancelled = await apiSql`UPDATE ai_tasks SET status = 'cancelled', quota_consumed = false WHERE id = ${taskId} RETURNING id`;
+    expect(cancelled).toHaveLength(1);
+
+    await expectDenied(apiSql`UPDATE ai_tasks SET claimed_by = 'worker-1' WHERE id = ${taskId}`);
+    await expectDenied(apiSql`INSERT INTO ai_results (account_id, task_id, answer, model_id, prompt_version) VALUES (${accountId}, ${taskId}, 'forged', 'x', 'v1')`);
+    await expectDenied(apiSql`UPDATE ai_results SET answer = 'tampered' WHERE task_id = ${taskId}`);
+  });
+
+  it('should let memoir_ai INSERT ai_results and cancel-adjacent-transition columns on ai_tasks, but never INSERT ai_tasks or touch hero_events (T-32, §5.4/§15.5)', async () => {
+    const taskId = Bun.randomUUIDv7();
+    await apiSql`INSERT INTO ai_tasks (id, account_id, query_text, expected_by, quota_month, quota_consumed) VALUES (${taskId}, ${accountId}, 'ai role coverage', now(), '2026-08', true)`;
+
+    await expectDenied(aiSql`INSERT INTO ai_tasks (id, account_id, query_text, expected_by) VALUES (${Bun.randomUUIDv7()}, ${accountId}, 'forged by worker', now())`);
+
+    const claimed = await aiSql`UPDATE ai_tasks SET status = 'running', claimed_by = 'worker-1', claimed_at = now() WHERE id = ${taskId} RETURNING id`;
+    expect(claimed).toHaveLength(1);
+
+    const result =
+      await aiSql`INSERT INTO ai_results (account_id, task_id, answer, model_id, prompt_version) VALUES (${accountId}, ${taskId}, 'you tend to miss quests after 8pm', 'llama3.1', 'v1') RETURNING id`;
+    expect(result).toHaveLength(1);
+
+    const finished = await aiSql`UPDATE ai_tasks SET status = 'done', finished_at = now() WHERE id = ${taskId} RETURNING id`;
+    expect(finished).toHaveLength(1);
+
+    await expectDenied(
+      aiSql`INSERT INTO hero_events (account_id, dedupe_key, type, xp_delta, coins_delta, date, note, ruleset_version) VALUES (${accountId}, 'dk-ai-2', 'quest_complete', 10, 5, now(), '', 1)`,
+    );
+    await expectDenied(aiSql`UPDATE ai_results SET answer = 'tampered' WHERE task_id = ${taskId}`);
+    await expectDenied(aiSql`DELETE FROM ai_results WHERE task_id = ${taskId}`);
+    await expectDenied(
+      aiSql`INSERT INTO applied_suggestions (account_id, result_id, suggestion_index, quest_id, quest_snapshot_before) VALUES (${accountId}, ${result[0].id}, 0, ${questId}, '{}')`,
+    );
+  });
+
   it('should preserve every role grant across a template-DB clone', async () => {
     const clonedName = `${databaseName}_clone`;
     await createDatabaseFromTemplate(clonedName);

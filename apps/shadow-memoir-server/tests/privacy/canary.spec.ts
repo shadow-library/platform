@@ -13,6 +13,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { FastifyModule, type FastifyRouter } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
+import { AiModule } from '@modules/ai';
 import { MemoirAuthModule } from '@modules/auth';
 import { CommandBus, CommandsModule } from '@modules/commands';
 import { FinanceModule } from '@modules/finance';
@@ -33,7 +34,7 @@ import { userToken } from '../test-idp';
  * drives coverage — a column joins this suite by being wrapped in `sensitive()`, not by being named here.
  */
 
-const TestHttpModule = FastifyModule.forRoot({ imports: [MemoirAuthModule, SyncModule], host: 'localhost', port: 0 });
+const TestHttpModule = FastifyModule.forRoot({ imports: [MemoirAuthModule, SyncModule, AiModule], host: 'localhost', port: 0 });
 
 @Module({ imports: [DatastoreModule, TestHttpModule, FinanceModule, MetricsModule, QuickLogsModule, CommandsModule] })
 class TestAppModule {}
@@ -62,6 +63,7 @@ const APP_TABLES = new Set([
   'meal_presets',
   'side_quests',
   'weights',
+  'ai_tasks',
 ]);
 
 function sleep(ms: number): Promise<void> {
@@ -282,6 +284,19 @@ describe('Privacy canary suite (T-28)', () => {
     format.transform(info, {});
     coveredKeys.add('weights.kg');
     expect(info.kg).not.toBe(CANARY);
+  });
+
+  it('should not leak a canary AI query through a POST /ai/tasks submission (T-32)', async () => {
+    const lines = await capture(async () => {
+      const response = await router
+        .mockRequest()
+        .post('/api/v1/ai/tasks')
+        .headers({ authorization: `Bearer ${bearer}` })
+        .body({ id: Bun.randomUUIDv7(), queryText: CANARY });
+      expect(response.statusCode).toBe(201);
+    });
+    coveredKeys.add('ai_tasks.query_text');
+    expect(lines).not.toContain(CANARY);
   });
 
   it('should not leak canary values through an unmapped constraint violation (duplicate expense id)', async () => {

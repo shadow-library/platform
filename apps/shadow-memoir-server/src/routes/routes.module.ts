@@ -3,6 +3,7 @@ import { FastifyModule } from '@shadow-library/fastify';
 import { HttpCoreModule } from '@shadow-library/modules';
 
 import { AccountModule } from '@server/modules/account';
+import { AiModule } from '@server/modules/ai';
 import { MemoirAuthModule } from '@server/modules/auth';
 import { BillingModule } from '@server/modules/billing';
 import { DevicesModule } from '@server/modules/devices';
@@ -15,7 +16,7 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({
 });
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, MemoirAuthModule, SyncModule, DevicesModule, AccountModule, OcrModule, BillingModule, ReceiptsModule],
+  imports: [AppHttpCoreModule, MemoirAuthModule, SyncModule, DevicesModule, AccountModule, OcrModule, BillingModule, ReceiptsModule, AiModule],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),

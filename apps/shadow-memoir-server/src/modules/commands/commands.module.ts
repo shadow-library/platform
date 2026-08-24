@@ -11,6 +11,6 @@ import { RolloverGate } from './rollover-gate';
 @Module({
   imports: [DatabaseModule, TelemetryModule],
   providers: [CommandLogRepository, HeroLedger, RolloverGate, CommandBus],
-  exports: [CommandBus, HeroLedger, RolloverGate],
+  exports: [CommandBus, CommandLogRepository, HeroLedger, RolloverGate],
 })
 export class CommandsModule {}
