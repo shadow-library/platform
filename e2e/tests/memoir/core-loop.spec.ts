@@ -39,7 +39,10 @@ test.describe('shadow memoir core loop', () => {
     const xpBefore = await page.getByRole('progressbar').getAttribute('aria-valuenow');
 
     await completeButton.click();
-    await expect(page.getByRole('button', { name: `Completed: ${questName}` })).toBeVisible();
+    // Completion isn't optimistic — the button flips only once the command's round trip lands and a full
+    // resync (`since=0`, not incremental) refetches. That routinely lands well past the default 10s under
+    // worker load; confirmed it always lands within ~8s single-worker, so widen rather than treat as a defect.
+    await expect(page.getByRole('button', { name: `Completed: ${questName}` })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow', xpBefore ?? '');
 
     // Give the outbox its round trip, then confirm the server actually recorded the completion (not just an

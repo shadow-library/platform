@@ -21,6 +21,10 @@ test.describe('shadow memoir quick capture', () => {
     await ensureOnboarded(await apiContext('memoir', 'user1'));
 
     await page.goto(url);
+    // The ⌘K listener is registered by a shell effect after hydration; `page.goto` only waits for `load`, so
+    // sending the shortcut immediately can fire before anything is listening. Wait for the banner's own quick
+    // capture trigger (same component tree, same mount) to confirm the shell has hydrated before sending it.
+    await expect(page.getByRole('button', { name: 'Quick capture' })).toBeVisible();
     await page.keyboard.press('ControlOrMeta+KeyK');
 
     const captureInput = page.getByLabel('Log something, or jump to a screen');
