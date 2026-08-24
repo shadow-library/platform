@@ -151,6 +151,68 @@ describe('First-party app sessions', () => {
     expect((await mint(sessionHandle)).statusCode).toBe(401);
   });
 
+  describe('self-owned resource scopes', () => {
+    const MEMOIR = 'api://memoir-fixture';
+    const REQUESTED = 'openid memoir:sync memoir:account memoir:destructive reports:read';
+
+    const registerSelfOwnedApp = async () => {
+      const clientService = env.getService(OAuthClientService);
+      const application = await env.getService(ApplicationService).createApplication({ name: 'memoir-fixture', subDomain: 'memoir-fixture' });
+      const resource = await clientService.ensureResource(application.id, MEMOIR);
+      await clientService.createScope(resource.id, 'memoir:sync', undefined, false, 'USER');
+      await clientService.createScope(resource.id, 'memoir:account', undefined, false, 'USER');
+      await clientService.createScope(resource.id, 'memoir:destructive', undefined, true, 'USER');
+
+      const platformId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+      const manage = await clientService.ensureScope(platformId, 'shadow-identity', 'app-session:manage');
+      return clientService.register({
+        applicationId: application.id,
+        name: 'Memoir Fixture',
+        kind: 'WEB_CONFIDENTIAL',
+        isFirstParty: true,
+        grantTypes: ['authorization_code', 'client_credentials'],
+        redirectUris: [REDIRECT_URI],
+        scopeIds: [manage],
+      });
+    };
+
+    it('should mint the scopes the client’s own application declares without any cross-resource grant', async () => {
+      const app = await registerSelfOwnedApp();
+      const { sessionHandle } = (await openSession(app, MEMOIR, REQUESTED)).json() as { sessionHandle: string };
+
+      const minted = await mint(sessionHandle, { resource: MEMOIR }, app);
+      expect(minted.statusCode).toBe(200);
+      const scopes = (minted.json() as { scope: string }).scope.split(' ');
+      expect(scopes).toContain('memoir:sync');
+      expect(scopes).toContain('memoir:account');
+    });
+
+    it('should drop a scope the client neither owns nor holds a grant for', async () => {
+      const app = await registerSelfOwnedApp();
+      const { sessionHandle } = (await openSession(app, MEMOIR, REQUESTED)).json() as { sessionHandle: string };
+
+      const scopes = ((await mint(sessionHandle, { resource: MEMOIR }, app)).json() as { scope: string }).scope.split(' ');
+      expect(scopes).not.toContain('reports:read');
+    });
+
+    it('should keep a sensitive self-owned scope out of an ordinary token and release it only on a claimed step-up', async () => {
+      const app = await registerSelfOwnedApp();
+      const { sessionHandle } = (await openSession(app, MEMOIR, REQUESTED)).json() as { sessionHandle: string };
+
+      const ordinary = await mint(sessionHandle, { resource: MEMOIR }, app);
+      expect((ordinary.json() as { scope: string }).scope).not.toContain('memoir:destructive');
+
+      await env.getService(SessionService).elevate(sessionId, { clientId: app.clientId, resource: MEMOIR });
+      expect((await claimElevation(sessionHandle, MEMOIR, app)).statusCode).toBe(200);
+
+      const elevated = await mint(sessionHandle, { resource: MEMOIR, elevated: true }, app);
+      expect(elevated.statusCode).toBe(200);
+      const body = elevated.json() as { scope: string; aal: string };
+      expect(body.aal).toBe('AAL2');
+      expect(body.scope).toContain('memoir:destructive');
+    });
+  });
+
   describe('step-up isolation', () => {
     const elevateCentralSession = (app = client, resource = REPORTS) => env.getService(SessionService).elevate(sessionId, { clientId: app.clientId, resource });
 

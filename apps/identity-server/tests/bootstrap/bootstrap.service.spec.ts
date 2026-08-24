@@ -186,6 +186,24 @@ describe('BootstrapService', () => {
     expect(memoirRedirects).toContain('https://shadow-memoir.shadow-apps.com/api/auth/callback');
   });
 
+  it('should redirect through the deployed host of an application whose hostname drops the hyphen', async () => {
+    const clientService = env.getService(OAuthClientService);
+
+    const forgeRedirects = (await clientService.getClientDetail('novel-forge'))?.redirectUris ?? [];
+    expect(forgeRedirects).toContain('https://novelforge.shadow-apps.com/api/auth/callback');
+    expect(forgeRedirects).not.toContain('https://novel-forge.shadow-apps.com/api/auth/callback');
+
+    const novelRedirects = (await clientService.getClientDetail('web-novel'))?.redirectUris ?? [];
+    expect(novelRedirects).toContain('https://webnovel.shadow-apps.com/api/auth/callback');
+    expect(novelRedirects).not.toContain('https://web-novel.shadow-apps.com/api/auth/callback');
+  });
+
+  it('should record the deployed hostname as the application subdomain and public origin', async () => {
+    const forge = (await env.getPostgresClient().select().from(schema.applications)).find(application => application.name === 'novel-forge');
+    expect(forge?.subDomain).toBe('novelforge');
+    expect(forge?.publicUrls).toContain('https://novelforge.shadow-apps.com');
+  });
+
   it('should register first-party API resources and the service-only publish scope', async () => {
     const resources = await env.getPostgresClient().select().from(schema.apiResources);
     expect(resources.map(resource => resource.identifier).sort()).toEqual(['api://novel-forge', 'api://pulse', 'api://shadow-memoir', 'api://web-novel', 'shadow-identity']);
@@ -273,6 +291,35 @@ describe('BootstrapService', () => {
     } finally {
       grants.pop();
     }
+  });
+
+  it('should add the corrected redirect URI to an application already seeded under the superseded hostname', async () => {
+    const db = env.getPostgresClient();
+    const clientService = env.getService(OAuthClientService);
+    const stale = 'https://novel-forge.shadow-apps.com/api/auth/callback';
+
+    await db.delete(schema.oauthClientRedirectUris).where(eq(schema.oauthClientRedirectUris.clientId, 'novel-forge'));
+    await db.insert(schema.oauthClientRedirectUris).values({ clientId: 'novel-forge', uri: stale });
+
+    await env.getService(EcosystemSeedService).seed(await seedOperator());
+
+    const redirects = (await clientService.getClientDetail('novel-forge'))?.redirectUris ?? [];
+    expect(redirects).toContain('https://novelforge.shadow-apps.com/api/auth/callback');
+    expect(redirects).toContain(stale);
+  });
+
+  it('should not duplicate redirect URIs when seeded repeatedly', async () => {
+    const db = env.getPostgresClient();
+    const seedService = env.getService(EcosystemSeedService);
+    const operator = await seedOperator();
+
+    await seedService.seed(operator);
+    const before = (await db.select().from(schema.oauthClientRedirectUris)).filter(row => row.clientId === 'web-novel');
+
+    await seedService.seed(operator);
+    const after = (await db.select().from(schema.oauthClientRedirectUris)).filter(row => row.clientId === 'web-novel');
+
+    expect(after.map(row => row.uri).sort()).toEqual(before.map(row => row.uri).sort());
   });
 
   it('should preserve an operator-granted extra scope when reconciling an existing application', async () => {

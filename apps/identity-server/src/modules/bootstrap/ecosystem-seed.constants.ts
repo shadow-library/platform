@@ -46,8 +46,8 @@ export interface SeedApplication {
   description: string;
   /** Display name of the `api://<name>` API resource. */
   resourceName: string;
-  /** Defaults to `name`. */
-  subDomain?: string;
+  /** DNS label the application is actually deployed under, when it differs from `name`; drives the subdomain, public origins and relying-party redirect URIs. */
+  publicHost?: string;
   /** Initial release visibility, applied only when the application is created. */
   visibility?: Application.Visibility;
   /** Whether the application's primary origin exposes the conventional logo asset. */
@@ -137,6 +137,7 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       displayName: 'Novel Forge',
       description: 'Long-form fiction authoring platform for the Shadow ecosystem',
       resourceName: 'Novel Forge API',
+      publicHost: 'novelforge',
       grants: [AUTHZ_CHECK, APP_SESSION, USERS_RESOLVE, { resource: 'api://web-novel', scope: 'web-novel:publish' }],
     },
     {
@@ -144,6 +145,7 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       displayName: 'Web Novel',
       description: 'Reader-facing web novel catalogue for the Shadow ecosystem',
       resourceName: 'Web Novel Reader API',
+      publicHost: 'webnovel',
       scopes: [
         {
           name: 'web-novel:publish',

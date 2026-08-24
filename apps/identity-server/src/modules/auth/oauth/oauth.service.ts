@@ -246,9 +246,8 @@ export class OAuthService {
 
   private async resolveGrant(client: OAuthClient, requestedResource: string | undefined, requestedScope: string, principal: 'user' | 'service'): Promise<ResolvedGrant> {
     const audience = requestedResource ?? DEFAULT_AUDIENCE;
-    const granted = await this.clientService.getGrantedScopes(client.id);
-    const grantedHere = new Set(granted.filter(scope => scope.resourceIdentifier === audience).map(scope => scope.name));
-    if (requestedResource !== undefined && grantedHere.size === 0 && !(await this.clientService.isOwnAudience(client, requestedResource))) {
+    const availableHere = await this.clientService.getAvailableScopes(client, audience);
+    if (requestedResource !== undefined && availableHere.size === 0 && !(await this.clientService.isOwnAudience(client, requestedResource))) {
       this.logger.warn('token request rejected: client holds no scope on the requested resource', {
         securityEvent: 'oauth.audience_denied',
         clientId: client.id,
@@ -259,7 +258,7 @@ export class OAuthService {
 
     const requested = requestedScope.split(' ').filter(Boolean);
     const principalScoped = await this.clientService.filterScopesForPrincipal(requested, principal);
-    const isAllowed = (name: string): boolean => grantedHere.has(name) || (principal === 'user' && OIDC_PROTOCOL_SCOPES.has(name));
+    const isAllowed = (name: string): boolean => availableHere.has(name) || (principal === 'user' && OIDC_PROTOCOL_SCOPES.has(name));
     return { audience, scopes: principalScoped.filter(isAllowed), rejected: principalScoped.filter(name => !isAllowed(name)) };
   }
 

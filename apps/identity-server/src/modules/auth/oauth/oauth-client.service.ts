@@ -175,6 +175,11 @@ export class OAuthClientService {
     return scope.id;
   }
 
+  async ensureRedirectUris(clientId: string, uris: string[]): Promise<void> {
+    this.assertValidRedirectUris(uris);
+    for (const uri of uris) await this.db.insert(schema.oauthClientRedirectUris).values({ clientId, uri }).onConflictDoNothing();
+  }
+
   async grantScope(clientId: string, scopeId: string): Promise<void> {
     await this.db.insert(schema.oauthClientScopeGrants).values({ clientId, scopeId }).onConflictDoNothing();
   }
@@ -288,6 +293,21 @@ export class OAuthClientService {
       .innerJoin(schema.scopes, eq(schema.oauthClientScopeGrants.scopeId, schema.scopes.id))
       .innerJoin(schema.apiResources, eq(schema.scopes.apiResourceId, schema.apiResources.id))
       .where(and(eq(schema.oauthClientScopeGrants.clientId, clientId), eq(schema.apiResources.isActive, true)));
+  }
+
+  /** A client reaches a scope on an audience either through an explicit cross-resource grant or, on its own application's canonical audience, by declaring it. */
+  async getAvailableScopes(client: OAuthClient, audience: string): Promise<Map<string, GrantedScope>> {
+    const granted = (await this.getGrantedScopes(client.id)).filter(scope => scope.resourceIdentifier === audience);
+    const owned = (await this.isOwnAudience(client, audience)) ? await this.listResourceScopes(audience) : [];
+    return new Map([...granted, ...owned].map(scope => [scope.name, scope]));
+  }
+
+  private async listResourceScopes(identifier: string): Promise<GrantedScope[]> {
+    return this.db
+      .select({ name: schema.scopes.name, resourceIdentifier: schema.apiResources.identifier, isSensitive: schema.scopes.isSensitive })
+      .from(schema.apiResources)
+      .innerJoin(schema.scopes, eq(schema.scopes.apiResourceId, schema.apiResources.id))
+      .where(and(eq(schema.apiResources.identifier, identifier), eq(schema.apiResources.isActive, true)));
   }
 
   async getGrantedScopeNames(clientId: string): Promise<string[]> {

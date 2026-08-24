@@ -140,10 +140,9 @@ export class AppSessionService {
     await this.assertApplicationAccess(live, input.client);
     const session = await this.realignOrganisation(live, input.client);
 
-    const granted = await this.clientService.getGrantedScopes(input.client.id);
     const audience = input.resource ?? DEFAULT_AUDIENCE;
-    const grantedHere = new Map(granted.filter(scope => scope.resourceIdentifier === audience).map(scope => [scope.name, scope]));
-    if (input.resource !== undefined && grantedHere.size === 0 && !(await this.clientService.isOwnAudience(input.client, input.resource))) {
+    const availableHere = await this.clientService.getAvailableScopes(input.client, audience);
+    if (input.resource !== undefined && availableHere.size === 0 && !(await this.clientService.isOwnAudience(input.client, input.resource))) {
       this.logger.warn('app session token refused: client holds no scope on the requested resource', {
         securityEvent: 'oauth.audience_denied',
         clientId: input.client.id,
@@ -157,7 +156,7 @@ export class AppSessionService {
     const requested = (input.scope ?? session.grantedScope).split(' ').filter(Boolean);
     const scopes = requested.filter(name => {
       if (OIDC_PROTOCOL_SCOPES.has(name)) return consented.has(name);
-      const scope = grantedHere.get(name);
+      const scope = availableHere.get(name);
       if (!scope || !consented.has(name)) return false;
       return scope.isSensitive ? elevation !== null : true;
     });

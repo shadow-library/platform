@@ -2,7 +2,7 @@ import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
-import { applicationAudience, OAuthClientService } from '@server/modules/auth/oauth';
+import { applicationAudience, OAUTH_CALLBACK_PATH, OAuthClientService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService, ServiceAccessService } from '@server/modules/authz';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
 
@@ -55,17 +55,21 @@ export class EcosystemSeedService {
     return catalogue;
   }
 
-  private appPublicOrigins(app: string): { primary: string; origins: string[] } {
+  private appPublicOrigins(seed: SeedApplication): { primary: string; origins: string[] } {
     const root = new URL(Config.get('oauth.issuer')).hostname.split('.').slice(1).join('.');
-    const primary = `https://${app}.${root}`;
+    const primary = `https://${seed.publicHost ?? seed.name}.${root}`;
     return { primary, origins: Config.isProd() ? [primary] : [primary, 'http://localhost:8080'] };
   }
 
+  private redirectUris(seed: SeedApplication): string[] {
+    return this.appPublicOrigins(seed).origins.map(origin => `${origin}${OAUTH_CALLBACK_PATH}`);
+  }
+
   private async createApplication(seed: SeedApplication, operator: EcosystemOperator, scopes: Map<string, string>): Promise<void> {
-    const { primary, origins } = this.appPublicOrigins(seed.name);
+    const { primary, origins } = this.appPublicOrigins(seed);
     const application = await this.applicationService.createApplication({
       name: seed.name,
-      subDomain: seed.subDomain ?? seed.name,
+      subDomain: seed.publicHost ?? seed.name,
       displayName: seed.displayName,
       description: seed.description,
       homePageUrl: primary,
@@ -159,13 +163,16 @@ export class EcosystemSeedService {
     const application = this.applicationService.getApplicationOrThrow(seed.name);
     await this.ensureResourceScopes(application.id, seed, scopes);
     await this.bindApplication(seed, scopes);
-    await this.reconcileWorkloadSubject(seed.name);
+    await this.reconcileClient(seed);
   }
 
-  private async reconcileWorkloadSubject(app: string): Promise<void> {
-    const client = await this.oauthClientService.getClient(app);
+  /** Additive only: a redirect URI seeded under a superseded hostname stays registered, since clients pinned to it would otherwise break mid-deploy. */
+  private async reconcileClient(seed: SeedApplication): Promise<void> {
+    const client = await this.oauthClientService.getClient(seed.name);
     if (!client) return;
-    const required = workloadSubject(app);
+    await this.oauthClientService.ensureRedirectUris(client.id, this.redirectUris(seed));
+
+    const required = workloadSubject(seed.name);
     const current = client.workloadSubjects ?? [];
     if (current.includes(required)) return;
     await this.oauthClientService.updateClient(client.id, { workloadSubjects: [...current, required] });
