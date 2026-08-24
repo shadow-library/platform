@@ -3,6 +3,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 
 import { MemoirAuthModule } from '@modules/auth';
 import { CommandsModule } from '@modules/commands';
+import { ProgressionModule } from '@modules/progression';
 import { SyncModule } from '@modules/sync';
 
 import { QuestCommandsService } from './quest-commands.service';
@@ -11,7 +12,7 @@ import { QuestRepository } from './quest.repository';
 import { QuestStreakRepository } from './quest-streak.repository';
 
 @Module({
-  imports: [DatabaseModule, MemoirAuthModule, CommandsModule, SyncModule],
+  imports: [DatabaseModule, MemoirAuthModule, CommandsModule, ProgressionModule, SyncModule],
   providers: [QuestRepository, QuestLogRepository, QuestStreakRepository, QuestCommandsService],
   exports: [QuestRepository, QuestLogRepository, QuestStreakRepository],
 })

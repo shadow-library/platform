@@ -249,7 +249,8 @@ describe('Quest engine commands (T-18)', () => {
 
       expect(second[0]!.replayed).toBe(true);
       expect(second[0]!.result).toEqual(first[0]!.result);
-      expect(await db.select().from(heroEvents).where(eq(heroEvents.accountId, accountId))).toHaveLength(1);
+      /** `quest_complete` plus the T-21 `first_quest_completed` `achievement_unlock` — a fresh account's first-ever completion, granted exactly once by the replay. */
+      expect(await db.select().from(heroEvents).where(eq(heroEvents.accountId, accountId))).toHaveLength(2);
     });
   });
 
@@ -523,7 +524,8 @@ describe('Quest engine commands (T-18)', () => {
           .from(questLogs)
           .where(and(eq(questLogs.questId, questId), eq(questLogs.date, '2026-02-15'))),
       ).toHaveLength(1);
-      expect(await db.select().from(heroEvents).where(eq(heroEvents.accountId, accountId))).toHaveLength(1);
+      /** `quest_complete` plus the T-21 `first_quest_completed` `achievement_unlock`, both converging exactly once across the race. */
+      expect(await db.select().from(heroEvents).where(eq(heroEvents.accountId, accountId))).toHaveLength(2);
     });
 
     it('should let the first terminal action win a complete-vs-skip race and report the actual state to the loser', async () => {

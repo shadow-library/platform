@@ -183,7 +183,17 @@ describe('GET /api/v1/sync/delta and the device registry (T-16)', () => {
 
     it('should return every registered domain, including the ones modules registered themselves', async () => {
       const body = await delta();
-      expect(Object.keys(body.domains).sort()).toEqual(['account', 'daily_states', 'devices', 'quest_logs', 'quest_streaks', 'quests']);
+      expect(Object.keys(body.domains).sort()).toEqual([
+        'account',
+        'achievements_earned',
+        'cosmetic_unlocks',
+        'daily_states',
+        'devices',
+        'quest_logs',
+        'quest_streaks',
+        'quests',
+        'titles_earned',
+      ]);
     });
 
     it('should ship the account snapshot without the account id or identity subject', async () => {

@@ -29,6 +29,8 @@ export const heroEventType = pgEnum('hero_event_type', [
   'recovery_expired',
   'crown_init',
   'crown_forfeit',
+  /** T-21: the Returner ritual fires with no XP/coin delta of its own; the event exists to key the incremental achievement check (ARCHITECTURE §26). */
+  'returner_fired',
 ]);
 
 /** `quest_id`/`quest_log_id` are historical references, not foreign keys: an owner may delete a quest log and that deletion must never touch this append-only trail (ARCHITECTURE §10.3). */

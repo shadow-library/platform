@@ -329,9 +329,9 @@ describe('game schema (T-13)', () => {
 
   describe('cosmetic_unlocks', () => {
     it('should reject a repeat purchase through the mapped domain error so a raced buy charges once', async () => {
-      await databaseService.run(() => db.insert(cosmeticUnlocks).values({ accountId, cosmeticId: 'midnight_cloak', source: 'coin' }));
+      await databaseService.run(() => db.insert(cosmeticUnlocks).values({ accountId, cosmeticId: 'midnight_cloak', kind: 'theme_accent', source: 'coin' }));
 
-      const thrown = await capture(() => db.insert(cosmeticUnlocks).values({ accountId, cosmeticId: 'midnight_cloak', source: 'coin' }));
+      const thrown = await capture(() => db.insert(cosmeticUnlocks).values({ accountId, cosmeticId: 'midnight_cloak', kind: 'theme_accent', source: 'coin' }));
 
       expect(AppError.is(thrown, AppErrorCode.CSM_001)).toBe(true);
     });

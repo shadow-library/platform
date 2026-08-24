@@ -1,5 +1,5 @@
-import { type InferEnum, type InferSelectModel } from 'drizzle-orm';
-import { bigint, bigserial, pgEnum, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { type InferEnum, type InferSelectModel, sql } from 'drizzle-orm';
+import { bigint, bigserial, boolean, pgEnum, pgTable, timestamp, unique, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 import { accounts } from './accounts';
 
@@ -44,6 +44,7 @@ export const titlesEarned = pgTable(
   t => [unique('titles_earned_account_id_title_id_unique').on(t.accountId, t.titleId)],
 );
 
+/** `kind` is a denormalized copy of the catalogue entry's kind at unlock time — needed so the "one equipped per kind" invariant (T-21, PRD §2.9) can be enforced by the partial unique index below without a join back to the code-side catalogue. */
 export const cosmeticUnlocks = pgTable(
   'cosmetic_unlocks',
   {
@@ -52,8 +53,15 @@ export const cosmeticUnlocks = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: 'cascade' }),
     cosmeticId: varchar('cosmetic_id', { length: 64 }).notNull(),
+    kind: varchar('kind', { length: 32 }).notNull(),
     source: cosmeticSource('source').notNull(),
+    equipped: boolean('equipped').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  t => [unique('cosmetic_unlocks_account_id_cosmetic_id_unique').on(t.accountId, t.cosmeticId)],
+  t => [
+    unique('cosmetic_unlocks_account_id_cosmetic_id_unique').on(t.accountId, t.cosmeticId),
+    uniqueIndex('cosmetic_unlocks_account_id_kind_equipped_unique')
+      .on(t.accountId, t.kind)
+      .where(sql`${t.equipped}`),
+  ],
 );

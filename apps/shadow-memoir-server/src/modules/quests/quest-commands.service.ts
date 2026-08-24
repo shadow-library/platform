@@ -9,6 +9,7 @@ import { AppError, ValidationError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
+import { ProgressionService } from '@modules/progression';
 import {
   addDays,
   applyStreakEvent,
@@ -94,6 +95,7 @@ export class QuestCommandsService implements OnModuleInit {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly heroLedger: HeroLedger,
+    private readonly progressionService: ProgressionService,
     private readonly questRepository: QuestRepository,
     private readonly questLogRepository: QuestLogRepository,
     private readonly questStreakRepository: QuestStreakRepository,
@@ -223,6 +225,14 @@ export class QuestCommandsService implements OnModuleInit {
     ]);
     if (!grant) throw AppError.internal(`HeroLedger.grant returned no outcome for quest log '${log.id}'`);
 
+    await this.progressionService.onQuestCompletion(ctx.tx, ctx.accountId, {
+      date: occurrence.ref.date,
+      strictness: occurrence.quest.strictness,
+      isAnchor: occurrence.quest.strictness === 'anchor',
+      priorStreakDays: priorStreak.currentDays,
+      postStreakDays,
+    });
+
     return {
       status: 'applied',
       result: {
@@ -282,6 +292,7 @@ export class QuestCommandsService implements OnModuleInit {
     if (!log) return this.convergedResult(occurrence);
 
     if (transition.outcome !== 'neutral') await this.questStreakRepository.write(ctx.tx, occurrence.quest.id, occurrence.ref.date, transition.state);
+    if (reasonTag !== null || reasonNote !== null) await this.progressionService.onReasonTagged(ctx.tx, ctx.accountId, occurrence.ref.date);
 
     return {
       status: 'applied',
@@ -354,6 +365,11 @@ export class QuestCommandsService implements OnModuleInit {
     const log = await this.questLogRepository.upsertReschedule(ctx.tx, write);
     if (!log) return this.convergedResult(occurrence);
 
+    if (reasonTag !== null || reasonNote !== null) {
+      await this.progressionService.onReasonTagged(ctx.tx, ctx.accountId, occurrence.ref.date);
+      await this.progressionService.onRescheduleReasonLogged(ctx.tx, ctx.accountId, occurrence.ref.date);
+    }
+
     return {
       status: 'applied',
       result: { state: 'rescheduled', logId: String(log.id), rescheduledToMin: toMin, rescheduleCountInWindow: usedInWindow + 1, rescheduleCap: RESCHEDULE_CAP_PER_WINDOW },
@@ -373,6 +389,7 @@ export class QuestCommandsService implements OnModuleInit {
     const log = await this.loadEditableLog(ctx);
     const updated = await this.questLogRepository.attachReason(ctx.tx, log.id, { reasonTag, reasonNote });
     if (!updated) throw AppError.internal(`quest log '${log.id}' vanished mid-transaction`);
+    await this.progressionService.onReasonTagged(ctx.tx, ctx.accountId, log.date);
     return { status: 'applied', result: { logId: String(updated.id), reasonTag: updated.reasonTag, reasonNote: updated.reasonNote } };
   }
 

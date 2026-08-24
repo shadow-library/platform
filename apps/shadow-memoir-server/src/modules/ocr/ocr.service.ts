@@ -8,6 +8,7 @@ import { AppError, Config } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { AccountContext, AccountRepository } from '@modules/auth';
+import { ProgressionService } from '@modules/progression';
 import { addDays, formatLocalDate, localDateAt, startOfLocalDay } from '@modules/rules';
 import { AppErrorCode } from '@server/classes';
 import type { Account } from '@server/database';
@@ -29,6 +30,7 @@ export class OcrService {
     private readonly accountContext: AccountContext,
     private readonly accountRepository: AccountRepository,
     private readonly structuringClient: OcrStructuringClient,
+    private readonly progressionService: ProgressionService,
   ) {}
 
   async getQuota(): Promise<OcrQuotaResponseDto> {
@@ -49,7 +51,9 @@ export class OcrService {
     const updated = await this.accountRepository.consumeOcrQuota(account.id, today, cap);
     if (!updated) AppErrorCode.OCR_001.throw({ resetAt: this.nextResetAt(account.timezone) });
 
-    return this.structuringClient.parse(body.extractedText);
+    const result = await this.structuringClient.parse(body.extractedText);
+    await this.progressionService.onReceiptScanned(account.id, today);
+    return result;
   }
 
   private quotaView(account: Account.Row): OcrQuotaResponseDto {

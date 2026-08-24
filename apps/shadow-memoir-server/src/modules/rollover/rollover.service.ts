@@ -8,6 +8,7 @@ import { AppError, Config, Logger } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { type GrantIntent, HeroLedger, RolloverGate } from '@modules/commands';
+import { ProgressionService } from '@modules/progression';
 import {
   addDays,
   applyStreakEvent,
@@ -103,6 +104,7 @@ export class RolloverService implements OnModuleInit {
   constructor(
     private readonly repository: RolloverRepository,
     private readonly heroLedger: HeroLedger,
+    private readonly progressionService: ProgressionService,
     private readonly gate: RolloverGate,
     private readonly registry: DeltaSourceRegistry,
     private readonly deltaRepository: DeltaRepository,
@@ -216,6 +218,7 @@ export class RolloverService implements OnModuleInit {
     const dayLogs = [...resolved.values()];
     const hp = await this.computeHp(tx, context, dayLogs);
     const crown = await this.settleCrown(tx, context, scheduled, dayLogs);
+    const missedCount = dayLogs.filter(log => log.state === 'missed').length;
 
     await this.repository.upsertDailyState(tx, {
       accountId: account.id,
@@ -231,11 +234,12 @@ export class RolloverService implements OnModuleInit {
       crownPeriodStart: crown.periodStart,
       crownBankedXp: crown.bankedXp,
       crownBankedCoins: crown.bankedCoins,
-      missedCount: dayLogs.filter(log => log.state === 'missed').length,
+      missedCount,
       rolloverAt: new Date(),
       rolloverEngineVersion: ROLLOVER_ENGINE_VERSION,
       rulesetVersion: context.ruleset.version,
     });
+    await this.progressionService.onDayClosed(tx, account.id, date, scheduled.length, missedCount);
 
     const active = dayLogs.some(log => isHold(log.state));
     const lastActiveDate = active && (account.lastActiveDate === null || account.lastActiveDate < date) ? date : undefined;
@@ -343,6 +347,7 @@ export class RolloverService implements OnModuleInit {
     }
 
     if (intents.length > 0) await this.heroLedger.grant(tx, account.id, intents);
+    if (bankedXp !== null && bankedCoins !== null && bankedXp + bankedCoins > 0) await this.progressionService.onCrownBanked(tx, account.id, date);
     return { ...crownDay, periodStart, bankedXp, bankedCoins };
   }
 
@@ -468,6 +473,10 @@ export class RolloverService implements OnModuleInit {
       const prior = await this.repository.lockStreak(tx, account.id, questId);
       const granted = grantStreakShield(ruleset, prior, plan.shields);
       await this.repository.writeStreak(tx, account.id, questId, date, granted.state);
+    }
+    if (event) {
+      await this.heroLedger.grant(tx, account.id, [{ dedupeKey: `returner_${date}`, type: 'returner_fired', date }]);
+      await this.progressionService.onReturnerFired(tx, account.id, date);
     }
     return true;
   }

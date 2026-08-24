@@ -9,6 +9,7 @@ import { AppError, ValidationError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
+import { ProgressionService } from '@modules/progression';
 import { AppErrorCode } from '@server/classes';
 import { type DatabaseTransaction, type Expense, schema, type Subscription } from '@server/database';
 import { pseudoAccountId, TelemetryService } from '@server/telemetry';
@@ -105,6 +106,7 @@ export class FinanceCommandsService implements OnModuleInit {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly heroLedger: HeroLedger,
+    private readonly progressionService: ProgressionService,
     private readonly expenseCategoryRepository: ExpenseCategoryRepository,
     private readonly expenseRepository: ExpenseRepository,
     private readonly subscriptionRepository: SubscriptionRepository,
@@ -355,6 +357,7 @@ export class FinanceCommandsService implements OnModuleInit {
       const nextDueDate = advanceDueDate(subscription, billingDate);
       await this.subscriptionRepository.advanceCycle(tx, subscriptionId, billingDate, nextDueDate);
       this.telemetry.emit({ name: 'subscription_cycle_confirmed', pseudoId: pseudoAccountId(accountId), occurredAtMs: Date.now(), frequency: subscription.frequency });
+      await this.progressionService.onSubscriptionConfirmed(tx, accountId, billingDate);
     }
     if (!expense) throw AppErrorCode.FIN_002.create();
 

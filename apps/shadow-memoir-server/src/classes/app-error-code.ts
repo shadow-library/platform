@@ -95,6 +95,22 @@ export class AppErrorCode extends ServerErrorCode {
   /** The cosmetic is already unlocked for this account, so a repeat purchase must not charge again */
   static readonly CSM_001 = AppErrorCode.conflict('CSM_001', 'This cosmetic is already unlocked');
 
+  /** The command named a `cosmeticId` that is not in the T-21 catalogue */
+  static readonly CSM_002 = AppErrorCode.notFound('CSM_002', 'Unknown cosmetic');
+
+  /** `EquipCosmetic` addressed a cosmetic the account has not unlocked yet */
+  static readonly CSM_003 = AppErrorCode.forbidden('CSM_003', 'This cosmetic has not been unlocked yet');
+
+  /** `PurchaseCosmetic` addressed a catalogue entry with no coin price — achievement-only cosmetics are never purchasable (PRD §2.9) */
+  static readonly CSM_004 = AppErrorCode.badRequest('CSM_004', 'This cosmetic is not available for purchase');
+
+  /*!
+   * Title Errors
+   */
+
+  /** `title.display` named a title the account has not earned; titles are never user-selected into existence, only chosen for display among ones already earned (PRD §2.9) */
+  static readonly TTL_001 = AppErrorCode.forbidden('TTL_001', 'This title has not been earned yet');
+
   /*!
    * Finance Errors
    */
