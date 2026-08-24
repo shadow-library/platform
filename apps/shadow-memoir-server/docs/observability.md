@@ -22,6 +22,20 @@ carries the same two fields, plus whatever context the caller adds:
 New counters call `logMetric(logger, message, metric, value, extra?, level?)` rather than hand-building
 the object, so the shape never drifts.
 
+**`value` is unreadable in the shipped log stream.** `manifestLogRedactionFormat` (T-23/T-24) redacts
+every `sensitive()`-wrapped column by name wherever it appears in a log call, at any nesting depth — and
+`metric_entries.value` (T-23's numeric health data) is one such column, so the bare top-level `value` key
+every `logMetric` line carries is redacted to `xxxx` right alongside it (`tests/privacy/canary.spec.ts`'s
+dedicated formatter-level case for exactly this collision). This is intentional defense-in-depth, not a
+bug to route around: a numeric health value has no other way to carry a canary string through the redactor
+test, so the match is deliberately name-based rather than call-site-aware. **Practically**: an alert rule
+can match on a `metric` name and the surrounding context fields (never named `value`), but cannot threshold
+on the number itself from the log text. T-35's own counters below are designed around this — each is only
+emitted when there is something to page on, so alerting is "this line exists" rather than "this line's
+`value` exceeds N". The rows below predating T-35 were not re-audited against this constraint; their
+documented `value > 0`-style thresholds should be read as "the underlying condition is true", enforced in
+practice by the line's mere presence, not by parsing the (redacted) number.
+
 ## Gauges vs. sweep-result lines
 
 Two related but distinct things get logged:
@@ -41,13 +55,17 @@ failure does not page.
 
 ## Current counters
 
-| Metric                               | Kind                | Source                                   | Meaning                                                             | Alert threshold                                                                                |
-| ------------------------------------ | ------------------- | ---------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `scheduler.tick`                     | sweep-result        | `SchedulerService` heartbeat, every tick | Cumulative tick count; `ran`/`failed` sweep names travel as context | Alert if no `Scheduler heartbeat` line appears for `>3× scheduler.tick-interval-ms` (liveness) |
-| `fx_reconciliation.unresolved`       | sweep-result        | `FxReconciliationService.run`            | Expenses still carrying a null FX rate after the sweep              | Alert if `value > 0` for `>2` consecutive hourly sweeps                                        |
-| `fx_reconciliation.unresolved_stale` | sweep-result (warn) | `FxReconciliationService.run`            | Expenses unresolved past 48h (`UNRESOLVED_ALERT_HOURS`)             | Alert immediately — any occurrence is already past the in-app threshold                        |
-| `sync.command_error_rate`            | request-path        | `SyncService.submitBatch`                | `failed / commandCount` for the batch (0–1)                         | Alert if the rolling rate over a 15-minute window exceeds `0.05`                               |
-| `rollover.failures`                  | gauge               | `RolloverService`, per heartbeat         | Accounts whose day-close walk raised and has not since completed    | Alert on any `value > 0`                                                                       |
+| Metric                               | Kind                | Source                                       | Meaning                                                                                                                                                                                                               | Alert threshold                                                                                |
+| ------------------------------------ | ------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `scheduler.tick`                     | sweep-result        | `SchedulerService` heartbeat, every tick     | Cumulative tick count; `ran`/`failed` sweep names travel as context                                                                                                                                                   | Alert if no `Scheduler heartbeat` line appears for `>3× scheduler.tick-interval-ms` (liveness) |
+| `fx_reconciliation.unresolved`       | sweep-result        | `FxReconciliationService.run`                | Expenses still carrying a null FX rate after the sweep                                                                                                                                                                | Alert if `value > 0` for `>2` consecutive hourly sweeps                                        |
+| `fx_reconciliation.unresolved_stale` | sweep-result (warn) | `FxReconciliationService.run`                | Expenses unresolved past 48h (`UNRESOLVED_ALERT_HOURS`)                                                                                                                                                               | Alert immediately — any occurrence is already past the in-app threshold                        |
+| `sync.command_error_rate`            | request-path        | `SyncService.submitBatch`                    | `failed / commandCount` for the batch (0–1)                                                                                                                                                                           | Alert if the rolling rate over a 15-minute window exceeds `0.05`                               |
+| `rollover.failures`                  | gauge               | `RolloverService`, per heartbeat             | Accounts whose day-close walk raised and has not since completed                                                                                                                                                      | Alert on any `value > 0`                                                                       |
+| `reconciliation.drift`               | sweep-result (warn) | `ReconciliationService.runDriftSweep`        | One line per account whose `accounts` mirror disagrees with `SUM(hero_events)`/`levelFor` — `accountPseudoId` + `fields` travel as context; never auto-fixed (§11.4)                                                  | Alert on any occurrence                                                                        |
+| `reconciliation.wedged_accounts`     | sweep-result        | `ReconciliationService.runDriftSweep`        | Accounts whose `last_hp_date` lags `reconciliation.wedged-last-hp-lag-days` behind a later `command_log` row — the corrupt-recurrence day-close wedge (see `docs/runbooks.md`); only logged when the count is nonzero | Alert on any occurrence                                                                        |
+| `quest_streak.divergence`            | sweep-result (warn) | `ReconciliationService.runStreakSampleSweep` | Sampled `quest_streaks` rows whose `recomputeStreak` rebuild disagrees with the live projection; only logged when the count is nonzero                                                                                | Alert on any occurrence                                                                        |
+| `command_log.pruned`                 | sweep-result        | `ReconciliationService.runCommandLogPrune`   | Rows deleted past `reconciliation.command-log-retention-days`, batch-limited per run                                                                                                                                  | Alert if `hitBatchLimit` is `true` for `>2` consecutive sweeps                                 |
 
 ## Registered but not yet sourced
 

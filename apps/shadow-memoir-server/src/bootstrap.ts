@@ -35,6 +35,13 @@ declare module '@shadow-library/common' {
     'fx.provider-url': string;
     'fx.reconciliation-interval-minutes': number;
 
+    'reconciliation.sweep-interval-minutes': number;
+    'reconciliation.streak-sample-size': number;
+    'reconciliation.wedged-last-hp-lag-days': number;
+    'reconciliation.command-log-retention-days': number;
+    'reconciliation.command-log-prune-batch-size': number;
+    'reconciliation.command-log-prune-max-batches': number;
+
     'telemetry.pseudo-id-secret': string;
   }
 }
@@ -85,6 +92,15 @@ Config.load('billing.webhook-tolerance-seconds', { defaultValue: '300', validate
 
 Config.load('fx.provider-url', { defaultValue: 'https://api.exchangerate.host' });
 Config.load('fx.reconciliation-interval-minutes', { defaultValue: '60', validateType: 'number' });
+
+/** ARCHITECTURE §11.4/§26: the account-mirror drift check, wedged-rollover surface, and quest-streak rebuild-compare all ride this cadence. */
+Config.load('reconciliation.sweep-interval-minutes', { defaultValue: '10080', validateType: 'number', reloadable: true });
+Config.load('reconciliation.streak-sample-size', { defaultValue: '25', validateType: 'number', reloadable: true });
+/** How far a `last_hp_date` may lag behind a later `command_log` entry before the account is surfaced as a wedged-rollover candidate. */
+Config.load('reconciliation.wedged-last-hp-lag-days', { defaultValue: '3', validateType: 'number', reloadable: true });
+Config.load('reconciliation.command-log-retention-days', { defaultValue: '90', validateType: 'number', reloadable: true });
+Config.load('reconciliation.command-log-prune-batch-size', { defaultValue: '1000', validateType: 'number', reloadable: true });
+Config.load('reconciliation.command-log-prune-max-batches', { defaultValue: '20', validateType: 'number', reloadable: true });
 
 /** HMAC key for the analytics pseudo-id (§23) — an account id must never be recoverable from it. Ops-provisioned per env; the default is dev/test-only. */
 Config.load('telemetry.pseudo-id-secret', { defaultValue: 'dev-only-telemetry-pseudo-id-secret' });
