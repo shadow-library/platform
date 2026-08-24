@@ -37,7 +37,7 @@ export interface WebNovelMutateOptions {
 export async function webNovelMutate(ctx: APIRequestContext, method: MutationMethod, url: string, options: WebNovelMutateOptions = {}): Promise<APIResponse> {
   await ctx.get(options.csrfSeedPath ?? '/api/auth/session');
 
-  const webNovelOrigin = new URL(getProductUrl('webNovel') ?? 'https://web-novel.shadow-apps.test').hostname;
+  const webNovelOrigin = new URL(getProductUrl('webNovel') ?? 'https://webnovel.shadow-apps.test').hostname;
   const { cookies } = await ctx.storageState();
   const cookie = cookies.find(c => c.name === 'csrf-token' && c.domain.replace(/^\./, '') === webNovelOrigin);
   const token = cookie?.value.split(':')[1];

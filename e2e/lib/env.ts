@@ -56,9 +56,9 @@ const PRODUCT_ENV_VARS: Record<ProductKey, string> = {
 const PRODUCT_DEFAULT_URLS: Record<ProductKey, string> = {
   identity: 'https://identity.shadow-apps.test',
   memoir: 'https://shadow-memoir.shadow-apps.test',
-  novelForge: 'https://novel-forge.shadow-apps.test',
+  novelForge: 'https://novelforge.shadow-apps.test',
   pulse: 'https://pulse.shadow-apps.test',
-  webNovel: 'https://web-novel.shadow-apps.test',
+  webNovel: 'https://webnovel.shadow-apps.test',
 };
 
 /** Iteration order every spec loops in — stable so test titles/reports read the same across runs. */

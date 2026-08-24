@@ -143,11 +143,11 @@ test.describe('internal api security', () => {
     // An opaque app-session handle is only meaningful in the store that issued it. Copy user1's Web Novel handle
     // onto the Novel Forge origin and it must resolve to nobody there — proving the handles aren't portable.
     const novelForgeUrl = requireProductUrl('novelForge');
-    const handle = cookieFromStorageState('user1', WEB_NOVEL_HANDLE, 'web-novel.shadow-apps.test');
+    const handle = cookieFromStorageState('user1', WEB_NOVEL_HANDLE, 'webnovel.shadow-apps.test');
     const ctx = await request.newContext({
       ignoreHTTPSErrors: true,
       storageState: {
-        cookies: [{ name: WEB_NOVEL_HANDLE, value: handle, domain: 'novel-forge.shadow-apps.test', path: '/', httpOnly: true, secure: true, sameSite: 'Lax', expires: -1 }],
+        cookies: [{ name: WEB_NOVEL_HANDLE, value: handle, domain: 'novelforge.shadow-apps.test', path: '/', httpOnly: true, secure: true, sameSite: 'Lax', expires: -1 }],
         origins: [],
       },
     });
