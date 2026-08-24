@@ -89,6 +89,19 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly QST_008 = AppErrorCode.badRequest('QST_008', 'Reschedule is not available for this quest');
 
   /*!
+   * Compassion Errors
+   */
+
+  /** No pending Recovery Quest exists for the day; already completed, expired, or never spawned */
+  static readonly RCV_001 = AppErrorCode.notFound('RCV_001', 'No pending recovery quest for today');
+
+  /** `plan.setLock` named a quest id that does not belong to the caller, or is not active */
+  static readonly LCK_001 = AppErrorCode.notFound('LCK_001', 'Quest not found');
+
+  /** The day has already been closed by rollover; the plan can no longer be locked or unlocked */
+  static readonly LCK_002 = AppErrorCode.conflict('LCK_002', 'This day is already closed and cannot be locked');
+
+  /*!
    * Cosmetic Errors
    */
 

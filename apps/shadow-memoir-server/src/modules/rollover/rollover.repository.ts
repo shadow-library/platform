@@ -11,6 +11,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { EMPTY_STREAK_STATE, type StreakState } from '@modules/rules';
 import {
   type Account,
+  type ComebackEvent,
   type DailyState,
   type DatabaseTransaction,
   type PrimaryDatabase,
@@ -39,6 +40,16 @@ export interface RecoveryQuestDraft {
   triggerLogIds: bigint[];
   isReturnerDay: boolean;
   expiresAt: Date;
+}
+
+export interface ComebackEventDraft {
+  kind: ComebackEvent.Kind;
+  triggerKind?: ComebackEvent.TriggerKind | null;
+  sourceQuestLogId?: bigint | null;
+  consumedQuestLogId?: bigint | null;
+  xpBonus?: number;
+  coinBonus?: number;
+  intensityMode: Account.IntensityMode;
 }
 
 export interface ReturnerEventDraft {
@@ -171,7 +182,7 @@ export class RolloverRepository {
       longestDays: row.bestRunDays,
       shields: row.shieldsAvailable,
       completionsTowardShield: row.completionsTowardShield,
-      pendingShieldGrant: 0,
+      pendingShieldGrant: row.pendingShieldGrant,
     };
   }
 
@@ -186,6 +197,7 @@ export class RolloverRepository {
         bestRunDays: state.longestDays,
         shieldsAvailable: state.shields,
         completionsTowardShield: state.completionsTowardShield,
+        pendingShieldGrant: state.pendingShieldGrant,
         runStartDate: state.currentDays > 0 ? date : null,
         lastCountedDate: date,
       })
@@ -196,6 +208,7 @@ export class RolloverRepository {
           bestRunDays: state.longestDays,
           shieldsAvailable: state.shields,
           completionsTowardShield: state.completionsTowardShield,
+          pendingShieldGrant: state.pendingShieldGrant,
           ...(runStartDate === undefined ? {} : { runStartDate }),
           lastCountedDate: date,
         }),
@@ -217,14 +230,13 @@ export class RolloverRepository {
     return new Set(rows.map(row => row.questId));
   }
 
-  /** PRD §4.10 step 4: expiry is silent — no penalty, no cascade, and no reopening of a Recovery already resolved by the user. */
-  async expirePendingRecovery(tx: DatabaseTransaction, accountId: bigint, date: string): Promise<number> {
-    const expired = await tx
+  /** PRD §4.10 step 4: expiry is silent to the user — no penalty, no cascade, no reopening — but still lands its own `hero_events` audit row (I-7). */
+  async expirePendingRecovery(tx: DatabaseTransaction, accountId: bigint, date: string): Promise<RecoveryQuest.Row[]> {
+    return tx
       .update(schema.recoveryQuests)
       .set({ state: 'expired' })
       .where(and(eq(schema.recoveryQuests.accountId, accountId), eq(schema.recoveryQuests.date, date), eq(schema.recoveryQuests.state, 'pending')))
-      .returning({ id: schema.recoveryQuests.id });
-    return expired.length;
+      .returning();
   }
 
   async insertRecoveryQuest(tx: DatabaseTransaction, accountId: bigint, draft: RecoveryQuestDraft): Promise<RecoveryQuest.Row | null> {
@@ -245,12 +257,52 @@ export class RolloverRepository {
     return event ?? null;
   }
 
-  async insertComebackEvent(tx: DatabaseTransaction, accountId: bigint, date: string, intensityMode: Account.IntensityMode, triggerKind: string | null): Promise<boolean> {
+  /** `(account, date, kind)` is the natural key (PRD §3.6): arming, re-arming, firing, and re-firing are each recorded at most once per day. */
+  async insertComebackEvent(tx: DatabaseTransaction, accountId: bigint, date: string, draft: ComebackEventDraft): Promise<boolean> {
     const [event] = await tx
       .insert(schema.comebackEvents)
-      .values({ accountId, date, kind: 'armed', triggerKind: triggerKind as (typeof schema.comebackEvents.$inferInsert)['triggerKind'], intensityMode })
+      .values({
+        accountId,
+        date,
+        kind: draft.kind,
+        triggerKind: draft.triggerKind ?? null,
+        sourceQuestLogId: draft.sourceQuestLogId ?? null,
+        consumedQuestLogId: draft.consumedQuestLogId ?? null,
+        xpBonus: draft.xpBonus ?? 0,
+        coinBonus: draft.coinBonus ?? 0,
+        intensityMode: draft.intensityMode,
+      })
       .onConflictDoNothing({ target: [schema.comebackEvents.accountId, schema.comebackEvents.date, schema.comebackEvents.kind] })
       .returning({ id: schema.comebackEvents.id });
     return Boolean(event);
+  }
+
+  /** Every open-day mutation of `daily_states` outside the rollover walk itself — locking the plan, breaking a lock, consuming Comeback — carries the same `rollover_at IS NULL` guard the day-close upsert does (§10.4). */
+  async updateDailyStateIfOpen(tx: DatabaseTransaction, accountId: bigint, date: string, values: Partial<typeof schema.dailyStates.$inferInsert>): Promise<boolean> {
+    const updated = await tx
+      .update(schema.dailyStates)
+      .set(syncStamped(schema.dailyStates, values))
+      .where(and(eq(schema.dailyStates.accountId, accountId), eq(schema.dailyStates.date, date), isNull(schema.dailyStates.rolloverAt)))
+      .returning({ accountId: schema.dailyStates.accountId });
+    return updated.length > 0;
+  }
+
+  async findRecoveryForDate(tx: DatabaseTransaction, accountId: bigint, date: string): Promise<RecoveryQuest.Row | null> {
+    const [recovery] = await tx
+      .select()
+      .from(schema.recoveryQuests)
+      .where(and(eq(schema.recoveryQuests.accountId, accountId), eq(schema.recoveryQuests.date, date)))
+      .for('update');
+    return recovery ?? null;
+  }
+
+  /** Pending-only, guarded by the natural-key `WHERE state = 'pending'` — a second attempt (replay or a race) converges to `null` rather than double-completing (PRD §3.6). */
+  async completeRecoveryQuest(tx: DatabaseTransaction, accountId: bigint, date: string, reflectionText: string | null): Promise<RecoveryQuest.Row | null> {
+    const [recovery] = await tx
+      .update(schema.recoveryQuests)
+      .set({ state: 'completed', reflectionText, completedAt: new Date() })
+      .where(and(eq(schema.recoveryQuests.accountId, accountId), eq(schema.recoveryQuests.date, date), eq(schema.recoveryQuests.state, 'pending')))
+      .returning();
+    return recovery ?? null;
   }
 }

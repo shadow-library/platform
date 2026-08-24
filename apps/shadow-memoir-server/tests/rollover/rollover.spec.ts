@@ -510,7 +510,7 @@ describe('Daily rollover engine (T-19)', () => {
         .from(schema.recoveryQuests)
         .where(and(eq(schema.recoveryQuests.accountId, fixture.accountId), eq(schema.recoveryQuests.date, fixture.at(-1))));
       expect(recovery!.state).toBe('expired');
-      expect(await countByType(fixture)).toEqual({});
+      expect(await countByType(fixture)).toEqual({ recovery_expired: 1 });
       expect((await readAccount(fixture)).totalXp).toBe(0n);
     });
 

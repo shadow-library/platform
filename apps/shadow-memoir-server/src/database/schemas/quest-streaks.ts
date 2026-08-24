@@ -24,6 +24,8 @@ export const questStreaks = pgTable(
     shieldsAvailable: smallint('shields_available').notNull().default(0),
     completionsTowardShield: smallint('completions_toward_shield').notNull().default(0),
     bestRunDays: integer('best_run_days').notNull().default(0),
+    /** A Returner shield held back because the Quest was already at cap (PRD §4.6); settles into `shields_available` the next time this run holds, bridges, or breaks. */
+    pendingShieldGrant: smallint('pending_shield_grant').notNull().default(0),
     syncSeq: bigint('sync_seq', { mode: 'bigint' })
       .notNull()
       .default(sql`nextval('sync_seq')`),
@@ -35,5 +37,6 @@ export const questStreaks = pgTable(
     check('quest_streaks_current_run_days_check', sql`${t.currentRunDays} >= 0`),
     check('quest_streaks_best_run_days_check', sql`${t.bestRunDays} >= 0`),
     check('quest_streaks_completions_toward_shield_check', sql`${t.completionsTowardShield} >= 0`),
+    check('quest_streaks_pending_shield_grant_check', sql`${t.pendingShieldGrant} >= 0`),
   ],
 );

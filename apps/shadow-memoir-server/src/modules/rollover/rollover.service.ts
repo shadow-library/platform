@@ -7,7 +7,7 @@ import { AppError, Config, Logger } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { type GrantIntent, HeroLedger, RolloverGate } from '@modules/commands';
+import { applyStreakTransition, type GrantIntent, HeroLedger, RolloverGate } from '@modules/commands';
 import { ProgressionService } from '@modules/progression';
 import {
   addDays,
@@ -213,7 +213,14 @@ export class RolloverService implements OnModuleInit {
     const missed = await this.recordMisses(tx, context, scheduled, resolved);
     for (const log of missed) resolved.set(log.questId, log);
 
-    await this.repository.expirePendingRecovery(tx, account.id, date);
+    const expired = await this.repository.expirePendingRecovery(tx, account.id, date);
+    if (expired.length > 0) {
+      await this.heroLedger.grant(
+        tx,
+        account.id,
+        expired.map(recovery => ({ dedupeKey: `recovery_expired_${recovery.id}`, type: 'recovery_expired' as const, date, questId: recovery.sourceQuestId ?? undefined })),
+      );
+    }
 
     const dayLogs = [...resolved.values()];
     const hp = await this.computeHp(tx, context, dayLogs);
@@ -240,10 +247,20 @@ export class RolloverService implements OnModuleInit {
       rulesetVersion: context.ruleset.version,
     });
     await this.progressionService.onDayClosed(tx, account.id, date, scheduled.length, missedCount);
+    if (this.lockedDayCleared(existing, resolved)) await this.progressionService.onLockedDayCleared(tx, account.id, date);
 
     const active = dayLogs.some(log => isHold(log.state));
     const lastActiveDate = active && (account.lastActiveDate === null || account.lastActiveDate < date) ? date : undefined;
     await this.repository.updateAccount(tx, account.id, { lastHpDate: date, ...(lastActiveDate ? { lastActiveDate } : {}) });
+  }
+
+  /** PRD §4.7 #15: a locked day is "fully cleared" when the lock survived the day unbroken and every Quest it named ended in a hold state. */
+  private lockedDayCleared(existing: DailyState.Row | null, resolved: Map<bigint, QuestLog.Row>): boolean {
+    if (!existing || existing.committedAt === null || existing.lockBrokenAt !== null || existing.lockedQuestIds.length === 0) return false;
+    return existing.lockedQuestIds.every(questId => {
+      const log = resolved.get(questId);
+      return log !== undefined && isHold(log.state);
+    });
   }
 
   /** Recovery-strictness quests are excluded here rather than filtered later: a Recovery that lapses expires silently, and a missed Recovery must never be able to spawn another (PRD Invariant 6). */
@@ -279,9 +296,11 @@ export class RolloverService implements OnModuleInit {
         streakOptIn: quest.optionalStreakOptIn,
         onTime: false,
       });
-      if (transition.outcome === 'neutral') continue;
-      if (transition.shieldsConsumed > 0) await this.repository.insertShieldConsumption(tx, account.id, quest.id, date);
-      await this.repository.writeStreak(tx, account.id, quest.id, date, transition.state);
+      await applyStreakTransition(
+        transition,
+        () => this.repository.writeStreak(tx, account.id, quest.id, date, transition.state),
+        () => this.repository.insertShieldConsumption(tx, account.id, quest.id, date),
+      );
     }
 
     return inserted;
@@ -468,11 +487,15 @@ export class RolloverService implements OnModuleInit {
       shieldPending: plan.placement !== 'granted',
       intensityMode: context.intensityMode,
     });
-    if (event && plan.placement === 'granted' && plan.questId !== null) {
+    if (!event) return true;
+
+    if (plan.questId !== null) {
       const questId = BigInt(plan.questId);
       const prior = await this.repository.lockStreak(tx, account.id, questId);
       const granted = grantStreakShield(ruleset, prior, plan.shields);
       await this.repository.writeStreak(tx, account.id, questId, date, granted.state);
+    } else {
+      await this.repository.updateAccount(tx, account.id, { pendingReturnerShields: account.pendingReturnerShields + plan.shields });
     }
     if (event) {
       await this.heroLedger.grant(tx, account.id, [{ dedupeKey: `returner_${date}`, type: 'returner_fired', date }]);
@@ -527,7 +550,7 @@ export class RolloverService implements OnModuleInit {
     const arming = evaluateComebackArming(ruleset, { intensityMode: context.intensityMode, momentum, returnerFired, recentMisses });
     if (!arming.armed) return false;
 
-    await this.repository.insertComebackEvent(tx, account.id, date, context.intensityMode, arming.trigger?.kind ?? null);
+    await this.repository.insertComebackEvent(tx, account.id, date, { kind: 'armed', triggerKind: arming.trigger?.kind ?? null, intensityMode: context.intensityMode });
     return true;
   }
 

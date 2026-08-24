@@ -8,20 +8,27 @@ import { AppError, ValidationError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
+import { applyStreakTransition, CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
 import { ProgressionService } from '@modules/progression';
 import {
   addDays,
   applyStreakEvent,
+  canFireComeback,
   clampPerformedAt,
+  comebackBonus,
+  type ComebackFire,
   type CompletionKind,
   computeReward,
   currentRuleset,
   daysBetween,
+  EMPTY_STREAK_STATE,
+  fireComeback,
   formatLocalDate,
+  grantStreakShield,
   type IntensityMode,
   type LocalDate,
   occursOn,
+  type OneShotModifier,
   parseLocalDate,
   type RecurrenceRule,
   resolveTimingBand,
@@ -30,9 +37,10 @@ import {
   type TimingBand,
   zonedFieldsAt,
 } from '@modules/rules';
+import { RolloverRepository } from '@modules/rollover';
 import { DeltaRepository, DeltaSourceRegistry, type KeysetDeltaSource } from '@modules/sync';
 import { AppErrorCode } from '@server/classes';
-import { type DatabaseTransaction, type HeroEvent, type Quest, type QuestLog, schema } from '@server/database';
+import { type DailyState, type DatabaseTransaction, type HeroEvent, type Quest, type QuestLog, schema } from '@server/database';
 
 import { type OccurrenceRef, parseOccurrenceId, parseQuestDraft, parseQuestPatch, parseReasonNote, parseReasonTag } from './quest-command.types';
 import { QuestLogRepository, type QuestLogWrite } from './quest-log.repository';
@@ -99,6 +107,7 @@ export class QuestCommandsService implements OnModuleInit {
     private readonly questRepository: QuestRepository,
     private readonly questLogRepository: QuestLogRepository,
     private readonly questStreakRepository: QuestStreakRepository,
+    private readonly rolloverRepository: RolloverRepository,
     private readonly deltaRegistry: DeltaSourceRegistry,
     private readonly deltaRepository: DeltaRepository,
   ) {}
@@ -133,6 +142,7 @@ export class QuestCommandsService implements OnModuleInit {
     const draft = parseQuestDraft(ctx.envelope.payload);
     if (draft.strictness === 'anchor' && draft.startTimeMinutes === null) throw AppErrorCode.QST_003.create();
     const quest = await this.questRepository.create(ctx.tx, draft);
+    await this.claimPendingReturnerShield(ctx.tx, ctx.accountId, quest.id, ctx.envelope.localDate);
     const entityRef = ctx.envelope.payload['entityRef'];
     const result: Record<string, unknown> = { id: String(quest.id) };
     if (typeof entityRef === 'string') result['entityRef'] = entityRef;
@@ -172,24 +182,24 @@ export class QuestCommandsService implements OnModuleInit {
     const timing = this.resolveTiming(ctx, ruleset, occurrence, account);
     const state = logStateFor(completion, timing.band);
 
+    /** §12.5's effect boundary: mid-day mechanics read the occurrence date's own `daily_states` snapshot, never the account's live (possibly already-staged-forward) mode. */
+    const dailyState = await this.rolloverRepository.lockDailyState(ctx.tx, ctx.accountId, occurrence.ref.date);
+    const intensityMode = dailyState?.intensityMode ?? account.intensityMode;
+
     const priorStreak = await this.questStreakRepository.readForUpdate(ctx.tx, occurrence.quest.id);
     const transition = applyStreakEvent(ruleset, priorStreak, {
       state,
       strictness: occurrence.quest.strictness,
-      intensityMode: account.intensityMode,
+      intensityMode,
       streakOptIn: occurrence.quest.optionalStreakOptIn,
       onTime: timing.band === 'on_time',
     });
     const postStreakDays = transition.outcome === 'neutral' ? priorStreak.currentDays : transition.state.currentDays;
 
-    const reward = computeReward(ruleset, {
-      strictness: occurrence.quest.strictness,
-      band: timing.band,
-      completion,
-      streakDays: postStreakDays,
-      lockActive: false,
-      oneShot: 'none',
-    });
+    const lockActive = this.isLockActive(dailyState, occurrence.quest.id);
+    const comebackFire = this.tryFireComeback(ruleset, dailyState, occurrence.quest.strictness);
+    const rewardInput = { strictness: occurrence.quest.strictness, band: timing.band, completion, streakDays: postStreakDays, lockActive };
+    const reward = computeReward(ruleset, { ...rewardInput, oneShot: comebackFire?.fired ? ('comeback' as OneShotModifier) : 'none' });
 
     const write: QuestLogWrite = {
       questId: occurrence.quest.id,
@@ -199,7 +209,7 @@ export class QuestCommandsService implements OnModuleInit {
       coinsAwarded: reward.coins,
       statAffinity: occurrence.quest.statAffinity,
       strictness: occurrence.quest.strictness,
-      intensityModeAtLog: account.intensityMode,
+      intensityModeAtLog: intensityMode,
       crownSliceWeight: ruleset.strictness[occurrence.quest.strictness].crownWeight.toFixed(2),
       rulesetVersion: ruleset.version,
       performedAt: timing.performedAt,
@@ -207,7 +217,11 @@ export class QuestCommandsService implements OnModuleInit {
     const log = await this.questLogRepository.upsertTerminal(ctx.tx, write);
     if (!log) return this.convergedResult(occurrence);
 
-    if (transition.outcome !== 'neutral') await this.questStreakRepository.write(ctx.tx, occurrence.quest.id, occurrence.ref.date, transition.state);
+    await applyStreakTransition(
+      transition,
+      () => this.questStreakRepository.write(ctx.tx, occurrence.quest.id, occurrence.ref.date, transition.state),
+      () => this.questStreakRepository.insertShieldConsumption(ctx.tx, occurrence.quest.id, occurrence.ref.date),
+    );
 
     const [grant] = await this.heroLedger.grant(ctx.tx, ctx.accountId, [
       {
@@ -233,6 +247,11 @@ export class QuestCommandsService implements OnModuleInit {
       postStreakDays,
     });
 
+    if (comebackFire?.fired && dailyState) {
+      await this.recordComebackFire(ctx.tx, ctx.accountId, dailyState, comebackFire, intensityMode, log.id, rewardInput);
+      await this.progressionService.onComebackBonusClaimed(ctx.tx, ctx.accountId, occurrence.ref.date);
+    }
+
     return {
       status: 'applied',
       result: {
@@ -250,6 +269,8 @@ export class QuestCommandsService implements OnModuleInit {
         shieldsEarned: transition.shieldsEarned,
         shieldsConsumed: transition.shieldsConsumed,
         milestone: transition.milestone,
+        comebackFired: comebackFire?.fired ?? false,
+        lockBonusApplied: lockActive,
       },
     };
   }
@@ -264,11 +285,14 @@ export class QuestCommandsService implements OnModuleInit {
     const reasonTag = parseReasonTag('reasonTag', payload['reasonTag']);
     const reasonNote = parseReasonNote('note', payload['note']);
 
+    const dailyState = await this.rolloverRepository.lockDailyState(ctx.tx, ctx.accountId, occurrence.ref.date);
+    const intensityMode = dailyState?.intensityMode ?? account.intensityMode;
+
     const priorStreak = await this.questStreakRepository.readForUpdate(ctx.tx, occurrence.quest.id);
     const transition = applyStreakEvent(ruleset, priorStreak, {
       state,
       strictness: occurrence.quest.strictness,
-      intensityMode: account.intensityMode,
+      intensityMode,
       streakOptIn: occurrence.quest.optionalStreakOptIn,
       onTime: false,
     });
@@ -281,7 +305,7 @@ export class QuestCommandsService implements OnModuleInit {
       coinsAwarded: 0,
       statAffinity: occurrence.quest.statAffinity,
       strictness: occurrence.quest.strictness,
-      intensityModeAtLog: account.intensityMode,
+      intensityModeAtLog: intensityMode,
       crownSliceWeight: ruleset.strictness[occurrence.quest.strictness].crownWeight.toFixed(2),
       rulesetVersion: ruleset.version,
       reasonTag,
@@ -291,8 +315,16 @@ export class QuestCommandsService implements OnModuleInit {
     const log = await this.questLogRepository.upsertTerminal(ctx.tx, write);
     if (!log) return this.convergedResult(occurrence);
 
-    if (transition.outcome !== 'neutral') await this.questStreakRepository.write(ctx.tx, occurrence.quest.id, occurrence.ref.date, transition.state);
+    await applyStreakTransition(
+      transition,
+      () => this.questStreakRepository.write(ctx.tx, occurrence.quest.id, occurrence.ref.date, transition.state),
+      () => this.questStreakRepository.insertShieldConsumption(ctx.tx, occurrence.quest.id, occurrence.ref.date),
+    );
     if (reasonTag !== null || reasonNote !== null) await this.progressionService.onReasonTagged(ctx.tx, ctx.accountId, occurrence.ref.date);
+
+    if (state === 'postponed' && this.isLockActive(dailyState, occurrence.quest.id)) {
+      await this.rolloverRepository.updateDailyStateIfOpen(ctx.tx, ctx.accountId, occurrence.ref.date, { lockBrokenAt: new Date() });
+    }
 
     return {
       status: 'applied',
@@ -414,6 +446,62 @@ export class QuestCommandsService implements OnModuleInit {
     const removed = await this.questLogRepository.remove(ctx.tx, log.id);
     if (!removed) throw AppErrorCode.QST_007.create();
     return { status: 'applied', result: { logId: String(log.id), deleted: true } };
+  }
+
+  /*!
+   * Compassion mechanics (T-20): lock bonus, Comeback consumption, Returner shield placement
+   */
+
+  private isLockActive(dailyState: DailyState.Row | null, questId: bigint): boolean {
+    if (!dailyState || dailyState.committedAt === null || dailyState.lockBrokenAt !== null) return false;
+    return dailyState.lockedQuestIds.includes(questId);
+  }
+
+  /** Comeback is only ever consumed against the currently open day's own arming — a closed day's flags are history, not a standing offer. */
+  private tryFireComeback(ruleset: Ruleset, dailyState: DailyState.Row | null, strictness: Quest.Strictness): ComebackFire | null {
+    if (!dailyState || dailyState.rolloverAt !== null || !dailyState.comebackArmed) return null;
+    const state = {
+      armed: dailyState.comebackArmed,
+      fires: (dailyState.comebackFired ? 1 : 0) + (dailyState.comebackReFired ? 1 : 0),
+      armedViaRecovery: dailyState.comebackArmedViaRecovery,
+    };
+    if (!canFireComeback(ruleset, state, strictness)) return null;
+    return fireComeback(ruleset, state, strictness);
+  }
+
+  private async recordComebackFire(
+    tx: DatabaseTransaction,
+    accountId: bigint,
+    dailyState: DailyState.Row,
+    fire: ComebackFire,
+    intensityMode: IntensityMode,
+    questLogId: bigint,
+    rewardInput: { strictness: Quest.Strictness; band: TimingBand; completion: CompletionKind; streakDays: number; lockActive: boolean },
+  ): Promise<void> {
+    const ruleset = currentRuleset();
+    const bonus = comebackBonus(ruleset, { ...rewardInput, oneShot: 'none' });
+    await this.rolloverRepository.insertComebackEvent(tx, accountId, dailyState.date, {
+      kind: fire.kind ?? 'fired',
+      consumedQuestLogId: questLogId,
+      xpBonus: bonus.xp,
+      coinBonus: bonus.coins,
+      intensityMode,
+    });
+    await this.rolloverRepository.updateDailyStateIfOpen(tx, accountId, dailyState.date, {
+      comebackArmed: fire.state.armed,
+      comebackFired: true,
+      comebackFiredAt: dailyState.comebackFiredAt ?? new Date(),
+      comebackReFired: fire.kind === 're_fired' ? true : dailyState.comebackReFired,
+    });
+  }
+
+  /** O-6: a Returner shield with no pre-absence Quest to target waits on the account until the owner creates one. */
+  private async claimPendingReturnerShield(tx: DatabaseTransaction, accountId: bigint, questId: bigint, date: string): Promise<void> {
+    const [account] = await tx.select({ pending: schema.accounts.pendingReturnerShields }).from(schema.accounts).where(eq(schema.accounts.id, accountId)).for('update');
+    if (!account || account.pending <= 0) return;
+    await tx.update(schema.accounts).set({ pendingReturnerShields: 0, updatedAt: new Date() }).where(eq(schema.accounts.id, accountId));
+    const granted = grantStreakShield(currentRuleset(), EMPTY_STREAK_STATE, account.pending);
+    await this.questStreakRepository.write(tx, questId, date, granted.state);
   }
 
   /*!

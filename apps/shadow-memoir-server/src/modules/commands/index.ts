@@ -1,3 +1,4 @@
+export * from './apply-streak-transition';
 export * from './command-bus.service';
 export * from './command-log.repository';
 export * from './command.dto';

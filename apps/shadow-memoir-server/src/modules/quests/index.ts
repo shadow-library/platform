@@ -1,3 +1,4 @@
+export * from './compassion-commands.service';
 export * from './quest-command.types';
 export * from './quest-commands.service';
 export * from './quest-log.repository';

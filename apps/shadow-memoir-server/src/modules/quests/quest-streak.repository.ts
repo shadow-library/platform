@@ -19,11 +19,6 @@ import { type DatabaseTransaction, schema, syncStamped } from '@server/database'
  * Declaring the constants
  */
 
-/**
- * `quest_streaks` carries no `pending_shield_grant` column — only the Returner ritual (T-19/T-20) ever
- * produces a held-pending grant, so a T-18 read always resolves it to zero; a column (or side table) is
- * needed once that lands.
- */
 @Injectable()
 export class QuestStreakRepository extends OwnerScopedRepository {
   async readForUpdate(tx: DatabaseTransaction, questId: bigint): Promise<StreakState> {
@@ -39,8 +34,17 @@ export class QuestStreakRepository extends OwnerScopedRepository {
       longestDays: row.bestRunDays,
       shields: row.shieldsAvailable,
       completionsTowardShield: row.completionsTowardShield,
-      pendingShieldGrant: 0,
+      pendingShieldGrant: row.pendingShieldGrant,
     };
+  }
+
+  /** Unifies the command path's streak break with rollover's miss path (T-19's gap): both must record the same audit row when a shield bridges. */
+  async insertShieldConsumption(tx: DatabaseTransaction, questId: bigint, date: string): Promise<void> {
+    const accountId = this.requireAccountId();
+    await tx
+      .insert(schema.shieldConsumptions)
+      .values({ accountId, questId, date })
+      .onConflictDoNothing({ target: [schema.shieldConsumptions.accountId, schema.shieldConsumptions.questId, schema.shieldConsumptions.date] });
   }
 
   /**
@@ -61,6 +65,7 @@ export class QuestStreakRepository extends OwnerScopedRepository {
         bestRunDays: state.longestDays,
         shieldsAvailable: state.shields,
         completionsTowardShield: state.completionsTowardShield,
+        pendingShieldGrant: state.pendingShieldGrant,
         runStartDate: state.currentDays > 0 ? date : null,
         lastCountedDate: date,
       })
@@ -71,6 +76,7 @@ export class QuestStreakRepository extends OwnerScopedRepository {
           bestRunDays: state.longestDays,
           shieldsAvailable: state.shields,
           completionsTowardShield: state.completionsTowardShield,
+          pendingShieldGrant: state.pendingShieldGrant,
           ...(runStartDate === undefined ? {} : { runStartDate }),
           lastCountedDate: date,
         }),
