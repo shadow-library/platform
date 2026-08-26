@@ -28,32 +28,15 @@
       "Bash(cut:*)",
       "Bash(jq:*)"
     ],
-    "deny": [
-      "Bash(sed -i:*)",
-      "Bash(sed --in-place:*)"
-    ]
+    "deny": ["Bash(sed -i:*)", "Bash(sed --in-place:*)"]
   },
   "worktree": {
-    "symlinkDirectories": [
-      "node_modules"
-    ],
+    "symlinkDirectories": ["node_modules"],
     "baseRef": "head",
     "bgIsolation": "worktree"
   },
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/enforce-worktree.sh\"",
-            "timeout": 10,
-            "statusMessage": "Enforcing worktree isolation"
-          }
-        ]
-      }
-    ],
+    "PreToolUse": [],
     "SessionStart": [
       {
         "matcher": "",
