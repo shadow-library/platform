@@ -2817,6 +2817,8 @@ export interface components {
       index: number;
       status: string;
       error?: string;
+      /** @description Why an op nobody rejected was declined anyway — an action that may not run from an auto-mode turn. */
+      note?: string;
       result?: {
         [key: string]: unknown;
       };
@@ -3266,7 +3268,8 @@ export interface components {
     FieldProvenanceResponse: {
       /** @enum {string} */
       source: 'author' | 'studio' | 'crossed';
-      turnOrdinal: number;
+      /** @description The chat ordinal that settled the field; null when no conversational turn did. */
+      turnOrdinal: null | number;
     };
     SeedConstraintResponse: {
       key: string;
@@ -3725,7 +3728,8 @@ export interface components {
        * @enum {string}
        */
       source?: 'author' | 'studio' | 'crossed';
-      turnOrdinal?: number;
+      /** @description The chat ordinal that settled the field; null when no conversational turn did. */
+      turnOrdinal?: null | number;
     };
     CreateProjectBody: {
       name: string;

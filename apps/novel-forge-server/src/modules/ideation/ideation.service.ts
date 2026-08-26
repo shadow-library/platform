@@ -20,7 +20,7 @@ import { type ChangeOp } from '../refinement/change-set';
 import { ChatCompactionService } from '../refinement/chat-compaction.service';
 import { ChatService, SCOPE_CHAT_ROLE } from '../refinement/chat.service';
 import { type ScopedTurnResult } from '../refinement/chat-turn.registry';
-import { ProposalApplyService } from '../refinement/proposal-apply.service';
+import { declinedOpNote, ProposalApplyService } from '../refinement/proposal-apply.service';
 import { ProposalService } from '../refinement/proposal.service';
 import { ProjectService } from '../project/project/project.service';
 import { matchPlaybooks } from './constraint-playbooks';
@@ -284,7 +284,7 @@ export class IdeationService {
     const session = sessionId ? await this.db.query.chatSessions.findFirst({ where: eq(schema.chatSessions.id, sessionId) }) : undefined;
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
-    const { runId, readiness } = await this.runStress({ seed, session: session ?? null, project, transcript: null });
+    const { runId, readiness } = await this.runStress({ seed, session: session ?? null, project, transcript: null, round: null });
     return { seed: this.present(await this.loadSeed(projectId), sessionId), runId, readiness };
   }
 
@@ -388,9 +388,8 @@ export class IdeationService {
 
   private async stressTurn(ctx: StudioTurnContext, round: RouterResult, content: string): Promise<ScopedTurnResult> {
     const { session, seed } = ctx;
-    const { runId, userMessage, assistantMessage } = await this.runStress({ seed, session, project: ctx.project, transcript: { content } });
+    const { runId, userMessage, assistantMessage } = await this.runStress({ seed, session, project: ctx.project, transcript: { content }, round });
     if (!userMessage || !assistantMessage) throw AppErrorCode.CHT_001.create();
-    await this.recordAsked(seed.id, round);
 
     return { userMessage, assistantMessage, proposal: null, runId, seed: await this.presentFresh(seed.projectId, session.id) };
   }
@@ -410,6 +409,8 @@ export class IdeationService {
      * seed, not something the author said, and every press would otherwise add two chat messages.
      */
     transcript: { content: string } | null;
+    /** The round whose offer the turn must record; null for the on-demand endpoint, which offers nothing. */
+    round: RouterResult | null;
   }): Promise<{ runId: string; readiness: Ideation.ReadinessEntry[]; userMessage?: Refinement.ChatMessage; assistantMessage?: Refinement.ChatMessage }> {
     const { seed, session, transcript } = input;
     const projectId = seed.projectId;
@@ -432,11 +433,13 @@ export class IdeationService {
 
       const readiness = output.readiness as unknown as Ideation.ReadinessEntry[];
 
-      // A verdict on the sheet the author has no message about, or a message reporting a verdict that
-      // was never stored, are both worse than no pass at all — so the two writes land together.
+      // A verdict on the sheet the author has no message about, a message reporting a verdict that was
+      // never stored, or an offer the router forgets and re-asks, are all worse than no pass at all — so
+      // the writes land together.
       const assistantMessage = await this.db.transaction(async tx => {
         await this.lockSeed(tx, seed.id);
         await tx.update(schema.storySeeds).set({ readiness, updatedAt: new Date() }).where(eq(schema.storySeeds.id, seed.id));
+        if (input.round) await this.recordAsked(seed.id, input.round, tx);
         if (!chat) return undefined;
         return this.persistAssistantMessage(tx, chat.session, (userMessage?.ordinal ?? 0) + 1, coachingOf(STRESS_QUESTION_ID), { kind: 'readiness', readiness }, runId, null);
       });
@@ -580,7 +583,11 @@ export class IdeationService {
   private async autoApply(projectId: bigint, proposal: Refinement.Proposal): Promise<Pick<ScopedTurnResult, 'proposal' | 'applied' | 'applyNote'>> {
     try {
       const applied = await this.proposalApplyService.apply(projectId, proposal.id, { autoApplied: true });
-      return { proposal: applied.proposal, applied: { applied: applied.applied, staleMarked: applied.staleMarked, opResults: applied.opResults } };
+      return {
+        proposal: applied.proposal,
+        applied: { applied: applied.applied, staleMarked: applied.staleMarked, opResults: applied.opResults },
+        applyNote: declinedOpNote(applied.opResults),
+      };
     } catch (err) {
       const fresh = await this.proposalService.get(projectId, proposal.id);
       const note = AppError.is(err) || err instanceof Error ? err.message : String(err);

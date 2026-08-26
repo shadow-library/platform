@@ -3,6 +3,7 @@ import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:tes
 import { eq } from 'drizzle-orm';
 import { ContextService } from '@shadow-library/fastify';
 
+import { FactService } from '@modules/bible/fact/fact.service';
 import { GenerationService } from '@modules/generation/generation.service';
 import { ProjectService } from '@modules/project/project/project.service';
 import { PublishingService } from '@modules/publishing/publishing.service';
@@ -107,6 +108,28 @@ describe.if(pgAvailable)('seed-status guards', () => {
 
     it('should let an active project past the guard and fail on its own preconditions', async () => {
       expect(await rejectionCode(testEnv.getService(PublishingService).publishChapter(activeId, 1, {}))).toBe('PUB_001');
+    });
+  });
+
+  describe('FactService', () => {
+    it('should reject writing a canon fact onto a seed project', async () => {
+      expect(await rejectionCode(testEnv.getService(FactService).upsert(seedId, 'promise:no-harem', { text: 'one romance at a time' }))).toBe('IDE_004');
+    });
+
+    it('should reject deleting, revealing, and retracting on a seed project', async () => {
+      const facts = testEnv.getService(FactService);
+
+      expect(await rejectionCode(facts.delete(seedId, 'promise:no-harem'))).toBe('IDE_004');
+      expect(await rejectionCode(facts.reveal(seedId, 'promise:no-harem', { entityKey: 'mara', chapter: 1 }))).toBe('IDE_004');
+      expect(await rejectionCode(facts.retract(seedId, 'promise:no-harem', 'mara'))).toBe('IDE_004');
+    });
+
+    it('should let an active project past the guard and fail on its own preconditions', async () => {
+      expect(await rejectionCode(testEnv.getService(FactService).delete(activeId, 'promise:no-harem'))).toBe('FCT_001');
+    });
+
+    it('should report a missing project rather than a seed', async () => {
+      expect(await rejectionCode(testEnv.getService(FactService).upsert(999_999n, 'promise:no-harem', { text: 'one romance' }))).toBe('PRJ_001');
     });
   });
 

@@ -195,6 +195,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly FCT_001 = AppErrorCode.notFound('FCT_001', 'Canon fact not found');
   static readonly FCT_002 = AppErrorCode.badRequest('FCT_002', 'Unknown entity key referenced by the knowledge operation');
   static readonly FCT_003 = AppErrorCode.badRequest('FCT_003', 'Canon fact has ledgered reveals — retract them before removing the fact');
+  static readonly FCT_004 = AppErrorCode.conflict('FCT_004', 'A canon fact with this key already exists in the project');
 
   /*!
    * Plan Import Errors

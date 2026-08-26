@@ -516,8 +516,12 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
     setInput('');
     turn.mutate(content, {
       onSuccess: result => {
-        if (result.applied) toast.success('Changes applied — revert anytime from History');
-        else if (result.applyNote) toast.danger(result.applyNote);
+        if (result.applied) {
+          toast.success('Changes applied — revert anytime from History');
+          // An applied turn still carries a note when the engine declined an op on its own — an action
+          // that may never run from an auto-mode turn.
+          if (result.applyNote) toast.warning(result.applyNote);
+        } else if (result.applyNote) toast.danger(result.applyNote);
         else if (result.proposal) toast.success('Forge drafted changes — review them below the reply.');
       },
       onError: err => {

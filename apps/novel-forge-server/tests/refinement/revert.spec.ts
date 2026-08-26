@@ -272,16 +272,21 @@ describe.if(pgAvailable)('apply engine v2: cherry-pick, actions, revert, rollbac
     await proposals.discard(projectId, proposal.id);
   });
 
-  it('should never auto-apply finalize but allow it manually', async () => {
+  it('should decline finalize in an auto-mode turn and refuse a blanket manual apply', async () => {
     registry.register('action.finalize', async () => ({ summary: 'finalized' }));
-    const proposal = await createProposal([{ op: 'action.finalize', upTo: 1 }]);
+    const auto = await createProposal([{ op: 'action.finalize', upTo: 1 }]);
 
-    await expect(applier.apply(projectId, proposal.id, { autoApplied: true })).rejects.toThrow(/never auto-applied/);
-    const still = await db.query.refinementProposals.findFirst({ where: eq(schema.refinementProposals.id, proposal.id) });
+    const declined = await applier.apply(projectId, auto.id, { autoApplied: true });
+    expect(declined.opResults[0]?.status).toBe('declined');
+    expect(declined.opResults[0]?.note).toMatch(/never auto-applied/);
+
+    const manual = await createProposal([{ op: 'action.finalize', upTo: 1 }]);
+    await expect(applier.apply(projectId, manual.id)).rejects.toThrow(/never auto-applied/);
+    const still = await db.query.refinementProposals.findFirst({ where: eq(schema.refinementProposals.id, manual.id) });
     expect(still?.status).toBe('pending');
 
-    const manual = await applier.apply(projectId, proposal.id);
-    expect(manual.opResults[0]).toMatchObject({ status: 'applied', result: { summary: 'finalized' } });
+    const selected = await applier.apply(projectId, manual.id, { opIndexes: [0] });
+    expect(selected.opResults[0]).toMatchObject({ status: 'applied', result: { summary: 'finalized' } });
   });
 
   it('should roll back to a point, newest first, skipping action-only changes', async () => {

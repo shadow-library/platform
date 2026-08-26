@@ -4,6 +4,7 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
+import { assertActiveProject } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
@@ -49,8 +50,20 @@ export class FactService {
     return this.toFactWithKnowledge(fact as FactRowWithLedger);
   }
 
+  /**
+   * The knowledge ledger belongs to a project with a bible behind it (IDE_004). A seed has no entities
+   * to reveal facts to, and graduation writes the promise facts itself — a fact hand-written onto a seed
+   * beforehand collides with them and wedges the graduation transaction.
+   */
+  private async assertActive(projectId: bigint): Promise<void> {
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { status: true } });
+    if (!project) throw AppErrorCode.PRJ_001.create();
+    assertActiveProject(project);
+  }
+
   /** Hand-authoring upsert: creates the fact or edits it in place, merging omitted optional fields. */
   async upsert(projectId: bigint, factKey: string, body: UpsertFactBody): Promise<FactWithKnowledge> {
+    await this.assertActive(projectId);
     const existing = await this.db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)) });
     const merged = {
       text: body.text,
@@ -77,6 +90,7 @@ export class FactService {
   }
 
   async delete(projectId: bigint, factKey: string): Promise<void> {
+    await this.assertActive(projectId);
     const deleted = await this.db
       .delete(schema.canonFacts)
       .where(and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)))
@@ -89,6 +103,7 @@ export class FactService {
    * duplicating — the manual endpoint doubles as the correction path for skipped brief reveals.
    */
   async reveal(projectId: bigint, factKey: string, body: RevealFactBody): Promise<FactWithKnowledge> {
+    await this.assertActive(projectId);
     const [fact, entity] = await Promise.all([
       this.db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)) }),
       this.db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, body.entityKey)) }),
@@ -109,6 +124,7 @@ export class FactService {
   }
 
   async retract(projectId: bigint, factKey: string, entityKey: string): Promise<FactWithKnowledge> {
+    await this.assertActive(projectId);
     const [fact, entity] = await Promise.all([
       this.db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)) }),
       this.db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)) }),

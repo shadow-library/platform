@@ -1,6 +1,8 @@
 import { SQL } from 'bun';
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
+import { type AppError } from '@shadow-library/common';
+import { DatabaseService } from '@shadow-library/modules';
 
 import { IdeationService } from '@modules/ideation';
 import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
@@ -339,6 +341,24 @@ describe.if(pgAvailable)('Ideation API', () => {
       expect(blank.json().code).toBe('IDE_002');
     });
 
+    it('should answer a colliding promise fact with a conflict and leave the project a seed', async () => {
+      const projectId = await seedReadyToGraduate();
+      // Written straight to the table: the fact endpoints refuse a seed project, so only a fact that
+      // predates the seed status — or one the studio's own grammar wrote — can collide here.
+      await db.insert(schema.canonFacts).values({ projectId, factKey: 'promise:no-harem', text: 'squatting on the key' });
+
+      const collided = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/seed/graduate`).body({ title: 'The Wreck Singer' });
+      expect(collided.statusCode).toBe(409);
+      expect(collided.json().code).toBe('FCT_004');
+      expect((await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }))?.status).toBe('seed');
+      expect(await db.query.storySeeds.findFirst({ where: eq(schema.storySeeds.projectId, projectId) })).toBeDefined();
+
+      await db.delete(schema.canonFacts).where(eq(schema.canonFacts.projectId, projectId));
+      const retried = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/seed/graduate`).body({ title: 'The Wreck Singer' });
+      expect(retried.statusCode).toBe(200);
+      expect(retried.json().factKeys).toEqual(['promise:no-harem']);
+    });
+
     it('should have its action executor wired into the live registry', () => {
       expect(testEnv.getService(ActionExecutorRegistry).has('action.graduate_seed')).toBe(true);
     });
@@ -350,6 +370,23 @@ describe.if(pgAvailable)('Ideation API', () => {
       const response = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${theirs?.id}/seed/graduate`).body({ title: 'Mine now' });
       expect(response.statusCode).toBe(404);
       expect(response.json().code).toBe('PRJ_001');
+    });
+  });
+
+  describe('chat message ordinals', () => {
+    it('should surface a lost ordinal race as CHT_006 rather than an internal error', async () => {
+      const created = (await createSeed('a salvager')).json();
+      // The spark already holds ordinal 1 — this is exactly the row a second concurrent turn computes.
+      const collide = testEnv
+        .getService(DatabaseService)
+        .run(() => db.insert(schema.chatMessages).values({ sessionId: created.sessionId, projectId: BigInt(created.projectId), ordinal: 1, role: 'user', content: 'again' }));
+
+      const error = (await collide.then(
+        () => null,
+        (err: AppError) => err,
+      )) as AppError;
+      expect(error.code).toBe('CHT_006');
+      expect(error.status).toBe(409);
     });
   });
 

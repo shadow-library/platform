@@ -22,7 +22,7 @@ import { type ChatRefineOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
 import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
-import { type ApplyResult, ProposalApplyService } from './proposal-apply.service';
+import { type ApplyResult, declinedOpNote, ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
 
 export interface CreateSessionInput {
@@ -322,7 +322,11 @@ export class ChatService {
   private async autoApply(projectId: bigint, proposal: Refinement.Proposal): Promise<Pick<ChatTurnResult, 'proposal' | 'applied' | 'applyNote'>> {
     try {
       const applied = await this.proposalApplyService.apply(projectId, proposal.id, { autoApplied: true });
-      return { proposal: applied.proposal, applied: { applied: applied.applied, staleMarked: applied.staleMarked, opResults: applied.opResults } };
+      return {
+        proposal: applied.proposal,
+        applied: { applied: applied.applied, staleMarked: applied.staleMarked, opResults: applied.opResults },
+        applyNote: declinedOpNote(applied.opResults),
+      };
     } catch (err) {
       const fresh = await this.proposalService.get(projectId, proposal.id);
       const note = AppError.is(err) || err instanceof Error ? err.message : String(err);

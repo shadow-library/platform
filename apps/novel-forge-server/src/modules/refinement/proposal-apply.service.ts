@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, gte, inArray, lte, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { AppError, Logger } from '@shadow-library/common';
+import { AppError, type ErrorCode, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
@@ -43,6 +43,8 @@ export interface OpResult {
   index: number;
   status: 'applied' | 'declined' | 'pending' | 'failed';
   error?: string;
+  /** Why an op the author did not reject was declined anyway — set when the engine declined it itself. */
+  note?: string;
   result?: Record<string, unknown>;
 }
 
@@ -95,6 +97,23 @@ const STALE_ARC_CHANGED = 'arc_changed';
 // Fields whose change invalidates the artifacts planned beneath the volume (§6.2 step 5).
 const VOLUME_STRUCTURAL_FIELDS = ['objective', 'conflict', 'payoff', 'targetChapterCount'] as const;
 
+/**
+ * The one-way doors: finalize locks prose and graduation deletes the sheet, so neither is covered by the
+ * revert guarantee. An auto-mode turn declines them and applies the rest of its change-set — throwing
+ * would discard a whole turn's work over the one op that may not run — and a blanket manual apply
+ * refuses, so the author must select the op's own index to walk through the door.
+ */
+const NEVER_AUTO_APPLIED: Partial<Record<ActionOp['op'], { code: ErrorCode; note: string }>> = {
+  'action.finalize': { code: AppErrorCode.RFN_009, note: 'Finalize is never auto-applied — it awaits a manual apply of this op.' },
+  'action.graduate_seed': { code: AppErrorCode.IDE_007, note: 'Graduation is never auto-applied — it awaits a manual apply of this op.' },
+};
+
+/** The engine's own decline reasons, as the one line an auto-applied turn reports back to the author. */
+export function declinedOpNote(opResults: OpResult[]): string | undefined {
+  const notes = [...new Set(opResults.flatMap(result => (result.note ? [result.note] : [])))];
+  return notes.length > 0 ? notes.join(' ') : undefined;
+}
+
 /** Per-key merge for the seed sheet's keyed jsonb columns, where a null value clears the key. */
 function mergeKeys<T extends object>(prior: T | null, patch: Record<string, unknown>): T {
   const merged = { ...(prior ?? ({} as T)) } as Record<string, unknown>;
@@ -111,7 +130,7 @@ function mergeKeys<T extends object>(prior: T | null, patch: Record<string, unkn
  * own suggestion, and the honesty check at graduation must be able to say so. Stamped onto the op before
  * the inverse is captured, so a revert still restores exactly the provenance the sheet had.
  */
-function withStudioProvenance(op: SeedUpdateOp, turnOrdinal: number): SeedUpdateOp {
+function withStudioProvenance(op: SeedUpdateOp, turnOrdinal: number | null): SeedUpdateOp {
   const written = Object.entries(op.fields ?? {}).filter(([, value]) => value !== null);
   if (written.length === 0 && op.provenance === undefined) return op;
 
@@ -145,7 +164,8 @@ export class ProposalApplyService {
    * Applies a pending proposal (§6.2, chat-hub design §5): lock, per-op selection (cherry-pick),
    * baseline conflict check over the selected refs, guarded op dispatch with inverse capture,
    * staleness propagation, audit. Content ops are transactional; selected actions execute after
-   * commit, sequentially, with their outcomes folded into opResults. A baseline mismatch commits
+   * commit, sequentially, with their outcomes folded into opResults — except the one-way doors, which
+   * an auto-mode turn declines with a note rather than failing over. A baseline mismatch commits
    * only the `conflicted` status flip and surfaces as HTTP 409; any other failure rolls the whole
    * transaction back and leaves the proposal pending.
    */
@@ -164,14 +184,17 @@ export class ProposalApplyService {
       const selected = this.resolveSelection(ops, options?.opIndexes);
       const selectedOps = selected.map(index => ({ index, op: ops[index] as ChangeOp }));
       const contentOps = selectedOps.filter((s): s is { index: number; op: ContentOp } => !isActionOp(s.op));
-      const actionOps = selectedOps.filter((s): s is { index: number; op: ActionOp } => isActionOp(s.op));
+      const selectedActions = selectedOps.filter((s): s is { index: number; op: ActionOp } => isActionOp(s.op));
 
-      // Finalize crosses the immutability line — once prose locks, the revert guarantee is gone, so an
-      // auto-mode turn may never trigger it; the proposal stays pending for a deliberate manual apply.
-      if (options?.autoApplied && actionOps.some(a => a.op.op === 'action.finalize')) throw AppErrorCode.RFN_009.create();
-      // Graduation is the same shape of one-way door: it deletes the sheet and ends the studio, so a
-      // tap in an auto-mode studio turn may never trigger it either (ideation-studio design §5).
-      if (options?.autoApplied && actionOps.some(a => a.op.op === 'action.graduate_seed')) throw AppErrorCode.IDE_007.create();
+      const guarded = selectedActions.flatMap(action => {
+        const door = NEVER_AUTO_APPLIED[action.op.op];
+        return door ? [{ ...action, door }] : [];
+      });
+      const blanketManualApply = !options?.autoApplied && !options?.opIndexes;
+      if (blanketManualApply && guarded[0]) throw guarded[0].door.code.create();
+      const declinedNotes = new Map(options?.autoApplied ? guarded.map(action => [action.index, action.door.note]) : []);
+      const actionOps = selectedActions.filter(action => !declinedNotes.has(action.index));
+
       for (const action of actionOps) {
         if (!this.actionRegistry.has(action.op.op)) throw AppErrorCode.RFN_008.create();
       }
@@ -198,7 +221,7 @@ export class ProposalApplyService {
       }
 
       const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
-      const turnOrdinal = contentOps.some(c => c.op.op === 'seed.update') ? await this.turnOrdinal(ctx.tx, proposal.messageId) : 0;
+      const turnOrdinal = contentOps.some(c => c.op.op === 'seed.update') ? await this.turnOrdinal(ctx.tx, proposal.messageId) : null;
       const inverseOps: ContentOp[] = [];
       for (const { op } of contentOps) {
         const effective = op.op === 'seed.update' ? withStudioProvenance(op, turnOrdinal) : op;
@@ -209,6 +232,8 @@ export class ProposalApplyService {
       const postState = await loadArtifactStates(ctx.tx, projectId, changeSetRefs(contentOps.map(c => c.op)));
 
       const opResults: OpResult[] = ops.map((op, index) => {
+        const note = declinedNotes.get(index);
+        if (note) return { index, status: 'declined', note };
         if (!selected.includes(index)) return { index, status: 'declined' };
         return { index, status: isActionOp(op) ? 'pending' : 'applied' };
       });
@@ -255,11 +280,11 @@ export class ProposalApplyService {
     return { proposal, applied: result.applied, staleMarked: result.staleMarked, opResults };
   }
 
-  /** The chat ordinal a sheet edit was settled on; 0 when the edit did not come from a conversational turn. */
-  private async turnOrdinal(tx: PrimaryDatabase, messageId: bigint | null): Promise<number> {
-    if (messageId === null) return 0;
+  /** The chat ordinal a sheet edit was settled on; null when the edit came from no conversational turn — an ordinal 0 would read as a real, impossibly early turn. */
+  private async turnOrdinal(tx: PrimaryDatabase, messageId: bigint | null): Promise<number | null> {
+    if (messageId === null) return null;
     const message = await tx.query.chatMessages.findFirst({ where: eq(schema.chatMessages.id, messageId), columns: { ordinal: true } });
-    return message?.ordinal ?? 0;
+    return message?.ordinal ?? null;
   }
 
   /** Validates a cherry-pick selection (RFN_011) and resolves the effective op indexes, in op order. */

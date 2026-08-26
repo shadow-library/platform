@@ -7,9 +7,9 @@ import { ActionExecutorRegistry } from '../refinement/action-registry';
 import { GraduationService } from './graduation.service';
 
 /**
- * The studio's half of the action registry (chat-hub design §5.3). `action.graduate_seed` never runs
- * from an auto-mode turn — the apply engine refuses it with IDE_007 — so reaching this executor always
- * means the author applied the proposal themselves.
+ * The studio's half of the action registry (chat-hub design §5.3). `action.graduate_seed` never runs from
+ * an auto-mode turn — the apply engine declines it there, and refuses a blanket manual apply with IDE_007
+ * — so reaching this executor always means the author selected this op themselves.
  */
 @Injectable()
 export class IdeationActionRegistrar {

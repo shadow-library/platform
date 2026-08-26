@@ -59,8 +59,8 @@ export class FieldProvenanceResponse {
   @Field(() => String, { enum: ['author', 'studio', 'crossed'] })
   source: Ideation.FieldSource;
 
-  @Field(() => Integer)
-  turnOrdinal: number;
+  @Field(() => Integer, { nullable: true, description: 'The chat ordinal that settled the field; null when no conversational turn did.' })
+  turnOrdinal: number | null;
 }
 
 // Enumerated per field rather than a keyed map: an unnormalised additionalProperties ref breaks client
@@ -262,8 +262,8 @@ export class ProvenanceFieldResponse {
   @Field(() => String, { optional: true, enum: ['author', 'studio', 'crossed'], description: 'Absent when the sheet carries a value the studio never recorded a source for.' })
   source?: Ideation.FieldSource;
 
-  @Field(() => Integer, { optional: true })
-  turnOrdinal?: number;
+  @Field(() => Integer, { optional: true, nullable: true, description: 'The chat ordinal that settled the field; null when no conversational turn did.' })
+  turnOrdinal?: number | null;
 }
 
 @Schema({

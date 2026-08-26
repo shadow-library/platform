@@ -37,8 +37,8 @@ export namespace Ideation {
   export interface FieldProvenance {
     /** Who decided the field: the author, the studio's own suggestion, or a crossed concept card. */
     source: FieldSource;
-    /** The chat ordinal that settled it, so the graduation screen can report how recent the decision is. */
-    turnOrdinal: number;
+    /** The chat ordinal that settled it, so the graduation screen can report how recent the decision is; null when no conversational turn settled it. */
+    turnOrdinal: number | null;
   }
 
   export type SeedProvenance = Partial<Record<FieldKey, FieldProvenance>>;

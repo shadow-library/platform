@@ -67,6 +67,9 @@ export class OpResultItem {
   @Field({ optional: true })
   error?: string;
 
+  @Field({ optional: true, description: 'Why an op nobody rejected was declined anyway — an action that may not run from an auto-mode turn.' })
+  note?: string;
+
   @Field(() => Object, { optional: true, additionalProperties: true })
   result?: Record<string, unknown>;
 }

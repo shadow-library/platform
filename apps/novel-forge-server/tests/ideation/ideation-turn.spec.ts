@@ -246,18 +246,25 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       expect((await sheet(projectId))?.concepts?.map(card => card.fate)).toEqual(['kept', 'offered', 'offered', 'offered']);
     });
 
-    it('stages a graduation the author asked for but never runs it inside the auto-mode turn', async () => {
+    it('declines a graduation the author asked for without losing the rest of the turn', async () => {
       const { projectId, sessionId } = await makeSeed({ fields: FULL_SHEET });
       structuredMock.mockImplementationOnce(
-        await answersRound(projectId, { reply: 'Ready when you are.', changeSet: [{ op: 'action.graduate_seed', title: 'The Wreck Singer' }] }),
+        await answersRound(projectId, {
+          reply: 'Ready when you are.',
+          changeSet: [
+            { op: 'seed.update', fields: { workingTitle: 'The Wreck Singer' } },
+            { op: 'action.graduate_seed', title: 'The Wreck Singer' },
+          ],
+        }),
       );
 
       const result = await ideation.turn(projectId, sessionId, 'start the novel');
 
-      expect(result.proposal?.status).toBe('pending');
-      expect(result.applied).toBeUndefined();
-      expect(result.applyNote).toContain('never auto-applied');
-      expect(await sheet(projectId)).toBeDefined();
+      expect(result.applied?.opResults.map(op => op.status)).toEqual(['applied', 'declined']);
+      expect(result.applied?.opResults[1]?.note).toContain('never auto-applied');
+      expect(result.applyNote).toContain('Graduation is never auto-applied');
+      expect(result.applyNote).toContain('manual apply');
+      expect((await sheet(projectId))?.fields?.workingTitle).toBe('The Wreck Singer');
       expect((await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }))?.status).toBe('seed');
     });
 

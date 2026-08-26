@@ -14,6 +14,7 @@ import { ProposalApplyService } from '@modules/refinement/proposal-apply.service
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { scopeAllowedOps } from '@modules/ai/prompts';
 import { seedContentHash } from '@server/common';
+import { constraintErrorMap } from '@server/database/database.constants';
 import { type Ideation, type PrimaryDatabase, schema } from '@server/database';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
@@ -73,13 +74,19 @@ describe.if(pgAvailable)('GraduationService', () => {
   let graduation: GraduationService;
   let proposals: ProposalService;
   let applier: ProposalApplyService;
+  let turnInFlight = false;
 
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
-    const databaseService = { getPostgresClient: () => db, translateError: (err: unknown) => Promise.reject(err) } as never;
+    // The map the real DatabaseService consults, so a constraint violation surfaces as its mapped code.
+    const databaseService = {
+      getPostgresClient: () => db,
+      translateError: (err: { constraint?: string }) => Promise.reject(constraintErrorMap[err.constraint ?? ''] ?? err),
+    } as never;
+    const chatService = { hasPendingTurn: async () => turnInFlight } as never;
 
-    graduation = new GraduationService(databaseService, new BibleDocumentService(databaseService));
+    graduation = new GraduationService(databaseService, new BibleDocumentService(databaseService), chatService);
     proposals = new ProposalService(databaseService);
     const registry = new ActionExecutorRegistry();
     new IdeationActionRegistrar(registry, graduation).onModuleInit();
@@ -242,26 +249,92 @@ describe.if(pgAvailable)('GraduationService', () => {
         allowedOps: scopeAllowedOps('ideation'),
       });
 
-    it('should refuse to run from an auto-mode turn and stay pending', async () => {
+    it('should decline itself in an auto-mode turn, with the note, and leave the seed alone', async () => {
       const { projectId, sessionId, seedId } = await makeSeed();
       const proposal = await stage(projectId, sessionId, 'The Wreck Singer');
 
-      expect(await codeOf(applier.apply(projectId, proposal.id, { autoApplied: true }))).toBe('IDE_007');
+      const applied = await applier.apply(projectId, proposal.id, { autoApplied: true });
+
+      expect(applied.opResults[0]).toMatchObject({ index: 0, status: 'declined' });
+      expect(applied.opResults[0]?.note).toContain('never auto-applied');
+      expect(await db.query.storySeeds.findFirst({ where: eq(schema.storySeeds.id, seedId) })).toBeDefined();
+      expect((await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }))?.status).toBe('seed');
+    });
+
+    it('should refuse a blanket manual apply that never selected it', async () => {
+      const { projectId, sessionId, seedId } = await makeSeed();
+      const proposal = await stage(projectId, sessionId, 'The Wreck Singer');
+
+      expect(await codeOf(applier.apply(projectId, proposal.id))).toBe('IDE_007');
 
       expect((await proposals.get(projectId, proposal.id)).status).toBe('pending');
       expect(await db.query.storySeeds.findFirst({ where: eq(schema.storySeeds.id, seedId) })).toBeDefined();
     });
 
-    it('should graduate the seed when the author applies it themselves', async () => {
+    it('should graduate the seed when the author selects the op themselves', async () => {
       const { projectId, sessionId, seedId } = await makeSeed();
       const proposal = await stage(projectId, sessionId, 'The Wreck Singer');
 
-      const applied = await applier.apply(projectId, proposal.id);
+      const applied = await applier.apply(projectId, proposal.id, { opIndexes: [0] });
 
       expect(applied.opResults[0]?.status).toBe('applied');
       expect((applied.opResults[0]?.result as { summary: string }).summary).toContain('The Wreck Singer');
       expect(await db.query.storySeeds.findFirst({ where: eq(schema.storySeeds.id, seedId) })).toBeUndefined();
       expect((await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }))?.status).toBe('active');
+    });
+
+    it('should decline a cherry-pick that left it out, without an error', async () => {
+      const { projectId, sessionId, seedId } = await makeSeed();
+      const proposal = await proposals.create(projectId, {
+        sessionId,
+        scopeType: 'ideation',
+        scopeRef: null,
+        kind: 'ideation',
+        summary: 'a note and a graduation',
+        changeSet: [
+          { op: 'seed.update', fields: { hook: 'the wreck answers back' } },
+          { op: 'action.graduate_seed', title: 'The Wreck Singer' },
+        ],
+        allowedOps: scopeAllowedOps('ideation'),
+      });
+
+      const applied = await applier.apply(projectId, proposal.id, { opIndexes: [0] });
+
+      expect(applied.opResults.map(result => result.status)).toEqual(['applied', 'declined']);
+      expect(applied.opResults[1]?.note).toBeUndefined();
+      expect(await db.query.storySeeds.findFirst({ where: eq(schema.storySeeds.id, seedId) })).toBeDefined();
+    });
+  });
+
+  describe('a turn in flight', () => {
+    it('should refuse to graduate under a running studio turn', async () => {
+      const { projectId, seedId } = await makeSeed();
+      turnInFlight = true;
+
+      try {
+        expect(await codeOf(graduation.graduate(projectId, { title: 'The Wreck Singer' }))).toBe('IDE_006');
+      } finally {
+        turnInFlight = false;
+      }
+
+      expect(await db.query.storySeeds.findFirst({ where: eq(schema.storySeeds.id, seedId) })).toBeDefined();
+      expect((await graduation.graduate(projectId, { title: 'The Wreck Singer' })).project.status).toBe('active');
+    });
+  });
+
+  describe('promise fact keys', () => {
+    it('should never mint the degenerate `promise:` key for a constraint whose key slugs to nothing', async () => {
+      const { projectId } = await makeSeed({
+        constraints: [
+          { key: '—', kind: 'promise', text: 'a death on the page stays a death', lockedBy: 'author' },
+          { key: '  ', kind: 'promise', text: '###', lockedBy: 'author' },
+        ],
+      });
+
+      const { factKeys } = await graduation.graduate(projectId, { title: 'The Wreck Singer' });
+
+      expect(factKeys).toEqual(['promise:a-death-on-the-page-stays', 'promise:constraint-2']);
+      expect(await facts(projectId)).toHaveLength(2);
     });
   });
 

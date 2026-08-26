@@ -1042,10 +1042,26 @@ describe('ContextAssembler.forReforgeTransform', () => {
 
 describe('ContextAssembler.forChapter — knowledge sections', () => {
   const facts = [
-    { id: 1n, factKey: 'service_door', text: 'The killer used the service door.', constraintNote: null, terms: ['service door'] },
-    { id: 2n, factKey: 'ledger_forgery', text: 'The ledger is a forgery planted by Elias.', constraintNote: 'Elias steers conversation away from the study.', terms: ['forgery'] },
-    { id: 3n, factKey: 'motive_debt', text: 'Marlow owed Elias a ruinous gambling debt.', constraintNote: null, terms: ['gambling debt'] },
+    { id: 1n, factKey: 'service_door', text: 'The killer used the service door.', constraintNote: null, terms: ['service door'], source: 'manual' },
+    {
+      id: 2n,
+      factKey: 'ledger_forgery',
+      text: 'The ledger is a forgery planted by Elias.',
+      constraintNote: 'Elias steers conversation away from the study.',
+      terms: ['forgery'],
+      source: 'manual',
+    },
+    { id: 3n, factKey: 'motive_debt', text: 'Marlow owed Elias a ruinous gambling debt.', constraintNote: null, terms: ['gambling debt'], source: 'manual' },
   ];
+
+  const promiseFact = {
+    id: 4n,
+    factKey: 'promise:no-harem',
+    text: 'she never collects suitors',
+    constraintNote: 'Reader promise locked at ideation — plan and write nothing that breaks it: she never collects suitors',
+    terms: [] as string[],
+    source: 'seed',
+  };
 
   function knowledgeOverrides(brief: unknown) {
     return {
@@ -1099,6 +1115,19 @@ describe('ContextAssembler.forChapter — knowledge sections', () => {
     expect(constraints?.rendered).toContain('Elias steers conversation away from the study.');
     expect(constraints?.rendered).not.toContain('forgery');
     expect(pack.rendered).not.toContain('The killer used the service door.');
+  });
+
+  it('keeps a graduation promise fact in the behavioral constraints — the drafter must obey it, spoiler or not', async () => {
+    const brief = { chapter: 5, body: 'Boone canvasses the street.', contextRefs: [], knowledgeContract: { pov: ['boone'], learns: [] } };
+    const overrides = knowledgeOverrides(brief);
+    overrides.query.entities.findMany = mock(async () => []);
+    overrides.query.canonFacts.findMany = mock(async () => [...facts, promiseFact]);
+    const assembler = makeAssembler(overrides);
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true });
+
+    const constraints = pack.sections.find(s => s.key === 'hidden_constraints');
+    expect(constraints?.rendered).toContain('Reader promise locked at ideation');
+    expect(constraints?.sourceRefs).toContain('fact:promise:no-harem');
   });
 
   it('adds no knowledge sections when the brief has no contract', async () => {

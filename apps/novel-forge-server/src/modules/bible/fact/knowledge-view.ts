@@ -2,7 +2,7 @@ import { and, eq, inArray, lt } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, schema } from '@server/database';
+import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
 /** A brief's epistemic contract (character-knowledge design §3): who bounds the chapter, who learns what. */
 export interface KnowledgeReveal {
@@ -21,6 +21,7 @@ export interface FactLike {
   text: string;
   constraintNote?: string | null;
   terms?: string[] | null;
+  source?: Knowledge.FactSource;
 }
 
 /** Facts partitioned by what this chapter's POV cast may see (design §4). */

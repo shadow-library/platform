@@ -8,4 +8,7 @@ export const constraintErrorMap: Record<string, AppError> = {
   // Two turns racing on one conversation compute the same next ordinal and the loser hits this unique
   // index; it is a lost race, not a broken request.
   chat_messages_session_id_ordinal_unique: AppErrorCode.CHT_006.create(),
+  // Graduation mints one fact per named betrayal, and the fact endpoints let the author write any key
+  // they like — a collision is a conflict the caller can resolve, never a 500 that aborts graduation.
+  canon_facts_project_id_fact_key_unique: AppErrorCode.FCT_004.create(),
 };

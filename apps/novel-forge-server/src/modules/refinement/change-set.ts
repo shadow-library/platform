@@ -157,7 +157,7 @@ export interface FactRemoveOp {
 /** `turnOrdinal` is the apply engine's to fill in — the model names the source, the server knows the turn. */
 export interface SeedProvenanceInput {
   source: Ideation.FieldSource;
-  turnOrdinal?: number;
+  turnOrdinal?: number | null;
 }
 
 export interface SeedUpdateOp {

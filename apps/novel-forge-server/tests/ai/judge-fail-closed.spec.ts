@@ -110,6 +110,35 @@ describe.if(pgAvailable)('judge fail-closed behavior', () => {
     expect(draft?.judgeNote).toContain('judge output unparseable');
   });
 
+  it('forbids the hidden facts to the judge but never the graduation promises the book openly obeys', async () => {
+    const projectId = await seedProject();
+    await db.insert(schema.briefs).values({
+      projectId,
+      chapter: 1,
+      body: 'Boone canvasses the street.',
+      contentHash: 'knowledge-brief',
+      knowledgeContract: { pov: ['boone'], learns: [] },
+    });
+    await db.insert(schema.canonFacts).values([
+      { projectId, factKey: 'secret_heir', text: 'Boone is the missing heir.', source: 'manual' },
+      { projectId, factKey: 'promise:no-harem', text: 'she never collects suitors', constraintNote: 'Reader promise locked at ideation', source: 'seed' },
+    ]);
+
+    const seenMessages: BaseMessage[][] = [];
+    const services = buildServices(db, [JSON.stringify({ verdict: 'consistent', findings: [], knowledgeCompliance: { compliant: true, issues: [] } })], seenMessages);
+    const graph = createChapterGenerationGraph(services);
+
+    const runId = `judge-forbidden-${projectId}`;
+    const input = { projectId: String(projectId), chapter: 1, volumeKey: '', guidance: '', autoFix: false, maxFixes: 3, runId };
+    await graph.invoke(input, { configurable: { thread_id: runId } });
+
+    const judgePrompt = String((seenMessages[0] ?? []).filter(message => message._getType() === 'human').at(-1)?.content);
+    expect(judgePrompt).toContain('## FORBIDDEN KNOWLEDGE');
+    expect(judgePrompt).toContain('[secret_heir] Boone is the missing heir.');
+    expect(judgePrompt).not.toContain('promise:no-harem');
+    expect(judgePrompt).not.toContain('she never collects suitors');
+  });
+
   it('prepends the judge few-shots to the in-graph judge prompt, matching the standalone path', async () => {
     const projectId = await seedProject();
     const seenMessages: BaseMessage[][] = [];

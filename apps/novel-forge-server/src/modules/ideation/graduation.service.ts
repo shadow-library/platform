@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -8,6 +8,7 @@ import { APP_NAME } from '@server/constants';
 import { type Ideation, type PrimaryDatabase, type PrimaryTransaction, type Project, schema } from '@server/database';
 
 import { BibleDocumentService } from '../bible/document/bible-document.service';
+import { ChatService } from '../refinement/chat.service';
 import {
   promiseConstraintNote,
   promiseFactKey,
@@ -51,8 +52,25 @@ export class GraduationService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly bibleDocuments: BibleDocumentService,
+    private readonly chatService: ChatService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
+  }
+
+  /**
+   * A studio turn in flight is about to write a reply, a proposal, and a sheet edit against a sheet this
+   * transaction deletes (IDE_006). The gate and the graduation are not one act: a turn that clears
+   * `hasPendingTurn` a moment before the seed lock is taken still lands its user message on the
+   * conversation graduation archives. The seed lock keeps the sheet itself consistent — the orphan
+   * message is accepted residue, not a corruption.
+   */
+  private async assertNoTurnInFlight(projectId: bigint): Promise<void> {
+    const session = await this.db.query.chatSessions.findFirst({
+      where: and(eq(schema.chatSessions.projectId, projectId), eq(schema.chatSessions.scopeType, 'ideation'), eq(schema.chatSessions.status, 'active')),
+      columns: { id: true },
+      orderBy: [desc(schema.chatSessions.createdAt), desc(schema.chatSessions.id)],
+    });
+    if (session && (await this.chatService.hasPendingTurn(projectId, session.id))) throw AppErrorCode.IDE_006.create();
   }
 
   /**
@@ -64,6 +82,7 @@ export class GraduationService {
    */
   async graduate(projectId: bigint, input: GraduateInput): Promise<GraduationResult> {
     const title = input.title.trim();
+    await this.assertNoTurnInFlight(projectId);
 
     return this.db.transaction(async tx => {
       const project = await tx.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
@@ -93,8 +112,9 @@ export class GraduationService {
         .catch(err => this.databaseService.translateError(err));
       if (!graduated) throw AppErrorCode.PRJ_001.create();
 
-      await this.bibleDocuments.upsert(projectId, PREMISE_DOC.section, PREMISE_DOC.slug, { body: renderPremiseDoc(fields) }, tx);
-      await this.bibleDocuments.upsert(projectId, READER_PROMISE_DOC.section, READER_PROMISE_DOC.slug, { body: renderReaderPromiseDoc(seed) }, tx);
+      const premise = await this.bibleDocuments.upsert(projectId, PREMISE_DOC.section, PREMISE_DOC.slug, { body: renderPremiseDoc(fields) }, tx);
+      const readerPromise = await this.bibleDocuments.upsert(projectId, READER_PROMISE_DOC.section, READER_PROMISE_DOC.slug, { body: renderReaderPromiseDoc(seed) }, tx);
+      const documents = [premise, readerPromise].map(document => `${document.section}/${document.slug}`);
 
       const factKeys = await this.writePromiseFacts(tx, projectId, seed.constraints ?? []);
       const provenance = provenanceSummary(seed);
@@ -117,7 +137,7 @@ export class GraduationService {
           instructions: graduated.instructions,
         },
         provenance,
-        documents: [`${PREMISE_DOC.section}/${PREMISE_DOC.slug}`, `${READER_PROMISE_DOC.section}/${READER_PROMISE_DOC.slug}`],
+        documents,
         factKeys,
       };
     });
@@ -126,14 +146,16 @@ export class GraduationService {
   /**
    * The named betrayals, and nothing else. These few rules are part of the core idea and must never be
    * paraphrased away by the planner, so they ride `canon_facts` — with `source: 'seed'` and a null
-   * reveal, which keeps them clear of the character-knowledge reveal machinery. Every other studio
-   * decision travels as prose in the reader-promise document.
+   * reveal. No POV cast ever learns them, so a chapter's knowledge view files them as hidden: they reach
+   * the drafter as behavioral constraints, and `source: 'seed'` is what keeps them out of the judge's
+   * forbidden list, where a rule the book obeys would read as a spoiler the draft leaked. Every other
+   * studio decision travels as prose in the reader-promise document.
    */
   private async writePromiseFacts(tx: PrimaryTransaction, projectId: bigint, constraints: Ideation.SeedConstraint[]): Promise<string[]> {
     const promises = new Map<string, Ideation.SeedConstraint>();
-    for (const constraint of constraints) {
-      if (constraint.kind === 'promise') promises.set(promiseFactKey(constraint.key), constraint);
-    }
+    constraints.forEach((constraint, index) => {
+      if (constraint.kind === 'promise') promises.set(promiseFactKey(constraint, index), constraint);
+    });
     if (promises.size === 0) return [];
 
     const rows = [...promises].map(([factKey, constraint]) => ({

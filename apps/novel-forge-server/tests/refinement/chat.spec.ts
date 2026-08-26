@@ -251,17 +251,18 @@ describe.if(pgAvailable)('ChatService', () => {
     expect(project?.premise).toBe('auto-applied premise');
   });
 
-  it('auto turn with a finalize action downgrades to a pending proposal with a note', async () => {
+  it('auto turn declines a finalize action with a note instead of running it', async () => {
     const session = await chat.createSession(projectId, { scopeType: 'project', mode: 'auto' });
     structuredMock.mockImplementationOnce(async () => ({
       reply: 'Finalizing everything.',
-      changeSet: [{ op: 'action.finalize' }],
+      changeSet: [{ op: 'premise.update', premise: 'a premise the turn keeps' }, { op: 'action.finalize' }],
     }));
 
     const result = await chat.turn(projectId, session.id, 'finalize the drafted chapters');
-    expect(result.proposal?.status).toBe('pending');
-    expect(result.applied).toBeUndefined();
+    expect(result.applied?.opResults.map(op => op.status)).toEqual(['applied', 'declined']);
+    expect(result.applied?.opResults[1]?.note).toContain('never auto-applied');
     expect(result.applyNote).toContain('never auto-applied');
+    expect((await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }))?.premise).toBe('a premise the turn keeps');
   });
 
   it('executes declared lookups between rounds and audits them in tool_calls', async () => {

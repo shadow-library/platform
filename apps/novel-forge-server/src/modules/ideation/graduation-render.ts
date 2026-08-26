@@ -4,7 +4,7 @@ export interface ProvenanceFieldSummary {
   field: string;
   /** Absent when the sheet carries a value the studio never recorded a source for. */
   source?: Ideation.FieldSource;
-  turnOrdinal?: number;
+  turnOrdinal?: number | null;
 }
 
 export interface ProvenanceSummary {
@@ -16,6 +16,8 @@ export interface ProvenanceSummary {
   unattributed: number;
   fields: ProvenanceFieldSummary[];
 }
+
+const PROMISE_SLUG_WORDS = 6;
 
 const SHEET_ORDER: Ideation.FieldKey[] = [
   'workingTitle',
@@ -79,7 +81,7 @@ export function renderReaderPromiseDoc(seed: Pick<Ideation.StorySeed, 'fields' |
   const ofKind = (kind: Ideation.ConstraintKind): string[] => constraints.filter(constraint => constraint.kind === kind).map(constraint => constraint.text);
 
   const promises = ofKind('promise');
-  const taste = [anchors.comps.length > 0 ? `Comps: ${anchors.comps.join(', ')}` : null, ...anchors.preferences.map(preference => `- ${preference}`)].filter(Boolean).join('\n');
+  const taste = bulletList([...(anchors.comps.length > 0 ? [`Comps: ${anchors.comps.join(', ')}`] : []), ...anchors.preferences]);
   const blocks = [
     section('What every chapter owes the reader', fields.hook ? `${fields.hook}\n\nThe ladder the reader follows: ${fields.progressionSystem ?? 'still to be decided.'}` : null),
     section(
@@ -126,14 +128,22 @@ export function provenanceSummary(seed: Pick<Ideation.StorySeed, 'fields' | 'pro
   };
 }
 
-/** `promise:no-harem` from `no harem` — the fact key is the constraint's key, normalised. */
-export function promiseFactKey(constraintKey: string): string {
-  const slug = constraintKey
+/**
+ * `promise:no-harem` from `no harem` — the constraint's key, normalised. A key that carries no letters or
+ * digits at all (`"—"`, an emoji, whitespace) would otherwise slug to nothing and every such constraint
+ * would land on the same degenerate `promise:` key, so the text and finally the position stand in.
+ */
+export function promiseFactKey(constraint: Pick<Ideation.SeedConstraint, 'key' | 'text'>, index: number): string {
+  const fromText = slugify(constraint.text).split('-').slice(0, PROMISE_SLUG_WORDS).join('-');
+  return `promise:${slugify(constraint.key) || fromText || `constraint-${index + 1}`}`;
+}
+
+function slugify(value: string): string {
+  return value
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return `promise:${slug}`;
 }
 
 /** The planner-facing phrasing of a betrayal rule: what it forbids, stated as an instruction. */
