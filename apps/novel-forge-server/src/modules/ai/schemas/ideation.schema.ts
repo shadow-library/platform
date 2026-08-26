@@ -2,14 +2,18 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 import { type Ideation } from '@server/database';
 
-import { READINESS_DIMENSION_ORDER } from '../../ideation/question-router';
+import { READINESS_DIMENSION_ORDER, type ReadinessDimensionName } from '../../ideation/question-router';
 
 @Schema()
 export class IdeationQuestionOut {
   @Field({ minLength: 1, description: 'the question id exactly as the round handed it over — never invent an id, never merge two questions into one' })
   id: string;
 
-  @Field({ minLength: 1, description: "the question in the author's language, built from what this seed already says; one question, no preamble" })
+  @Field({
+    minLength: 1,
+    description:
+      "the complete question in the author's language, built from what this seed already says; one question, no preamble. This is the only place the question is asked — the reply never repeats it, and the options render as chips beside it",
+  })
   wording: string;
 
   @Field({ minLength: 1, description: 'the coaching line copied character for character from the round input — this text is reviewed prose, never rewritten or summarised' })
@@ -42,18 +46,28 @@ export class IdeationLockOut {
 
 @Schema()
 export class IdeationTurnPayload {
+  @Field(() => String, { enum: ['questions'], description: "always the literal 'questions' — the envelope tag that tells the studio which payload shape this is" })
+  kind: 'questions';
+
   @Field(() => [IdeationQuestionOut], {
     description: 'one entry per question the round handed over, in the order it handed them over; an empty list only when the round asked nothing',
   })
   questions: IdeationQuestionOut[];
 
-  @Field(() => [IdeationLockOut], { optional: true, description: 'decisions read out of what the author just said, for confirmation — omit when nothing new was decided' })
+  @Field(() => [IdeationLockOut], {
+    optional: true,
+    description:
+      'decisions INFERRED from material the author supplied — a spark, a pasted paragraph — offered back for confirmation. An answer the author gave outright is not a lock: it goes straight into the changeSet. Omit when nothing was inferred',
+  })
   locks?: IdeationLockOut[];
 }
 
 @Schema()
 export class IdeationTurnSchema {
-  @Field({ minLength: 1, description: 'what you say to the author this turn: what you heard, what it commits them to, and the questions in prose' })
+  @Field({
+    minLength: 1,
+    description: 'the lead-in only: what you heard and what it commits them to. The questions are NOT in here — each one is asked in full in its own payload.questions[].wording',
+  })
   reply: string;
 
   @Field(() => IdeationTurnPayload)
@@ -88,6 +102,9 @@ export class IdeationConceptCard {
 
 @Schema()
 export class IdeationConceptsSchema {
+  @Field(() => String, { enum: ['cards'], description: "always the literal 'cards' — the envelope tag that tells the studio which output shape this is" })
+  kind: 'cards';
+
   @Field(() => [IdeationConceptCard], { minItems: 4, maxItems: 4, description: 'exactly four concepts, each a different novel — not four dressings of one' })
   cards: IdeationConceptCard[];
 }
@@ -97,7 +114,7 @@ export type IdeationConceptsOutput = IdeationConceptsSchema;
 @Schema()
 export class IdeationReadinessEntry {
   @Field(() => String, { enum: [...READINESS_DIMENSION_ORDER], description: 'the readiness dimension being judged' })
-  dimension: string;
+  dimension: ReadinessDimensionName;
 
   @Field(() => String, {
     enum: ['strong', 'thin', 'empty'],
@@ -114,6 +131,9 @@ export class IdeationReadinessEntry {
 
 @Schema()
 export class IdeationStressSchema {
+  @Field(() => String, { enum: ['readiness'], description: "always the literal 'readiness' — the envelope tag that tells the studio which output shape this is" })
+  kind: 'readiness';
+
   @Field(() => [IdeationReadinessEntry], {
     minItems: READINESS_DIMENSION_ORDER.length,
     maxItems: READINESS_DIMENSION_ORDER.length,

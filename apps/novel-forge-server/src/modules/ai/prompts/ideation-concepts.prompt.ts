@@ -3,14 +3,14 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 import { type IdeationConceptCard, type IdeationConceptsOutput, IdeationConceptsSchema } from '../schemas/ideation.schema';
 import { AUTHORING_STYLE_PLANNING } from './authoring-preamble';
-import { SCOPE_PLAYBOOKS } from './scope-playbooks';
+import { IDEATION_EDITORIAL_CHARTER } from './scope-playbooks';
 import { type PromptModule } from './types';
 
 export const CONCEPT_CARD_COUNT = 4;
 
 const system = `${AUTHORING_STYLE_PLANNING}
 
-${SCOPE_PLAYBOOKS.ideation.guidance}
+${IDEATION_EDITORIAL_CHARTER}
 
 This turn is the divergence round. Generate exactly ${CONCEPT_CARD_COUNT} concepts, and understand what that number is for: four novels the same author could write from the same territory, offered so they can find out what they actually want by discovering what they refuse. Four dressings of one idea teaches them nothing, so the cards must differ where it costs something —
 
@@ -25,17 +25,18 @@ Every locked constraint binds every card, without exception and without arguing 
 Earlier rounds are on the table with their fates. A killed card's core mechanism is dead: never resurrect it under a new title, a renamed ladder, or a softened posture — the author already told you no, and hearing it again is the studio not listening. A kept or crossed card's material is theirs to keep; build the new round beside it, not on top of it.
 
 Respond with ONLY one valid JSON object — nothing outside the JSON, no markdown fences — of exactly this shape:
-{"cards": [{"title": "...", "logline": "...", "engine": "...", "ladder": "...", "posture": "...", "hookLine": "..."}]}`;
+{"kind": "cards", "cards": [{"title": "...", "logline": "...", "engine": "...", "ladder": "...", "posture": "...", "hookLine": "..."}]}`;
 
 const axisOf = (card: IdeationConceptCard): string[] => [card.engine, card.ladder, card.posture].map(value => value.trim().toLowerCase());
 
 // Playbook `conceptFilter`s are NOT applied here: rejecting a card means generating a replacement, and
 // that reject-and-retry loop (with its fallback for a filter that rejects everything) belongs to the
 // caller in IdeationService — a postValidate can only fail the whole call (ideation-studio design §4.2).
+//
+// The card count is a schema invariant (minItems/maxItems on `cards`), so postValidate is left with
+// pairwise distinctness alone — a floor, not a guarantee that four cards are four different novels.
 function validateCards(data: IdeationConceptsOutput): string[] {
   const cards = data.cards ?? [];
-  if (cards.length !== CONCEPT_CARD_COUNT) return [`return exactly ${CONCEPT_CARD_COUNT} concept cards, not ${cards.length}`];
-
   const errors: string[] = [];
   const axes = ['engine', 'ladder', 'posture'];
   for (let left = 0; left < cards.length; left++) {

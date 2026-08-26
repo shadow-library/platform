@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'bun:test';
 
-import { buildIdeationStressPrompt, CONCEPT_CARD_COUNT, PROMPT_REGISTRY, renderScopeInstructions, SCOPE_PLAYBOOKS } from '@modules/ai/prompts';
+import {
+  buildIdeationStressPrompt,
+  buildIdeationTurnPrompt,
+  CONCEPT_CARD_COUNT,
+  IDEATION_EDITORIAL_CHARTER,
+  PROMPT_REGISTRY,
+  renderReadinessPrecheck,
+  renderScopeInstructions,
+  SCOPE_PLAYBOOKS,
+} from '@modules/ai/prompts';
 import { IdeationConceptsSchema, IdeationStressSchema, IdeationTurnSchema } from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
+import { getQuestion } from '@modules/ideation/question-bank';
 import { READINESS_DIMENSION_ORDER, type ReadinessDimension } from '@modules/ideation/question-router';
 
 const question = {
@@ -12,6 +22,8 @@ const question = {
   options: ['Debt', 'A rival crew'],
   youDecide: 'Debt — it renews every arc.',
 };
+
+const roundOf = (...questions: { id: string; coaching: string }[]) => ({ questions: questions as never });
 
 const card = (index: number) => ({
   title: `Card ${index}`,
@@ -24,8 +36,12 @@ const card = (index: number) => ({
 
 const cards = (count = CONCEPT_CARD_COUNT) => Array.from({ length: count }, (_, index) => card(index + 1));
 
+const conceptsOut = (count = CONCEPT_CARD_COUNT) => ({ kind: 'cards', cards: cards(count) });
+
 const readiness = (overrides: Partial<Record<string, string>> = {}) =>
   READINESS_DIMENSION_ORDER.map(dimension => ({ dimension, verdict: overrides[dimension] ?? 'thin', note: 'the sheet says little here', fix: 'name the thing in one sentence' }));
+
+const stressOut = (overrides: Partial<Record<string, string>> = {}) => ({ kind: 'readiness', readiness: readiness(overrides) });
 
 const precheck = (verdicts: Partial<Record<string, ReadinessDimension['verdict']>>): ReadinessDimension[] =>
   READINESS_DIMENSION_ORDER.map(dimension => ({ dimension, fields: [], present: [], verdict: verdicts[dimension] ?? 'strong' }));
@@ -72,8 +88,51 @@ describe('ideation prompt modules', () => {
   it('should carry the emission contracts the router reads back', () => {
     const system = PROMPT_REGISTRY['ideation-turn'].system;
     expect(system).toContain('A question that lists NO fields never produces a field');
-    expect(system).toContain("the question's intent names the key and kind to use");
-    expect(system).toContain('"constraints" replaces the whole list');
+    expect(system).toContain("when the question's intent names a key and a kind, use exactly those");
+    expect(system).toContain('otherwise choose a short kebab-case key and the kind the intent implies');
+    expect(system).toContain('The spark question is the one exception');
+  });
+
+  it('should state the wholesale-replace rule once, in the rendered op vocabulary', () => {
+    const system = PROMPT_REGISTRY['ideation-turn'].system;
+    expect(system).toContain('"constraints", "concepts", and "tasteAnchors" replace their whole column');
+    expect(system).not.toContain('"constraints" replaces the whole list');
+  });
+
+  it("should name tasteAnchors as the taste question's destination, in the prompt and in the question itself", () => {
+    expect(PROMPT_REGISTRY['ideation-turn'].system).toContain('Its answer writes seed.update tasteAnchors');
+    expect(getQuestion('taste.comps')?.intent).toContain('emit it as seed.update tasteAnchors');
+  });
+
+  it('should keep the reply a lead-in and the questions in payload.questions[].wording', () => {
+    const system = PROMPT_REGISTRY['ideation-turn'].system;
+    expect(system).toContain('"reply" is the lead-in and nothing more');
+    expect(system).toContain('payload.questions[].wording');
+    expect(system).toContain('A question repeated in the reply is the author asked twice');
+  });
+
+  it('should split locks from the change set by where the decision came from', () => {
+    const system = PROMPT_REGISTRY['ideation-turn'].system;
+    expect(system).toContain('goes straight into the changeSet');
+    expect(system).toContain('payload.locks is for inferred material only');
+  });
+
+  it('should name a constraint key and kind on every playbook-gated question', () => {
+    const gated = ['deepen.secondLadder', 'deepen.foreknowledgeDecay', 'deepen.divergence', 'deepen.stayingCost'] as const;
+    const gatedKeys = { 'deepen.secondLadder': 'ladder', 'deepen.foreknowledgeDecay': 'knowledge', 'deepen.divergence': 'divergence', 'deepen.stayingCost': 'tension' };
+    const more = { 'deepen.systemRules': 'system', 'deepen.povBudget': 'pov', 'deepen.deferredTension': 'tension', 'deepen.ironyBudget': 'irony' };
+
+    for (const [id, key] of [...gated.map(id => [id, gatedKeys[id]] as const), ...Object.entries(more)]) {
+      expect(getQuestion(id)?.intent).toContain(`key '${key}' and kind 'shape'`);
+    }
+  });
+
+  it('should exempt the spark question from a fixed emission key', () => {
+    const intent = getQuestion('spark.idea')?.intent ?? '';
+    expect(intent).toContain('no fixed emission key');
+    expect(intent).toContain('sheet-shaped material lands as fields in seed.update');
+    expect(intent).toContain('story-rule material as constraints');
+    expect(intent).toContain('offered as locks for confirmation first');
   });
 
   it('should render ideation-concepts with the stable sheet first and the round material last', async () => {
@@ -124,10 +183,19 @@ describe('the ideation scope playbook', () => {
     expect(PROMPT_REGISTRY['ideation-turn'].system).toContain(SCOPE_PLAYBOOKS.ideation.guidance);
     expect(PROMPT_REGISTRY['ideation-turn'].system).toContain('"op": "seed.update"');
   });
+
+  it('should give the concept round the charter without the interview mechanics', () => {
+    const system = PROMPT_REGISTRY['ideation-concepts'].system;
+    expect(system).toContain(IDEATION_EDITORIAL_CHARTER);
+    expect(system).toContain('A locked constraint is a promise, not a preference');
+    expect(system).not.toContain('a question router picks what gets asked');
+    expect(system).not.toContain('you never rewrite a coaching line');
+    expect(system).not.toContain('Never an empty box');
+  });
 });
 
 describe('IdeationTurnSchema', () => {
-  const valid = { reply: 'Heard you.', payload: { questions: [question] } };
+  const valid = { reply: 'Heard you.', payload: { kind: 'questions', questions: [question] } };
 
   it('should accept a turn that asks questions and settles nothing', () => {
     expect(parseSchema(IdeationTurnSchema, valid).success).toBe(true);
@@ -136,30 +204,35 @@ describe('IdeationTurnSchema', () => {
   it('should accept locks and a seed.update change set', () => {
     const withOps = {
       ...valid,
-      payload: { questions: [question], locks: [{ key: 'promise', kind: 'promise', text: 'no harem' }] },
+      payload: { kind: 'questions', questions: [question], locks: [{ key: 'promise', kind: 'promise', text: 'no harem' }] },
       changeSet: [{ op: 'seed.update', fields: { genre: 'progression fantasy' } }],
     };
     expect(parseSchema(IdeationTurnSchema, withOps).success).toBe(true);
   });
 
   it('should accept an empty question list, which is how a finished sheet reports itself', () => {
-    expect(parseSchema(IdeationTurnSchema, { reply: 'You are ready.', payload: { questions: [] } }).success).toBe(true);
+    expect(parseSchema(IdeationTurnSchema, { reply: 'You are ready.', payload: { kind: 'questions', questions: [] } }).success).toBe(true);
+  });
+
+  it('should reject a payload without its envelope tag', () => {
+    expect(parseSchema(IdeationTurnSchema, { reply: 'Heard you.', payload: { questions: [question] } }).success).toBe(false);
+    expect(parseSchema(IdeationTurnSchema, { reply: 'Heard you.', payload: { kind: 'cards', questions: [question] } }).success).toBe(false);
   });
 
   it('should reject a question offering fewer than two options — a turn never ends in an empty box', () => {
-    const oneOption = { ...valid, payload: { questions: [{ ...question, options: ['Debt'] }] } };
+    const oneOption = { ...valid, payload: { kind: 'questions', questions: [{ ...question, options: ['Debt'] }] } };
     expect(parseSchema(IdeationTurnSchema, oneOption).success).toBe(false);
   });
 
   it('should reject a question missing its coaching line or its escape hatch', () => {
     for (const field of ['id', 'wording', 'coaching', 'options', 'youDecide'] as const) {
       const { [field]: _dropped, ...rest } = question;
-      expect(parseSchema(IdeationTurnSchema, { ...valid, payload: { questions: [rest] } }).success).toBe(false);
+      expect(parseSchema(IdeationTurnSchema, { ...valid, payload: { kind: 'questions', questions: [rest] } }).success).toBe(false);
     }
   });
 
   it('should reject a lock filed under an unknown kind', () => {
-    const badKind = { ...valid, payload: { questions: [question], locks: [{ key: 'promise', kind: 'vibe', text: 'no harem' }] } };
+    const badKind = { ...valid, payload: { kind: 'questions', questions: [question], locks: [{ key: 'promise', kind: 'vibe', text: 'no harem' }] } };
     expect(parseSchema(IdeationTurnSchema, badKind).success).toBe(false);
   });
 
@@ -176,81 +249,141 @@ describe('IdeationTurnSchema', () => {
   });
 });
 
-describe('IdeationConceptsSchema', () => {
-  it('should accept exactly four distinct cards', () => {
-    const parsed = parseSchema(IdeationConceptsSchema, { cards: cards() });
-    expect(parsed.success).toBe(true);
-    expect(PROMPT_REGISTRY['ideation-concepts'].postValidate?.({ cards: cards() } as never)).toEqual([]);
+describe('buildIdeationTurnPrompt', () => {
+  const second = { ...question, id: 'deepen.voice', coaching: 'Second coaching line, verbatim.' };
+  const round = roundOf(question, second);
+  const turn = (...questions: unknown[]) => ({ reply: 'Heard you.', payload: { kind: 'questions', questions } });
+
+  it('should pass a turn that echoes the round exactly', () => {
+    expect(buildIdeationTurnPrompt(round).postValidate?.(turn(question, second) as never)).toEqual([]);
   });
 
-  it('should reject any card count other than four', () => {
-    for (const count of [0, 3, 5]) expect(parseSchema(IdeationConceptsSchema, { cards: cards(count) }).success).toBe(false);
-    expect(PROMPT_REGISTRY['ideation-concepts'].postValidate?.({ cards: cards(3) } as never)[0]).toMatch(/exactly 4 concept cards/);
+  it('should reject a paraphrased coaching line', () => {
+    const paraphrased = { ...question, coaching: 'Coaching line, verbatim' };
+    expect(buildIdeationTurnPrompt(round).postValidate?.(turn(paraphrased, second) as never)[0]).toMatch(/coaching line for 'deepen.engine' was rewritten/);
+  });
+
+  it('should reject a dropped question', () => {
+    expect(buildIdeationTurnPrompt(round).postValidate?.(turn(question) as never)[0]).toMatch(/'deepen.voice' was in this round and is missing/);
+  });
+
+  it('should reject an invented id', () => {
+    const invented = { ...question, id: 'deepen.madeUp' };
+    const errors = buildIdeationTurnPrompt(round).postValidate?.(turn(invented, second) as never) ?? [];
+    expect(errors[0]).toMatch(/'deepen.madeUp' is not one of this round's questions/);
+    expect(errors[1]).toMatch(/'deepen.engine' was in this round and is missing/);
+  });
+
+  it('should reject the same question answered twice', () => {
+    expect(buildIdeationTurnPrompt(round).postValidate?.(turn(question, question, second) as never)[0]).toMatch(/'deepen.engine' appears 2 times/);
+  });
+
+  it('should still enforce the seed vocabulary alongside the round echo', () => {
+    const data = { ...turn(question, second), changeSet: [{ op: 'premise.update', premise: 'x' }] };
+    expect(buildIdeationTurnPrompt(round).postValidate?.(data as never)[0]).toMatch(/not allowed for this scope/);
+  });
+});
+
+describe('IdeationConceptsSchema', () => {
+  it('should accept exactly four distinct cards', () => {
+    const parsed = parseSchema(IdeationConceptsSchema, conceptsOut());
+    expect(parsed.success).toBe(true);
+    expect(PROMPT_REGISTRY['ideation-concepts'].postValidate?.(conceptsOut() as never)).toEqual([]);
+  });
+
+  it('should reject any card count other than four, through the schema', () => {
+    for (const count of [0, 3, 5]) expect(parseSchema(IdeationConceptsSchema, conceptsOut(count)).success).toBe(false);
+  });
+
+  it('should reject an output without its envelope tag', () => {
+    expect(parseSchema(IdeationConceptsSchema, { cards: cards() }).success).toBe(false);
+    expect(parseSchema(IdeationConceptsSchema, { kind: 'questions', cards: cards() }).success).toBe(false);
   });
 
   it('should reject a card missing an axis', () => {
     const [first = card(1), ...rest] = cards();
     const { engine: _engine, ...noEngine } = first;
-    expect(parseSchema(IdeationConceptsSchema, { cards: [noEngine, ...rest] }).success).toBe(false);
+    expect(parseSchema(IdeationConceptsSchema, { kind: 'cards', cards: [noEngine, ...rest] }).success).toBe(false);
   });
 
   it('should reject two cards that share an axis, case and padding ignored', () => {
     const shared = cards();
     shared[1] = { ...card(2), posture: '  POSTURE 1 ' };
-    const errors = PROMPT_REGISTRY['ideation-concepts'].postValidate?.({ cards: shared } as never) ?? [];
+    const errors = PROMPT_REGISTRY['ideation-concepts'].postValidate?.({ kind: 'cards', cards: shared } as never) ?? [];
     expect(errors[0]).toMatch(/share the same posture/);
   });
 
   it('should name every axis two identical cards share', () => {
     const twins = cards();
     twins[3] = { ...card(1), title: 'Card 4' };
-    const errors = PROMPT_REGISTRY['ideation-concepts'].postValidate?.({ cards: twins } as never) ?? [];
+    const errors = PROMPT_REGISTRY['ideation-concepts'].postValidate?.({ kind: 'cards', cards: twins } as never) ?? [];
     expect(errors[0]).toMatch(/engine and ladder and posture/);
   });
 });
 
 describe('IdeationStressSchema', () => {
   it('should accept the seven dimensions in the router order', () => {
-    const parsed = parseSchema(IdeationStressSchema, { readiness: readiness() });
+    const parsed = parseSchema(IdeationStressSchema, stressOut());
     expect(parsed.success).toBe(true);
-    expect(PROMPT_REGISTRY['ideation-stress'].postValidate?.({ readiness: readiness() } as never)).toEqual([]);
+    expect(PROMPT_REGISTRY['ideation-stress'].postValidate?.(stressOut() as never)).toEqual([]);
   });
 
-  it('should reject a report that skips a dimension', () => {
-    expect(parseSchema(IdeationStressSchema, { readiness: readiness().slice(1) }).success).toBe(false);
-    expect(PROMPT_REGISTRY['ideation-stress'].postValidate?.({ readiness: readiness().slice(1) } as never)[0]).toMatch(/exactly 7 readiness entries/);
+  it('should reject a report that skips a dimension, through the schema', () => {
+    expect(parseSchema(IdeationStressSchema, { kind: 'readiness', readiness: readiness().slice(1) }).success).toBe(false);
+  });
+
+  it('should reject an output without its envelope tag', () => {
+    expect(parseSchema(IdeationStressSchema, { readiness: readiness() }).success).toBe(false);
+    expect(parseSchema(IdeationStressSchema, { kind: 'cards', readiness: readiness() }).success).toBe(false);
   });
 
   it('should reject a dimension name outside the seven', () => {
     const invented = readiness().map((entry, index) => (index === 2 ? { ...entry, dimension: 'pacing' } : entry));
-    expect(parseSchema(IdeationStressSchema, { readiness: invented }).success).toBe(false);
+    expect(parseSchema(IdeationStressSchema, { kind: 'readiness', readiness: invented }).success).toBe(false);
   });
 
   it('should reject the seven dimensions reported out of order', () => {
     const shuffled = [...readiness()].reverse();
-    expect(PROMPT_REGISTRY['ideation-stress'].postValidate?.({ readiness: shuffled } as never)[0]).toMatch(/must be the 'hook' dimension/);
+    expect(PROMPT_REGISTRY['ideation-stress'].postValidate?.({ kind: 'readiness', readiness: shuffled } as never)[0]).toMatch(/must be the 'hook' dimension/);
   });
 
   it('should require a fix on every thin and empty verdict', () => {
     const noFix = readiness().map(entry => ({ dimension: entry.dimension, verdict: entry.verdict, note: entry.note }));
-    const errors = PROMPT_REGISTRY['ideation-stress'].postValidate?.({ readiness: noFix } as never) ?? [];
+    const errors = PROMPT_REGISTRY['ideation-stress'].postValidate?.({ kind: 'readiness', readiness: noFix } as never) ?? [];
     expect(errors).toHaveLength(READINESS_DIMENSION_ORDER.length);
     expect(errors[0]).toMatch(/needs a concrete fix/);
   });
 
   it('should let a verdict upgrade a precheck that found material', () => {
     const prompt = buildIdeationStressPrompt(precheck({ hook: 'thin' }));
-    expect(prompt.postValidate?.({ readiness: readiness({ hook: 'strong' }) } as never)).toEqual([]);
+    expect(prompt.postValidate?.(stressOut({ hook: 'strong' }) as never)).toEqual([]);
   });
 
   it('should never let a structurally empty dimension be called strong', () => {
     const prompt = buildIdeationStressPrompt(precheck({ voice: 'empty' }));
-    expect(prompt.postValidate?.({ readiness: readiness({ voice: 'strong' }) } as never)[0]).toMatch(/'voice' dimension has no material/);
-    expect(prompt.postValidate?.({ readiness: readiness({ voice: 'thin' }) } as never)).toEqual([]);
+    expect(prompt.postValidate?.(stressOut({ voice: 'strong' }) as never)[0]).toMatch(/'voice' dimension has no material/);
+    expect(prompt.postValidate?.(stressOut({ voice: 'thin' }) as never)).toEqual([]);
   });
 
   it('should report shape errors before the contradiction rule', () => {
     const prompt = buildIdeationStressPrompt(precheck({ hook: 'empty' }));
-    expect(prompt.postValidate?.({ readiness: readiness().slice(1) } as never)[0]).toMatch(/exactly 7 readiness entries/);
+    const shuffled = { kind: 'readiness', readiness: [...readiness({ hook: 'strong' })].reverse() };
+    expect(prompt.postValidate?.(shuffled as never)[0]).toMatch(/must be the 'hook' dimension/);
+  });
+});
+
+describe('renderReadinessPrecheck', () => {
+  it('should name each dimension its verdict, what the sheet found, and what is still missing', () => {
+    const rendered = renderReadinessPrecheck([
+      { dimension: 'protagonist', fields: ['protagonistDrive', 'castShape'], present: ['castShape'], verdict: 'thin' },
+      { dimension: 'voice', fields: ['voice'], present: [], verdict: 'empty' },
+      { dimension: 'hook', fields: ['hook'], present: ['hook'], verdict: 'strong' },
+    ]);
+
+    expect(rendered.split('\n')).toEqual([
+      'protagonist: thin — present: castShape — missing: protagonistDrive',
+      'voice: empty — no fields present — missing: voice',
+      'hook: strong — present: hook',
+    ]);
   });
 });

@@ -83,7 +83,8 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'spark.idea',
     stage: 'spark',
-    intent: 'Get the idea out of the author in whatever shape it already exists, and extract the decisions hiding inside it as locked constraints.',
+    intent:
+      'Get the idea out of the author in whatever shape it already exists, and read the decisions hiding inside it back to them. This is the one question with no fixed emission key: sheet-shaped material lands as fields in seed.update, story-rule material as constraints, and both are offered as locks for confirmation first — nothing here is settled until the author says it is.',
     coaching:
       'Start anywhere. A sentence, a scene you keep replaying, a comparison to something else — all of it works, and none of it has to be good yet. I am not grading this. I am going to read it back to you as a list of decisions you have already made, and you tell me which ones are load-bearing.',
     fills: [],
@@ -93,7 +94,8 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'taste.comps',
     stage: 'taste',
-    intent: 'Name up to three stories the author would reread, and what the reread is for — the anchors every option offered later is calibrated against.',
+    intent:
+      "Name up to three stories the author would reread, and what the reread is for — the anchors every option offered later is calibrated against. The answer is neither a field nor a constraint: emit it as seed.update tasteAnchors, the titles under 'comps' and what they have in common under 'preferences'.",
     coaching:
       'Name up to three stories you would happily read a second time. This is the single most useful thing you can tell me: everything I offer you from here is built out of what those three have in common, so two minutes now saves you rejecting twenty bad suggestions later. They do not have to be in your genre, and they do not have to be respectable.',
     fills: [],
@@ -271,7 +273,8 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'deepen.secondLadder',
     stage: 'deepen',
-    intent: 'Decide whether the second lead climbs an independent ladder or an offset one, so they cannot decay into a sidekick.',
+    intent:
+      "Decide whether the second lead climbs an independent ladder or an offset one, so they cannot decay into a sidekick. Emit the answer as a locked constraint with key 'ladder' and kind 'shape'.",
     coaching:
       'You have two leads. Does the second one have their own thing that goes up, or an offset one that moves when the first stalls? Either answer works. What does not work is neither, because within the first arcs the lead without a ladder has quietly become a sidekick with extra dialogue.',
     fills: [],
@@ -281,7 +284,8 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'deepen.foreknowledgeDecay',
     stage: 'deepen',
-    intent: 'Name the edge that replaces foreknowledge once the remembered timeline has stopped predicting this one.',
+    intent:
+      "Name the edge that replaces foreknowledge once the remembered timeline has stopped predicting this one. Emit the answer as a locked constraint with key 'knowledge' and kind 'shape'.",
     coaching:
       'Your lead knows what happens. That is a clock, not a premise — every chapter they act on what they remember, the future they remember drifts further from the one they are living in. What becomes their edge once the memory has stopped being worth anything?',
     fills: [],
@@ -291,7 +295,8 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'deepen.divergence',
     stage: 'deepen',
-    intent: 'Fix the divergence structure — the early change and the consequence that makes this run stop resembling the remembered one.',
+    intent:
+      "Fix the divergence structure — the early change and the consequence that makes this run stop resembling the remembered one. Emit the answer as a locked constraint with key 'divergence' and kind 'shape'.",
     coaching:
       'What makes this run different from the last one? Name the change they make early and the thing it detonates, because a second run that replays the first is a recap, and readers can feel a recap coming from a long way off.',
     fills: [],
@@ -301,7 +306,8 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'deepen.stayingCost',
     stage: 'deepen',
-    intent: 'Name what carries the tension a single-pairing romance removes — what staying together costs each of them.',
+    intent:
+      "Name what carries the tension a single-pairing romance removes — what staying together costs each of them. Emit the answer as a locked constraint with key 'tension' and kind 'shape'.",
     coaching:
       'You have ruled out the genre\'s default tension source, the open question of who they end up with. Something has to take the load, and it is almost always cost: what does staying together actually take from each of them? Answer that and the romance keeps generating pressure long after the question of "who" is closed.',
     fills: [],
@@ -311,7 +317,8 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'deepen.systemRules',
     stage: 'deepen',
-    intent: "Fix the system's hard rules and its published limits, so the visible numbers stay constrainable rather than decorative.",
+    intent:
+      "Fix the system's hard rules and its published limits, so the visible numbers stay constrainable rather than decorative. Emit the answer as a locked constraint with key 'system' and kind 'shape'.",
     coaching:
       'What can the system not do? Visible numbers only make tension if they are bounded — a system that gains a mechanic whenever the plot needs one is scenery, and the reader discounts every win after the first time it happens. Give me two or three rules you will never quietly break.',
     fills: [],
@@ -321,7 +328,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'deepen.povBudget',
     stage: 'deepen',
-    intent: 'Set the POV budget and name whose arc is the spine of the book.',
+    intent: "Set the POV budget and name whose arc is the spine of the book. Emit the answer as a locked constraint with key 'pov' and kind 'shape'.",
     coaching:
       "How many viewpoints, and whose arc is the spine? An ensemble is a budget: every POV you spend has to earn its chapters against the others, and one arc still has to be the book's centre of gravity — otherwise the reader has nobody to worry about while everyone else is off-page.",
     fills: [],
@@ -331,7 +338,8 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'deepen.deferredTension',
     stage: 'deepen',
-    intent: 'Name what tightens while the central pairing is deferred, so the wait escalates instead of idling.',
+    intent:
+      "Name what tightens while the central pairing is deferred, so the wait escalates instead of idling. Emit the answer as a locked constraint with key 'tension' and kind 'shape'.",
     coaching:
       'You are deferring the thing the reader is waiting for. That is a good trade only if something else is tightening meanwhile — proximity they cannot escape, obligation that keeps them in the same room, the mounting cost of concealment. What tightens while nothing happens? Without it, a slow burn reads as a stalled one.',
     fills: [],
@@ -341,7 +349,8 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'deepen.ironyBudget',
     stage: 'deepen',
-    intent: 'Decide what the single viewpoint permanently withholds from the reader, and what that blindness buys.',
+    intent:
+      "Decide what the single viewpoint permanently withholds from the reader, and what that blindness buys. Emit the answer as a locked constraint with key 'irony' and kind 'shape'.",
     coaching:
       "One viewpoint means there are things the reader can never simply be told. That is a purchase, not a loss — the reader's ignorance is where suspense lives. Name one thing you will keep off the page for a long time, and the moment your lead finally collides with it.",
     fills: [],

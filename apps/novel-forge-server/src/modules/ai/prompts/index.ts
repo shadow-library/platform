@@ -67,8 +67,10 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'bible-audit': bibleAuditPrompt as PromptModule<unknown>,
   'chat-refine': chatRefinePrompt as PromptModule<unknown>,
   'chat-compact': chatCompactPrompt as PromptModule<unknown>,
+  /** Shape-only — the round echo rules live in `buildIdeationTurnPrompt`; the studio calls the builder. */
   'ideation-turn': ideationTurnPrompt as PromptModule<unknown>,
   'ideation-concepts': ideationConceptsPrompt as PromptModule<unknown>,
+  /** Shape-only — the no-contradiction rule lives in `buildIdeationStressPrompt`; the studio calls the builder. */
   'ideation-stress': ideationStressPrompt as PromptModule<unknown>,
   'arc-plan': arcPlanPrompt as PromptModule<unknown>,
   'chapter-extract': chapterExtractPrompt as PromptModule<unknown>,
@@ -91,7 +93,8 @@ export * from './types';
 export * from './authoring-preamble';
 export * from './scope-playbooks';
 export { buildChatRefinePrompt } from './chat-refine.prompt';
-export { buildIdeationStressPrompt } from './ideation-stress.prompt';
+export { buildIdeationStressPrompt, renderReadinessPrecheck } from './ideation-stress.prompt';
+export { buildIdeationTurnPrompt } from './ideation-turn.prompt';
 export { CONCEPT_CARD_COUNT } from './ideation-concepts.prompt';
 export { buildArcPlanPrompt } from './arc-plan.prompt';
 export { buildOutlinePrompt } from './outline.prompt';

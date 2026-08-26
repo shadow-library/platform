@@ -19,9 +19,11 @@ import { computeDormantThreads, renderDormantThreads } from './dormant-threads';
 import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextSegment, type ContextTier, joinSections, renderSection, splitSegments } from './sections';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
 
-export interface IdeationTurnSession {
-  /** The recent conversation, oldest first, already rendered as speaker-labelled lines. */
-  recentTurns: string[];
+export interface IdeationPackOptions {
+  budgetTokens?: number;
+  dryRun?: boolean;
+  /** False drops the round header and its questions — the concept round has no interview to word. */
+  round?: boolean;
 }
 
 export type IdeationSeedInput = Pick<schema.Ideation.StorySeed, 'projectId' | 'fields' | 'constraints' | 'tasteAnchors' | 'concepts' | 'readiness' | 'askedQuestions'>;
@@ -69,6 +71,8 @@ export const REFORGE_TRANSFORM_BUDGET = 16_000;
 // The studio turn is an interview: every answer the author gave must reach the model in their own
 // words, so the seed pack is sized like a bootstrap hub turn rather than a scoped chat turn.
 export const IDEATION_BUDGET = CHAT_BOOTSTRAP_BUDGET;
+// The conversation is never packed: it reaches the model as prompt messages through the template's
+// `history` placeholder, so this budget caps that message list at the turn pipeline, not the pack.
 export const IDEATION_HISTORY_BUDGET = CHAT_BOOTSTRAP_HISTORY_BUDGET;
 export const ILLUSTRATION_BUDGET = 6_000;
 export const ILLUSTRATION_WORLD_FACTS_MAX = 30;
@@ -151,8 +155,14 @@ function renderSeedSheet(fields: schema.Ideation.SeedFields): string {
   }).join('\n');
 }
 
+// Sorted by key — as are the playbook excerpts derived from it — so re-locking an existing constraint,
+// or the column coming back in a different order, cannot reshuffle the stable segment and throw away the
+// prompt cache for a sheet that has not actually changed.
 function renderSeedConstraints(constraints: schema.Ideation.SeedConstraint[]): string {
-  return constraints.map(c => `- ${c.key} (${c.kind}, locked by ${c.lockedBy}${c.playbookKey ? `, playbook ${c.playbookKey}` : ''}): ${c.text}`).join('\n');
+  return [...constraints]
+    .sort((left, right) => left.key.localeCompare(right.key))
+    .map(c => `- ${c.key} (${c.kind}, locked by ${c.lockedBy}${c.playbookKey ? `, playbook ${c.playbookKey}` : ''}): ${c.text}`)
+    .join('\n');
 }
 
 function renderTasteAnchors(anchors: schema.Ideation.TasteAnchors): string {
@@ -165,14 +175,11 @@ function renderTasteAnchors(anchors: schema.Ideation.TasteAnchors): string {
 /** One excerpt per matched playbook — what the shape promises, what it removes, and what must carry the load. */
 function renderPlaybookExcerpts(constraints: schema.Ideation.SeedConstraint[]): string {
   const { matched } = matchPlaybooks(constraints);
-  const seen = new Set<string>();
-  const blocks: string[] = [];
-  for (const { playbook } of matched) {
-    if (seen.has(playbook.key)) continue;
-    seen.add(playbook.key);
-    blocks.push(`**${playbook.key}**\nPromises: ${playbook.promises}\nKills: ${playbook.kills}\nMust replace: ${playbook.mustReplace}`);
-  }
-  return blocks.join('\n\n');
+  const byKey = new Map(matched.map(({ playbook }) => [playbook.key, playbook]));
+  return [...byKey.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, playbook]) => `**${key}**\nPromises: ${playbook.promises}\nKills: ${playbook.kills}\nMust replace: ${playbook.mustReplace}`)
+    .join('\n\n');
 }
 
 function renderRoundQuestions(router: RouterResult): string {
@@ -1023,15 +1030,11 @@ export class ContextAssembler {
   /**
    * Pack for one Ideation Studio turn (ideation-studio design §4.2). Stable: the sheet, the locked
    * constraints, the taste anchors, and the playbooks for the shapes already committed to — all of it
-   * byte-identical until the sheet itself moves. Volatile: the recent conversation and the round the
-   * router just chose, which differ on every turn by construction.
+   * byte-identical until the sheet itself moves. Volatile: the round the router just chose and the
+   * concept rounds already offered. The conversation is NOT here — it travels as prompt messages
+   * through the template's `history` placeholder, which carries its own cache breakpoint.
    */
-  async forIdeationTurn(
-    session: IdeationTurnSession,
-    seed: IdeationSeedInput,
-    router: RouterResult,
-    opts?: { budgetTokens?: number; dryRun?: boolean },
-  ): Promise<AssembledPack & { id: bigint | null }> {
+  async forIdeationTurn(seed: IdeationSeedInput, router: RouterResult, opts?: IdeationPackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const state = toRouterSeedState(seed);
     const sections: ContextSection[] = [asStable(makeSection('seed_sheet', renderSeedSheet(state.fields), 'canonical', ['seed']))];
 
@@ -1041,14 +1044,15 @@ export class ContextAssembler {
     const playbooks = renderPlaybookExcerpts(state.constraints);
     if (playbooks) sections.push(asStable(makeSection('shape_playbooks', playbooks, 'canonical', [])));
 
+    if (opts?.round !== false) sections.push(makeSection('round_questions', renderRoundQuestions(router), 'working', []));
     if (state.concepts.length > 0) sections.push(makeSection('concept_history', renderConceptHistory(state.concepts), 'working', ['seed']));
-    if (session.recentTurns.length > 0) {
-      const { text } = truncateAtParagraphTail(session.recentTurns.join('\n\n'), IDEATION_HISTORY_BUDGET);
-      sections.push(makeSection('recent_turns', text, 'working', []));
-    }
-    sections.push(makeSection('round_questions', renderRoundQuestions(router), 'working', []));
 
     return this.finalize(seed.projectId, 'ideation', null, sections, [], opts?.budgetTokens ?? IDEATION_BUDGET, opts?.dryRun);
+  }
+
+  /** The concept round runs off the same seed pack, minus the interview: the cards answer no question. */
+  async forIdeationConcepts(seed: IdeationSeedInput, router: RouterResult, opts?: Omit<IdeationPackOptions, 'round'>): Promise<AssembledPack & { id: bigint | null }> {
+    return this.forIdeationTurn(seed, router, { ...opts, round: false });
   }
 
   /** The live production picture the hub reasons over: cursor, draft states, stale plans, open work. */

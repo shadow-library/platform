@@ -100,7 +100,6 @@ export const SECTION_LABELS: Record<string, string> = {
   taste_anchors: '## TASTE ANCHORS',
   shape_playbooks: '## SHAPE PLAYBOOKS',
   concept_history: '## CONCEPTS ALREADY OFFERED',
-  recent_turns: '## RECENT TURNS',
   round_questions: '## THIS ROUND',
   art_style: '## ART STYLE BIBLE',
   subject_card: '## SUBJECT',

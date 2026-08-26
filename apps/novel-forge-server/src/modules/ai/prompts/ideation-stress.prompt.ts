@@ -1,11 +1,11 @@
 import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-import { READINESS_DIMENSION_ORDER, type ReadinessDimension } from '../../ideation/question-router';
+import { READINESS_DIMENSION_ORDER, type ReadinessDimension, type ReadinessDimensionName } from '../../ideation/question-router';
 import { type IdeationStressOutput, IdeationStressSchema } from '../schemas/ideation.schema';
 import { type PromptModule } from './types';
 
-const DIMENSION_BRIEFS: Record<string, string> = {
+const DIMENSION_BRIEFS: Record<ReadinessDimensionName, string> = {
   hook: 'the reason a browsing reader opens chapter one, stated as a specific promise rather than a mood',
   protagonist: 'a person with a want the reader can feel, and a cast shape that gives them someone to be a person at',
   engine: 'what keeps generating scenes once the premise is spent — the stakes that renew instead of resolving',
@@ -29,14 +29,14 @@ You receive a structural precheck computed from the sheet — which fields and l
 This report advises and never blocks. The author is allowed to start the novel on a thin sheet, and telling them what is thin is how they choose knowingly. No preamble, no encouragement, no summary — the dimensions carry the whole message.
 
 Respond with ONLY one valid JSON object — nothing outside the JSON, no markdown fences — of exactly this shape:
-{"readiness": [{"dimension": "${READINESS_DIMENSION_ORDER[0]}", "verdict": "strong|thin|empty", "note": "...", "fix": "..."}]}`;
+{"kind": "readiness", "readiness": [{"dimension": "${READINESS_DIMENSION_ORDER[0]}", "verdict": "strong|thin|empty", "note": "...", "fix": "..."}]}`;
 
 const template = ChatPromptTemplate.fromMessages([new SystemMessage(system), ['human', '{stableContext}'], ['human', 'Structural precheck:\n{precheck}']]);
 
+// The entry count is a schema invariant (minItems/maxItems on `readiness`), so postValidate never sees
+// a short list and only has the ordering and the fix rule left to enforce.
 function validateShape(data: IdeationStressOutput): string[] {
   const entries = data.readiness ?? [];
-  if (entries.length !== READINESS_DIMENSION_ORDER.length) return [`return exactly ${READINESS_DIMENSION_ORDER.length} readiness entries, one per dimension`];
-
   const errors: string[] = [];
   READINESS_DIMENSION_ORDER.forEach((dimension, index) => {
     if (entries[index]?.dimension !== dimension) errors.push(`readiness[${index}] must be the '${dimension}' dimension — report them in the given order`);
@@ -47,10 +47,17 @@ function validateShape(data: IdeationStressOutput): string[] {
   return errors;
 }
 
+/**
+ * Shape-only: this entry checks the dimension order and the fix rule and nothing else. The rule that a
+ * structurally empty dimension can never be called strong lives in `buildIdeationStressPrompt`, so every
+ * caller runs the stress pass through the builder — the bare module is here for the registry's sake.
+ */
 export const ideationStressPrompt: PromptModule<IdeationStressOutput> = {
   key: 'ideation-stress',
   version: '1.0.0',
   kind: 'analytical',
+  // 'judge' is a CACHEABLE_ROLE: re-running the stress pass on an unchanged sheet is served from
+  // llm_cache rather than re-billed, which is the intent — the verdict is a function of the sheet.
   role: 'judge',
   cacheStrategy: { stableVars: ['stableContext'] },
   system,
@@ -58,6 +65,17 @@ export const ideationStressPrompt: PromptModule<IdeationStressOutput> = {
   schema: IdeationStressSchema,
   postValidate: validateShape,
 };
+
+/** The `{precheck}` template var: one line per dimension, naming what the sheet structurally found and what it is still missing. */
+export function renderReadinessPrecheck(dimensions: ReadinessDimension[]): string {
+  return dimensions
+    .map(dimension => {
+      const missing = dimension.fields.filter(field => !dimension.present.includes(field));
+      const found = dimension.present.length > 0 ? `present: ${dimension.present.join(', ')}` : 'no fields present';
+      return [`${dimension.dimension}: ${dimension.verdict}`, found, ...(missing.length > 0 ? [`missing: ${missing.join(', ')}`] : [])].join(' — ');
+    })
+    .join('\n');
+}
 
 /** Precheck-bound variant: the repair ladder forces the critic back below what the sheet structurally supports. */
 export function buildIdeationStressPrompt(precheck: ReadinessDimension[]): PromptModule<IdeationStressOutput> {
