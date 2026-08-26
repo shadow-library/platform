@@ -2,7 +2,7 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-import { ContentMode, ProjectKind, SortByTime } from '@server/common';
+import { ContentMode, ProjectKind, ProjectStatus, SortByTime } from '@server/common';
 import { type Project } from '@server/database';
 
 @Schema()
@@ -120,6 +120,9 @@ export class ProjectResponse {
   @Field(() => ProjectKind)
   kind: Project.Kind;
 
+  @Field(() => ProjectStatus, { description: 'A `seed` project is an Ideation Studio idea and has no bible, plan, or chapters until it graduates.' })
+  status: Project.Status;
+
   @Field({ optional: true, nullable: true })
   title?: string | null;
 
@@ -201,6 +204,9 @@ export class CloneProjectBody {
 export class ListProjectsQuery extends PaginationQuery(SortByTime) {
   @Field(() => ProjectKind, { optional: true })
   kind?: Project.Kind;
+
+  @Field(() => ProjectStatus, { optional: true, description: 'Defaults to `active`; seeds live on the Ideas shelf and are listed only when asked for explicitly.' })
+  status?: Project.Status;
 }
 
 @Schema()

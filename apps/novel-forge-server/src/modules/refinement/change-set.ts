@@ -1,4 +1,4 @@
-import { type Bible } from '@server/database';
+import { type Bible, type Ideation } from '@server/database';
 
 import { HOOK_TYPES, type HookTypeValue } from '../ai/schemas/enums';
 
@@ -149,6 +149,20 @@ export interface FactRemoveOp {
   factKey: string;
 }
 
+/**
+ * The Ideation Studio sheet edit (ideation-studio design §4.1). `fields` and `provenance` merge per
+ * key — a `null` value clears that key, which is what makes the captured inverse exact; the three
+ * collection columns replace wholesale.
+ */
+export interface SeedUpdateOp {
+  op: 'seed.update';
+  fields?: Record<string, string | string[] | null>;
+  provenance?: Record<string, Ideation.FieldProvenance | null>;
+  constraints?: Ideation.SeedConstraint[];
+  concepts?: Ideation.ConceptCard[];
+  tasteAnchors?: Ideation.TasteAnchors;
+}
+
 // Action ops drive the pipeline through existing service code (chat-hub design §4.2). They carry no
 // artifact refs, no baseline, and no inverse — they execute post-commit and their outcome lands in
 // the proposal's opResults, never in domain tables directly.
@@ -234,7 +248,8 @@ export type ContentOp =
   | EntityUpsertOp
   | EntityRemoveOp
   | FactUpsertOp
-  | FactRemoveOp;
+  | FactRemoveOp
+  | SeedUpdateOp;
 
 export type ActionOp =
   | GenerateChaptersAction
@@ -256,14 +271,22 @@ export type OpType = ChangeOp['op'];
 export type ContentOpType = ContentOp['op'];
 export type ActionType = ActionOp['op'];
 
-type FieldKind = 'string' | 'number' | 'string[]' | 'object' | 'object|null';
+type FieldKind = 'string' | 'number' | 'string[]' | 'object' | 'object[]' | 'object|null';
 interface OpSpec {
   required: Record<string, FieldKind>;
   optional: Record<string, FieldKind>;
+  /** Merge or lifecycle semantics the field list cannot show; rendered into the op vocabulary verbatim. */
+  description?: string;
 }
 
 const BIBLE_SECTIONS = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
 const ENTITY_TYPES = ['character', 'faction', 'location', 'power_rule', 'item', 'concept'];
+const SEED_COLUMNS = ['fields', 'provenance', 'constraints', 'concepts', 'tasteAnchors'] as const;
+const SEED_FIELD_KEYS = ['genre', 'themes', 'premise', 'hook', 'castShape', 'progressionSystem', 'protagonistDrive', 'stakes', 'serializationNotes', 'voice', 'workingTitle'];
+const SEED_FIELD_SOURCES = ['author', 'studio', 'crossed'];
+const SEED_CONSTRAINT_KINDS = ['shape', 'scope', 'promise'];
+const SEED_CONSTRAINT_LOCKED_BY = ['author', 'inferred'];
+const SEED_CONCEPT_FATES = ['kept', 'killed', 'crossed'];
 
 const OP_SPECS: Record<OpType, OpSpec> = {
   'premise.update': { required: {}, optional: { premise: 'string', brief: 'string', themes: 'string[]', instructions: 'string' } },
@@ -307,6 +330,12 @@ const OP_SPECS: Record<OpType, OpSpec> = {
     optional: { body: 'string', subjects: 'string[]', constraintNote: 'string', terms: 'string[]', revealChapter: 'number' },
   },
   'fact.remove': { required: { factKey: 'string' }, optional: {} },
+  'seed.update': {
+    required: {},
+    optional: { fields: 'object', provenance: 'object', constraints: 'object[]', concepts: 'object[]', tasteAnchors: 'object' },
+    description:
+      'edit the story seed sheet. Only the top-level keys you send are touched; the rest of the sheet is left alone. Inside "fields" and "provenance" the merge is per key — send only the entries you are changing, and send a key with the value null to clear it. "constraints", "concepts", and "tasteAnchors" replace their whole column, so send the complete list every time you change one.',
+  },
   'action.generate_chapters': { required: { count: 'number' }, optional: {} },
   'action.plan_volumes': { required: { volumeCount: 'number', chaptersPerVolume: 'number' }, optional: {} },
   'action.plan_arcs': { required: { volumeKey: 'string' }, optional: { arcCount: 'number' } },
@@ -354,6 +383,7 @@ function isKind(value: unknown, kind: FieldKind): boolean {
   if (kind === 'string') return typeof value === 'string';
   if (kind === 'number') return typeof value === 'number' && Number.isInteger(value);
   if (kind === 'string[]') return Array.isArray(value) && value.every(v => typeof v === 'string');
+  if (kind === 'object[]') return Array.isArray(value) && value.every(v => typeof v === 'object' && v !== null && !Array.isArray(v));
   if (kind === 'object|null' && value === null) return true;
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -395,6 +425,68 @@ function validateKnowledgeContract(value: unknown, path: string, errors: string[
       if (key !== 'entityKey' && key !== 'factKey') errors.push(`${at}: unexpected field '${key}'`);
     }
   });
+}
+
+function validateSeedFields(value: Record<string, unknown>, path: string, errors: string[]): void {
+  for (const [key, entry] of Object.entries(value)) {
+    if (!SEED_FIELD_KEYS.includes(key)) errors.push(`${path}: unknown sheet field 'fields.${key}'`);
+    if (entry === null || typeof entry === 'string') continue;
+    if (key === 'themes' && isKind(entry, 'string[]')) continue;
+    errors.push(`${path}: fields.${key} must be a string${key === 'themes' ? ' array' : ''} or null`);
+  }
+}
+
+function validateSeedProvenance(value: Record<string, unknown>, path: string, errors: string[]): void {
+  for (const [key, entry] of Object.entries(value)) {
+    if (!SEED_FIELD_KEYS.includes(key)) errors.push(`${path}: unknown sheet field 'provenance.${key}'`);
+    if (entry === null) continue;
+    if (!isKind(entry, 'object')) {
+      errors.push(`${path}: provenance.${key} must be an object or null`);
+      continue;
+    }
+    const record = entry as Record<string, unknown>;
+    if (!SEED_FIELD_SOURCES.includes(record['source'] as string)) errors.push(`${path}: provenance.${key}.source must be one of ${SEED_FIELD_SOURCES.join(', ')}`);
+    if (!isKind(record['turnOrdinal'], 'number')) errors.push(`${path}: provenance.${key}.turnOrdinal must be an integer`);
+  }
+}
+
+function validateItems(items: unknown[], path: string, validate: (record: Record<string, unknown>, at: string) => void): void {
+  items.forEach((item, index) => validate(item as Record<string, unknown>, `${path}[${index}]`));
+}
+
+function requireStrings(record: Record<string, unknown>, keys: string[], at: string, errors: string[]): void {
+  for (const key of keys) {
+    if (typeof record[key] !== 'string' || record[key] === '') errors.push(`${at}.${key} must be a non-empty string`);
+  }
+}
+
+function validateSeedUpdate(record: Record<string, unknown>, path: string, errors: string[]): void {
+  if (SEED_COLUMNS.every(column => record[column] === undefined)) return void errors.push(`${path}: seed.update must set at least one of ${SEED_COLUMNS.join(', ')}`);
+
+  if (isKind(record['fields'], 'object')) validateSeedFields(record['fields'] as Record<string, unknown>, path, errors);
+  if (isKind(record['provenance'], 'object')) validateSeedProvenance(record['provenance'] as Record<string, unknown>, path, errors);
+
+  if (isKind(record['constraints'], 'object[]')) {
+    validateItems(record['constraints'] as unknown[], `${path}: constraints`, (constraint, at) => {
+      requireStrings(constraint, ['key', 'text'], at, errors);
+      if (!SEED_CONSTRAINT_KINDS.includes(constraint['kind'] as string)) errors.push(`${at}.kind must be one of ${SEED_CONSTRAINT_KINDS.join(', ')}`);
+      if (!SEED_CONSTRAINT_LOCKED_BY.includes(constraint['lockedBy'] as string)) errors.push(`${at}.lockedBy must be one of ${SEED_CONSTRAINT_LOCKED_BY.join(', ')}`);
+    });
+  }
+
+  if (isKind(record['concepts'], 'object[]')) {
+    validateItems(record['concepts'] as unknown[], `${path}: concepts`, (card, at) => {
+      requireStrings(card, ['title', 'logline', 'engine', 'ladder', 'posture'], at, errors);
+      if (!isKind(card['round'], 'number')) errors.push(`${at}.round must be an integer`);
+      if (!SEED_CONCEPT_FATES.includes(card['fate'] as string)) errors.push(`${at}.fate must be one of ${SEED_CONCEPT_FATES.join(', ')}`);
+    });
+  }
+
+  const anchors = record['tasteAnchors'];
+  if (!isKind(anchors, 'object')) return;
+  const { comps, preferences } = anchors as Record<string, unknown>;
+  if (!isKind(comps, 'string[]')) errors.push(`${path}: tasteAnchors.comps must be a string array`);
+  if (!isKind(preferences, 'string[]')) errors.push(`${path}: tasteAnchors.preferences must be a string array`);
 }
 
 /**
@@ -467,6 +559,7 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     if (op === 'draft.update' && record['title'] === undefined && record['body'] === undefined && record['summary'] === undefined) {
       errors.push(`${path}: draft.update must set at least one of title, body, summary`);
     }
+    if (op === 'seed.update') validateSeedUpdate(record, path, errors);
     if (op === 'action.validate' && !VALIDATION_SCOPES.includes(record['scope'] as string)) errors.push(`${path}: scope must be one of ${VALIDATION_SCOPES.join(', ')}`);
     if (op === 'action.generate_chapters' && typeof record['count'] === 'number' && record['count'] < 1) errors.push(`${path}: count must be >= 1`);
   });
@@ -483,7 +576,7 @@ export function renderOpVocabulary(ops: readonly OpType[]): string {
     const spec = OP_SPECS[op];
     const required = Object.entries(spec.required).map(([key, kind]) => `"${key}": <${kind}, required>`);
     const optional = Object.entries(spec.optional).map(([key, kind]) => `"${key}": <${kind}, optional>`);
-    return `- {"op": "${op}"${[...required, ...optional].map(f => `, ${f}`).join('')}}`;
+    return `- {"op": "${op}"${[...required, ...optional].map(f => `, ${f}`).join('')}}${spec.description ? ` — ${spec.description}` : ''}`;
   });
   const contractShape = ops.includes('brief.update')
     ? `\nendingContract, when present, must be exactly: {"hookType": <one of: ${HOOK_TYPES.join(' | ')}>, "emotionalBeat": <non-empty string>, "openQuestion": <non-empty string>, "handoffState": <non-empty string>, "mustNotResolve": <string[], optional>} — hookType is an enum, never free text.`
@@ -519,6 +612,7 @@ export function changeSetRefs(ops: ChangeOp[]): string[] {
     if (op.op === 'entity.upsert' || op.op === 'entity.remove') return [`entity:${op.entityKey}`];
     if (op.op === 'fact.upsert' || op.op === 'fact.remove') return [`fact:${op.factKey}`];
     if (op.op === 'draft.update' || op.op === 'draft.remove') return [`draft:${op.chapter}`];
+    if (op.op === 'seed.update') return ['seed'];
     return [`chapter:${op.chapter}`];
   });
   return [...new Set(refs)];

@@ -11,6 +11,7 @@ export interface ArtifactState {
 
 interface ParsedRefs {
   premise: boolean;
+  seed: boolean;
   docs: { section: Bible.Section; slug: string; ref: string }[];
   volumeKeys: string[];
   arcKeys: string[];
@@ -23,9 +24,10 @@ interface ParsedRefs {
 const MISSING: ArtifactState = { exists: false, revision: null, contentHash: null };
 
 function parseRefs(refs: string[]): ParsedRefs {
-  const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], arcKeys: [], chapters: [], drafts: [], entityKeys: [], factKeys: [] };
+  const parsed: ParsedRefs = { premise: false, seed: false, docs: [], volumeKeys: [], arcKeys: [], chapters: [], drafts: [], entityKeys: [], factKeys: [] };
   for (const ref of refs) {
     if (ref === 'premise') parsed.premise = true;
+    else if (ref === 'seed') parsed.seed = true;
     else if (ref.startsWith('doc:')) {
       const [section = '', ...rest] = ref.slice(4).split('/');
       parsed.docs.push({ section: section as Bible.Section, slug: rest.join('/'), ref });
@@ -56,6 +58,12 @@ export async function loadArtifactStates(db: PrimaryDatabase, projectId: bigint,
       const contentHash = computeContentHash({ premise: project.premise, brief: project.brief, themes: project.themes, instructions: project.instructions });
       states['premise'] = { exists: true, revision: null, contentHash };
     }
+  }
+
+  // Singleton per project, like `premise` — the sheet's own revision and hash are stored on the row.
+  if (parsed.seed) {
+    const seed = await db.query.storySeeds.findFirst({ where: eq(schema.storySeeds.projectId, projectId) });
+    if (seed) states['seed'] = { exists: true, revision: seed.revision, contentHash: seed.contentHash };
   }
 
   if (parsed.docs.length > 0) {

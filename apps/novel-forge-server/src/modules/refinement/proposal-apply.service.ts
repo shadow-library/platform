@@ -4,9 +4,9 @@ import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { arcContentHash, briefContentHash, computeBibleDocHash, volumeContentHash } from '@server/common';
+import { arcContentHash, briefContentHash, computeBibleDocHash, seedContentHash, volumeContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
+import { type Ideation, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { type ActionExecutor, ActionExecutorRegistry } from './action-registry';
 import { type ArtifactState, loadArtifactStates } from './artifact-state';
@@ -29,6 +29,7 @@ import {
   type FactUpsertOp,
   isActionOp,
   type PremiseUpdateOp,
+  type SeedUpdateOp,
   type VolumeRemoveOp,
   type VolumeUpsertOp,
 } from './change-set';
@@ -93,6 +94,22 @@ const STALE_ARC_CHANGED = 'arc_changed';
 
 // Fields whose change invalidates the artifacts planned beneath the volume (§6.2 step 5).
 const VOLUME_STRUCTURAL_FIELDS = ['objective', 'conflict', 'payoff', 'targetChapterCount'] as const;
+
+/** Per-key merge for the seed sheet's keyed jsonb columns, where a null value clears the key. */
+function mergeKeys<T extends object>(prior: T | null, patch: Record<string, unknown>): T {
+  const merged = { ...(prior ?? ({} as T)) } as Record<string, unknown>;
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) delete merged[key];
+    else merged[key] = value;
+  }
+  return merged as T;
+}
+
+/** The patch's keys mapped to their current values — null where the key is not there yet. */
+function priorKeys(patch: Record<string, unknown>, prior: object | null): Record<string, unknown> {
+  const current = (prior ?? {}) as Record<string, unknown>;
+  return Object.fromEntries(Object.keys(patch).map(key => [key, current[key] ?? null]));
+}
 
 @Injectable()
 export class ProposalApplyService {
@@ -409,6 +426,19 @@ export class ProposalApplyService {
           revealChapter: fact.revealChapter ?? undefined,
         };
       }
+      case 'seed.update': {
+        const seed = await ctx.tx.query.storySeeds.findFirst({ where: eq(schema.storySeeds.projectId, ctx.projectId) });
+        if (!seed) return null;
+        const inverse: SeedUpdateOp = { op: 'seed.update' };
+        // Per-key inverses, not the whole prior object: a key the op introduced has no prior value, and
+        // only an explicit null in the inverse removes it again under the applier's merge.
+        if (op.fields !== undefined) inverse.fields = priorKeys(op.fields, seed.fields) as SeedUpdateOp['fields'];
+        if (op.provenance !== undefined) inverse.provenance = priorKeys(op.provenance, seed.provenance) as SeedUpdateOp['provenance'];
+        if (op.constraints !== undefined) inverse.constraints = seed.constraints ?? [];
+        if (op.concepts !== undefined) inverse.concepts = seed.concepts ?? [];
+        if (op.tasteAnchors !== undefined) inverse.tasteAnchors = seed.tasteAnchors ?? { comps: [], preferences: [] };
+        return inverse;
+      }
     }
   }
 
@@ -444,6 +474,8 @@ export class ProposalApplyService {
         return this.applyFactUpsert(ctx, op);
       case 'fact.remove':
         return this.applyFactRemove(ctx, op);
+      case 'seed.update':
+        return this.applySeedUpdate(ctx, op);
       default:
         // Actions never reach the content dispatcher — they are filtered out before apply and executed
         // post-commit (chat-hub design §5.3). Reaching here is a programming error, not bad input.
@@ -814,6 +846,32 @@ export class ProposalApplyService {
 
     await ctx.tx.delete(schema.canonFacts).where(eq(schema.canonFacts.id, existing.id));
     ctx.applied.push({ artifactRef: `fact:${op.factKey}`, newRevision: null });
+  }
+
+  /**
+   * The sheet is a singleton per seed project, so there is nothing to create and nothing downstream to
+   * mark stale — no bible, plan, or brief can depend on a project that has not graduated. The hash
+   * covers `fields` alone (ideation-studio design §2.2).
+   */
+  private async applySeedUpdate(ctx: ApplyContext, op: SeedUpdateOp): Promise<void> {
+    const existing = await ctx.tx.query.storySeeds.findFirst({ where: eq(schema.storySeeds.projectId, ctx.projectId) });
+    if (!existing) throw AppErrorCode.IDE_001.create();
+
+    const fields = op.fields ? mergeKeys<Ideation.SeedFields>(existing.fields, op.fields) : (existing.fields ?? {});
+    const merged = {
+      fields,
+      provenance: op.provenance ? mergeKeys<Ideation.SeedProvenance>(existing.provenance, op.provenance) : (existing.provenance ?? {}),
+      constraints: op.constraints ?? existing.constraints ?? [],
+      concepts: op.concepts ?? existing.concepts ?? [],
+      tasteAnchors: op.tasteAnchors ?? existing.tasteAnchors ?? { comps: [], preferences: [] },
+    };
+    const revision = existing.revision + 1;
+
+    await ctx.tx
+      .update(schema.storySeeds)
+      .set({ ...merged, revision, contentHash: seedContentHash(fields), updatedAt: new Date() })
+      .where(eq(schema.storySeeds.id, existing.id));
+    ctx.applied.push({ artifactRef: 'seed', newRevision: revision });
   }
 
   /**

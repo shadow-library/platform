@@ -60,3 +60,9 @@ export function arcContentHash(arc: Record<string, unknown>): string {
 export function briefContentHash(brief: Record<string, unknown>): string {
   return pickAndHash(brief, BRIEF_HASH_FIELDS);
 }
+
+// The seed sheet hashes over `fields` alone (ideation-studio design §2.2): constraints, concepts,
+// taste anchors, and readiness are the studio's working memory, not the artifact being versioned.
+export function seedContentHash(fields: object | null | undefined): string {
+  return computeContentHash({ fields: fields ?? {} });
+}

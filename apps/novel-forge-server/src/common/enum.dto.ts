@@ -4,6 +4,7 @@ import { schema } from '@server/database';
 
 export const SortByTime = EnumType.create('SortByTime', ['createdAt', 'updatedAt']);
 export const ProjectKind = EnumType.create('ProjectKind', schema.projectKind.enumValues);
+export const ProjectStatus = EnumType.create('ProjectStatus', schema.projectStatus.enumValues);
 export const ContentMode = EnumType.create('ContentMode', schema.contentMode.enumValues);
 export const ContentGenerator = EnumType.create('ContentGenerator', schema.contentGenerator.enumValues);
 export const ChapterStatus = EnumType.create('ChapterStatus', schema.chapterStatus.enumValues);

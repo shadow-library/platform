@@ -96,8 +96,11 @@ export class ProjectService {
       defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' },
     });
 
-    const owner = eq(schema.projects.ownerId, this.ownerId());
-    const where = filter.kind ? and(owner, eq(schema.projects.kind, filter.kind)) : owner;
+    // Seeds are hidden unless asked for by name: the main shelf is the novels shelf, and an unfiltered
+    // list would fill it with ideas that have no bible, plan, or chapters (ideation-studio design §2.1).
+    const conditions = [eq(schema.projects.ownerId, this.ownerId()), eq(schema.projects.status, filter.status ?? 'active')];
+    if (filter.kind) conditions.push(eq(schema.projects.kind, filter.kind));
+    const where = and(...conditions);
     const column = query.sortBy === 'createdAt' ? schema.projects.createdAt : schema.projects.updatedAt;
     const order = query.sortOrder === 'asc' ? asc(column) : desc(column);
 
