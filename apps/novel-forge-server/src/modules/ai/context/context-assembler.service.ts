@@ -4,6 +4,7 @@ import { and, between, eq, inArray, isNotNull, isNull, lte, or, sql } from 'driz
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
+import { AppErrorCode } from '@server/classes';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
@@ -922,6 +923,14 @@ export class ContextAssembler {
           }
         }
         break;
+      }
+      // Ideation sessions are rejected before reaching here (ChatService.createSession/turn); T5 replaces
+      // this with the real forIdeationTurn pack once the studio's own assembly purpose lands.
+      case 'ideation':
+        throw AppErrorCode.IDE_005.create();
+      default: {
+        const exhaustive: never = session.scopeType;
+        throw new Error(`Unhandled chat scope: ${String(exhaustive)}`);
       }
     }
 

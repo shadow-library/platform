@@ -114,6 +114,7 @@ export class RefineService {
   async auditBible(projectId: bigint): Promise<BibleAuditResult> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     if (!project) throw AppErrorCode.PRJ_001.create();
+    assertActiveProject(project);
 
     const prompt = PROMPT_REGISTRY['bible-audit'];
     const [pack, docs] = await Promise.all([

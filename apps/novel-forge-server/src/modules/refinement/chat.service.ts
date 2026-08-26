@@ -98,6 +98,7 @@ export class ChatService {
   }
 
   async createSession(projectId: bigint, input: CreateSessionInput): Promise<Refinement.ChatSession> {
+    if (input.scopeType === 'ideation') throw AppErrorCode.IDE_005.create();
     const scopeRef = await this.validateScopeRef(projectId, input.scopeType, input.scopeRef ?? null);
     const [session] = await this.db
       .insert(schema.chatSessions)
@@ -249,6 +250,7 @@ export class ChatService {
   async turn(projectId: bigint, sessionId: string, content: string): Promise<ChatTurnResult> {
     const session = await this.getSession(projectId, sessionId);
     if (session.status !== 'active') throw AppErrorCode.CHT_002.create();
+    if (session.scopeType === 'ideation') throw AppErrorCode.IDE_005.create();
     await this.validateScopeRef(projectId, session.scopeType, session.scopeRef);
     this.logger.info('chat turn', { projectId, sessionId, scopeType: session.scopeType, mode: session.mode });
     this.logger.debug('chat turn user message', { projectId, sessionId, content });

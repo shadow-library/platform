@@ -145,18 +145,12 @@ describe.if(pgAvailable)('ideation schemas', () => {
     expect(proposal).toMatchObject({ kind: 'ideation', scopeType: 'ideation', status: 'pending' });
   });
 
-  it('should accept seed as a canon-fact knowledge source', async () => {
+  it('should accept seed as a canon-fact origin, kept out of the reveal ledger', async () => {
     const [fact] = await db
       .insert(schema.canonFacts)
-      .values({ projectId, factKey: `promise:no-harem-${Date.now()}`, text: 'one romance, never a roster' })
+      .values({ projectId, factKey: `promise:no-harem-${Date.now()}`, text: 'one romance, never a roster', source: 'seed', revealChapter: null })
       .returning();
-    const [entity] = await db
-      .insert(schema.entities)
-      .values({ projectId, entityKey: `lead-${Date.now()}`, type: 'character', name: 'Ren' })
-      .returning();
-    if (!fact || !entity) throw new Error('failed to seed knowledge fixtures');
 
-    const [ledgered] = await db.insert(schema.characterKnowledge).values({ projectId, factId: fact.id, entityId: entity.id, learnedInChapter: 1, source: 'seed' }).returning();
-    expect(ledgered?.source).toBe('seed');
+    expect(fact).toMatchObject({ source: 'seed', revealChapter: null });
   });
 });

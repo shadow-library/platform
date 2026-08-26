@@ -94,7 +94,6 @@ export const storySeeds = pgTable(
     tasteAnchors: jsonb('taste_anchors').$type<Ideation.TasteAnchors>(),
     concepts: jsonb('concepts').$type<Ideation.ConceptCard[]>(),
     readiness: jsonb('readiness').$type<Ideation.ReadinessEntry[]>(),
-    // The router's memory: question-bank ids already answered or skipped.
     askedQuestions: jsonb('asked_questions').$type<string[]>(),
     revision: integer('revision').notNull().default(1),
     contentHash: text('content_hash'),

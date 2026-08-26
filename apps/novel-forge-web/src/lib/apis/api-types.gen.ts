@@ -2593,6 +2593,7 @@ export interface components {
       };
       volumeKey?: null | string;
       reviewStatus: components['schemas']['DraftReviewStatus'];
+      staleReason?: null | string;
       generator: string;
       judge?: null | string;
       judgeNote?: null | string;
@@ -2731,9 +2732,9 @@ export interface components {
       updatedAt: string;
     };
     /** @enum {string} */
-    ChatScope: 'project' | 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief';
+    ChatScope: 'project' | 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief' | 'ideation';
     /** @enum {string} */
-    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'arc_plan' | 'chapter_extract';
+    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'arc_plan' | 'chapter_extract' | 'ideation';
     /** @enum {string} */
     RefinementProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted' | 'reverted';
     /** @description Change-set operation whose remaining fields depend on its server-validated op value. */
@@ -3472,7 +3473,7 @@ export interface components {
       createdAt: string;
     };
     /** @enum {string} */
-    FactSource: 'brief' | 'manual' | 'import';
+    FactSource: 'brief' | 'manual' | 'import' | 'seed';
     UpsertFactBody: {
       text: string;
       subjects?: string[];

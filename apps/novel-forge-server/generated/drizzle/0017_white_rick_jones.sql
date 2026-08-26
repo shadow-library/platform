@@ -1,0 +1,1 @@
+ALTER TABLE "canon_facts" ADD COLUMN "source" "fact_source" DEFAULT 'manual' NOT NULL;

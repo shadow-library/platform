@@ -87,6 +87,10 @@ describe.if(pgAvailable)('seed-status guards', () => {
       expect(await rejectionCode(testEnv.getService(RefineService).planArcs(seedId, 'v1'))).toBe('IDE_004');
     });
 
+    it('should reject auditBible for a seed project', async () => {
+      expect(await rejectionCode(testEnv.getService(RefineService).auditBible(seedId))).toBe('IDE_004');
+    });
+
     it('should let an active project past the guard and fail on its own preconditions', async () => {
       expect(await rejectionCode(testEnv.getService(RefineService).enhancePremise(activeId))).toBe('PRM_001');
     });

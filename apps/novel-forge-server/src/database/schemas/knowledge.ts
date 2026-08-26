@@ -152,6 +152,7 @@ export const canonFacts = pgTable(
     constraintNote: text('constraint_note'),
     terms: jsonb('terms').$type<string[]>(),
     revealChapter: integer('reveal_chapter'),
+    source: factSource('source').notNull().default('manual'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

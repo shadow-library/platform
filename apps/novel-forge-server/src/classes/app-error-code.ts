@@ -209,6 +209,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly IDE_002 = AppErrorCode.badRequest('IDE_002', 'Graduation requires a title');
   static readonly IDE_003 = AppErrorCode.badRequest('IDE_003', 'Unknown question id');
   static readonly IDE_004 = AppErrorCode.badRequest('IDE_004', 'Project is a seed — this operation requires an active project');
+  static readonly IDE_005 = AppErrorCode.badRequest('IDE_005', 'ideation chat sessions are managed by the ideation studio');
 
   /*!
    * Publishing Errors
