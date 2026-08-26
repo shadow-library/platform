@@ -159,12 +159,16 @@ export class IdeationService {
     return this.present(seed, sessions.get(projectId) ?? null);
   }
 
-  /** One project can end up with more than one `ideation` session; the newest one is the live studio conversation. */
+  /**
+   * One project can end up with more than one `ideation` session; the newest one is the live studio
+   * conversation. Sessions minted in the same transaction share a timestamp, so the id breaks the tie
+   * and the same session is returned on every read.
+   */
   private async studioSessions(projectIds: bigint[]): Promise<Map<bigint, string>> {
     const sessions = await this.db.query.chatSessions.findMany({
       where: and(inArray(schema.chatSessions.projectId, projectIds), eq(schema.chatSessions.scopeType, 'ideation')),
       columns: { id: true, projectId: true },
-      orderBy: desc(schema.chatSessions.createdAt),
+      orderBy: [desc(schema.chatSessions.createdAt), desc(schema.chatSessions.id)],
     });
 
     const newest = new Map<bigint, string>();

@@ -208,6 +208,21 @@ describe.if(pgAvailable)('Ideation API', () => {
       expect(response.json().sessionId).toBe(newerSession?.id);
     });
 
+    it('should resolve the same session on every read when two share a timestamp', async () => {
+      const created = (await createSeed('a tied session')).json();
+      const projectId = BigInt(created.projectId);
+
+      const tiedAt = new Date('2026-01-01T00:00:00.000Z');
+      const [original] = await db.update(schema.chatSessions).set({ createdAt: tiedAt }).where(eq(schema.chatSessions.projectId, projectId)).returning();
+      const [twin] = await db.insert(schema.chatSessions).values({ projectId, scopeType: 'ideation', mode: 'auto', title: 'Ideation Studio', createdAt: tiedAt }).returning();
+
+      const expected = [original?.id, twin?.id].sort().reverse()[0];
+      for (let read = 0; read < 3; read++) {
+        const response = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${projectId}/seed`);
+        expect(response.json().sessionId).toBe(expected);
+      }
+    });
+
     it('should return the whole sheet', async () => {
       const created = (await createSeed('a salvager')).json();
       const seedId = BigInt(created.id);

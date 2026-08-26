@@ -432,10 +432,10 @@ function validateSeedFields(value: Record<string, unknown>, path: string, errors
     if (!SEED_FIELD_KEYS.includes(key)) errors.push(`${path}: unknown sheet field 'fields.${key}'`);
     if (entry === null) continue;
     if (key === 'themes') {
-      if (!isKind(entry, 'string[]')) errors.push(`${path}: fields.themes must be a string array or null`);
+      if (!isKind(entry, 'string[]') || (entry as string[]).some(theme => theme.trim() === '')) errors.push(`${path}: fields.themes must be an array of non-empty strings or null`);
       continue;
     }
-    if (typeof entry !== 'string' || entry === '') errors.push(`${path}: fields.${key} must be a non-empty string or null`);
+    if (typeof entry !== 'string' || entry.trim() === '') errors.push(`${path}: fields.${key} must be a non-empty string or null`);
   }
 }
 

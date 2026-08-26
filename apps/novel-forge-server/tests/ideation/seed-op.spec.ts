@@ -111,6 +111,22 @@ describe.if(pgAvailable)('seed.update op', () => {
       expect(validateChangeSet([{ op: 'seed.update', fields: { hook: ['grief'] } }])).toHaveLength(1);
     });
 
+    it('should reject a whitespace-only sheet value', () => {
+      expect(validateChangeSet([{ op: 'seed.update', fields: { hook: '   ' } }])[0]).toContain('fields.hook must be a non-empty string');
+    });
+
+    it('should reject an empty themes entry', () => {
+      expect(validateChangeSet([{ op: 'seed.update', fields: { themes: [''] } }])[0]).toContain('fields.themes must be an array of non-empty strings');
+    });
+
+    it('should reject a whitespace-only themes entry', () => {
+      expect(validateChangeSet([{ op: 'seed.update', fields: { themes: ['grief', ' '] } }])[0]).toContain('fields.themes must be an array of non-empty strings');
+    });
+
+    it('should accept an empty themes list as a cleared list', () => {
+      expect(validateChangeSet([{ op: 'seed.update', fields: { themes: [] } }])).toEqual([]);
+    });
+
     it('should reject a malformed provenance entry', () => {
       const errors = validateChangeSet([{ op: 'seed.update', provenance: { hook: { source: 'nobody', turnOrdinal: 'two' } } }]);
       expect(errors).toHaveLength(2);
@@ -136,7 +152,7 @@ describe.if(pgAvailable)('seed.update op', () => {
 
     it('should reject a bare string for the themes array', () => {
       const errors = validateChangeSet([{ op: 'seed.update', fields: { themes: 'grief' } }]);
-      expect(errors[0]).toContain('fields.themes must be a string array or null');
+      expect(errors[0]).toContain('fields.themes must be an array of non-empty strings or null');
     });
 
     it('should reject an empty string sheet value', () => {
