@@ -156,7 +156,7 @@ export interface FactRemoveOp {
  */
 export interface SeedUpdateOp {
   op: 'seed.update';
-  fields?: Record<string, string | string[] | null>;
+  fields?: { [K in keyof Ideation.SeedFields]?: Ideation.SeedFields[K] | null };
   provenance?: Record<string, Ideation.FieldProvenance | null>;
   constraints?: Ideation.SeedConstraint[];
   concepts?: Ideation.ConceptCard[];
@@ -430,9 +430,12 @@ function validateKnowledgeContract(value: unknown, path: string, errors: string[
 function validateSeedFields(value: Record<string, unknown>, path: string, errors: string[]): void {
   for (const [key, entry] of Object.entries(value)) {
     if (!SEED_FIELD_KEYS.includes(key)) errors.push(`${path}: unknown sheet field 'fields.${key}'`);
-    if (entry === null || typeof entry === 'string') continue;
-    if (key === 'themes' && isKind(entry, 'string[]')) continue;
-    errors.push(`${path}: fields.${key} must be a string${key === 'themes' ? ' array' : ''} or null`);
+    if (entry === null) continue;
+    if (key === 'themes') {
+      if (!isKind(entry, 'string[]')) errors.push(`${path}: fields.themes must be a string array or null`);
+      continue;
+    }
+    if (typeof entry !== 'string' || entry === '') errors.push(`${path}: fields.${key} must be a non-empty string or null`);
   }
 }
 
@@ -462,6 +465,15 @@ function requireStrings(record: Record<string, unknown>, keys: string[], at: str
 
 function validateSeedUpdate(record: Record<string, unknown>, path: string, errors: string[]): void {
   if (SEED_COLUMNS.every(column => record[column] === undefined)) return void errors.push(`${path}: seed.update must set at least one of ${SEED_COLUMNS.join(', ')}`);
+
+  // `fields`/`provenance` merge per key, so an empty object is a genuine no-op (a revision bump with
+  // nothing changed) rather than the "clear everything" a wholesale-replace column would mean.
+  for (const column of ['fields', 'provenance'] as const) {
+    const value = record[column];
+    if (value !== undefined && isKind(value, 'object') && Object.keys(value as Record<string, unknown>).length === 0) {
+      errors.push(`${path}: ${column} must not be empty when provided`);
+    }
+  }
 
   if (isKind(record['fields'], 'object')) validateSeedFields(record['fields'] as Record<string, unknown>, path, errors);
   if (isKind(record['provenance'], 'object')) validateSeedProvenance(record['provenance'] as Record<string, unknown>, path, errors);

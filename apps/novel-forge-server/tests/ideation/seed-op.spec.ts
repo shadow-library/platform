@@ -99,7 +99,7 @@ describe.if(pgAvailable)('seed.update op', () => {
     });
 
     it('should reject a non-string sheet value', () => {
-      expect(validateChangeSet([{ op: 'seed.update', fields: { hook: 3 } }])[0]).toContain('fields.hook must be a string');
+      expect(validateChangeSet([{ op: 'seed.update', fields: { hook: 3 } }])[0]).toContain('fields.hook must be a non-empty string');
     });
 
     it('should accept a null sheet value as a clear', () => {
@@ -132,6 +132,27 @@ describe.if(pgAvailable)('seed.update op', () => {
 
     it('should reject collections that are not arrays of objects', () => {
       expect(validateChangeSet([{ op: 'seed.update', concepts: ['a card'] }])[0]).toContain("invalid field 'concepts'");
+    });
+
+    it('should reject a bare string for the themes array', () => {
+      const errors = validateChangeSet([{ op: 'seed.update', fields: { themes: 'grief' } }]);
+      expect(errors[0]).toContain('fields.themes must be a string array or null');
+    });
+
+    it('should reject an empty string sheet value', () => {
+      expect(validateChangeSet([{ op: 'seed.update', fields: { hook: '' } }])[0]).toContain('fields.hook must be a non-empty string or null');
+    });
+
+    it('should reject an empty fields object as a no-op', () => {
+      expect(validateChangeSet([{ op: 'seed.update', fields: {} }])[0]).toContain('fields must not be empty when provided');
+    });
+
+    it('should reject an empty provenance object as a no-op', () => {
+      expect(validateChangeSet([{ op: 'seed.update', provenance: {} }])[0]).toContain('provenance must not be empty when provided');
+    });
+
+    it('should still accept an empty constraints/concepts array as a wholesale clear', () => {
+      expect(validateChangeSet([{ op: 'seed.update', constraints: [], concepts: [] }])).toEqual([]);
     });
 
     it('should keep seed.update out of the hub vocabulary', () => {

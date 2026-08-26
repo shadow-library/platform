@@ -3615,6 +3615,9 @@ export interface components {
       fix?: string;
     };
     ListSeedsResponse: {
+      total: number;
+      limit: number;
+      offset: number;
       items: components['schemas']['SeedSummaryResponse'][];
     };
     /** @description One card on the Ideas shelf. */
@@ -9161,7 +9164,12 @@ export interface operations {
   };
   get_api_v1_seeds: {
     parameters: {
-      query?: never;
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+        sortOrder?: components['schemas']['SortOrder'];
+        sortBy?: components['schemas']['SortByTime'];
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -12330,6 +12338,7 @@ export type ListBibleDocsPathParams = Exclude<paths['/api/v1/projects/{projectId
 export type GetBibleDocPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/{section}/{slug}']['get']['parameters']['path'], undefined>;
 export type ListFactsPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts']['get']['parameters']['path'], undefined>;
 export type GetFactPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts/{factKey}']['get']['parameters']['path'], undefined>;
+export type ListSeedsQueryParams = Exclude<paths['/api/v1/seeds']['get']['parameters']['query'], undefined>;
 export type GetSeedPathParams = Exclude<paths['/api/v1/projects/{projectId}/seed']['get']['parameters']['path'], undefined>;
 export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
 export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;

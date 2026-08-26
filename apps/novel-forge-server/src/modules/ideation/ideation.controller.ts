@@ -1,7 +1,7 @@
 import { Authenticated } from '@shadow-library/auth/module';
-import { Body, Get, HttpController, Params, Post, RespondFor } from '@shadow-library/fastify';
+import { Body, Get, HttpController, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-import { CreateSeedBody, ListSeedsResponse, SeedProjectParams, SeedResponse } from './ideation.dto';
+import { CreateSeedBody, ListSeedsQuery, ListSeedsResponse, SeedProjectParams, SeedResponse } from './ideation.dto';
 import { IdeationService } from './ideation.service';
 
 @Authenticated()
@@ -17,8 +17,8 @@ export class SeedController {
 
   @Get()
   @RespondFor(200, ListSeedsResponse)
-  listSeeds(): Promise<ListSeedsResponse> {
-    return this.ideationService.listSeeds();
+  listSeeds(@Query() query: ListSeedsQuery): Promise<ListSeedsResponse> {
+    return this.ideationService.listSeeds(query);
   }
 }
 

@@ -2,8 +2,10 @@ import { SQL } from 'bun';
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 
+import { IdeationService } from '@modules/ideation';
 import { seedContentHash } from '@server/common';
 import { type PrimaryDatabase, schema } from '@server/database';
+import { ProjectService } from '@modules/project/project/project.service';
 import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
 
 const pgAvailable = await (async () => {
@@ -89,6 +91,28 @@ describe.if(pgAvailable)('Ideation API', () => {
 
       expect(await db.query.chatMessages.findMany({ where: eq(schema.chatMessages.sessionId, body.sessionId) })).toHaveLength(0);
     });
+
+    it('should delete the orphan project when the follow-up transaction fails', async () => {
+      const ideationService = testEnv.getService(IdeationService);
+      const projectService = testEnv.getService(ProjectService);
+      const originalCreate = projectService.create.bind(projectService);
+      (projectService as unknown as { create: typeof projectService.create }).create = async (...args: Parameters<typeof projectService.create>) => {
+        const project = await originalCreate(...args);
+        // Pre-seeds the unique story_seeds row the transaction is about to insert, forcing a
+        // deterministic constraint violation once the follow-up transaction runs.
+        await db.insert(schema.storySeeds).values({ projectId: project.id, contentHash: seedContentHash({}) });
+        return project;
+      };
+
+      try {
+        await expect(ideationService.createSeed({})).rejects.toBeDefined();
+      } finally {
+        (projectService as unknown as { create: typeof projectService.create }).create = originalCreate;
+      }
+
+      const stranded = await db.query.projects.findFirst({ where: eq(schema.projects.name, 'Untitled idea') });
+      expect(stranded).toBeUndefined();
+    });
   });
 
   describe('GET /api/v1/seeds', () => {
@@ -142,11 +166,48 @@ describe.if(pgAvailable)('Ideation API', () => {
     });
 
     it('should return an empty shelf when the caller has no seeds', async () => {
-      expect((await testEnv.getRouter().mockRequest().get('/api/v1/seeds')).json()).toEqual({ items: [] });
+      const body = (await testEnv.getRouter().mockRequest().get('/api/v1/seeds')).json();
+      expect(body).toMatchObject({ items: [], total: 0, limit: 20, offset: 0 });
+    });
+
+    it('should paginate with a default limit and honour limit/offset', async () => {
+      for (let i = 0; i < 3; i++) await createSeed(`idea ${i}`);
+
+      const page1 = (await testEnv.getRouter().mockRequest().get('/api/v1/seeds?limit=2&offset=0')).json();
+      expect(page1).toMatchObject({ total: 3, limit: 2, offset: 0 });
+      expect(page1.items).toHaveLength(2);
+
+      const page2 = (await testEnv.getRouter().mockRequest().get('/api/v1/seeds?limit=2&offset=2')).json();
+      expect(page2).toMatchObject({ total: 3, limit: 2, offset: 2 });
+      expect(page2.items).toHaveLength(1);
+
+      const ids = [...page1.items, ...page2.items].map((item: { id: string }) => item.id);
+      expect(new Set(ids).size).toBe(3);
+    });
+
+    it('should cap the limit at 100', async () => {
+      const response = await testEnv.getRouter().mockRequest().get('/api/v1/seeds?limit=1000');
+      expect(response.statusCode).toBe(422);
     });
   });
 
   describe('GET /api/v1/projects/:projectId/seed', () => {
+    it('should resolve the newest ideation session when a project has more than one', async () => {
+      const created = (await createSeed('first session')).json();
+      const projectId = BigInt(created.projectId);
+
+      const [olderSession] = await db.query.chatSessions.findMany({ where: eq(schema.chatSessions.projectId, projectId) });
+      await db
+        .update(schema.chatSessions)
+        .set({ createdAt: new Date(Date.now() - 60_000) })
+        .where(eq(schema.chatSessions.id, olderSession?.id as string));
+
+      const [newerSession] = await db.insert(schema.chatSessions).values({ projectId, scopeType: 'ideation', mode: 'auto', title: 'Ideation Studio' }).returning();
+
+      const response = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${projectId}/seed`);
+      expect(response.json().sessionId).toBe(newerSession?.id);
+    });
+
     it('should return the whole sheet', async () => {
       const created = (await createSeed('a salvager')).json();
       const seedId = BigInt(created.id);

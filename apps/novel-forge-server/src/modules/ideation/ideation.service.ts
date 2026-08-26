@@ -1,6 +1,6 @@
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { Logger, utils } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
@@ -10,7 +10,7 @@ import { APP_NAME } from '@server/constants';
 import { type Ideation, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { ProjectService } from '../project/project/project.service';
-import { type CreateSeedBody, type ListSeedsResponse, type SeedResponse, type SeedSummaryResponse } from './ideation.dto';
+import { type CreateSeedBody, type ListSeedsQuery, type ListSeedsResponse, type SeedResponse, type SeedSummaryResponse } from './ideation.dto';
 
 const PLACEHOLDER_SEED_NAME = 'Untitled idea';
 const STUDIO_SESSION_TITLE = 'Ideation Studio';
@@ -61,54 +61,73 @@ export class IdeationService {
     const spark = body.spark?.trim();
     const project = await this.projectService.create({ name: PLACEHOLDER_SEED_NAME, kind: 'new_novel' }, { status: 'seed' });
 
-    return this.db.transaction(async tx => {
-      const [seed] = await tx
-        .insert(schema.storySeeds)
-        .values({
-          projectId: project.id,
-          fields: {},
-          provenance: {},
-          constraints: [],
-          tasteAnchors: { comps: [], preferences: [] },
-          concepts: [],
-          readiness: [],
-          askedQuestions: [],
-          contentHash: seedContentHash({}),
-        })
-        .returning()
-        .catch(err => this.databaseService.translateError(err));
-      if (!seed) throw AppErrorCode.S001.create();
-
-      const [session] = await tx
-        .insert(schema.chatSessions)
-        .values({ projectId: project.id, scopeType: 'ideation', mode: 'auto', title: STUDIO_SESSION_TITLE })
-        .returning()
-        .catch(err => this.databaseService.translateError(err));
-      if (!session) throw AppErrorCode.CHT_001.create();
-
-      if (spark) {
-        await tx
-          .insert(schema.chatMessages)
-          .values({ sessionId: session.id, projectId: project.id, ordinal: 1, role: 'user', content: spark })
+    try {
+      return await this.db.transaction(async tx => {
+        const [seed] = await tx
+          .insert(schema.storySeeds)
+          .values({
+            projectId: project.id,
+            fields: {},
+            provenance: {},
+            constraints: [],
+            tasteAnchors: { comps: [], preferences: [] },
+            concepts: [],
+            readiness: [],
+            askedQuestions: [],
+            contentHash: seedContentHash({}),
+          })
+          .returning()
           .catch(err => this.databaseService.translateError(err));
-      }
+        if (!seed) throw AppErrorCode.S001.create();
 
-      this.logger.info('seed created', { projectId: project.id, seedId: seed.id, sessionId: session.id, hasSpark: Boolean(spark) });
-      return this.present(seed, session.id);
-    });
+        const [session] = await tx
+          .insert(schema.chatSessions)
+          .values({ projectId: project.id, scopeType: 'ideation', mode: 'auto', title: STUDIO_SESSION_TITLE })
+          .returning()
+          .catch(err => this.databaseService.translateError(err));
+        if (!session) throw AppErrorCode.CHT_001.create();
+
+        if (spark) {
+          await tx
+            .insert(schema.chatMessages)
+            .values({ sessionId: session.id, projectId: project.id, ordinal: 1, role: 'user', content: spark })
+            .catch(err => this.databaseService.translateError(err));
+        }
+
+        this.logger.info('seed created', { projectId: project.id, seedId: seed.id, sessionId: session.id, hasSpark: Boolean(spark) });
+        return this.present(seed, session.id);
+      });
+    } catch (err) {
+      // The project insert already committed outside this transaction (ProjectService.create owns no
+      // tx of its own and inserts nothing else for seeds), so a failure here would otherwise strand a
+      // seed-status project with no sheet — invisible everywhere but the /seeds listing's join. Delete
+      // it and surface the original failure.
+      await this.db
+        .delete(schema.projects)
+        .where(eq(schema.projects.id, project.id))
+        .catch(deleteErr => this.logger.error('failed to compensate orphan seed project', { projectId: project.id, error: deleteErr }));
+      throw err;
+    }
   }
 
-  /** The Ideas shelf: every seed-status project the caller owns, newest activity first. */
-  async listSeeds(): Promise<ListSeedsResponse> {
-    const rows = await this.db
-      .select({ seed: schema.storySeeds })
-      .from(schema.storySeeds)
-      .innerJoin(schema.projects, eq(schema.projects.id, schema.storySeeds.projectId))
-      .where(and(eq(schema.projects.ownerId, this.ownerId()), eq(schema.projects.status, 'seed')))
-      .orderBy(desc(schema.storySeeds.updatedAt));
-    if (rows.length === 0) return { items: [] };
+  /** The Ideas shelf: every seed-status project the caller owns, newest activity first, page by page. */
+  async listSeeds(filter: ListSeedsQuery): Promise<ListSeedsResponse> {
+    const query = utils.pagination.normalise(filter, { mode: 'offset', defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' } });
 
-    const seeds = rows.map(row => row.seed);
+    const ownedSeedProjectIds = this.db
+      .select({ id: schema.projects.id })
+      .from(schema.projects)
+      .where(and(eq(schema.projects.ownerId, this.ownerId()), eq(schema.projects.status, 'seed')));
+    const where = inArray(schema.storySeeds.projectId, ownedSeedProjectIds);
+    const column = query.sortBy === 'createdAt' ? schema.storySeeds.createdAt : schema.storySeeds.updatedAt;
+    const order = query.sortOrder === 'asc' ? asc(column) : desc(column);
+
+    const [total, seeds] = await Promise.all([
+      this.db.$count(schema.storySeeds, where),
+      this.db.query.storySeeds.findMany({ where, orderBy: order, limit: query.limit, offset: query.offset }),
+    ]);
+    if (seeds.length === 0) return utils.pagination.createResult(query, [], total);
+
     const sessions = await this.studioSessions(seeds.map(seed => seed.projectId));
     const sparks = await this.sparkExcerpts([...sessions.values()]);
 
@@ -124,7 +143,7 @@ export class IdeationService {
         updatedAt: seed.updatedAt,
       };
     });
-    return { items };
+    return utils.pagination.createResult(query, items, total);
   }
 
   /** The full sheet for one seed. Ownership is enforced a stage earlier by `ProjectOwnershipGuard`. */
@@ -140,13 +159,19 @@ export class IdeationService {
     return this.present(seed, sessions.get(projectId) ?? null);
   }
 
+  /** One project can end up with more than one `ideation` session; the newest one is the live studio conversation. */
   private async studioSessions(projectIds: bigint[]): Promise<Map<bigint, string>> {
     const sessions = await this.db.query.chatSessions.findMany({
       where: and(inArray(schema.chatSessions.projectId, projectIds), eq(schema.chatSessions.scopeType, 'ideation')),
       columns: { id: true, projectId: true },
-      orderBy: schema.chatSessions.createdAt,
+      orderBy: desc(schema.chatSessions.createdAt),
     });
-    return new Map(sessions.map((session: Pick<Refinement.ChatSession, 'id' | 'projectId'>) => [session.projectId, session.id]));
+
+    const newest = new Map<bigint, string>();
+    for (const session of sessions as Pick<Refinement.ChatSession, 'id' | 'projectId'>[]) {
+      if (!newest.has(session.projectId)) newest.set(session.projectId, session.id);
+    }
+    return newest;
   }
 
   /**

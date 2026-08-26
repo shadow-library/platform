@@ -5,6 +5,7 @@ import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
+import { assertActiveProject } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Bible, type Chapter, type Knowledge, type Plan, type PrimaryDatabase, type Project, schema } from '@server/database';
 
@@ -176,6 +177,7 @@ export class ProjectService {
     return this.db.transaction(async tx => {
       const source = await tx.query.projects.findFirst({ where: eq(schema.projects.id, id) });
       if (!source) throw AppErrorCode.PRJ_001.create();
+      assertActiveProject(source);
 
       if (body.resetDerived === false) {
         this.logger.warn(`clone resetDerived=false for project ${id}: full child-table copy is not yet implemented`);

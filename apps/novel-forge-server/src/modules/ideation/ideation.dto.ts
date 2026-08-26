@@ -1,6 +1,8 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
+import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
+import { SortByTime } from '@server/common';
 import { type Ideation } from '@server/database';
 
 @Schema()
@@ -235,7 +237,7 @@ export class SeedSummaryResponse {
 }
 
 @Schema()
-export class ListSeedsResponse {
-  @Field(() => [SeedSummaryResponse])
-  items: SeedSummaryResponse[];
-}
+export class ListSeedsQuery extends PaginationQuery(SortByTime, { sortBy: 'updatedAt', sortOrder: 'desc' }) {}
+
+@Schema()
+export class ListSeedsResponse extends Paginated(SeedSummaryResponse) {}
