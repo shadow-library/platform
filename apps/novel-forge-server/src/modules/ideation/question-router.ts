@@ -9,6 +9,10 @@ export interface RouterResult {
   questions: StudioQuestion[];
   /** Playbook-forced and follow-up ids still owed, in bank order, whatever stage they belong to. */
   forced: string[];
+  /** Ids in `questions` re-offered past `askedQuestions` because a stress-ready field they fill is missing. */
+  backfilled: string[];
+  /** Per offered id, what is already locked about it — the turn should confirm that rather than re-ask it. */
+  hints: Record<string, string>;
   done: boolean;
 }
 
@@ -73,23 +77,46 @@ function collectForced(seed: RouterSeedState): Set<string> {
   return new Set([...ids].filter(id => !asked.has(id) && QUESTION_BANK.some(question => question.id === id)));
 }
 
+/**
+ * Retirement, and the reason `fills` being empty is load-bearing. A question that fills sheet fields
+ * is spent only once every one of them is present, so an unanswered offer of it comes back. A question
+ * that fills nothing retires on its first offer: its answer lands as a locked constraint, none of them
+ * fill a stress-ready field, and an enrichment question the author declined is not worth re-asking.
+ */
 const answered = (seed: RouterSeedState, question: StudioQuestion): boolean =>
   (question.fills.length > 0 && question.fills.every(field => hasField(seed, field))) || question.skipWhen(seed);
 
+/** The fillers of every missing stress-ready field, in bank order, ignoring `askedQuestions` entirely. */
+function backfill(seed: RouterSeedState): StudioQuestion[] {
+  const missing = STRESS_READY_FIELDS.filter(field => !hasField(seed, field));
+  return QUESTION_BANK.filter(question => question.fills.some(field => missing.includes(field))).slice(0, MAX_QUESTIONS_PER_TURN);
+}
+
+const collectHints = (seed: RouterSeedState, questions: StudioQuestion[]): Record<string, string> => {
+  const hints: Record<string, string> = {};
+  for (const question of questions) {
+    const hint = question.hint?.(seed);
+    if (hint) hints[question.id] = hint;
+  }
+  return hints;
+};
+
 /**
- * The whole interview, as a pure function of the sheet. A question is dropped when its sheet fields
- * are already filled or a locked constraint has answered it; a forced question bypasses both of
- * those and is gated only on having been asked before, which is what makes the renewal question fire
- * exactly once even though the engine answer has already written its field.
+ * The whole interview, as a pure function of the sheet. Stage by stage it offers the questions not yet
+ * asked whose sheet fields are still empty and whose locked constraints have not settled them; a forced
+ * question bypasses the second test and is gated only on having been asked before, which is what makes
+ * the renewal question fire exactly once. Offered-but-unanswered questions never hold a stage open — a
+ * tone question the author skips would otherwise stall the interview on that stage forever.
  *
  * The caller MUST record every id in `questions` — see `recordOffered`. Recording only the ids the
  * author actually answered re-offers a forced question forever, because "already asked" is the only
  * gate a forced question has.
  *
- * The termination invariant: every field in `STRESS_READY_FIELDS` keeps at least one live filler in
- * every reachable seed state, so a walk that answers what it is offered always reaches `done`. It is
- * held in the bank rather than here — no stress-ready field may be left with all of its fillers
- * suppressed by `skipWhen` at once (`question-router.spec.ts` walks the matrix that proves it).
+ * The termination invariant is structural rather than statistical. Every field in `STRESS_READY_FIELDS`
+ * has at least one filler in the bank (`question-router.spec.ts` pins it), and when the stage walk runs
+ * out with the sheet unfinished the router re-offers those fillers regardless of `askedQuestions`. So
+ * `questions: [] && done: false` is unreachable, an author who skipped a field is asked again rather
+ * than stranded, and a field cleared back to null after the fact is re-offered on the next turn.
  */
 export function nextQuestions(seed: RouterSeedState): RouterResult {
   const asked = new Set(seed.askedQuestions);
@@ -106,10 +133,12 @@ export function nextQuestions(seed: RouterSeedState): RouterResult {
     if (pending.length === 0) continue;
 
     const ordered = [...pending].sort((left, right) => Number(forced.has(right.id)) - Number(forced.has(left.id)));
-    return { stage, questions: ordered.slice(0, MAX_QUESTIONS_PER_TURN), forced: forcedList, done };
+    const questions = ordered.slice(0, MAX_QUESTIONS_PER_TURN);
+    return { stage, questions, forced: forcedList, backfilled: [], hints: collectHints(seed, questions), done };
   }
 
-  return { stage: 'stress', questions: [], forced: forcedList, done };
+  const reoffered = done ? [] : backfill(seed);
+  return { stage: 'stress', questions: reoffered, forced: forcedList, backfilled: reoffered.map(question => question.id), hints: collectHints(seed, reoffered), done };
 }
 
 /**

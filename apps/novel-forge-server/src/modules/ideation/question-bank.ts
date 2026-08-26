@@ -27,6 +27,8 @@ export interface StudioQuestion {
   skipWhen: (seed: RouterSeedState) => boolean;
   /** Question ids this answer makes mandatory — the conditional branches the bank cannot hard-code. */
   followUps?: (seed: RouterSeedState) => string[];
+  /** A deterministic note about what is already locked, so the turn confirms the decision instead of re-asking it. */
+  hint?: (seed: RouterSeedState) => string | undefined;
   youDecide: 'commit-and-explain';
 }
 
@@ -47,8 +49,12 @@ const SEED_FIELD_MEMBERS: Record<Ideation.FieldKey, true> = {
 
 export const SEED_FIELD_KEYS = Object.keys(SEED_FIELD_MEMBERS) as Ideation.FieldKey[];
 
-/** Constraint keys that name the room itself. The length lock is a scope constraint too, and fixes nothing about where the story happens. */
-const ROOM_CONSTRAINT_KEYS = ['room', 'setting', 'world', 'place', 'location', 'locale'];
+/**
+ * Constraint keys that name the room itself. The length lock is a scope constraint too, and fixes
+ * nothing about where the story happens. This is the emission contract the extraction prompt writes
+ * against — a room answer that lands under any other key is invisible to the router.
+ */
+export const ROOM_CONSTRAINT_KEYS = ['room', 'setting', 'world', 'place', 'location', 'locale'];
 
 const filled = (value: string | string[] | undefined): boolean => (Array.isArray(value) ? value.length > 0 : typeof value === 'string' && value.trim() !== '');
 
@@ -57,11 +63,13 @@ export const hasField = (seed: RouterSeedState, key: Ideation.FieldKey): boolean
 const hasConstraintKind = (seed: RouterSeedState, kind: Ideation.ConstraintKind): boolean => seed.constraints.some(constraint => constraint.kind === kind);
 
 export const hasRoomConstraint = (seed: RouterSeedState): boolean =>
-  seed.constraints.some(constraint =>
-    constraint.key
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .some(token => ROOM_CONSTRAINT_KEYS.includes(token)),
+  seed.constraints.some(
+    constraint =>
+      constraint.kind === 'scope' &&
+      constraint.key
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .some(token => ROOM_CONSTRAINT_KEYS.includes(token)),
   );
 
 const playbook = (seed: RouterSeedState, key: string): boolean => hasPlaybook(seed.constraints, key);
@@ -100,12 +108,15 @@ export const QUESTION_BANK: StudioQuestion[] = [
       'Which shelf does this sit on? I am not asking so I can put it in a box. A genre is a set of promises the reader arrives already holding, and I would much rather we keep them on purpose than break them by accident.',
     fills: ['genre'],
     skipWhen: () => false,
+    hint: seed =>
+      playbook(seed, 'litrpg-system') ? 'Locked already: a litRPG system with visible numbers. Confirm the shelf around it rather than re-asking the shelf.' : undefined,
     youDecide: 'commit-and-explain',
   },
   {
     id: 'orient.room',
     stage: 'orient',
-    intent: 'Pin the room the reader lives in — where and when the story happens, at the resolution of a place you could point at.',
+    intent:
+      "Pin the room the reader lives in — where and when the story happens, at the resolution of a place you could point at. Emit the answer as a locked constraint with key 'setting' and kind 'scope'; under any other key or kind the router cannot see it and asks again.",
     coaching:
       'Where does this happen, and when? One place, not a world map — the room the reader will spend most of their time in. Settings are cheap to invent and expensive to change, because every decision after this one will quietly assume it.',
     fills: [],
@@ -121,6 +132,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: ['serializationNotes'],
     skipWhen: seed => playbook(seed, 'open-ended-length'),
     followUps: seed => (isOpenEndedLength(seed.fields.serializationNotes) ? ['deepen.renewal'] : []),
+    hint: seed => (playbook(seed, 'open-ended-length') ? 'Locked already: an open-ended run. Confirm the cadence rather than re-asking the container.' : undefined),
     youDecide: 'commit-and-explain',
   },
   {
@@ -141,6 +153,12 @@ export const QUESTION_BANK: StudioQuestion[] = [
       'How many people is this really about? One lead, two bound together, a crew of five. This decision has the longest shadow of anything we will decide today, because every lead you add needs a reason to be on the page late in the run, not just at the start.',
     fills: ['castShape'],
     skipWhen: () => false,
+    hint: (seed: RouterSeedState): string | undefined => {
+      if (playbook(seed, 'dual-leads')) return 'Locked already: dual leads. Confirm rather than re-ask.';
+      if (playbook(seed, 'ensemble')) return 'Locked already: an ensemble cast. Confirm the count rather than re-ask the shape.';
+      if (playbook(seed, 'single-pov')) return 'Locked already: a single viewpoint. Confirm rather than re-ask.';
+      return undefined;
+    },
     youDecide: 'commit-and-explain',
   },
   {
@@ -179,10 +197,11 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'deepen.renewal',
     stage: 'deepen',
-    intent: 'Decide the second engine that takes over when the first ladder tops out, before the story is long enough for it to matter.',
+    intent:
+      "Decide the second engine that takes over when the first ladder tops out, before the story is long enough for it to matter. The answer enriches the progression engine rather than replacing it: record it as a locked constraint with key 'renewal' and kind 'scope', or fold it into the existing progressionSystem text — never as the field's only content.",
     coaching:
       'When the ladder tops out, what replaces it? This is where open-ended stories die: the lead reaches the top of the thing that was going up, and there is nothing left to escalate. Decide the second engine now, while it is one paragraph, instead of mid-run when it is a rewrite.',
-    fills: ['progressionSystem'],
+    fills: [],
     skipWhen: seed => !playbook(seed, 'open-ended-length') && !isOpenEndedLength(seed.fields.serializationNotes),
     youDecide: 'commit-and-explain',
   },
@@ -199,7 +218,8 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'deepen.refusal',
     stage: 'deepen',
-    intent: 'Name the line the protagonist will not cross, and lock it, so victory can later be made to cost something.',
+    intent:
+      "Name the line the protagonist will not cross, and lock it, so victory can later be made to cost something. Emit the answer as a locked constraint with key 'refusal' and kind 'shape'.",
     coaching:
       "What won't they do, even to win? A character with no refusal is a plot device with dialogue. Give me the one line they hold, and I will make sure the story eventually asks them to cross it — that scene is usually the reason readers stay.",
     fills: [],
@@ -219,7 +239,8 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'deepen.foil',
     stage: 'deepen',
-    intent: 'Identify who is allowed to tell the protagonist they are wrong, and why the protagonist listens to them and nobody else.',
+    intent:
+      "Identify who is allowed to tell the protagonist they are wrong, and why the protagonist listens to them and nobody else. Emit the answer as a locked constraint with key 'foil' and kind 'shape'.",
     coaching:
       'Who can tell them they are wrong and be heard? Every lead needs one person whose disagreement lands, or the book becomes an argument the protagonist wins by default. Name them now — they are usually the second most important character in the book, and they are almost always invented too late.',
     fills: [],
@@ -229,7 +250,8 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'deepen.promise',
     stage: 'deepen',
-    intent: 'Name the reader-promise betrayals — the specific things that would make a reader of this genre quit — and lock them as rules the plan must carry.',
+    intent:
+      "Name the reader-promise betrayals — the specific things that would make a reader of this genre quit — and lock them as rules the plan must carry. Emit each as a locked constraint with key 'promise' and kind 'promise'; the readiness pass reads the kind, so a promise recorded under any other kind never counts.",
     coaching:
       'What would make a reader of this genre put the book down and not come back? Pick the betrayals you are promising never to commit. These few rules are the only ones I carry forward as hard constraints, so choose the ones you actually mean: a promise broken deep into the run costs far more than one you never made.',
     fills: [],

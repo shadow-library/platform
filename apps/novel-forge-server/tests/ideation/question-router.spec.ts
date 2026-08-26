@@ -171,6 +171,25 @@ describe('nextQuestions', () => {
     expect(nextQuestions(seed).questions.map(question => question.id)).toContain('deepen.renewal');
   });
 
+  it('should leave the engine question as the only filler of the progression system', () => {
+    expect(QUESTION_BANK.filter(question => question.fills.includes('progressionSystem')).map(question => question.id)).toEqual(['deepen.engine']);
+  });
+
+  it('should hint at a locked cast shape rather than let the turn re-ask it', () => {
+    const seed = seedWith({
+      askedQuestions: ['spark.idea', 'taste.comps', 'orient.shelf', 'orient.room', 'orient.length'],
+      constraints: [constraint('cast', 'dual leads, bonded by the debt')],
+    });
+    const result = nextQuestions(seed);
+    expect(result.questions.map(question => question.id)).toContain('orient.cast');
+    expect(result.hints['orient.cast']).toBe('Locked already: dual leads. Confirm rather than re-ask.');
+  });
+
+  it('should leave a question without a locked decision unhinted', () => {
+    const seed = seedWith({ askedQuestions: ['spark.idea', 'taste.comps'] });
+    expect(nextQuestions(seed).hints).toEqual({});
+  });
+
   it('should raise the dual-leads questions at deepen', () => {
     const seed = orientedSeed({ constraints: [constraint('cast', 'dual leads, bonded')] });
     const result = nextQuestions(seed);
@@ -204,23 +223,32 @@ describe('nextQuestions', () => {
     expect(result.forced).toEqual([]);
   });
 
-  it('should never repeat a question once it is recorded as asked', () => {
+  it('should never repeat a question while the stage walk still has fresh ones', () => {
     const seed = blankSeed();
     const seen: string[] = [];
     for (let turn = 0; turn < 30; turn++) {
       const result = nextQuestions(seed);
-      if (result.questions.length === 0) break;
+      if (result.backfilled.length > 0) break;
       for (const question of result.questions) seen.push(question.id);
-      seed.askedQuestions.push(...result.questions.map(question => question.id));
+      seed.askedQuestions = recordOffered(seed, result);
     }
     expect(new Set(seen).size).toBe(seen.length);
   });
 
-  it('should terminate on the stress stage when every question has been asked', () => {
-    const seed = seedWith({ askedQuestions: QUESTION_BANK.map(question => question.id) });
-    const result = nextQuestions(seed);
+  it('should terminate on the stress stage when every question has been asked and the sheet is finished', () => {
+    const fields = Object.fromEntries(STRESS_READY_FIELDS.map(field => [field, 'settled'])) as Ideation.SeedFields;
+    const result = nextQuestions(seedWith({ fields, askedQuestions: QUESTION_BANK.map(question => question.id) }));
     expect(result.stage).toBe('stress');
     expect(result.questions).toEqual([]);
+    expect(result.done).toBe(true);
+  });
+
+  it('should re-offer the fillers of the missing fields when every question has been asked but the sheet is not finished', () => {
+    const result = nextQuestions(seedWith({ askedQuestions: QUESTION_BANK.map(question => question.id) }));
+    expect(result.stage).toBe('stress');
+    expect(result.done).toBe(false);
+    expect(result.backfilled).toEqual(result.questions.map(question => question.id));
+    expect(result.backfilled).toEqual(['orient.shelf', 'orient.cast', 'diverge.cards']);
   });
 
   it('should offer the readiness question at the stress stage', () => {
@@ -323,6 +351,11 @@ describe('the room question', () => {
     expect(nextQuestions(seed).questions.map(question => question.id)).not.toContain('orient.room');
   });
 
+  it('should be asked when a room-keyed constraint was locked under the wrong kind', () => {
+    const seed = seedWith({ askedQuestions: ['spark.idea', 'taste.comps'], constraints: [constraint('setting', 'a drowned cathedral city', 'shape')] });
+    expect(nextQuestions(seed).questions.map(question => question.id)).toContain('orient.room');
+  });
+
   it('should be asked to a seed that only has a premise', () => {
     const seed = seedWith({ askedQuestions: ['spark.idea', 'taste.comps'], fields: { premise: 'a tide-priest sells prophecies she no longer believes' } });
     expect(nextQuestions(seed).questions.map(question => question.id)).toContain('orient.room');
@@ -410,11 +443,94 @@ describe('interview termination', () => {
     expect(new Set(result.offered).size).toBe(result.offered.length);
   });
 
-  it('should keep at least one live filler for every stress-ready field in every walked state', () => {
-    const suppressed = STRESS_READY_FIELDS.filter(field => {
-      const fillers = QUESTION_BANK.filter(question => question.fills.includes(field));
-      return fillers.length === 0 || fillers.every(question => question.skipWhen(blankSeed()));
-    });
+  it('should reach a finished sheet for an author who answers only the first question of every turn', () => {
+    const seed = blankSeed();
+    let turns = 0;
+    for (; turns < MAX_TURNS; turns++) {
+      const result = nextQuestions(seed);
+      if (result.done) break;
+      expect(result.questions.length).toBeGreaterThan(0);
+      const first = result.questions[0]!;
+      for (const field of first.fills) seed.fields[field] = (DUMMY[field] ?? 'settled') as never;
+      seed.askedQuestions = recordOffered(seed, result);
+    }
+    expect(nextQuestions(seed).done).toBe(true);
+    expect(turns).toBeLessThan(MAX_TURNS);
+  });
+
+  it('should keep offering questions to an author who answers nothing at all', () => {
+    const seed = blankSeed();
+    for (let turn = 0; turn < 30; turn++) {
+      const result = nextQuestions(seed);
+      expect(result.done).toBe(false);
+      expect(result.questions.length).toBeGreaterThan(0);
+      seed.askedQuestions = recordOffered(seed, result);
+    }
+  });
+
+  it('should re-offer a filler for every stress-ready field cleared back to null after the sheet was finished', () => {
+    const finished: RouterSeedState = { ...blankSeed(), askedQuestions: QUESTION_BANK.map(question => question.id) };
+    for (const field of STRESS_READY_FIELDS) finished.fields[field] = (DUMMY[field] ?? 'settled') as never;
+    expect(nextQuestions(finished).done).toBe(true);
+
+    for (const cleared of STRESS_READY_FIELDS) {
+      const seed: RouterSeedState = { ...finished, fields: { ...finished.fields, [cleared]: null } as Ideation.SeedFields };
+      const result = nextQuestions(seed);
+      expect(result.done).toBe(false);
+      expect(result.questions.some(question => question.fills.includes(cleared))).toBe(true);
+      expect(result.backfilled).toEqual(result.questions.map(question => question.id));
+    }
+  });
+
+  const PLAYBOOK_CONSTRAINTS: Ideation.SeedConstraint[] = [
+    constraint('cast', 'dual leads, bonded by the debt'),
+    constraint('regression', 'she returns to the day before the siege'),
+    constraint('romance', 'no harem, one romance only', 'promise'),
+    constraint('shelf', 'a litRPG with a visible status window'),
+    constraint('length', 'open ended, an ongoing web serial', 'scope'),
+    constraint('cast', 'an ensemble, a crew of five'),
+    constraint('pacing', 'a slow burn, deferred for years'),
+    constraint('pov', 'single pov, tight third throughout'),
+  ];
+
+  const subsets = <T>(items: T[], mask: number): T[] => items.filter((_item, index) => (mask & (1 << index)) !== 0);
+
+  /**
+   * The invariant pin, over every playbook subset × every missing-field subset with the worst-case
+   * `askedQuestions`. Two things must hold in each of the 65 536 states: the router never returns the
+   * dead end `questions: [] && done: false`, and every missing field still has a filler the ordinary
+   * stage walk can reach. Dropping a field from its sole filler's `fills` breaks the first; suppressing
+   * a sole filler with `skipWhen` breaks the second, which the backfill would otherwise paper over.
+   */
+  it('should never dead-end or suppress a sole filler on any playbook and missing-field combination', () => {
+    const askedQuestions = QUESTION_BANK.map(question => question.id);
+    const dead: string[] = [];
+    const suppressed: string[] = [];
+    let states = 0;
+
+    for (let playbookMask = 0; playbookMask < 1 << PLAYBOOK_CONSTRAINTS.length; playbookMask++) {
+      const constraints = subsets(PLAYBOOK_CONSTRAINTS, playbookMask);
+      for (let fieldMask = 0; fieldMask < 1 << STRESS_READY_FIELDS.length; fieldMask++) {
+        const missing = subsets(STRESS_READY_FIELDS, fieldMask);
+        const fields = Object.fromEntries(STRESS_READY_FIELDS.filter(field => !missing.includes(field)).map(field => [field, DUMMY[field] ?? 'settled'])) as Ideation.SeedFields;
+        const seed = seedWith({ constraints, fields, askedQuestions });
+        const result = nextQuestions(seed);
+        states++;
+
+        if (result.questions.length === 0 && !result.done) dead.push(`${playbookMask}:${fieldMask} missing=${missing.join(',')}`);
+        for (const field of missing) {
+          if (!QUESTION_BANK.some(question => question.fills.includes(field) && !question.skipWhen(seed))) suppressed.push(`${playbookMask}:${fieldMask} ${field}`);
+        }
+      }
+    }
+
+    expect(states).toBe(65536);
+    expect(dead).toEqual([]);
     expect(suppressed).toEqual([]);
+  });
+
+  it('should keep at least one filler in the bank for every stress-ready field', () => {
+    const unfilled = STRESS_READY_FIELDS.filter(field => !QUESTION_BANK.some(question => question.fills.includes(field)));
+    expect(unfilled).toEqual([]);
   });
 });
