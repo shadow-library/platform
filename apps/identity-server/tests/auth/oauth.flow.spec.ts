@@ -66,6 +66,58 @@ describe('OAuth authorization-code flow', () => {
     return cookie ? chain.cookies({ [SESSION_COOKIE_NAME]: sessionSecret }) : chain;
   };
 
+  describe('GET /oauth2/authorize error handling', () => {
+    const raw = (overrides: Record<string, string>) => {
+      const params = new URLSearchParams({ client_id: clientId, redirect_uri: REDIRECT_URI, response_type: 'code', scope: 'openid', state: 'xyz', ...overrides });
+      return env
+        .getRouter()
+        .mockRequest()
+        .get(`/oauth2/authorize?${params.toString()}`)
+        .cookies({ [SESSION_COOKIE_NAME]: sessionSecret });
+    };
+
+    it('should send an unregistered redirect_uri to the identity error page instead of answering with JSON', async () => {
+      const response = await raw({ redirect_uri: 'https://evil.example.com/callback' });
+
+      expect(response.statusCode).toBe(302);
+      const location = new URL(response.headers.location ?? '');
+      expect(location.pathname).toBe('/invalid-request');
+      expect(location.searchParams.get('error')).toBe('invalid_redirect_uri');
+      expect(location.searchParams.get('client_id')).toBe(clientId);
+      expect(location.searchParams.get('redirect_uri')).toBe('https://evil.example.com/callback');
+      expect(location.searchParams.get('application')).toBeTruthy();
+    });
+
+    it('should send a malformed redirect_uri to the identity error page', async () => {
+      const response = await raw({ redirect_uri: 'not-a-url' });
+
+      expect(response.statusCode).toBe(302);
+      const location = new URL(response.headers.location ?? '');
+      expect(location.pathname).toBe('/invalid-request');
+      expect(location.searchParams.get('error')).toBe('invalid_redirect_uri');
+    });
+
+    it('should send an unknown client to the identity error page without naming an application', async () => {
+      const response = await raw({ client_id: 'no-such-client' });
+
+      expect(response.statusCode).toBe(302);
+      const location = new URL(response.headers.location ?? '');
+      expect(location.pathname).toBe('/invalid-request');
+      expect(location.searchParams.get('error')).toBe('invalid_client');
+      expect(location.searchParams.get('application')).toBeNull();
+    });
+
+    it('should report an unsupported response_type back to the registered redirect_uri', async () => {
+      const response = await raw({ response_type: 'token' });
+
+      expect(response.statusCode).toBe(302);
+      const location = new URL(response.headers.location ?? '');
+      expect(location.origin + location.pathname).toBe(REDIRECT_URI);
+      expect(location.searchParams.get('error')).toBe('unsupported_response_type');
+      expect(location.searchParams.get('state')).toBe('xyz');
+    });
+  });
+
   it('should publish discovery metadata', async () => {
     const response = await env.getRouter().mockRequest().get('/.well-known/openid-configuration');
     expect(response.statusCode).toBe(200);
@@ -444,7 +496,10 @@ describe('OAuth authorization-code flow', () => {
         .mockRequest()
         .get(`/oauth2/authorize?${params.toString()}`)
         .cookies({ [SESSION_COOKIE_NAME]: sessionSecret });
-      expect(response.statusCode).toBe(400);
+      expect(response.statusCode).toBe(302);
+      const location = new URL(response.headers.location ?? '');
+      expect(location.origin + location.pathname).toBe(REDIRECT_URI);
+      expect(location.searchParams.get('error')).toBe('invalid_target');
     });
 
     it('should allow an application its own canonical audience without scope grants', async () => {

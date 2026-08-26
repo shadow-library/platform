@@ -1,0 +1,15 @@
+.details {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+}
+
+.detailKey {
+  color: var(--sh-text-tertiary);
+}
+
+.detailValue {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--sh-text-primary);
+}

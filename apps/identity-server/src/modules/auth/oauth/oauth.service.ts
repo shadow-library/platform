@@ -35,6 +35,12 @@ export interface AuthorizeParams {
 
 export type AuthorizeResult = { kind: 'redirect'; url: string } | { kind: 'login' };
 
+/** Authorize failures that must be shown on the identity app rather than sent to the client's `redirect_uri`. */
+export type AuthorizeRejection = 'invalid_client' | 'invalid_redirect_uri';
+
+/** Authorize failures reported back to the client per RFC 6749 §4.1.2.1, once its `redirect_uri` is known good. */
+export type AuthorizeFailure = 'access_denied' | 'invalid_request' | 'invalid_scope' | 'invalid_target' | 'server_error' | 'unauthorized_client' | 'unsupported_response_type';
+
 export interface ClientCredential {
   clientId?: string;
   clientSecret?: string;
@@ -162,12 +168,25 @@ export class OAuthService {
   }
 
   async authorize(params: AuthorizeParams, sessionSecret?: string): Promise<AuthorizeResult> {
-    const client = await this.requireClient(params.clientId);
-    if (!(await this.clientService.isRedirectUriAllowed(client.id, params.redirectUri))) throw AppErrorCode.OAU_001.create();
-    if (params.responseType !== 'code') throw AppErrorCode.OAU_001.create();
-    if (!client.grantTypes.includes('authorization_code')) throw AppErrorCode.OAU_001.create();
-    if (client.requirePkce && (!params.codeChallenge || params.codeChallengeMethod !== 'S256')) throw AppErrorCode.OAU_001.create();
+    const client = await this.clientService.getClient(params.clientId);
+    if (!client || !client.isActive) return this.rejectAuthorize(params, 'invalid_client');
+    if (!(await this.clientService.isRedirectUriAllowed(client.id, params.redirectUri))) return this.rejectAuthorize(params, 'invalid_redirect_uri', client);
 
+    if (params.responseType !== 'code') return this.failAuthorize(params, 'unsupported_response_type');
+    if (!client.grantTypes.includes('authorization_code')) return this.failAuthorize(params, 'unauthorized_client');
+    if (client.requirePkce && (!params.codeChallenge || params.codeChallengeMethod !== 'S256')) return this.failAuthorize(params, 'invalid_request');
+
+    try {
+      return await this.grantAuthorization(client, params, sessionSecret);
+    } catch (error) {
+      if (AppError.is(error, AppErrorCode.OAU_004)) return this.failAuthorize(params, 'invalid_scope');
+      if (AppError.is(error, AppErrorCode.OAU_005)) return this.failAuthorize(params, 'invalid_target');
+      this.logger.error('authorization request failed after the redirect uri was validated', { clientId: client.id, error });
+      return this.failAuthorize(params, 'server_error');
+    }
+  }
+
+  private async grantAuthorization(client: OAuthClient, params: AuthorizeParams, sessionSecret?: string): Promise<AuthorizeResult> {
     const grant = await this.resolveGrant(client, params.resource, params.scope, 'user');
     if (grant.rejected.length > 0) {
       this.logger.warn('dropped scopes the client does not hold on the requested audience', { clientId: client.id, audience: grant.audience, dropped: grant.rejected });
@@ -179,7 +198,7 @@ export class OAuthService {
     try {
       await this.applicationAccessService.assertUserAccess(session.userId, client.applicationId);
     } catch (error) {
-      if (AppError.is(error, AppErrorCode.APP_006)) throw AppErrorCode.OAU_002.create();
+      if (AppError.is(error, AppErrorCode.APP_006)) return this.rejectAuthorize(params, 'invalid_client');
       if (!AppError.is(error, AppErrorCode.APP_007)) throw error;
       return this.denyAuthorize(client, params, session.userId);
     }
@@ -218,6 +237,36 @@ export class OAuthService {
     return { kind: 'redirect', url: url.toString() };
   }
 
+  /**
+   * Terminates an authorization request that failed before `redirect_uri` could be trusted, by sending the browser
+   * to the identity app's own error page. RFC 6749 §4.1.2.1 forbids redirecting back to a client-supplied URI that
+   * is unknown or unregistered — doing so would turn the authorize endpoint into an open redirector.
+   */
+  private async rejectAuthorize(params: AuthorizeParams, error: AuthorizeRejection, client?: OAuthClient): Promise<AuthorizeResult> {
+    this.logger.warn('authorization request rejected before the redirect uri could be trusted', {
+      securityEvent: 'oauth.authorize_rejected',
+      error,
+      clientId: params.clientId,
+      redirectUri: params.redirectUri,
+    });
+
+    const url = new URL('/invalid-request', this.loginUrl);
+    url.searchParams.set('error', error);
+    url.searchParams.set('client_id', params.clientId);
+    url.searchParams.set('redirect_uri', params.redirectUri);
+    const application = client ? await this.clientService.resolveApplicationLabel(client.id) : null;
+    if (application) url.searchParams.set('application', application);
+    return { kind: 'redirect', url: url.toString() };
+  }
+
+  private failAuthorize(params: AuthorizeParams, error: AuthorizeFailure): AuthorizeResult {
+    this.logger.debug('authorization request refused', { clientId: params.clientId, error });
+    const url = new URL(params.redirectUri);
+    url.searchParams.set('error', error);
+    if (params.state) url.searchParams.set('state', params.state);
+    return { kind: 'redirect', url: url.toString() };
+  }
+
   private async denyAuthorize(client: OAuthClient, params: AuthorizeParams, userId: bigint): Promise<AuthorizeResult> {
     await this.auditService.record({
       action: 'oauth.authorize.denied',
@@ -238,10 +287,7 @@ export class OAuthService {
       return { kind: 'redirect', url: url.toString() };
     }
 
-    const url = new URL(params.redirectUri);
-    url.searchParams.set('error', 'access_denied');
-    if (params.state) url.searchParams.set('state', params.state);
-    return { kind: 'redirect', url: url.toString() };
+    return this.failAuthorize(params, 'access_denied');
   }
 
   private async resolveGrant(client: OAuthClient, requestedResource: string | undefined, requestedScope: string, principal: 'user' | 'service'): Promise<ResolvedGrant> {

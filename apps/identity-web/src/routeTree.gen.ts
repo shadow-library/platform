@@ -24,6 +24,7 @@ import { Route as AuthStepUpRouteImport } from './routes/_auth/step-up'
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
 import { Route as AuthRecoverRouteImport } from './routes/_auth/recover'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
+import { Route as AuthInvalidRequestRouteImport } from './routes/_auth/invalid-request'
 import { Route as AuthErrorRouteImport } from './routes/_auth/error'
 import { Route as AuthConsentRouteImport } from './routes/_auth/consent'
 import { Route as ConsoleUsersIndexRouteImport } from './routes/console/users.index'
@@ -117,6 +118,11 @@ const AuthRecoverRoute = AuthRecoverRouteImport.update({
 const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => AuthRoute,
+} as any)
+const AuthInvalidRequestRoute = AuthInvalidRequestRouteImport.update({
+  id: '/invalid-request',
+  path: '/invalid-request',
   getParentRoute: () => AuthRoute,
 } as any)
 const AuthErrorRoute = AuthErrorRouteImport.update({
@@ -241,6 +247,7 @@ export interface FileRoutesByFullPath {
   '/console': typeof ConsoleRouteWithChildren
   '/consent': typeof AuthConsentRoute
   '/error': typeof AuthErrorRoute
+  '/invalid-request': typeof AuthInvalidRequestRoute
   '/login': typeof AuthLoginRoute
   '/recover': typeof AuthRecoverRoute
   '/register': typeof AuthRegisterRoute
@@ -276,6 +283,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/consent': typeof AuthConsentRoute
   '/error': typeof AuthErrorRoute
+  '/invalid-request': typeof AuthInvalidRequestRoute
   '/login': typeof AuthLoginRoute
   '/recover': typeof AuthRecoverRoute
   '/register': typeof AuthRegisterRoute
@@ -314,6 +322,7 @@ export interface FileRoutesById {
   '/console': typeof ConsoleRouteWithChildren
   '/_auth/consent': typeof AuthConsentRoute
   '/_auth/error': typeof AuthErrorRoute
+  '/_auth/invalid-request': typeof AuthInvalidRequestRoute
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/recover': typeof AuthRecoverRoute
   '/_auth/register': typeof AuthRegisterRoute
@@ -352,6 +361,7 @@ export interface FileRouteTypes {
     | '/console'
     | '/consent'
     | '/error'
+    | '/invalid-request'
     | '/login'
     | '/recover'
     | '/register'
@@ -387,6 +397,7 @@ export interface FileRouteTypes {
     | '/'
     | '/consent'
     | '/error'
+    | '/invalid-request'
     | '/login'
     | '/recover'
     | '/register'
@@ -424,6 +435,7 @@ export interface FileRouteTypes {
     | '/console'
     | '/_auth/consent'
     | '/_auth/error'
+    | '/_auth/invalid-request'
     | '/_auth/login'
     | '/_auth/recover'
     | '/_auth/register'
@@ -569,6 +581,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof AuthLoginRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_auth/invalid-request': {
+      id: '/_auth/invalid-request'
+      path: '/invalid-request'
+      fullPath: '/invalid-request'
+      preLoaderRoute: typeof AuthInvalidRequestRouteImport
       parentRoute: typeof AuthRoute
     }
     '/_auth/error': {
@@ -724,6 +743,7 @@ declare module '@tanstack/react-router' {
 interface AuthRouteChildren {
   AuthConsentRoute: typeof AuthConsentRoute
   AuthErrorRoute: typeof AuthErrorRoute
+  AuthInvalidRequestRoute: typeof AuthInvalidRequestRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthRecoverRoute: typeof AuthRecoverRoute
   AuthRegisterRoute: typeof AuthRegisterRoute
@@ -733,6 +753,7 @@ interface AuthRouteChildren {
 const AuthRouteChildren: AuthRouteChildren = {
   AuthConsentRoute: AuthConsentRoute,
   AuthErrorRoute: AuthErrorRoute,
+  AuthInvalidRequestRoute: AuthInvalidRequestRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthRecoverRoute: AuthRecoverRoute,
   AuthRegisterRoute: AuthRegisterRoute,

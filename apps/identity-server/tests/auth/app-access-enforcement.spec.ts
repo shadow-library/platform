@@ -159,8 +159,11 @@ describe('Application access enforcement (T-902)', () => {
       const client = await registerClient(app.id);
 
       const response = await authorize(client);
-      expect(response.statusCode).toBe(401);
-      expect(response.json()).toMatchObject({ code: 'invalid_client' });
+      expect(response.statusCode).toBe(302);
+      const location = new URL(response.headers.location ?? '');
+      expect(location.pathname).toBe('/invalid-request');
+      expect(location.searchParams.get('error')).toBe('invalid_client');
+      expect(location.searchParams.get('application')).toBeNull();
     });
   });
 
