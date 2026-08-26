@@ -22,8 +22,8 @@ import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail 
 export interface IdeationPackOptions {
   budgetTokens?: number;
   dryRun?: boolean;
-  /** False drops the round header and its questions — the concept round has no interview to word. */
-  round?: boolean;
+  /** Question ids the turn pipeline has decided must be settled this turn rather than asked again. */
+  commitIds?: string[];
 }
 
 export type IdeationSeedInput = Pick<schema.Ideation.StorySeed, 'projectId' | 'fields' | 'constraints' | 'tasteAnchors' | 'concepts' | 'readiness' | 'askedQuestions'>;
@@ -182,8 +182,9 @@ function renderPlaybookExcerpts(constraints: schema.Ideation.SeedConstraint[]): 
     .join('\n\n');
 }
 
-function renderRoundQuestions(router: RouterResult): string {
+function renderRoundQuestions(router: RouterResult, commitIds: string[]): string {
   const backfilled = new Set(router.backfilled);
+  const commit = new Set(commitIds);
   const header = router.done
     ? `Stage: ${router.stage}. Every stress-ready field is filled — the author can start the novel whenever they want, and should hear that.`
     : `Stage: ${router.stage}.`;
@@ -196,6 +197,10 @@ function renderRoundQuestions(router: RouterResult): string {
     const hint = router.hints[question.id];
     if (hint) lines.push(`HINT — already settled: ${hint}. Confirm it instead of asking again.`);
     if (backfilled.has(question.id)) lines.push('CIRCLING BACK — this was offered before and left unanswered. Say so, make it easier, lead with your own answer.');
+    if (commit.has(question.id))
+      lines.push(
+        "COMMIT NOW — the author has passed on this three times running. Stop asking: take the youDecide answer yourself, record it in the changeSet under this question's emission contract, and tell them in one line what you committed to and why they can overturn it whenever they like.",
+      );
     return lines.join('\n');
   });
   return [header, ...blocks].join('\n\n');
@@ -1035,6 +1040,15 @@ export class ContextAssembler {
    * through the template's `history` placeholder, which carries its own cache breakpoint.
    */
   async forIdeationTurn(seed: IdeationSeedInput, router: RouterResult, opts?: IdeationPackOptions): Promise<AssembledPack & { id: bigint | null }> {
+    return this.ideationPack(seed, router, opts);
+  }
+
+  /** The concept round runs off the same seed pack, minus the interview: the cards answer no question. */
+  async forIdeationConcepts(seed: IdeationSeedInput, opts?: Omit<IdeationPackOptions, 'commitIds'>): Promise<AssembledPack & { id: bigint | null }> {
+    return this.ideationPack(seed, null, opts);
+  }
+
+  private async ideationPack(seed: IdeationSeedInput, router: RouterResult | null, opts?: IdeationPackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const state = toRouterSeedState(seed);
     const sections: ContextSection[] = [asStable(makeSection('seed_sheet', renderSeedSheet(state.fields), 'canonical', ['seed']))];
 
@@ -1044,15 +1058,12 @@ export class ContextAssembler {
     const playbooks = renderPlaybookExcerpts(state.constraints);
     if (playbooks) sections.push(asStable(makeSection('shape_playbooks', playbooks, 'canonical', [])));
 
-    if (opts?.round !== false) sections.push(makeSection('round_questions', renderRoundQuestions(router), 'working', []));
+    // The round is what the turn is FOR: a sheet long enough to crowd it out would leave the model
+    // wording nothing, so it is reserved against the budget instead of competing for what is left.
+    if (router) sections.push({ ...makeSection('round_questions', renderRoundQuestions(router, opts?.commitIds ?? []), 'working', []), required: true });
     if (state.concepts.length > 0) sections.push(makeSection('concept_history', renderConceptHistory(state.concepts), 'working', ['seed']));
 
     return this.finalize(seed.projectId, 'ideation', null, sections, [], opts?.budgetTokens ?? IDEATION_BUDGET, opts?.dryRun);
-  }
-
-  /** The concept round runs off the same seed pack, minus the interview: the cards answer no question. */
-  async forIdeationConcepts(seed: IdeationSeedInput, router: RouterResult, opts?: Omit<IdeationPackOptions, 'round'>): Promise<AssembledPack & { id: bigint | null }> {
-    return this.forIdeationTurn(seed, router, { ...opts, round: false });
   }
 
   /** The live production picture the hub reasons over: cursor, draft states, stale plans, open work. */

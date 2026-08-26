@@ -1519,6 +1519,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/seed/stress': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Stress Seed */
+    post: operations['post_api_v1_projects_projectId_seed_stress'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects': {
     parameters: {
       query?: never;
@@ -3148,6 +3165,8 @@ export interface components {
       ordinal: number;
       role: string;
       content: string;
+      /** @description Structured turn payload the studio renders beside the prose. Discriminated by `kind`: "questions" (option chips), "cards" (concept cards), "readiness" (the stress table). */
+      payload?: null | Record<string, never>;
       proposalId?: null | string;
       runId?: null | string;
       modelProvider?: null | string;
@@ -3167,6 +3186,8 @@ export interface components {
       applied?: components['schemas']['TurnAppliedResult'];
       /** @description why an auto-mode change-set was NOT applied (conflict, finalize gating, action failure) */
       applyNote?: string;
+      /** @description the story seed sheet as this turn left it; present only on Ideation Studio turns */
+      seed?: components['schemas']['SeedResponse'];
       runId: string;
     };
     /** @description Proposal application outcome returned as part of an automatic-mode turn. */
@@ -3174,6 +3195,98 @@ export interface components {
       applied: components['schemas']['AppliedArtifactItem'][];
       staleMarked: string[];
       opResults: components['schemas']['OpResultItem'][];
+    };
+    SeedResponse: {
+      id: string;
+      projectId: string;
+      /** @description The ideation chat session driving this seed. */
+      sessionId?: null | string;
+      fields: components['schemas']['SeedFieldsResponse'];
+      provenance: components['schemas']['SeedProvenanceResponse'];
+      constraints: components['schemas']['SeedConstraintResponse'][];
+      tasteAnchors: components['schemas']['TasteAnchorsResponse'];
+      concepts: components['schemas']['ConceptCardResponse'][];
+      /** @description The last stress-pass result; empty until a stress pass has run. */
+      readiness: components['schemas']['ReadinessEntryResponse'][];
+      /** @description Question-bank ids already answered or skipped, which is what the question router remembers. */
+      askedQuestions: string[];
+      revision: number;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @description The story seed sheet — idea altitude only: no places, chapter structure, or volume detail. */
+    SeedFieldsResponse: {
+      genre?: string;
+      themes?: string[];
+      premise?: string;
+      hook?: string;
+      /** @description Lead count plus configuration — one lead, dual leads bonded, an ensemble of four. */
+      castShape?: string;
+      progressionSystem?: string;
+      protagonistDrive?: string;
+      stakes?: string;
+      serializationNotes?: string;
+      voice?: string;
+      workingTitle?: string;
+    };
+    /** @description Provenance for each sheet field the studio or the author has settled. */
+    SeedProvenanceResponse: {
+      genre?: components['schemas']['FieldProvenanceResponse'];
+      themes?: components['schemas']['FieldProvenanceResponse'];
+      premise?: components['schemas']['FieldProvenanceResponse'];
+      hook?: components['schemas']['FieldProvenanceResponse'];
+      castShape?: components['schemas']['FieldProvenanceResponse'];
+      progressionSystem?: components['schemas']['FieldProvenanceResponse'];
+      protagonistDrive?: components['schemas']['FieldProvenanceResponse'];
+      stakes?: components['schemas']['FieldProvenanceResponse'];
+      serializationNotes?: components['schemas']['FieldProvenanceResponse'];
+      voice?: components['schemas']['FieldProvenanceResponse'];
+      workingTitle?: components['schemas']['FieldProvenanceResponse'];
+    };
+    /** @description Who settled one sheet field, and on which turn. */
+    FieldProvenanceResponse: {
+      /** @enum {string} */
+      source: 'author' | 'studio' | 'crossed';
+      turnOrdinal: number;
+    };
+    SeedConstraintResponse: {
+      key: string;
+      /** @enum {string} */
+      kind: 'shape' | 'scope' | 'promise';
+      text: string;
+      /** @description The matching constraint playbook; absent when nothing in the library recognised the constraint. */
+      playbookKey?: string;
+      /** @enum {string} */
+      lockedBy: 'author' | 'inferred';
+    };
+    TasteAnchorsResponse: {
+      /** @description Comparable works the author named at the Taste stage. */
+      comps: string[];
+      /** @description The preferences derived from those comps, in editor terms. */
+      preferences: string[];
+    };
+    ConceptCardResponse: {
+      round: number;
+      title: string;
+      logline: string;
+      engine: string;
+      ladder: string;
+      posture: string;
+      /**
+       * @description Offered until the author reacts to the card, then their verdict.
+       * @enum {string}
+       */
+      fate: 'offered' | 'kept' | 'killed' | 'crossed';
+      reason?: string;
+    };
+    ReadinessEntryResponse: {
+      dimension: string;
+      /** @enum {string} */
+      verdict: 'strong' | 'thin' | 'empty';
+      note: string;
+      fix?: string;
     };
     UpdateChatSessionBody: {
       mode?: components['schemas']['ChatMode'];
@@ -3525,95 +3638,6 @@ export interface components {
       /** @description The idea as the author first typed it; kept verbatim as the opening turn of the studio conversation. */
       spark?: string;
     };
-    SeedResponse: {
-      id: string;
-      projectId: string;
-      /** @description The ideation chat session driving this seed. */
-      sessionId?: null | string;
-      fields: components['schemas']['SeedFieldsResponse'];
-      provenance: components['schemas']['SeedProvenanceResponse'];
-      constraints: components['schemas']['SeedConstraintResponse'][];
-      tasteAnchors: components['schemas']['TasteAnchorsResponse'];
-      concepts: components['schemas']['ConceptCardResponse'][];
-      /** @description The last stress-pass result; empty until a stress pass has run. */
-      readiness: components['schemas']['ReadinessEntryResponse'][];
-      /** @description Question-bank ids already answered or skipped, which is what the question router remembers. */
-      askedQuestions: string[];
-      revision: number;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    /** @description The story seed sheet — idea altitude only: no places, chapter structure, or volume detail. */
-    SeedFieldsResponse: {
-      genre?: string;
-      themes?: string[];
-      premise?: string;
-      hook?: string;
-      /** @description Lead count plus configuration — one lead, dual leads bonded, an ensemble of four. */
-      castShape?: string;
-      progressionSystem?: string;
-      protagonistDrive?: string;
-      stakes?: string;
-      serializationNotes?: string;
-      voice?: string;
-      workingTitle?: string;
-    };
-    /** @description Provenance for each sheet field the studio or the author has settled. */
-    SeedProvenanceResponse: {
-      genre?: components['schemas']['FieldProvenanceResponse'];
-      themes?: components['schemas']['FieldProvenanceResponse'];
-      premise?: components['schemas']['FieldProvenanceResponse'];
-      hook?: components['schemas']['FieldProvenanceResponse'];
-      castShape?: components['schemas']['FieldProvenanceResponse'];
-      progressionSystem?: components['schemas']['FieldProvenanceResponse'];
-      protagonistDrive?: components['schemas']['FieldProvenanceResponse'];
-      stakes?: components['schemas']['FieldProvenanceResponse'];
-      serializationNotes?: components['schemas']['FieldProvenanceResponse'];
-      voice?: components['schemas']['FieldProvenanceResponse'];
-      workingTitle?: components['schemas']['FieldProvenanceResponse'];
-    };
-    /** @description Who settled one sheet field, and on which turn. */
-    FieldProvenanceResponse: {
-      /** @enum {string} */
-      source: 'author' | 'studio' | 'crossed';
-      turnOrdinal: number;
-    };
-    SeedConstraintResponse: {
-      key: string;
-      /** @enum {string} */
-      kind: 'shape' | 'scope' | 'promise';
-      text: string;
-      /** @description The matching constraint playbook; absent when nothing in the library recognised the constraint. */
-      playbookKey?: string;
-      /** @enum {string} */
-      lockedBy: 'author' | 'inferred';
-    };
-    TasteAnchorsResponse: {
-      /** @description Comparable works the author named at the Taste stage. */
-      comps: string[];
-      /** @description The preferences derived from those comps, in editor terms. */
-      preferences: string[];
-    };
-    ConceptCardResponse: {
-      round: number;
-      title: string;
-      logline: string;
-      engine: string;
-      ladder: string;
-      posture: string;
-      /** @enum {string} */
-      fate: 'kept' | 'killed' | 'crossed';
-      reason?: string;
-    };
-    ReadinessEntryResponse: {
-      dimension: string;
-      /** @enum {string} */
-      verdict: 'strong' | 'thin' | 'empty';
-      note: string;
-      fix?: string;
-    };
     ListSeedsResponse: {
       total: number;
       limit: number;
@@ -3632,6 +3656,13 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+    };
+    /** @description The result of a stress pass: the readiness verdict and the sheet carrying it. */
+    SeedStressResponse: {
+      seed: components['schemas']['SeedResponse'];
+      /** @description The verdict per dimension, in the fixed dimension order. It advises; it never blocks graduation. */
+      readiness: components['schemas']['ReadinessEntryResponse'][];
+      runId: string;
     };
     CreateProjectBody: {
       name: string;
@@ -9285,6 +9316,46 @@ export interface operations {
       };
     };
   };
+  post_api_v1_projects_projectId_seed_stress: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SeedStressResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects: {
     parameters: {
       query?: {
@@ -12087,6 +12158,14 @@ export type ChatMessageResponse = components['schemas']['ChatMessageResponse'];
 export type ChatTurnBody = components['schemas']['ChatTurnBody'];
 export type ChatTurnResponse = components['schemas']['ChatTurnResponse'];
 export type TurnAppliedResult = components['schemas']['TurnAppliedResult'];
+export type SeedResponse = components['schemas']['SeedResponse'];
+export type SeedFieldsResponse = components['schemas']['SeedFieldsResponse'];
+export type SeedProvenanceResponse = components['schemas']['SeedProvenanceResponse'];
+export type FieldProvenanceResponse = components['schemas']['FieldProvenanceResponse'];
+export type SeedConstraintResponse = components['schemas']['SeedConstraintResponse'];
+export type TasteAnchorsResponse = components['schemas']['TasteAnchorsResponse'];
+export type ConceptCardResponse = components['schemas']['ConceptCardResponse'];
+export type ReadinessEntryResponse = components['schemas']['ReadinessEntryResponse'];
 export type UpdateChatSessionBody = components['schemas']['UpdateChatSessionBody'];
 export type UpdateSessionModelBody = components['schemas']['UpdateSessionModelBody'];
 export type EnhancePremiseBody = components['schemas']['EnhancePremiseBody'];
@@ -12131,16 +12210,9 @@ export type FactSource = components['schemas']['FactSource'];
 export type UpsertFactBody = components['schemas']['UpsertFactBody'];
 export type RevealFactBody = components['schemas']['RevealFactBody'];
 export type CreateSeedBody = components['schemas']['CreateSeedBody'];
-export type SeedResponse = components['schemas']['SeedResponse'];
-export type SeedFieldsResponse = components['schemas']['SeedFieldsResponse'];
-export type SeedProvenanceResponse = components['schemas']['SeedProvenanceResponse'];
-export type FieldProvenanceResponse = components['schemas']['FieldProvenanceResponse'];
-export type SeedConstraintResponse = components['schemas']['SeedConstraintResponse'];
-export type TasteAnchorsResponse = components['schemas']['TasteAnchorsResponse'];
-export type ConceptCardResponse = components['schemas']['ConceptCardResponse'];
-export type ReadinessEntryResponse = components['schemas']['ReadinessEntryResponse'];
 export type ListSeedsResponse = components['schemas']['ListSeedsResponse'];
 export type SeedSummaryResponse = components['schemas']['SeedSummaryResponse'];
+export type SeedStressResponse = components['schemas']['SeedStressResponse'];
 export type CreateProjectBody = components['schemas']['CreateProjectBody'];
 export type ProjectKind = components['schemas']['ProjectKind'];
 export type ContentMode = components['schemas']['ContentMode'];

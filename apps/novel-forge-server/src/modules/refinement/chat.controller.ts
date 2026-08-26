@@ -16,12 +16,16 @@ import {
   UpdateSessionModelBody,
 } from './chat.dto';
 import { ChatService } from './chat.service';
+import { type ChatTurnHandler, ChatTurnRegistry } from './chat-turn.registry';
 import { serialiseMessage, serialiseProposal } from './serialise';
 
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/chat/sessions')
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly turnRegistry: ChatTurnRegistry,
+  ) {}
 
   @Post()
   @RespondFor(201, ChatSessionResponse)
@@ -51,17 +55,28 @@ export class ChatController {
     return { messages: messages.map(serialiseMessage), pendingTurn };
   }
 
+  /**
+   * One endpoint, two pipelines: a scope with a registered handler (the Ideation Studio) runs its own
+   * turn, everything else runs the chat turn. The session is read here only to choose between them —
+   * both pipelines re-read and re-guard it, and ownership was settled by the project middleware.
+   */
   @Post('/:sessionId/messages')
   @RespondFor(201, ChatTurnResponse)
-  createTurn(@Params() params: ChatSessionParams, @Body() body: ChatTurnBody): Promise<ChatTurnResponse> {
-    return this.chatService.turn(params.projectId, params.sessionId, body.content).then(r => ({
-      userMessage: serialiseMessage(r.userMessage),
-      assistantMessage: serialiseMessage(r.assistantMessage),
-      proposal: r.proposal ? serialiseProposal(r.proposal) : undefined,
-      applied: r.applied,
-      applyNote: r.applyNote,
-      runId: r.runId,
-    }));
+  async createTurn(@Params() params: ChatSessionParams, @Body() body: ChatTurnBody): Promise<ChatTurnResponse> {
+    const session = await this.chatService.getSession(params.projectId, params.sessionId);
+    const scoped = this.turnRegistry.get(session.scopeType);
+    const turn: ChatTurnHandler = scoped ?? ((projectId, sessionId, content) => this.chatService.turn(projectId, sessionId, content));
+
+    const result = await turn(params.projectId, params.sessionId, body.content);
+    return {
+      userMessage: serialiseMessage(result.userMessage),
+      assistantMessage: serialiseMessage(result.assistantMessage),
+      proposal: result.proposal ? serialiseProposal(result.proposal) : undefined,
+      applied: result.applied,
+      applyNote: result.applyNote,
+      seed: result.seed,
+      runId: result.runId,
+    };
   }
 
   @Patch('/:sessionId')

@@ -281,6 +281,25 @@ describe.if(pgAvailable)('Ideation API', () => {
     });
   });
 
+  describe('POST /api/v1/projects/:projectId/seed/stress', () => {
+    it('should refuse a stress pass on somebody else’s seed before any model runs', async () => {
+      const [theirs] = await db.insert(schema.projects).values({ name: 'theirs', kind: 'new_novel', status: 'seed', ownerId: 987_654n }).returning();
+      await db.insert(schema.storySeeds).values({ projectId: theirs?.id as bigint, contentHash: seedContentHash({}) });
+
+      const response = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${theirs?.id}/seed/stress`).body({});
+      expect(response.statusCode).toBe(404);
+      expect(response.json().code).toBe('PRJ_001');
+    });
+
+    it('should reject a stress pass on an active project with IDE_001', async () => {
+      const project = (await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'a novel', kind: 'new_novel' })).json();
+
+      const response = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${project.id}/seed/stress`).body({});
+      expect(response.statusCode).toBe(400);
+      expect(response.json().code).toBe('IDE_001');
+    });
+  });
+
   describe('GET /api/v1/projects', () => {
     beforeEach(async () => {
       await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'a novel', kind: 'new_novel' });

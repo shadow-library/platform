@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
-import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
-import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
+import { AIMessage, HumanMessage } from '@langchain/core/messages';
+import { and, asc, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
@@ -16,11 +16,12 @@ import { countTokens } from '../ai/context/token-budget';
 import { type AiRole, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { buildChatRefinePrompt, PROMPT_REGISTRY, renderScopeInstructions, scopeAllowedOps } from '../ai/prompts';
+import { buildChatRefinePrompt, renderScopeInstructions, scopeAllowedOps } from '../ai/prompts';
 import { RetrievalService } from '../ai/retrieval';
-import { type ChatCompactOutput, type ChatRefineOutput } from '../ai/schemas';
+import { type ChatRefineOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
 import { type ChangeOp } from './change-set';
+import { ChatCompactionService } from './chat-compaction.service';
 import { type ApplyResult, ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
 
@@ -48,12 +49,6 @@ interface SessionListFilter {
   sortBy?: string;
   sortOrder?: string;
 }
-
-// Compaction thresholds (design §5.4): fold history once the verbatim window outgrows its token
-// budget or trails the watermark by more than MAX_VERBATIM_TURNS messages; the newest
-// KEEP_VERBATIM_TURNS messages always stay verbatim.
-const MAX_VERBATIM_TURNS = 12;
-const KEEP_VERBATIM_TURNS = 6;
 
 // Declared-lookup budget for a hub turn (chat-hub design §6 step 4): at most this many lookup rounds
 // execute before the model is told to answer with what it has.
@@ -93,6 +88,7 @@ export class ChatService {
     private readonly proposalApplyService: ProposalApplyService,
     private readonly toolRegistry: ToolRegistryService,
     private readonly retrievalService: RetrievalService,
+    private readonly compaction: ChatCompactionService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -232,7 +228,7 @@ export class ChatService {
     const row = await this.db.query.workflowRuns.findFirst({
       where: and(
         eq(schema.workflowRuns.projectId, projectId),
-        eq(schema.workflowRuns.graph, 'chat-turn'),
+        inArray(schema.workflowRuns.graph, ['chat-turn', 'ideation-turn', 'ideation-concepts']),
         eq(schema.workflowRuns.target, `session:${sessionId}`),
         eq(schema.workflowRuns.status, 'running'),
         gt(schema.workflowRuns.startedAt, cutoff),
@@ -258,11 +254,11 @@ export class ChatService {
     const isHub = session.scopeType === 'project';
     const bootstrap = isHub && (await this.isBootstrapProject(projectId));
 
-    await this.compactIfNeeded(projectId, session, bootstrap);
+    await this.compaction.compactIfNeeded(projectId, session, bootstrap ? CHAT_BOOTSTRAP_HISTORY_BUDGET : CHAT_HISTORY_BUDGET);
 
     const [pack, history, project] = await Promise.all([
       this.contextAssembler.forChatTurn(projectId, session, bootstrap ? { budgetTokens: CHAT_BOOTSTRAP_BUDGET } : undefined),
-      this.buildHistory(session),
+      this.compaction.buildHistory(session),
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
 
@@ -469,57 +465,5 @@ export class ChatService {
       .from(schema.chatMessages)
       .where(eq(schema.chatMessages.sessionId, sessionId));
     return row?.max ?? 0;
-  }
-
-  /** Summary + post-watermark verbatim turns as real prompt messages (design §10.2). */
-  private async buildHistory(session: Refinement.ChatSession): Promise<BaseMessage[]> {
-    const verbatim = await this.db.query.chatMessages.findMany({
-      where: and(eq(schema.chatMessages.sessionId, session.id), gt(schema.chatMessages.ordinal, session.summaryThroughOrdinal)),
-      orderBy: asc(schema.chatMessages.ordinal),
-    });
-
-    const history: BaseMessage[] = [];
-    if (session.summary) history.push(new HumanMessage(`Conversation so far (compacted summary):\n${session.summary}`));
-    for (const message of verbatim) history.push(message.role === 'assistant' ? new AIMessage(message.content) : new HumanMessage(message.content));
-    return history;
-  }
-
-  /**
-   * Folds everything up to the newest KEEP_VERBATIM_TURNS messages into the rolling summary once the
-   * verbatim window exceeds its token budget or MAX_VERBATIM_TURNS. Messages are never deleted — the
-   * watermark is a read-time window over the intact transcript.
-   */
-  private async compactIfNeeded(projectId: bigint, session: Refinement.ChatSession, bootstrap = false): Promise<void> {
-    const verbatim = await this.db.query.chatMessages.findMany({
-      where: and(eq(schema.chatMessages.sessionId, session.id), gt(schema.chatMessages.ordinal, session.summaryThroughOrdinal)),
-      orderBy: asc(schema.chatMessages.ordinal),
-    });
-    if (verbatim.length <= KEEP_VERBATIM_TURNS) return;
-
-    const totalTokens = verbatim.reduce((sum, m) => sum + (m.tokens ?? countTokens(m.content)), 0);
-    const historyBudget = bootstrap ? CHAT_BOOTSTRAP_HISTORY_BUDGET : CHAT_HISTORY_BUDGET;
-    if (totalTokens <= historyBudget && verbatim.length <= MAX_VERBATIM_TURNS) return;
-
-    const toFold = verbatim.slice(0, verbatim.length - KEEP_VERBATIM_TURNS);
-    const watermark = toFold[toFold.length - 1]?.ordinal ?? session.summaryThroughOrdinal;
-    const transcript = toFold.map(m => `${m.role}: ${m.content}`).join('\n\n');
-
-    const prompt = PROMPT_REGISTRY['chat-compact'];
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    const { result: summary } = await this.workflowRunService.runChain(projectId, 'chat-compact', `session:${session.id}`, { watermark }, async runId => {
-      const ctx = { projectId, runId, node: 'chat-compact', promptKey: prompt.key, promptVersion: prompt.version, role: 'compact' };
-      const output = (await this.modelRouter.structured(
-        prompt,
-        { priorSummary: session.summary ?? 'none', transcript },
-        ctx,
-        project as ProjectConfig | undefined,
-      )) as ChatCompactOutput;
-      return output.summary;
-    });
-
-    await this.db.update(schema.chatSessions).set({ summary, summaryThroughOrdinal: watermark, updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id));
-    session.summary = summary;
-    session.summaryThroughOrdinal = watermark;
-    this.logger.debug(`compacted session ${session.id} through ordinal ${watermark}`);
   }
 }

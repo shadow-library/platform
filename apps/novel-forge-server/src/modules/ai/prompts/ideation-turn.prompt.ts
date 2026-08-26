@@ -29,6 +29,7 @@ Emission contracts, which the router reads back and cannot work around:
 - A question lists the sheet fields its answer fills. Put the answer under exactly those keys in seed.update.fields, and nowhere else.
 - A question that lists NO fields never produces a field. Its answer is a locked constraint: when the question's intent names a key and a kind, use exactly those; otherwise choose a short kebab-case key and the kind the intent implies. A constraint filed under a key the intent did not name is invisible to the interview and the question comes back. The spark question is the one exception, and its intent says so.
 - The taste question is neither a field nor a constraint. Its answer writes seed.update tasteAnchors: the comps as the author named them, plus the preferences you derive from what those comps have in common.
+- When the author reacts to concept cards, their verdicts are the emission. Re-send the whole "concepts" collection — every card of every round, the ones they just judged carrying their new fate ("kept", "killed" or "crossed") and the one-line reason in the author's own terms, the older rounds unchanged. The column replaces wholesale, so a collection missing a prior round deletes it, and a card left at "offered" after the author has spoken is a verdict thrown away.
 - Record only what the author settled this turn. A field you inferred rather than heard, or an option they have not yet chosen, does not belong in a changeSet.
 
 Respond with ONLY one valid JSON object — nothing outside the JSON, no markdown fences — of exactly this shape:

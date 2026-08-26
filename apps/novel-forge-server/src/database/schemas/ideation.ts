@@ -11,7 +11,8 @@ export namespace Ideation {
   export type FieldSource = 'author' | 'studio' | 'crossed';
   export type ConstraintKind = 'shape' | 'scope' | 'promise';
   export type ConstraintLockedBy = 'author' | 'inferred';
-  export type ConceptFate = 'kept' | 'killed' | 'crossed';
+  /** `offered` is the state a freshly generated card sits in until the author reacts to it. */
+  export type ConceptFate = 'offered' | 'kept' | 'killed' | 'crossed';
   export type ReadinessVerdict = 'strong' | 'thin' | 'empty';
 
   /**

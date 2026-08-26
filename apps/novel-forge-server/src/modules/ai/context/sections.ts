@@ -31,6 +31,8 @@ export interface ContextSection {
   truncated: boolean;
   sourceRefs: string[];
   rendered: string;
+  /** Survives budget pressure: the pack is meaningless without it, so it is reserved before anything else fits. */
+  required?: boolean;
 }
 
 export interface OmittedSection {

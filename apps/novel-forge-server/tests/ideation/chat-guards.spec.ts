@@ -1,5 +1,5 @@
 import { SQL } from 'bun';
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AppError } from '@shadow-library/common';
 
@@ -8,6 +8,9 @@ import { ContextAssembler } from '@modules/ai/context/context-assembler.service'
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
 import { ToolRegistryService } from '@modules/ai/tools';
 import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
+import { IdeationTurnRegistrar } from '@modules/ideation/ideation-turn.registrar';
+import { ChatCompactionService } from '@modules/refinement/chat-compaction.service';
+import { ChatTurnRegistry } from '@modules/refinement/chat-turn.registry';
 import { ChatService } from '@modules/refinement/chat.service';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
@@ -52,7 +55,17 @@ describe.if(pgAvailable)('ChatService ideation guards', () => {
     const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop);
     const modelRouter = { structured: noop, resolveModel: () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }) } as never;
     const applier = new ProposalApplyService(databaseService, new ActionExecutorRegistry());
-    chat = new ChatService(databaseService, assembler, modelRouter, workflowRuns, new ProposalService(databaseService), applier, new ToolRegistryService(), noop);
+    chat = new ChatService(
+      databaseService,
+      assembler,
+      modelRouter,
+      workflowRuns,
+      new ProposalService(databaseService),
+      applier,
+      new ToolRegistryService(),
+      noop,
+      new ChatCompactionService(databaseService, modelRouter, workflowRuns),
+    );
 
     const [project] = await db
       .insert(schema.projects)
@@ -73,5 +86,17 @@ describe.if(pgAvailable)('ChatService ideation guards', () => {
     if (!session) throw new Error('failed to seed session');
 
     expect(await codeOf(chat.turn(projectId, session.id, 'hello'))).toBe('IDE_005');
+  });
+});
+
+describe('IdeationTurnRegistrar', () => {
+  it('hands the ideation scope to the studio and leaves every other scope to the chat turn', () => {
+    const registry = new ChatTurnRegistry();
+    const turn = mock(async () => ({}) as never);
+    new IdeationTurnRegistrar(registry, { turn } as never).onModuleInit();
+
+    expect(registry.get('project')).toBeUndefined();
+    void registry.get('ideation')?.(1n, 'session', 'hello');
+    expect(turn).toHaveBeenCalledWith(1n, 'session', 'hello');
   });
 });

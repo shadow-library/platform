@@ -360,7 +360,8 @@ export const QUESTION_BANK: StudioQuestion[] = [
   {
     id: 'stress.readiness',
     stage: 'stress',
-    intent: 'Report the readiness verdict per dimension with concrete optional fixes, while making plain that none of it blocks starting the novel.',
+    intent:
+      "Report the readiness verdict per dimension with concrete optional fixes, while making plain that none of it blocks starting the novel. This is the emission contract's one exception: the readiness report is a report, never a constraint — it lands in story_seeds.readiness through the stress pass and produces no field and no locked constraint, so never invent a key for it.",
     coaching:
       'Here is where the idea is strong and where it is thin. None of this blocks you — you can start the novel right now and fix the thin parts while you write. But thin things do not stay quiet; they turn into a stall you hit mid-draft, and five minutes here is much cheaper than that.',
     fills: [],

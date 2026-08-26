@@ -1,7 +1,7 @@
 import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-import { CreateSeedBody, ListSeedsQuery, ListSeedsResponse, SeedProjectParams, SeedResponse } from './ideation.dto';
+import { CreateSeedBody, ListSeedsQuery, ListSeedsResponse, SeedProjectParams, SeedResponse, SeedStressResponse } from './ideation.dto';
 import { IdeationService } from './ideation.service';
 
 @Authenticated()
@@ -31,5 +31,11 @@ export class IdeationController {
   @RespondFor(200, SeedResponse)
   getSeed(@Params() params: SeedProjectParams): Promise<SeedResponse> {
     return this.ideationService.getSeed(params.projectId);
+  }
+
+  @Post('/seed/stress')
+  @RespondFor(200, SeedStressResponse)
+  stressSeed(@Params() params: SeedProjectParams): Promise<SeedStressResponse> {
+    return this.ideationService.stress(params.projectId);
   }
 }

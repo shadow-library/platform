@@ -86,12 +86,16 @@ export interface BudgetResult<T> {
   omitted: BudgetOmission[];
 }
 
-export function applyBudget<T extends { key: string; tokens: number }>(sections: T[], budgetTokens: number): BudgetResult<T> {
+export function applyBudget<T extends { key: string; tokens: number; required?: boolean }>(sections: T[], budgetTokens: number): BudgetResult<T> {
   const fitting: T[] = [];
   const omitted: BudgetOmission[] = [];
-  let used = 0;
+  // Required sections are charged against the budget before anything competes for it, so a pack whose
+  // meaning depends on one section (the ideation round's questions) can never lose it to a long prefix.
+  let used = sections.reduce((sum, section) => sum + (section.required ? section.tokens : 0), 0);
   for (const section of sections) {
-    if (used + section.tokens <= budgetTokens) {
+    if (section.required) {
+      fitting.push(section);
+    } else if (used + section.tokens <= budgetTokens) {
       fitting.push(section);
       used += section.tokens;
     } else {

@@ -148,7 +148,7 @@ export class ConceptCardResponse {
   @Field()
   posture: string;
 
-  @Field(() => String, { enum: ['kept', 'killed', 'crossed'] })
+  @Field(() => String, { enum: ['offered', 'kept', 'killed', 'crossed'], description: 'Offered until the author reacts to the card, then their verdict.' })
   fate: Ideation.ConceptFate;
 
   @Field({ optional: true })
@@ -210,6 +210,18 @@ export class SeedResponse {
 
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;
+}
+
+@Schema({ description: 'The result of a stress pass: the readiness verdict and the sheet carrying it.' })
+export class SeedStressResponse {
+  @Field(() => SeedResponse)
+  seed: SeedResponse;
+
+  @Field(() => [ReadinessEntryResponse], { description: 'The verdict per dimension, in the fixed dimension order. It advises; it never blocks graduation.' })
+  readiness: ReadinessEntryResponse[];
+
+  @Field()
+  runId: string;
 }
 
 @Schema({ description: 'One card on the Ideas shelf.' })

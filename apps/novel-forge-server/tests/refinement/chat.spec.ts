@@ -9,6 +9,7 @@ import { CHAT_BOOTSTRAP_BUDGET, CHAT_HUB_BUDGET, ContextAssembler } from '@modul
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
 import { ToolRegistryService } from '@modules/ai/tools';
 import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
+import { ChatCompactionService } from '@modules/refinement/chat-compaction.service';
 import { ChatService } from '@modules/refinement/chat.service';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
@@ -54,7 +55,17 @@ describe.if(pgAvailable)('ChatService', () => {
     const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop);
     const modelRouter = { structured: structuredMock, resolveModel: () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }) } as never;
     const applier = new ProposalApplyService(databaseService, new ActionExecutorRegistry());
-    chat = new ChatService(databaseService, assembler, modelRouter, workflowRuns, new ProposalService(databaseService), applier, new ToolRegistryService(), noop);
+    chat = new ChatService(
+      databaseService,
+      assembler,
+      modelRouter,
+      workflowRuns,
+      new ProposalService(databaseService),
+      applier,
+      new ToolRegistryService(),
+      noop,
+      new ChatCompactionService(databaseService, modelRouter, workflowRuns),
+    );
 
     const [project] = await db
       .insert(schema.projects)

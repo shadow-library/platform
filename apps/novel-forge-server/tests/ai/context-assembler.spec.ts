@@ -1325,6 +1325,14 @@ describe('ContextAssembler.forIdeationTurn', () => {
     for (const marker of ['PREMISE_MARKER', 'COMP_MARKER', 'dual-leads']) expect(pack.renderedStable).toContain(marker);
   });
 
+  it('should keep this round under budget pressure that drops everything else', async () => {
+    const pack = await makeAssembler().forIdeationTurn(seed(), round(), { dryRun: true, budgetTokens: 1 });
+
+    expect(pack.sections.map(s => s.key)).toEqual(['round_questions']);
+    expect(pack.omitted.map(o => o.key)).toContain('seed_sheet');
+    expect(pack.renderedVolatile).toContain('Coaching (reproduce verbatim)');
+  });
+
   it('should never pack the conversation — history travels as prompt messages, not as pack text', async () => {
     const pack = await makeAssembler().forIdeationTurn(seed(), round(), { dryRun: true });
 
@@ -1452,9 +1460,7 @@ describe('ContextAssembler.forIdeationConcepts', () => {
       readiness: [],
       askedQuestions: [],
     } as unknown as IdeationSeedInput;
-    const router = nextQuestions(toRouterSeedState(seed));
-
-    const pack = await makeAssembler().forIdeationConcepts(seed, router, { dryRun: true });
+    const pack = await makeAssembler().forIdeationConcepts(seed, { dryRun: true });
 
     expect(pack.sections.map(s => s.key)).not.toContain('round_questions');
     expect(pack.renderedStable).toContain('COMP_MARKER');

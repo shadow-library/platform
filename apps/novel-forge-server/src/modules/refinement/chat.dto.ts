@@ -5,6 +5,7 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 import { ChatMode, ChatScope, ChatSessionStatus, SortByTime } from '@server/common';
 import { type Refinement } from '@server/database';
 
+import { SeedResponse } from '../ideation/ideation.dto';
 import { AppliedArtifactItem, OpResultItem, ProposalResponse } from './refinement.dto';
 
 @Schema()
@@ -145,6 +146,14 @@ export class ChatMessageResponse {
   @Field()
   content: string;
 
+  @Field(() => Object, {
+    optional: true,
+    nullable: true,
+    description:
+      'Structured turn payload the studio renders beside the prose. Discriminated by `kind`: "questions" (option chips), "cards" (concept cards), "readiness" (the stress table).',
+  })
+  payload?: Record<string, unknown> | null;
+
   @Field(() => String, { optional: true, nullable: true })
   proposalId?: bigint | null;
 
@@ -208,6 +217,9 @@ export class ChatTurnResponse {
 
   @Field({ optional: true, description: 'why an auto-mode change-set was NOT applied (conflict, finalize gating, action failure)' })
   applyNote?: string;
+
+  @Field(() => SeedResponse, { optional: true, description: 'the story seed sheet as this turn left it; present only on Ideation Studio turns' })
+  seed?: SeedResponse;
 
   @Field()
   runId: string;
