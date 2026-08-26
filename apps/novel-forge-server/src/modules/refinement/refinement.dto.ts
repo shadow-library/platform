@@ -24,7 +24,7 @@ export class ProposalIdParams {
 }
 
 @Schema()
-export class ListProposalsQuery extends PaginationQuery(SortByTime) {
+export class ListProposalsQuery extends PaginationQuery(SortByTime, { sortBy: 'createdAt', sortOrder: 'desc' }) {
   @Field(() => RefinementProposalStatus, { optional: true })
   status?: Refinement.ProposalStatus;
 
@@ -222,7 +222,7 @@ export class ChangeItemResponse {
 }
 
 @Schema()
-export class ListChangesQuery extends PaginationQuery(SortByTime) {}
+export class ListChangesQuery extends PaginationQuery(SortByTime, { sortBy: 'updatedAt', sortOrder: 'desc' }) {}
 
 @Schema()
 export class ListChangesResponse extends Paginated(ChangeItemResponse) {}

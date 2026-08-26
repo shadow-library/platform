@@ -201,7 +201,7 @@ export class CloneProjectBody {
 }
 
 @Schema()
-export class ListProjectsQuery extends PaginationQuery(SortByTime) {
+export class ListProjectsQuery extends PaginationQuery(SortByTime, { sortBy: 'updatedAt', sortOrder: 'desc' }) {
   @Field(() => ProjectKind, { optional: true })
   kind?: Project.Kind;
 

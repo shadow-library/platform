@@ -1,7 +1,9 @@
 import { SQL } from 'bun';
 import { describe, expect, it } from 'bun:test';
+import { eq } from 'drizzle-orm';
 
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
+import { schema } from '@server/database';
 import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
 
 const pgAvailable = await (async () => {
@@ -86,6 +88,35 @@ describe.if(pgAvailable)('Projects API', () => {
       const cleared = await testEnv.getRouter().mockRequest().patch(`/api/v1/projects/${id}`).body({ instructions: '' });
       expect(cleared.statusCode).toBe(200);
       expect(cleared.json().instructions).toBe(DEFAULT_WRITING_INSTRUCTIONS);
+    });
+  });
+
+  describe('GET /api/v1/projects', () => {
+    it('should list the newest activity first when the caller asks for no particular order', async () => {
+      const db = testEnv.getPostgresClient();
+      const stamps: [string, number][] = [
+        ['sort-stalest', 3],
+        ['sort-freshest', 1],
+        ['sort-middling', 2],
+      ];
+      const names = stamps.map(([name]) => name);
+
+      for (const [name, hoursAgo] of stamps) {
+        const created = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name, kind: 'new_novel' });
+        await db
+          .update(schema.projects)
+          .set({ updatedAt: new Date(Date.now() - hoursAgo * 3_600_000) })
+          .where(eq(schema.projects.id, BigInt(created.json().id)));
+      }
+
+      const response = await testEnv.getRouter().mockRequest().get('/api/v1/projects?limit=100');
+
+      expect(response.statusCode).toBe(200);
+      const listed = response
+        .json()
+        .items.map((item: { name: string }) => item.name)
+        .filter((name: string) => names.includes(name));
+      expect(listed).toEqual(['sort-freshest', 'sort-middling', 'sort-stalest']);
     });
   });
 

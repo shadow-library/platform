@@ -63,7 +63,7 @@ export class UpdateSessionModelBody {
 }
 
 @Schema()
-export class ListChatSessionsQuery extends PaginationQuery(SortByTime) {
+export class ListChatSessionsQuery extends PaginationQuery(SortByTime, { sortBy: 'updatedAt', sortOrder: 'desc' }) {
   @Field(() => ChatScope, { optional: true })
   scopeType?: Refinement.ChatScope;
 

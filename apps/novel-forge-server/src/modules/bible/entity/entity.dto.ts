@@ -160,7 +160,7 @@ export class AddEntityImageBody extends UploadImageBody {
 export class UpdateEntityBody extends PartialType(OmitType(CreateEntityBody, ['entityKey', 'type'] as const)) {}
 
 @Schema()
-export class ListEntitiesQuery extends PaginationQuery(SortByTime) {
+export class ListEntitiesQuery extends PaginationQuery(SortByTime, { sortBy: 'updatedAt', sortOrder: 'desc' }) {
   @Field(() => EntityType, { optional: true })
   type?: Knowledge.EntityType;
 
