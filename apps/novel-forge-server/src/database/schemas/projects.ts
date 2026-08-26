@@ -47,11 +47,16 @@ export namespace Project {
   // serialiser is what keeps the ref off the wire.
   export type Presented = Omit<Row, 'config'> & { config?: ProjectConfigData; coverUrl?: string };
   export type Kind = InferEnum<typeof projectKind>;
+  export type Status = InferEnum<typeof projectStatus>;
   export type ContentMode = InferEnum<typeof contentMode>;
   export type ContentGenerator = InferEnum<typeof contentGenerator>;
 }
 
 export const projectKind = pgEnum('project_kind', ['source', 'new_novel']);
+// A `seed` project is an idea under construction in the Ideation Studio: it owns chat, proposal and run
+// history like any project, but the generation, planning and publishing pipelines reject it until
+// graduation flips it to `active` (ideation-studio design §2.1).
+export const projectStatus = pgEnum('project_status', ['seed', 'active']);
 export const contentMode = pgEnum('content_mode', ['standard', 'grok_only']);
 export const contentGenerator = pgEnum('content_generator', ['standard', 'grok', 'human']);
 
@@ -60,6 +65,7 @@ export const projects = pgTable('projects', {
   ownerId: bigint('owner_id', { mode: 'bigint' }),
   name: varchar('name', { length: 255 }).notNull(),
   kind: projectKind('kind').notNull(),
+  status: projectStatus('status').notNull().default('active'),
   title: varchar('title', { length: 500 }),
   coverImagePath: varchar('cover_image_path'),
   contentMode: contentMode('content_mode').notNull().default('standard'),

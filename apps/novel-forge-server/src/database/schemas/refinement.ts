@@ -16,11 +16,11 @@ export namespace Refinement {
   export type ProposalStatus = InferEnum<typeof refinementProposalStatus>;
 }
 
-export const chatScope = pgEnum('chat_scope', ['project', 'novel', 'bible_document', 'volume_plan', 'volume', 'arc_plan', 'arc', 'brief']);
+export const chatScope = pgEnum('chat_scope', ['project', 'novel', 'bible_document', 'volume_plan', 'volume', 'arc_plan', 'arc', 'brief', 'ideation']);
 export const chatSessionStatus = pgEnum('chat_session_status', ['active', 'archived']);
 export const chatMessageRole = pgEnum('chat_message_role', ['user', 'assistant']);
 export const chatMode = pgEnum('chat_mode', ['manual', 'auto']);
-export const refinementKind = pgEnum('refinement_kind', ['chat', 'hub', 'premise_enhance', 'bible_audit', 'arc_plan', 'chapter_extract']);
+export const refinementKind = pgEnum('refinement_kind', ['chat', 'hub', 'premise_enhance', 'bible_audit', 'arc_plan', 'chapter_extract', 'ideation']);
 export const refinementProposalStatus = pgEnum('refinement_proposal_status', ['pending', 'applied', 'discarded', 'superseded', 'conflicted', 'reverted']);
 
 export const chatSessions = pgTable(
@@ -63,6 +63,10 @@ export const chatMessages = pgTable(
     ordinal: integer('ordinal').notNull(),
     role: chatMessageRole('role').notNull(),
     content: text('content').notNull(),
+    // Structured turn payload the web renders alongside the prose reply — option chips, concept cards,
+    // the locked-constraints block, the readiness table. Null on every message that is prose only;
+    // keeping it out of `content` is what stops compaction summaries from swallowing it.
+    payload: jsonb('payload').$type<Record<string, unknown>>(),
     // Loose key to refinement_proposals: the proposal row is written in the same transaction as the
     // message it belongs to, and a FK here would be circular with refinement_proposals.message_id.
     proposalId: bigint('proposal_id', { mode: 'bigint' }),

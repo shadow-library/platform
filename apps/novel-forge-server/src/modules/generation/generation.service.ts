@@ -5,7 +5,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { renderBriefBody, renderChapterBrief } from '@server/common';
+import { assertActiveProject, renderBriefBody, renderChapterBrief } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -139,7 +139,14 @@ export class GenerationService {
   }
 
   async seedFromBrief(projectId: bigint, body: SeedFromBriefBody): Promise<WorkflowRunResult> {
+    await this.assertActive(projectId);
     return this.workflowRunService.runBibleBuilder({ projectId, brief: body.brief, force: body.force });
+  }
+
+  private async assertActive(projectId: bigint): Promise<void> {
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { status: true } });
+    if (!project) throw AppErrorCode.PRJ_001.create();
+    assertActiveProject(project);
   }
 
   async plan(projectId: bigint, body: PlanBody): Promise<{ volumes: Plan.Volume[] }> {
@@ -148,6 +155,7 @@ export class GenerationService {
       this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
     ]);
     if (!project) throw AppErrorCode.PRJ_001.create();
+    assertActiveProject(project);
 
     // Fresh (non-source) novels have no skeleton; a blank "Novel skeleton:" line makes weak models
     // treat the task as unanswerable and return an empty plan, so state the fallback explicitly.
@@ -230,6 +238,7 @@ export class GenerationService {
   }
 
   async outline(projectId: bigint, body: OutlineBody): Promise<{ briefs: Generation.Brief[] }> {
+    await this.assertActive(projectId);
     const [catalog, volumes] = await Promise.all([
       this.contextAssembler.catalog(projectId),
       this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), ne(schema.volumes.status, 'draft')), orderBy: asc(schema.volumes.ordinal) }),
@@ -321,6 +330,7 @@ export class GenerationService {
    * boundary. Gated on the whole volume's arcs being approved (design §4 gate 2).
    */
   async outlineArc(projectId: bigint, arcKey: string, body: OutlineArcBody): Promise<{ briefs: Generation.Brief[] }> {
+    await this.assertActive(projectId);
     const arc = await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, arcKey)) });
     if (!arc) throw AppErrorCode.ARC_001.create();
     if (arc.chapterStart === null || arc.chapterEnd === null) throw AppErrorCode.ARC_002.create();
@@ -499,6 +509,7 @@ export class GenerationService {
   }
 
   async generate(projectId: bigint, body: GenerateBody): Promise<JobEnqueueResult> {
+    await this.assertActive(projectId);
     const limit = body.limit ?? 1;
 
     const approvedVolumes = await this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.status, ['approved', 'source'])) });

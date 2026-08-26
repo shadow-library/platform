@@ -76,6 +76,7 @@ export const SCOPE_CHAT_ROLE: Record<Refinement.ChatScope, AiRole> = {
   arc: 'arc',
   brief: 'outline',
   bible_document: 'bible',
+  ideation: 'chat',
 };
 
 @Injectable()
@@ -121,6 +122,7 @@ export class ChatService {
     const value = scopeRef?.includes(':') ? (scopeRef.split(':')[1] ?? '') : '';
     switch (scopeType) {
       case 'project':
+      case 'ideation':
       case 'novel':
       case 'volume_plan':
         return null;

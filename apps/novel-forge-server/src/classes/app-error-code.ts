@@ -203,6 +203,14 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly IMP_003 = AppErrorCode.badRequest('IMP_003', 'Overwrite is not allowed once drafts or chapters exist — edit the plan in the app instead');
 
   /*!
+   * Ideation Studio Errors
+   */
+  static readonly IDE_001 = AppErrorCode.badRequest('IDE_001', 'Project is not a seed or has already graduated');
+  static readonly IDE_002 = AppErrorCode.badRequest('IDE_002', 'Graduation requires a title');
+  static readonly IDE_003 = AppErrorCode.badRequest('IDE_003', 'Unknown question id');
+  static readonly IDE_004 = AppErrorCode.badRequest('IDE_004', 'Project is a seed — this operation requires an active project');
+
+  /*!
    * Publishing Errors
    */
   static readonly PUB_001 = AppErrorCode.notFound('PUB_001', 'Publication not found');

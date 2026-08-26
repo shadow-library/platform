@@ -80,6 +80,14 @@ export const SCOPE_PLAYBOOKS: Record<Refinement.ChatScope, ScopePlaybook> = {
       'Scope: one chapter brief. The two things that make or break a serialized chapter: the ending contract (hookType, emotional beat, open question, handoff state — never a hurried, conclusive ending) and the declared context refs (everything the chapter author must see, most important first, chosen from the catalog — never invented). Refine the beats to fill one chapter exactly. Set a knowledgeContract only when the chapter turns on who knows what — pov bounds what the prose may state, learns records the facts discovered on-page; a chapter that reveals nothing previously hidden carries no contract. Only this brief may change.',
     allowedOps: ['brief.update'],
   },
+  // The Ideation Studio drives its own turn pipeline; this entry exists so the scope map stays total
+  // over `chat_scope`. Its charter and the `seed.update` / `action.graduate_seed` vocabulary arrive
+  // with the studio's prompts (ideation-studio design §4.1).
+  ideation: {
+    guidance:
+      'Scope: the Ideation Studio — a story seed being shaped before it becomes a novel. The question router decides what is asked; word its questions in editor terms, keep every option concrete and calibrated to the comps the author named, and never propose anything that violates a locked constraint.',
+    allowedOps: [],
+  },
 };
 
 // Rides on the hub playbook only while the project is empty (no bible documents, no volumes). A blank

@@ -4,6 +4,7 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
+import { assertActiveProject } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Publishing, schema } from '@server/database';
 
@@ -41,6 +42,7 @@ export class PublishingService {
   async publishNovel(projectId: bigint, body: PublishNovelBody): Promise<Publishing.Publication> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     if (!project) throw AppErrorCode.PRJ_001.create();
+    assertActiveProject(project);
 
     const stored = await this.db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId) });
     if (!stored) {
@@ -93,6 +95,9 @@ export class PublishingService {
    * bumping `revision` only when the rendered payload's hash actually changed.
    */
   async publishChapter(projectId: bigint, chapterNumber: number, body: PublishChapterBody): Promise<Publishing.ChapterPublication> {
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { status: true } });
+    if (!project) throw AppErrorCode.PRJ_001.create();
+    assertActiveProject(project);
     await this.getPublication(projectId);
 
     const chapter = await this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapterNumber)) });

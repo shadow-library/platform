@@ -21,6 +21,11 @@ import {
 
 const BIBLE_SECTIONS: Bible.Section[] = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
 
+export interface CreateProjectOptions {
+  /** Defaults to `active`; `seed` creates an Ideation Studio project with no blank bible documents. */
+  status?: Project.Status;
+}
+
 @Injectable()
 export class ProjectService {
   private readonly logger = Logger.getLogger(APP_NAME, ProjectService.name);
@@ -47,8 +52,13 @@ export class ProjectService {
     return { ...project, config: project.config ?? undefined, instructions, coverUrl: this.storage.getPublicUrl(project.coverImagePath) };
   }
 
-  async create(body: CreateProjectBody): Promise<Project.Presented> {
-    this.logger.debug('create project', { name: body.name, kind: body.kind, contentMode: body.contentMode });
+  /**
+   * `options.status` is internal-only — it is not part of `CreateProjectBody`, so no HTTP caller can
+   * mint a seed; the ideation module passes it directly.
+   */
+  async create(body: CreateProjectBody, options?: CreateProjectOptions): Promise<Project.Presented> {
+    const status = options?.status ?? 'active';
+    this.logger.debug('create project', { name: body.name, kind: body.kind, contentMode: body.contentMode, status });
 
     const [project] = await this.db
       .insert(schema.projects)
@@ -56,6 +66,7 @@ export class ProjectService {
         ownerId: this.ownerId(),
         name: body.name,
         kind: body.kind,
+        status,
         title: body.title,
         // Blank instructions stay null so the column means "use the default"; `present` fills it in.
         instructions: body.instructions?.trim() || null,
@@ -65,9 +76,11 @@ export class ProjectService {
       .catch(err => this.databaseService.translateError(err));
 
     if (!project) throw AppErrorCode.S001.create();
-    this.logger.info('project created', { projectId: project.id, name: project.name, kind: project.kind });
+    this.logger.info('project created', { projectId: project.id, name: project.name, kind: project.kind, status: project.status });
 
-    if (body.kind === 'new_novel') {
+    // A seed gets no blank bible documents: graduation writes real ones, and blanks would defeat the
+    // emptiness checks the bible builder and audit rely on (ideation-studio design §2.1).
+    if (body.kind === 'new_novel' && status !== 'seed') {
       await this.db
         .insert(schema.bibleDocuments)
         .values(BIBLE_SECTIONS.map(section => ({ projectId: project.id, section, slug: 'default' })))

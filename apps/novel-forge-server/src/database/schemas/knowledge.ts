@@ -22,7 +22,7 @@ export namespace Knowledge {
 }
 
 export const entityType = pgEnum('entity_type', ['character', 'faction', 'location', 'power_rule', 'item', 'concept']);
-export const factSource = pgEnum('fact_source', ['brief', 'manual', 'import']);
+export const factSource = pgEnum('fact_source', ['brief', 'manual', 'import', 'seed']);
 export const entitySignificance = pgEnum('entity_significance', ['major', 'minor']);
 export const entityOrigin = pgEnum('entity_origin', ['extracted', 'seeded', 'generated']);
 
