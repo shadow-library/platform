@@ -54,7 +54,26 @@ const normalise = (text: string): string =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 
-const containsAny = (haystack: string, needles: string[]): boolean => needles.some(needle => haystack.includes(needle));
+const NEEDLE_PATTERNS = new Map<string, RegExp>();
+
+/**
+ * A needle matches whole words only — 'experience' must not answer to 'xp'. A trailing `*` marks a stem
+ * whose end is deliberately open ('reincarnat*' → reincarnated, reincarnation); everything else is
+ * anchored at both ends, multi-word needles included, which makes them phrase matches.
+ */
+const needlePattern = (needle: string): RegExp => {
+  const cached = NEEDLE_PATTERNS.get(needle);
+  if (cached) return cached;
+
+  const stem = needle.endsWith('*');
+  const body = stem ? needle.slice(0, -1) : needle;
+  const pattern = new RegExp(`\\b${body}${stem ? '' : '\\b'}`);
+  NEEDLE_PATTERNS.set(needle, pattern);
+  return pattern;
+};
+
+/** `haystack` must already be normalised — lowercase, punctuation collapsed to single spaces. */
+const containsAny = (haystack: string, needles: string[]): boolean => needles.some(needle => needlePattern(needle).test(haystack));
 
 const matcher =
   (needles: string[]) =>
@@ -74,11 +93,11 @@ export const CONSTRAINT_PLAYBOOKS: ConstraintPlaybook[] = [
       'Either a second ladder that rises on its own schedule, or an explicitly offset one where the second lead advances when the first stalls. Both work; neither is the same book, and having neither is not a third option.',
     forcedQuestions: ['deepen.secondLadder'],
     failureModes: [
-      'One lead becomes a sidekick with extra dialogue by chapter thirty — the reader stops turning to their chapters.',
+      'One lead becomes a sidekick with extra dialogue within the first arcs — the reader stops turning to their chapters.',
       'Both leads want the same thing in the same way, so their scenes together stop generating friction.',
       'The two ladders rise in lockstep, which reads as one ladder with two names on it.',
     ],
-    conceptFilter: card => containsAny(normalise(`${card.logline} ${card.engine} ${card.posture}`), ['two', 'both', 'pair', 'partner', 'dual', 'each other', 'together']),
+    conceptFilter: card => containsAny(normalise(`${card.logline} ${card.engine} ${card.posture}`), ['two', 'both', 'pair*', 'partner*', 'dual', 'each other', 'together']),
   },
   {
     key: 'regression',
@@ -88,7 +107,7 @@ export const CONSTRAINT_PLAYBOOKS: ConstraintPlaybook[] = [
       'second life',
       'time loop',
       'loops back',
-      'reincarnat',
+      'reincarnat*',
       'returned to the past',
       'do over',
       'knows the future',
@@ -108,17 +127,17 @@ export const CONSTRAINT_PLAYBOOKS: ConstraintPlaybook[] = [
   },
   {
     key: 'no-harem',
-    matches: matcher(['no harem', 'anti harem', 'not a harem', 'single pairing', 'one romance', 'one love interest', 'single love interest', 'monogam', 'no love triangle']),
+    matches: matcher(['no harem', 'anti harem', 'not a harem', 'single pairing', 'one romance', 'one love interest', 'single love interest', 'monogam*', 'no love triangle']),
     promises: 'A romance the reader can invest in without hedging — nobody is being kept in reserve, and the pairing named early is the pairing that ships.',
     kills: 'The genre default: the open question of who the lead ends up with, which is the cheapest recurring tension source progression fiction has.',
     mustReplace: 'Cost. Once "who" is settled, the pressure has to come from what staying together takes — what each of them gives up, hides, or refuses on the other\'s behalf.',
     forcedQuestions: ['deepen.stayingCost'],
     failureModes: [
-      'The romance resolves in the first arc and then sits inert for two hundred chapters.',
+      'The romance resolves in the first arc and then sits inert for the rest of the run.',
       'Rivals are introduced anyway and disposed of insincerely, which reads as the promise being tested rather than kept.',
       'The partner becomes a support function — always present, never costly.',
     ],
-    conceptFilter: card => !containsAny(normalise(`${card.logline} ${card.posture}`), ['harem', 'love triangle', 'suitors', 'multiple love interests']),
+    conceptFilter: card => !containsAny(normalise(`${card.logline} ${card.posture}`), ['harem', 'love triangle*', 'suitor*', 'multiple love interests']),
   },
   {
     key: 'litrpg-system',
@@ -148,7 +167,7 @@ export const CONSTRAINT_PLAYBOOKS: ConstraintPlaybook[] = [
       'Numbers inflate faster than the fiction around them, so the same fight reads identically at level 5 and level 500.',
       'The screen reports what the prose already said, which turns a mechanism into decoration.',
     ],
-    conceptFilter: card => containsAny(normalise(`${card.engine} ${card.ladder}`), ['level', 'stat', 'rank', 'tier', 'skill', 'system', 'number', 'point', 'class']),
+    conceptFilter: card => containsAny(normalise(`${card.engine} ${card.ladder}`), ['level*', 'stat*', 'rank*', 'tier*', 'skill*', 'system*', 'number*', 'point*', 'class*']),
   },
   {
     key: 'open-ended-length',
@@ -157,7 +176,7 @@ export const CONSTRAINT_PLAYBOOKS: ConstraintPlaybook[] = [
     kills:
       'The ending. Every structural comfort that comes from knowing where the last chapter is: the planned climax, the arc that pays off on schedule, the ladder sized to the book.',
     mustReplace:
-      'A renewal mechanism. The first ladder will top out — usually around chapter ninety — and the story needs a second engine decided in advance, so the renewal is a plan rather than a panic.',
+      'A renewal mechanism. The first ladder will top out — usually mid-run — and the story needs a second engine decided in advance, so the renewal is a plan rather than a panic.',
     forcedQuestions: ['deepen.renewal'],
     failureModes: [
       'The ladder runs out and the book stalls: the lead is the strongest thing in the setting and there is nothing left to escalate.',
@@ -200,7 +219,7 @@ export const CONSTRAINT_PLAYBOOKS: ConstraintPlaybook[] = [
       'Something that tightens while nothing happens: proximity that cannot be escaped, obligation that keeps them in the same room, or the mounting cost of concealment.',
     forcedQuestions: ['deepen.deferredTension'],
     failureModes: [
-      'Deferral without escalation — a slow burn that reads as a stalled one, because the gap between them is the same in chapter eighty as in chapter eight.',
+      'Deferral without escalation — a slow burn that reads as a stalled one, because the gap between them is the same late in the run as it was on the first page.',
       'Contrived obstacles the reader can see the author placing, which converts patience into irritation.',
       'The payoff arrives and the book has nothing left, because the wait was the only engine.',
     ],
@@ -218,7 +237,7 @@ export const CONSTRAINT_PLAYBOOKS: ConstraintPlaybook[] = [
       'Exposition is smuggled in through implausibly talkative informants.',
       "The lead is absent from the book's biggest event, and it has to be reported rather than felt.",
     ],
-    conceptFilter: card => !containsAny(normalise(`${card.logline} ${card.engine} ${card.posture}`), ['multiple pov', 'rotating pov', 'several viewpoints', 'ensemble']),
+    conceptFilter: card => !containsAny(normalise(`${card.logline} ${card.engine} ${card.posture}`), ['multiple pov*', 'rotating pov*', 'several viewpoints', 'ensemble']),
   },
 ];
 

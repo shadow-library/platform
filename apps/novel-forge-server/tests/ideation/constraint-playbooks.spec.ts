@@ -71,6 +71,18 @@ describe('matchPlaybooks', () => {
     expect(unmatched).toEqual([]);
   });
 
+  it.each(['the experience of grief', 'a train station on the coast', 'a level-headed diplomat', 'she experiences the loop as grief'])(
+    'should not match %p to any playbook on a substring alone',
+    text => {
+      expect(matchPlaybooks([constraint('c', text)]).matched).toEqual([]);
+    },
+  );
+
+  it('should still match a genuine token', () => {
+    expect(matchPlaybooks([constraint('c', 'xp grind, levels, a status screen')]).matched.map(match => match.playbook.key)).toEqual(['litrpg-system']);
+    expect(matchPlaybooks([constraint('c', 'she is reincarnated as her own rival')]).matched.map(match => match.playbook.key)).toEqual(['regression']);
+  });
+
   it('should match on punctuation and casing the author actually types', () => {
     expect(matchPlaybooks([constraint('c', 'DUAL-LEADS!!')]).matched.map(match => match.playbook.key)).toEqual(['dual-leads']);
   });

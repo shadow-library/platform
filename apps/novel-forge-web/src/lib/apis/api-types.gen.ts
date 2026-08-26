@@ -7285,8 +7285,6 @@ export interface operations {
       query?: {
         limit?: number | string;
         offset?: number | string;
-        sortOrder?: components['schemas']['SortOrder'];
-        sortBy?: components['schemas']['SortByTime'];
       };
       header?: never;
       path: {

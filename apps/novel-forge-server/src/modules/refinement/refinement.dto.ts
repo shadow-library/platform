@@ -1,4 +1,4 @@
-import { Field, Integer, Schema } from '@shadow-library/class-schema';
+import { Field, Integer, OmitType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
@@ -221,8 +221,9 @@ export class ChangeItemResponse {
   revertedAt?: Date | null;
 }
 
+/** The change feed's ordering is fixed by design — newest apply first — so it advertises no sort fields to choose between. */
 @Schema()
-export class ListChangesQuery extends PaginationQuery(SortByTime, { sortBy: 'updatedAt', sortOrder: 'desc' }) {}
+export class ListChangesQuery extends OmitType(PaginationQuery(SortByTime, { limit: 30 }), ['sortBy', 'sortOrder'] as const) {}
 
 @Schema()
 export class ListChangesResponse extends Paginated(ChangeItemResponse) {}

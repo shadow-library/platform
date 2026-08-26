@@ -30,13 +30,39 @@ export interface StudioQuestion {
   youDecide: 'commit-and-explain';
 }
 
-const CAST_PLAYBOOKS = ['dual-leads', 'ensemble', 'single-pov'];
+/** Exhaustive by construction: a new `SeedFields` key fails to type-check until it is listed here. */
+const SEED_FIELD_MEMBERS: Record<Ideation.FieldKey, true> = {
+  genre: true,
+  themes: true,
+  premise: true,
+  hook: true,
+  castShape: true,
+  progressionSystem: true,
+  protagonistDrive: true,
+  stakes: true,
+  serializationNotes: true,
+  voice: true,
+  workingTitle: true,
+};
+
+export const SEED_FIELD_KEYS = Object.keys(SEED_FIELD_MEMBERS) as Ideation.FieldKey[];
+
+/** Constraint keys that name the room itself. The length lock is a scope constraint too, and fixes nothing about where the story happens. */
+const ROOM_CONSTRAINT_KEYS = ['room', 'setting', 'world', 'place', 'location', 'locale'];
 
 const filled = (value: string | string[] | undefined): boolean => (Array.isArray(value) ? value.length > 0 : typeof value === 'string' && value.trim() !== '');
 
 export const hasField = (seed: RouterSeedState, key: Ideation.FieldKey): boolean => filled(seed.fields[key]);
 
 const hasConstraintKind = (seed: RouterSeedState, kind: Ideation.ConstraintKind): boolean => seed.constraints.some(constraint => constraint.kind === kind);
+
+export const hasRoomConstraint = (seed: RouterSeedState): boolean =>
+  seed.constraints.some(constraint =>
+    constraint.key
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .some(token => ROOM_CONSTRAINT_KEYS.includes(token)),
+  );
 
 const playbook = (seed: RouterSeedState, key: string): boolean => hasPlaybook(seed.constraints, key);
 
@@ -73,7 +99,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     coaching:
       'Which shelf does this sit on? I am not asking so I can put it in a box. A genre is a set of promises the reader arrives already holding, and I would much rather we keep them on purpose than break them by accident.',
     fills: ['genre'],
-    skipWhen: seed => playbook(seed, 'litrpg-system'),
+    skipWhen: () => false,
     youDecide: 'commit-and-explain',
   },
   {
@@ -83,7 +109,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     coaching:
       'Where does this happen, and when? One place, not a world map — the room the reader will spend most of their time in. Settings are cheap to invent and expensive to change, because every decision after this one will quietly assume it.',
     fills: [],
-    skipWhen: seed => hasConstraintKind(seed, 'scope') || hasField(seed, 'premise'),
+    skipWhen: hasRoomConstraint,
     youDecide: 'commit-and-explain',
   },
   {
@@ -112,9 +138,9 @@ export const QUESTION_BANK: StudioQuestion[] = [
     stage: 'orient',
     intent: 'Settle the cast shape — how many leads carry the book, and how they are configured.',
     coaching:
-      'How many people is this really about? One lead, two bound together, a crew of five. This decision has the longest shadow of anything we will decide today, because every lead you add needs a reason to be on the page in chapter ninety, not just at the start.',
+      'How many people is this really about? One lead, two bound together, a crew of five. This decision has the longest shadow of anything we will decide today, because every lead you add needs a reason to be on the page late in the run, not just at the start.',
     fills: ['castShape'],
-    skipWhen: seed => CAST_PLAYBOOKS.some(key => playbook(seed, key)),
+    skipWhen: () => false,
     youDecide: 'commit-and-explain',
   },
   {
@@ -125,6 +151,19 @@ export const QUESTION_BANK: StudioQuestion[] = [
       'Here are four versions of your idea. They are not drafts of the same thing — each one runs on a different engine, so choosing between them is choosing what the book is for. Kill the ones you do not want and tell me why: a sharp reason for rejecting something is worth more to me than a lukewarm yes.',
     fills: ['premise', 'hook'],
     skipWhen: seed => hasField(seed, 'premise'),
+    youDecide: 'commit-and-explain',
+  },
+  {
+    id: 'deepen.hook',
+    stage: 'deepen',
+    intent:
+      'Pin the first-chapter promise — the specific thing the opening puts on the table that makes a reader keep going to see it resolved. Idea altitude only: what is promised, never how it is staged.',
+    coaching:
+      'What does the first chapter promise? Not how it opens — what it puts on the table. A hook is the debt the story takes on early and the reader stays to see paid: a question they need answered, a threat with a date on it, a bargain they can already tell will cost more than it looks. Say it in one line, and say the thing you are promising rather than the scene you would write.',
+    fills: ['hook'],
+    // The beginner path fills premise and hook together at diverge; this is the expert path's only
+    // route to a hook, so it is offered the moment a seed arrives with a premise and no hook.
+    skipWhen: seed => !hasField(seed, 'premise'),
     youDecide: 'commit-and-explain',
   },
   {
@@ -142,7 +181,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     stage: 'deepen',
     intent: 'Decide the second engine that takes over when the first ladder tops out, before the story is long enough for it to matter.',
     coaching:
-      'When the ladder tops out, what replaces it? This is where open-ended stories die: the lead reaches the top of the thing that was going up, and there is nothing left to escalate. Decide the second engine now, while it is one paragraph, instead of at chapter ninety when it is a rewrite.',
+      'When the ladder tops out, what replaces it? This is where open-ended stories die: the lead reaches the top of the thing that was going up, and there is nothing left to escalate. Decide the second engine now, while it is one paragraph, instead of mid-run when it is a rewrite.',
     fills: ['progressionSystem'],
     skipWhen: seed => !playbook(seed, 'open-ended-length') && !isOpenEndedLength(seed.fields.serializationNotes),
     youDecide: 'commit-and-explain',
@@ -192,7 +231,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     stage: 'deepen',
     intent: 'Name the reader-promise betrayals — the specific things that would make a reader of this genre quit — and lock them as rules the plan must carry.',
     coaching:
-      'What would make a reader of this genre put the book down and not come back? Pick the betrayals you are promising never to commit. These few rules are the only ones I carry forward as hard constraints, so choose the ones you actually mean: a promise broken in chapter forty costs far more than one you never made.',
+      'What would make a reader of this genre put the book down and not come back? Pick the betrayals you are promising never to commit. These few rules are the only ones I carry forward as hard constraints, so choose the ones you actually mean: a promise broken deep into the run costs far more than one you never made.',
     fills: [],
     skipWhen: seed => hasConstraintKind(seed, 'promise'),
     youDecide: 'commit-and-explain',
@@ -212,7 +251,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     stage: 'deepen',
     intent: 'Decide whether the second lead climbs an independent ladder or an offset one, so they cannot decay into a sidekick.',
     coaching:
-      'You have two leads. Does the second one have their own thing that goes up, or an offset one that moves when the first stalls? Either answer works. What does not work is neither, because by chapter thirty the lead without a ladder has quietly become a sidekick with extra dialogue.',
+      'You have two leads. Does the second one have their own thing that goes up, or an offset one that moves when the first stalls? Either answer works. What does not work is neither, because within the first arcs the lead without a ladder has quietly become a sidekick with extra dialogue.',
     fills: [],
     skipWhen: seed => !playbook(seed, 'dual-leads'),
     youDecide: 'commit-and-explain',
@@ -292,7 +331,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     stage: 'stress',
     intent: 'Report the readiness verdict per dimension with concrete optional fixes, while making plain that none of it blocks starting the novel.',
     coaching:
-      'Here is where the idea is strong and where it is thin. None of this blocks you — you can start the novel right now and fix the thin parts while you write. But thin things do not stay quiet; they turn into a stalled chapter twelve, and five minutes here is much cheaper than that.',
+      'Here is where the idea is strong and where it is thin. None of this blocks you — you can start the novel right now and fix the thin parts while you write. But thin things do not stay quiet; they turn into a stall you hit mid-draft, and five minutes here is much cheaper than that.',
     fills: [],
     skipWhen: () => false,
     youDecide: 'commit-and-explain',

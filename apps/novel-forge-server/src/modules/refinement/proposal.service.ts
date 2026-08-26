@@ -125,6 +125,8 @@ export class ProposalService {
    * apply first — the feed the UI timeline renders with per-change revert and rollback-to-here.
    */
   async listChanges(projectId: bigint, filter: Partial<ListChangesQuery>): Promise<OffsetPaginationResult<ChangeItem>> {
+    // The feed's order is fixed — newest apply first — so the query DTO offers no sort fields and these
+    // defaults only satisfy the normaliser's shape; nothing reads them.
     const query = utils.pagination.normalise(filter, { mode: 'offset', defaults: { limit: 30, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' } });
     const where = and(eq(schema.refinementProposals.projectId, projectId), inArray(schema.refinementProposals.status, ['applied', 'reverted']));
 

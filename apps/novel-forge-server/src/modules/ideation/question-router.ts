@@ -1,7 +1,7 @@
 import { type Ideation } from '@server/database';
 
 import { matchPlaybooks } from './constraint-playbooks';
-import { hasField, QUESTION_BANK, type RouterSeedState, type StudioQuestion, type StudioStage } from './question-bank';
+import { hasField, hasRoomConstraint, QUESTION_BANK, type RouterSeedState, type StudioQuestion, type StudioStage } from './question-bank';
 
 export interface RouterResult {
   stage: StudioStage;
@@ -24,8 +24,8 @@ export interface ReadinessDimension {
 interface DimensionSpec {
   dimension: ReadinessDimensionName;
   fields: Ideation.FieldKey[];
-  /** A locked constraint of this kind counts as a source, so the dimension reads thin rather than empty. */
-  supportingConstraint?: Ideation.ConstraintKind;
+  /** A locked constraint the dimension reads as a source of its own, counted alongside the fields. */
+  support?: (seed: RouterSeedState) => boolean;
 }
 
 const MAX_QUESTIONS_PER_TURN = 3;
@@ -35,14 +35,20 @@ const STAGE_ORDER: StudioStage[] = ['spark', 'taste', 'orient', 'diverge', 'deep
 /** Everything the stress pass needs in front of it before the sheet can be called finished. */
 export const STRESS_READY_FIELDS: Ideation.FieldKey[] = ['genre', 'premise', 'hook', 'castShape', 'progressionSystem', 'protagonistDrive', 'stakes', 'voice'];
 
+/**
+ * The dimension names follow the concept card's vocabulary: a card's `engine` is what generates
+ * pressure and a card's `ladder` is the visible thing that climbs. So `engine` reads `stakes` and
+ * `ladder` reads `progressionSystem` — the reverse of the first cut, which named them the other way
+ * round and left the two vocabularies contradicting each other.
+ */
 const READINESS_SPECS: DimensionSpec[] = [
   { dimension: 'hook', fields: ['hook'] },
   { dimension: 'protagonist', fields: ['protagonistDrive', 'castShape'] },
-  { dimension: 'engine', fields: ['progressionSystem'] },
-  { dimension: 'ladder', fields: ['stakes'] },
-  { dimension: 'promise', fields: ['serializationNotes'], supportingConstraint: 'promise' },
+  { dimension: 'engine', fields: ['stakes'] },
+  { dimension: 'ladder', fields: ['progressionSystem'] },
+  { dimension: 'promise', fields: [], support: seed => seed.constraints.some(constraint => constraint.kind === 'promise') },
   { dimension: 'voice', fields: ['voice'] },
-  { dimension: 'room', fields: ['genre', 'premise'], supportingConstraint: 'scope' },
+  { dimension: 'room', fields: ['genre'], support: hasRoomConstraint },
 ];
 
 /** Fills every nullable story_seeds column, so the router never has to defend against a fresh row. */
@@ -75,6 +81,15 @@ const answered = (seed: RouterSeedState, question: StudioQuestion): boolean =>
  * are already filled or a locked constraint has answered it; a forced question bypasses both of
  * those and is gated only on having been asked before, which is what makes the renewal question fire
  * exactly once even though the engine answer has already written its field.
+ *
+ * The caller MUST record every id in `questions` — see `recordOffered`. Recording only the ids the
+ * author actually answered re-offers a forced question forever, because "already asked" is the only
+ * gate a forced question has.
+ *
+ * The termination invariant: every field in `STRESS_READY_FIELDS` keeps at least one live filler in
+ * every reachable seed state, so a walk that answers what it is offered always reaches `done`. It is
+ * held in the bank rather than here — no stress-ready field may be left with all of its fillers
+ * suppressed by `skipWhen` at once (`question-router.spec.ts` walks the matrix that proves it).
  */
 export function nextQuestions(seed: RouterSeedState): RouterResult {
   const asked = new Set(seed.askedQuestions);
@@ -83,8 +98,9 @@ export function nextQuestions(seed: RouterSeedState): RouterResult {
   const done = STRESS_READY_FIELDS.every(field => hasField(seed, field));
 
   for (const stage of STAGE_ORDER) {
-    // Diverge exists to invent a premise; a seed that arrived with one skips the concept round entirely.
-    if (stage === 'diverge' && hasField(seed, 'premise')) continue;
+    // Diverge exists to invent a premise; a seed that arrived with one skips the concept round — unless a
+    // playbook forced a diverge question, which the skip would strand for the rest of the interview.
+    if (stage === 'diverge' && hasField(seed, 'premise') && !QUESTION_BANK.some(question => question.stage === 'diverge' && forced.has(question.id))) continue;
 
     const pending = QUESTION_BANK.filter(question => question.stage === stage && !asked.has(question.id) && (forced.has(question.id) || !answered(seed, question)));
     if (pending.length === 0) continue;
@@ -97,14 +113,27 @@ export function nextQuestions(seed: RouterSeedState): RouterResult {
 }
 
 /**
+ * Hard precondition of the router, not a convenience: the turn that offered `result` must persist this
+ * array, whether or not the author answered anything. `askedQuestions` records what was *offered* — a
+ * turn that records only the answered ids leaves every unanswered forced question eligible again and
+ * the interview repeats it on every subsequent turn.
+ */
+export const recordOffered = (seed: RouterSeedState, result: RouterResult): string[] => {
+  const asked = new Set(seed.askedQuestions);
+  return [...seed.askedQuestions, ...result.questions.map(question => question.id).filter(id => !asked.has(id))];
+};
+
+/**
  * The structural precheck behind the seven readiness dimensions. It reports only what is present and
  * what is missing — whether what is present is any good is the stress prompt's verdict, not this one's.
  */
 export function readinessDimensions(seed: RouterSeedState): ReadinessDimension[] {
   return READINESS_SPECS.map(spec => {
     const present = spec.fields.filter(field => hasField(seed, field));
-    const supported = spec.supportingConstraint !== undefined && seed.constraints.some(constraint => constraint.kind === spec.supportingConstraint);
-    const verdict: Ideation.ReadinessVerdict = present.length === spec.fields.length ? 'strong' : present.length > 0 || supported ? 'thin' : 'empty';
+    const supported = spec.support?.(seed) ?? false;
+    const sources = spec.fields.length + (spec.support ? 1 : 0);
+    const found = present.length + (supported ? 1 : 0);
+    const verdict: Ideation.ReadinessVerdict = found === sources ? 'strong' : found > 0 ? 'thin' : 'empty';
     return { dimension: spec.dimension, fields: spec.fields, present, verdict };
   });
 }
