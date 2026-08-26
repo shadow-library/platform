@@ -251,11 +251,47 @@ describe('nextQuestions', () => {
     expect(result.backfilled).toEqual(['orient.shelf', 'orient.cast', 'diverge.cards']);
   });
 
-  it('should offer the readiness question at the stress stage', () => {
+  it('should not offer the readiness question while stress-ready fields are still missing', () => {
     const seed = seedWith({ askedQuestions: QUESTION_BANK.filter(question => question.stage !== 'stress').map(question => question.id) });
     const result = nextQuestions(seed);
     expect(result.stage).toBe('stress');
-    expect(result.questions.map(question => question.id)).toEqual(['stress.readiness']);
+    expect(result.done).toBe(false);
+    expect(result.questions.map(question => question.id)).not.toContain('stress.readiness');
+    expect(result.backfilled).toEqual(result.questions.map(question => question.id));
+  });
+
+  it('should offer stress.readiness exactly once, on the finished sheet, before reporting done', () => {
+    const seed = blankSeed();
+    let readinessOffers = 0;
+    let finishedTurn = -1;
+
+    for (let turn = 0; turn < 40; turn++) {
+      const result = nextQuestions(seed);
+      if (result.questions.length === 0) {
+        expect(result.done).toBe(true);
+        finishedTurn = turn;
+        break;
+      }
+      if (result.questions.some(question => question.id === 'stress.readiness')) {
+        readinessOffers += 1;
+        expect(result.done).toBe(true);
+      }
+      for (const question of result.questions) for (const field of question.fills) seed.fields[field] = 'settled' as never;
+      seed.askedQuestions = recordOffered(seed, result);
+    }
+
+    expect(readinessOffers).toBe(1);
+    expect(finishedTurn).toBeGreaterThan(-1);
+  });
+
+  it('should backfill the expert filler for a missing hook ahead of the suppressed diverge question', () => {
+    const fields = { ...Object.fromEntries(STRESS_READY_FIELDS.map(field => [field, 'settled'])), hook: '' } as Ideation.SeedFields;
+    const seed = seedWith({ fields, askedQuestions: QUESTION_BANK.map(question => question.id) });
+    const result = nextQuestions(seed);
+    expect(result.stage).toBe('stress');
+    expect(result.done).toBe(false);
+    expect(result.backfilled).toEqual(['deepen.hook']);
+    expect(result.questions.map(question => question.id)).not.toContain('diverge.cards');
   });
 
   it('should report done only when every stress-ready field is filled', () => {

@@ -86,10 +86,17 @@ function collectForced(seed: RouterSeedState): Set<string> {
 const answered = (seed: RouterSeedState, question: StudioQuestion): boolean =>
   (question.fills.length > 0 && question.fills.every(field => hasField(seed, field))) || question.skipWhen(seed);
 
-/** The fillers of every missing stress-ready field, in bank order, ignoring `askedQuestions` entirely. */
+/**
+ * The fillers of every missing stress-ready field, in bank order, ignoring `askedQuestions` entirely.
+ * A suppressed filler (`skipWhen` true — e.g. `diverge.cards` once a premise is locked) is offered only
+ * to keep the turn non-empty when no non-suppressed filler covers the gap.
+ */
 function backfill(seed: RouterSeedState): StudioQuestion[] {
   const missing = STRESS_READY_FIELDS.filter(field => !hasField(seed, field));
-  return QUESTION_BANK.filter(question => question.fills.some(field => missing.includes(field))).slice(0, MAX_QUESTIONS_PER_TURN);
+  const candidates = QUESTION_BANK.filter(question => question.fills.some(field => missing.includes(field)));
+  const active = candidates.filter(question => !question.skipWhen(seed));
+  const pool = active.length > 0 ? active : candidates.filter(question => question.skipWhen(seed));
+  return pool.slice(0, MAX_QUESTIONS_PER_TURN);
 }
 
 const collectHints = (seed: RouterSeedState, questions: StudioQuestion[]): Record<string, string> => {
@@ -105,8 +112,10 @@ const collectHints = (seed: RouterSeedState, questions: StudioQuestion[]): Recor
  * The whole interview, as a pure function of the sheet. Stage by stage it offers the questions not yet
  * asked whose sheet fields are still empty and whose locked constraints have not settled them; a forced
  * question bypasses the second test and is gated only on having been asked before, which is what makes
- * the renewal question fire exactly once. Offered-but-unanswered questions never hold a stage open — a
- * tone question the author skips would otherwise stall the interview on that stage forever.
+ * the renewal question fire exactly once — it fills nothing (`fills: []`), so `answered` retires it on
+ * its first offer whether or not the author's answer landed in a field. Offered-but-unanswered questions
+ * never hold a stage open — a tone question the author skips would otherwise stall the interview on that
+ * stage forever.
  *
  * The caller MUST record every id in `questions` — see `recordOffered`. Recording only the ids the
  * author actually answered re-offers a forced question forever, because "already asked" is the only
@@ -128,6 +137,9 @@ export function nextQuestions(seed: RouterSeedState): RouterResult {
     // Diverge exists to invent a premise; a seed that arrived with one skips the concept round — unless a
     // playbook forced a diverge question, which the skip would strand for the rest of the interview.
     if (stage === 'diverge' && hasField(seed, 'premise') && !QUESTION_BANK.some(question => question.stage === 'diverge' && forced.has(question.id))) continue;
+
+    // Stress is the finished-sheet pass; offering it early strands the readiness verdict on an unfinished sheet.
+    if (stage === 'stress' && !done) continue;
 
     const pending = QUESTION_BANK.filter(question => question.stage === stage && !asked.has(question.id) && (forced.has(question.id) || !answered(seed, question)));
     if (pending.length === 0) continue;
