@@ -3,7 +3,7 @@ import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
 import { SortByTime } from '@server/common';
-import { type Ideation } from '@server/database';
+import { type Ideation, type Project } from '@server/database';
 
 @Schema()
 export class SeedProjectParams {
@@ -246,6 +246,87 @@ export class SeedSummaryResponse {
 
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;
+}
+
+@Schema()
+export class GraduateSeedBody {
+  @Field({ minLength: 1, description: 'The novel’s title. Graduation names the project after it; there is no other hard requirement beyond a premise.' })
+  title: string;
+}
+
+@Schema({ description: 'One sheet field and where its value came from.' })
+export class ProvenanceFieldResponse {
+  @Field()
+  field: string;
+
+  @Field(() => String, { optional: true, enum: ['author', 'studio', 'crossed'], description: 'Absent when the sheet carries a value the studio never recorded a source for.' })
+  source?: Ideation.FieldSource;
+
+  @Field(() => Integer, { optional: true })
+  turnOrdinal?: number;
+}
+
+@Schema({
+  description:
+    'The honesty check: how much of the graduated sheet the author decided themselves. The seed is deleted at graduation, so this response is the last place it can be read.',
+})
+export class ProvenanceSummaryResponse {
+  @Field(() => Integer, { description: 'Sheet fields carrying a value.' })
+  filled: number;
+
+  @Field(() => Integer)
+  author: number;
+
+  @Field(() => Integer)
+  studio: number;
+
+  @Field(() => Integer)
+  crossed: number;
+
+  @Field(() => Integer, { description: 'Filled fields with no recorded source — counted apart so the check never overstates authorship.' })
+  unattributed: number;
+
+  @Field(() => [ProvenanceFieldResponse])
+  fields: ProvenanceFieldResponse[];
+}
+
+@Schema({ description: 'The project the seed became.' })
+export class GraduatedProjectResponse {
+  @Field(() => String)
+  id: bigint;
+
+  @Field()
+  name: string;
+
+  @Field({ optional: true, nullable: true })
+  title?: string | null;
+
+  @Field(() => String, { enum: ['seed', 'active'] })
+  status: Project.Status;
+
+  @Field({ optional: true, nullable: true })
+  premise?: string | null;
+
+  @Field(() => [String], { optional: true, nullable: true })
+  themes?: string[] | null;
+
+  @Field({ optional: true, nullable: true, description: 'The chapter-instruction channel, now carrying the narration voice the studio settled.' })
+  instructions?: string | null;
+}
+
+@Schema({ description: 'What graduation wrote: the project, the two handoff documents, the betrayal facts, and the provenance honesty check.' })
+export class GraduationResponse {
+  @Field(() => GraduatedProjectResponse)
+  project: GraduatedProjectResponse;
+
+  @Field(() => ProvenanceSummaryResponse)
+  provenance: ProvenanceSummaryResponse;
+
+  @Field(() => [String], { description: 'The `section/slug` of every bible document graduation wrote — the entire handoff into lore-bible refinement.' })
+  documents: string[];
+
+  @Field(() => [String], { description: 'Canon facts written for the named reader-promise betrayals, and nothing else.' })
+  factKeys: string[];
 }
 
 @Schema()

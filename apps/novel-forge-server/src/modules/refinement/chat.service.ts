@@ -11,7 +11,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
-import { CHAT_BOOTSTRAP_BUDGET, CHAT_BOOTSTRAP_HISTORY_BUDGET, CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
+import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
 import { type AiRole, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
@@ -263,20 +263,16 @@ export class ChatService {
     this.logger.debug('chat turn user message', { projectId, sessionId, content });
 
     const isHub = session.scopeType === 'project';
-    const bootstrap = isHub && (await this.isBootstrapProject(projectId));
-
-    await this.compaction.compactIfNeeded(projectId, session, bootstrap ? CHAT_BOOTSTRAP_HISTORY_BUDGET : CHAT_HISTORY_BUDGET);
+    await this.compaction.compactIfNeeded(projectId, session, CHAT_HISTORY_BUDGET);
 
     const [pack, history, project] = await Promise.all([
-      this.contextAssembler.forChatTurn(projectId, session, bootstrap ? { budgetTokens: CHAT_BOOTSTRAP_BUDGET } : undefined),
+      this.contextAssembler.forChatTurn(projectId, session),
       this.compaction.buildHistory(session),
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
 
     const prompt = buildChatRefinePrompt(session.scopeType);
-    const scopeInstructions = isHub
-      ? `${renderScopeInstructions(session.scopeType, { bootstrap })}\n\n${this.renderLookupVocabulary()}`
-      : renderScopeInstructions(session.scopeType);
+    const scopeInstructions = isHub ? `${renderScopeInstructions(session.scopeType)}\n\n${this.renderLookupVocabulary()}` : renderScopeInstructions(session.scopeType);
 
     // Resolve which model this turn runs on, then inject it as the `config.models.chat` override the
     // router already reads — the turn keeps the `chat` role for prompts/telemetry either way.
@@ -333,15 +329,6 @@ export class ChatService {
       this.logger.warn(`auto-apply of proposal ${proposal.id} failed: ${note}`);
       return { proposal: fresh, applyNote: note };
     }
-  }
-
-  /** A project with neither bible documents nor volumes has never been planned — the hub interviews instead of proposing. */
-  private async isBootstrapProject(projectId: bigint): Promise<boolean> {
-    const [doc, volume] = await Promise.all([
-      this.db.query.bibleDocuments.findFirst({ where: eq(schema.bibleDocuments.projectId, projectId), columns: { id: true } }),
-      this.db.query.volumes.findFirst({ where: eq(schema.volumes.projectId, projectId), columns: { id: true } }),
-    ]);
-    return !doc && !volume;
   }
 
   /** The lookup half of the hub playbook: names, argument shapes, and purposes of the read-only tools. */
@@ -420,7 +407,8 @@ export class ChatService {
     const [userMessage] = await this.db
       .insert(schema.chatMessages)
       .values({ sessionId: session.id, projectId, ordinal: lastOrdinal + 1, role: 'user', content, runId, tokens: countTokens(content) })
-      .returning();
+      .returning()
+      .catch(err => this.databaseService.translateError(err));
     if (!userMessage) throw AppErrorCode.CHT_001.create();
     return userMessage;
   }
@@ -446,7 +434,8 @@ export class ChatService {
         modelId: model.model,
         tokens: countTokens(output.reply),
       })
-      .returning();
+      .returning()
+      .catch(err => this.databaseService.translateError(err));
     if (!assistantMessage) throw AppErrorCode.CHT_001.create();
 
     let proposal: Refinement.Proposal | null = null;

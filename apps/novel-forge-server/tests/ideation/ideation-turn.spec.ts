@@ -72,27 +72,28 @@ const cards = (marker: string) =>
     hookLine: `hook ${n}`,
   }));
 
+/**
+ * A mocked model answer that still has to satisfy the real prompt contract — the harness default, so a
+ * test cannot opt out of it by accident. Without it the pipeline tests only ever saw outputs the repair
+ * ladder had never judged, which is how a change-set the grammar rejects — every post-diverge turn's —
+ * passed the suite and died in production.
+ */
+const answering =
+  (output: unknown) =>
+  async (prompt: PromptModule<never>): Promise<unknown> => {
+    const errors = prompt.postValidate?.(output as never) ?? [];
+    if (errors.length > 0) throw new Error(`postValidate rejected the model output: ${errors.join('; ')}`);
+    return output;
+  };
+
 describe.if(pgAvailable)('IdeationService turn pipeline', () => {
   let db: PrimaryDatabase;
   let ideation: IdeationService;
   let proposals: ProposalService;
   let applier: ProposalApplyService;
-  const structuredMock = mock<(prompt: PromptModule<never>, input: Record<string, string>) => Promise<unknown>>(async () => ({ reply: 'stub' }));
+  const structuredMock = mock<(prompt: PromptModule<never>, input: Record<string, string>) => Promise<unknown>>(answering({ reply: 'stub' }));
 
   const lastInput = (): Record<string, string> => structuredMock.mock.calls.at(-1)?.[1] as Record<string, string>;
-
-  /**
-   * A mocked model answer that still has to satisfy the real prompt contract. Without this the pipeline
-   * tests only ever saw outputs the repair ladder had never judged, which is how a change-set the
-   * grammar rejects — every post-diverge turn's — passed the suite and died in production.
-   */
-  const answering =
-    (output: unknown) =>
-    async (prompt: PromptModule<never>): Promise<unknown> => {
-      const errors = prompt.postValidate?.(output as never) ?? [];
-      if (errors.length > 0) throw new Error(`postValidate rejected the model output: ${errors.join('; ')}`);
-      return output;
-    };
 
   async function makeSeed(overrides: Partial<Ideation.StorySeed> = {}, sessionOverrides: Partial<Refinement.ChatSession> = {}) {
     const [project] = await db
@@ -126,6 +127,18 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
   const messages = (sessionId: string) => db.query.chatMessages.findMany({ where: eq(schema.chatMessages.sessionId, sessionId), orderBy: asc(schema.chatMessages.ordinal) });
   const sheet = (projectId: bigint) => db.query.storySeeds.findFirst({ where: eq(schema.storySeeds.projectId, projectId) });
 
+  /** The round the turn about to run will be handed — the only questions its answer may carry. */
+  const roundOf = async (projectId: bigint) => nextQuestions(toRouterSeedState((await sheet(projectId)) as Ideation.StorySeed));
+
+  const asked = (round: { questions: { id: string; coaching: string }[] }) =>
+    round.questions.map(question => ({ id: question.id, wording: 'w', coaching: question.coaching, options: ['a', 'b'], youDecide: 'a' }));
+
+  /** A contract-satisfying interview answer for whatever the router is about to ask. */
+  const answersRound = async (projectId: bigint, output: { reply: string; changeSet?: unknown[] }) => {
+    const questions = asked(await roundOf(projectId));
+    return answering({ ...output, payload: { kind: 'questions', questions } });
+  };
+
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
@@ -147,15 +160,9 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
   describe('the interview turn', () => {
     it('persists the chip payload, records what was offered, and auto-applies the sheet edit', async () => {
       const { projectId, sessionId } = await makeSeed();
-      const coaching = getQuestion('spark.idea')?.coaching as string;
-      structuredMock.mockImplementationOnce(async () => ({
-        reply: 'Heard: a salvager, and a debt.',
-        payload: {
-          kind: 'questions',
-          questions: [{ id: 'spark.idea', wording: 'What is the idea?', coaching, options: ['a salvager', 'a courier'], youDecide: 'the salvager — the debt is already a plot' }],
-        },
-        changeSet: [{ op: 'seed.update', fields: { genre: 'progression fantasy' } }],
-      }));
+      structuredMock.mockImplementationOnce(
+        await answersRound(projectId, { reply: 'Heard: a salvager, and a debt.', changeSet: [{ op: 'seed.update', fields: { genre: 'progression fantasy' } }] }),
+      );
 
       const result = await ideation.turn(projectId, sessionId, 'a salvager who hears dead ships');
 
@@ -180,11 +187,7 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
 
     it('reverts an auto-applied sheet edit back to the byte the turn started from', async () => {
       const { projectId, sessionId } = await makeSeed();
-      structuredMock.mockImplementationOnce(async () => ({
-        reply: 'Locking the shelf.',
-        payload: { kind: 'questions', questions: [] },
-        changeSet: [{ op: 'seed.update', fields: { genre: 'cosy mystery' } }],
-      }));
+      structuredMock.mockImplementationOnce(await answersRound(projectId, { reply: 'Locking the shelf.', changeSet: [{ op: 'seed.update', fields: { genre: 'cosy mystery' } }] }));
 
       const result = await ideation.turn(projectId, sessionId, 'cosy mystery, please');
       expect((await sheet(projectId))?.fields?.genre).toBe('cosy mystery');
@@ -195,10 +198,7 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
 
     it('records offered ids even when the author settled nothing', async () => {
       const { projectId, sessionId } = await makeSeed();
-      structuredMock.mockImplementationOnce(async () => ({
-        reply: 'No rush.',
-        payload: { kind: 'questions', questions: [{ id: 'spark.idea', wording: 'w', coaching: 'c', options: ['a', 'b'], youDecide: 'a' }] },
-      }));
+      structuredMock.mockImplementationOnce(await answersRound(projectId, { reply: 'No rush.' }));
 
       const result = await ideation.turn(projectId, sessionId, 'not sure yet');
       expect(result.proposal).toBeNull();
@@ -207,19 +207,16 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
 
     it('leaves a conflicted auto-apply pending with the reason on the turn', async () => {
       const { projectId, sessionId, seedId } = await makeSeed();
-      const original = proposals.create.bind(proposals);
-      (proposals as unknown as { create: typeof proposals.create }).create = async (...args) => {
-        const proposal = await original(...args);
+      const original = applier.apply.bind(applier);
+      (applier as unknown as { apply: typeof applier.apply }).apply = async (...args) => {
         // Someone else edited the sheet between staging and applying — the baseline no longer matches.
+        // The write has to land after the turn's transaction committed; inside it, it would simply wait
+        // on the sheet's row lock.
         await db.update(schema.storySeeds).set({ revision: 99 }).where(eq(schema.storySeeds.id, seedId));
-        return proposal;
+        return original(...args);
       };
 
-      structuredMock.mockImplementationOnce(async () => ({
-        reply: 'Shelf locked.',
-        payload: { kind: 'questions', questions: [] },
-        changeSet: [{ op: 'seed.update', fields: { genre: 'grimdark' } }],
-      }));
+      structuredMock.mockImplementationOnce(await answersRound(projectId, { reply: 'Shelf locked.', changeSet: [{ op: 'seed.update', fields: { genre: 'grimdark' } }] }));
 
       try {
         const result = await ideation.turn(projectId, sessionId, 'grimdark');
@@ -228,7 +225,7 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
         expect(result.applyNote).toBeTruthy();
         expect((await sheet(projectId))?.fields?.genre).toBeUndefined();
       } finally {
-        (proposals as unknown as { create: typeof proposals.create }).create = original;
+        (applier as unknown as { apply: typeof applier.apply }).apply = original;
       }
     });
 
@@ -249,13 +246,29 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       expect((await sheet(projectId))?.concepts?.map(card => card.fate)).toEqual(['kept', 'offered', 'offered', 'offered']);
     });
 
+    it('stages a graduation the author asked for but never runs it inside the auto-mode turn', async () => {
+      const { projectId, sessionId } = await makeSeed({ fields: FULL_SHEET });
+      structuredMock.mockImplementationOnce(
+        await answersRound(projectId, { reply: 'Ready when you are.', changeSet: [{ op: 'action.graduate_seed', title: 'The Wreck Singer' }] }),
+      );
+
+      const result = await ideation.turn(projectId, sessionId, 'start the novel');
+
+      expect(result.proposal?.status).toBe('pending');
+      expect(result.applied).toBeUndefined();
+      expect(result.applyNote).toContain('never auto-applied');
+      expect(await sheet(projectId)).toBeDefined();
+      expect((await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }))?.status).toBe('seed');
+    });
+
     it('refuses a second turn while the first turn’s model call is still in flight', async () => {
       const { projectId, sessionId } = await makeSeed();
       let release = (): void => {};
       const held = new Promise<void>(resolve => (release = resolve));
-      structuredMock.mockImplementationOnce(async () => {
+      const slow = await answersRound(projectId, { reply: 'slow' });
+      structuredMock.mockImplementationOnce(async prompt => {
         await held;
-        return { reply: 'slow', payload: { kind: 'questions', questions: [] } };
+        return slow(prompt);
       });
 
       const first = ideation.turn(projectId, sessionId, 'take your time');
@@ -272,12 +285,12 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
     it('compacts a long studio conversation before assembling the turn', async () => {
       const { projectId, sessionId } = await makeSeed();
       for (let i = 0; i < 7; i++) {
-        structuredMock.mockImplementationOnce(async () => ({ reply: `reply ${i}`, payload: { kind: 'questions', questions: [] } }));
+        structuredMock.mockImplementationOnce(await answersRound(projectId, { reply: `reply ${i}` }));
         await ideation.turn(projectId, sessionId, `message ${i}`);
       }
 
-      structuredMock.mockImplementationOnce(async () => ({ summary: 'Decisions: salvager, dead ships. Open: the ladder.' }));
-      structuredMock.mockImplementationOnce(async () => ({ reply: 'post-compaction', payload: { kind: 'questions', questions: [] } }));
+      structuredMock.mockImplementationOnce(answering({ summary: 'Decisions: salvager, dead ships. Open: the ladder.' }));
+      structuredMock.mockImplementationOnce(await answersRound(projectId, { reply: 'post-compaction' }));
       await ideation.turn(projectId, sessionId, 'one more');
 
       const session = await db.query.chatSessions.findFirst({ where: eq(schema.chatSessions.id, sessionId) });
@@ -320,7 +333,7 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
 
     it('persists four offered cards and asks nothing of the author yet', async () => {
       const { projectId, sessionId } = await makeSeed({ askedQuestions: ORIENTED });
-      structuredMock.mockImplementationOnce(async () => ({ kind: 'cards', cards: cards('Wreck') }));
+      structuredMock.mockImplementationOnce(answering({ kind: 'cards', cards: cards('Wreck') }));
 
       const result = await ideation.turn(projectId, sessionId, 'show me options');
 
@@ -367,8 +380,8 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
 
     it('re-generates once when a playbook filter rejects the set, and keeps the second set', async () => {
       const { projectId, sessionId } = await makeSeed({ askedQuestions: ORIENTED, constraints: dualLeads });
-      structuredMock.mockImplementationOnce(async () => ({ kind: 'cards', cards: cards('Solo') }));
-      structuredMock.mockImplementationOnce(async () => ({ kind: 'cards', cards: cards('Solo').map(card => ({ ...card, logline: `${card.logline}, both of them` })) }));
+      structuredMock.mockImplementationOnce(answering({ kind: 'cards', cards: cards('Solo') }));
+      structuredMock.mockImplementationOnce(answering({ kind: 'cards', cards: cards('Solo').map(card => ({ ...card, logline: `${card.logline}, both of them` })) }));
       const before = structuredMock.mock.calls.length;
 
       const result = await ideation.turn(projectId, sessionId, 'options please');
@@ -382,8 +395,8 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
 
     it('shows the cards anyway when the filter still rejects them, with the failures named', async () => {
       const { projectId, sessionId } = await makeSeed({ askedQuestions: ORIENTED, constraints: dualLeads });
-      structuredMock.mockImplementationOnce(async () => ({ kind: 'cards', cards: cards('Solo') }));
-      structuredMock.mockImplementationOnce(async () => ({ kind: 'cards', cards: cards('Alone') }));
+      structuredMock.mockImplementationOnce(answering({ kind: 'cards', cards: cards('Solo') }));
+      structuredMock.mockImplementationOnce(answering({ kind: 'cards', cards: cards('Alone') }));
       const before = structuredMock.mock.calls.length;
 
       const result = await ideation.turn(projectId, sessionId, 'options please');
@@ -409,7 +422,7 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
 
     it('runs when the router reaches it, persists the verdict, and records the offer', async () => {
       const { projectId, sessionId } = await finished();
-      structuredMock.mockImplementationOnce(async () => ({ kind: 'readiness', readiness: readiness() }));
+      structuredMock.mockImplementationOnce(answering({ kind: 'readiness', readiness: readiness() }));
 
       const result = await ideation.turn(projectId, sessionId, 'am I ready?');
 
@@ -425,7 +438,7 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
 
     it('runs on demand from the sheet screen', async () => {
       const { projectId } = await finished();
-      structuredMock.mockImplementationOnce(async () => ({ kind: 'readiness', readiness: readiness() }));
+      structuredMock.mockImplementationOnce(answering({ kind: 'readiness', readiness: readiness() }));
 
       const result = await ideation.stress(projectId);
       expect(result.readiness).toHaveLength(7);
@@ -495,11 +508,7 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       (proposals as unknown as { create: typeof proposals.create }).create = async () => {
         throw new Error('staging failed');
       };
-      structuredMock.mockImplementationOnce(async () => ({
-        reply: 'Locking the shelf.',
-        payload: { kind: 'questions', questions: [] },
-        changeSet: [{ op: 'seed.update', fields: { genre: 'noir' } }],
-      }));
+      structuredMock.mockImplementationOnce(await answersRound(projectId, { reply: 'Locking the shelf.', changeSet: [{ op: 'seed.update', fields: { genre: 'noir' } }] }));
 
       try {
         expect(await codeOf(ideation.turn(projectId, sessionId, 'noir'))).toContain('staging failed');
@@ -520,12 +529,15 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       const { genre: _genre, ...withoutGenre } = FULL_SHEET;
       const { projectId, sessionId } = await makeSeed({ fields: withoutGenre, askedQuestions: [...ORIENTED, 'diverge.cards', ...QUESTION_IDS_DEEPEN] });
 
-      const offer = { kind: 'questions', questions: [{ id: 'orient.shelf', wording: 'w', coaching: 'c', options: ['a', 'b'], youDecide: 'a' }] };
+      const offer = {
+        kind: 'questions',
+        questions: [{ id: 'orient.shelf', wording: 'w', coaching: getQuestion('orient.shelf')?.coaching as string, options: ['a', 'b'], youDecide: 'a' }],
+      };
       for (const ordinal of [1, 2]) {
         await db.insert(schema.chatMessages).values({ sessionId, projectId, ordinal, role: 'assistant', content: 'asked before', payload: offer });
       }
 
-      structuredMock.mockImplementationOnce(async () => ({ reply: 'Committing.', payload: offer }));
+      structuredMock.mockImplementationOnce(answering({ reply: 'Committing.', payload: offer }));
       await ideation.turn(projectId, sessionId, 'skip');
 
       expect(lastInput()['volatileContext']).toContain('COMMIT NOW');
@@ -536,13 +548,16 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       const { genre: _genre, ...withoutGenre } = FULL_SHEET;
       const { projectId, sessionId } = await makeSeed({ fields: withoutGenre, askedQuestions: [...ORIENTED, 'diverge.cards', ...QUESTION_IDS_DEEPEN] });
 
-      const offer = { kind: 'questions', questions: [{ id: 'orient.shelf', wording: 'w', coaching: 'c', options: ['a', 'b'], youDecide: 'a' }] };
+      const offer = {
+        kind: 'questions',
+        questions: [{ id: 'orient.shelf', wording: 'w', coaching: getQuestion('orient.shelf')?.coaching as string, options: ['a', 'b'], youDecide: 'a' }],
+      };
       for (const ordinal of [1, 2]) {
         await db.insert(schema.chatMessages).values({ sessionId, projectId, ordinal, role: 'assistant', content: 'asked before', payload: offer });
       }
       await db.insert(schema.chatMessages).values({ sessionId, projectId, ordinal: 3, role: 'assistant', content: 'cards', payload: { kind: 'cards', round: 1, cards: [] } });
 
-      structuredMock.mockImplementationOnce(async () => ({ reply: 'Committing.', payload: offer }));
+      structuredMock.mockImplementationOnce(answering({ reply: 'Committing.', payload: offer }));
       await ideation.turn(projectId, sessionId, 'skip');
 
       expect(lastInput()['volatileContext']).toContain('COMMIT NOW');
@@ -560,7 +575,7 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
         payload: { kind: 'questions', questions: [{ id: 'orient.shelf' }] },
       });
 
-      structuredMock.mockImplementationOnce(async () => ({ reply: 'Asking again.', payload: { kind: 'questions', questions: [] } }));
+      structuredMock.mockImplementationOnce(await answersRound(projectId, { reply: 'Asking again.' }));
       await ideation.turn(projectId, sessionId, 'skip');
 
       expect(lastInput()['volatileContext']).not.toContain('COMMIT NOW');

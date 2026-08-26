@@ -205,10 +205,42 @@ describe.if(pgAvailable)('seed.update op', () => {
     });
 
     it('should merge provenance per key', async () => {
-      const proposal = await createProposal([{ op: 'seed.update', provenance: { premise: { source: 'studio', turnOrdinal: 3 } } }]);
+      const proposal = await createProposal([{ op: 'seed.update', provenance: { premise: { source: 'studio' } } }]);
       await applier.apply(projectId, proposal.id);
 
-      expect((await currentSeed())?.provenance).toEqual({ genre: { source: 'author', turnOrdinal: 1 }, premise: { source: 'studio', turnOrdinal: 3 } });
+      // The turn ordinal is the server's to record: this proposal hangs off no chat message, so it is 0.
+      expect((await currentSeed())?.provenance).toEqual({ genre: { source: 'author', turnOrdinal: 1 }, premise: { source: 'studio', turnOrdinal: 0 } });
+    });
+
+    it('should record an unattributed field as the studio’s own', async () => {
+      const proposal = await createProposal([{ op: 'seed.update', fields: { hook: 'the ships remember', stakes: null } }]);
+      await applier.apply(projectId, proposal.id);
+
+      const provenance = (await currentSeed())?.provenance;
+      expect(provenance?.hook).toEqual({ source: 'studio', turnOrdinal: 0 });
+      // A cleared field is not a written one, so nothing is stamped for it.
+      expect(provenance?.stakes).toBeUndefined();
+    });
+
+    it('should keep the author as the source when the turn named them, and stamp the real turn ordinal', async () => {
+      const [session] = await db.insert(schema.chatSessions).values({ projectId, scopeType: 'ideation', mode: 'auto' }).returning();
+      const [message] = await db
+        .insert(schema.chatMessages)
+        .values({ sessionId: session?.id as string, projectId, ordinal: 4, role: 'assistant', content: 'heard' })
+        .returning();
+      const proposal = await proposals.create(projectId, {
+        sessionId: session?.id,
+        messageId: message?.id,
+        scopeType: 'ideation',
+        kind: 'ideation',
+        changeSet: [{ op: 'seed.update', fields: { hook: 'the ships remember', voice: 'dry and close' }, provenance: { hook: { source: 'author', turnOrdinal: 99 } } }],
+      });
+
+      await applier.apply(projectId, proposal.id);
+
+      const provenance = (await currentSeed())?.provenance;
+      expect(provenance?.hook).toEqual({ source: 'author', turnOrdinal: 4 });
+      expect(provenance?.voice).toEqual({ source: 'studio', turnOrdinal: 4 });
     });
 
     it('should replace the collection columns wholesale', async () => {
@@ -306,7 +338,9 @@ describe.if(pgAvailable)('seed.update op', () => {
       await applier.apply(projectId, proposal.id);
 
       const applied = await db.query.refinementProposals.findFirst({ where: eq(schema.refinementProposals.id, proposal.id) });
-      expect(applied?.inverseOps).toEqual([{ op: 'seed.update', fields: { hook: null }, concepts: [CARD] }]);
+      // The provenance the applier stamped for the written field is inverted with it, or a revert would
+      // leave a source behind for a field that no longer exists.
+      expect(applied?.inverseOps).toEqual([{ op: 'seed.update', fields: { hook: null }, provenance: { hook: null }, concepts: [CARD] }]);
     });
 
     it('should refuse a revert once the sheet moved on', async () => {

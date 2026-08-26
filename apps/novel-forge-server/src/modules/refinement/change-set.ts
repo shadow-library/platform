@@ -154,10 +154,16 @@ export interface FactRemoveOp {
  * key — a `null` value clears that key, which is what makes the captured inverse exact; the three
  * collection columns replace wholesale.
  */
+/** `turnOrdinal` is the apply engine's to fill in — the model names the source, the server knows the turn. */
+export interface SeedProvenanceInput {
+  source: Ideation.FieldSource;
+  turnOrdinal?: number;
+}
+
 export interface SeedUpdateOp {
   op: 'seed.update';
   fields?: { [K in keyof Ideation.SeedFields]?: Ideation.SeedFields[K] | null };
-  provenance?: Record<string, Ideation.FieldProvenance | null>;
+  provenance?: Record<string, SeedProvenanceInput | null>;
   constraints?: Ideation.SeedConstraint[];
   concepts?: Ideation.ConceptCard[];
   tasteAnchors?: Ideation.TasteAnchors;
@@ -233,6 +239,11 @@ export interface FinalizeAction {
   upTo?: number;
 }
 
+export interface GraduateSeedAction {
+  op: 'action.graduate_seed';
+  title: string;
+}
+
 export type ContentOp =
   | PremiseUpdateOp
   | BibleDocumentUpsertOp
@@ -264,7 +275,8 @@ export type ActionOp =
   | ApproveVolumePlanAction
   | ApproveArcsAction
   | ValidateAction
-  | FinalizeAction;
+  | FinalizeAction
+  | GraduateSeedAction;
 
 export type ChangeOp = ContentOp | ActionOp;
 export type OpType = ChangeOp['op'];
@@ -337,7 +349,7 @@ const OP_SPECS: Record<OpType, OpSpec> = {
     required: {},
     optional: { fields: 'object', provenance: 'object', constraints: 'object[]', concepts: 'object[]', tasteAnchors: 'object' },
     description:
-      'edit the story seed sheet. Only the top-level keys you send are touched; the rest of the sheet is left alone. Inside "fields" and "provenance" the merge is per key — send only the entries you are changing, and send a key with the value null to clear it. "constraints", "concepts", and "tasteAnchors" replace their whole column, so send the complete list every time you change one.',
+      'edit the story seed sheet. Only the top-level keys you send are touched; the rest of the sheet is left alone. Inside "fields" and "provenance" the merge is per key — send only the entries you are changing, and send a key with the value null to clear it. "constraints", "concepts", and "tasteAnchors" replace their whole column, so send the complete list every time you change one. A provenance entry is {"source": "author" | "studio" | "crossed"} — the turn it was settled on is recorded for you.',
   },
   'action.generate_chapters': { required: { count: 'number' }, optional: {} },
   'action.plan_volumes': { required: { volumeCount: 'number', chaptersPerVolume: 'number' }, optional: {} },
@@ -352,10 +364,14 @@ const OP_SPECS: Record<OpType, OpSpec> = {
   'action.approve_arcs': { required: { volumeKey: 'string' }, optional: {} },
   'action.validate': { required: { scope: 'string' }, optional: { chapter: 'number' } },
   'action.finalize': { required: {}, optional: { upTo: 'number' } },
+  'action.graduate_seed': { required: { title: 'string' }, optional: {} },
 };
 
 export const OP_TYPES = Object.keys(OP_SPECS) as OpType[];
 export const ACTION_TYPES = OP_TYPES.filter(op => op.startsWith('action.')) as ActionType[];
+// Graduation belongs to the studio alone: a hub project has already graduated, so offering it there is
+// an action the model can only fail with (IDE_001).
+export const HUB_ACTION_TYPES = ACTION_TYPES.filter(action => action !== 'action.graduate_seed');
 export const VALIDATION_SCOPES = ['novel', 'chapter'];
 
 // What each action does, rendered into the hub playbook so the model picks actions by meaning, not by
@@ -374,6 +390,8 @@ const ACTION_PURPOSES: Record<ActionType, string> = {
   'action.approve_arcs': 'approve all arcs of one volume (unlocks outlining)',
   'action.validate': 'run continuity validation over the novel or one chapter',
   'action.finalize': 'finalize drafted chapters into locked canon — irreversible, never auto-applied',
+  'action.graduate_seed':
+    'turn the story seed into a novel under `title` — writes the premise and reader-promise bible documents, keeps the named betrayals as canon facts, and ends the studio conversation. Propose it only when the author says they are ready to start the novel; it is never auto-applied',
 };
 
 export function isActionOp(op: ChangeOp): op is ActionOp;
@@ -452,7 +470,10 @@ function validateSeedProvenance(value: Record<string, unknown>, path: string, er
     }
     const record = entry as Record<string, unknown>;
     if (!SEED_FIELD_SOURCES.includes(record['source'] as string)) errors.push(`${path}: provenance.${key}.source must be one of ${SEED_FIELD_SOURCES.join(', ')}`);
-    if (!isKind(record['turnOrdinal'], 'number')) errors.push(`${path}: provenance.${key}.turnOrdinal must be an integer`);
+    if (record['turnOrdinal'] !== undefined && !isKind(record['turnOrdinal'], 'number')) errors.push(`${path}: provenance.${key}.turnOrdinal must be an integer`);
+    for (const field of Object.keys(record)) {
+      if (field !== 'source' && field !== 'turnOrdinal') errors.push(`${path}: unexpected field 'provenance.${key}.${field}'`);
+    }
   }
 }
 
@@ -577,6 +598,7 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     if (op === 'seed.update') validateSeedUpdate(record, path, errors);
     if (op === 'action.validate' && !VALIDATION_SCOPES.includes(record['scope'] as string)) errors.push(`${path}: scope must be one of ${VALIDATION_SCOPES.join(', ')}`);
     if (op === 'action.generate_chapters' && typeof record['count'] === 'number' && record['count'] < 1) errors.push(`${path}: count must be >= 1`);
+    if (op === 'action.graduate_seed' && typeof record['title'] === 'string' && record['title'].trim() === '') errors.push(`${path}: title must be a non-empty string`);
   });
 
   return errors;

@@ -140,6 +140,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly CHT_003 = AppErrorCode.badRequest('CHT_003', 'Invalid chat scope reference');
   static readonly CHT_004 = AppErrorCode.badRequest('CHT_004', 'Lookup budget exhausted — the turn hit its declared-lookup round cap');
   static readonly CHT_005 = AppErrorCode.badRequest('CHT_005', 'Invalid chat session mode');
+  static readonly CHT_006 = AppErrorCode.conflict('CHT_006', 'Another turn wrote to this conversation at the same time — send the message again');
 
   /*!
    * Refinement Proposal Errors
@@ -211,6 +212,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly IDE_004 = AppErrorCode.badRequest('IDE_004', 'Project is a seed — this operation requires an active project');
   static readonly IDE_005 = AppErrorCode.badRequest('IDE_005', 'Ideation chat sessions are managed by the ideation studio');
   static readonly IDE_006 = AppErrorCode.conflict('IDE_006', 'A turn is already running for this session');
+  static readonly IDE_007 = AppErrorCode.badRequest('IDE_007', 'Graduation is never auto-applied — apply the proposal manually to start the novel');
+  static readonly IDE_008 = AppErrorCode.badRequest('IDE_008', 'Graduation requires a premise on the sheet');
 
   /*!
    * Publishing Errors

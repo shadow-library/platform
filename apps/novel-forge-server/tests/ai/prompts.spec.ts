@@ -248,18 +248,20 @@ describe('Prompt modules', () => {
       expect(renderScopeInstructions('volume_plan')).not.toContain('knowledgeContract');
     });
 
-    it('renders the bootstrap interview playbook only when asked for it', () => {
-      const bootstrap = renderScopeInstructions('project', { bootstrap: true });
-      expect(bootstrap).toContain('Interview first');
-      expect(bootstrap).toContain('how many volumes, how many chapters per volume');
-      expect(bootstrap).toContain("Never invent the author's story unprompted");
-      expect(bootstrap).toContain('action.plan_volumes at the confirmed volumeCount');
-      expect(bootstrap).toContain('project/reader-promise');
-      expect(bootstrap).toContain('plot/escalation-map');
-      expect(bootstrap).toContain(SCOPE_PLAYBOOKS.project.guidance);
+    it('no longer carries a bootstrap interview block — the Ideation Studio owns that conversation', () => {
+      const hub = renderScopeInstructions('project');
+      expect(hub).toContain(SCOPE_PLAYBOOKS.project.guidance);
+      expect(hub).not.toContain('BOOTSTRAP');
+      expect(hub).not.toContain('Interview first');
+    });
 
-      expect(renderScopeInstructions('project')).not.toContain('Interview first');
-      expect(renderScopeInstructions('project', { bootstrap: false })).not.toContain('BOOTSTRAP');
+    it('offers graduation to the studio scope and to no other', () => {
+      const studio = renderScopeInstructions('ideation');
+      expect(studio).toContain('"op": "action.graduate_seed", "title": <string, required>');
+      expect(studio).toContain('never auto-applied');
+
+      expect(renderScopeInstructions('project')).not.toContain('action.graduate_seed');
+      expect(SCOPE_PLAYBOOKS.project.allowedActions).not.toContain('action.graduate_seed');
     });
 
     it('accepts epistemic ops in the hub scope and rejects them elsewhere', () => {

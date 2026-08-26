@@ -5,7 +5,7 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { computeBibleDocHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Bible, type PrimaryDatabase, schema } from '@server/database';
+import { type Bible, type DbExecutor, type PrimaryDatabase, schema } from '@server/database';
 
 import { type UpsertBibleDocBody } from './bible-document.dto';
 
@@ -26,16 +26,17 @@ export class BibleDocumentService {
     });
   }
 
-  get(projectId: bigint, section: Bible.Section, slug: string): Promise<Bible.Document | null> {
-    return this.db.query.bibleDocuments
+  get(projectId: bigint, section: Bible.Section, slug: string, executor: DbExecutor = this.db): Promise<Bible.Document | null> {
+    return executor.query.bibleDocuments
       .findFirst({
         where: and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, section), eq(schema.bibleDocuments.slug, slug)),
       })
       .then(r => r ?? null);
   }
 
-  async upsert(projectId: bigint, section: Bible.Section, slug: string, body: UpsertBibleDocBody): Promise<Bible.Document> {
-    const existing = await this.get(projectId, section, slug);
+  /** `executor` lets a caller that already owns a transaction — graduation, say — write the document inside it. */
+  async upsert(projectId: bigint, section: Bible.Section, slug: string, body: UpsertBibleDocBody, executor?: DbExecutor): Promise<Bible.Document> {
+    const existing = await this.get(projectId, section, slug, executor);
     const contentHash = computeBibleDocHash(body.frontmatter, body.body);
     const contentChanged = !existing || existing.contentHash !== contentHash;
 
@@ -44,7 +45,7 @@ export class BibleDocumentService {
 
     // Bumping the revision and invalidating dependents happens atomically: a bible edit that survives
     // must always mark the chapters validated against the prior canon as needing re-validation.
-    const doc = await this.db.transaction(async tx => {
+    const write = async (tx: DbExecutor): Promise<Bible.Document | undefined> => {
       const [row] = await tx
         .insert(schema.bibleDocuments)
         .values({ projectId, section, slug, frontmatter: body.frontmatter, body: body.body, contentHash, revision: 1 })
@@ -58,7 +59,8 @@ export class BibleDocumentService {
       await tx.update(schema.chapters).set({ needsRevalidation: true, updatedAt: new Date() }).where(eq(schema.chapters.projectId, projectId));
 
       return row;
-    });
+    };
+    const doc = executor ? await write(executor) : await this.db.transaction(write);
 
     if (!doc) throw AppError.internal('Bible document upsert failed unexpectedly');
     return doc;

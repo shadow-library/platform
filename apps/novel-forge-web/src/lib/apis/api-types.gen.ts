@@ -1536,6 +1536,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/seed/graduate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Graduate Seed */
+    post: operations['post_api_v1_projects_projectId_seed_graduate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects': {
     parameters: {
       query?: never;
@@ -3663,6 +3680,52 @@ export interface components {
       /** @description The verdict per dimension, in the fixed dimension order. It advises; it never blocks graduation. */
       readiness: components['schemas']['ReadinessEntryResponse'][];
       runId: string;
+    };
+    GraduateSeedBody: {
+      /** @description The novel’s title. Graduation names the project after it; there is no other hard requirement beyond a premise. */
+      title: string;
+    };
+    /** @description What graduation wrote: the project, the two handoff documents, the betrayal facts, and the provenance honesty check. */
+    GraduationResponse: {
+      project: components['schemas']['GraduatedProjectResponse'];
+      provenance: components['schemas']['ProvenanceSummaryResponse'];
+      /** @description The `section/slug` of every bible document graduation wrote — the entire handoff into lore-bible refinement. */
+      documents: string[];
+      /** @description Canon facts written for the named reader-promise betrayals, and nothing else. */
+      factKeys: string[];
+    };
+    /** @description The project the seed became. */
+    GraduatedProjectResponse: {
+      id: string;
+      name: string;
+      title?: null | string;
+      /** @enum {string} */
+      status: 'seed' | 'active';
+      premise?: null | string;
+      themes?: null | string[];
+      /** @description The chapter-instruction channel, now carrying the narration voice the studio settled. */
+      instructions?: null | string;
+    };
+    /** @description The honesty check: how much of the graduated sheet the author decided themselves. The seed is deleted at graduation, so this response is the last place it can be read. */
+    ProvenanceSummaryResponse: {
+      /** @description Sheet fields carrying a value. */
+      filled: number;
+      author: number;
+      studio: number;
+      crossed: number;
+      /** @description Filled fields with no recorded source — counted apart so the check never overstates authorship. */
+      unattributed: number;
+      fields: components['schemas']['ProvenanceFieldResponse'][];
+    };
+    /** @description One sheet field and where its value came from. */
+    ProvenanceFieldResponse: {
+      field: string;
+      /**
+       * @description Absent when the sheet carries a value the studio never recorded a source for.
+       * @enum {string}
+       */
+      source?: 'author' | 'studio' | 'crossed';
+      turnOrdinal?: number;
     };
     CreateProjectBody: {
       name: string;
@@ -9356,6 +9419,50 @@ export interface operations {
       };
     };
   };
+  post_api_v1_projects_projectId_seed_graduate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GraduateSeedBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GraduationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects: {
     parameters: {
       query?: {
@@ -12213,6 +12320,11 @@ export type CreateSeedBody = components['schemas']['CreateSeedBody'];
 export type ListSeedsResponse = components['schemas']['ListSeedsResponse'];
 export type SeedSummaryResponse = components['schemas']['SeedSummaryResponse'];
 export type SeedStressResponse = components['schemas']['SeedStressResponse'];
+export type GraduateSeedBody = components['schemas']['GraduateSeedBody'];
+export type GraduationResponse = components['schemas']['GraduationResponse'];
+export type GraduatedProjectResponse = components['schemas']['GraduatedProjectResponse'];
+export type ProvenanceSummaryResponse = components['schemas']['ProvenanceSummaryResponse'];
+export type ProvenanceFieldResponse = components['schemas']['ProvenanceFieldResponse'];
 export type CreateProjectBody = components['schemas']['CreateProjectBody'];
 export type ProjectKind = components['schemas']['ProjectKind'];
 export type ContentMode = components['schemas']['ContentMode'];

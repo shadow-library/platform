@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 
 import { IdeationService } from '@modules/ideation';
+import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
 import { seedContentHash } from '@server/common';
 import { type PrimaryDatabase, schema } from '@server/database';
 import { ProjectService } from '@modules/project/project/project.service';
@@ -297,6 +298,58 @@ describe.if(pgAvailable)('Ideation API', () => {
       const response = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${project.id}/seed/stress`).body({});
       expect(response.statusCode).toBe(400);
       expect(response.json().code).toBe('IDE_001');
+    });
+  });
+
+  describe('POST /api/v1/projects/:projectId/seed/graduate', () => {
+    async function seedReadyToGraduate(): Promise<bigint> {
+      const projectId = BigInt((await createSeed('a salvager')).json().projectId);
+      await db
+        .update(schema.storySeeds)
+        .set({
+          fields: { premise: 'a salvager who can hear the dead ships she strips', voice: 'first person, past, dry' },
+          provenance: { premise: { source: 'author', turnOrdinal: 1 } },
+          constraints: [{ key: 'no-harem', kind: 'promise', text: 'one romance at a time or none', lockedBy: 'author' }],
+        })
+        .where(eq(schema.storySeeds.projectId, projectId));
+      return projectId;
+    }
+
+    it('should turn the seed into a novel and report what it wrote', async () => {
+      const projectId = await seedReadyToGraduate();
+
+      const response = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/seed/graduate`).body({ title: 'The Wreck Singer' });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.project).toMatchObject({ id: String(projectId), name: 'The Wreck Singer', status: 'active' });
+      expect(body.documents).toEqual(['project/premise', 'project/reader-promise']);
+      expect(body.factKeys).toEqual(['promise:no-harem']);
+      expect(body.provenance).toMatchObject({ filled: 2, author: 1, studio: 0, unattributed: 1 });
+    });
+
+    it('should require a title', async () => {
+      const projectId = await seedReadyToGraduate();
+
+      const empty = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/seed/graduate`).body({ title: '' });
+      expect(empty.statusCode).toBe(422);
+
+      const blank = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/seed/graduate`).body({ title: '   ' });
+      expect(blank.statusCode).toBe(400);
+      expect(blank.json().code).toBe('IDE_002');
+    });
+
+    it('should have its action executor wired into the live registry', () => {
+      expect(testEnv.getService(ActionExecutorRegistry).has('action.graduate_seed')).toBe(true);
+    });
+
+    it('should refuse somebody else’s seed', async () => {
+      const [theirs] = await db.insert(schema.projects).values({ name: 'theirs', kind: 'new_novel', status: 'seed', ownerId: 987_654n }).returning();
+      await db.insert(schema.storySeeds).values({ projectId: theirs?.id as bigint, fields: { premise: 'theirs' }, contentHash: seedContentHash({}) });
+
+      const response = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${theirs?.id}/seed/graduate`).body({ title: 'Mine now' });
+      expect(response.statusCode).toBe(404);
+      expect(response.json().code).toBe('PRJ_001');
     });
   });
 

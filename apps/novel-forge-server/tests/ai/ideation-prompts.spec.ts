@@ -164,19 +164,19 @@ describe('the ideation scope playbook', () => {
     expect(guidance).toContain('The exit is always visible');
   });
 
-  it('should render the seed.update vocabulary and nothing else', () => {
+  it('should render the sheet edit and the exit, and no other vocabulary', () => {
     const instructions = renderScopeInstructions('ideation');
     expect(instructions).toContain('"op": "seed.update"');
     expect(instructions).toContain('the merge is per key');
+    expect(instructions).toContain('"op": "action.graduate_seed"');
     expect(instructions).not.toContain('"op": "premise.update"');
     expect(instructions).not.toContain('"op": "bible_document.upsert"');
-    expect(instructions).not.toContain('action.');
+    expect(instructions).not.toContain('"op": "action.plan_volumes"');
   });
 
-  // action.graduate_seed joins the playbook in T6, with the action op and its executor.
-  it('should stage sheet edits only until the graduation action exists', () => {
+  it('should let the studio stage sheet edits and the graduation, and nothing else', () => {
     expect(SCOPE_PLAYBOOKS.ideation.allowedOps).toEqual(['seed.update']);
-    expect(SCOPE_PLAYBOOKS.ideation.allowedActions).toBeUndefined();
+    expect(SCOPE_PLAYBOOKS.ideation.allowedActions).toEqual(['action.graduate_seed']);
   });
 
   it('should bake the charter and the vocabulary into the turn prompt itself', () => {

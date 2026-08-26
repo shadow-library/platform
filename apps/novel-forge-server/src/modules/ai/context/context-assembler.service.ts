@@ -46,11 +46,7 @@ export const CHAT_PACK_BUDGET = CHAT_STABLE_BUDGET + CHAT_VOLATILE_DELTA_BUDGET;
 // The hub sees the whole project (catalog + full plan + pipeline status), so it gets catalog headroom
 // over the scoped chat budget (chat-hub design §6.1).
 export const CHAT_HUB_BUDGET = 20_000;
-// A bootstrap hub turn IS the authoring session: the interview answers and the premise/bible/cast it
-// produces must all stay verbatim, because every later step is derived from them.
-export const CHAT_BOOTSTRAP_BUDGET = 32_000;
 export const CHAT_HISTORY_BUDGET = 6_000;
-export const CHAT_BOOTSTRAP_HISTORY_BUDGET = 10_000;
 export const CHAT_SUMMARY_BUDGET = 1_500;
 export const ARC_PLAN_BUDGET = 16_000;
 export const PREMISE_BUDGET = 8_000;
@@ -68,12 +64,13 @@ export const REFORGE_ANALYSIS_BUDGET = 12_000;
 // span's source prose still travels as a template var.
 export const REFORGE_TRANSFORM_BUDGET = 16_000;
 // An image prompt is a paragraph: the composer needs the subject, the look, and nothing else.
-// The studio turn is an interview: every answer the author gave must reach the model in their own
-// words, so the seed pack is sized like a bootstrap hub turn rather than a scoped chat turn.
-export const IDEATION_BUDGET = CHAT_BOOTSTRAP_BUDGET;
+// The studio turn IS the authoring session: every answer the author gave must reach the model in their
+// own words, because every later step of the novel is derived from them — so the seed pack gets far
+// more headroom than a scoped chat turn.
+export const IDEATION_BUDGET = 32_000;
 // The conversation is never packed: it reaches the model as prompt messages through the template's
 // `history` placeholder, so this budget caps that message list at the turn pipeline, not the pack.
-export const IDEATION_HISTORY_BUDGET = CHAT_BOOTSTRAP_HISTORY_BUDGET;
+export const IDEATION_HISTORY_BUDGET = 10_000;
 export const ILLUSTRATION_BUDGET = 6_000;
 export const ILLUSTRATION_WORLD_FACTS_MAX = 30;
 
@@ -860,8 +857,8 @@ export class ContextAssembler {
    * volatile carries only the artifacts whose revision moved since the session started. History is
    * NOT part of the pack — it rides as prompt messages so provider caching can extend across turns.
    */
-  async forChatTurn(projectId: bigint, session: ChatScopeInput, opts?: { budgetTokens?: number }): Promise<AssembledPack & { id: bigint | null }> {
-    const budgetTokens = opts?.budgetTokens ?? (session.scopeType === 'project' ? CHAT_HUB_BUDGET : CHAT_PACK_BUDGET);
+  async forChatTurn(projectId: bigint, session: ChatScopeInput): Promise<AssembledPack & { id: bigint | null }> {
+    const budgetTokens = session.scopeType === 'project' ? CHAT_HUB_BUDGET : CHAT_PACK_BUDGET;
     const refValue = session.scopeRef?.includes(':') ? (session.scopeRef.split(':')[1] ?? '') : (session.scopeRef ?? '');
 
     const sections: ContextSection[] = [];
@@ -1029,7 +1026,7 @@ export class ContextAssembler {
     if (changed.length > 0) sections.push(makeSection('changed_since', changed.join('\n'), 'working', []));
 
     const purpose = session.scopeType === 'project' ? 'chat_hub' : 'chat';
-    return this.finalize(projectId, purpose, null, sections, unresolvedRefs, budgetTokens, opts && 'dryRun' in opts ? (opts as { dryRun?: boolean }).dryRun : false);
+    return this.finalize(projectId, purpose, null, sections, unresolvedRefs, budgetTokens, false);
   }
 
   /**

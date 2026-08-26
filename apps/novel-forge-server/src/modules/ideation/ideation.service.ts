@@ -311,6 +311,10 @@ export class IdeationService {
       // One transaction for everything the model's answer produced: a reply the author can see with no
       // proposal behind it, or a round whose offer was never recorded, are both worse than no turn.
       const persisted = await this.db.transaction(async tx => {
+        // The sheet row is locked before the message writes, the same order the concept round takes it
+        // in: two transactions that take chat_messages first and story_seeds second would deadlock
+        // against it.
+        await this.lockSeed(tx, seed.id);
         const assistantMessage = await this.persistAssistantMessage(
           tx,
           session,
@@ -427,11 +431,15 @@ export class IdeationService {
       )) as IdeationStressOutput;
 
       const readiness = output.readiness as unknown as Ideation.ReadinessEntry[];
-      await this.persistReadiness(seed.id, readiness);
 
-      const assistantMessage = chat
-        ? await this.persistAssistantMessage(this.db, chat.session, (userMessage?.ordinal ?? 0) + 1, coachingOf(STRESS_QUESTION_ID), { kind: 'readiness', readiness }, runId, null)
-        : undefined;
+      // A verdict on the sheet the author has no message about, or a message reporting a verdict that
+      // was never stored, are both worse than no pass at all — so the two writes land together.
+      const assistantMessage = await this.db.transaction(async tx => {
+        await this.lockSeed(tx, seed.id);
+        await tx.update(schema.storySeeds).set({ readiness, updatedAt: new Date() }).where(eq(schema.storySeeds.id, seed.id));
+        if (!chat) return undefined;
+        return this.persistAssistantMessage(tx, chat.session, (userMessage?.ordinal ?? 0) + 1, coachingOf(STRESS_QUESTION_ID), { kind: 'readiness', readiness }, runId, null);
+      });
       return { readiness, userMessage, assistantMessage };
     });
 
@@ -539,13 +547,6 @@ export class IdeationService {
     await tx.update(schema.storySeeds).set({ askedQuestions, updatedAt: new Date() }).where(eq(schema.storySeeds.id, seedId));
   }
 
-  private async persistReadiness(seedId: bigint, readiness: Ideation.ReadinessEntry[]): Promise<void> {
-    await this.db.transaction(async tx => {
-      await this.lockSeed(tx, seedId);
-      await tx.update(schema.storySeeds).set({ readiness, updatedAt: new Date() }).where(eq(schema.storySeeds.id, seedId));
-    });
-  }
-
   private async stageProposal(
     tx: PrimaryTransaction,
     session: Refinement.ChatSession,
@@ -605,7 +606,8 @@ export class IdeationService {
     const [message] = await tx
       .insert(schema.chatMessages)
       .values({ sessionId: session.id, projectId: session.projectId, ordinal, role: 'user', content, runId, tokens: countTokens(content) })
-      .returning();
+      .returning()
+      .catch(err => this.databaseService.translateError(err));
     if (!message) throw AppErrorCode.CHT_001.create();
     return message;
   }
@@ -633,7 +635,8 @@ export class IdeationService {
         modelId: model?.model,
         tokens: countTokens(content),
       })
-      .returning();
+      .returning()
+      .catch(err => this.databaseService.translateError(err));
     if (!message) throw AppErrorCode.CHT_001.create();
 
     await tx.update(schema.chatSessions).set({ lastTurnAt: new Date(), updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id));

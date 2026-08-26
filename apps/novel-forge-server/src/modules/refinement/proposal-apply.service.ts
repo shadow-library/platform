@@ -105,6 +105,24 @@ function mergeKeys<T extends object>(prior: T | null, patch: Record<string, unkn
   return merged as T;
 }
 
+/**
+ * The deterministic provenance floor (ideation-studio design §2.2). The studio prompt marks material
+ * that came from the author's own words; a field written with no source named is therefore the studio's
+ * own suggestion, and the honesty check at graduation must be able to say so. Stamped onto the op before
+ * the inverse is captured, so a revert still restores exactly the provenance the sheet had.
+ */
+function withStudioProvenance(op: SeedUpdateOp, turnOrdinal: number): SeedUpdateOp {
+  const written = Object.entries(op.fields ?? {}).filter(([, value]) => value !== null);
+  if (written.length === 0 && op.provenance === undefined) return op;
+
+  const provenance: NonNullable<SeedUpdateOp['provenance']> = {};
+  for (const [key, entry] of Object.entries(op.provenance ?? {})) provenance[key] = entry === null ? null : { source: entry.source, turnOrdinal };
+  for (const [key] of written) {
+    if (!(key in provenance)) provenance[key] = { source: 'studio', turnOrdinal };
+  }
+  return { ...op, provenance };
+}
+
 /** The patch's keys mapped to their current values — null where the key is not there yet. */
 function priorKeys(patch: Record<string, unknown>, prior: object | null): Record<string, unknown> {
   const current = (prior ?? {}) as Record<string, unknown>;
@@ -151,6 +169,9 @@ export class ProposalApplyService {
       // Finalize crosses the immutability line — once prose locks, the revert guarantee is gone, so an
       // auto-mode turn may never trigger it; the proposal stays pending for a deliberate manual apply.
       if (options?.autoApplied && actionOps.some(a => a.op.op === 'action.finalize')) throw AppErrorCode.RFN_009.create();
+      // Graduation is the same shape of one-way door: it deletes the sheet and ends the studio, so a
+      // tap in an auto-mode studio turn may never trigger it either (ideation-studio design §5).
+      if (options?.autoApplied && actionOps.some(a => a.op.op === 'action.graduate_seed')) throw AppErrorCode.IDE_007.create();
       for (const action of actionOps) {
         if (!this.actionRegistry.has(action.op.op)) throw AppErrorCode.RFN_008.create();
       }
@@ -177,10 +198,12 @@ export class ProposalApplyService {
       }
 
       const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
+      const turnOrdinal = contentOps.some(c => c.op.op === 'seed.update') ? await this.turnOrdinal(ctx.tx, proposal.messageId) : 0;
       const inverseOps: ContentOp[] = [];
       for (const { op } of contentOps) {
-        const inverse = await this.captureInverse(ctx, op);
-        await this.applyOp(ctx, op);
+        const effective = op.op === 'seed.update' ? withStudioProvenance(op, turnOrdinal) : op;
+        const inverse = await this.captureInverse(ctx, effective);
+        await this.applyOp(ctx, effective);
         if (inverse) inverseOps.unshift(inverse);
       }
       const postState = await loadArtifactStates(ctx.tx, projectId, changeSetRefs(contentOps.map(c => c.op)));
@@ -230,6 +253,13 @@ export class ProposalApplyService {
 
     this.logger.info(`proposal ${proposalId} applied: ${result.applied.map(a => a.artifactRef).join(', ') || 'actions only'}`);
     return { proposal, applied: result.applied, staleMarked: result.staleMarked, opResults };
+  }
+
+  /** The chat ordinal a sheet edit was settled on; 0 when the edit did not come from a conversational turn. */
+  private async turnOrdinal(tx: PrimaryDatabase, messageId: bigint | null): Promise<number> {
+    if (messageId === null) return 0;
+    const message = await tx.query.chatMessages.findFirst({ where: eq(schema.chatMessages.id, messageId), columns: { ordinal: true } });
+    return message?.ordinal ?? 0;
   }
 
   /** Validates a cherry-pick selection (RFN_011) and resolves the effective op indexes, in op order. */
