@@ -4,6 +4,7 @@ import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler, FULL_CAST_MAX, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
+import { nextQuestions, toRouterSeedState } from '@modules/ideation/question-router';
 
 describe('countTokens', () => {
   it('returns a positive integer for a non-empty string', () => {
@@ -1278,5 +1279,118 @@ describe('ContextAssembler.forIllustration', () => {
     expect(pack.rendered).toContain('Chapter 3: The Ridge');
     expect(pack.rendered).toContain('## CAST APPEARANCE');
     expect(pack.rendered).toContain('Evan Vale (character): silver hair');
+  });
+});
+
+describe('ContextAssembler.forIdeationTurn', () => {
+  const seed = (overrides: Partial<Parameters<ContextAssembler['forIdeationTurn']>[1]> = {}) =>
+    ({
+      projectId: 1n,
+      fields: { genre: 'progression fantasy', premise: 'PREMISE_MARKER', castShape: 'dual leads, bonded' },
+      constraints: [{ key: 'leads', kind: 'shape', text: 'dual leads, both salvagers', lockedBy: 'author' }],
+      tasteAnchors: { comps: ['COMP_MARKER'], preferences: ['competence over destiny'] },
+      concepts: [],
+      readiness: [],
+      askedQuestions: [],
+      ...overrides,
+    }) as Parameters<ContextAssembler['forIdeationTurn']>[1];
+
+  const round = (state = seed()) => nextQuestions(toRouterSeedState(state));
+
+  it('should carry the sheet, the locks, the taste anchors and the playbooks as the stable segment', async () => {
+    const pack = await makeAssembler().forIdeationTurn({ recentTurns: ['Author: TURN_MARKER'] }, seed(), round(), { dryRun: true });
+
+    const segments = Object.fromEntries(pack.sections.map(s => [s.key, s.segment]));
+    expect(segments).toMatchObject({
+      seed_sheet: 'stable',
+      locked_constraints: 'stable',
+      taste_anchors: 'stable',
+      shape_playbooks: 'stable',
+      recent_turns: 'volatile',
+      round_questions: 'volatile',
+    });
+
+    expect(pack.purpose).toBe('ideation');
+    for (const marker of ['PREMISE_MARKER', 'COMP_MARKER', 'dual-leads']) expect(pack.renderedStable).toContain(marker);
+    expect(pack.renderedVolatile).toContain('TURN_MARKER');
+    expect(pack.renderedStable).not.toContain('TURN_MARKER');
+  });
+
+  it('should render every sheet field, naming the ones still open', async () => {
+    const pack = await makeAssembler().forIdeationTurn({ recentTurns: [] }, seed(), round(), { dryRun: true });
+
+    expect(pack.renderedStable).toContain('genre: progression fantasy');
+    expect(pack.renderedStable).toContain('voice: (empty)');
+    expect(pack.renderedStable).toContain('themes: (empty)');
+  });
+
+  it('should keep the stable segment byte-identical when only the round and the conversation move', async () => {
+    const first = await makeAssembler().forIdeationTurn({ recentTurns: ['Author: A'] }, seed(), round(), { dryRun: true });
+    const asked = seed({ askedQuestions: round().questions.map(q => q.id) });
+    const second = await makeAssembler().forIdeationTurn({ recentTurns: ['Author: B'] }, seed(), nextQuestions(toRouterSeedState(asked)), { dryRun: true });
+
+    expect(first.renderedStable.length).toBeGreaterThan(0);
+    expect(second.renderedStable).toBe(first.renderedStable);
+    expect(second.renderedVolatile).not.toBe(first.renderedVolatile);
+  });
+
+  it('should hand the model each question with its intent and its coaching line unaltered', async () => {
+    const result = round();
+    const pack = await makeAssembler().forIdeationTurn({ recentTurns: [] }, seed(), result, { dryRun: true });
+
+    for (const question of result.questions) {
+      expect(pack.renderedVolatile).toContain(`[${question.id}]`);
+      expect(pack.renderedVolatile).toContain(question.coaching);
+      expect(pack.renderedVolatile).toContain(question.intent);
+    }
+  });
+
+  it('should mark a hinted question as settled and a re-offered one as circling back', async () => {
+    const result = round();
+    const [first] = result.questions;
+    const marked = { ...result, hints: { [first?.id ?? '']: 'the cast shape is locked' }, backfilled: [first?.id ?? ''] };
+    const pack = await makeAssembler().forIdeationTurn({ recentTurns: [] }, seed(), marked, { dryRun: true });
+
+    expect(pack.renderedVolatile).toContain('HINT — already settled: the cast shape is locked');
+    expect(pack.renderedVolatile).toContain('CIRCLING BACK');
+  });
+
+  it('should tell a finished sheet that the door is open', async () => {
+    const finished = seed({
+      fields: {
+        genre: 'progression fantasy',
+        premise: 'p',
+        hook: 'h',
+        castShape: 'c',
+        progressionSystem: 'l',
+        protagonistDrive: 'd',
+        stakes: 's',
+        voice: 'v',
+      },
+    });
+    const pack = await makeAssembler().forIdeationTurn({ recentTurns: [] }, finished, nextQuestions(toRouterSeedState(finished)), { dryRun: true });
+
+    expect(pack.renderedVolatile).toContain('start the novel whenever they want');
+  });
+
+  it('should carry the fates of the concepts already offered so a killed mechanism is never resurrected', async () => {
+    const withCards = seed({
+      concepts: [{ round: 1, title: 'The Salvage Line', logline: 'l', engine: 'debt', ladder: 'ship class', posture: 'opportunist', fate: 'killed', reason: 'debt plots bore me' }],
+    });
+    const pack = await makeAssembler().forIdeationTurn({ recentTurns: [] }, withCards, round(withCards), { dryRun: true });
+
+    expect(pack.renderedVolatile).toContain('Round 1 — The Salvage Line [killed]: debt plots bore me');
+    expect(pack.renderedVolatile).toContain('engine: debt | ladder: ship class | posture: opportunist');
+  });
+
+  it('should omit the optional stable sections a bare seed has nothing to fill them with', async () => {
+    const bare = seed({ fields: {}, constraints: [], tasteAnchors: { comps: [], preferences: [] } });
+    const pack = await makeAssembler().forIdeationTurn({ recentTurns: [] }, bare, round(bare), { dryRun: true });
+
+    const keys = pack.sections.map(s => s.key);
+    expect(keys).toContain('seed_sheet');
+    expect(keys).not.toContain('locked_constraints');
+    expect(keys).not.toContain('taste_anchors');
+    expect(keys).not.toContain('shape_playbooks');
   });
 });

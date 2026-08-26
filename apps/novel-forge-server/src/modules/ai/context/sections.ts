@@ -6,6 +6,7 @@ export type ContextPurpose =
   | 'outline'
   | 'chat'
   | 'chat_hub'
+  | 'ideation'
   | 'arc_plan'
   | 'premise'
   | 'audit'
@@ -94,6 +95,13 @@ export const SECTION_LABELS: Record<string, string> = {
   known_facts: '## KNOWN FACTS (POV CAST)',
   chapter_reveals: '## REVEALED THIS CHAPTER',
   hidden_constraints: '## BEHAVIORAL CONSTRAINTS',
+  seed_sheet: '## STORY SEED SHEET',
+  locked_constraints: '## LOCKED CONSTRAINTS',
+  taste_anchors: '## TASTE ANCHORS',
+  shape_playbooks: '## SHAPE PLAYBOOKS',
+  concept_history: '## CONCEPTS ALREADY OFFERED',
+  recent_turns: '## RECENT TURNS',
+  round_questions: '## THIS ROUND',
   art_style: '## ART STYLE BIBLE',
   subject_card: '## SUBJECT',
   cast_appearance: '## CAST APPEARANCE',

@@ -55,6 +55,9 @@ const READINESS_SPECS: DimensionSpec[] = [
   { dimension: 'room', fields: ['genre'], support: hasRoomConstraint },
 ];
 
+/** The seven dimensions in the order every readiness report — precheck, prompt, and sheet — must carry them in. */
+export const READINESS_DIMENSION_ORDER: ReadinessDimensionName[] = READINESS_SPECS.map(spec => spec.dimension);
+
 /** Fills every nullable story_seeds column, so the router never has to defend against a fresh row. */
 export function toRouterSeedState(seed: Pick<Ideation.StorySeed, 'fields' | 'constraints' | 'tasteAnchors' | 'concepts' | 'readiness' | 'askedQuestions'>): RouterSeedState {
   return {

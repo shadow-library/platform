@@ -14,6 +14,9 @@ import { epitomePrompt } from './epitome.prompt';
 import { extractionPrompt } from './extraction.prompt';
 import { fixPrompt } from './fix.prompt';
 import { generationPrompt } from './generation.prompt';
+import { ideationConceptsPrompt } from './ideation-concepts.prompt';
+import { ideationStressPrompt } from './ideation-stress.prompt';
+import { ideationTurnPrompt } from './ideation-turn.prompt';
 import { illustrationComposePrompt } from './illustration-compose.prompt';
 import { judgePrompt } from './judge.prompt';
 import { newNovelPrompt } from './new-novel.prompt';
@@ -64,6 +67,9 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'bible-audit': bibleAuditPrompt as PromptModule<unknown>,
   'chat-refine': chatRefinePrompt as PromptModule<unknown>,
   'chat-compact': chatCompactPrompt as PromptModule<unknown>,
+  'ideation-turn': ideationTurnPrompt as PromptModule<unknown>,
+  'ideation-concepts': ideationConceptsPrompt as PromptModule<unknown>,
+  'ideation-stress': ideationStressPrompt as PromptModule<unknown>,
   'arc-plan': arcPlanPrompt as PromptModule<unknown>,
   'chapter-extract': chapterExtractPrompt as PromptModule<unknown>,
   'rebrand-glossary': rebrandGlossaryPrompt as PromptModule<unknown>,
@@ -85,6 +91,8 @@ export * from './types';
 export * from './authoring-preamble';
 export * from './scope-playbooks';
 export { buildChatRefinePrompt } from './chat-refine.prompt';
+export { buildIdeationStressPrompt } from './ideation-stress.prompt';
+export { CONCEPT_CARD_COUNT } from './ideation-concepts.prompt';
 export { buildArcPlanPrompt } from './arc-plan.prompt';
 export { buildOutlinePrompt } from './outline.prompt';
 export { renderReforgeFidelityGuidance } from './reforge-write.prompt';

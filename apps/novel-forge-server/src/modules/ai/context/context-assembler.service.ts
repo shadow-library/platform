@@ -9,12 +9,22 @@ import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import { loadKnowledgeView, parseKnowledgeContract, renderChapterReveals, renderHiddenConstraints, renderKnownFacts } from '../../bible/fact/knowledge-view';
+import { matchPlaybooks } from '../../ideation/constraint-playbooks';
+import { SEED_FIELD_KEYS } from '../../ideation/question-bank';
+import { type RouterResult, toRouterSeedState } from '../../ideation/question-router';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../prompts/authoring-preamble';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 import { CatalogService } from './catalog.service';
 import { computeDormantThreads, renderDormantThreads } from './dormant-threads';
 import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextSegment, type ContextTier, joinSections, renderSection, splitSegments } from './sections';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
+
+export interface IdeationTurnSession {
+  /** The recent conversation, oldest first, already rendered as speaker-labelled lines. */
+  recentTurns: string[];
+}
+
+export type IdeationSeedInput = Pick<schema.Ideation.StorySeed, 'projectId' | 'fields' | 'constraints' | 'tasteAnchors' | 'concepts' | 'readiness' | 'askedQuestions'>;
 
 export interface ChatScopeInput {
   scopeType: schema.Refinement.ChatScope;
@@ -56,6 +66,10 @@ export const REFORGE_ANALYSIS_BUDGET = 12_000;
 // span's source prose still travels as a template var.
 export const REFORGE_TRANSFORM_BUDGET = 16_000;
 // An image prompt is a paragraph: the composer needs the subject, the look, and nothing else.
+// The studio turn is an interview: every answer the author gave must reach the model in their own
+// words, so the seed pack is sized like a bootstrap hub turn rather than a scoped chat turn.
+export const IDEATION_BUDGET = CHAT_BOOTSTRAP_BUDGET;
+export const IDEATION_HISTORY_BUDGET = CHAT_BOOTSTRAP_HISTORY_BUDGET;
 export const ILLUSTRATION_BUDGET = 6_000;
 export const ILLUSTRATION_WORLD_FACTS_MAX = 30;
 
@@ -126,6 +140,68 @@ function latestRelationships(rows: EntityRelationshipRow[]): EntityRelationshipR
     if (!current || (row.chapter ?? -1) > (current.chapter ?? -1) || ((row.chapter ?? -1) === (current.chapter ?? -1) && row.id > current.id)) latest.set(key, row);
   }
   return [...latest.values()];
+}
+
+/** Every sheet field in a fixed order, empty ones included — the model must see what is still open. */
+function renderSeedSheet(fields: schema.Ideation.SeedFields): string {
+  return SEED_FIELD_KEYS.map(key => {
+    const value = fields[key];
+    const text = Array.isArray(value) ? value.join(', ') : (value ?? '');
+    return `${key}: ${text.trim() === '' ? '(empty)' : text}`;
+  }).join('\n');
+}
+
+function renderSeedConstraints(constraints: schema.Ideation.SeedConstraint[]): string {
+  return constraints.map(c => `- ${c.key} (${c.kind}, locked by ${c.lockedBy}${c.playbookKey ? `, playbook ${c.playbookKey}` : ''}): ${c.text}`).join('\n');
+}
+
+function renderTasteAnchors(anchors: schema.Ideation.TasteAnchors): string {
+  const lines: string[] = [];
+  if (anchors.comps.length > 0) lines.push(`Comps: ${anchors.comps.join(' | ')}`);
+  if (anchors.preferences.length > 0) lines.push(`What those comps have in common: ${anchors.preferences.join(' | ')}`);
+  return lines.join('\n');
+}
+
+/** One excerpt per matched playbook — what the shape promises, what it removes, and what must carry the load. */
+function renderPlaybookExcerpts(constraints: schema.Ideation.SeedConstraint[]): string {
+  const { matched } = matchPlaybooks(constraints);
+  const seen = new Set<string>();
+  const blocks: string[] = [];
+  for (const { playbook } of matched) {
+    if (seen.has(playbook.key)) continue;
+    seen.add(playbook.key);
+    blocks.push(`**${playbook.key}**\nPromises: ${playbook.promises}\nKills: ${playbook.kills}\nMust replace: ${playbook.mustReplace}`);
+  }
+  return blocks.join('\n\n');
+}
+
+function renderRoundQuestions(router: RouterResult): string {
+  const backfilled = new Set(router.backfilled);
+  const header = router.done
+    ? `Stage: ${router.stage}. Every stress-ready field is filled — the author can start the novel whenever they want, and should hear that.`
+    : `Stage: ${router.stage}.`;
+  const blocks = router.questions.map(question => {
+    const lines = [
+      `[${question.id}] fills: ${question.fills.length > 0 ? question.fills.join(', ') : 'nothing — this answer is a locked constraint'}`,
+      `Intent: ${question.intent}`,
+      `Coaching (reproduce verbatim): ${question.coaching}`,
+    ];
+    const hint = router.hints[question.id];
+    if (hint) lines.push(`HINT — already settled: ${hint}. Confirm it instead of asking again.`);
+    if (backfilled.has(question.id)) lines.push('CIRCLING BACK — this was offered before and left unanswered. Say so, make it easier, lead with your own answer.');
+    return lines.join('\n');
+  });
+  return [header, ...blocks].join('\n\n');
+}
+
+/** Prior rounds with their fates — the killed mechanisms the next round may not resurrect. */
+function renderConceptHistory(concepts: schema.Ideation.ConceptCard[]): string {
+  return concepts
+    .map(
+      card =>
+        `Round ${card.round} — ${card.title} [${card.fate}]${card.reason ? `: ${card.reason}` : ''}\n  ${card.logline}\n  engine: ${card.engine} | ladder: ${card.ladder} | posture: ${card.posture}`,
+    )
+    .join('\n\n');
 }
 
 @Injectable()
@@ -924,9 +1000,9 @@ export class ContextAssembler {
         }
         break;
       }
-      // ChatService.createSession/turn reject ideation scope before assembling a pack, but RefineService's
-      // /context/preview endpoint reaches this branch directly; T5 replaces it with the real forIdeationTurn
-      // pack once the studio's own assembly purpose lands.
+      // An ideation session assembles through forIdeationTurn, which needs the seed row and the round the
+      // router chose — neither of which a chat-scope input carries. ChatService rejects the scope before it
+      // gets here; RefineService's /context/preview endpoint reaches this branch directly.
       case 'ideation':
         throw AppErrorCode.IDE_005.create();
       default: {
@@ -942,6 +1018,37 @@ export class ContextAssembler {
 
     const purpose = session.scopeType === 'project' ? 'chat_hub' : 'chat';
     return this.finalize(projectId, purpose, null, sections, unresolvedRefs, budgetTokens, opts && 'dryRun' in opts ? (opts as { dryRun?: boolean }).dryRun : false);
+  }
+
+  /**
+   * Pack for one Ideation Studio turn (ideation-studio design §4.2). Stable: the sheet, the locked
+   * constraints, the taste anchors, and the playbooks for the shapes already committed to — all of it
+   * byte-identical until the sheet itself moves. Volatile: the recent conversation and the round the
+   * router just chose, which differ on every turn by construction.
+   */
+  async forIdeationTurn(
+    session: IdeationTurnSession,
+    seed: IdeationSeedInput,
+    router: RouterResult,
+    opts?: { budgetTokens?: number; dryRun?: boolean },
+  ): Promise<AssembledPack & { id: bigint | null }> {
+    const state = toRouterSeedState(seed);
+    const sections: ContextSection[] = [asStable(makeSection('seed_sheet', renderSeedSheet(state.fields), 'canonical', ['seed']))];
+
+    if (state.constraints.length > 0) sections.push(asStable(makeSection('locked_constraints', renderSeedConstraints(state.constraints), 'canonical', ['seed'])));
+    const anchors = renderTasteAnchors(state.tasteAnchors);
+    if (anchors) sections.push(asStable(makeSection('taste_anchors', anchors, 'canonical', ['seed'])));
+    const playbooks = renderPlaybookExcerpts(state.constraints);
+    if (playbooks) sections.push(asStable(makeSection('shape_playbooks', playbooks, 'canonical', [])));
+
+    if (state.concepts.length > 0) sections.push(makeSection('concept_history', renderConceptHistory(state.concepts), 'working', ['seed']));
+    if (session.recentTurns.length > 0) {
+      const { text } = truncateAtParagraphTail(session.recentTurns.join('\n\n'), IDEATION_HISTORY_BUDGET);
+      sections.push(makeSection('recent_turns', text, 'working', []));
+    }
+    sections.push(makeSection('round_questions', renderRoundQuestions(router), 'working', []));
+
+    return this.finalize(seed.projectId, 'ideation', null, sections, [], opts?.budgetTokens ?? IDEATION_BUDGET, opts?.dryRun);
   }
 
   /** The live production picture the hub reasons over: cursor, draft states, stale plans, open work. */
