@@ -1,6 +1,6 @@
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AppError } from '@shadow-library/common';
 
@@ -8,11 +8,14 @@ import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
 import { buildIdeationStressPrompt } from '@modules/ai/prompts';
+import { type PromptModule } from '@modules/ai/prompts/types';
+import { ToolRegistryService } from '@modules/ai/tools';
 import { IdeationService } from '@modules/ideation';
 import { getQuestion } from '@modules/ideation/question-bank';
-import { readinessDimensions, toRouterSeedState } from '@modules/ideation/question-router';
+import { nextQuestions, readinessDimensions, toRouterSeedState } from '@modules/ideation/question-router';
 import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
 import { ChatCompactionService } from '@modules/refinement/chat-compaction.service';
+import { ChatService } from '@modules/refinement/chat.service';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { seedContentHash } from '@server/common';
@@ -56,6 +59,9 @@ const FULL_SHEET: Ideation.SeedFields = {
   voice: 'first person, past, dry',
 };
 
+const offeredCards = (marker: string): Ideation.ConceptCard[] =>
+  cards(marker).map(card => ({ round: 1, title: card.title, logline: card.logline, engine: card.engine, ladder: card.ladder, posture: card.posture, fate: 'offered' }));
+
 const cards = (marker: string) =>
   [1, 2, 3, 4].map(n => ({
     title: `${marker} ${n}`,
@@ -71,9 +77,22 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
   let ideation: IdeationService;
   let proposals: ProposalService;
   let applier: ProposalApplyService;
-  const structuredMock = mock<() => Promise<unknown>>(async () => ({ reply: 'stub' }));
+  const structuredMock = mock<(prompt: PromptModule<never>, input: Record<string, string>) => Promise<unknown>>(async () => ({ reply: 'stub' }));
 
-  const lastInput = (): Record<string, string> => structuredMock.mock.calls.at(-1)?.[1 as never] as unknown as Record<string, string>;
+  const lastInput = (): Record<string, string> => structuredMock.mock.calls.at(-1)?.[1] as Record<string, string>;
+
+  /**
+   * A mocked model answer that still has to satisfy the real prompt contract. Without this the pipeline
+   * tests only ever saw outputs the repair ladder had never judged, which is how a change-set the
+   * grammar rejects — every post-diverge turn's — passed the suite and died in production.
+   */
+  const answering =
+    (output: unknown) =>
+    async (prompt: PromptModule<never>): Promise<unknown> => {
+      const errors = prompt.postValidate?.(output as never) ?? [];
+      if (errors.length > 0) throw new Error(`postValidate rejected the model output: ${errors.join('; ')}`);
+      return output;
+    };
 
   async function makeSeed(overrides: Partial<Ideation.StorySeed> = {}, sessionOverrides: Partial<Refinement.ChatSession> = {}) {
     const [project] = await db
@@ -119,7 +138,8 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
     proposals = new ProposalService(databaseService);
     applier = new ProposalApplyService(databaseService, new ActionExecutorRegistry());
     const compaction = new ChatCompactionService(databaseService, modelRouter, workflowRuns);
-    ideation = new IdeationService(databaseService, noop, noop, assembler, modelRouter, workflowRuns, proposals, applier, compaction);
+    const chat = new ChatService(databaseService, assembler, modelRouter, workflowRuns, proposals, applier, new ToolRegistryService(), noop, compaction);
+    ideation = new IdeationService(databaseService, noop, noop, assembler, modelRouter, workflowRuns, proposals, applier, compaction, chat);
   });
 
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
@@ -212,6 +232,43 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       }
     });
 
+    it('accepts a verdict turn that re-sends the cards the author has not judged yet', async () => {
+      const offered = offeredCards('Wreck');
+      const { projectId, sessionId } = await makeSeed({ askedQuestions: [...ORIENTED, 'diverge.cards'], concepts: offered });
+      const round = nextQuestions(toRouterSeedState((await sheet(projectId)) as Ideation.StorySeed));
+      const questions = round.questions.map(question => ({ id: question.id, wording: 'w', coaching: question.coaching, options: ['a', 'b'], youDecide: 'a' }));
+      const verdicts = offered.map((card, index) => (index === 0 ? { ...card, fate: 'kept' as const } : card));
+
+      structuredMock.mockImplementationOnce(
+        answering({ reply: 'Keeping the wreck.', payload: { kind: 'questions', questions }, changeSet: [{ op: 'seed.update', concepts: verdicts }] }),
+      );
+
+      const result = await ideation.turn(projectId, sessionId, 'the first one');
+
+      expect(result.applyNote).toBeUndefined();
+      expect((await sheet(projectId))?.concepts?.map(card => card.fate)).toEqual(['kept', 'offered', 'offered', 'offered']);
+    });
+
+    it('refuses a second turn while the first turn’s model call is still in flight', async () => {
+      const { projectId, sessionId } = await makeSeed();
+      let release = (): void => {};
+      const held = new Promise<void>(resolve => (release = resolve));
+      structuredMock.mockImplementationOnce(async () => {
+        await held;
+        return { reply: 'slow', payload: { kind: 'questions', questions: [] } };
+      });
+
+      const first = ideation.turn(projectId, sessionId, 'take your time');
+      const running = () => db.query.workflowRuns.findFirst({ where: and(eq(schema.workflowRuns.target, `session:${sessionId}`), eq(schema.workflowRuns.status, 'running')) });
+      for (let attempt = 0; attempt < 200 && !(await running()); attempt++) await Bun.sleep(5);
+
+      expect(await codeOf(ideation.turn(projectId, sessionId, 'again'))).toBe('IDE_006');
+
+      release();
+      await first;
+      expect(await codeOf(ideation.stress(projectId))).not.toBe('IDE_006');
+    });
+
     it('compacts a long studio conversation before assembling the turn', async () => {
       const { projectId, sessionId } = await makeSeed();
       for (let i = 0; i < 7; i++) {
@@ -281,14 +338,31 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       expect(run).toMatchObject({ graph: 'ideation-concepts', status: 'completed' });
     });
 
-    it('numbers a second round above the first', async () => {
-      const first = cards('Wreck').map(card => ({ ...card, round: 1, fate: 'killed' as const })) as unknown as Ideation.ConceptCard[];
-      const { projectId, sessionId } = await makeSeed({ askedQuestions: ORIENTED.filter(id => id !== 'diverge.cards'), concepts: first });
-      structuredMock.mockImplementationOnce(async () => ({ kind: 'cards', cards: cards('Tide') }));
+    it('runs a fresh round when the author kills every card, rather than a text question', async () => {
+      // Built through the pipeline, not hand-written: the state that follows a wholesale kill is the
+      // backfill re-offering diverge.cards from the stress stage, which a stage-keyed dispatch missed.
+      const { projectId, sessionId } = await makeSeed({ askedQuestions: [...ORIENTED, ...QUESTION_IDS_DEEPEN] });
+      structuredMock.mockImplementationOnce(answering({ kind: 'cards', cards: cards('Wreck') }));
+      await ideation.turn(projectId, sessionId, 'show me options');
 
-      await ideation.turn(projectId, sessionId, 'again, different');
-      const row = await sheet(projectId);
-      expect(row?.concepts?.filter(card => card.round === 2)).toHaveLength(4);
+      const killed = ((await sheet(projectId))?.concepts ?? []).map(card => ({ ...card, fate: 'killed' as const }));
+      await db.update(schema.storySeeds).set({ concepts: killed }).where(eq(schema.storySeeds.projectId, projectId));
+
+      structuredMock.mockImplementationOnce(answering({ kind: 'cards', cards: cards('Tide') }));
+      const result = await ideation.turn(projectId, sessionId, 'again, different');
+
+      expect((result.assistantMessage.payload as { kind: string; round: number }).round).toBe(2);
+      expect((await sheet(projectId))?.concepts?.filter(card => card.round === 2)).toHaveLength(4);
+    });
+
+    it('carries the author’s direction for the round into the model input', async () => {
+      const { projectId, sessionId } = await makeSeed({ askedQuestions: ORIENTED });
+      structuredMock.mockImplementationOnce(answering({ kind: 'cards', cards: cards('Wreck') }));
+
+      await ideation.turn(projectId, sessionId, 'no ghost ships this time');
+
+      expect(lastInput()['volatileContext']).toContain('AUTHOR DIRECTION');
+      expect(lastInput()['volatileContext']).toContain('no ghost ships this time');
     });
 
     it('re-generates once when a playbook filter rejects the set, and keeps the second set', async () => {
@@ -359,6 +433,29 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       expect(result.runId).toBeTruthy();
     });
 
+    it('writes no chat messages when it is re-run from the sheet screen', async () => {
+      const { projectId, sessionId } = await finished();
+      const before = (await messages(sessionId)).length;
+
+      for (let run = 0; run < 2; run++) {
+        structuredMock.mockImplementationOnce(answering({ kind: 'readiness', readiness: readiness() }));
+        await ideation.stress(projectId);
+      }
+
+      expect(await messages(sessionId)).toHaveLength(before);
+      expect((await sheet(projectId))?.readiness).toHaveLength(7);
+    });
+
+    it('carries the author’s direction into the router-triggered pass and files the user message under its run', async () => {
+      const { projectId, sessionId } = await finished();
+      structuredMock.mockImplementationOnce(answering({ kind: 'readiness', readiness: readiness() }));
+
+      const result = await ideation.turn(projectId, sessionId, 'be harsh about the voice');
+
+      expect(lastInput()['precheck']).toContain('be harsh about the voice');
+      expect(result.userMessage.runId).toBe(result.runId);
+    });
+
     it('sends a structurally empty dimension back rather than accepting a strong verdict for it', () => {
       const empty = readinessDimensions(
         toRouterSeedState({ fields: {}, constraints: [], tasteAnchors: { comps: [], preferences: [] }, concepts: [], readiness: [], askedQuestions: [] }),
@@ -368,6 +465,53 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
 
       const errors = prompt.postValidate?.({ kind: 'readiness', readiness: report } as never) ?? [];
       expect(errors).toEqual(["the 'hook' dimension has no material on the sheet and cannot be strong"]);
+    });
+  });
+
+  describe('partial failure', () => {
+    it('leaves no orphan concepts behind when the card message cannot be written', async () => {
+      const { projectId, sessionId } = await makeSeed({ askedQuestions: ORIENTED });
+      const service = ideation as unknown as { persistAssistantMessage: () => Promise<unknown> };
+      const original = service.persistAssistantMessage;
+      service.persistAssistantMessage = async () => {
+        throw new Error('message write failed');
+      };
+      structuredMock.mockImplementationOnce(answering({ kind: 'cards', cards: cards('Wreck') }));
+
+      try {
+        expect(await codeOf(ideation.turn(projectId, sessionId, 'options please'))).toContain('message write failed');
+      } finally {
+        service.persistAssistantMessage = original;
+      }
+
+      const row = await sheet(projectId);
+      expect(row?.concepts).toEqual([]);
+      expect(row?.askedQuestions).toEqual(ORIENTED);
+    });
+
+    it('records no offered question when the proposal cannot be staged', async () => {
+      const { projectId, sessionId } = await makeSeed();
+      const original = proposals.create.bind(proposals);
+      (proposals as unknown as { create: typeof proposals.create }).create = async () => {
+        throw new Error('staging failed');
+      };
+      structuredMock.mockImplementationOnce(async () => ({
+        reply: 'Locking the shelf.',
+        payload: { kind: 'questions', questions: [] },
+        changeSet: [{ op: 'seed.update', fields: { genre: 'noir' } }],
+      }));
+
+      try {
+        expect(await codeOf(ideation.turn(projectId, sessionId, 'noir'))).toContain('staging failed');
+      } finally {
+        (proposals as unknown as { create: typeof proposals.create }).create = original;
+      }
+
+      const persisted = await messages(sessionId);
+      expect(persisted.filter(message => message.role === 'assistant')).toHaveLength(0);
+      const row = await sheet(projectId);
+      expect(row?.askedQuestions).toEqual([]);
+      expect(row?.fields?.genre).toBeUndefined();
     });
   });
 
@@ -386,6 +530,22 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
 
       expect(lastInput()['volatileContext']).toContain('COMMIT NOW');
       expect(lastInput()['volatileContext']).toContain('CIRCLING BACK');
+    });
+
+    it('does not lose the count to a cards turn taken between two offers of the same question', async () => {
+      const { genre: _genre, ...withoutGenre } = FULL_SHEET;
+      const { projectId, sessionId } = await makeSeed({ fields: withoutGenre, askedQuestions: [...ORIENTED, 'diverge.cards', ...QUESTION_IDS_DEEPEN] });
+
+      const offer = { kind: 'questions', questions: [{ id: 'orient.shelf', wording: 'w', coaching: 'c', options: ['a', 'b'], youDecide: 'a' }] };
+      for (const ordinal of [1, 2]) {
+        await db.insert(schema.chatMessages).values({ sessionId, projectId, ordinal, role: 'assistant', content: 'asked before', payload: offer });
+      }
+      await db.insert(schema.chatMessages).values({ sessionId, projectId, ordinal: 3, role: 'assistant', content: 'cards', payload: { kind: 'cards', round: 1, cards: [] } });
+
+      structuredMock.mockImplementationOnce(async () => ({ reply: 'Committing.', payload: offer }));
+      await ideation.turn(projectId, sessionId, 'skip');
+
+      expect(lastInput()['volatileContext']).toContain('COMMIT NOW');
     });
 
     it('says nothing about committing while the question is only on its second outing', async () => {

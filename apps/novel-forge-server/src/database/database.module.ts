@@ -5,6 +5,10 @@ import { constraintErrorMap } from './database.constants';
 import * as schema from './schemas';
 
 export type PrimaryDatabase = BunSQLDatabase<typeof schema>;
+export type PrimaryTransaction = Parameters<Parameters<PrimaryDatabase['transaction']>[0]>[0];
+
+/** Whatever a write runs on: the pool, or the transaction a caller has already opened around it. */
+export type DbExecutor = PrimaryDatabase | PrimaryTransaction;
 
 declare module '@shadow-library/modules' {
   interface DatabaseRecords {

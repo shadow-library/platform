@@ -286,7 +286,10 @@ const SEED_FIELD_KEYS = ['genre', 'themes', 'premise', 'hook', 'castShape', 'pro
 const SEED_FIELD_SOURCES = ['author', 'studio', 'crossed'];
 const SEED_CONSTRAINT_KINDS = ['shape', 'scope', 'promise'];
 const SEED_CONSTRAINT_LOCKED_BY = ['author', 'inferred'];
-const SEED_CONCEPT_FATES = ['kept', 'killed', 'crossed'];
+// 'offered' is a legal emission, not just a persisted state: the column replaces wholesale, so every
+// re-send of the collection carries the cards the author has not judged yet — and un-judging one back
+// to 'offered' is a verdict the author is allowed to take back.
+const SEED_CONCEPT_FATES = ['offered', 'kept', 'killed', 'crossed'];
 
 const OP_SPECS: Record<OpType, OpSpec> = {
   'premise.update': { required: {}, optional: { premise: 'string', brief: 'string', themes: 'string[]', instructions: 'string' } },

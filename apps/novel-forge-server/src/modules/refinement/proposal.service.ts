@@ -5,7 +5,7 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
+import { type DbExecutor, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { loadArtifactStates } from './artifact-state';
 import { type ChangeOp, changeSetRefs, type OpType, validateChangeSet } from './change-set';
@@ -53,14 +53,14 @@ export class ProposalService {
    * pending proposal of the same session that touches an overlapping artifact (§6.4). Cross-session
    * pending proposals are left alone — the baseline check catches them at apply time.
    */
-  async create(projectId: bigint, input: CreateProposalInput): Promise<Refinement.Proposal> {
+  async create(projectId: bigint, input: CreateProposalInput, executor: DbExecutor = this.db): Promise<Refinement.Proposal> {
     const errors = validateChangeSet(input.changeSet, input.allowedOps);
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
     const refs = changeSetRefs(input.changeSet);
-    const baseline = await loadArtifactStates(this.db, projectId, refs);
+    const baseline = await loadArtifactStates(executor, projectId, refs);
 
-    const [proposal] = await this.db
+    const [proposal] = await executor
       .insert(schema.refinementProposals)
       .values({
         projectId,
@@ -78,12 +78,12 @@ export class ProposalService {
       .returning();
     if (!proposal) throw AppErrorCode.RFN_001.create();
 
-    if (input.sessionId) await this.supersedeOverlapping(projectId, input.sessionId, proposal.id, refs);
+    if (input.sessionId) await this.supersedeOverlapping(projectId, input.sessionId, proposal.id, refs, executor);
     return proposal;
   }
 
-  private async supersedeOverlapping(projectId: bigint, sessionId: string, newProposalId: bigint, refs: string[]): Promise<void> {
-    const pending = await this.db.query.refinementProposals.findMany({
+  private async supersedeOverlapping(projectId: bigint, sessionId: string, newProposalId: bigint, refs: string[], executor: DbExecutor): Promise<void> {
+    const pending = await executor.query.refinementProposals.findMany({
       where: and(
         eq(schema.refinementProposals.projectId, projectId),
         eq(schema.refinementProposals.sessionId, sessionId),
@@ -94,7 +94,7 @@ export class ProposalService {
 
     const overlapping = pending.filter(p => changeSetRefs(p.changeSet as ChangeOp[]).some(ref => refs.includes(ref)));
     for (const proposal of overlapping) {
-      await this.db.update(schema.refinementProposals).set({ status: 'superseded', updatedAt: new Date() }).where(eq(schema.refinementProposals.id, proposal.id));
+      await executor.update(schema.refinementProposals).set({ status: 'superseded', updatedAt: new Date() }).where(eq(schema.refinementProposals.id, proposal.id));
       this.logger.debug(`proposal ${proposal.id} superseded by ${newProposalId}`);
     }
   }

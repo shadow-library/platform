@@ -7,7 +7,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import { seedContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Ideation, type PrimaryDatabase, type Refinement, schema } from '@server/database';
+import { type DbExecutor, type Ideation, type PrimaryDatabase, type PrimaryTransaction, type Refinement, schema } from '@server/database';
 
 import { ContextAssembler, IDEATION_HISTORY_BUDGET } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
@@ -18,7 +18,7 @@ import { buildIdeationStressPrompt, buildIdeationTurnPrompt, PROMPT_REGISTRY, re
 import { type IdeationConceptsOutput, type IdeationStressOutput, type IdeationTurnOutput } from '../ai/schemas';
 import { type ChangeOp } from '../refinement/change-set';
 import { ChatCompactionService } from '../refinement/chat-compaction.service';
-import { SCOPE_CHAT_ROLE } from '../refinement/chat.service';
+import { ChatService, SCOPE_CHAT_ROLE } from '../refinement/chat.service';
 import { type ScopedTurnResult } from '../refinement/chat-turn.registry';
 import { ProposalApplyService } from '../refinement/proposal-apply.service';
 import { ProposalService } from '../refinement/proposal.service';
@@ -67,6 +67,7 @@ export class IdeationService {
     private readonly proposalService: ProposalService,
     private readonly proposalApplyService: ProposalApplyService,
     private readonly compaction: ChatCompactionService,
+    private readonly chatService: ChatService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -252,24 +253,38 @@ export class IdeationService {
    */
   async turn(projectId: bigint, sessionId: string, content: string): Promise<ScopedTurnResult> {
     const ctx = await this.loadStudio(projectId, sessionId);
+    await this.assertNoTurnInFlight(projectId, sessionId);
     await this.compaction.compactIfNeeded(projectId, ctx.session, IDEATION_HISTORY_BUDGET);
 
     const round = nextQuestions(toRouterSeedState(ctx.seed));
     this.logger.info('studio turn', { projectId, sessionId, stage: round.stage, questions: round.questions.map(question => question.id), done: round.done });
 
+    // Dispatch on the QUESTION, never on the stage. The backfill re-offers `diverge.cards` from the
+    // stress stage whenever the premise is still missing — after the author kills every card, say — and
+    // a stage test answers that question with a text chip the studio has no round to attach.
     if (round.questions.some(question => question.id === STRESS_QUESTION_ID)) return this.stressTurn(ctx, round, content);
-    if (round.stage === 'diverge' && round.questions.some(question => question.id === DIVERGE_QUESTION_ID)) return this.conceptsTurn(ctx, round, content);
+    if (round.questions.some(question => question.id === DIVERGE_QUESTION_ID)) return this.conceptsTurn(ctx, round, content);
     return this.interviewTurn(ctx, round, content);
+  }
+
+  /**
+   * One conversational turn at a time per session. Every turn reads the sheet, calls the model, then
+   * writes back what it computed from that read; two turns overlapping on one session compute their
+   * rounds from the same sheet and the slower one's write lands on top of the faster one's.
+   */
+  private async assertNoTurnInFlight(projectId: bigint, sessionId: string): Promise<void> {
+    if (await this.chatService.hasPendingTurn(projectId, sessionId)) throw AppErrorCode.IDE_006.create();
   }
 
   /** The stress pass on demand — the same critic the router fires once, re-runnable from the sheet screen. */
   async stress(projectId: bigint): Promise<SeedStressResponse> {
     const seed = await this.loadSeed(projectId);
     const sessionId = (await this.studioSessions([projectId])).get(projectId) ?? null;
+    if (sessionId) await this.assertNoTurnInFlight(projectId, sessionId);
     const session = sessionId ? await this.db.query.chatSessions.findFirst({ where: eq(schema.chatSessions.id, sessionId) }) : undefined;
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
-    const { runId, readiness } = await this.runStress({ seed, session: session ?? null, project });
+    const { runId, readiness } = await this.runStress({ seed, session: session ?? null, project, transcript: null });
     return { seed: this.present(await this.loadSeed(projectId), sessionId), runId, readiness };
   }
 
@@ -285,7 +300,7 @@ export class IdeationService {
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'ideation-turn', `session:${session.id}`, { content }, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
-      const userMessage = await this.persistUserMessage(session, content, runId);
+      const userMessage = await this.persistUserMessage(this.db, session, content, runId);
       const output = (await this.modelRouter.structured(
         prompt,
         { stableContext: pack.renderedStable, history, volatileContext: pack.renderedVolatile || 'nothing', userMessage: content },
@@ -293,17 +308,23 @@ export class IdeationService {
         this.withSessionModel(ctx.project, model),
       )) as IdeationTurnOutput;
 
-      const assistantMessage = await this.persistAssistantMessage(
-        session,
-        userMessage.ordinal + 1,
-        output.reply,
-        output.payload as unknown as Record<string, unknown>,
-        runId,
-        model,
-      );
-      const proposal = await this.stageProposal(session, assistantMessage, output.changeSet, output.reply, runId);
-      await this.recordAsked(seed, round);
-      return { userMessage, assistantMessage, proposal };
+      // One transaction for everything the model's answer produced: a reply the author can see with no
+      // proposal behind it, or a round whose offer was never recorded, are both worse than no turn.
+      const persisted = await this.db.transaction(async tx => {
+        const assistantMessage = await this.persistAssistantMessage(
+          tx,
+          session,
+          userMessage.ordinal + 1,
+          output.reply,
+          output.payload as unknown as Record<string, unknown>,
+          runId,
+          model,
+        );
+        const proposal = await this.stageProposal(tx, session, assistantMessage, output.changeSet, output.reply, runId);
+        await this.recordAsked(seed.id, round, tx);
+        return { assistantMessage, proposal };
+      });
+      return { userMessage, ...persisted };
     });
 
     const settled = session.mode === 'auto' && result.proposal ? await this.autoApply(projectId, result.proposal) : {};
@@ -326,7 +347,7 @@ export class IdeationService {
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'ideation-concepts', `session:${session.id}`, { content }, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
-      const userMessage = await this.persistUserMessage(session, content, runId);
+      const userMessage = await this.persistUserMessage(this.db, session, content, runId);
       const telemetry = { projectId, runId, node: 'ideation-concepts', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat' };
       const generate = async (volatileContext: string): Promise<IdeationConceptsOutput> =>
         (await this.modelRouter.structured(
@@ -336,7 +357,7 @@ export class IdeationService {
           this.withSessionModel(ctx.project, model),
         )) as IdeationConceptsOutput;
 
-      const volatile = pack.renderedVolatile || 'nothing';
+      const volatile = [pack.renderedVolatile || 'nothing', renderAuthorDirection(content)].filter(Boolean).join('\n\n');
       let output = await generate(volatile);
       let rejections = this.rejectedCards(output, filters);
       if (rejections.length > 0) {
@@ -346,10 +367,15 @@ export class IdeationService {
       }
       if (rejections.length > 0) this.logger.warn('studio concepts: filters still rejecting — presenting the cards with the failures noted', { projectId, runId, rejections });
 
-      const cards = await this.persistConcepts(seed, output);
-      const payload = { kind: 'cards', round: cards[0]?.round ?? 1, cards, ...(rejections.length > 0 ? { filtersFailed: rejections } : {}) };
-      const assistantMessage = await this.persistAssistantMessage(session, userMessage.ordinal + 1, coachingOf(DIVERGE_QUESTION_ID), payload, runId, model);
-      await this.recordAsked(seed, round);
+      // Cards written without the message that shows them are a round the author can neither see nor
+      // judge, and the next round would number itself above them — so the three writes land together.
+      const assistantMessage = await this.db.transaction(async tx => {
+        const cards = await this.persistConcepts(tx, seed.id, output);
+        const payload = { kind: 'cards', round: cards[0]?.round ?? 1, cards, ...(rejections.length > 0 ? { filtersFailed: rejections } : {}) };
+        const message = await this.persistAssistantMessage(tx, session, userMessage.ordinal + 1, coachingOf(DIVERGE_QUESTION_ID), payload, runId, model);
+        await this.recordAsked(seed.id, round, tx);
+        return message;
+      });
       return { userMessage, assistantMessage, proposal: null };
     });
 
@@ -358,14 +384,11 @@ export class IdeationService {
 
   private async stressTurn(ctx: StudioTurnContext, round: RouterResult, content: string): Promise<ScopedTurnResult> {
     const { session, seed } = ctx;
-    const projectId = seed.projectId;
+    const { runId, userMessage, assistantMessage } = await this.runStress({ seed, session, project: ctx.project, transcript: { content } });
+    if (!userMessage || !assistantMessage) throw AppErrorCode.CHT_001.create();
+    await this.recordAsked(seed.id, round);
 
-    const userMessage = await this.persistUserMessage(session, content, null);
-    const { runId, assistantMessage } = await this.runStress({ seed, session, project: ctx.project, ordinal: userMessage.ordinal + 1 });
-    await this.recordAsked(seed, round);
-    if (!assistantMessage) throw AppErrorCode.CHT_001.create();
-
-    return { userMessage, assistantMessage, proposal: null, runId, seed: await this.presentFresh(projectId, session.id) };
+    return { userMessage, assistantMessage, proposal: null, runId, seed: await this.presentFresh(seed.projectId, session.id) };
   }
 
   /**
@@ -377,38 +400,39 @@ export class IdeationService {
     seed: Ideation.StorySeed;
     session: Refinement.ChatSession | null;
     project: { config: unknown } | undefined;
-    ordinal?: number;
-  }): Promise<{ runId: string; readiness: Ideation.ReadinessEntry[]; assistantMessage?: Refinement.ChatMessage }> {
-    const { seed, session } = input;
+    /**
+     * The author's message, present only for the router-triggered turn. The on-demand endpoint runs the
+     * same critic and writes no transcript at all: re-running it from the sheet screen is a read of the
+     * seed, not something the author said, and every press would otherwise add two chat messages.
+     */
+    transcript: { content: string } | null;
+  }): Promise<{ runId: string; readiness: Ideation.ReadinessEntry[]; userMessage?: Refinement.ChatMessage; assistantMessage?: Refinement.ChatMessage }> {
+    const { seed, session, transcript } = input;
     const projectId = seed.projectId;
     const dimensions = readinessDimensions(toRouterSeedState(seed));
     const prompt = buildIdeationStressPrompt(dimensions);
     const pack = await this.contextAssembler.forIdeationConcepts(seed);
     const target = session ? `session:${session.id}` : `seed:${seed.id}`;
+    const chat = session && transcript ? { session, content: transcript.content } : null;
+    const precheck = [renderReadinessPrecheck(dimensions), chat ? renderAuthorDirection(chat.content) : ''].filter(Boolean).join('\n\n');
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'ideation-stress', target, {}, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
+      const userMessage = chat ? await this.persistUserMessage(this.db, chat.session, chat.content, runId) : undefined;
       const output = (await this.modelRouter.structured(
         prompt,
-        { stableContext: pack.renderedStable, precheck: renderReadinessPrecheck(dimensions) },
+        { stableContext: pack.renderedStable, precheck },
         { projectId, runId, node: 'ideation-stress', promptKey: prompt.key, promptVersion: prompt.version, role: prompt.role ?? 'judge' },
         input.project as ProjectConfig | undefined,
       )) as IdeationStressOutput;
 
       const readiness = output.readiness as unknown as Ideation.ReadinessEntry[];
-      await this.db.update(schema.storySeeds).set({ readiness, updatedAt: new Date() }).where(eq(schema.storySeeds.id, seed.id));
+      await this.persistReadiness(seed.id, readiness);
 
-      const assistantMessage = session
-        ? await this.persistAssistantMessage(
-            session,
-            input.ordinal ?? (await this.latestOrdinal(session.id)) + 1,
-            coachingOf(STRESS_QUESTION_ID),
-            { kind: 'readiness', readiness },
-            runId,
-            null,
-          )
+      const assistantMessage = chat
+        ? await this.persistAssistantMessage(this.db, chat.session, (userMessage?.ordinal ?? 0) + 1, coachingOf(STRESS_QUESTION_ID), { kind: 'readiness', readiness }, runId, null)
         : undefined;
-      return { readiness, assistantMessage };
+      return { readiness, userMessage, assistantMessage };
     });
 
     return { runId, ...result };
@@ -449,7 +473,9 @@ export class IdeationService {
   private async circlingIds(sessionId: string, round: RouterResult): Promise<string[]> {
     if (round.backfilled.length === 0) return [];
     const recent = await this.db.query.chatMessages.findMany({
-      where: and(eq(schema.chatMessages.sessionId, sessionId), eq(schema.chatMessages.role, 'assistant')),
+      // Only question turns count: a cards or readiness reply between two offers of the same question
+      // is the studio doing other work, not the author being let off it.
+      where: and(eq(schema.chatMessages.sessionId, sessionId), eq(schema.chatMessages.role, 'assistant'), sql`${schema.chatMessages.payload}->>'kind' = 'questions'`),
       orderBy: desc(schema.chatMessages.ordinal),
       limit: CIRCLING_LIMIT - 1,
       columns: { payload: true },
@@ -470,9 +496,23 @@ export class IdeationService {
     return rejections;
   }
 
+  /**
+   * The row every sheet write recomputes from. `concepts`, `readiness` and `askedQuestions` are whole-column
+   * jsonb writes, and the snapshot a turn started from is minutes old by the time the model answers, so the
+   * fresh row is re-read under a row lock and the new value computed from THAT. None of these columns is
+   * covered by `contentHash` (it hashes `fields` alone), which is deliberate — they are the router's memory,
+   * not authored content — but it also means a seed baseline cannot notice a concurrent write to them, and
+   * this lock is the only thing that keeps two turns from each overwriting the other's round.
+   */
+  private async lockSeed(tx: PrimaryTransaction, seedId: bigint): Promise<Ideation.StorySeed> {
+    const [seed] = await tx.select().from(schema.storySeeds).where(eq(schema.storySeeds.id, seedId)).for('update');
+    if (!seed) throw AppErrorCode.IDE_001.create();
+    return seed;
+  }
+
   /** Cards land as `offered` — a fate is the author's verdict, and inventing one before they speak fakes it. */
-  private async persistConcepts(seed: Ideation.StorySeed, output: IdeationConceptsOutput): Promise<Ideation.ConceptCard[]> {
-    const existing = seed.concepts ?? [];
+  private async persistConcepts(tx: PrimaryTransaction, seedId: bigint, output: IdeationConceptsOutput): Promise<Ideation.ConceptCard[]> {
+    const existing = (await this.lockSeed(tx, seedId)).concepts ?? [];
     const round = existing.reduce((highest, card) => Math.max(highest, card.round), 0) + 1;
     const fresh: Ideation.ConceptCard[] = (output.cards ?? []).map(card => ({
       round,
@@ -484,20 +524,30 @@ export class IdeationService {
       fate: 'offered',
     }));
 
-    await this.db
+    await tx
       .update(schema.storySeeds)
       .set({ concepts: [...existing, ...fresh], updatedAt: new Date() })
-      .where(eq(schema.storySeeds.id, seed.id));
+      .where(eq(schema.storySeeds.id, seedId));
     return fresh;
   }
 
-  private async recordAsked(seed: Ideation.StorySeed, round: RouterResult): Promise<void> {
+  private async recordAsked(seedId: bigint, round: RouterResult, tx?: PrimaryTransaction): Promise<void> {
+    if (!tx) return this.db.transaction(inner => this.recordAsked(seedId, round, inner));
+    const seed = await this.lockSeed(tx, seedId);
     const askedQuestions = recordOffered(toRouterSeedState(seed), round);
     if (askedQuestions.length === (seed.askedQuestions ?? []).length) return;
-    await this.db.update(schema.storySeeds).set({ askedQuestions, updatedAt: new Date() }).where(eq(schema.storySeeds.id, seed.id));
+    await tx.update(schema.storySeeds).set({ askedQuestions, updatedAt: new Date() }).where(eq(schema.storySeeds.id, seedId));
+  }
+
+  private async persistReadiness(seedId: bigint, readiness: Ideation.ReadinessEntry[]): Promise<void> {
+    await this.db.transaction(async tx => {
+      await this.lockSeed(tx, seedId);
+      await tx.update(schema.storySeeds).set({ readiness, updatedAt: new Date() }).where(eq(schema.storySeeds.id, seedId));
+    });
   }
 
   private async stageProposal(
+    tx: PrimaryTransaction,
     session: Refinement.ChatSession,
     assistantMessage: Refinement.ChatMessage,
     changeSet: Record<string, unknown>[] | undefined,
@@ -505,18 +555,22 @@ export class IdeationService {
     runId: string,
   ): Promise<Refinement.Proposal | null> {
     if (!changeSet || changeSet.length === 0) return null;
-    const proposal = await this.proposalService.create(session.projectId, {
-      sessionId: session.id,
-      messageId: assistantMessage.id,
-      scopeType: 'ideation',
-      scopeRef: null,
-      kind: 'ideation',
-      summary: reply.split('\n', 1)[0]?.slice(0, 300),
-      changeSet: changeSet as unknown as ChangeOp[],
-      allowedOps: scopeAllowedOps('ideation'),
-      runId,
-    });
-    await this.db.update(schema.chatMessages).set({ proposalId: proposal.id }).where(eq(schema.chatMessages.id, assistantMessage.id));
+    const proposal = await this.proposalService.create(
+      session.projectId,
+      {
+        sessionId: session.id,
+        messageId: assistantMessage.id,
+        scopeType: 'ideation',
+        scopeRef: null,
+        kind: 'ideation',
+        summary: reply.split('\n', 1)[0]?.slice(0, 300),
+        changeSet: changeSet as unknown as ChangeOp[],
+        allowedOps: scopeAllowedOps('ideation'),
+        runId,
+      },
+      tx,
+    );
+    await tx.update(schema.chatMessages).set({ proposalId: proposal.id }).where(eq(schema.chatMessages.id, assistantMessage.id));
     assistantMessage.proposalId = proposal.id;
     return proposal;
   }
@@ -546,9 +600,9 @@ export class IdeationService {
     return { ...project, config: { ...base, models: { ...(base.models ?? {}), chat: model } } } as ProjectConfig;
   }
 
-  private async persistUserMessage(session: Refinement.ChatSession, content: string, runId: string | null): Promise<Refinement.ChatMessage> {
+  private async persistUserMessage(tx: DbExecutor, session: Refinement.ChatSession, content: string, runId: string | null): Promise<Refinement.ChatMessage> {
     const ordinal = (await this.latestOrdinal(session.id)) + 1;
-    const [message] = await this.db
+    const [message] = await tx
       .insert(schema.chatMessages)
       .values({ sessionId: session.id, projectId: session.projectId, ordinal, role: 'user', content, runId, tokens: countTokens(content) })
       .returning();
@@ -557,6 +611,7 @@ export class IdeationService {
   }
 
   private async persistAssistantMessage(
+    tx: DbExecutor,
     session: Refinement.ChatSession,
     ordinal: number,
     content: string,
@@ -564,7 +619,7 @@ export class IdeationService {
     runId: string,
     model: ResolvedModel | null,
   ): Promise<Refinement.ChatMessage> {
-    const [message] = await this.db
+    const [message] = await tx
       .insert(schema.chatMessages)
       .values({
         sessionId: session.id,
@@ -581,7 +636,7 @@ export class IdeationService {
       .returning();
     if (!message) throw AppErrorCode.CHT_001.create();
 
-    await this.db.update(schema.chatSessions).set({ lastTurnAt: new Date(), updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id));
+    await tx.update(schema.chatSessions).set({ lastTurnAt: new Date(), updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id));
     return message;
   }
 
@@ -606,6 +661,16 @@ function offeredQuestionIds(payload: Record<string, unknown> | null): string[] {
   const questions = payload['questions'];
   if (!Array.isArray(questions)) return [];
   return questions.map(question => (question as { id?: unknown }).id).filter((id): id is string => typeof id === 'string');
+}
+
+/**
+ * The author's own words for the turn, carried into a round that has no `{userMessage}` slot of its own.
+ * A re-roll asked for with "no ghost ships this time" that reaches the model without the sentence is a
+ * re-roll the author cannot steer.
+ */
+function renderAuthorDirection(content: string): string {
+  const text = content.trim();
+  return text ? `AUTHOR DIRECTION — what the author asked for this turn, in their words. Honour it:\n${text}` : '';
 }
 
 function renderFilterRejections(rejections: FilterRejection[]): string {

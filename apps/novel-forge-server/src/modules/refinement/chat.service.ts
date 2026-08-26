@@ -106,7 +106,7 @@ export class ChatService {
   }
 
   async updateSession(projectId: bigint, sessionId: string, update: { mode?: Refinement.ChatMode; title?: string }): Promise<Refinement.ChatSession> {
-    const session = await this.getSession(projectId, sessionId);
+    const session = await this.mutableSession(projectId, sessionId);
     const set: Record<string, unknown> = { updatedAt: new Date() };
     if (update.mode !== undefined) set['mode'] = update.mode;
     if (update.title !== undefined) set['title'] = update.title;
@@ -185,8 +185,19 @@ export class ChatService {
     return session;
   }
 
-  async setSessionStatus(projectId: bigint, sessionId: string, status: Refinement.ChatSessionStatus): Promise<Refinement.ChatSession> {
+  /**
+   * The studio owns its own conversation end to end: its mode, title, model, lifetime and archival are
+   * consequences of the seed, not of a chat setting. Every mutating path funnels through here so a new
+   * verb on the controller cannot reopen the hole — reading one stays open, the studio screen uses it.
+   */
+  private async mutableSession(projectId: bigint, sessionId: string): Promise<Refinement.ChatSession> {
     const session = await this.getSession(projectId, sessionId);
+    if (session.scopeType === 'ideation') throw AppErrorCode.IDE_005.create();
+    return session;
+  }
+
+  async setSessionStatus(projectId: bigint, sessionId: string, status: Refinement.ChatSessionStatus): Promise<Refinement.ChatSession> {
+    const session = await this.mutableSession(projectId, sessionId);
     const [updated] = await this.db.update(schema.chatSessions).set({ status, updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id)).returning();
     if (!updated) throw AppErrorCode.CHT_001.create();
     return updated;
@@ -194,13 +205,13 @@ export class ChatService {
 
   /** Deletes a chat and its whole history (messages cascade); staged proposals survive with the session detached. */
   async deleteSession(projectId: bigint, sessionId: string): Promise<Refinement.ChatSession> {
-    const session = await this.getSession(projectId, sessionId);
+    const session = await this.mutableSession(projectId, sessionId);
     await this.db.delete(schema.chatSessions).where(eq(schema.chatSessions.id, session.id));
     return session;
   }
 
   async updateSessionModel(projectId: bigint, sessionId: string, provider: string | null, model: string | null): Promise<Refinement.ChatSession> {
-    const session = await this.getSession(projectId, sessionId);
+    const session = await this.mutableSession(projectId, sessionId);
     const [updated] = await this.db
       .update(schema.chatSessions)
       .set({ modelProvider: provider, modelId: model, updatedAt: new Date() })
@@ -228,7 +239,7 @@ export class ChatService {
     const row = await this.db.query.workflowRuns.findFirst({
       where: and(
         eq(schema.workflowRuns.projectId, projectId),
-        inArray(schema.workflowRuns.graph, ['chat-turn', 'ideation-turn', 'ideation-concepts']),
+        inArray(schema.workflowRuns.graph, ['chat-turn', 'ideation-turn', 'ideation-concepts', 'ideation-stress']),
         eq(schema.workflowRuns.target, `session:${sessionId}`),
         eq(schema.workflowRuns.status, 'running'),
         gt(schema.workflowRuns.startedAt, cutoff),

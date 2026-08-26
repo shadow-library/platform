@@ -1,7 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm';
 
 import { computeContentHash } from '@server/common';
-import { type Bible, type PrimaryDatabase, schema } from '@server/database';
+import { type Bible, type DbExecutor, schema } from '@server/database';
 
 export interface ArtifactState {
   exists: boolean;
@@ -47,7 +47,7 @@ function parseRefs(refs: string[]): ParsedRefs {
  * "missing" rather than throwing, so a stale ref surfaces as a baseline mismatch, not a crash.
  * Works on a transaction handle as well as the root client.
  */
-export async function loadArtifactStates(db: PrimaryDatabase, projectId: bigint, refs: string[]): Promise<Record<string, ArtifactState>> {
+export async function loadArtifactStates(db: DbExecutor, projectId: bigint, refs: string[]): Promise<Record<string, ArtifactState>> {
   const parsed = parseRefs(refs);
   const states: Record<string, ArtifactState> = {};
   for (const ref of refs) states[ref] = MISSING;

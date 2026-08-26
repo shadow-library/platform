@@ -87,6 +87,19 @@ describe.if(pgAvailable)('ChatService ideation guards', () => {
 
     expect(await codeOf(chat.turn(projectId, session.id, 'hello'))).toBe('IDE_005');
   });
+
+  it('rejects every mutation of a studio session and still allows reading it', async () => {
+    const [session] = await db.insert(schema.chatSessions).values({ projectId, scopeType: 'ideation', mode: 'auto' }).returning();
+    if (!session) throw new Error('failed to seed session');
+
+    expect(await codeOf(chat.updateSession(projectId, session.id, { mode: 'manual', title: 'mine now' }))).toBe('IDE_005');
+    expect(await codeOf(chat.updateSessionModel(projectId, session.id, 'openrouter', 'x-ai/grok-4.6'))).toBe('IDE_005');
+    expect(await codeOf(chat.setSessionStatus(projectId, session.id, 'archived'))).toBe('IDE_005');
+    expect(await codeOf(chat.setSessionStatus(projectId, session.id, 'active'))).toBe('IDE_005');
+    expect(await codeOf(chat.deleteSession(projectId, session.id))).toBe('IDE_005');
+
+    expect(await chat.getSession(projectId, session.id)).toMatchObject({ id: session.id, mode: 'auto', status: 'active' });
+  });
 });
 
 describe('IdeationTurnRegistrar', () => {

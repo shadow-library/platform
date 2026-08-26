@@ -138,6 +138,12 @@ describe.if(pgAvailable)('seed.update op', () => {
       expect(validateChangeSet([{ op: 'seed.update', constraints: [{ ...CONSTRAINT, kind: 'vibe' }] }])[0]).toContain('kind must be one of');
     });
 
+    it('should accept a card still sitting at offered', () => {
+      // The column replaces wholesale, so every turn after the diverge round re-sends the cards the
+      // author has not judged — and taking a verdict back to 'offered' is theirs to do.
+      expect(validateChangeSet([{ op: 'seed.update', concepts: [{ ...CARD, fate: 'offered' }] }])).toEqual([]);
+    });
+
     it('should reject a concept card with an unknown fate', () => {
       expect(validateChangeSet([{ op: 'seed.update', concepts: [{ ...CARD, fate: 'maybe' }] }])[0]).toContain('fate must be one of');
     });
