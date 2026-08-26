@@ -1,0 +1,110 @@
+import { type Ideation } from '@server/database';
+
+import { matchPlaybooks } from './constraint-playbooks';
+import { hasField, QUESTION_BANK, type RouterSeedState, type StudioQuestion, type StudioStage } from './question-bank';
+
+export interface RouterResult {
+  stage: StudioStage;
+  /** At most three questions — a turn that asks more than three gets answers to none of them. */
+  questions: StudioQuestion[];
+  /** Playbook-forced and follow-up ids still owed, in bank order, whatever stage they belong to. */
+  forced: string[];
+  done: boolean;
+}
+
+export type ReadinessDimensionName = 'hook' | 'protagonist' | 'engine' | 'ladder' | 'promise' | 'voice' | 'room';
+
+export interface ReadinessDimension {
+  dimension: ReadinessDimensionName;
+  fields: Ideation.FieldKey[];
+  present: Ideation.FieldKey[];
+  verdict: Ideation.ReadinessVerdict;
+}
+
+interface DimensionSpec {
+  dimension: ReadinessDimensionName;
+  fields: Ideation.FieldKey[];
+  /** A locked constraint of this kind counts as a source, so the dimension reads thin rather than empty. */
+  supportingConstraint?: Ideation.ConstraintKind;
+}
+
+const MAX_QUESTIONS_PER_TURN = 3;
+
+const STAGE_ORDER: StudioStage[] = ['spark', 'taste', 'orient', 'diverge', 'deepen', 'stress'];
+
+/** Everything the stress pass needs in front of it before the sheet can be called finished. */
+export const STRESS_READY_FIELDS: Ideation.FieldKey[] = ['genre', 'premise', 'hook', 'castShape', 'progressionSystem', 'protagonistDrive', 'stakes', 'voice'];
+
+const READINESS_SPECS: DimensionSpec[] = [
+  { dimension: 'hook', fields: ['hook'] },
+  { dimension: 'protagonist', fields: ['protagonistDrive', 'castShape'] },
+  { dimension: 'engine', fields: ['progressionSystem'] },
+  { dimension: 'ladder', fields: ['stakes'] },
+  { dimension: 'promise', fields: ['serializationNotes'], supportingConstraint: 'promise' },
+  { dimension: 'voice', fields: ['voice'] },
+  { dimension: 'room', fields: ['genre', 'premise'], supportingConstraint: 'scope' },
+];
+
+/** Fills every nullable story_seeds column, so the router never has to defend against a fresh row. */
+export function toRouterSeedState(seed: Pick<Ideation.StorySeed, 'fields' | 'constraints' | 'tasteAnchors' | 'concepts' | 'readiness' | 'askedQuestions'>): RouterSeedState {
+  return {
+    fields: seed.fields ?? {},
+    constraints: seed.constraints ?? [],
+    tasteAnchors: seed.tasteAnchors ?? { comps: [], preferences: [] },
+    concepts: seed.concepts ?? [],
+    readiness: seed.readiness ?? [],
+    askedQuestions: seed.askedQuestions ?? [],
+  };
+}
+
+function collectForced(seed: RouterSeedState): Set<string> {
+  const { matched } = matchPlaybooks(seed.constraints);
+  const ids = new Set<string>();
+  for (const { playbook } of matched) for (const id of playbook.forcedQuestions) ids.add(id);
+  for (const question of QUESTION_BANK) for (const id of question.followUps?.(seed) ?? []) ids.add(id);
+
+  const asked = new Set(seed.askedQuestions);
+  return new Set([...ids].filter(id => !asked.has(id) && QUESTION_BANK.some(question => question.id === id)));
+}
+
+const answered = (seed: RouterSeedState, question: StudioQuestion): boolean =>
+  (question.fills.length > 0 && question.fills.every(field => hasField(seed, field))) || question.skipWhen(seed);
+
+/**
+ * The whole interview, as a pure function of the sheet. A question is dropped when its sheet fields
+ * are already filled or a locked constraint has answered it; a forced question bypasses both of
+ * those and is gated only on having been asked before, which is what makes the renewal question fire
+ * exactly once even though the engine answer has already written its field.
+ */
+export function nextQuestions(seed: RouterSeedState): RouterResult {
+  const asked = new Set(seed.askedQuestions);
+  const forced = collectForced(seed);
+  const forcedList = QUESTION_BANK.filter(question => forced.has(question.id)).map(question => question.id);
+  const done = STRESS_READY_FIELDS.every(field => hasField(seed, field));
+
+  for (const stage of STAGE_ORDER) {
+    // Diverge exists to invent a premise; a seed that arrived with one skips the concept round entirely.
+    if (stage === 'diverge' && hasField(seed, 'premise')) continue;
+
+    const pending = QUESTION_BANK.filter(question => question.stage === stage && !asked.has(question.id) && (forced.has(question.id) || !answered(seed, question)));
+    if (pending.length === 0) continue;
+
+    const ordered = [...pending].sort((left, right) => Number(forced.has(right.id)) - Number(forced.has(left.id)));
+    return { stage, questions: ordered.slice(0, MAX_QUESTIONS_PER_TURN), forced: forcedList, done };
+  }
+
+  return { stage: 'stress', questions: [], forced: forcedList, done };
+}
+
+/**
+ * The structural precheck behind the seven readiness dimensions. It reports only what is present and
+ * what is missing — whether what is present is any good is the stress prompt's verdict, not this one's.
+ */
+export function readinessDimensions(seed: RouterSeedState): ReadinessDimension[] {
+  return READINESS_SPECS.map(spec => {
+    const present = spec.fields.filter(field => hasField(seed, field));
+    const supported = spec.supportingConstraint !== undefined && seed.constraints.some(constraint => constraint.kind === spec.supportingConstraint);
+    const verdict: Ideation.ReadinessVerdict = present.length === spec.fields.length ? 'strong' : present.length > 0 || supported ? 'thin' : 'empty';
+    return { dimension: spec.dimension, fields: spec.fields, present, verdict };
+  });
+}
