@@ -242,6 +242,7 @@ export class PlanImportService {
         constraintNote: item.constraintNote ?? null,
         terms: (item.terms ?? null) as never,
         revealChapter: item.revealChapter ?? null,
+        source: 'import' as const,
       };
       // Facts carry no content hash; field-level comparison keeps re-imports idempotent.
       const unchanged = row && Object.entries(values).every(([key, value]) => JSON.stringify(row[key as keyof typeof values] ?? null) === JSON.stringify(value ?? null));

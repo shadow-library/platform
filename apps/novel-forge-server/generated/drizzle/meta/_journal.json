@@ -127,6 +127,13 @@
       "when": 1787771462275,
       "tag": "0017_white_rick_jones",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787772397311,
+      "tag": "0018_wise_nightmare",
+      "breakpoints": true
     }
   ]
 }

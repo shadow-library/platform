@@ -3473,7 +3473,7 @@ export interface components {
       createdAt: string;
     };
     /** @enum {string} */
-    FactSource: 'brief' | 'manual' | 'import' | 'seed';
+    FactSource: 'brief' | 'manual' | 'import' | 'seed' | 'generated';
     UpsertFactBody: {
       text: string;
       subjects?: string[];
@@ -7796,8 +7796,8 @@ export interface operations {
         purpose: 'generation' | 'outline' | 'chat' | 'arc_plan' | 'premise' | 'audit';
         /** @description required for generation/outline */
         chapter?: number | string;
-        /** @description chat scope type (novel, volume, arc, brief, …) */
-        scopeType?: string;
+        /** @description chat scope type */
+        scopeType?: 'project' | 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief' | 'ideation';
         /** @description chat scope ref (volume:v1, arc:a1, chapter:3, doc:section/slug) */
         scopeRef?: string;
         /** @description volume for arc_plan previews */

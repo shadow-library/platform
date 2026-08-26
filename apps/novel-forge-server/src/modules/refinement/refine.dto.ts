@@ -1,6 +1,8 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
+import { chatScope } from '@server/database';
+
 import { ProposalResponse } from './refinement.dto';
 
 @Schema()
@@ -154,7 +156,7 @@ export class ContextPreviewQuery {
   @Field(() => Integer, { optional: true, minimum: 1, description: 'required for generation/outline' })
   chapter?: number;
 
-  @Field({ optional: true, description: 'chat scope type (novel, volume, arc, brief, …)' })
+  @Field({ optional: true, enum: chatScope.enumValues, description: 'chat scope type' })
   scopeType?: string;
 
   @Field({ optional: true, description: 'chat scope ref (volume:v1, arc:a1, chapter:3, doc:section/slug)' })

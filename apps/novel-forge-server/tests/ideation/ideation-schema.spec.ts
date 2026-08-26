@@ -150,7 +150,9 @@ describe.if(pgAvailable)('ideation schemas', () => {
       .insert(schema.canonFacts)
       .values({ projectId, factKey: `promise:no-harem-${Date.now()}`, text: 'one romance, never a roster', source: 'seed', revealChapter: null })
       .returning();
+    if (!fact) throw new Error('failed to seed fact');
 
-    expect(fact).toMatchObject({ source: 'seed', revealChapter: null });
+    const ledgerRows = await db.query.characterKnowledge.findMany({ where: eq(schema.characterKnowledge.factId, fact.id) });
+    expect(ledgerRows).toHaveLength(0);
   });
 });

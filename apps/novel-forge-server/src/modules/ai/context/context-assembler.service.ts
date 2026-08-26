@@ -924,8 +924,9 @@ export class ContextAssembler {
         }
         break;
       }
-      // Ideation sessions are rejected before reaching here (ChatService.createSession/turn); T5 replaces
-      // this with the real forIdeationTurn pack once the studio's own assembly purpose lands.
+      // ChatService.createSession/turn reject ideation scope before assembling a pack, but RefineService's
+      // /context/preview endpoint reaches this branch directly; T5 replaces it with the real forIdeationTurn
+      // pack once the studio's own assembly purpose lands.
       case 'ideation':
         throw AppErrorCode.IDE_005.create();
       default: {

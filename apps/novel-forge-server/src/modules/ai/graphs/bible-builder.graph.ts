@@ -146,6 +146,7 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
             constraintNote: f.constraintNote ?? null,
             terms: f.terms ?? null,
             revealChapter: f.revealChapter ?? null,
+            source: 'generated',
           })
           .onConflictDoUpdate({
             target: [schema.canonFacts.projectId, schema.canonFacts.factKey],
