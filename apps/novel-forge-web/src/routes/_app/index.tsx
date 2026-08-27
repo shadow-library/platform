@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button, SegmentedControl } from '@shadow-library/ui';
 
-import { BookIcon, PlusIcon, UploadIcon } from '@/components/icons';
+import { BookIcon, PlusIcon, SparkIcon, UploadIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
 import { listProjectsQueryOptions, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
@@ -122,6 +122,9 @@ function Dashboard(): React.JSX.Element {
         subtitle={`${projects.length} project${projects.length === 1 ? '' : 's'} · ${sourceCount} source · ${newCount} original`}
         extra={
           <>
+            <Button variant="ghost" prefix={<SparkIcon />} onClick={() => navigate({ to: '/ideas' })}>
+              Ideas
+            </Button>
             <Button variant="secondary" prefix={<UploadIcon />} onClick={() => navigate({ to: '/import' })}>
               Import novel
             </Button>
@@ -164,7 +167,12 @@ function Dashboard(): React.JSX.Element {
         </div>
       </QueryState>
 
-      <NewNovelModal open={createOpen} onOpenChange={setCreateOpen} onCreated={project => navigate({ to: '/novels/$novelId/overview', params: { novelId: project.id } })} />
+      <NewNovelModal
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={project => navigate({ to: '/novels/$novelId/overview', params: { novelId: project.id } })}
+        onSeedCreated={seed => navigate({ to: '/ideas/$seedId', params: { seedId: seed.projectId } })}
+      />
     </div>
   );
 }

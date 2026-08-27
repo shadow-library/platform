@@ -517,9 +517,9 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
     turn.mutate(content, {
       onSuccess: result => {
         if (result.applied) {
-          toast.success('Changes applied — revert anytime from History');
-          // An applied turn still carries a note when the engine declined an op on its own — an action
-          // that may never run from an auto-mode turn.
+          // A turn whose every op was declined applied nothing and left the proposal pending, so it is not
+          // a success — only the note, naming the door the author has to walk through themselves, is true.
+          if (result.applied.opResults.some(op => op.status === 'applied')) toast.success('Changes applied — revert anytime from History');
           if (result.applyNote) toast.warning(result.applyNote);
         } else if (result.applyNote) toast.danger(result.applyNote);
         else if (result.proposal) toast.success('Forge drafted changes — review them below the reply.');
@@ -639,7 +639,9 @@ function ChatScreen(): React.JSX.Element {
   const setStatus = useSetSessionStatusMutation(novelId);
   const deleteSession = useDeleteChatSessionMutation(novelId);
 
-  const sessions = sessionsQuery.data?.items ?? [];
+  // Ideation sessions belong to the studio, not the hub: renaming, archiving, deleting or flipping the mode
+  // of one is refused with IDE_005, and its turns need the studio's own router and payload renderers.
+  const sessions = (sessionsQuery.data?.items ?? []).filter(session => session.scopeType !== 'ideation');
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChatSessionResponse | undefined>();

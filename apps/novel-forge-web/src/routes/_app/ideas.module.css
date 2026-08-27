@@ -1,0 +1,96 @@
+.page {
+  padding: 24px 28px 40px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 16px;
+  min-height: 132px;
+  border: 1px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+  cursor: pointer;
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardTime {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--sh-text-body);
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.cardSpark {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+  line-height: 1.5;
+}
+
+.newCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 132px;
+  border: 1px dashed var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  background: transparent;
+  cursor: pointer;
+  color: var(--sh-text-secondary);
+}
+
+.newCard:hover {
+  border-color: var(--sh-accent);
+  color: var(--sh-accent);
+}
+
+.newIcon {
+  display: flex;
+}
+
+.newLabel {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+}
+
+.newHint {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.pagerLabel {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}

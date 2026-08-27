@@ -7,7 +7,7 @@ import { userDisplayName } from '@shadow-library/web';
 import { useListProjectsQuery, useListProposalsQuery, useLogoutMutation, useMeQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery } from '@/lib/apis';
 import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle } from '@/lib/format';
 
-import { BookIcon, GridIcon, MoonIcon, SearchIcon, SunIcon } from '../icons';
+import { BookIcon, GridIcon, MoonIcon, SearchIcon, SparkIcon, SunIcon } from '../icons';
 import styles from './AppShell.module.css';
 import { JobsTray } from './JobsTray';
 import { type NovelParams } from './routes';
@@ -86,7 +86,12 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
     : {
         variant: 'sections',
         sections: [
-          { items: [{ to: '/', label: 'Projects', icon: <GridIcon />, exact: true }] },
+          {
+            items: [
+              { to: '/', label: 'Projects', icon: <GridIcon />, exact: true },
+              { to: '/ideas', label: 'Ideas', icon: <SparkIcon /> },
+            ],
+          },
           {
             label: 'Pinned',
             hidden: projects.length === 0,
@@ -109,6 +114,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
       }
     }
     items.push({ id: 'go-projects', group: 'Go to', label: 'All projects', icon: <GridIcon />, onRun: () => navigate({ to: '/' }) });
+    items.push({ id: 'go-ideas', group: 'Go to', label: 'Ideas', icon: <SparkIcon />, onRun: () => navigate({ to: '/ideas' }) });
     for (const candidate of projects) {
       items.push({
         id: `project-${candidate.id}`,
