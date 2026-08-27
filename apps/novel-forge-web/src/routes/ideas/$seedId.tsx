@@ -199,17 +199,29 @@ interface CardVerdict {
 
 /**
  * The chat-message payload is a frozen snapshot — its card always carries `fate: 'offered'`. The seed's
- * `concepts` list is the live record, so the real verdict (if any) is read off the matching entry there,
- * matched by round + position within that round.
+ * `concepts` list is the live record, so the real verdict (if any) is read off the matching entry there.
  */
 function recordedVerdict(matched: ConceptCardResponse | undefined): CardVerdict | undefined {
   return matched && matched.fate !== 'offered' ? { fate: matched.fate, reason: matched.reason ?? '' } : undefined;
 }
 
-function conceptsByRound(seed: SeedResponse): Map<number, ConceptCardResponse[]> {
-  const map = new Map<number, ConceptCardResponse[]>();
-  for (const concept of seed.concepts) map.set(concept.round, [...(map.get(concept.round) ?? []), concept]);
-  return map;
+/**
+ * Cards are matched to the live sheet by their server-minted id. Transcripts written before ids existed
+ * carry none, so those fall back to round + position within the round — the old behaviour, which is wrong
+ * the moment the model reorders a re-sent collection and is why the id exists.
+ */
+function matchCards(payload: Extract<StudioPayload, { kind: 'cards' }>, seed: SeedResponse): (ConceptCardResponse | undefined)[] {
+  const byId = new Map(seed.concepts.map(concept => [concept.id, concept]));
+  const byRound = new Map<number, ConceptCardResponse[]>();
+  for (const concept of seed.concepts) byRound.set(concept.round, [...(byRound.get(concept.round) ?? []), concept]);
+
+  const roundSeen = new Map<number, number>();
+  return payload.cards.map(card => {
+    const round = card.round || payload.round;
+    const index = roundSeen.get(round) ?? 0;
+    roundSeen.set(round, index + 1);
+    return byId.get(card.id) ?? (card.id ? undefined : byRound.get(round)?.[index]);
+  });
 }
 
 function ConceptCardsBlock({
@@ -220,19 +232,12 @@ function ConceptCardsBlock({
 }: { payload: Extract<StudioPayload, { kind: 'cards' }>; seed: SeedResponse } & Omit<SendProps, 'onSend'>): React.JSX.Element {
   const [verdicts, setVerdicts] = useState<Record<string, CardVerdict>>({});
 
-  // Rounds re-use titles, so the key has to name the round and the card's place in it.
-  const cardKey = (card: ConceptCardResponse, index: number): string => `${card.round || payload.round}:${index}`;
+  // Pre-id transcripts have no identity to key on, so those still fall back to round + position.
+  const cardKey = (card: ConceptCardResponse, index: number): string => card.id || `${card.round || payload.round}:${index}`;
   const setFate = (key: string, fate: Fate): void => setVerdicts(prev => ({ ...prev, [key]: { fate, reason: prev[key]?.reason ?? '' } }));
   const setReason = (key: string, reason: string): void => setVerdicts(prev => ({ ...prev, [key]: { fate: prev[key]?.fate ?? 'kept', reason } }));
 
-  const byRound = conceptsByRound(seed);
-  const roundSeen = new Map<number, number>();
-  const matched = payload.cards.map(card => {
-    const round = card.round || payload.round;
-    const index = roundSeen.get(round) ?? 0;
-    roundSeen.set(round, index + 1);
-    return byRound.get(round)?.[index];
-  });
+  const matched = matchCards(payload, seed);
 
   const undecided = payload.cards.map((card, index) => ({ card, key: cardKey(card, index), recorded: recordedVerdict(matched[index]) })).filter(({ recorded }) => !recorded);
   const decided = undecided.filter(({ key }) => verdicts[key]);
@@ -269,6 +274,7 @@ function ConceptCardsBlock({
                 <StatusChip intent="neutral">round {card.round || payload.round}</StatusChip>
               </div>
               <p className={styles.cardLogline}>{card.logline}</p>
+              {card.hookLine && <p className={styles.cardHook}>{card.hookLine}</p>}
               <dl className={styles.cardFacets}>
                 <div>
                   <dt>Engine</dt>

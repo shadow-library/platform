@@ -124,7 +124,13 @@ function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.E
   const [declined, setDeclined] = useState<Set<number>>(() => defaultDeclined(proposal.changeSet));
   const opResults = (proposal.opResults ?? []) as { index: number; status: string; error?: string; result?: Record<string, unknown> }[];
 
-  useEffect(() => setDeclined(defaultDeclined(proposal.changeSet)), [proposal.id]);
+  // The selection is keyed to one proposal's op indexes, so a different proposal in the same slot resets
+  // it during render rather than in an effect — an effect would paint one frame of the old selection.
+  const [selectionFor, setSelectionFor] = useState(proposal.id);
+  if (selectionFor !== proposal.id) {
+    setSelectionFor(proposal.id);
+    setDeclined(defaultDeclined(proposal.changeSet));
+  }
 
   const toggleOp = (index: number): void => {
     setDeclined(prev => {

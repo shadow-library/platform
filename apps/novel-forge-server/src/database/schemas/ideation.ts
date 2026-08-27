@@ -60,12 +60,19 @@ export namespace Ideation {
   }
 
   export interface ConceptCard {
+    /**
+     * Stable server-minted identity, opaque and never parsed. The model re-sends the whole collection to
+     * record verdicts and is free to reorder or drop cards inside it, so a fate matched by position lands
+     * on the wrong card; the id is what the applier and the web transcript match on instead.
+     */
+    id: string;
     round: number;
     title: string;
     logline: string;
     engine: string;
     ladder: string;
     posture: string;
+    hookLine?: string;
     fate: ConceptFate;
     reason?: string;
   }

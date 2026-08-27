@@ -60,7 +60,17 @@ const FULL_SHEET: Ideation.SeedFields = {
 };
 
 const offeredCards = (marker: string): Ideation.ConceptCard[] =>
-  cards(marker).map(card => ({ round: 1, title: card.title, logline: card.logline, engine: card.engine, ladder: card.ladder, posture: card.posture, fate: 'offered' }));
+  cards(marker).map((card, index) => ({
+    id: `card-${marker}-${index}`,
+    round: 1,
+    title: card.title,
+    logline: card.logline,
+    engine: card.engine,
+    ladder: card.ladder,
+    posture: card.posture,
+    hookLine: card.hookLine,
+    fate: 'offered',
+  }));
 
 const cards = (marker: string) =>
   [1, 2, 3, 4].map(n => ({
@@ -246,6 +256,26 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       expect((await sheet(projectId))?.concepts?.map(card => card.fate)).toEqual(['kept', 'offered', 'offered', 'offered']);
     });
 
+    it('attributes a verdict by card id when the model re-sends the collection reordered', async () => {
+      const offered = offeredCards('Wreck');
+      const { projectId, sessionId } = await makeSeed({ askedQuestions: [...ORIENTED, 'diverge.cards'], concepts: offered });
+      const round = nextQuestions(toRouterSeedState((await sheet(projectId)) as Ideation.StorySeed));
+      const questions = round.questions.map(question => ({ id: question.id, wording: 'w', coaching: question.coaching, options: ['a', 'b'], youDecide: 'a' }));
+      const judged = offered[2] as Ideation.ConceptCard;
+      const reordered = [...offered].reverse().map(card => (card.id === judged.id ? { ...card, fate: 'kept' as const, reason: 'the tide one' } : card));
+
+      structuredMock.mockImplementationOnce(
+        answering({ reply: 'Keeping the third.', payload: { kind: 'questions', questions }, changeSet: [{ op: 'seed.update', concepts: reordered }] }),
+      );
+
+      await ideation.turn(projectId, sessionId, 'the third one');
+
+      const stored = (await sheet(projectId))?.concepts ?? [];
+      expect(stored.map(card => card.id)).toEqual([...offered].reverse().map(card => card.id));
+      expect(stored.filter(card => card.fate === 'kept').map(card => card.id)).toEqual([judged.id]);
+      expect(stored.find(card => card.id === judged.id)?.title).toBe(judged.title);
+    });
+
     it('declines a graduation the author asked for without losing the rest of the turn', async () => {
       const { projectId, sessionId } = await makeSeed({ fields: FULL_SHEET });
       structuredMock.mockImplementationOnce(
@@ -352,6 +382,8 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       const row = await sheet(projectId);
       expect(row?.concepts).toHaveLength(4);
       expect(row?.concepts?.every(card => card.fate === 'offered' && card.round === 1)).toBe(true);
+      expect(new Set(row?.concepts?.map(card => card.id)).size).toBe(4);
+      expect(row?.concepts?.map(card => card.hookLine)).toEqual(['hook 1', 'hook 2', 'hook 3', 'hook 4']);
       expect(row?.askedQuestions).toContain('diverge.cards');
 
       const run = await db.query.workflowRuns.findFirst({ where: eq(schema.workflowRuns.id, result.runId) });

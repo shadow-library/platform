@@ -81,7 +81,7 @@ describe.if(pgAvailable)('ideation schemas', () => {
     const constraints: Ideation.SeedConstraint[] = [{ key: 'no-harem', kind: 'promise', text: 'one romance, never a roster', playbookKey: 'no-harem', lockedBy: 'author' }];
     const tasteAnchors: Ideation.TasteAnchors = { comps: ['Cradle'], preferences: ['clear power rules'] };
     const concepts: Ideation.ConceptCard[] = [
-      { round: 1, title: 'Salvage Rites', logline: 'he sells what the gods left', engine: 'debt', ladder: 'relic tiers', posture: 'wry', fate: 'kept' },
+      { id: 'r1c0', round: 1, title: 'Salvage Rites', logline: 'he sells what the gods left', engine: 'debt', ladder: 'relic tiers', posture: 'wry', fate: 'kept' },
     ];
     const readiness: Ideation.ReadinessEntry[] = [{ dimension: 'hook', verdict: 'thin', note: 'the promise is implied, never stated', fix: 'name the betrayal' }];
 

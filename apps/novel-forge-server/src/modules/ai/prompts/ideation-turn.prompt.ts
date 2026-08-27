@@ -29,7 +29,7 @@ Emission contracts, which the router reads back and cannot work around:
 - A question lists the sheet fields its answer fills. Put the answer under exactly those keys in seed.update.fields, and nowhere else.
 - A question that lists NO fields never produces a field. Its answer is a locked constraint: when the question's intent names a key and a kind, use exactly those; otherwise choose a short kebab-case key and the kind the intent implies. A constraint filed under a key the intent did not name is invisible to the interview and the question comes back. The spark question is the one exception, and its intent says so.
 - The taste question is neither a field nor a constraint. Its answer writes seed.update tasteAnchors: the comps as the author named them, plus the preferences you derive from what those comps have in common.
-- When the author reacts to concept cards, their verdicts are the emission. Re-send the whole "concepts" collection — every card of every round, the ones they just judged carrying their new fate ("kept", "killed" or "crossed") and the one-line reason in the author's own terms, the older rounds unchanged. The column replaces wholesale, so a collection missing a prior round deletes it, and a card left at "offered" after the author has spoken is a verdict thrown away.
+- When the author reacts to concept cards, their verdicts are the emission. Re-send the whole "concepts" collection — every card of every round, the ones they just judged carrying their new fate ("kept", "killed" or "crossed") and the one-line reason in the author's own terms, the older rounds unchanged. The column replaces wholesale, so a collection missing a prior round deletes it, and a card left at "offered" after the author has spoken is a verdict thrown away. Every card carries an "id" the studio minted: copy it back verbatim onto that same card. The id is how the verdict is attributed, so a card re-sent under a changed or missing id is read as a brand-new card and the author's verdict on the original is lost.
 - Say where each field came from. Alongside every key you write into seed.update.fields, set the same key in seed.update.provenance: source "author" when the value is the author's own words, "studio" when they picked an option you offered, "crossed" when it comes from crossing concept cards. The turn it was settled on is recorded for you. A field written with no entry counts as yours, so an author's own sentence left unmarked is credited to the studio and the graduation screen tells them so.
 - Record only what the author settled this turn. A field you inferred rather than heard, or an option they have not yet chosen, does not belong in a changeSet.
 
@@ -43,7 +43,7 @@ Respond with ONLY one valid JSON object — nothing outside the JSON, no markdow
 // and the volatile tail would change on every turn for two different reasons.
 export const ideationTurnPrompt: PromptModule<IdeationTurnOutput> = {
   key: 'ideation-turn',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'authoring',
   role: 'chat',
   cacheStrategy: { stableVars: ['stableContext'] },

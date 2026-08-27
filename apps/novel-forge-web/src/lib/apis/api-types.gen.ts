@@ -3288,12 +3288,16 @@ export interface components {
       preferences: string[];
     };
     ConceptCardResponse: {
+      /** @description The card's stable identity, minted when the round was generated; verdicts are attributed by it, never by position. */
+      id: string;
       round: number;
       title: string;
       logline: string;
       engine: string;
       ladder: string;
       posture: string;
+      /** @description The line that would make a browsing reader open chapter one. */
+      hookLine?: string;
       /**
        * @description Offered until the author reacts to the card, then their verdict.
        * @enum {string}

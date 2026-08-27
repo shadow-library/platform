@@ -56,8 +56,9 @@ describe('ideation prompt modules', () => {
     expect(PROMPT_REGISTRY['ideation-concepts'].kind).toBe('authoring');
     expect(PROMPT_REGISTRY['ideation-stress'].kind).toBe('analytical');
 
+    expect(PROMPT_REGISTRY['ideation-turn'].version).toBe('1.1.0');
+    for (const key of ['ideation-concepts', 'ideation-stress'] as const) expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
     for (const key of ['ideation-turn', 'ideation-concepts', 'ideation-stress'] as const) {
-      expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
       expect(PROMPT_REGISTRY[key].cacheStrategy).toEqual({ stableVars: ['stableContext'] });
     }
   });

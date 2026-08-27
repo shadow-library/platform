@@ -270,6 +270,14 @@
   line-height: 1.55;
 }
 
+.cardHook {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.5;
+  color: var(--sh-text-secondary);
+  font-style: italic;
+}
+
 .cardFacets {
   margin: 0;
   display: flex;

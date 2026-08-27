@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, utils } from '@shadow-library/common';
@@ -521,17 +523,23 @@ export class IdeationService {
     return seed;
   }
 
-  /** Cards land as `offered` — a fate is the author's verdict, and inventing one before they speak fakes it. */
+  /**
+   * Cards land as `offered` — a fate is the author's verdict, and inventing one before they speak fakes it.
+   * The id minted here is the card's identity for the rest of its life: the payload the author judges carries
+   * it, the model echoes it back on the re-sent collection, and the applier attributes the fate by it.
+   */
   private async persistConcepts(tx: PrimaryTransaction, seedId: bigint, output: IdeationConceptsOutput): Promise<Ideation.ConceptCard[]> {
     const existing = (await this.lockSeed(tx, seedId)).concepts ?? [];
     const round = existing.reduce((highest, card) => Math.max(highest, card.round), 0) + 1;
     const fresh: Ideation.ConceptCard[] = (output.cards ?? []).map(card => ({
+      id: randomUUID(),
       round,
       title: card.title,
       logline: card.logline,
       engine: card.engine,
       ladder: card.ladder,
       posture: card.posture,
+      hookLine: card.hookLine,
       fate: 'offered',
     }));
 

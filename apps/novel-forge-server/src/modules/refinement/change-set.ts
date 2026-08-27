@@ -160,12 +160,19 @@ export interface SeedProvenanceInput {
   turnOrdinal?: number | null;
 }
 
+/**
+ * A card as it arrives on a re-sent collection. `id` is optional on the wire only: the model is asked to
+ * echo the server's id verbatim, and the applier stamps a fresh one on any card that arrives without a
+ * recognised one, so an id never vanishes from the stored column.
+ */
+export type ConceptCardInput = Omit<Ideation.ConceptCard, 'id'> & { id?: string };
+
 export interface SeedUpdateOp {
   op: 'seed.update';
   fields?: { [K in keyof Ideation.SeedFields]?: Ideation.SeedFields[K] | null };
   provenance?: Record<string, SeedProvenanceInput | null>;
   constraints?: Ideation.SeedConstraint[];
-  concepts?: Ideation.ConceptCard[];
+  concepts?: ConceptCardInput[];
   tasteAnchors?: Ideation.TasteAnchors;
 }
 
@@ -513,6 +520,9 @@ function validateSeedUpdate(record: Record<string, unknown>, path: string, error
   if (isKind(record['concepts'], 'object[]')) {
     validateItems(record['concepts'] as unknown[], `${path}: concepts`, (card, at) => {
       requireStrings(card, ['title', 'logline', 'engine', 'ladder', 'posture'], at, errors);
+      for (const key of ['id', 'hookLine'] as const) {
+        if (card[key] !== undefined && (typeof card[key] !== 'string' || card[key] === '')) errors.push(`${at}.${key} must be a non-empty string when provided`);
+      }
       if (!isKind(card['round'], 'number')) errors.push(`${at}.round must be an integer`);
       if (!SEED_CONCEPT_FATES.includes(card['fate'] as string)) errors.push(`${at}.fate must be one of ${SEED_CONCEPT_FATES.join(', ')}`);
     });

@@ -236,7 +236,7 @@ describe.if(pgAvailable)('Ideation API', () => {
           provenance: { premise: { source: 'author', turnOrdinal: 1 } },
           constraints: [{ key: 'no-harem', kind: 'promise', text: 'one romance only', lockedBy: 'author' }],
           tasteAnchors: { comps: ['Blame!'], preferences: ['cold worlds'] },
-          concepts: [{ round: 1, title: 'Salvage Rites', logline: 'a salvager', engine: 'debt', ladder: 'depth', posture: 'grim', fate: 'kept' }],
+          concepts: [{ id: 'r1c0', round: 1, title: 'Salvage Rites', logline: 'a salvager', engine: 'debt', ladder: 'depth', posture: 'grim', fate: 'kept' }],
           readiness: [{ dimension: 'hook', verdict: 'thin', note: 'needs a face' }],
           askedQuestions: ['orient.shelf'],
           revision: 4,

@@ -24,7 +24,7 @@ const pgAvailable = await (async () => {
 
 const ANCHORS: Ideation.TasteAnchors = { comps: ['Blame!'], preferences: ['cold worlds'] };
 const CONSTRAINT: Ideation.SeedConstraint = { key: 'no-harem', kind: 'promise', text: 'one romance only', lockedBy: 'author' };
-const CARD: Ideation.ConceptCard = { round: 1, title: 'Salvage Rites', logline: 'a salvager', engine: 'debt', ladder: 'depth', posture: 'grim', fate: 'kept' };
+const CARD: Ideation.ConceptCard = { id: 'r1c0', round: 1, title: 'Salvage Rites', logline: 'a salvager', engine: 'debt', ladder: 'depth', posture: 'grim', fate: 'kept' };
 
 describe.if(pgAvailable)('seed.update op', () => {
   let db: PrimaryDatabase;
@@ -142,6 +142,8 @@ describe.if(pgAvailable)('seed.update op', () => {
       // The column replaces wholesale, so every turn after the diverge round re-sends the cards the
       // author has not judged — and taking a verdict back to 'offered' is theirs to do.
       expect(validateChangeSet([{ op: 'seed.update', concepts: [{ ...CARD, fate: 'offered' }] }])).toEqual([]);
+      expect(validateChangeSet([{ op: 'seed.update', concepts: [{ ...CARD, id: undefined }] }])).toEqual([]);
+      expect(validateChangeSet([{ op: 'seed.update', concepts: [{ ...CARD, id: '' }] }])[0]).toContain('id must be a non-empty string');
     });
 
     it('should reject a concept card with an unknown fate', () => {
@@ -252,6 +254,30 @@ describe.if(pgAvailable)('seed.update op', () => {
       expect(seed?.constraints).toEqual([replacement]);
       expect(seed?.concepts).toEqual([]);
       expect(seed?.tasteAnchors).toEqual({ comps: [], preferences: ['warm worlds'] });
+    });
+
+    it('should preserve a re-sent card’s id and stamp a fresh one on anything unrecognised', async () => {
+      const { id: _dropped, ...idless } = CARD;
+      const proposal = await createProposal([
+        {
+          op: 'seed.update',
+          concepts: [
+            { ...CARD, fate: 'killed', reason: 'too cold' },
+            { ...idless, title: 'New Tide' },
+            { ...idless, id: 'r9c9', title: 'Unknown Id' },
+          ],
+        },
+      ]);
+      await applier.apply(projectId, proposal.id);
+
+      const concepts = (await currentSeed())?.concepts ?? [];
+      expect(concepts[0]).toMatchObject({ id: CARD.id, title: CARD.title, fate: 'killed', reason: 'too cold' });
+      expect(concepts.map(card => card.id).filter(Boolean)).toHaveLength(3);
+      expect(new Set(concepts.map(card => card.id)).size).toBe(3);
+      expect(concepts[1]?.id).toBeString();
+      // An id the sheet has never seen is a new card and keeps the identity it arrived with: re-minting it
+      // here would also re-mint the ids an inverse op restores, which reverts must reproduce exactly.
+      expect(concepts[2]?.id).toBe('r9c9');
     });
 
     it('should leave the collection columns alone when the op omits them', async () => {

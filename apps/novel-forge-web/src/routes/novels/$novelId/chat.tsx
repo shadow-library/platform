@@ -258,14 +258,17 @@ function TurnProposalCard({ novelId, proposalId }: TurnProposalCardProps): React
   const apply = useApplyProposalMutation(novelId);
   const discard = useDiscardProposalMutation(novelId);
   const revert = useRevertProposalMutation(novelId);
-  const [declined, setDeclined] = useState<Set<number>>(new Set());
+  const proposal = proposalQuery.data;
+  const [declined, setDeclined] = useState<Set<number>>(() => (proposal ? defaultDeclined(proposal.changeSet) : new Set<number>()));
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
-  const proposal = proposalQuery.data;
-
-  useEffect(() => {
-    if (proposal) setDeclined(defaultDeclined(proposal.changeSet));
-  }, [proposal?.id]);
+  // The selection is keyed to one proposal's op indexes, so a different proposal in the same slot resets
+  // it during render rather than in an effect — an effect would paint one frame of the old selection.
+  const [selectionFor, setSelectionFor] = useState(proposal?.id);
+  if (proposal && selectionFor !== proposal.id) {
+    setSelectionFor(proposal.id);
+    setDeclined(defaultDeclined(proposal.changeSet));
+  }
 
   if (proposalQuery.isLoading) return <Spinner size="sm" />;
   if (!proposal) return null;

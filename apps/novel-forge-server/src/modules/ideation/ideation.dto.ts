@@ -130,6 +130,9 @@ export class TasteAnchorsResponse {
 
 @Schema()
 export class ConceptCardResponse {
+  @Field({ description: "The card's stable identity, minted when the round was generated; verdicts are attributed by it, never by position." })
+  id: string;
+
   @Field(() => Integer)
   round: number;
 
@@ -147,6 +150,9 @@ export class ConceptCardResponse {
 
   @Field()
   posture: string;
+
+  @Field({ optional: true, description: 'The line that would make a browsing reader open chapter one.' })
+  hookLine?: string;
 
   @Field(() => String, { enum: ['offered', 'kept', 'killed', 'crossed'], description: 'Offered until the author reacts to the card, then their verdict.' })
   fate: Ideation.ConceptFate;

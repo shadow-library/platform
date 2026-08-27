@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { and, asc, desc, eq, gt, gte, inArray, lte, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, type ErrorCode, Logger } from '@shadow-library/common';
@@ -20,6 +22,7 @@ import {
   type BriefUpdateOp,
   type ChangeOp,
   changeSetRefs,
+  type ConceptCardInput,
   type ContentOp,
   type DraftRemoveOp,
   type DraftUpdateOp,
@@ -150,6 +153,24 @@ function withStudioProvenance(op: SeedUpdateOp, turnOrdinal: number | null): See
 function priorKeys(patch: Record<string, unknown>, prior: object | null): Record<string, unknown> {
   const current = (prior ?? {}) as Record<string, unknown>;
   return Object.fromEntries(Object.keys(patch).map(key => [key, current[key] ?? null]));
+}
+
+/**
+ * The concepts column replaces wholesale, so every re-sent card has to come back out of the op with an
+ * identity. An id the model echoed is kept verbatim — that is the whole point, since the fate beside it
+ * is a verdict on THAT card however the collection was reordered — and a card that arrives with no id, or
+ * that repeats an id already used earlier in the same collection, is a new card and gets a fresh uuid.
+ * An id the sheet does not recognise is likewise a new card; it is kept rather than re-minted because an
+ * inverse op restoring a prior collection is applied through here too, and re-minting would restore the
+ * content but not the identity, breaking the exact-restore guarantee reverts are held to (hard rule 14).
+ */
+function stampConceptIds(incoming: ConceptCardInput[]): Ideation.ConceptCard[] {
+  const seen = new Set<string>();
+  return incoming.map(card => {
+    const id = card.id && !seen.has(card.id) ? card.id : randomUUID();
+    seen.add(id);
+    return { ...card, id };
+  });
 }
 
 @Injectable()
@@ -936,7 +957,7 @@ export class ProposalApplyService {
       fields,
       provenance: op.provenance ? mergeKeys<Ideation.SeedProvenance>(existing.provenance, op.provenance) : (existing.provenance ?? {}),
       constraints: op.constraints ?? existing.constraints ?? [],
-      concepts: op.concepts ?? existing.concepts ?? [],
+      concepts: op.concepts ? stampConceptIds(op.concepts) : (existing.concepts ?? []),
       tasteAnchors: op.tasteAnchors ?? existing.tasteAnchors ?? { comps: [], preferences: [] },
     };
     const revision = existing.revision + 1;
