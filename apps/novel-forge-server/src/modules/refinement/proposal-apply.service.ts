@@ -88,6 +88,7 @@ interface ApplyContext {
 
 type TxResult =
   | { outcome: 'applied'; proposal: Refinement.Proposal; applied: AppliedArtifact[]; staleMarked: string[]; opResults: OpResult[] }
+  | { outcome: 'declined'; proposal: Refinement.Proposal; opResults: OpResult[] }
   | { outcome: 'conflicted'; proposal: Refinement.Proposal };
 
 const STALE_VOLUME_CHANGED = 'volume_changed';
@@ -104,8 +105,8 @@ const VOLUME_STRUCTURAL_FIELDS = ['objective', 'conflict', 'payoff', 'targetChap
  * refuses, so the author must select the op's own index to walk through the door.
  */
 const NEVER_AUTO_APPLIED: Partial<Record<ActionOp['op'], { code: ErrorCode; note: string }>> = {
-  'action.finalize': { code: AppErrorCode.RFN_009, note: 'Finalize is never auto-applied — it awaits a manual apply of this op.' },
-  'action.graduate_seed': { code: AppErrorCode.IDE_007, note: 'Graduation is never auto-applied — it awaits a manual apply of this op.' },
+  'action.finalize': { code: AppErrorCode.RFN_009, note: 'Finalize is never auto-applied — run it yourself from the Finalize action when the chapters are ready.' },
+  'action.graduate_seed': { code: AppErrorCode.IDE_007, note: 'Graduation is never auto-applied — start the novel yourself from the studio’s “Start the novel” button.' },
 };
 
 /** The engine's own decline reasons, as the one line an auto-applied turn reports back to the author. */
@@ -195,6 +196,14 @@ export class ProposalApplyService {
       const declinedNotes = new Map(options?.autoApplied ? guarded.map(action => [action.index, action.door.note]) : []);
       const actionOps = selectedActions.filter(action => !declinedNotes.has(action.index));
 
+      // An apply whose every selected op was declined executed nothing, so it is not an application: the
+      // proposal stays pending and no approval is recorded, leaving the author free to select the
+      // one-way-door op themselves later instead of having it locked behind an `applied` status.
+      if (selected.every(index => declinedNotes.has(index))) {
+        this.logger.info(`proposal ${proposalId} declined in full — every selected op is a one-way door, leaving it pending`);
+        return { outcome: 'declined', proposal, opResults: this.opResultsFor(ops, selected, declinedNotes) };
+      }
+
       for (const action of actionOps) {
         if (!this.actionRegistry.has(action.op.op)) throw AppErrorCode.RFN_008.create();
       }
@@ -231,12 +240,7 @@ export class ProposalApplyService {
       }
       const postState = await loadArtifactStates(ctx.tx, projectId, changeSetRefs(contentOps.map(c => c.op)));
 
-      const opResults: OpResult[] = ops.map((op, index) => {
-        const note = declinedNotes.get(index);
-        if (note) return { index, status: 'declined', note };
-        if (!selected.includes(index)) return { index, status: 'declined' };
-        return { index, status: isActionOp(op) ? 'pending' : 'applied' };
-      });
+      const opResults = this.opResultsFor(ops, selected, declinedNotes);
 
       const [applied] = await tx
         .update(schema.refinementProposals)
@@ -271,6 +275,7 @@ export class ProposalApplyService {
     });
 
     if (result.outcome === 'conflicted') throw AppErrorCode.RFN_003.create();
+    if (result.outcome === 'declined') return { proposal: result.proposal, applied: [], staleMarked: [], opResults: result.opResults };
 
     const ops = result.proposal.changeSet as ChangeOp[];
     const pendingActions = result.opResults.filter(r => r.status === 'pending').map(r => ({ index: r.index, op: ops[r.index] as ActionOp }));
@@ -285,6 +290,15 @@ export class ProposalApplyService {
     if (messageId === null) return null;
     const message = await tx.query.chatMessages.findFirst({ where: eq(schema.chatMessages.id, messageId), columns: { ordinal: true } });
     return message?.ordinal ?? null;
+  }
+
+  private opResultsFor(ops: ChangeOp[], selected: number[], declinedNotes: Map<number, string>): OpResult[] {
+    return ops.map((op, index) => {
+      const note = declinedNotes.get(index);
+      if (note) return { index, status: 'declined', note };
+      if (!selected.includes(index)) return { index, status: 'declined' };
+      return { index, status: isActionOp(op) ? 'pending' : 'applied' };
+    });
   }
 
   /** Validates a cherry-pick selection (RFN_011) and resolves the effective op indexes, in op order. */

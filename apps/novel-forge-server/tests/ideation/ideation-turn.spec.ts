@@ -263,7 +263,7 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       expect(result.applied?.opResults.map(op => op.status)).toEqual(['applied', 'declined']);
       expect(result.applied?.opResults[1]?.note).toContain('never auto-applied');
       expect(result.applyNote).toContain('Graduation is never auto-applied');
-      expect(result.applyNote).toContain('manual apply');
+      expect(result.applyNote).toContain('Start the novel');
       expect((await sheet(projectId))?.fields?.workingTitle).toBe('The Wreck Singer');
       expect((await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }))?.status).toBe('seed');
     });

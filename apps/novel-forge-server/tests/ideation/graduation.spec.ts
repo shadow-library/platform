@@ -82,7 +82,7 @@ describe.if(pgAvailable)('GraduationService', () => {
     // The map the real DatabaseService consults, so a constraint violation surfaces as its mapped code.
     const databaseService = {
       getPostgresClient: () => db,
-      translateError: (err: { constraint?: string }) => Promise.reject(constraintErrorMap[err.constraint ?? ''] ?? err),
+      translateError: (err: { cause?: { constraint?: string } }) => Promise.reject(constraintErrorMap[err.cause?.constraint ?? ''] ?? err),
     } as never;
     const chatService = { hasPendingTurn: async () => turnInFlight } as never;
 
@@ -249,7 +249,7 @@ describe.if(pgAvailable)('GraduationService', () => {
         allowedOps: scopeAllowedOps('ideation'),
       });
 
-    it('should decline itself in an auto-mode turn, with the note, and leave the seed alone', async () => {
+    it('should decline itself in an auto-mode turn, with the note, leaving the proposal pending and the seed alone', async () => {
       const { projectId, sessionId, seedId } = await makeSeed();
       const proposal = await stage(projectId, sessionId, 'The Wreck Singer');
 
@@ -257,6 +257,7 @@ describe.if(pgAvailable)('GraduationService', () => {
 
       expect(applied.opResults[0]).toMatchObject({ index: 0, status: 'declined' });
       expect(applied.opResults[0]?.note).toContain('never auto-applied');
+      expect((await proposals.get(projectId, proposal.id)).status).toBe('pending');
       expect(await db.query.storySeeds.findFirst({ where: eq(schema.storySeeds.id, seedId) })).toBeDefined();
       expect((await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }))?.status).toBe('seed');
     });
