@@ -48,7 +48,7 @@ function IdeasShelf(): React.JSX.Element {
   };
 
   return (
-    <div className={styles.page}>
+    <div className={`nf-page ${styles.page}`}>
       <PageHeader
         title="Ideas"
         subtitle={`${total} idea${total === 1 ? '' : 's'} in the studio · nothing here is a novel until you start it`}
