@@ -197,12 +197,27 @@ interface CardVerdict {
   reason: string;
 }
 
-/** A verdict the server already recorded — the round is over, so the card shows it rather than re-offering it. */
-function recordedVerdict(card: ConceptCardResponse): CardVerdict | undefined {
-  return card.fate === 'offered' ? undefined : { fate: card.fate, reason: card.reason ?? '' };
+/**
+ * The chat-message payload is a frozen snapshot — its card always carries `fate: 'offered'`. The seed's
+ * `concepts` list is the live record, so the real verdict (if any) is read off the matching entry there,
+ * matched by round + position within that round.
+ */
+function recordedVerdict(matched: ConceptCardResponse | undefined): CardVerdict | undefined {
+  return matched && matched.fate !== 'offered' ? { fate: matched.fate, reason: matched.reason ?? '' } : undefined;
 }
 
-function ConceptCardsBlock({ payload, onCompose, disabled }: { payload: Extract<StudioPayload, { kind: 'cards' }> } & Omit<SendProps, 'onSend'>): React.JSX.Element {
+function conceptsByRound(seed: SeedResponse): Map<number, ConceptCardResponse[]> {
+  const map = new Map<number, ConceptCardResponse[]>();
+  for (const concept of seed.concepts) map.set(concept.round, [...(map.get(concept.round) ?? []), concept]);
+  return map;
+}
+
+function ConceptCardsBlock({
+  payload,
+  seed,
+  onCompose,
+  disabled,
+}: { payload: Extract<StudioPayload, { kind: 'cards' }>; seed: SeedResponse } & Omit<SendProps, 'onSend'>): React.JSX.Element {
   const [verdicts, setVerdicts] = useState<Record<string, CardVerdict>>({});
 
   // Rounds re-use titles, so the key has to name the round and the card's place in it.
@@ -210,7 +225,16 @@ function ConceptCardsBlock({ payload, onCompose, disabled }: { payload: Extract<
   const setFate = (key: string, fate: Fate): void => setVerdicts(prev => ({ ...prev, [key]: { fate, reason: prev[key]?.reason ?? '' } }));
   const setReason = (key: string, reason: string): void => setVerdicts(prev => ({ ...prev, [key]: { fate: prev[key]?.fate ?? 'kept', reason } }));
 
-  const undecided = payload.cards.map((card, index) => ({ card, key: cardKey(card, index) })).filter(({ card }) => !recordedVerdict(card));
+  const byRound = conceptsByRound(seed);
+  const roundSeen = new Map<number, number>();
+  const matched = payload.cards.map(card => {
+    const round = card.round || payload.round;
+    const index = roundSeen.get(round) ?? 0;
+    roundSeen.set(round, index + 1);
+    return byRound.get(round)?.[index];
+  });
+
+  const undecided = payload.cards.map((card, index) => ({ card, key: cardKey(card, index), recorded: recordedVerdict(matched[index]) })).filter(({ recorded }) => !recorded);
   const decided = undecided.filter(({ key }) => verdicts[key]);
   const compose = (): void => {
     const lines = decided.map(({ card, key }) => {
@@ -236,7 +260,7 @@ function ConceptCardsBlock({ payload, onCompose, disabled }: { payload: Extract<
       <div className={styles.cards}>
         {payload.cards.map((card, index) => {
           const key = cardKey(card, index);
-          const recorded = recordedVerdict(card);
+          const recorded = recordedVerdict(matched[index]);
           const verdict = recorded ?? verdicts[key];
           return (
             <div key={key} className={styles.card} data-fate={verdict?.fate}>
@@ -611,7 +635,7 @@ function StudioScreen(): React.JSX.Element {
                     <Markdown content={message.content} className={styles.assistantBubble} />
                     <MessageModelTag message={message} />
                     {payload?.kind === 'questions' && <QuestionsBlock payload={payload} onSend={send} disabled={pending} />}
-                    {payload?.kind === 'cards' && <ConceptCardsBlock payload={payload} onCompose={compose} disabled={pending} />}
+                    {payload?.kind === 'cards' && <ConceptCardsBlock payload={payload} seed={seed} onCompose={compose} disabled={pending} />}
                     {payload?.kind === 'readiness' && <ReadinessTable readiness={payload.readiness} />}
                     {applied && (
                       <div className={styles.appliedNote}>

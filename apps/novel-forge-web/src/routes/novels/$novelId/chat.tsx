@@ -29,7 +29,7 @@ import {
 import { messageTime, relativeTime } from '@/lib/format';
 
 import styles from './chat.module.css';
-import { ChangeOpBody, opLabel } from './proposals';
+import { ChangeOpBody, defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE, opLabel } from './proposals';
 
 interface ChatSearch {
   session?: string;
@@ -262,6 +262,11 @@ function TurnProposalCard({ novelId, proposalId }: TurnProposalCardProps): React
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   const proposal = proposalQuery.data;
+
+  useEffect(() => {
+    if (proposal) setDeclined(defaultDeclined(proposal.changeSet));
+  }, [proposal?.id]);
+
   if (proposalQuery.isLoading) return <Spinner size="sm" />;
   if (!proposal) return null;
 
@@ -322,6 +327,7 @@ function TurnProposalCard({ novelId, proposalId }: TurnProposalCardProps): React
                 <div className={styles.spacer} />
                 {result && <StatusChip intent={OP_RESULT_INTENT[result.status] ?? 'neutral'}>{result.status}</StatusChip>}
               </div>
+              {isPending && isGuardedOp(op) && <div className={styles.turnOpNote}>{NEVER_AUTO_NOTE}</div>}
               {expanded.has(i) && <ChangeOpBody op={op} />}
               {result?.error && <div className={styles.turnOpError}>{result.error}</div>}
               {result?.result?.summary !== undefined && <div className={styles.turnOpSummary}>{String(result.result.summary)}</div>}

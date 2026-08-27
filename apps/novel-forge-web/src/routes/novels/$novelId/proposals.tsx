@@ -40,6 +40,18 @@ function statusIntent(status: string): ChipIntent {
   return STATUS_INTENT[status] ?? 'neutral';
 }
 
+const GUARDED_OP_TYPES = new Set(['action.finalize', 'action.graduate_seed']);
+
+export const NEVER_AUTO_NOTE = 'Applies only when you select it deliberately.';
+
+export function isGuardedOp(op: Record<string, unknown>): boolean {
+  return GUARDED_OP_TYPES.has(String(op.op));
+}
+
+export function defaultDeclined(changeSet: Record<string, unknown>[]): Set<number> {
+  return new Set(changeSet.reduce<number[]>((acc, op, i) => (isGuardedOp(op) ? [...acc, i] : acc), []));
+}
+
 function proposalTitle(p: ProposalResponse): string {
   return p.summary?.trim() || `${p.kind} · ${p.scopeType}`;
 }
@@ -109,10 +121,10 @@ function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.E
   const isPending = proposal.status === 'pending';
   const isConflicted = proposal.status === 'conflicted';
   const isApplied = proposal.status === 'applied';
-  const [declined, setDeclined] = useState<Set<number>>(new Set());
+  const [declined, setDeclined] = useState<Set<number>>(() => defaultDeclined(proposal.changeSet));
   const opResults = (proposal.opResults ?? []) as { index: number; status: string; error?: string; result?: Record<string, unknown> }[];
 
-  useEffect(() => setDeclined(new Set()), [proposal.id]);
+  useEffect(() => setDeclined(defaultDeclined(proposal.changeSet)), [proposal.id]);
 
   const toggleOp = (index: number): void => {
     setDeclined(prev => {
@@ -190,6 +202,7 @@ function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.E
                   <div className={styles.spacer} />
                   {result && <StatusChip intent={OP_RESULT_INTENT[result.status] ?? 'neutral'}>{result.status}</StatusChip>}
                 </div>
+                {isPending && isGuardedOp(op) && <div className={styles.opNote}>{NEVER_AUTO_NOTE}</div>}
                 <ChangeOpBody op={op} />
                 {result?.error && <div className={styles.opError}>{result.error}</div>}
                 {result?.result?.summary !== undefined && <div className={styles.opSummary}>{String(result.result.summary)}</div>}

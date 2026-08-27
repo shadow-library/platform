@@ -348,6 +348,12 @@
   text-decoration: underline;
 }
 
+.turnOpNote {
+  margin-top: 4px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
 .turnOpError {
   margin-top: 6px;
   font-size: var(--sh-text-body-sm);

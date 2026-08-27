@@ -131,6 +131,12 @@
   color: var(--sh-text-primary);
 }
 
+.opNote {
+  padding: 0 16px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
 .opError {
   padding: 0 16px 12px;
   font-size: var(--sh-text-body-sm);
