@@ -256,7 +256,7 @@ describe.if(pgAvailable)('GraduationService', () => {
       const applied = await applier.apply(projectId, proposal.id, { autoApplied: true });
 
       expect(applied.opResults[0]).toMatchObject({ index: 0, status: 'declined' });
-      expect(applied.opResults[0]?.note).toContain('never auto-applied');
+      expect(applied.opResults[0]?.note).toContain('never applied automatically');
       expect((await proposals.get(projectId, proposal.id)).status).toBe('pending');
       expect(await db.query.storySeeds.findFirst({ where: eq(schema.storySeeds.id, seedId) })).toBeDefined();
       expect((await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }))?.status).toBe('seed');

@@ -260,8 +260,8 @@ describe.if(pgAvailable)('ChatService', () => {
 
     const result = await chat.turn(projectId, session.id, 'finalize the drafted chapters');
     expect(result.applied?.opResults.map(op => op.status)).toEqual(['applied', 'declined']);
-    expect(result.applied?.opResults[1]?.note).toContain('never auto-applied');
-    expect(result.applyNote).toContain('never auto-applied');
+    expect(result.applied?.opResults[1]?.note).toContain('never applied automatically');
+    expect(result.applyNote).toContain('never applied automatically');
     expect((await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }))?.premise).toBe('a premise the turn keeps');
   });
 

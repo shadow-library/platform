@@ -278,7 +278,7 @@ describe.if(pgAvailable)('apply engine v2: cherry-pick, actions, revert, rollbac
 
     const declined = await applier.apply(projectId, auto.id, { autoApplied: true });
     expect(declined.opResults[0]?.status).toBe('declined');
-    expect(declined.opResults[0]?.note).toMatch(/never auto-applied/);
+    expect(declined.opResults[0]?.note).toMatch(/never applied automatically/);
     const autoRow = await db.query.refinementProposals.findFirst({ where: eq(schema.refinementProposals.id, auto.id) });
     expect(autoRow?.status).toBe('pending');
     const feedback = await db.query.userFeedback.findMany({
@@ -287,7 +287,7 @@ describe.if(pgAvailable)('apply engine v2: cherry-pick, actions, revert, rollbac
     expect(feedback).toHaveLength(0);
 
     const manual = await createProposal([{ op: 'action.finalize', upTo: 1 }]);
-    await expect(applier.apply(projectId, manual.id)).rejects.toThrow(/never auto-applied/);
+    await expect(applier.apply(projectId, manual.id)).rejects.toThrow(/never applied automatically/);
     const still = await db.query.refinementProposals.findFirst({ where: eq(schema.refinementProposals.id, manual.id) });
     expect(still?.status).toBe('pending');
 

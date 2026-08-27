@@ -105,8 +105,11 @@ const VOLUME_STRUCTURAL_FIELDS = ['objective', 'conflict', 'payoff', 'targetChap
  * refuses, so the author must select the op's own index to walk through the door.
  */
 const NEVER_AUTO_APPLIED: Partial<Record<ActionOp['op'], { code: ErrorCode; note: string }>> = {
-  'action.finalize': { code: AppErrorCode.RFN_009, note: 'Finalize is never auto-applied — run it yourself from the Finalize action when the chapters are ready.' },
-  'action.graduate_seed': { code: AppErrorCode.IDE_007, note: 'Graduation is never auto-applied — start the novel yourself from the studio’s “Start the novel” button.' },
+  'action.finalize': { code: AppErrorCode.RFN_009, note: 'Finalize is never applied automatically — select the finalize step and apply it deliberately.' },
+  'action.graduate_seed': {
+    code: AppErrorCode.IDE_007,
+    note: 'Graduation is never applied automatically — use “Start the novel” in the studio, or select the graduation step and apply it deliberately.',
+  },
 };
 
 /** The engine's own decline reasons, as the one line an auto-applied turn reports back to the author. */
@@ -199,6 +202,8 @@ export class ProposalApplyService {
       // An apply whose every selected op was declined executed nothing, so it is not an application: the
       // proposal stays pending and no approval is recorded, leaving the author free to select the
       // one-way-door op themselves later instead of having it locked behind an `applied` status.
+      // Vacuously true for an empty selection too, so an empty change-set also stays pending — unreachable
+      // from the live routes, which never stage a proposal without ops.
       if (selected.every(index => declinedNotes.has(index))) {
         this.logger.info(`proposal ${proposalId} declined in full — every selected op is a one-way door, leaving it pending`);
         return { outcome: 'declined', proposal, opResults: this.opResultsFor(ops, selected, declinedNotes) };

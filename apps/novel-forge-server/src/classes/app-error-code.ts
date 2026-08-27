@@ -154,7 +154,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly RFN_007 = AppErrorCode.badRequest('RFN_007', 'Proposal is not revertible — it is not applied, has no content ops, or was already reverted');
   // A user-facing 500: the message must reach the client, so this stays out of the internal() mask
   static readonly RFN_008 = new AppErrorCode('RFN_008', 'Action execution failed — see the per-op results on the proposal', 500);
-  static readonly RFN_009 = AppErrorCode.badRequest('RFN_009', 'Finalize is never auto-applied — apply the proposal manually to finalize chapters');
+  static readonly RFN_009 = AppErrorCode.badRequest('RFN_009', 'Finalize is never applied automatically — select the finalize step and apply it deliberately');
   static readonly RFN_010 = AppErrorCode.badRequest('RFN_010', 'Draft is final or the chapter is already finalized — prose cannot be modified');
   static readonly RFN_011 = AppErrorCode.badRequest('RFN_011', 'Invalid op selection — indexes must reference ops in the change-set and select at least one');
 
@@ -213,7 +213,10 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly IDE_004 = AppErrorCode.badRequest('IDE_004', 'Project is a seed — this operation requires an active project');
   static readonly IDE_005 = AppErrorCode.badRequest('IDE_005', 'Ideation chat sessions are managed by the ideation studio');
   static readonly IDE_006 = AppErrorCode.conflict('IDE_006', 'A turn is already running for this session');
-  static readonly IDE_007 = AppErrorCode.badRequest('IDE_007', 'Graduation is never auto-applied — apply the proposal manually to start the novel');
+  static readonly IDE_007 = AppErrorCode.badRequest(
+    'IDE_007',
+    'Graduation is never applied automatically — use “Start the novel” in the studio, or select the graduation step and apply it deliberately',
+  );
   static readonly IDE_008 = AppErrorCode.badRequest('IDE_008', 'Graduation requires a premise on the sheet');
 
   /*!
