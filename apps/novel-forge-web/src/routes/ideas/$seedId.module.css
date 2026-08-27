@@ -124,7 +124,7 @@
   padding: 10px 12px;
   border: 1px solid var(--sh-border-subtle);
   border-radius: var(--sh-radius-md);
-  background: var(--sh-surface-subtle, transparent);
+  background: var(--sh-surface-well);
 }
 
 .lockRow {
@@ -196,8 +196,23 @@
 }
 
 .chipDecide {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 100%;
+  border-radius: var(--sh-radius-lg);
   border-style: dashed;
   color: var(--sh-text-secondary);
+}
+
+.chipDecideLabel {
+  font-weight: 600;
+}
+
+.chipDecideText {
+  color: var(--sh-text-tertiary);
+  line-height: 1.45;
+  white-space: normal;
 }
 
 .filterNote {
@@ -305,6 +320,16 @@
   width: 120px;
   font-weight: 600;
   text-transform: capitalize;
+}
+
+.readinessCaption {
+  padding-bottom: 6px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sh-text-tertiary);
 }
 
 .readinessFix {

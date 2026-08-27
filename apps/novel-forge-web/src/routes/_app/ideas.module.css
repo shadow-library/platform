@@ -24,6 +24,17 @@
   cursor: pointer;
 }
 
+/* The card is not an `.nf-selrow`, so it carries the shelf's reveal rule itself. */
+.card:hover :global(.nf-rowactions),
+.card:focus-within :global(.nf-rowactions) {
+  opacity: 1;
+}
+
+.card :global(.nf-rowaction:focus-visible) {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+
 .cardTop {
   display: flex;
   align-items: center;

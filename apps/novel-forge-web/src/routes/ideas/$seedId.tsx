@@ -109,6 +109,12 @@ type Fate = 'kept' | 'killed' | 'crossed';
 const FATE_LABEL: Record<Fate, string> = { kept: 'Keep', killed: 'Kill', crossed: 'Cross' };
 const FATE_SENTENCE: Record<Fate, string> = { kept: 'Keeping', killed: 'Killing', crossed: 'Crossing' };
 
+/** Graduation names its handoff documents as `section/slug`; the author is told what they are called. */
+function documentLabel(ref: string): string {
+  const words = (ref.split('/').pop() ?? ref).replaceAll('-', ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 function fieldValue(fields: SeedFieldsResponse, key: SheetField): string | undefined {
   const value = fields[key];
   if (Array.isArray(value)) return value.length > 0 ? value.join(' · ') : undefined;
@@ -117,6 +123,7 @@ function fieldValue(fields: SeedFieldsResponse, key: SheetField): string | undef
 
 interface ProvenanceSplit {
   filled: number;
+  empty: number;
   author: number;
   studio: number;
   crossed: number;
@@ -125,12 +132,17 @@ interface ProvenanceSplit {
 
 /**
  * The honesty check, computed here rather than read off the graduation response: the author has to see the
- * split BEFORE deciding, and graduation deletes the provenance with the rest of the seed.
+ * split BEFORE deciding, and graduation deletes the provenance with the rest of the seed. Only filled
+ * fields carry a source, so the split counts them and reports the empty ones separately —
+ * `author + crossed + studio + unattributed === filled`, and `filled + empty === SHEET_FIELDS.length`.
  */
 function provenanceSplit(seed: SeedResponse): ProvenanceSplit {
-  const split: ProvenanceSplit = { filled: 0, author: 0, studio: 0, crossed: 0, unattributed: 0 };
+  const split: ProvenanceSplit = { filled: 0, empty: 0, author: 0, studio: 0, crossed: 0, unattributed: 0 };
   for (const { key } of SHEET_FIELDS) {
-    if (fieldValue(seed.fields, key) === undefined) continue;
+    if (fieldValue(seed.fields, key) === undefined) {
+      split.empty += 1;
+      continue;
+    }
     split.filled += 1;
     const source = seed.provenance[key]?.source;
     if (source) split[source] += 1;
@@ -169,8 +181,9 @@ function QuestionsBlock({ payload, onSend, disabled }: { payload: Extract<Studio
                 {option}
               </button>
             ))}
-            <button type="button" className={`${styles.chip} ${styles.chipDecide}`} disabled={disabled} title={question.youDecide} onClick={() => onSend(question.youDecide)}>
-              You decide
+            <button type="button" className={`${styles.chip} ${styles.chipDecide}`} disabled={disabled} onClick={() => onSend(question.youDecide)}>
+              <span className={styles.chipDecideLabel}>You decide</span>
+              <span className={styles.chipDecideText}>{question.youDecide}</span>
             </button>
           </div>
         </div>
@@ -179,16 +192,29 @@ function QuestionsBlock({ payload, onSend, disabled }: { payload: Extract<Studio
   );
 }
 
+interface CardVerdict {
+  fate: Fate;
+  reason: string;
+}
+
+/** A verdict the server already recorded — the round is over, so the card shows it rather than re-offering it. */
+function recordedVerdict(card: ConceptCardResponse): CardVerdict | undefined {
+  return card.fate === 'offered' ? undefined : { fate: card.fate, reason: card.reason ?? '' };
+}
+
 function ConceptCardsBlock({ payload, onCompose, disabled }: { payload: Extract<StudioPayload, { kind: 'cards' }> } & Omit<SendProps, 'onSend'>): React.JSX.Element {
-  const [verdicts, setVerdicts] = useState<Record<string, { fate: Fate; reason: string }>>({});
+  const [verdicts, setVerdicts] = useState<Record<string, CardVerdict>>({});
 
-  const setFate = (title: string, fate: Fate): void => setVerdicts(prev => ({ ...prev, [title]: { fate, reason: prev[title]?.reason ?? '' } }));
-  const setReason = (title: string, reason: string): void => setVerdicts(prev => ({ ...prev, [title]: { fate: prev[title]?.fate ?? 'kept', reason } }));
+  // Rounds re-use titles, so the key has to name the round and the card's place in it.
+  const cardKey = (card: ConceptCardResponse, index: number): string => `${card.round || payload.round}:${index}`;
+  const setFate = (key: string, fate: Fate): void => setVerdicts(prev => ({ ...prev, [key]: { fate, reason: prev[key]?.reason ?? '' } }));
+  const setReason = (key: string, reason: string): void => setVerdicts(prev => ({ ...prev, [key]: { fate: prev[key]?.fate ?? 'kept', reason } }));
 
-  const decided = payload.cards.filter(card => verdicts[card.title]);
+  const undecided = payload.cards.map((card, index) => ({ card, key: cardKey(card, index) })).filter(({ card }) => !recordedVerdict(card));
+  const decided = undecided.filter(({ key }) => verdicts[key]);
   const compose = (): void => {
-    const lines = decided.map(card => {
-      const verdict = verdicts[card.title] as { fate: Fate; reason: string };
+    const lines = decided.map(({ card, key }) => {
+      const verdict = verdicts[key] as CardVerdict;
       const reason = verdict.reason.trim();
       return `${FATE_SENTENCE[verdict.fate]} “${card.title}”${reason ? ` — ${reason}` : ''}.`;
     });
@@ -208,51 +234,59 @@ function ConceptCardsBlock({ payload, onCompose, disabled }: { payload: Extract<
         </div>
       )}
       <div className={styles.cards}>
-        {payload.cards.map(card => (
-          <div key={card.title} className={styles.card} data-fate={verdicts[card.title]?.fate}>
-            <div className={styles.cardHead}>
-              <span className={styles.cardTitle}>{card.title}</span>
-              <StatusChip intent="neutral">round {card.round || payload.round}</StatusChip>
+        {payload.cards.map((card, index) => {
+          const key = cardKey(card, index);
+          const recorded = recordedVerdict(card);
+          const verdict = recorded ?? verdicts[key];
+          return (
+            <div key={key} className={styles.card} data-fate={verdict?.fate}>
+              <div className={styles.cardHead}>
+                <span className={styles.cardTitle}>{card.title}</span>
+                <StatusChip intent="neutral">round {card.round || payload.round}</StatusChip>
+              </div>
+              <p className={styles.cardLogline}>{card.logline}</p>
+              <dl className={styles.cardFacets}>
+                <div>
+                  <dt>Engine</dt>
+                  <dd>{card.engine}</dd>
+                </div>
+                <div>
+                  <dt>Ladder</dt>
+                  <dd>{card.ladder}</dd>
+                </div>
+                <div>
+                  <dt>Posture</dt>
+                  <dd>{card.posture}</dd>
+                </div>
+              </dl>
+              <div className={styles.cardActions}>
+                {(['kept', 'killed', 'crossed'] as const).map(fate => (
+                  <button
+                    key={fate}
+                    type="button"
+                    className={styles.chip}
+                    aria-pressed={verdict?.fate === fate}
+                    data-active={verdict?.fate === fate}
+                    disabled={disabled || Boolean(recorded)}
+                    onClick={() => setFate(key, fate)}
+                  >
+                    {FATE_LABEL[fate]}
+                  </button>
+                ))}
+              </div>
+              {recorded
+                ? recorded.reason.trim() !== '' && <p className={styles.cardLogline}>“{recorded.reason}”</p>
+                : verdicts[key] && (
+                    <Input
+                      size="sm"
+                      placeholder="Why? (optional — the studio uses the reason on the next round)"
+                      value={verdicts[key]?.reason ?? ''}
+                      onValueChange={value => setReason(key, value)}
+                    />
+                  )}
             </div>
-            <p className={styles.cardLogline}>{card.logline}</p>
-            <dl className={styles.cardFacets}>
-              <div>
-                <dt>Engine</dt>
-                <dd>{card.engine}</dd>
-              </div>
-              <div>
-                <dt>Ladder</dt>
-                <dd>{card.ladder}</dd>
-              </div>
-              <div>
-                <dt>Posture</dt>
-                <dd>{card.posture}</dd>
-              </div>
-            </dl>
-            <div className={styles.cardActions}>
-              {(['kept', 'killed', 'crossed'] as const).map(fate => (
-                <button
-                  key={fate}
-                  type="button"
-                  className={styles.chip}
-                  data-active={verdicts[card.title]?.fate === fate}
-                  disabled={disabled}
-                  onClick={() => setFate(card.title, fate)}
-                >
-                  {FATE_LABEL[fate]}
-                </button>
-              ))}
-            </div>
-            {verdicts[card.title] && (
-              <Input
-                size="sm"
-                placeholder="Why? (optional — the studio uses the reason on the next round)"
-                value={verdicts[card.title]?.reason ?? ''}
-                onValueChange={value => setReason(card.title, value)}
-              />
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
       <Button size="sm" variant="secondary" disabled={disabled || decided.length === 0} onClick={compose}>
         Put {decided.length || 'my'} verdict{decided.length === 1 ? '' : 's'} in the reply
@@ -265,6 +299,7 @@ function ReadinessTable({ readiness }: { readiness: ReadinessEntryResponse[] }):
   return (
     <div className={styles.payload}>
       <table className={styles.readiness}>
+        <caption className={styles.readinessCaption}>Readiness by dimension — the verdict, and what would lift it</caption>
         <tbody>
           {readiness.map(entry => (
             <tr key={entry.dimension}>
@@ -306,7 +341,9 @@ function GraduateDialog({ seed, open, onOpenChange }: GraduateDialogProps): Reac
       {
         onSuccess: result => {
           onOpenChange(false);
-          toast.success(`“${result.project.title ?? result.project.name}” is a novel — ${result.documents.join(' and ')} written, ${result.factKeys.length} promise fact(s) kept.`);
+          toast.success(
+            `“${result.project.title ?? result.project.name}” is a novel — ${result.documents.map(documentLabel).join(' and ')} written, ${result.factKeys.length} promise fact(s) kept.`,
+          );
           void navigate({ to: '/novels/$novelId/overview', params: { novelId: result.project.id } });
         },
         onError: err => toast.danger(err.message),
@@ -327,8 +364,9 @@ function GraduateDialog({ seed, open, onOpenChange }: GraduateDialogProps): Reac
             <div className={styles.honesty}>
               <div className={styles.blockLabel}>Where this sheet came from</div>
               <p className={styles.honestyLine}>
-                {split.author} of {SHEET_FIELDS.length} fields are your own words
-                {split.crossed > 0 ? `, ${split.crossed} came from crossing concepts` : ''}, and {split.studio + split.unattributed} came from the studio.
+                Of the {split.filled} field{split.filled === 1 ? '' : 's'} that {split.filled === 1 ? 'is' : 'are'} filled, {split.author} {split.author === 1 ? 'is' : 'are'} your
+                own words{split.crossed > 0 ? `, ${split.crossed} came from crossing concepts` : ''}, and {split.studio + split.unattributed} came from the studio.
+                {split.empty > 0 ? ` ${split.empty} field${split.empty === 1 ? ' is' : 's are'} still empty.` : ''}
               </p>
               {split.studio + split.unattributed > split.author && (
                 <p className={styles.honestyWarn}>Most of this sheet is the studio talking — ten more minutes of answering would make it yours.</p>
@@ -501,17 +539,24 @@ function StudioScreen(): React.JSX.Element {
   const [graduateOpen, setGraduateOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const changesQuery = useListChangesQuery(seedId);
+
   const messages = messagesQuery.data?.messages ?? [];
   const pending = turn.isPending || (messagesQuery.data?.pendingTurn ?? false);
+  // The change feed carries applied and reverted proposals only, so it is what tells a turn that moved the
+  // sheet apart from one whose proposal is still sitting there pending.
+  const appliedChanges = new Map((changesQuery.data?.items ?? []).filter(change => change.status === 'applied').map(change => [change.id, change]));
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages.length, pending]);
 
-  const send = (content: string): void => {
+  // A chip sends its own text and leaves the composer alone; only the composer's own send clears the draft,
+  // and a failure puts it back unless the author has started typing something else in the meantime.
+  const send = (content: string, clearedDraft?: string): void => {
     const text = content.trim();
     if (!text || pending || !sessionId) return;
-    setInput('');
+    if (clearedDraft !== undefined) setInput('');
     turn.mutate(text, {
       onSuccess: result => {
         syncSeed(result.seed);
@@ -519,10 +564,14 @@ function StudioScreen(): React.JSX.Element {
       },
       onError: err => {
         toast.danger(err.message);
-        setInput(text);
+        if (clearedDraft !== undefined) setInput(current => current || clearedDraft);
       },
     });
   };
+
+  const sendDraft = (): void => send(input, input);
+
+  const compose = (content: string): void => setInput(current => (current.trim() ? `${current.trim()} ${content}` : content));
 
   if (seedQuery.isLoading) return <PaneLoader />;
   if (seedQuery.error) return <PaneError error={seedQuery.error} />;
@@ -552,6 +601,7 @@ function StudioScreen(): React.JSX.Element {
                 );
 
               const payload = studioPayload(message.payload);
+              const applied = message.proposalId ? appliedChanges.get(message.proposalId) : undefined;
               return (
                 <div key={message.id} className={styles.assistantRow}>
                   <div className={styles.avatar}>
@@ -561,11 +611,11 @@ function StudioScreen(): React.JSX.Element {
                     <Markdown content={message.content} className={styles.assistantBubble} />
                     <MessageModelTag message={message} />
                     {payload?.kind === 'questions' && <QuestionsBlock payload={payload} onSend={send} disabled={pending} />}
-                    {payload?.kind === 'cards' && <ConceptCardsBlock payload={payload} onCompose={setInput} disabled={pending} />}
+                    {payload?.kind === 'cards' && <ConceptCardsBlock payload={payload} onCompose={compose} disabled={pending} />}
                     {payload?.kind === 'readiness' && <ReadinessTable readiness={payload.readiness} />}
-                    {message.proposalId && (
+                    {applied && (
                       <div className={styles.appliedNote}>
-                        <ProposalsIcon size={13} /> the sheet moved with this turn — undo it from the sheet
+                        <ProposalsIcon size={13} /> the sheet moved with this turn{applied.revertible ? ' — undo it from the sheet' : ''}
                       </div>
                     )}
                   </div>
@@ -594,14 +644,14 @@ function StudioScreen(): React.JSX.Element {
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  send(input);
+                  sendDraft();
                 }
               }}
             />
             <div className={styles.composerBar}>
               <span className={styles.hint}>Every answer lands on the sheet straight away, and everything is revertible.</span>
               <div className={styles.spacer} />
-              <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} loading={pending} disabled={pending || !sessionId} onClick={() => send(input)}>
+              <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} loading={pending} disabled={pending || !sessionId} onClick={sendDraft}>
                 Send
               </Button>
             </div>

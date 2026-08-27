@@ -126,14 +126,15 @@ function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.E
   const doApply = (): void => {
     const selected = proposal.changeSet.map((_, i) => i).filter(i => !declined.has(i));
     if (selected.length === 0) return void toast.danger('Select at least one operation to apply');
-    const opIndexes = selected.length === proposal.changeSet.length ? undefined : selected;
+    // Always explicit: a blanket apply (no `opIndexes`) is refused outright when the change-set holds a
+    // one-way door, so naming the indexes is what makes finalize and graduation reachable at all.
     apply.mutate(
-      { proposalId: proposal.id, opIndexes },
+      { proposalId: proposal.id, opIndexes: selected },
       {
         onSuccess: r => {
           const failed = r.opResults.filter(o => o.status === 'failed');
           if (failed.length > 0) toast.danger(`Applied with ${failed.length} failed action(s) — see the op results`);
-          else toast.success(opIndexes ? `Applied ${opIndexes.length} of ${proposal.changeSet.length} ops` : 'Applied to canon');
+          else toast.success(selected.length === proposal.changeSet.length ? 'Applied to canon' : `Applied ${selected.length} of ${proposal.changeSet.length} ops`);
         },
         onError: err => toast.danger(err.message),
       },

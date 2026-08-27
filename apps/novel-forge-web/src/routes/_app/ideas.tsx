@@ -13,9 +13,10 @@ import styles from './ideas.module.css';
 const SEED_LIMIT = 50;
 
 // The shelf's only data is the seed list, so the loader prefetches it and the grid paints on the server.
+// The params object is the query key, so the prefetch has to name the same first page the component asks for.
 export const Route = createFileRoute('/_app/ideas')({
   head: () => ({ meta: [{ title: 'Ideas · Novel Forge' }] }),
-  loader: ({ context }) => context.queryClient.prefetchQuery(listSeedsQueryOptions({ limit: SEED_LIMIT })),
+  loader: ({ context }) => context.queryClient.prefetchQuery(listSeedsQueryOptions({ limit: SEED_LIMIT, offset: 0 })),
   component: IdeasShelf,
 });
 
@@ -75,7 +76,10 @@ function IdeasShelf(): React.JSX.Element {
               tabIndex={0}
               onClick={() => openStudio(seed.projectId)}
               onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === ' ') openStudio(seed.projectId);
+                if (e.target !== e.currentTarget) return;
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                openStudio(seed.projectId);
               }}
             >
               <div className={styles.cardTop}>

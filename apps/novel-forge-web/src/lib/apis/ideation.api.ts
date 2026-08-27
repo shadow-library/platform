@@ -58,13 +58,16 @@ export function useStressSeedMutation(projectId: string): UseMutationResult<Seed
   const queryClient = useQueryClient();
   return useMutation<SeedStressResponse, ApiError, undefined>({
     mutationFn: () => APIRequest.post(`/projects/${projectId}/seed/stress`).execute(),
-    onSuccess: result => queryClient.setQueryData(seedKeys.sheet(projectId), result.seed),
+    onSuccess: result => {
+      queryClient.setQueryData(seedKeys.sheet(projectId), result.seed);
+      queryClient.invalidateQueries({ queryKey: seedKeys.all });
+    },
   });
 }
 
 /**
  * The canonical graduation path — the studio's own button rather than the `action.graduate_seed` op, which
- * is never auto-applied. It ends the seed: the sheet row is deleted and the project joins the main shelf.
+ * is never applied automatically. It ends the seed: the sheet row is deleted and the project joins the shelf.
  */
 export function useGraduateSeedMutation(projectId: string): UseMutationResult<GraduationResponse, ApiError, GraduateSeedBody> {
   const queryClient = useQueryClient();
@@ -90,14 +93,14 @@ export function useDeleteSeedMutation(): UseMutationResult<undefined, ApiError, 
 }
 
 /**
- * A studio turn answers with the sheet as it left it, so the pane on the right refreshes from the turn
- * itself; the refetch behind it still runs, because an auto-applied turn also moves the proposal and
- * change history the sheet's revert affordance reads.
+ * A studio turn answers with the sheet as it left it, so that response is authoritative for the pane on
+ * the right — the turn mutation already invalidates the proposal and change history behind it. The list
+ * still has to be invalidated: a turn can rewrite the working title the shelf labels this idea with.
  */
 export function useSeedSync(projectId: string): (seed?: SeedResponse) => void {
   const queryClient = useQueryClient();
   return seed => {
     if (seed) queryClient.setQueryData(seedKeys.sheet(projectId), seed);
-    queryClient.invalidateQueries({ queryKey: seedKeys.sheet(projectId) });
+    queryClient.invalidateQueries({ queryKey: seedKeys.all });
   };
 }
