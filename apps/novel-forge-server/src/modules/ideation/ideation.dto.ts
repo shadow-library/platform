@@ -2,7 +2,7 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-import { SortByTime } from '@server/common';
+import { ContentMode, SortByTime } from '@server/common';
 import { type Ideation, type Project } from '@server/database';
 
 @Schema()
@@ -16,6 +16,9 @@ export class SeedProjectParams {
 export class CreateSeedBody {
   @Field({ optional: true, description: 'The idea as the author first typed it; kept verbatim as the opening turn of the studio conversation.' })
   spark?: string;
+
+  @Field(() => ContentMode, { optional: true, description: 'Content policy for the seed. Unrestricted routes studio chat through models that will write adult material.' })
+  contentMode?: Project.ContentMode;
 }
 
 @Schema({ description: 'The story seed sheet — idea altitude only: no places, chapter structure, or volume detail.' })

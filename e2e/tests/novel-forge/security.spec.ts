@@ -18,8 +18,8 @@ import { createProject, deleteProjectQuietly, HAIKU_MODEL, jsonOrUndefined, uniq
  *
  * Ownership is enforced by `ProjectOwnershipGuard`, which answers another user's project with 404 PRJ_001 — a
  * deliberate BOLA defence that never leaks existence via 403. These tests assert the *code*, not just the
- * status, so a future accidental 403 would fail here. The grok-only block records the real server behaviour:
- * `resolveModel` coerces grok_only projects to xAI (model-router.service.ts:130) and the PATCH itself does not
+ * status, so a future accidental 403 would fail here. The Unrestricted block records the real server behaviour:
+ * `resolveModel` coerces disallowed overrides on Unrestricted projects (model-router.service.ts) and the PATCH itself does not
  * validate the override against contentMode — so AI_003, though defined, is never thrown (see the fixme).
  */
 
@@ -85,13 +85,13 @@ test.describe('novel-forge ownership security', () => {
   });
 });
 
-test.describe('novel-forge grok-only enforcement', () => {
+test.describe('novel-forge unrestricted enforcement', () => {
   let ctx: APIRequestContext;
   let projectId: string;
 
   test.beforeAll(async () => {
     ctx = await apiContext('novelForge', 'user1');
-    const { id } = await createProject(ctx, { name: `e2e-forge-grok-${uniqueSuffix()}`, kind: 'new_novel', contentMode: 'grok_only' });
+    const { id } = await createProject(ctx, { name: `e2e-forge-unrestricted-${uniqueSuffix()}`, kind: 'new_novel', contentMode: 'unrestricted' });
     projectId = id;
   });
 
@@ -100,26 +100,22 @@ test.describe('novel-forge grok-only enforcement', () => {
     await ctx.dispose();
   });
 
-  test('should accept (but not honour) an anthropic override on a grok_only project', async () => {
+  test('should accept (but not honour) an anthropic override on an Unrestricted project', async () => {
     // The PATCH is NOT the enforcement point: the server stores whatever override is sent. Enforcement is at
-    // resolve time, where grok_only unconditionally returns xAI regardless of this stored value. So the
+    // resolve time, where Unrestricted coerces disallowed models to the group default. So the
     // contract here is: 200, and the override round-trips in config.models — inert, not rejected.
     const patch = await mutate(ctx, 'patch', `/api/v1/projects/${projectId}`, { data: { config: { models: { generation: HAIKU_MODEL } } } });
     expect(patch.status(), await patch.text()).toBe(200);
 
     const fetched = await ctx.get(`/api/v1/projects/${projectId}`);
     const body = (await fetched.json()) as { contentMode: string; config?: { models?: Record<string, { provider: string }> } };
-    expect(body.contentMode).toBe('grok_only');
+    expect(body.contentMode).toBe('unrestricted');
     expect(body.config?.models?.generation?.provider).toBe('anthropic');
   });
 
-  // SUSPECTED APP BUG: AI_003 ("Grok-only projects ... may only use xAI") is defined in
-  // app-error-code.ts:76 but thrown nowhere in the source (grep finds only the definition + its unit test).
-  // model-router.service.ts:130 silently coerces grok_only to xAI, so an anthropic-pinned grok_only project
-  // never surfaces AI_003 on dispatch — the guard the task expected does not exist. Recorded, not "fixed":
-  // this is app behaviour, and confirming it would require a working xAI leg anyway.
-  test.fixme('should reject an anthropic AI dispatch on a grok_only project with AI_003', async () => {
-    const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/premise/enhance`, { data: { overview: 'A grok-only project that should refuse anthropic.' } });
+  // AI_003 is defined but thrown nowhere — Unrestricted silently coerces at resolve time. Recorded, not "fixed".
+  test.fixme('should reject an anthropic AI dispatch on an Unrestricted project with AI_003', async () => {
+    const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/premise/enhance`, { data: { overview: 'An Unrestricted project that should refuse anthropic.' } });
     expect(response.status()).toBe(400);
     expect((await jsonOrUndefined<{ code: string }>(response))?.code).toBe('AI_003');
   });

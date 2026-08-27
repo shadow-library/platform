@@ -501,7 +501,7 @@ The same shape covers every reviewable artifact: continuity proposals (propose �
 
 - **Embedding model:** `ollama/qwen3-embedding:8b`, dim 1024 (shared `EMBEDDING_DIM` constant; a dim change is a migration, not a runtime branch). Tests use `qwen3-embedding:0.6b` truncated to 1024 — same family, same dimension path.
 - **Retrieval:** `VectorIndexRetriever` with metadata filters; `retrieve(projectId, query, { index, k, excludeGrok: true })` returns `{ text, score, metadata }[]`. No query engines, no synthesis — retrieval only.
-- **Exclusions:** grok chapters are excluded from prose retrieval; `grok_only` projects retrieve `[]` (no substitute embedder — fail closed).
+- **Exclusions:** grok-interlude chapters (`generator = grok`) are excluded from prose retrieval. Unrestricted projects retrieve normally — embeddings have no content policy.
 
 ### 7.4 Exactly when retrieval happens
 
@@ -543,14 +543,14 @@ One env var selects the role→model profile at bootstrap: `AI_PROFILE=prod | lo
 
 ### 8.4 Mocked model testing (rung 1)
 
-`FakeModelRouter implements ModelRouterService`: `enqueue(promptKey, output | Error)` FIFO per key, plus `defaultFor(promptKey, factory)`. Outputs are **built from the real Zod schemas**, so a schema change breaks fixtures loudly. It records every call for spy assertions ("no Anthropic model constructed for a grok_only project"). For tool-using chains, the fake returns scripted `tool_calls` messages so the loop executes **real handlers** against the test DB — tool handlers are always real; only the model is fake.
+`FakeModelRouter implements ModelRouterService`: `enqueue(promptKey, output | Error)` FIFO per key, plus `defaultFor(promptKey, factory)`. Outputs are **built from the real Zod schemas**, so a schema change breaks fixtures loudly. It records every call for spy assertions ("no Anthropic model constructed for an Unrestricted project"). For tool-using chains, the fake returns scripted `tool_calls` messages so the loop executes **real handlers** against the test DB — tool handlers are always real; only the model is fake.
 
 ### 8.5 What each test class covers
 
 - **Context routing tests (rung 1):** catalog render golden; outline schema drops invented refs and preserves ordering; ref resolution (fresh content after a canon edit, unknown-ref skip → `unresolvedRefs`, zero-ref legacy fallback); per-purpose pack goldens asserting the §3.4 matrix — the generation pack contains the serial core + resolved refs and _nothing else_.
 - **Graph testing (rung 2):** build each `StateGraph` with fake node functions; assert topology — contradiction routes to repair only when `autoFix`; patch-uniqueness failure routes to rewrite; repeated finding early-stops; budget exhaustion ⇒ `acceptAsIs`; **checkpoint-resume**: kill between nodes, re-invoke same `thread_id`, assert `draftChapter` executed once.
 - **Tool testing (rung 1, real handlers):** per tool — happy path, projectId isolation (cannot see project B), arg-validation error string, call budget, output truncation, `tool_calls` audit rows.
-- **Retrieval testing (rung 3-lite: real embedder, no chat model):** seed 3 chapters + lore; prose search returns the right chapter; lore search returns the right entity; grok chapters excluded; `grok_only` retrieves `[]`; edit-driven re-embed (`sourceUpdatedAt` newer ⇒ refresh).
+- **Retrieval testing (rung 3-lite: real embedder, no chat model):** seed 3 chapters + lore; prose search returns the right chapter; lore search returns the right entity; grok-interlude chapters excluded; Unrestricted projects retrieve; edit-driven re-embed (`sourceUpdatedAt` newer ⇒ refresh).
 - **Structured output testing:** schema fixtures (rung 1: ok/repaired/extracted/`AI_001` ladder paths, judge normalization corners) plus a rung-3 **torture test**: run each schema 5× against the local model, record parse/repair/fail counts to a report file — a regression tripwire, not a hard gate.
 - **End-to-end workflow (rung 3, ~6 scenarios):** (1) seed-from-brief on a 3-sentence brief ⇒ every bible section has rows, all Zod-parsed; (2) generate chapter 1 of the micro-project ⇒ prose 300+ words, valid continuation state, judge returns a verdict; (3) judge a fixture draft that kills an already-dead character ⇒ hard assertion: verdict parses; soft assertion (logged, non-failing): verdict is contradiction; (4) fix-loop on a planted unique find-string ⇒ patch applies byte-identically outside the edit; (5) judge tool loop against seeded canon ⇒ valid `tool_calls` rows, no crash, final verdict parses; (6) the torture report.
 - **Smoke test:** `bun run ai:smoke` — one end-to-end micro-novel on Ollama: seed → plan → approve → generate 2 chapters (autofix) → feedback + revise → approve → finalize both; assert canon rows, `lore_chunks`, `model_calls`/`tool_calls` populated, checkpoints pruned; print a run report (tokens, latency, parse stats).
@@ -628,7 +628,7 @@ _Tests:_ render goldens per prompt; schema fixtures (known-good and known-bad ou
 
 **Phase A3 — Model router, telemetry, repair ladder.** _Objective:_ `ModelRouterService.chatFor(role)` + `structured()` + `model_calls` writing.
 _Create:_ `src/modules/ai/{models,defaults,model-router.service,telemetry.handler}.ts`, provider constructors, `AI_PROFILE` bootstrap key, `FakeModelRouter` test double.
-_Result:_ role-resolution precedence matrix passes (grok_only, forceProvider, env gating); parse-fail fixture yields `repaired` then `AI_001` with raw output persisted first.
+_Result:_ role-resolution precedence matrix passes (unrestricted allowlist, forceProvider, env gating); parse-fail fixture yields `repaired` then `AI_001` with raw output persisted first.
 _Tests:_ router precedence; repair ladder (ok/repaired/extracted/fail); grok-isolation spy tests.
 
 **Phase A4 — Context Assembly Service.** _Objective:_ `ContextAssembler` + `context_packs` (the crown jewel — golden tests first, port second).
@@ -638,7 +638,7 @@ _Tests:_ assembler unit suite (routing, budgeting, eviction, paragraph-boundary 
 
 **Phase A5 — Retrieval and indexing.** _Objective:_ both LlamaIndex-backed indexes live.
 _Create:_ `src/modules/ai/retrieval/{retrieval.service,ingestion,lore-cards}.ts`, backfill script.
-_Result:_ paragraph chunker + lore-card renderers work; metadata-filtered retrieval with grok/grok_only exclusions; upsert-on-edit re-embeds.
+_Result:_ paragraph chunker + lore-card renderers work; metadata-filtered retrieval with grok-interlude exclusions; upsert-on-edit re-embeds.
 _Tests:_ `test:ai:retrieval` green against the local embedder at dim 1024.
 
 **Phase A6 — Tool system.** _Objective:_ the six read-only tools + bounded loop + audit.
@@ -682,7 +682,7 @@ _Result:_ `bun test` green; nightly green-or-skipped; docs current.
 5. Every structured call goes through the repair ladder; every output is Zod-validated; domain-invalid output never enters the DB as canon.
 6. Context is assembled once per run, token-budgeted, tier-labeled, and persisted as a pack.
 7. Drafting sees only the mandatory serial core plus the refs its brief declared; broad canon access belongs to the outliner (catalog, titles only) and the judge (tools) — never the drafter.
-8. Draft and grok content never enter an index; `grok_only` retrieval fails closed to `[]`.
+8. Draft and grok-interlude content never enter an index. Unrestricted projects retrieve like Standard.
 9. Review state lives in `drafts.reviewStatus`, not in paused graphs; feedback starts a new run.
 10. Prompt text lives in versioned code modules; every call logs `promptKey@promptVersion`.
 11. `runId` correlates everything; a failed generation is debuggable from the database alone.

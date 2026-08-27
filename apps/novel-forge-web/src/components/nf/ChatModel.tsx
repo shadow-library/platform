@@ -71,12 +71,15 @@ export function modelLabel(models: AiModelOption[], provider?: string | null, mo
   return match?.label ?? modelId;
 }
 
-function resolveDefault(scopeType: ChatScope, config: ProjectConfig | undefined, defaults: AiRoleDefault[]): ResolvedDefault | undefined {
+function resolveDefault(scopeType: ChatScope, config: ProjectConfig | undefined, defaults: AiRoleDefault[], allowlist?: Set<string>): ResolvedDefault | undefined {
   const scopeRole = SCOPE_CHAT_ROLE[scopeType];
   const group = SCOPE_GROUP[scopeType];
   const configured = config?.models ?? {};
-  if (configured[scopeRole]) return { ...configured[scopeRole], group };
-  if (group === 'chat' && configured.plan) return { ...configured.plan, group: 'planning' };
+  const honour = (ref?: { provider: string; model: string }): ref is { provider: string; model: string } => Boolean(ref && (!allowlist || allowlist.has(ref.model)));
+  const scoped = configured[scopeRole];
+  if (honour(scoped)) return { ...scoped, group };
+  const plan = configured.plan;
+  if (group === 'chat' && honour(plan)) return { ...plan, group: 'planning' };
   const fromProfile = defaults.find(d => d.role === group);
   return fromProfile ? { provider: fromProfile.provider, model: fromProfile.model, group } : undefined;
 }
@@ -96,9 +99,16 @@ export function ChatModelMenu({ novelId, session, scopeType, disabled }: ChatMod
   // ourselves and shut it on any pick.
   const [open, setOpen] = useState(false);
 
+  const unrestricted = projectQuery.data?.contentMode === 'unrestricted';
+  const allowlist = new Set(modelsQuery.data?.unrestrictedAllowlist ?? []);
   const models = modelsQuery.data?.models ?? [];
-  const llmModels = models.filter(m => m.kind === 'llm' && m.enabled);
-  const resolvedDefault = resolveDefault(scopeType, projectQuery.data?.config, modelsQuery.data?.defaults ?? []);
+  const llmModels = models.filter(m => m.kind === 'llm' && m.enabled && (!unrestricted || allowlist.has(m.id)));
+  const resolvedDefault = resolveDefault(
+    scopeType,
+    projectQuery.data?.config,
+    unrestricted ? (modelsQuery.data?.unrestrictedDefaults ?? []) : (modelsQuery.data?.defaults ?? []),
+    unrestricted ? allowlist : undefined,
+  );
 
   const overridden = Boolean(session?.modelProvider && session?.modelId);
   const value = overridden ? encodeModelRef(session?.modelProvider ?? '', session?.modelId ?? '') : 'default';

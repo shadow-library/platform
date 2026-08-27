@@ -87,10 +87,31 @@ const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
 };
 
-// grok_only content mode pins every role to a specific Grok model regardless of group defaults — see
-// its usage in model-router.service.ts. The image role needs its own pin: grok-4.6 is text-only.
-export const GROK_ONLY_MODEL: ResolvedModel = { provider: 'openrouter', model: 'x-ai/grok-4.6' };
-export const GROK_ONLY_IMAGE_MODEL: ResolvedModel = { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' };
+// Unrestricted is a content policy, not a vendor pin. Writing goes to Grok 4.6 because it will put adult
+// material on the page; planning/chat stay on GLM-5.2 (same structured stack as Standard); review/helper
+// move off Claude/Luna onto DeepSeek V4 Pro so the judge and illustration-prompt compose do not refuse.
+export const UNRESTRICTED_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
+  writing: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
+  planning: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
+  review: { provider: 'openrouter', model: 'deepseek/deepseek-v4-pro' },
+  chat: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
+  helper: { provider: 'openrouter', model: 'deepseek/deepseek-v4-pro' },
+  image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
+  embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
+};
+
+export const UNRESTRICTED_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(UNRESTRICTED_GROUP_DEFAULTS);
+
+// Overrides on an Unrestricted project are honoured only when the model will actually generate the content.
+// grok-4.3 is excluded: it avoids sexual content and collapses into summary-like prose.
+export const UNRESTRICTED_LLM_ALLOWLIST = ['x-ai/grok-4.6', 'deepseek/deepseek-v4-pro', 'z-ai/glm-5.2', 'moonshotai/kimi-k3'] as const;
+export const UNRESTRICTED_IMAGE_ALLOWLIST = ['x-ai/grok-imagine-image-2.0'] as const;
+
+export function isUnrestrictedAllowed(role: AiRole, resolved: ResolvedModel): boolean {
+  if (role === 'embedding') return true;
+  if (role === 'image') return (UNRESTRICTED_IMAGE_ALLOWLIST as readonly string[]).includes(resolved.model);
+  return (UNRESTRICTED_LLM_ALLOWLIST as readonly string[]).includes(resolved.model);
+}
 
 // Local-test profile: routes everything to Ollama (used in smoke tests / dev without API keys).
 const LOCAL_TEST_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {

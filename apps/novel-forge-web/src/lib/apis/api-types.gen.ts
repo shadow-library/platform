@@ -2490,6 +2490,10 @@ export interface components {
       profile: string;
       models: components['schemas']['AiModelOption'][];
       defaults: components['schemas']['AiRoleDefault'][];
+      /** @description Group defaults used when a project is in Unrestricted content mode. */
+      unrestrictedDefaults: components['schemas']['AiRoleDefault'][];
+      /** @description Model ids that Unrestricted projects may select. Others are coerced to the Unrestricted group default. */
+      unrestrictedAllowlist: string[];
     };
     AiModelOption: {
       id: string;
@@ -3661,6 +3665,8 @@ export interface components {
     CreateSeedBody: {
       /** @description The idea as the author first typed it; kept verbatim as the opening turn of the studio conversation. */
       spark?: string;
+      /** @description Content policy for the seed. Unrestricted routes studio chat through models that will write adult material. */
+      contentMode?: components['schemas']['ContentMode'];
     };
     ListSeedsResponse: {
       total: number;
@@ -3746,7 +3752,7 @@ export interface components {
     /** @enum {string} */
     ProjectKind: 'source' | 'new_novel';
     /** @enum {string} */
-    ContentMode: 'standard' | 'grok_only';
+    ContentMode: 'standard' | 'unrestricted';
     ProjectResponse: {
       id: string;
       name: string;

@@ -93,7 +93,7 @@ export async function jsonOrUndefined<T = Record<string, unknown>>(response: API
 /** Creates a project via the API and returns its id (as a string). `name` should already carry a unique suffix. */
 export async function createProject(
   ctx: APIRequestContext,
-  body: { name: string; kind: 'new_novel' | 'source'; title?: string; instructions?: string; contentMode?: 'standard' | 'grok_only' },
+  body: { name: string; kind: 'new_novel' | 'source'; title?: string; instructions?: string; contentMode?: 'standard' | 'unrestricted' },
 ): Promise<{ id: string; response: APIResponse }> {
   const response = await mutate(ctx, 'post', '/api/v1/projects', { data: body });
   const parsed = (await jsonOrUndefined<{ id: string }>(response)) ?? { id: '' };

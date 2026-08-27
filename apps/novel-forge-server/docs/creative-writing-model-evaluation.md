@@ -182,6 +182,7 @@ budgets, and the fixes are the cheaper of the two.
 | helper (title/compact/epitome)                    | `openai/gpt-5.6-luna`       | Replaces the dead `grok-4.1-fast` slug                               |
 
 Reasoning effort is capped per group by `REASONING_POLICY` (helper `none`, all other groups `low`); the
-`grok_only` content mode pins every role to `GROK_ONLY_MODEL` (`x-ai/grok-4.6`). All four non-Anthropic
-defaults get OpenRouter's automatic caching; only Anthropic needs the explicit `cache_control` breakpoints
-the router injects.
+`unrestricted` content mode uses its own group map (`UNRESTRICTED_GROUP_DEFAULTS`): writing → `x-ai/grok-4.6`,
+planning/chat → `z-ai/glm-5.2`, review/helper → `deepseek/deepseek-v4-pro`, image → `x-ai/grok-imagine-image-2.0`.
+All four non-Anthropic Standard defaults get OpenRouter's automatic caching; only Anthropic needs the explicit
+`cache_control` breakpoints the router injects.

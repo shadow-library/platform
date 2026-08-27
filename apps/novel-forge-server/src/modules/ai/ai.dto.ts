@@ -55,4 +55,10 @@ export class AiModelsResponse {
 
   @Field(() => [AiRoleDefault])
   defaults: AiRoleDefault[];
+
+  @Field(() => [AiRoleDefault], { description: 'Group defaults used when a project is in Unrestricted content mode.' })
+  unrestrictedDefaults: AiRoleDefault[];
+
+  @Field(() => [String], { description: 'Model ids that Unrestricted projects may select. Others are coerced to the Unrestricted group default.' })
+  unrestrictedAllowlist: string[];
 }

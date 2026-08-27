@@ -1045,10 +1045,7 @@ export class GenerationService {
     const locked = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
     if (locked?.status === 'final') throw AppErrorCode.DRF_002.create();
 
-    const [brief, project] = await Promise.all([
-      this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
-      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-    ]);
+    const brief = await this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
 
     const pack = await this.contextAssembler.forChapter(projectId, chapter);
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.generation.key, promptVersion: PROMPT_REGISTRY.generation.version, role: PROMPT_REGISTRY.generation.key };
@@ -1063,7 +1060,7 @@ export class GenerationService {
         guidance: body.guidance ?? '',
       },
       ctx,
-      { contentMode: 'grok_only', config: project?.config as never },
+      { contentMode: 'unrestricted' },
     )) as {
       title: string;
       body: string;

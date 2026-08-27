@@ -193,7 +193,7 @@ describe.if(pgAvailable)('IllustrationService — canon-driven generation', () =
     return (db as unknown as { $client: SQL }).$client.close();
   });
 
-  async function seedProject(name: string, config: Record<string, unknown> | null = null, contentMode: 'standard' | 'grok_only' = 'standard'): Promise<bigint> {
+  async function seedProject(name: string, config: Record<string, unknown> | null = null, contentMode: 'standard' | 'unrestricted' = 'standard'): Promise<bigint> {
     const [project] = await db
       .insert(schema.projects)
       .values({ name: `${name}-${Date.now()}-${Math.random()}`, kind: 'source', contentMode, config: config as never, premise: 'A frozen empire eats its heirs.' })
@@ -444,8 +444,8 @@ describe.if(pgAvailable)('IllustrationService — canon-driven generation', () =
     expect(harness.imageRequests[0]?.model).toBe('openai/gpt-5.4-image-2');
   });
 
-  it('should keep grok_only projects on the Grok image model rather than its text pin', async () => {
-    const projectId = await seedProject('illustration-grok-only', null, 'grok_only');
+  it('should keep Unrestricted projects on the Grok image model rather than its writing model', async () => {
+    const projectId = await seedProject('illustration-unrestricted', null, 'unrestricted');
     await harness.service.start(projectId, { subjectType: 'cover' });
 
     expect(harness.imageRequests[0]?.model).toBe('x-ai/grok-imagine-image-2.0');

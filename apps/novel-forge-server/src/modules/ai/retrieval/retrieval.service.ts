@@ -1,11 +1,10 @@
-import { eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
-import * as schema from '@server/database/schemas';
 
 import { EmbeddingService } from './embedding.service';
 
@@ -34,12 +33,9 @@ export class RetrievalService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  // Search prose index. Excludes grok chapters. Returns [] for grok_only projects or on embed failure.
+  // Search prose index. Excludes grok-interlude chapters. Returns [] on embed failure.
   async searchProse(projectId: bigint, query: string, k = DEFAULT_PROSE_K): Promise<RetrievalHit[]> {
     try {
-      const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-      if (project?.contentMode === 'grok_only') return [];
-
       const embedding = await this.embeddingService.embed(query);
       if (!embedding) return [];
 
@@ -69,12 +65,9 @@ export class RetrievalService {
     }
   }
 
-  // Search lore index. Filter by kinds[] if provided. Returns [] for grok_only projects or on embed failure.
+  // Search lore index. Filter by kinds[] if provided. Returns [] on embed failure.
   async searchLore(projectId: bigint, query: string, k = DEFAULT_LORE_K, opts?: { kinds?: string[] }): Promise<RetrievalHit[]> {
     try {
-      const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-      if (project?.contentMode === 'grok_only') return [];
-
       const embedding = await this.embeddingService.embed(query);
       if (!embedding) return [];
 

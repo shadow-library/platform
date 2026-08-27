@@ -3,7 +3,15 @@ import { describe, expect, it, mock } from 'bun:test';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 
-import { GROK_ONLY_IMAGE_MODEL, GROK_ONLY_MODEL, LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, REASONING_POLICY, resolveReasoningEffort, ROLE_GROUP } from '@modules/ai/defaults';
+import {
+  LOCAL_TEST_DEFAULTS,
+  PRODUCTION_DEFAULTS,
+  REASONING_POLICY,
+  resolveReasoningEffort,
+  ROLE_GROUP,
+  UNRESTRICTED_DEFAULTS,
+  UNRESTRICTED_GROUP_DEFAULTS,
+} from '@modules/ai/defaults';
 import { ModelRouterService, resolveProvider, supportsPromptCaching } from '@modules/ai/model-router.service';
 import { MODEL_REGISTRY } from '@modules/ai/models';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
@@ -27,16 +35,17 @@ describe('ModelRouterService.resolveModel', () => {
   const stubTelemetry = {} as never;
   const router = new ModelRouterService(stubTelemetry, stubDatabaseService());
 
-  it('returns the fixed grok_only model regardless of role', () => {
-    const resolved = router.resolveModel('extraction', { contentMode: 'grok_only' });
-    expect(resolved.provider).toBe(GROK_ONLY_MODEL.provider);
-    expect(resolved.model).toBe(GROK_ONLY_MODEL.model);
+  it('routes Unrestricted roles through the Unrestricted group map, not a single pin', () => {
+    expect(router.resolveModel('generation', { contentMode: 'unrestricted' }).model).toBe(UNRESTRICTED_GROUP_DEFAULTS.writing.model);
+    expect(router.resolveModel('extraction', { contentMode: 'unrestricted' }).model).toBe(UNRESTRICTED_GROUP_DEFAULTS.planning.model);
+    expect(router.resolveModel('judge', { contentMode: 'unrestricted' }).model).toBe(UNRESTRICTED_GROUP_DEFAULTS.review.model);
+    expect(router.resolveModel('title', { contentMode: 'unrestricted' }).model).toBe(UNRESTRICTED_GROUP_DEFAULTS.helper.model);
   });
 
-  it('should pin the image role to the Grok image model in grok_only mode, not the text model', () => {
-    const resolved = router.resolveModel('image', { contentMode: 'grok_only' });
-    expect(resolved.model).toBe(GROK_ONLY_IMAGE_MODEL.model);
-    expect(resolved.model).not.toBe(GROK_ONLY_MODEL.model);
+  it('should pin the image role to the Grok image model in Unrestricted mode, not the writing model', () => {
+    const resolved = router.resolveModel('image', { contentMode: 'unrestricted' });
+    expect(resolved.model).toBe(UNRESTRICTED_GROUP_DEFAULTS.image.model);
+    expect(resolved.model).not.toBe(UNRESTRICTED_GROUP_DEFAULTS.writing.model);
   });
 
   it('honours per-project config model override', () => {
@@ -54,13 +63,28 @@ describe('ModelRouterService.resolveModel', () => {
     expect(resolved.model).toBe(PRODUCTION_DEFAULTS.embedding.model);
   });
 
-  it('grok_only overrides per-project model config', () => {
+  it('coerces an Anthropic override on an Unrestricted project back to the group default', () => {
     const resolved = router.resolveModel('generation', {
-      contentMode: 'grok_only',
+      contentMode: 'unrestricted',
       config: { models: { generation: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } },
     });
-    expect(resolved.provider).toBe(GROK_ONLY_MODEL.provider);
-    expect(resolved.model).toBe(GROK_ONLY_MODEL.model);
+    expect(resolved.model).toBe(UNRESTRICTED_DEFAULTS.generation.model);
+  });
+
+  it('honours a Kimi writing override on an Unrestricted project', () => {
+    const resolved = router.resolveModel('generation', {
+      contentMode: 'unrestricted',
+      config: { models: { generation: { provider: 'openrouter', model: 'moonshotai/kimi-k3' } } },
+    });
+    expect(resolved.model).toBe('moonshotai/kimi-k3');
+  });
+
+  it('rejects grok-4.3 on an Unrestricted project', () => {
+    const resolved = router.resolveModel('generation', {
+      contentMode: 'unrestricted',
+      config: { models: { generation: { provider: 'openrouter', model: 'x-ai/grok-4.3' } } },
+    });
+    expect(resolved.model).toBe(UNRESTRICTED_DEFAULTS.generation.model);
   });
 
   it('refinement chat inherits the planning selection when no chat model is set', () => {

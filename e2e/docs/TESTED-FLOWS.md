@@ -167,7 +167,7 @@ the OIDC hop for a non-privileged user. That denial is itself asserted (see Cros
 
 - user2 GET/PATCH/DELETE user1's project → **404 `PRJ_001`** (never 403 — BOLA non-disclosure).
 - Unauthenticated `GET /api/v1/projects` → 401; guest workspace visit → `/login`.
-- `contentMode=grok_only` accepts but ignores an anthropic override (documented coercion).
+- `contentMode=unrestricted` accepts but ignores an anthropic override (documented coercion).
 
 **Import → publish → cross-app arrival (API + DB, no AI)**
 

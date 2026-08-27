@@ -44,47 +44,29 @@ describe('chunkText', () => {
   });
 });
 
-describe('RetrievalService — grok_only project', () => {
-  it('searchProse returns [] without calling embed for grok_only projects', async () => {
+describe('RetrievalService — unrestricted project', () => {
+  it('searchProse still embeds for unrestricted projects', async () => {
     const embedSpy = mock(async () => [0.1, 0.2]);
-
-    const mockDb = {
-      query: {
-        projects: {
-          findFirst: mock(async () => ({ contentMode: 'grok_only' })),
-        },
-      },
-    };
-
+    const mockDb = { execute: mock(async () => []) };
     const mockDatabaseService = { getPostgresClient: () => mockDb } as never;
     const mockEmbeddingService = { embed: embedSpy } as never as EmbeddingService;
 
     const retrieval = new RetrievalService(mockDatabaseService, mockEmbeddingService);
-    const hits = await retrieval.searchProse(BigInt(1), 'test query');
+    await retrieval.searchProse(BigInt(1), 'test query');
 
-    expect(hits).toEqual([]);
-    expect(embedSpy).not.toHaveBeenCalled();
+    expect(embedSpy).toHaveBeenCalled();
   });
 
-  it('searchLore returns [] without calling embed for grok_only projects', async () => {
+  it('searchLore still embeds for unrestricted projects', async () => {
     const embedSpy = mock(async () => [0.1, 0.2]);
-
-    const mockDb = {
-      query: {
-        projects: {
-          findFirst: mock(async () => ({ contentMode: 'grok_only' })),
-        },
-      },
-    };
-
+    const mockDb = { execute: mock(async () => []) };
     const mockDatabaseService = { getPostgresClient: () => mockDb } as never;
     const mockEmbeddingService = { embed: embedSpy } as never as EmbeddingService;
 
     const retrieval = new RetrievalService(mockDatabaseService, mockEmbeddingService);
-    const hits = await retrieval.searchLore(BigInt(1), 'test query');
+    await retrieval.searchLore(BigInt(1), 'test query');
 
-    expect(hits).toEqual([]);
-    expect(embedSpy).not.toHaveBeenCalled();
+    expect(embedSpy).toHaveBeenCalled();
   });
 });
 

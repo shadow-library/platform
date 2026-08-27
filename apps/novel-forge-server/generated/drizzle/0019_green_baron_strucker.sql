@@ -1,0 +1,1 @@
+ALTER TYPE "public"."content_mode" RENAME VALUE 'grok_only' TO 'unrestricted';

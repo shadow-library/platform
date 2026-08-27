@@ -66,7 +66,7 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
 
   const submitIdea = (): void => {
     createSeed.mutate(
-      { spark: spark.trim() || undefined },
+      { spark: spark.trim() || undefined, contentMode },
       {
         onSuccess: seed => {
           onOpenChange(false);
@@ -103,6 +103,15 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
             </SegmentedControl>
             {door === 'idea' ? (
               <>
+                <FormField
+                  label="Content mode"
+                  helper="Unrestricted uses models that will write adult and otherwise blocked material. Standard uses the default quality stack, which refuses or sanitises this."
+                >
+                  <SegmentedControl value={contentMode} onValueChange={v => setContentMode(v as Mode)} fullWidth>
+                    <SegmentedControl.Item value="standard">Standard</SegmentedControl.Item>
+                    <SegmentedControl.Item value="unrestricted">Unrestricted</SegmentedControl.Item>
+                  </SegmentedControl>
+                </FormField>
                 <FormField label="The spark" helper="Optional — a sentence, a paragraph, or nothing at all. The studio starts from whatever you have.">
                   <Textarea
                     placeholder="e.g. a salvager who can hear what drowned ships remember"
@@ -128,10 +137,13 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
                 <FormField label="Working title" required error={titleError}>
                   <Input placeholder="e.g. The Ashfall Chronicles" value={title} onValueChange={setTitle} invalid={Boolean(titleError)} autoFocus />
                 </FormField>
-                <FormField label="Content mode">
+                <FormField
+                  label="Content mode"
+                  helper="Unrestricted uses models that will write adult and otherwise blocked material. Standard uses the default quality stack, which refuses or sanitises this."
+                >
                   <SegmentedControl value={contentMode} onValueChange={v => setContentMode(v as Mode)} fullWidth>
                     <SegmentedControl.Item value="standard">Standard</SegmentedControl.Item>
-                    <SegmentedControl.Item value="grok_only">Grok only</SegmentedControl.Item>
+                    <SegmentedControl.Item value="unrestricted">Unrestricted</SegmentedControl.Item>
                   </SegmentedControl>
                 </FormField>
                 <div className={styles.hint}>

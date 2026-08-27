@@ -137,12 +137,15 @@ function SettingsScreen(): React.JSX.Element {
     setContentMode(project.contentMode);
     const overrides = project.config?.models ?? {};
     const next: Partial<Record<ModelGroup, string>> = {};
+    const allowed = new Set(modelsQuery.data?.unrestrictedAllowlist ?? []);
+    const unrestrictedMode = project.contentMode === 'unrestricted';
     for (const group of ALL_ROLES) {
       const entry = GROUP_ROLES[group.key].map(role => overrides[role]).find(Boolean);
-      next[group.key] = entry ? encodeModelRef(entry.provider, entry.model) : INHERIT;
+      const honour = Boolean(entry && (!unrestrictedMode || allowed.has(entry.model)));
+      next[group.key] = honour && entry ? encodeModelRef(entry.provider, entry.model) : INHERIT;
     }
     setModels(next);
-  }, [project]);
+  }, [project, modelsQuery.data?.unrestrictedAllowlist]);
 
   const setModel = (key: ModelGroup, value: string): void => setModels(prev => ({ ...prev, [key]: value }));
 
@@ -179,9 +182,12 @@ function SettingsScreen(): React.JSX.Element {
     });
   };
 
-  const modelOptions = modelsQuery.data?.models ?? [];
+  const unrestricted = contentMode === 'unrestricted';
+  const allowlist = new Set(modelsQuery.data?.unrestrictedAllowlist ?? []);
+  const modelOptions = (modelsQuery.data?.models ?? []).filter(m => !unrestricted || allowlist.has(m.id) || m.kind === 'embedding');
   const profile = modelsQuery.data?.profile;
-  const defaultsMap = new Map((modelsQuery.data?.defaults ?? []).map(d => [d.role, d.model]));
+  const inheritedDefaults = unrestricted ? (modelsQuery.data?.unrestrictedDefaults ?? []) : (modelsQuery.data?.defaults ?? []);
+  const defaultsMap = new Map(inheritedDefaults.map(d => [d.role, d.model]));
 
   return (
     <PageContainer>
@@ -211,10 +217,13 @@ function SettingsScreen(): React.JSX.Element {
                   >
                     <Textarea value={instructions} onValueChange={setInstructions} minRows={6} autoGrow />
                   </FormField>
-                  <FormField label="Content mode">
+                  <FormField
+                    label="Content mode"
+                    helper="Unrestricted uses models that will write adult and otherwise blocked material. Standard uses the default quality stack, which refuses or sanitises this."
+                  >
                     <SegmentedControl value={contentMode} onValueChange={v => setContentMode(v as ContentMode)}>
                       <SegmentedControl.Item value="standard">Standard</SegmentedControl.Item>
-                      <SegmentedControl.Item value="grok_only">Grok only</SegmentedControl.Item>
+                      <SegmentedControl.Item value="unrestricted">Unrestricted</SegmentedControl.Item>
                     </SegmentedControl>
                   </FormField>
                   <div>
@@ -230,7 +239,10 @@ function SettingsScreen(): React.JSX.Element {
               <div className={styles.alertWrap}>
                 <Alert intent="info" title="Model changes apply to new runs only">
                   Each operation picks a provider and model together; the provider follows the model you choose. Operations set to “Inherit default” use the
-                  <strong>{profile ? ` ${profile}` : ''}</strong> server profile. In-flight jobs keep the model they started with.
+                  <strong>{profile ? ` ${profile}` : ''}</strong> server profile{unrestricted ? ' Unrestricted map' : ''}. In-flight jobs keep the model they started with.
+                  {unrestricted
+                    ? ' Unrestricted only lists models that will write adult and otherwise blocked material; Standard providers that refuse this content are hidden.'
+                    : ''}
                 </Alert>
               </div>
 

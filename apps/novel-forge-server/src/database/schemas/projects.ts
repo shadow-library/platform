@@ -57,7 +57,7 @@ export const projectKind = pgEnum('project_kind', ['source', 'new_novel']);
 // history like any project, but the generation, planning and publishing pipelines reject it until
 // graduation flips it to `active` (ideation-studio design §2.1).
 export const projectStatus = pgEnum('project_status', ['seed', 'active']);
-export const contentMode = pgEnum('content_mode', ['standard', 'grok_only']);
+export const contentMode = pgEnum('content_mode', ['standard', 'unrestricted']);
 export const contentGenerator = pgEnum('content_generator', ['standard', 'grok', 'human']);
 
 export const projects = pgTable('projects', {

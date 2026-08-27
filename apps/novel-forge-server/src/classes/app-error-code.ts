@@ -80,7 +80,7 @@ export class AppErrorCode extends ServerErrorCode {
    */
   static readonly AI_001 = AppErrorCode.badRequest('AI_001', 'AI model returned unparseable response');
   static readonly AI_002 = AppErrorCode.badRequest('AI_002', 'Role or model not in registry, or provider is not supported');
-  static readonly AI_003 = AppErrorCode.badRequest('AI_003', 'Grok-only projects and grok interlude operations may only use xAI');
+  static readonly AI_003 = AppErrorCode.badRequest('AI_003', 'Unrestricted projects and Grok interlude operations may only use models that will generate this content');
   // User-facing 500s: both are actionable by the operator (set the key / retry), so the detail must not
   // be swallowed by the internal() mask.
   static readonly AI_004 = new AppErrorCode('AI_004', 'Image generation is not configured — set AI_OPENROUTER_API_KEY', 500);

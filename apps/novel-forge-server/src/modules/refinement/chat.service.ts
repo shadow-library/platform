@@ -13,7 +13,7 @@ import { type PrimaryDatabase, type Refinement, schema } from '@server/database'
 
 import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
-import { type AiRole, type ResolvedModel } from '../ai/defaults';
+import { type AiRole, isUnrestrictedAllowed, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { buildChatRefinePrompt, renderScopeInstructions, scopeAllowedOps } from '../ai/prompts';
@@ -402,7 +402,10 @@ export class ChatService {
    *     selection and the chat → planning default (arc chat → the planning model, and so on).
    */
   private resolveSessionModel(session: Refinement.ChatSession, project?: ProjectConfig): ResolvedModel {
-    if (session.modelProvider && session.modelId) return { provider: session.modelProvider, model: session.modelId };
+    if (session.modelProvider && session.modelId) {
+      const picked = { provider: session.modelProvider, model: session.modelId };
+      if (project?.contentMode !== 'unrestricted' || isUnrestrictedAllowed(SCOPE_CHAT_ROLE[session.scopeType], picked)) return picked;
+    }
     return this.modelRouter.resolveModel(SCOPE_CHAT_ROLE[session.scopeType], project);
   }
 

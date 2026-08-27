@@ -89,6 +89,11 @@ Originality
 
 Simple does not mean flat. Vary rhythm; let a strong moment land in a longer sentence.`;
 
+export const UNRESTRICTED_AUTHORING_ADDENDUM = `CONTENT POLICY — UNRESTRICTED:
+- Adult sexual content, violence, and vulgar language are in-scope when the brief, bible, or author instructions call for them.
+- Do not fade-to-black, moralise, or substitute euphemism for a scene the material requires on-page.
+- Characters in sexual scenes are adults.`;
+
 // Shared output directive for the bible-builder stage prompts: the models write section prose, but
 // it must arrive wrapped in the BibleStageSchema envelope or the parse fails outright.
 export const BIBLE_STAGE_OUTPUT_SHAPE =

@@ -104,7 +104,7 @@ export class IdeationService {
    */
   async createSeed(body: CreateSeedBody): Promise<SeedResponse> {
     const spark = body.spark?.trim();
-    const project = await this.projectService.create({ name: PLACEHOLDER_SEED_NAME, kind: 'new_novel' }, { status: 'seed' });
+    const project = await this.projectService.create({ name: PLACEHOLDER_SEED_NAME, kind: 'new_novel', contentMode: body.contentMode }, { status: 'seed' });
 
     try {
       return await this.db.transaction(async tx => {
