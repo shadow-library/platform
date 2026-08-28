@@ -19,6 +19,9 @@ const pgAvailable = await (async () => {
 
 const testEnv = new TestEnvironment('publishing_api');
 
+/** web-novel-server's `PublishNovelBody.novelSlug` pattern — every slug the forge derives must satisfy it verbatim */
+const READER_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 describe('renderChapterPayload', () => {
   const chapter = { number: 4, title: '  The Vale Gate ', content: 'One two three.\n\nFour five.', note: 'thanks for reading', wordCount: null };
 
@@ -84,11 +87,70 @@ describe.if(pgAvailable)('Publishing API', () => {
       expect(updated).toMatchObject({ revision: 2, blurb: 'A city of gates and ash.', genres: ['fantasy'], novelSlug: 'ashes-of-veldram' });
     });
 
-    it('should keep the slug immutable and support retiring the novel', async () => {
+    it('should bump the revision when a later publish supplies a different slug, and treat a resent identical slug as unchanged', async () => {
       const projectId = await createProject();
       await publishNovel(projectId, { novelSlug: 'first-slug', title: 'First' });
       const retired = await publishNovel(projectId, { novelSlug: 'second-slug', status: 'retired' });
-      expect(retired).toMatchObject({ novelSlug: 'first-slug', status: 'retired', revision: 2 });
+      expect(retired).toMatchObject({ novelSlug: 'second-slug', status: 'retired', revision: 2 });
+
+      const unchanged = await publishNovel(projectId, { novelSlug: 'second-slug', status: 'retired' });
+      expect(unchanged.revision).toBe(2);
+    });
+
+    it('should 409 with PUB_007 rather than ladder off a slug the author supplied', async () => {
+      await publishNovel(await createProject(), { novelSlug: 'claimed-slug', title: 'Holder' });
+      const projectId = await createProject();
+
+      const created = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/publish`).body({ novelSlug: 'claimed-slug', title: 'Contender' });
+      expect(created.statusCode).toBe(409);
+      expect(created.json().code).toBe('PUB_007');
+
+      const publication = await publishNovel(projectId, { title: 'Contender' });
+      expect(publication.novelSlug).toBe('contender');
+      const moved = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/publish`).body({ novelSlug: 'claimed-slug' });
+      expect(moved.statusCode).toBe(409);
+      expect(moved.json().code).toBe('PUB_007');
+    });
+
+    it('should suffix the slug when another project already holds the derived one', async () => {
+      const title = 'Twin Lanterns of Ord';
+      const first = await publishNovel(await createProject(), { title });
+      const second = await publishNovel(await createProject(), { title });
+      expect(first.novelSlug).toBe('twin-lanterns-of-ord');
+      expect(second.novelSlug).toBe('twin-lanterns-of-ord-2');
+
+      const stored = await testEnv.getPostgresClient().query.publications.findFirst({ where: eq(schema.publications.id, BigInt(String(second.id))) });
+      expect(stored?.novelSlug).toBe('twin-lanterns-of-ord-2');
+    });
+
+    it('should 409 with PUB_008 once the whole suffix ladder is taken', async () => {
+      const title = 'Crowded Shelf';
+      for (let attempt = 1; attempt <= 5; attempt++) await publishNovel(await createProject(), { title });
+
+      const projectId = await createProject();
+      const response = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/publish`).body({ title });
+      expect(response.statusCode).toBe(409);
+      expect(response.json().code).toBe('PUB_008');
+    });
+
+    it('should derive a valid slug from a punctuation-only title and suffix it the same way', async () => {
+      const title = '!!! ??? ...';
+      const first = await publishNovel(await createProject(), { title });
+      const second = await publishNovel(await createProject(), { title });
+      expect([first.novelSlug, second.novelSlug]).toEqual(['novel', 'novel-2']);
+      for (const slug of [first.novelSlug, second.novelSlug]) expect(slug).toMatch(READER_SLUG_PATTERN);
+    });
+
+    it('should keep a suffixed slug inside the reader 128-character cap', async () => {
+      const title = 'z'.repeat(200);
+      const first = await publishNovel(await createProject(), { title });
+      const second = await publishNovel(await createProject(), { title });
+      expect(first.novelSlug).toBe('z'.repeat(128));
+      expect(second.novelSlug).toBe(`${'z'.repeat(126)}-2`);
+      for (const slug of [first.novelSlug, second.novelSlug]) {
+        expect(String(slug).length).toBeLessThanOrEqual(128);
+        expect(slug).toMatch(READER_SLUG_PATTERN);
+      }
     });
 
     it('should 404 with PRJ_001 for an unknown project', async () => {

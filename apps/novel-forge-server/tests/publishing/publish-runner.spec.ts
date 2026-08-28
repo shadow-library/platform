@@ -15,12 +15,20 @@ import { JobExecutor } from '@modules/jobs/job.executor';
 import { JobService } from '@modules/jobs/job.service';
 import { PublicationJanitor } from '@modules/jobs/publication.janitor';
 import { PublicationAccessService } from '@modules/publishing/publication-access.service';
-import { HASH_MISMATCH_ERROR_PREFIX, PublishRunner, SLUG_CONFLICT_ERROR_PREFIX, STALE_ERROR_PREFIX } from '@modules/publishing/publish-runner';
+import {
+  HASH_MISMATCH_ERROR_PREFIX,
+  PublishRunner,
+  SLUG_EXHAUSTED_ERROR_PREFIX,
+  STALE_ERROR_PREFIX,
+  UNKNOWN_CONFLICT_ERROR_PREFIX,
+  UNSWEEPABLE_ERROR_PREFIXES,
+} from '@modules/publishing/publish-runner';
 import { PublishingService } from '@modules/publishing/publishing.service';
-import { ReaderPushClient } from '@modules/publishing/reader-push.client';
+import { ReaderPushClient, SLUG_CONFLICT_ERROR_PREFIX } from '@modules/publishing/reader-push.client';
 import { WikiPublishingService } from '@modules/publishing/wiki-publishing.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { createTestDatabaseService } from '@tests/fixtures/database-service';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 import { MockReaderService } from './mock-reader';
@@ -54,7 +62,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
-    databaseService = { getPostgresClient: () => db } as never;
+    databaseService = createTestDatabaseService(db) as never;
     publishingService = new PublishingService(databaseService);
     // The shared, discovery-backed client the AuthModule would inject in a real boot — here built
     // directly against the mock issuer with the app's own credential.
@@ -316,22 +324,58 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     while (Date.now() < deadline && (await ledgerRow(projectId, 1))?.status !== 'published') await new Promise(resolve => setTimeout(resolve, 50));
     expect(await ledgerRow(projectId, 1)).toMatchObject({ status: 'published', error: null });
   });
-  it('should ledger a slug another publisher owns distinguishably from a stale rejection, and park it', async () => {
+  it('should re-assign a slug another publisher owns and push the novel under the new one', async () => {
     const { projectId, slug } = await seedPublishedProject(1);
     reader.foreignSlugs.add(slug);
-
-    await expect(runner.converge(projectId)).rejects.toThrow(/Reader service push failed/);
-    const row = await ledgerRow(projectId, 1);
-    expect(row).toMatchObject({ status: 'failed', error: expect.stringContaining(SLUG_CONFLICT_ERROR_PREFIX) });
-    expect(String(row?.error)).not.toStartWith(STALE_ERROR_PREFIX);
 
     // Reads must not distinguish a foreign slug from a missing one, or 409-vs-404 is an oracle over another publisher's slugs.
     expect(await pushClient.getManifest(slug)).toEqual([]);
     expect(await pushClient.getWikiManifest(slug)).toEqual([]);
     expect(await pushClient.getAccess(slug)).toBeUndefined();
 
-    // Nothing re-assigns the slug yet, so an identical retry can never clear it: the sweep must park the row.
+    const result = await runner.converge(projectId);
+    expect(result).toMatchObject({ novel: 'applied', pushed: [1], failed: [] });
+
+    const publication = await db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId) });
+    expect(publication?.novelSlug).toBe(`${slug}-2`);
+    expect(reader.novels.has(slug)).toBe(false);
+    expect([...(reader.novels.get(`${slug}-2`)?.chapters.keys() ?? [])]).toEqual([1]);
+    expect(await ledgerRow(projectId, 1)).toMatchObject({ status: 'published', error: null });
+  });
+
+  it('should park the row once every candidate slug is refused, and keep it out of the sweep', async () => {
+    const { projectId, slug } = await seedPublishedProject(1);
+    for (let attempt = 1; attempt <= 5; attempt++) reader.foreignSlugs.add(attempt === 1 ? slug : `${slug}-${attempt}`);
+
+    await expect(runner.converge(projectId)).rejects.toThrow(/Reader service push failed/);
+    const row = await ledgerRow(projectId, 1);
+    expect(row).toMatchObject({ status: 'failed', error: expect.stringContaining(SLUG_EXHAUSTED_ERROR_PREFIX) });
+    expect(String(row?.error)).not.toStartWith(STALE_ERROR_PREFIX);
+
+    // Every rung committed on its own, so a spent ladder must walk the publication back to the slug it entered with.
+    const publication = await db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId) });
+    expect(publication?.novelSlug).toBe(slug);
+
+    // The ladder is spent, so a further converge would refuse the same five slugs forever: the sweep must park the row.
     expect((await dueProjects()).map(String)).not.toContain(String(projectId));
+  });
+
+  it('should refuse to re-slug a publication that already serves live reader URLs', async () => {
+    const { projectId, slug } = await seedPublishedProject(1);
+    await runner.converge(projectId);
+    // Ownership changed under us — a deleted-and-reclaimed reader row, or a rotated client id. Moving now would
+    // orphan the chapter URLs readers already hold and leave a duplicate novel behind.
+    reader.foreignSlugs.add(slug);
+
+    await expect(runner.converge(projectId)).rejects.toThrow(/Reader service push failed/);
+    const publication = await db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId) });
+    expect(publication?.novelSlug).toBe(slug);
+    expect(reader.novels.has(`${slug}-2`)).toBe(false);
+  });
+
+  it('should sweep a bare slug conflict while still parking stale, malformed and unattributed rejections', () => {
+    expect(UNSWEEPABLE_ERROR_PREFIXES).not.toContain(SLUG_CONFLICT_ERROR_PREFIX);
+    expect(UNSWEEPABLE_ERROR_PREFIXES).toEqual([STALE_ERROR_PREFIX, HASH_MISMATCH_ERROR_PREFIX, SLUG_EXHAUSTED_ERROR_PREFIX, UNKNOWN_CONFLICT_ERROR_PREFIX]);
   });
 
   it('should ledger a reader hash rejection as a malformed push and keep it out of the sweep', async () => {

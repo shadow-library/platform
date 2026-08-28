@@ -1,6 +1,6 @@
 import { and, asc, eq, type SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { chapterContentHash } from '@shadow-library/sdk/publishing';
@@ -31,6 +31,17 @@ interface StaleMarker {
 }
 
 /**
+ * Raised out of the novel insert to roll its transaction back; only a re-read of the committed row can say
+ * whose the slug is. A second race within one call escapes as a 500 the publisher retries, never as an
+ * ownership verdict — being wrong about ownership is what sends a publisher off to re-slug.
+ */
+class NovelInsertRace extends Error {
+  constructor() {
+    super('novel insert lost a slug race; the committed row must be re-read');
+  }
+}
+
+/**
  * Optimistic-concurrency rules (same for novels and chapters): an incoming revision behind the
  * stored one is a 409 stale rejection; an equal revision carrying identical content is a no-op;
  * anything else replaces the row and stores the incoming revision. Every branch — including the
@@ -50,9 +61,27 @@ export class PublishService {
     this.db = databaseService.getPostgresClient();
   }
 
+  /**
+   * A first push locks nothing — the row does not exist yet — so two converge passes of the same
+   * publisher can both reach the insert, and the index rejects the loser. That is a self-race, not
+   * foreign ownership: the loser re-runs against the now-committed row, where the ownership check
+   * converges our own row and still refuses another publisher's with `WBN_010`.
+   */
   async upsertNovel(slug: string, body: NovelUpsertBody): Promise<UpsertResult> {
     const caller = this.caller();
-    const result = await this.db.transaction(async tx => {
+    const result = await this.runNovelUpsert(slug, body, caller).catch((err: unknown) => {
+      if (err instanceof NovelInsertRace) return this.runNovelUpsert(slug, body, caller);
+      throw err;
+    });
+
+    this.auditService.markRecorded();
+    if (result.outcome === 'stale') throw AppErrorCode.WBN_003.create({ incoming: body.revision, stored: result.stored });
+    this.logger.info('novel metadata push handled', { slug, outcome: result.outcome, revision: body.revision });
+    return result;
+  }
+
+  private runNovelUpsert(slug: string, body: NovelUpsertBody, caller: PublishCaller): Promise<UpsertResult | StaleMarker> {
+    return this.db.transaction(async tx => {
       const [stored] = await tx.select().from(schema.novels).where(eq(schema.novels.slug, slug)).for('update');
       const base: Omit<PublishAuditEntry, 'outcome'> = { action: 'novel.upsert', novelSlug: slug, incomingRevision: body.revision, storedRevision: stored?.revision, ...caller };
       /** Ahead of the revision ladder: WBN_003 quotes the stored revision, which a foreign caller has no business learning. */
@@ -82,11 +111,6 @@ export class PublishService {
       await this.auditService.record({ ...base, outcome: 'applied' }, tx);
       return { outcome: 'applied', revision: body.revision } satisfies UpsertResult;
     });
-
-    this.auditService.markRecorded();
-    if (result.outcome === 'stale') throw AppErrorCode.WBN_003.create({ incoming: body.revision, stored: result.stored });
-    this.logger.info('novel metadata push handled', { slug, outcome: result.outcome, revision: body.revision });
-    return result;
   }
 
   async upsertChapter(slug: string, ordinal: number, body: ChapterUpsertBody): Promise<UpsertResult> {
@@ -242,9 +266,14 @@ export class PublishService {
   }
 
   private async insertNovel(tx: PublishTransaction, values: typeof schema.novels.$inferInsert): Promise<void> {
-    await this.databaseService.run(async () => {
-      await tx.insert(schema.novels).values(values);
-    });
+    await this.databaseService
+      .run(async () => {
+        await tx.insert(schema.novels).values(values);
+      })
+      .catch((err: unknown) => {
+        if (AppError.is(err, AppErrorCode.WBN_010)) throw new NovelInsertRace();
+        throw err;
+      });
   }
 
   private chapterFilter(novelId: bigint, ordinal: number): SQL {

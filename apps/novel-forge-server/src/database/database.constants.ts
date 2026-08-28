@@ -11,4 +11,7 @@ export const constraintErrorMap: Record<string, AppError> = {
   // Graduation mints one fact per named betrayal, and the fact endpoints let the author write any key
   // they like — a collision is a conflict the caller can resolve, never a 500 that aborts graduation.
   canon_facts_project_id_fact_key_unique: AppErrorCode.FCT_004.create(),
+  // Two projects whose titles slugify identically race for one reader URL; PublishingService walks a
+  // suffix ladder off this error, so it is a retry signal there as much as a response here.
+  publications_novel_slug_unique: AppErrorCode.PUB_007.create(),
 };

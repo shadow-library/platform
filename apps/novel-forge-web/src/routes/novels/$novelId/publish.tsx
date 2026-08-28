@@ -88,9 +88,9 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
         .map(genre => genre.trim())
         .filter(Boolean),
     };
-    // The slug only travels on first publish (immutable afterwards); status only once the listing exists —
-    // on first publish an omitted status is the go-live default.
-    if (!publication && slug.trim()) body.novelSlug = slug.trim();
+    // The slug travels only when it would change something, so a republish at a new URL is always a deliberate
+    // act here. Status travels only once the listing exists — on first publish an omitted one goes live.
+    if (slug.trim() && slug.trim() !== publication?.novelSlug) body.novelSlug = slug.trim();
     if (publication) body.status = status;
     publishNovel.mutate(body, {
       onSuccess: result => {
@@ -102,6 +102,8 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
   };
 
   const fieldErrors = publishNovel.error?.fieldErrors ?? {};
+  // A taken or exhausted slug arrives as a top-level code, but it is a problem with this field alone.
+  const slugConflict = publishNovel.error && ['PUB_007', 'PUB_008'].includes(publishNovel.error.code) ? publishNovel.error.message : undefined;
 
   return (
     <SectionCard
@@ -122,14 +124,14 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
         <div className={styles.formGrid}>
           <FormField
             label="Slug"
-            error={fieldErrors['novelSlug']}
+            error={fieldErrors['novelSlug'] ?? slugConflict}
             helper={
               publication
-                ? 'Immutable — the slug anchors reader URLs and bookmarks.'
-                : 'Lowercase and dashes; left blank it is derived from the title. Immutable after first publish.'
+                ? 'Changing it republishes the novel at the new URL. The old one stays live as a stale copy until you retire it by hand.'
+                : 'Lowercase and dashes; left blank it is derived from the title.'
             }
           >
-            <Input value={slug} onValueChange={setSlug} placeholder="derived-from-title" disabled={Boolean(publication)} />
+            <Input value={slug} onValueChange={setSlug} placeholder="derived-from-title" />
           </FormField>
           <FormField label="Title" error={fieldErrors['title']}>
             <Input value={title} onValueChange={setTitle} placeholder="Reader-facing title" />

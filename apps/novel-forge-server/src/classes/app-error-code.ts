@@ -231,4 +231,6 @@ export class AppErrorCode extends ServerErrorCode {
   // not that "something went wrong", since the fix is to retry rather than to change the share list.
   static readonly PUB_005 = new AppErrorCode('PUB_005', 'Could not resolve the people to share with — the identity service is unavailable', 503);
   static readonly PUB_006 = AppErrorCode.badRequest('PUB_006', 'Organisation visibility requires the session to be acting in an organisation');
+  static readonly PUB_007 = AppErrorCode.conflict('PUB_007', 'That novel slug already belongs to another project');
+  static readonly PUB_008 = AppErrorCode.conflict('PUB_008', 'No free novel slug remains near “{base}” — publish with an explicit novelSlug');
 }

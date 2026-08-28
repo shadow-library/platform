@@ -26,7 +26,9 @@ export class PublishNovelBody {
     optional: true,
     pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$',
     maxLength: 128,
-    description: 'Immutable reader URL slug set on first publish; omission derives it from the title and later values are ignored.',
+    description:
+      'Reader URL slug; omission derives it from the title. A slug another project holds is rejected. ' +
+      'A different one on a later publish republishes the novel at the new URL — it does not rename the old one, which stays live until retired by hand.',
   })
   novelSlug?: string;
 

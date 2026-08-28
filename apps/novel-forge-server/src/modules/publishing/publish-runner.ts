@@ -9,8 +9,8 @@ import { type PrimaryDatabase, type Publishing, schema } from '@server/database'
 
 import { PublicationAccessService } from './publication-access.service';
 import { renderChapterPayload } from './publish-payload';
-import { PublishingService } from './publishing.service';
-import { type AccessPushBody, type AccessState, type ChapterPushBody, type ManifestItem, ReaderPushClient, type WikiManifestItem } from './reader-push.client';
+import { PublishingService, SLUG_ATTEMPT_LIMIT } from './publishing.service';
+import { type AccessPushBody, type AccessState, type ChapterPushBody, type ManifestItem, ReaderPushClient, SlugConflictError, type WikiManifestItem } from './reader-push.client';
 import { type WikiEntryProjection } from './wiki-projection';
 import { WikiPublishingService } from './wiki-publishing.service';
 
@@ -57,14 +57,22 @@ export const STALE_ERROR_PREFIX = 'stale revision:';
 /** The reader rehashed our payload and disagreed: the push itself is malformed, so an identical retry cannot pass */
 export const HASH_MISMATCH_ERROR_PREFIX = 'payload hash mismatch:';
 
-/** The reader serves this slug for another publisher — clearable only by publishing under a different slug, which nothing does yet */
-export const SLUG_CONFLICT_ERROR_PREFIX = 'slug conflict:';
+/** Every candidate on the ladder is refused by the reader or held by another project — nothing an identical retry can move */
+export const SLUG_EXHAUSTED_ERROR_PREFIX = 'slug unassignable:';
 
 /** A 409 the reader attributed to no code — which of its conflicts fired is unknown, so it is handled as the fatal reading */
 export const UNKNOWN_CONFLICT_ERROR_PREFIX = 'unattributed conflict:';
 
 /** Ledgered failures an identical retry can never clear; the sweep skips them and only an explicit reconcile/republish revisits them */
-export const UNSWEEPABLE_ERROR_PREFIXES = [STALE_ERROR_PREFIX, HASH_MISMATCH_ERROR_PREFIX, SLUG_CONFLICT_ERROR_PREFIX, UNKNOWN_CONFLICT_ERROR_PREFIX];
+export const UNSWEEPABLE_ERROR_PREFIXES = [STALE_ERROR_PREFIX, HASH_MISMATCH_ERROR_PREFIX, SLUG_EXHAUSTED_ERROR_PREFIX, UNKNOWN_CONFLICT_ERROR_PREFIX];
+
+/** The terminal outcome of the slug ladder: ledgered under an unsweepable prefix so the janitor stops re-running a converge that cannot converge */
+export class SlugExhaustedError extends Error {
+  constructor(readonly slug: string) {
+    super(`${SLUG_EXHAUSTED_ERROR_PREFIX} the reader refuses '${slug}' and no re-assignment is available — republish this project with an explicit novelSlug`);
+    this.name = 'SlugExhaustedError';
+  }
+}
 
 function isUnsweepable(error: string | null | undefined): boolean {
   return UNSWEEPABLE_ERROR_PREFIXES.some(prefix => error?.startsWith(prefix) === true);
@@ -93,7 +101,7 @@ export class PublishRunner {
   }
 
   async converge(projectId: bigint, options: ConvergeOptions = {}): Promise<ConvergeResult> {
-    const publication = await this.publishingService.getPublication(projectId);
+    let publication = await this.publishingService.getPublication(projectId);
     const ledger = await this.publishingService.loadLedger(projectId);
     const result: ConvergeResult = {
       novel: 'noop',
@@ -110,30 +118,15 @@ export class PublishRunner {
     // clear PUB_004, while boot and every non-publishing feature stay untouched.
     let manifest: Map<number, ManifestItem>;
     try {
-      const novelResult = await this.pushClient.upsertNovel(publication.novelSlug, {
-        title: publication.title,
-        blurb: publication.blurb ?? undefined,
-        coverPath: publication.coverPath ?? undefined,
-        genres: (publication.genres as string[] | null) ?? undefined,
-        status: publication.status === 'retired' ? 'retired' : 'live',
-        visibility: publication.visibility,
-        revision: publication.revision,
-      });
-      result.novel = novelResult.outcome;
-
-      /**
-       * Access goes second, and always before any chapter. The metadata push carries the tier, so a
-       * novel is created already restricted; the window between the two pushes is one in which
-       * nobody can read it. The reverse order would open a window in which everybody could.
-       */
-      result.access = await this.convergeAccess(publication, options);
-
-      const items = await this.pushClient.getManifest(publication.novelSlug);
-      manifest = new Map(items.map(item => [item.ordinal, item]));
+      const header = await this.convergeHeader(publication, options, result);
+      publication = header.publication;
+      manifest = header.manifest;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       await this.recordFailure(this.dueRows(ledger, options), message);
-      this.logger.error('publish converge aborted before chapter pushes', { projectId, slug: publication.novelSlug, message });
+      // The header may have laddered before it failed, so the slug the row now holds is not the one it entered with.
+      const held = await this.db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId), columns: { novelSlug: true } });
+      this.logger.error('publish converge aborted before chapter pushes', { projectId, slug: publication.novelSlug, heldSlug: held?.novelSlug, message });
       throw AppErrorCode.PUB_004.create({ reason: message });
     }
 
@@ -175,6 +168,65 @@ export class PublishRunner {
       wikiUnknown: result.wiki.unknownEntries,
     });
     return result;
+  }
+
+  /**
+   * Pushes the novel metadata, then the access list, then reads the manifest — the three calls that
+   * must land before any chapter, and the only ones that can discover the slug belongs to someone
+   * else. A `WBN_010` is resolved rather than ledgered: the publication moves to the next free slug
+   * near the one it entered with and the whole header replays under it. Slugs the reader has already
+   * refused in this pass are carried forward, so within a pass the ladder only ever climbs.
+   */
+  private async convergeHeader(
+    publication: Publishing.Publication,
+    options: ConvergeOptions,
+    result: ConvergeResult,
+  ): Promise<{ publication: Publishing.Publication; manifest: Map<number, ManifestItem> }> {
+    const refused = new Set<string>();
+    const entrySlug = publication.novelSlug;
+    let current = publication;
+
+    for (let attempt = 1; attempt <= SLUG_ATTEMPT_LIMIT; attempt++) {
+      try {
+        const novelResult = await this.pushClient.upsertNovel(current.novelSlug, {
+          title: current.title,
+          blurb: current.blurb ?? undefined,
+          coverPath: current.coverPath ?? undefined,
+          genres: (current.genres as string[] | null) ?? undefined,
+          status: current.status === 'retired' ? 'retired' : 'live',
+          visibility: current.visibility,
+          revision: current.revision,
+        });
+        result.novel = novelResult.outcome;
+
+        /**
+         * Access goes second, and always before any chapter. The metadata push carries the tier, so a
+         * novel is created already restricted; the window between the two pushes is one in which
+         * nobody can read it. The reverse order would open a window in which everybody could.
+         */
+        result.access = await this.convergeAccess(current, options);
+
+        const items = await this.pushClient.getManifest(current.novelSlug);
+        return { publication: current, manifest: new Map(items.map(item => [item.ordinal, item])) };
+      } catch (err) {
+        if (!(err instanceof SlugConflictError)) throw err;
+        refused.add(current.novelSlug);
+        const moved = await this.publishingService.reassignSlug(current, entrySlug, refused);
+        if (!moved) return this.abandonSlugLadder(current, entrySlug);
+        this.logger.warn('reader refused the publication slug — retrying under a re-assigned one', {
+          projectId: current.projectId,
+          refused: current.novelSlug,
+          slug: moved.novelSlug,
+        });
+        current = moved;
+      }
+    }
+    return this.abandonSlugLadder(current, entrySlug);
+  }
+
+  private async abandonSlugLadder(current: Publishing.Publication, entrySlug: string): Promise<never> {
+    await this.publishingService.restoreSlug(current, entrySlug);
+    throw new SlugExhaustedError(entrySlug);
   }
 
   private async pushChapter(projectId: bigint, slug: string, row: Publishing.ChapterPublication, result: ConvergeResult): Promise<void> {

@@ -532,11 +532,10 @@ describe('Internal publish API', () => {
 
     /**
      * An uncommitted row on another connection is invisible to the request's `SELECT … FOR UPDATE` yet already
-     * holds the index entry, so the request reaches its insert and blocks there — no timing assumption. The held
-     * row is forge-owned on purpose: had the select seen it, the push would have applied, so a 409 can only come
-     * from the `23505` translation.
+     * holds the index entry, so the request reaches its insert and blocks there — no timing assumption. Which
+     * publisher committed that row is the whole question, so both owners are driven through the same harness.
      */
-    it('should answer WBN_010 when the insert loses the slug unique index to a concurrent publisher', async () => {
+    async function raceTheSlugIndex(holderClientId: string, body: object): Promise<ReturnType<typeof push>> {
       const holder = new SQL(env.getDatabaseUrl(), { max: 1 });
       const probe = new SQL(env.getDatabaseUrl(), { max: 1 });
       let commit!: () => void;
@@ -546,24 +545,49 @@ describe('Internal publish API', () => {
 
       try {
         const holding = holder.begin(async tx => {
-          await tx`insert into novels (slug, source_client_id, title, revision) values ('race', ${FORGE_CLIENT_ID}, 'Race', 1)`;
+          await tx`insert into novels (slug, source_client_id, title, revision) values ('race', ${holderClientId}, 'Race', 1)`;
           held();
           await committed;
         });
         await holdsSlug;
 
-        const attempt = push('put', '/internal/novels/race', { body: novelBody(5, { title: 'Race' }) });
+        const attempt = push('put', '/internal/novels/race', { body });
         await waitUntilBlocked(probe);
         commit();
         await holding;
-
-        const response = await attempt;
-        expect(response.statusCode).toBe(409);
-        expect(response.json()).toMatchObject({ code: 'WBN_010' });
+        return await attempt;
       } finally {
         commit();
         await Promise.all([holder.close(), probe.close()]);
       }
+    }
+
+    it('should answer WBN_010 when the insert loses the slug unique index to another publisher', async () => {
+      const response = await raceTheSlugIndex(INGEST_CLIENT_ID, novelBody(5, { title: 'Race' }));
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'WBN_010' });
+
+      const [novel] = await env.getPostgresClient().select().from(schema.novels).where(eq(schema.novels.slug, 'race'));
+      expect(novel).toMatchObject({ title: 'Race', revision: 1, sourceClientId: INGEST_CLIENT_ID });
+    });
+
+    /**
+     * A publisher's own two converge passes race the same way, and reading that as foreign ownership would send
+     * the forge off to re-slug and publish a second copy of the novel it just created.
+     */
+    it('should converge on its own row when the insert loses the slug unique index to itself', async () => {
+      const response = await raceTheSlugIndex(FORGE_CLIENT_ID, novelBody(5, { title: 'Race II' }));
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ slug: 'race', outcome: 'applied', revision: 5 });
+
+      const novels = await env.getPostgresClient().select().from(schema.novels).where(eq(schema.novels.slug, 'race'));
+      expect(novels).toHaveLength(1);
+      expect(novels[0]).toMatchObject({ title: 'Race II', revision: 5, sourceClientId: FORGE_CLIENT_ID });
+
+      // The rolled-back first attempt must leave no trace: one audit row, written by the pass that converged.
+      const rows = (await auditRows()).filter(row => row.novelSlug === 'race');
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ action: 'novel.upsert', outcome: 'applied', incomingRevision: 5, storedRevision: 1 });
     });
 
     it('should let the owning publisher keep mutating its own novel', async () => {

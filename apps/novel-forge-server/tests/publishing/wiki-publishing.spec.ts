@@ -21,6 +21,7 @@ import { ReaderPushClient } from '@modules/publishing/reader-push.client';
 import { WikiPublishingService } from '@modules/publishing/wiki-publishing.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { createTestDatabaseService } from '@tests/fixtures/database-service';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 import { MockReaderService } from './mock-reader';
@@ -61,7 +62,7 @@ describe.if(pgAvailable)('Wiki publish pipeline (mocked reader service)', () => 
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
-    databaseService = { getPostgresClient: () => db } as never;
+    databaseService = createTestDatabaseService(db) as never;
     publishingService = new PublishingService(databaseService);
     wikiService = new WikiPublishingService(databaseService);
     const authClient = new AuthClient({ issuer: testIdP.issuer, appId: APP_ID, client: { id: APP_ID, secret: CLIENT_SECRET } });

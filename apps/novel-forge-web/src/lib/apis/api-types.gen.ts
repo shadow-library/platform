@@ -3668,6 +3668,8 @@ export interface components {
       /** @description Content policy for the seed. Unrestricted routes studio chat through models that will write adult material. */
       contentMode?: components['schemas']['ContentMode'];
     };
+    /** @enum {string} */
+    ContentMode: 'standard' | 'unrestricted';
     ListSeedsResponse: {
       total: number;
       limit: number;
@@ -3751,8 +3753,6 @@ export interface components {
     };
     /** @enum {string} */
     ProjectKind: 'source' | 'new_novel';
-    /** @enum {string} */
-    ContentMode: 'standard' | 'unrestricted';
     ProjectResponse: {
       id: string;
       name: string;
@@ -4484,7 +4484,7 @@ export interface components {
       failedChapters: number[];
     };
     PublishNovelBody: {
-      /** @description Immutable reader URL slug set on first publish; omission derives it from the title and later values are ignored. */
+      /** @description Reader URL slug; omission derives it from the title. A slug another project holds is rejected. A different one on a later publish republishes the novel at the new URL — it does not rename the old one, which stays live until retired by hand. */
       novelSlug?: string;
       title?: string;
       blurb?: string | null;
@@ -12331,6 +12331,7 @@ export type FactSource = components['schemas']['FactSource'];
 export type UpsertFactBody = components['schemas']['UpsertFactBody'];
 export type RevealFactBody = components['schemas']['RevealFactBody'];
 export type CreateSeedBody = components['schemas']['CreateSeedBody'];
+export type ContentMode = components['schemas']['ContentMode'];
 export type ListSeedsResponse = components['schemas']['ListSeedsResponse'];
 export type SeedSummaryResponse = components['schemas']['SeedSummaryResponse'];
 export type SeedStressResponse = components['schemas']['SeedStressResponse'];
@@ -12341,7 +12342,6 @@ export type ProvenanceSummaryResponse = components['schemas']['ProvenanceSummary
 export type ProvenanceFieldResponse = components['schemas']['ProvenanceFieldResponse'];
 export type CreateProjectBody = components['schemas']['CreateProjectBody'];
 export type ProjectKind = components['schemas']['ProjectKind'];
-export type ContentMode = components['schemas']['ContentMode'];
 export type ProjectResponse = components['schemas']['ProjectResponse'];
 export type ProjectStatus = components['schemas']['ProjectStatus'];
 export type ProjectConfig = components['schemas']['ProjectConfig'];

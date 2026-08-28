@@ -15,6 +15,7 @@ import { PublishRunner } from '@modules/publishing/publish-runner';
 import { PublishingService } from '@modules/publishing/publishing.service';
 import { ReaderPushClient } from '@modules/publishing/reader-push.client';
 import { WikiPublishingService } from '@modules/publishing/wiki-publishing.service';
+import { createTestDatabaseService } from '@tests/fixtures/database-service';
 import { TestEnvironment } from '@tests/test-environment';
 
 import { MockReaderService } from '../publishing/mock-reader';
@@ -94,7 +95,7 @@ describe.if(pgAvailable)('Novel import (final mode) → publish (mocked reader)'
     // Same mocked-reader harness as tests/publishing/publish-runner.spec.ts: a real PublishRunner,
     // pointed at the real DB the app just wrote through, converges the ledger against an in-process
     // reader — proving the imported chapters push through the exact publishing path production uses.
-    const databaseService = { getPostgresClient: () => testEnv.getPostgresClient() } as never;
+    const databaseService = createTestDatabaseService(testEnv.getPostgresClient()) as never;
     const authClient = new AuthClient({ issuer: testIdP.issuer, appId: APP_ID, client: { id: APP_ID, secret: CLIENT_SECRET } });
     const publishingService = new PublishingService(databaseService);
     const accessService = new PublicationAccessService(databaseService, publishingService, authClient);

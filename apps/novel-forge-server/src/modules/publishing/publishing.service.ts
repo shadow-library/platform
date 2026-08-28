@@ -1,6 +1,6 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
@@ -16,13 +16,29 @@ export interface PublicationsLedger {
   chapters: Publishing.ChapterPublication[];
 }
 
+/** The reader's `novel_slug` column and its `^[a-z0-9]+(?:-[a-z0-9]+)*$` pattern both cap here, so every candidate must fit */
+const MAX_SLUG_LENGTH = 128;
+
+/** `base`, `base-2` … `base-5`: enough for the handful of same-title collisions a real catalog produces, few enough that the ladder always terminates */
+export const SLUG_ATTEMPT_LIMIT = 5;
+
+function trimSlug(slug: string, limit = MAX_SLUG_LENGTH): string {
+  return slug.slice(0, limit).replace(/-+$/, '');
+}
+
 function slugify(title: string): string {
-  return (
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'novel'
-  );
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return trimSlug(slug) || 'novel';
+}
+
+/** The `-N` suffix eats into the base rather than overflowing the reader's cap */
+function slugCandidate(base: string, attempt: number): string {
+  if (attempt === 1) return trimSlug(base);
+  const suffix = `-${attempt}`;
+  return `${trimSlug(base, MAX_SLUG_LENGTH - suffix.length)}${suffix}`;
 }
 
 @Injectable()
@@ -30,14 +46,19 @@ export class PublishingService {
   private readonly logger = Logger.getLogger(APP_NAME, PublishingService.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(databaseService: DatabaseService) {
+  constructor(private readonly databaseService: DatabaseService) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
   /**
-   * Creates or updates the novel's publication record — metadata plus go-live (design §4). The slug
-   * is set once (given or derived from the title) and never changes; any reader-facing metadata
-   * change bumps the forge-assigned `revision` that drives the reader's optimistic concurrency.
+   * Creates or updates the novel's publication record — metadata plus go-live (design §4). An
+   * omitted `novelSlug` is derived from the title and walked past collisions on a suffix ladder; a
+   * supplied one is taken verbatim — the only way out for a publication every candidate slug has
+   * been refused for. Supplying a different one later republishes the novel at the new URL rather
+   * than renaming it: the reader has no rename, so the next converge repushes every published
+   * chapter under the new slug and the reader novel at the old slug stays live until someone
+   * retires it by hand. Any reader-facing metadata change bumps the forge-assigned `revision` that
+   * drives the reader's optimistic concurrency.
    */
   async publishNovel(projectId: bigint, body: PublishNovelBody): Promise<Publishing.Publication> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
@@ -47,23 +68,21 @@ export class PublishingService {
     const stored = await this.db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId) });
     if (!stored) {
       const title = body.title?.trim() || project.title?.trim() || project.name;
-      const novelSlug = body.novelSlug ?? slugify(title);
       const values = {
         projectId,
-        novelSlug,
         title,
         blurb: body.blurb ?? null,
         coverPath: body.coverPath ?? null,
         genres: body.genres ?? null,
         status: body.status ?? ('live' as const),
       };
-      const [publication] = await this.db.insert(schema.publications).values(values).returning();
-      if (!publication) throw AppErrorCode.PUB_001.create();
-      this.logger.info('publication created', { projectId, novelSlug, status: publication.status });
+      const publication = body.novelSlug ? await this.insertWithGivenSlug(values, body.novelSlug) : await this.insertWithFreeSlug(values, slugify(title));
+      this.logger.info('publication created', { projectId, novelSlug: publication.novelSlug, status: publication.status });
       return publication;
     }
 
     const next = {
+      novelSlug: body.novelSlug ?? stored.novelSlug,
       title: body.title?.trim() || stored.title,
       blurb: body.blurb !== undefined ? body.blurb : stored.blurb,
       coverPath: body.coverPath !== undefined ? body.coverPath : stored.coverPath,
@@ -71,6 +90,7 @@ export class PublishingService {
       status: body.status ?? ('live' as const),
     };
     const unchanged =
+      next.novelSlug === stored.novelSlug &&
       next.title === stored.title &&
       next.blurb === stored.blurb &&
       next.coverPath === stored.coverPath &&
@@ -78,12 +98,20 @@ export class PublishingService {
       JSON.stringify(next.genres ?? null) === JSON.stringify(stored.genres ?? null);
     if (unchanged) return stored;
 
-    const [updated] = await this.db
-      .update(schema.publications)
-      .set({ ...next, revision: stored.revision + 1, updatedAt: new Date() })
-      .where(eq(schema.publications.id, stored.id))
-      .returning();
+    const [updated] = await this.databaseService.run(() =>
+      this.db
+        .update(schema.publications)
+        .set({ ...next, revision: stored.revision + 1, updatedAt: new Date() })
+        .where(eq(schema.publications.id, stored.id))
+        .returning(),
+    );
     if (!updated) throw AppErrorCode.PUB_001.create();
+    if (updated.novelSlug !== stored.novelSlug)
+      this.logger.warn('publication republished under an explicit novelSlug; the reader novel at the old slug stays live', {
+        projectId,
+        from: stored.novelSlug,
+        to: updated.novelSlug,
+      });
     this.logger.info('publication metadata updated', { projectId, novelSlug: updated.novelSlug, revision: updated.revision, status: updated.status });
     return updated;
   }
@@ -154,6 +182,59 @@ export class PublishingService {
     return inserted;
   }
 
+  /**
+   * Moves the publication onto the next free slug near `base`, skipping the ones a caller already
+   * knows are unusable. Safe only while nothing of ours is served under the current slug: a refusal
+   * normally means the push never landed there, but a reader row that was deleted and re-claimed —
+   * or a rotated forge `clientId` — makes the reader refuse URLs it still serves for us, and moving
+   * then orphans them and duplicates the novel. A ledgered `published` row is that evidence, so it
+   * bars the move. Answers `undefined` whenever no move is available, so the caller decides how to
+   * give up.
+   */
+  async reassignSlug(publication: Publishing.Publication, base: string, unusable: ReadonlySet<string>): Promise<Publishing.Publication | undefined> {
+    const live = await this.db.query.chapterPublications.findFirst({
+      where: and(eq(schema.chapterPublications.projectId, publication.projectId), eq(schema.chapterPublications.status, 'published')),
+      columns: { id: true },
+    });
+    if (live) {
+      this.logger.warn('refusing to re-slug a publication that already serves live reader URLs', { projectId: publication.projectId, novelSlug: publication.novelSlug });
+      return undefined;
+    }
+    for (let attempt = 1; attempt <= SLUG_ATTEMPT_LIMIT; attempt++) {
+      const novelSlug = slugCandidate(base, attempt);
+      if (novelSlug === publication.novelSlug || unusable.has(novelSlug)) continue;
+      const updated = await this.databaseService
+        .run(() => this.db.update(schema.publications).set({ novelSlug, updatedAt: new Date() }).where(eq(schema.publications.id, publication.id)).returning())
+        .catch((err: unknown) => {
+          if (AppError.is(err, AppErrorCode.PUB_007)) return [];
+          throw err;
+        });
+      const [row] = updated;
+      if (!row) continue;
+      this.logger.info('publication slug reassigned', { projectId: publication.projectId, from: publication.novelSlug, to: novelSlug });
+      return row;
+    }
+    return undefined;
+  }
+
+  /**
+   * Walks the publication back onto the slug a spent ladder started from: every rung committed on
+   * its own, so giving up must undo them — only the ladder's success is meaningful, and a row parked
+   * on a slug the reader explicitly refused sits further from recovery than where it began.
+   */
+  async restoreSlug(publication: Publishing.Publication, novelSlug: string): Promise<void> {
+    if (publication.novelSlug === novelSlug) return;
+    const restored = await this.databaseService
+      .run(() => this.db.update(schema.publications).set({ novelSlug, updatedAt: new Date() }).where(eq(schema.publications.id, publication.id)).returning())
+      .catch((err: unknown) => {
+        if (AppError.is(err, AppErrorCode.PUB_007)) return [];
+        throw err;
+      });
+    const context = { projectId: publication.projectId, from: publication.novelSlug, to: novelSlug };
+    if (restored.length) this.logger.info('publication slug restored after a spent ladder', context);
+    else this.logger.warn('publication slug could not be restored after a spent ladder', context);
+  }
+
   /** Marks the ledger row unpublished — the ordinal is kept forever so a later republish reuses it (design §4). Idempotent. */
   async unpublishChapter(projectId: bigint, chapterNumber: number): Promise<Publishing.ChapterPublication> {
     await this.getPublication(projectId);
@@ -185,6 +266,38 @@ export class PublishingService {
 
   loadLedger(projectId: bigint): Promise<Publishing.ChapterPublication[]> {
     return this.db.query.chapterPublications.findMany({ where: eq(schema.chapterPublications.projectId, projectId), orderBy: asc(schema.chapterPublications.publishedOrdinal) });
+  }
+
+  /** An author-chosen slug is taken as given: `PUB_007` names the collision, which serves them better than a `-2` they never asked for */
+  private async insertWithGivenSlug(values: Omit<typeof schema.publications.$inferInsert, 'novelSlug'>, novelSlug: string): Promise<Publishing.Publication> {
+    const [publication] = await this.databaseService.run(() =>
+      this.db
+        .insert(schema.publications)
+        .values({ ...values, novelSlug })
+        .returning(),
+    );
+    return publication ?? AppErrorCode.PUB_001.throw();
+  }
+
+  /** `constraintErrorMap` can only say "this constraint fired", never "stop trying", so the loop bound — not the error — decides when to give up */
+  private async insertWithFreeSlug(values: Omit<typeof schema.publications.$inferInsert, 'novelSlug'>, base: string): Promise<Publishing.Publication> {
+    for (let attempt = 1; attempt <= SLUG_ATTEMPT_LIMIT; attempt++) {
+      const novelSlug = slugCandidate(base, attempt);
+      const inserted = await this.databaseService
+        .run(() =>
+          this.db
+            .insert(schema.publications)
+            .values({ ...values, novelSlug })
+            .returning(),
+        )
+        .catch((err: unknown) => {
+          if (AppError.is(err, AppErrorCode.PUB_007)) return [];
+          throw err;
+        });
+      const [publication] = inserted;
+      if (publication) return publication;
+    }
+    throw AppErrorCode.PUB_008.create({ base });
   }
 
   /** PUB_003 half 1: nothing may go (back) live above an unpublished hole — readers would see chapter 7 with 6 missing */

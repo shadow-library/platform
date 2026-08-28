@@ -113,10 +113,13 @@ export class UnknownConflictError extends Error {
   }
 }
 
+/** `converge` re-slugs and retries on this, so a chapter row ledgered under it is worth sweeping — unlike every other conflict prefix */
+export const SLUG_CONFLICT_ERROR_PREFIX = 'slug conflict:';
+
 /** The reader serves this slug for a different publisher (WBN_010) — every push and unpublish under it is refused until the project publishes under a slug it owns */
 export class SlugConflictError extends Error {
   constructor(readonly slug: string) {
-    super(`slug conflict: the reader serves '${slug}' for a different publisher — this project cannot write to it`);
+    super(`${SLUG_CONFLICT_ERROR_PREFIX} the reader serves '${slug}' for a different publisher — this project cannot write to it`);
     this.name = 'SlugConflictError';
   }
 }
