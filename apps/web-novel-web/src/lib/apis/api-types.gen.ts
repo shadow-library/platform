@@ -532,13 +532,212 @@ export interface components {
       title: string;
       blurb?: string;
       coverPath?: string;
-      genres?: string[];
+      genres?: components['schemas']['NovelGenre'][];
+      tags?: components['schemas']['NovelTag'][];
+      /** @description Omit when unrated. An absent dimension is stored as unrated and is never inferred to be "none". */
+      sexualContent?: components['schemas']['SexualContentRating'];
+      /** @description Omit when unrated. An absent dimension is stored as unrated and is never inferred to be "none". */
+      violence?: components['schemas']['ViolenceRating'];
+      /** @description Omit when unrated. An absent dimension is stored as unrated and is never inferred to be "none". */
+      darkContent?: components['schemas']['DarkContentRating'];
       /** @enum {string} */
       status?: 'live' | 'retired';
-      /** @enum {string} */
+      /**
+       * @description Required access tier. It has no PUBLIC default so an omitted value cannot accidentally publish private content.
+       * @enum {string}
+       */
       visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
+      /** @description Forge-assigned monotonic revision used for optimistic concurrency. */
       revision: number;
     };
+    /** @enum {string} */
+    NovelGenre:
+      | 'Action'
+      | 'Adult'
+      | 'Adventure'
+      | 'Comedy'
+      | 'Drama'
+      | 'Ecchi'
+      | 'Fantasy'
+      | 'Gender Bender'
+      | 'Harem'
+      | 'Historical'
+      | 'Horror'
+      | 'Josei'
+      | 'Martial Arts'
+      | 'Mature'
+      | 'Mecha'
+      | 'Mystery'
+      | 'Psychological'
+      | 'Romance'
+      | 'School Life'
+      | 'Sci-fi'
+      | 'Seinen'
+      | 'Shoujo'
+      | 'Shoujo Ai'
+      | 'Shounen'
+      | 'Shounen Ai'
+      | 'Slice of Life'
+      | 'Smut'
+      | 'Sports'
+      | 'Supernatural'
+      | 'Tragedy'
+      | 'Wuxia'
+      | 'Xianxia'
+      | 'Xuanhuan'
+      | 'Yaoi'
+      | 'Yuri';
+    /** @enum {string} */
+    NovelTag:
+      | 'Male Protagonist'
+      | 'Female Protagonist'
+      | 'Overpowered Protagonist'
+      | 'Weak to Strong'
+      | 'Protagonist Strong from the Start'
+      | 'Antihero Protagonist'
+      | 'Evil Protagonist'
+      | 'Ruthless Protagonist'
+      | 'Genius Protagonist'
+      | 'Calm Protagonist'
+      | 'Lazy Protagonist'
+      | 'Loner Protagonist'
+      | 'Underestimated Protagonist'
+      | 'Multiple Protagonists'
+      | 'Slow Romance'
+      | 'Love Triangles'
+      | 'Childhood Friends'
+      | 'Arranged Marriage'
+      | 'Marriage of Convenience'
+      | 'Enemies Become Lovers'
+      | 'Fated Lovers'
+      | 'Unrequited Love'
+      | 'Obsessive Love'
+      | 'Secret Relationship'
+      | 'Office Romance'
+      | 'Reverse Harem'
+      | 'Polygamy'
+      | 'Tsundere'
+      | 'Yandere'
+      | 'Cross-dressing'
+      | 'Cultivation'
+      | 'Sect Development'
+      | 'Master-Disciple Relationship'
+      | 'Dao Companion'
+      | 'Alchemy'
+      | 'Martial Spirits'
+      | 'Immortals'
+      | 'Multiple Realms'
+      | 'Strength-based Social Hierarchy'
+      | 'Bloodlines'
+      | 'Ancient China'
+      | 'Magic'
+      | 'Magic Beasts'
+      | 'Dragons'
+      | 'Elves'
+      | 'Demons'
+      | 'Demon Lord'
+      | 'Gods'
+      | 'Vampires'
+      | 'Werebeasts'
+      | 'Zombies'
+      | 'Ghosts'
+      | 'Witches'
+      | 'Necromancer'
+      | 'Beastkin'
+      | 'Monster Tamer'
+      | 'Curses'
+      | 'Artificial Intelligence'
+      | 'Androids'
+      | 'Aliens'
+      | 'Cosmic Wars'
+      | 'Apocalypse'
+      | 'Post-apocalyptic'
+      | 'Dystopia'
+      | 'Genetic Modifications'
+      | 'Virtual Reality'
+      | 'Time Travel'
+      | 'Game Elements'
+      | 'Level System'
+      | 'MMORPG'
+      | 'Dungeons'
+      | 'Tower Climbing'
+      | 'Cheats'
+      | 'Hidden Abilities'
+      | 'Transported into a Game World'
+      | 'Survival Game'
+      | 'e-Sports'
+      | 'Modern Knowledge'
+      | 'Business Management'
+      | 'Showbiz'
+      | 'Celebrities'
+      | 'Medical Knowledge'
+      | 'Organized Crime'
+      | 'Academy'
+      | 'College/University'
+      | 'Nobles'
+      | 'Royalty'
+      | 'Court Official'
+      | 'Imperial Harem'
+      | 'Kingdom Building'
+      | 'Politics'
+      | 'Schemes And Conspiracies'
+      | 'Wars'
+      | 'Military'
+      | 'Medieval'
+      | 'Reincarnation'
+      | 'Transmigration'
+      | 'Transported to Another World'
+      | 'Returning from Another World'
+      | 'Parallel Worlds'
+      | 'Time Loop'
+      | 'Time Skip'
+      | 'Second Chance'
+      | 'Amnesia'
+      | 'Hiding True Identity'
+      | 'Mistaken Identity'
+      | 'Body Swap'
+      | 'Possession'
+      | 'Prophecies'
+      | 'Revenge'
+      | 'Villainess Noble Girls'
+      | 'Assassins'
+      | 'Mercenaries'
+      | 'Knights'
+      | 'Ninjas'
+      | 'Samurai'
+      | 'Pirates'
+      | 'Hunters'
+      | 'Strategic Battles'
+      | 'Battle Competition'
+      | 'Harsh Training'
+      | 'Sword Wielder'
+      | 'Firearms'
+      | 'Farming'
+      | 'Cooking'
+      | 'Crafting'
+      | 'Blacksmith'
+      | 'Herbalist'
+      | 'Merchants'
+      | 'Healers'
+      | 'Easy Going Life'
+      | 'Found Family'
+      | 'Survival'
+      | 'Betrayal'
+      | 'Past Trauma'
+      | 'Death of Loved Ones'
+      | 'Bullying'
+      | 'Discrimination'
+      | 'Slaves'
+      | 'Human Experimentation'
+      | 'Drugs'
+      | 'Depression'
+      | 'Terminal Illness';
+    /** @enum {string} */
+    SexualContentRating: 'none' | 'suggestive' | 'moderate' | 'explicit';
+    /** @enum {string} */
+    ViolenceRating: 'none' | 'mild' | 'graphic' | 'extreme';
+    /** @enum {string} */
+    DarkContentRating: 'none' | 'mild' | 'heavy';
     PublishResultResponse: {
       slug: string;
       /** @enum {string} */
@@ -548,7 +747,9 @@ export interface components {
     NovelAccessBody: {
       /** @enum {string} */
       visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
+      /** @description Required only when visibility is ORGANISATION. */
       organisationId?: string;
+      /** @description Resolved identity subject IDs. Email addresses are not accepted. */
       subjectIds?: string[];
       revision: number;
     };
@@ -564,6 +765,7 @@ export interface components {
       content: string;
       authorNote?: string;
       contentHash: string;
+      /** @description Forge-assigned monotonic revision used for optimistic concurrency. */
       revision: number;
       wordCount?: number;
       publishedAt?: string;
@@ -578,9 +780,12 @@ export interface components {
       /** @enum {string} */
       type: 'character' | 'faction' | 'location' | 'item' | 'concept' | 'power_rule';
       name: string;
+      /** @description Content-addressed storage reference, such as <sha256>.webp. */
       imageRef?: string;
+      /** @description First reader ordinal at which this entry appears; 0 exposes it before reading. */
       firstVisibleOrdinal: number;
       contentHash: string;
+      /** @description Forge-assigned monotonic revision used for optimistic concurrency. */
       revision: number;
       facets: components['schemas']['WikiFacetInput'][];
       images: components['schemas']['WikiImageInput'][];
@@ -589,6 +794,7 @@ export interface components {
       facetKey: string;
       content: string;
       sortOrder: number;
+      /** @description First reader ordinal at which this facet becomes visible. */
       visibleFromOrdinal: number;
     };
     WikiImageInput: {
@@ -624,11 +830,22 @@ export interface components {
       slug: string;
       title: string;
       blurb?: string;
+      /** @description Absolute public URL; absent when the novel has no cover. */
       coverUrl?: string;
-      genres: string[];
+      genres: components['schemas']['NovelGenre'][];
+      tags: components['schemas']['NovelTag'][];
+      /** @description Absent when unrated; never asserts the absence of content. */
+      sexualContent?: components['schemas']['SexualContentRating'];
+      /** @description Absent when unrated; never asserts the absence of content. */
+      violence?: components['schemas']['ViolenceRating'];
+      /** @description Absent when unrated; never asserts the absence of content. */
+      darkContent?: components['schemas']['DarkContentRating'];
       /** @enum {string} */
       status: 'live' | 'retired';
-      /** @enum {string} */
+      /**
+       * @description The access tier already authorized for the caller.
+       * @enum {string}
+       */
       visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
       chapterCount: number;
       updatedAt: string;
@@ -637,11 +854,22 @@ export interface components {
       slug: string;
       title: string;
       blurb?: string;
+      /** @description Absolute public URL; absent when the novel has no cover. */
       coverUrl?: string;
-      genres: string[];
+      genres: components['schemas']['NovelGenre'][];
+      tags: components['schemas']['NovelTag'][];
+      /** @description Absent when unrated; never asserts the absence of content. */
+      sexualContent?: components['schemas']['SexualContentRating'];
+      /** @description Absent when unrated; never asserts the absence of content. */
+      violence?: components['schemas']['ViolenceRating'];
+      /** @description Absent when unrated; never asserts the absence of content. */
+      darkContent?: components['schemas']['DarkContentRating'];
       /** @enum {string} */
       status: 'live' | 'retired';
-      /** @enum {string} */
+      /**
+       * @description The access tier already authorized for the caller.
+       * @enum {string}
+       */
       visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
       chapterCount: number;
       updatedAt: string;
@@ -672,6 +900,7 @@ export interface components {
     ProgressListItem: {
       ordinal: number;
       position: number;
+      /** @description Furthest chapter ever reached; it does not decrease when rereading earlier chapters. */
       furthestOrdinal: number;
       updatedAt: string;
       novelSlug: string;
@@ -679,11 +908,13 @@ export interface components {
     ProgressResponse: {
       ordinal: number;
       position: number;
+      /** @description Furthest chapter ever reached; it does not decrease when rereading earlier chapters. */
       furthestOrdinal: number;
       updatedAt: string;
     };
     ProgressBody: {
       ordinal: number;
+      /** @description Scroll offset within the chapter as reported by the reader client. */
       position: number;
     };
     LibraryListResponse: {
@@ -692,12 +923,17 @@ export interface components {
     LibraryItem: {
       slug: string;
       title: string;
+      /** @description Absolute public URL; absent when the novel has no cover. */
       coverUrl?: string;
-      genres: string[];
+      genres: components['schemas']['NovelGenre'][];
       /** @enum {string} */
       status: 'live' | 'retired';
-      /** @enum {string} */
+      /**
+       * @description The access tier already authorized for the caller.
+       * @enum {string}
+       */
       visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
+      /** @description Shelf addition time; on /shared, this is the novel's last update time. */
       addedAt: string;
     };
     LibraryAddBody: {
@@ -705,6 +941,7 @@ export interface components {
     };
     WikiListResponse: {
       items: components['schemas']['WikiListItem'][];
+      /** @description Number of entries hidden beyond the reader's progress gate; hidden entries are never returned. */
       lockedCount: number;
     };
     WikiListItem: {
@@ -712,6 +949,7 @@ export interface components {
       /** @enum {string} */
       type: 'character' | 'faction' | 'location' | 'item' | 'concept' | 'power_rule';
       name: string;
+      /** @description Absolute public URL; absent when the entry has no image. */
       imageUrl?: string;
     };
     WikiEntryDetailResponse: {
@@ -722,6 +960,7 @@ export interface components {
       imageUrl?: string;
       facets: components['schemas']['WikiFacetItem'][];
       images: components['schemas']['WikiImageItem'][];
+      /** @description Number of facets hidden beyond the reader's progress gate; hidden facet content is never returned. */
       hiddenFacetCount: number;
     };
     WikiFacetItem: {
@@ -1245,6 +1484,7 @@ export interface operations {
       header?: never;
       path: {
         slug: string;
+        /** @description A positive chapter ordinal of at most 9 digits. */
         ordinal: string;
       };
       cookie?: never;
@@ -1290,6 +1530,7 @@ export interface operations {
       header?: never;
       path: {
         slug: string;
+        /** @description A positive chapter ordinal of at most 9 digits. */
         ordinal: string;
       };
       cookie?: never;
@@ -1362,6 +1603,7 @@ export interface operations {
       header?: never;
       path: {
         slug: string;
+        /** @description Forge-assigned stable wiki entry key. */
         entryKey: string;
       };
       cookie?: never;
@@ -1407,6 +1649,7 @@ export interface operations {
       header?: never;
       path: {
         slug: string;
+        /** @description Forge-assigned stable wiki entry key. */
         entryKey: string;
       };
       cookie?: never;
@@ -1480,9 +1723,14 @@ export interface operations {
         offset?: number | string;
         sortOrder?: components['schemas']['SortOrder'];
         sortBy?: components['schemas']['NovelSortBy'];
+        /** @description Case-insensitive substring match on the title. */
         search?: string;
-        genre?: string;
+        genre?: components['schemas']['NovelGenre'];
+        tag?: components['schemas']['NovelTag'];
         status?: 'live' | 'retired';
+        maxSexualContent?: components['schemas']['SexualContentRating'];
+        maxViolence?: components['schemas']['ViolenceRating'];
+        maxDarkContent?: components['schemas']['DarkContentRating'];
       };
       header?: never;
       path?: never;
@@ -1605,6 +1853,7 @@ export interface operations {
       header?: never;
       path: {
         slug: string;
+        /** @description A positive chapter ordinal of at most 9 digits. */
         ordinal: string;
       };
       cookie?: never;
@@ -1948,6 +2197,7 @@ export interface operations {
       header?: never;
       path: {
         slug: string;
+        /** @description Forge-assigned stable wiki entry key. */
         entryKey: string;
       };
       cookie?: never;
@@ -1997,6 +2247,11 @@ export type HealthResponse = components['schemas']['HealthResponse'];
 export type ReadyResponse = components['schemas']['ReadyResponse'];
 export type HealthDependencies = components['schemas']['HealthDependencies'];
 export type NovelUpsertBody = components['schemas']['NovelUpsertBody'];
+export type NovelGenre = components['schemas']['NovelGenre'];
+export type NovelTag = components['schemas']['NovelTag'];
+export type SexualContentRating = components['schemas']['SexualContentRating'];
+export type ViolenceRating = components['schemas']['ViolenceRating'];
+export type DarkContentRating = components['schemas']['DarkContentRating'];
 export type PublishResultResponse = components['schemas']['PublishResultResponse'];
 export type NovelAccessBody = components['schemas']['NovelAccessBody'];
 export type NovelAccessResponse = components['schemas']['NovelAccessResponse'];

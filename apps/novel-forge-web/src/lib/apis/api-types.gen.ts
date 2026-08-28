@@ -4489,20 +4489,221 @@ export interface components {
       title?: string;
       blurb?: string | null;
       coverPath?: string | null;
-      genres?: string[];
+      /** @description Reader catalog genres; null clears them, omission keeps the stored ones. */
+      genres?: components['schemas']['NovelGenre'][] | null;
+      /** @description Reader catalog tags; null clears them, omission keeps the stored ones. */
+      tags?: components['schemas']['NovelTag'][] | null;
+      /** @description Content rating level; null clears it back to unrated, omission keeps the stored level. No level means unrated — never send "none" to say it. */
+      sexualContent?: components['schemas']['SexualContentRating'] | null;
+      /** @description Content rating level; null clears it back to unrated, omission keeps the stored level. No level means unrated — never send "none" to say it. */
+      violence?: components['schemas']['ViolenceRating'] | null;
+      /** @description Content rating level; null clears it back to unrated, omission keeps the stored level. No level means unrated — never send "none" to say it. */
+      darkContent?: components['schemas']['DarkContentRating'] | null;
       /**
        * @description Publication status; omission defaults to 'live'.
        * @enum {string}
        */
       status?: 'live' | 'retired';
     };
+    /** @enum {string} */
+    NovelGenre:
+      | 'Action'
+      | 'Adult'
+      | 'Adventure'
+      | 'Comedy'
+      | 'Drama'
+      | 'Ecchi'
+      | 'Fantasy'
+      | 'Gender Bender'
+      | 'Harem'
+      | 'Historical'
+      | 'Horror'
+      | 'Josei'
+      | 'Martial Arts'
+      | 'Mature'
+      | 'Mecha'
+      | 'Mystery'
+      | 'Psychological'
+      | 'Romance'
+      | 'School Life'
+      | 'Sci-fi'
+      | 'Seinen'
+      | 'Shoujo'
+      | 'Shoujo Ai'
+      | 'Shounen'
+      | 'Shounen Ai'
+      | 'Slice of Life'
+      | 'Smut'
+      | 'Sports'
+      | 'Supernatural'
+      | 'Tragedy'
+      | 'Wuxia'
+      | 'Xianxia'
+      | 'Xuanhuan'
+      | 'Yaoi'
+      | 'Yuri';
+    /** @enum {string} */
+    NovelTag:
+      | 'Male Protagonist'
+      | 'Female Protagonist'
+      | 'Overpowered Protagonist'
+      | 'Weak to Strong'
+      | 'Protagonist Strong from the Start'
+      | 'Antihero Protagonist'
+      | 'Evil Protagonist'
+      | 'Ruthless Protagonist'
+      | 'Genius Protagonist'
+      | 'Calm Protagonist'
+      | 'Lazy Protagonist'
+      | 'Loner Protagonist'
+      | 'Underestimated Protagonist'
+      | 'Multiple Protagonists'
+      | 'Slow Romance'
+      | 'Love Triangles'
+      | 'Childhood Friends'
+      | 'Arranged Marriage'
+      | 'Marriage of Convenience'
+      | 'Enemies Become Lovers'
+      | 'Fated Lovers'
+      | 'Unrequited Love'
+      | 'Obsessive Love'
+      | 'Secret Relationship'
+      | 'Office Romance'
+      | 'Reverse Harem'
+      | 'Polygamy'
+      | 'Tsundere'
+      | 'Yandere'
+      | 'Cross-dressing'
+      | 'Cultivation'
+      | 'Sect Development'
+      | 'Master-Disciple Relationship'
+      | 'Dao Companion'
+      | 'Alchemy'
+      | 'Martial Spirits'
+      | 'Immortals'
+      | 'Multiple Realms'
+      | 'Strength-based Social Hierarchy'
+      | 'Bloodlines'
+      | 'Ancient China'
+      | 'Magic'
+      | 'Magic Beasts'
+      | 'Dragons'
+      | 'Elves'
+      | 'Demons'
+      | 'Demon Lord'
+      | 'Gods'
+      | 'Vampires'
+      | 'Werebeasts'
+      | 'Zombies'
+      | 'Ghosts'
+      | 'Witches'
+      | 'Necromancer'
+      | 'Beastkin'
+      | 'Monster Tamer'
+      | 'Curses'
+      | 'Artificial Intelligence'
+      | 'Androids'
+      | 'Aliens'
+      | 'Cosmic Wars'
+      | 'Apocalypse'
+      | 'Post-apocalyptic'
+      | 'Dystopia'
+      | 'Genetic Modifications'
+      | 'Virtual Reality'
+      | 'Time Travel'
+      | 'Game Elements'
+      | 'Level System'
+      | 'MMORPG'
+      | 'Dungeons'
+      | 'Tower Climbing'
+      | 'Cheats'
+      | 'Hidden Abilities'
+      | 'Transported into a Game World'
+      | 'Survival Game'
+      | 'e-Sports'
+      | 'Modern Knowledge'
+      | 'Business Management'
+      | 'Showbiz'
+      | 'Celebrities'
+      | 'Medical Knowledge'
+      | 'Organized Crime'
+      | 'Academy'
+      | 'College/University'
+      | 'Nobles'
+      | 'Royalty'
+      | 'Court Official'
+      | 'Imperial Harem'
+      | 'Kingdom Building'
+      | 'Politics'
+      | 'Schemes And Conspiracies'
+      | 'Wars'
+      | 'Military'
+      | 'Medieval'
+      | 'Reincarnation'
+      | 'Transmigration'
+      | 'Transported to Another World'
+      | 'Returning from Another World'
+      | 'Parallel Worlds'
+      | 'Time Loop'
+      | 'Time Skip'
+      | 'Second Chance'
+      | 'Amnesia'
+      | 'Hiding True Identity'
+      | 'Mistaken Identity'
+      | 'Body Swap'
+      | 'Possession'
+      | 'Prophecies'
+      | 'Revenge'
+      | 'Villainess Noble Girls'
+      | 'Assassins'
+      | 'Mercenaries'
+      | 'Knights'
+      | 'Ninjas'
+      | 'Samurai'
+      | 'Pirates'
+      | 'Hunters'
+      | 'Strategic Battles'
+      | 'Battle Competition'
+      | 'Harsh Training'
+      | 'Sword Wielder'
+      | 'Firearms'
+      | 'Farming'
+      | 'Cooking'
+      | 'Crafting'
+      | 'Blacksmith'
+      | 'Herbalist'
+      | 'Merchants'
+      | 'Healers'
+      | 'Easy Going Life'
+      | 'Found Family'
+      | 'Survival'
+      | 'Betrayal'
+      | 'Past Trauma'
+      | 'Death of Loved Ones'
+      | 'Bullying'
+      | 'Discrimination'
+      | 'Slaves'
+      | 'Human Experimentation'
+      | 'Drugs'
+      | 'Depression'
+      | 'Terminal Illness';
+    /** @enum {string} */
+    SexualContentRating: 'none' | 'suggestive' | 'moderate' | 'explicit';
+    /** @enum {string} */
+    ViolenceRating: 'none' | 'mild' | 'graphic' | 'extreme';
+    /** @enum {string} */
+    DarkContentRating: 'none' | 'mild' | 'heavy';
     PublicationResponse: {
       id: string;
       novelSlug: string;
       title: string;
       blurb?: null | string;
       coverPath?: null | string;
-      genres?: null | string[];
+      genres?: null | components['schemas']['NovelGenre'][];
+      tags?: null | components['schemas']['NovelTag'][];
+      sexualContent?: components['schemas']['SexualContentRating'] | null;
+      violence?: components['schemas']['ViolenceRating'] | null;
+      darkContent?: components['schemas']['DarkContentRating'] | null;
       status: components['schemas']['PublicationStatus'];
       revision: number;
       /** Format: date-time */
@@ -12452,6 +12653,11 @@ export type ReforgeCutKind = components['schemas']['ReforgeCutKind'];
 export type ReforgeCutDisposition = components['schemas']['ReforgeCutDisposition'];
 export type ReforgeManuscriptResponse = components['schemas']['ReforgeManuscriptResponse'];
 export type PublishNovelBody = components['schemas']['PublishNovelBody'];
+export type NovelGenre = components['schemas']['NovelGenre'];
+export type NovelTag = components['schemas']['NovelTag'];
+export type SexualContentRating = components['schemas']['SexualContentRating'];
+export type ViolenceRating = components['schemas']['ViolenceRating'];
+export type DarkContentRating = components['schemas']['DarkContentRating'];
 export type PublicationResponse = components['schemas']['PublicationResponse'];
 export type PublicationStatus = components['schemas']['PublicationStatus'];
 export type PublishChapterBody = components['schemas']['PublishChapterBody'];

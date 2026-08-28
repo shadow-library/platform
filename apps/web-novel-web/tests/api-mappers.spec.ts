@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { type LibraryEntry, type ReadingProgress, toLibraryEntry, toReadingProgress } from '@/lib/apis';
+import { type LibraryEntry, type LibraryListResponse, type ReadingProgress, toLibraryEntry, toReadingProgress } from '@/lib/apis';
 
-const LIBRARY_RESPONSE = {
+const LIBRARY_RESPONSE: LibraryListResponse = {
   items: [
     {
       slug: 'omniscient-sovereigns',
       title: 'Omniscient Sovereigns',
-      genres: ['Fantasy', 'System'],
+      genres: ['Fantasy', 'Supernatural'],
       status: 'live' as const,
       visibility: 'PUBLIC' as const,
       addedAt: '2026-07-01T10:00:00.000Z',
@@ -16,7 +16,7 @@ const LIBRARY_RESPONSE = {
       slug: 'starfall-requiem',
       title: 'Starfall Requiem',
       coverUrl: 'http://localhost:9000/wiki-assets/starfall.webp',
-      genres: ['Sci-Fi'],
+      genres: ['Sci-fi'],
       status: 'retired' as const,
       visibility: 'PUBLIC' as const,
       addedAt: '2026-06-20T08:30:00.000Z',
@@ -39,7 +39,7 @@ describe('toLibraryEntry', () => {
     expect(entry.novel).toMatchObject({
       slug: 'omniscient-sovereigns',
       title: 'Omniscient Sovereigns',
-      genres: ['Fantasy', 'System'],
+      genres: ['Fantasy', 'Supernatural'],
       status: 'ongoing',
       author: 'Unknown author',
     });
