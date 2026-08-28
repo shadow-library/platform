@@ -1,7 +1,24 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
+import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
 
-import { ChapterPublicationStatus, PublicationGrantState, PublicationStatus, PublicationVisibility } from '@server/common';
+import {
+  ChapterPublicationStatus,
+  DarkContentRating,
+  NovelGenre,
+  NovelTag,
+  PublicationGrantState,
+  PublicationStatus,
+  PublicationVisibility,
+  SexualContentRating,
+  ViolenceRating,
+} from '@server/common';
+
+/** The reader rejects a duplicate outright, so the cap and the uniqueness both belong at this boundary rather than at the push. */
+export const MAX_NOVEL_GENRES = 10;
+export const MAX_NOVEL_TAGS = 30;
+
+const RATING_DESCRIPTION = 'Content rating level; null clears it back to unrated, omission keeps the stored level. No level means unrated — never send "none" to say it.';
 
 @Schema()
 export class PublishingProjectParams {
@@ -41,8 +58,32 @@ export class PublishNovelBody {
   @Field(() => String, { optional: true, nullable: true, maxLength: 512 })
   coverPath?: string | null;
 
-  @Field(() => [String], { optional: true })
-  genres?: string[];
+  @Field(() => [NovelGenre], {
+    optional: true,
+    nullable: true,
+    uniqueItems: true,
+    maxItems: MAX_NOVEL_GENRES,
+    description: 'Reader catalog genres; null clears them, omission keeps the stored ones.',
+  })
+  genres?: Genre[] | null;
+
+  @Field(() => [NovelTag], {
+    optional: true,
+    nullable: true,
+    uniqueItems: true,
+    maxItems: MAX_NOVEL_TAGS,
+    description: 'Reader catalog tags; null clears them, omission keeps the stored ones.',
+  })
+  tags?: Tag[] | null;
+
+  @Field(() => SexualContentRating, { optional: true, nullable: true, description: RATING_DESCRIPTION })
+  sexualContent?: SexualContentLevel | null;
+
+  @Field(() => ViolenceRating, { optional: true, nullable: true, description: RATING_DESCRIPTION })
+  violence?: ViolenceLevel | null;
+
+  @Field(() => DarkContentRating, { optional: true, nullable: true, description: RATING_DESCRIPTION })
+  darkContent?: DarkContentLevel | null;
 
   @Field(() => String, { enum: ['live', 'retired'], optional: true, description: "Publication status; omission defaults to 'live'." })
   status?: 'live' | 'retired';
@@ -76,8 +117,20 @@ export class PublicationResponse {
   @Field({ optional: true, nullable: true })
   coverPath?: string | null;
 
-  @Field(() => [String], { optional: true, nullable: true })
-  genres?: string[] | null;
+  @Field(() => [NovelGenre], { optional: true, nullable: true })
+  genres?: Genre[] | null;
+
+  @Field(() => [NovelTag], { optional: true, nullable: true })
+  tags?: Tag[] | null;
+
+  @Field(() => SexualContentRating, { optional: true, nullable: true })
+  sexualContent?: SexualContentLevel | null;
+
+  @Field(() => ViolenceRating, { optional: true, nullable: true })
+  violence?: ViolenceLevel | null;
+
+  @Field(() => DarkContentRating, { optional: true, nullable: true })
+  darkContent?: DarkContentLevel | null;
 
   @Field(() => PublicationStatus)
   status: string;

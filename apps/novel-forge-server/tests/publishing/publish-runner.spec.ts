@@ -138,6 +138,50 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     expect(reader.requests.every(request => request.hasBearer)).toBe(true);
   });
 
+  it('should carry genres, tags and ratings to the reader and repush when only a tag or a rating changes', async () => {
+    const { projectId, slug } = await seedPublishedProject(1);
+    await publishingService.publishNovel(projectId, { genres: ['Fantasy', 'Adventure'], tags: ['Cultivation'], violence: 'graphic' });
+    await runner.converge(projectId);
+    expect(reader.novels.get(slug)).toMatchObject({ genres: ['Fantasy', 'Adventure'], tags: ['Cultivation'], violence: 'graphic' });
+
+    await publishingService.publishNovel(projectId, { tags: ['Cultivation', 'Weak to Strong'] });
+    const tagOnly = await runner.converge(projectId);
+    expect(tagOnly.novel).toBe('applied');
+    expect(reader.novels.get(slug)?.tags).toEqual(['Cultivation', 'Weak to Strong']);
+
+    await publishingService.publishNovel(projectId, { darkContent: 'heavy' });
+    const ratingOnly = await runner.converge(projectId);
+    expect(ratingOnly.novel).toBe('applied');
+    expect(reader.novels.get(slug)?.darkContent).toBe('heavy');
+  });
+
+  it('should carry a nulled rating to the reader as unrated and leave an omitted one standing', async () => {
+    const { projectId, slug } = await seedPublishedProject(1);
+    await publishingService.publishNovel(projectId, { violence: 'mild', darkContent: 'heavy' });
+    await runner.converge(projectId);
+    expect(reader.novels.get(slug)).toMatchObject({ violence: 'mild', darkContent: 'heavy', sexualContent: null });
+
+    await publishingService.publishNovel(projectId, { blurb: 'A metadata-only save.' });
+    await runner.converge(projectId);
+    expect(reader.novels.get(slug)).toMatchObject({ violence: 'mild', darkContent: 'heavy' });
+
+    await publishingService.publishNovel(projectId, { violence: null });
+    await runner.converge(projectId);
+    expect(reader.novels.get(slug)).toMatchObject({ violence: null, darkContent: 'heavy' });
+  });
+
+  it('should drop duplicate and unknown vocabulary stored before the reader closed it', async () => {
+    const { projectId, slug } = await seedPublishedProject(1);
+    await db
+      .update(schema.publications)
+      .set({ genres: ['Fantasy', 'Fantasy', 'grimdark'] as never, tags: ['Cultivation', 'Cultivation'] as never })
+      .where(eq(schema.publications.projectId, projectId));
+
+    const result = await runner.converge(projectId);
+    expect(result.novel).toBe('applied');
+    expect(reader.novels.get(slug)).toMatchObject({ genres: ['Fantasy'], tags: ['Cultivation'] });
+  });
+
   it('should make retries and replays no-ops: converged state skips, re-pushes answer 204', async () => {
     const { projectId, slug } = await seedPublishedProject(2);
     await runner.converge(projectId);

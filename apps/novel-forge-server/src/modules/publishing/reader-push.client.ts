@@ -1,6 +1,7 @@
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { type APIResponse, Logger } from '@shadow-library/common';
+import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
 
 import { APP_NAME } from '@server/constants';
 
@@ -8,7 +9,12 @@ export interface NovelPushBody {
   title: string;
   blurb?: string;
   coverPath?: string;
-  genres?: string[];
+  genres?: Genre[];
+  tags?: Tag[];
+  /** Omission is how a rating is cleared: the reader stores an absent dimension as unrated, and rejects an explicit null. */
+  sexualContent?: SexualContentLevel;
+  violence?: ViolenceLevel;
+  darkContent?: DarkContentLevel;
   status?: 'live' | 'retired';
   /** Required by the reader, not optional: a default would let a dropped field publish a private novel publicly. */
   visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';

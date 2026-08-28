@@ -83,8 +83,82 @@ describe.if(pgAvailable)('Publishing API', () => {
       const unchanged = await publishNovel(projectId, { blurb: 'A city of gates.' });
       expect(unchanged.revision).toBe(1);
 
-      const updated = await publishNovel(projectId, { blurb: 'A city of gates and ash.', genres: ['fantasy'] });
-      expect(updated).toMatchObject({ revision: 2, blurb: 'A city of gates and ash.', genres: ['fantasy'], novelSlug: 'ashes-of-veldram' });
+      const updated = await publishNovel(projectId, { blurb: 'A city of gates and ash.', genres: ['Fantasy'] });
+      expect(updated).toMatchObject({ revision: 2, blurb: 'A city of gates and ash.', genres: ['Fantasy'], novelSlug: 'ashes-of-veldram' });
+    });
+
+    it('should store the catalog vocabulary and bump the revision for a tag-only or rating-only change', async () => {
+      const projectId = await createProject();
+      const created = await publishNovel(projectId, { title: 'Vocabulary', genres: ['Fantasy'], tags: ['Cultivation'], violence: 'graphic' });
+      expect(created).toMatchObject({ revision: 1, genres: ['Fantasy'], tags: ['Cultivation'], violence: 'graphic' });
+      expect(created.sexualContent).toBeNull();
+      expect(created.darkContent).toBeNull();
+
+      const tagged = await publishNovel(projectId, { tags: ['Cultivation', 'Weak to Strong'] });
+      expect(tagged).toMatchObject({ revision: 2, genres: ['Fantasy'], tags: ['Cultivation', 'Weak to Strong'], violence: 'graphic' });
+
+      const rated = await publishNovel(projectId, { darkContent: 'heavy' });
+      expect(rated).toMatchObject({ revision: 3, darkContent: 'heavy' });
+
+      const unchanged = await publishNovel(projectId, { darkContent: 'heavy' });
+      expect(unchanged.revision).toBe(3);
+    });
+
+    it('should retain every stored rating and array through a metadata-only save', async () => {
+      const projectId = await createProject();
+      const rated = { title: 'Still Rated', genres: ['Horror'], tags: ['Ruthless Protagonist'], sexualContent: 'explicit', violence: 'mild', darkContent: 'heavy' };
+      await publishNovel(projectId, rated);
+
+      const untouched = await publishNovel(projectId, { title: 'Still Rated' });
+      expect(untouched).toMatchObject({ revision: 1, ...rated });
+
+      const blurbed = await publishNovel(projectId, { blurb: 'Now with a blurb.' });
+      expect(blurbed).toMatchObject({ revision: 2, ...rated });
+
+      const stored = await testEnv.getPostgresClient().query.publications.findFirst({ where: eq(schema.publications.projectId, BigInt(projectId)) });
+      expect(stored).toMatchObject({ sexualContent: 'explicit', violence: 'mild', darkContent: 'heavy' });
+    });
+
+    it('should clear exactly the rating nulled and leave the other dimensions standing', async () => {
+      const projectId = await createProject();
+      await publishNovel(projectId, { title: 'Unrated Again', sexualContent: 'explicit', violence: 'mild', darkContent: 'heavy' });
+
+      const cleared = await publishNovel(projectId, { sexualContent: null });
+      expect(cleared).toMatchObject({ revision: 2, violence: 'mild', darkContent: 'heavy' });
+      expect(cleared.sexualContent).toBeNull();
+
+      const stored = await testEnv.getPostgresClient().query.publications.findFirst({ where: eq(schema.publications.projectId, BigInt(projectId)) });
+      expect(stored?.sexualContent).toBeNull();
+      expect(stored?.violence).toBe('mild');
+    });
+
+    it('should clear the catalog arrays on an explicit null', async () => {
+      const projectId = await createProject();
+      await publishNovel(projectId, { title: 'Emptied', genres: ['Horror'], tags: ['Ruthless Protagonist'] });
+
+      const cleared = await publishNovel(projectId, { genres: null, tags: null });
+      expect(cleared).toMatchObject({ revision: 2, genres: null, tags: null });
+    });
+
+    it('should reject vocabulary the reader would refuse: unknown terms, duplicates, and a level from another dimension', async () => {
+      const projectId = await createProject();
+      await publishNovel(projectId, { title: 'Rejections' });
+
+      const bodies = [
+        { genres: ['Grimdark'] },
+        { tags: ['Sentient Toaster'] },
+        { genres: ['Fantasy', 'Fantasy'] },
+        { tags: ['Cultivation', 'Cultivation'] },
+        { darkContent: 'extreme' },
+        { violence: 'suggestive' },
+      ];
+      for (const body of bodies) {
+        const response = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/publish`).body(body);
+        expect(response.statusCode).toBe(422);
+      }
+
+      const publication = await publishNovel(projectId, {});
+      expect(publication).toMatchObject({ revision: 1, genres: null, tags: null });
     });
 
     it('should bump the revision when a later publish supplies a different slug, and treat a resent identical slug as unchanged', async () => {

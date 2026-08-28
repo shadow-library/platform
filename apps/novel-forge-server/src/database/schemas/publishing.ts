@@ -1,5 +1,6 @@
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
 
 import { jsonb } from './jsonb';
 import { projects } from './projects';
@@ -51,7 +52,12 @@ export const publications = pgTable('publications', {
   title: varchar('title', { length: 256 }).notNull(),
   blurb: text('blurb'),
   coverPath: varchar('cover_path', { length: 512 }),
-  genres: jsonb('genres').$type<string[]>(),
+  genres: jsonb('genres').$type<Genre[]>(),
+  tags: jsonb('tags').$type<Tag[]>(),
+  /** Null is *unrated*, never `'none'` — the reader stores and filters the two differently, so an unset dimension must never be defaulted. */
+  sexualContent: varchar('sexual_content', { length: 16 }).$type<SexualContentLevel>(),
+  violence: varchar('violence', { length: 16 }).$type<ViolenceLevel>(),
+  darkContent: varchar('dark_content', { length: 16 }).$type<DarkContentLevel>(),
   status: publicationStatus('status').notNull().default('draft'),
   visibility: publicationVisibility('visibility').notNull().default('PUBLIC'),
   /**

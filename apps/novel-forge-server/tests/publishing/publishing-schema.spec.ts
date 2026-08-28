@@ -52,7 +52,17 @@ describe.if(pgAvailable)('publishing schemas', () => {
 
   it('should default publication columns and enforce one publication per project', async () => {
     const [publication] = await db.insert(schema.publications).values({ projectId, novelSlug: 'ashes-of-veldram', title: 'Ashes of Veldram' }).returning();
-    expect(publication).toMatchObject({ status: 'draft', revision: 1, blurb: null, coverPath: null, genres: null });
+    expect(publication).toMatchObject({
+      status: 'draft',
+      revision: 1,
+      blurb: null,
+      coverPath: null,
+      genres: null,
+      tags: null,
+      sexualContent: null,
+      violence: null,
+      darkContent: null,
+    });
 
     const duplicate = db.insert(schema.publications).values({ projectId, novelSlug: 'other-slug', title: 'Other' }).execute();
     expect(await violatedConstraint(duplicate)).toMatch(/publications_project_id_unique/);

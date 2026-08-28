@@ -1,3 +1,5 @@
+import { CONTENT_RATING_DIMENSIONS, isGenre, isRatingLevel, isTag } from '@shadow-library/sdk';
+
 export interface MockReaderChapter {
   title: string;
   content: string;
@@ -24,6 +26,10 @@ export interface MockReaderNovel {
   blurb: string | null;
   coverPath: string | null;
   genres: string[];
+  tags: string[];
+  sexualContent: string | null;
+  violence: string | null;
+  darkContent: string | null;
   status: string;
   visibility: string;
   revision: number;
@@ -90,6 +96,13 @@ export class MockReaderService {
     );
   }
 
+  /** Mirrors the reader's `uniqueItems` + closed-enum rejection so a duplicate or unknown term fails the push here exactly as it would in production. */
+  private isVocabulary(values: unknown, isMember: (value: unknown) => boolean): boolean {
+    if (values === undefined) return true;
+    if (!Array.isArray(values)) return false;
+    return values.every(isMember) && new Set(values).size === values.length;
+  }
+
   private async handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const hasBearer = request.headers.get('authorization')?.startsWith('Bearer ') ?? false;
@@ -132,12 +145,19 @@ export class MockReaderService {
     const revision = body.revision as number;
     const stored = this.novels.get(slug);
     if (stored && revision < stored.revision) return Response.json({ code: 'WBN_003' }, { status: 409 });
+    if (!this.isVocabulary(body.genres, isGenre) || !this.isVocabulary(body.tags, isTag)) return Response.json({ code: 'WBN_002' }, { status: 422 });
+    const ratings = CONTENT_RATING_DIMENSIONS.map(dimension => [dimension, body[dimension]] as const);
+    if (ratings.some(([dimension, level]) => level !== undefined && !isRatingLevel(dimension, level))) return Response.json({ code: 'WBN_002' }, { status: 422 });
 
     const next = {
       title: body.title as string,
       blurb: (body.blurb as string | undefined) ?? null,
       coverPath: (body.coverPath as string | undefined) ?? null,
       genres: (body.genres as string[] | undefined) ?? [],
+      tags: (body.tags as string[] | undefined) ?? [],
+      sexualContent: (body.sexualContent as string | undefined) ?? null,
+      violence: (body.violence as string | undefined) ?? null,
+      darkContent: (body.darkContent as string | undefined) ?? null,
       status: (body.status as string | undefined) ?? 'live',
       visibility: body.visibility as string,
       revision,
@@ -150,7 +170,11 @@ export class MockReaderService {
       next.coverPath === stored.coverPath &&
       next.status === stored.status &&
       next.visibility === stored.visibility &&
-      JSON.stringify(next.genres) === JSON.stringify(stored.genres);
+      next.sexualContent === stored.sexualContent &&
+      next.violence === stored.violence &&
+      next.darkContent === stored.darkContent &&
+      JSON.stringify(next.genres) === JSON.stringify(stored.genres) &&
+      JSON.stringify(next.tags) === JSON.stringify(stored.tags);
     if (unchanged) return new Response(null, { status: 204 });
 
     this.novels.set(slug, {

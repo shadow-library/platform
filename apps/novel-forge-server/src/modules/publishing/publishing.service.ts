@@ -74,6 +74,10 @@ export class PublishingService {
         blurb: body.blurb ?? null,
         coverPath: body.coverPath ?? null,
         genres: body.genres ?? null,
+        tags: body.tags ?? null,
+        sexualContent: body.sexualContent ?? null,
+        violence: body.violence ?? null,
+        darkContent: body.darkContent ?? null,
         status: body.status ?? ('live' as const),
       };
       const publication = body.novelSlug ? await this.insertWithGivenSlug(values, body.novelSlug) : await this.insertWithFreeSlug(values, slugify(title));
@@ -87,6 +91,10 @@ export class PublishingService {
       blurb: body.blurb !== undefined ? body.blurb : stored.blurb,
       coverPath: body.coverPath !== undefined ? body.coverPath : stored.coverPath,
       genres: body.genres !== undefined ? body.genres : stored.genres,
+      tags: body.tags !== undefined ? body.tags : stored.tags,
+      sexualContent: body.sexualContent !== undefined ? body.sexualContent : stored.sexualContent,
+      violence: body.violence !== undefined ? body.violence : stored.violence,
+      darkContent: body.darkContent !== undefined ? body.darkContent : stored.darkContent,
       status: body.status ?? ('live' as const),
     };
     const unchanged =
@@ -95,7 +103,11 @@ export class PublishingService {
       next.blurb === stored.blurb &&
       next.coverPath === stored.coverPath &&
       next.status === stored.status &&
-      JSON.stringify(next.genres ?? null) === JSON.stringify(stored.genres ?? null);
+      next.sexualContent === stored.sexualContent &&
+      next.violence === stored.violence &&
+      next.darkContent === stored.darkContent &&
+      JSON.stringify(next.genres ?? null) === JSON.stringify(stored.genres ?? null) &&
+      JSON.stringify(next.tags ?? null) === JSON.stringify(stored.tags ?? null);
     if (unchanged) return stored;
 
     const [updated] = await this.databaseService.run(() =>

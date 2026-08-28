@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
+import { type Genre, isGenre, isTag, type Tag } from '@shadow-library/sdk';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
@@ -192,7 +193,11 @@ export class PublishRunner {
           title: current.title,
           blurb: current.blurb ?? undefined,
           coverPath: current.coverPath ?? undefined,
-          genres: (current.genres as string[] | null) ?? undefined,
+          genres: this.vocabulary(current.genres, isGenre, 'genres', current.projectId),
+          tags: this.vocabulary(current.tags, isTag, 'tags', current.projectId),
+          sexualContent: current.sexualContent ?? undefined,
+          violence: current.violence ?? undefined,
+          darkContent: current.darkContent ?? undefined,
           status: current.status === 'retired' ? 'retired' : 'live',
           visibility: current.visibility,
           revision: current.revision,
@@ -222,6 +227,18 @@ export class PublishRunner {
       }
     }
     return this.abandonSlugLadder(current, entrySlug);
+  }
+
+  /**
+   * The DTO already rejects duplicates and unknown terms on the way in, so this guards the other
+   * direction: retiring a term from the sdk vocabulary leaves stored rows holding it, and the reader
+   * 422s the whole push over one — dropping it keeps the publication convergent until it is re-edited.
+   */
+  private vocabulary<T extends Genre | Tag>(stored: unknown, isMember: (value: unknown) => value is T, field: string, projectId: bigint): T[] | undefined {
+    if (!Array.isArray(stored) || stored.length === 0) return undefined;
+    const kept = [...new Set(stored.filter(isMember))];
+    if (kept.length !== stored.length) this.logger.warn('publication vocabulary values dropped before the reader push', { projectId, field, stored, kept });
+    return kept.length ? kept : undefined;
   }
 
   private async abandonSlugLadder(current: Publishing.Publication, entrySlug: string): Promise<never> {
