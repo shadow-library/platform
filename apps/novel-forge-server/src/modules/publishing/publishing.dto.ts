@@ -41,7 +41,7 @@ export class PublishNovelBody {
     maxLength: 128,
     description:
       'Reader URL slug; omission derives it from the title. A slug another project holds is rejected. ' +
-      'A different one on a later publish republishes the novel at the new URL — it does not rename the old one, which stays live until retired by hand.',
+      'A different one on a later publish renames the novel: the next converge moves it, chapters and all, and the old reader URL stops resolving.',
   })
   novelSlug?: string;
 

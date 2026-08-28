@@ -152,7 +152,7 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
       violence: violenceTouched ? (violence === UNRATED ? null : violence) : undefined,
       darkContent: darkContentTouched ? (darkContent === UNRATED ? null : darkContent) : undefined,
     };
-    // The slug travels only when it would change something, so a republish at a new URL is always a deliberate
+    // The slug travels only when it would change something, so a move to a new URL is always a deliberate
     // act here. Status travels only once the listing exists — on first publish an omitted one goes live.
     if (slug.trim() && slug.trim() !== publication?.novelSlug) body.novelSlug = slug.trim();
     if (publication) body.status = status;
@@ -196,7 +196,7 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
             error={fieldErrors['novelSlug'] ?? slugConflict}
             helper={
               publication
-                ? 'Changing it republishes the novel at the new URL. The old one stays live as a stale copy until you retire it by hand.'
+                ? 'Changing it moves the novel to the new URL, chapters and all. The old URL stops resolving, so links readers saved will break.'
                 : 'Lowercase and dashes; left blank it is derived from the title.'
             }
           >

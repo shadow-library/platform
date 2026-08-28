@@ -52,7 +52,7 @@ export interface PublicationsLedger {
 }
 
 export interface PublishNovelBody {
-  /** Changing it republishes at the new URL; the old slug stays live as a stale copy. Omitted, it is derived from the title. */
+  /** Changing it moves the novel to the new URL and the old one stops resolving. Omitted, it is derived from the title. */
   novelSlug?: string;
   title?: string;
   blurb?: string | null;

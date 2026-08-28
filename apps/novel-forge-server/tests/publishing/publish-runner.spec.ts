@@ -124,7 +124,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     expect(result).toMatchObject({ novel: 'applied', pushed: [1, 2], deleted: [], failed: [], unknownOrdinals: [] });
 
     const novel = reader.novels.get(slug);
-    expect(novel).toMatchObject({ title: 'Runner Novel 1', blurb: 'Pushed by tests.', status: 'live', revision: 1 });
+    expect(novel).toMatchObject({ title: 'Runner Novel 1', blurb: 'Pushed by tests.', status: 'live', revision: 1, sourceRef: String(projectId) });
     expect([...(novel?.chapters.keys() ?? [])]).toEqual([1, 2]);
 
     const row = await ledgerRow(projectId, 1);
@@ -404,17 +404,69 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     expect((await dueProjects()).map(String)).not.toContain(String(projectId));
   });
 
-  it('should refuse to re-slug a publication that already serves live reader URLs', async () => {
+  it('should rename the reader novel in place when the publication moves to a new slug, carrying its chapters', async () => {
+    const { projectId, slug } = await seedPublishedProject(2);
+    await runner.converge(projectId);
+    const servedHash = reader.novels.get(slug)?.chapters.get(1)?.contentHash;
+
+    const renamed = `${slug}-renamed`;
+    await publishingService.publishNovel(projectId, { novelSlug: renamed });
+    const result = await runner.converge(projectId);
+
+    // Nothing is re-pushed: the chapters came along with the row, so the manifest at the new slug already matches.
+    expect(result).toMatchObject({ novel: 'applied', pushed: [], skipped: [1, 2], failed: [] });
+    expect(reader.novels.has(slug)).toBe(false);
+    const moved = reader.novels.get(renamed);
+    expect(moved).toMatchObject({ sourceRef: String(projectId), revision: 2 });
+    expect([...(moved?.chapters.keys() ?? [])]).toEqual([1, 2]);
+    expect(moved?.chapters.get(1)?.contentHash).toBe(servedHash);
+  });
+
+  it('should re-slug a publication whose chapters are already published and carry them onto the new slug', async () => {
+    const { projectId, slug } = await seedPublishedProject(2);
+    await runner.converge(projectId);
+
+    const taken = `${slug}-taken`;
+    reader.foreignSlugs.add(taken);
+    await publishingService.publishNovel(projectId, { novelSlug: taken });
+
+    const result = await runner.converge(projectId);
+    expect(result).toMatchObject({ novel: 'applied', pushed: [], skipped: [1, 2], failed: [] });
+
+    const publication = await db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId) });
+    expect(publication?.novelSlug).toBe(`${taken}-2`);
+    expect(reader.novels.has(slug)).toBe(false);
+    expect([...(reader.novels.get(`${taken}-2`)?.chapters.keys() ?? [])]).toEqual([1, 2]);
+  });
+
+  it('should ladder onto a new slug when ownership of a converged one changes under the publication', async () => {
     const { projectId, slug } = await seedPublishedProject(1);
     await runner.converge(projectId);
-    // Ownership changed under us — a deleted-and-reclaimed reader row, or a rotated client id. Moving now would
-    // orphan the chapter URLs readers already hold and leave a duplicate novel behind.
+    // A rotated client id, or a reader row deleted and re-claimed: our ref lives in the old owner's key space now, so
+    // it misses too and the ladder builds a second novel. The first is unaddressable either way; parking the project
+    // would not recover it, only stop it publishing at all.
     reader.foreignSlugs.add(slug);
 
-    await expect(runner.converge(projectId)).rejects.toThrow(/Reader service push failed/);
+    const result = await runner.converge(projectId);
+    expect(result).toMatchObject({ novel: 'applied', pushed: [1], failed: [] });
+
     const publication = await db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId) });
-    expect(publication?.novelSlug).toBe(slug);
-    expect(reader.novels.has(`${slug}-2`)).toBe(false);
+    expect(publication?.novelSlug).toBe(`${slug}-2`);
+    expect([...(reader.novels.get(`${slug}-2`)?.chapters.keys() ?? [])]).toEqual([1]);
+  });
+
+  it('should adopt a reader row pushed before the forge sent a ref instead of publishing a second novel', async () => {
+    const { projectId, slug } = await seedPublishedProject(1);
+    await runner.converge(projectId);
+    const served = reader.novels.get(slug);
+    if (!served) throw new Error('reader lost the novel');
+    served.sourceRef = null;
+
+    await publishingService.publishNovel(projectId, { blurb: 'Adopted on the next converge.' });
+    const result = await runner.converge(projectId);
+    expect(result).toMatchObject({ novel: 'applied', failed: [] });
+    expect(reader.novels.get(slug)).toMatchObject({ sourceRef: String(projectId), blurb: 'Adopted on the next converge.' });
+    expect([...(reader.novels.get(slug)?.chapters.keys() ?? [])]).toEqual([1]);
   });
 
   it('should sweep a bare slug conflict while still parking stale, malformed and unattributed rejections', () => {

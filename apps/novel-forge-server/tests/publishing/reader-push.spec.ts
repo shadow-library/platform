@@ -85,7 +85,7 @@ describe('ReaderPushClient', () => {
 
     it('should discriminate novel, access and wiki pushes by the same body code', async () => {
       const conflicted = clientAnswering(409, { code: 'WBN_010' });
-      await expect(conflicted.upsertNovel('taken-slug', { title: 'A', visibility: 'PUBLIC', revision: 1 })).rejects.toBeInstanceOf(SlugConflictError);
+      await expect(conflicted.upsertNovel('taken-slug', { sourceRef: '42', title: 'A', visibility: 'PUBLIC', revision: 1 })).rejects.toBeInstanceOf(SlugConflictError);
       await expect(conflicted.upsertAccess('taken-slug', { visibility: 'PUBLIC', revision: 1 })).rejects.toBeInstanceOf(SlugConflictError);
 
       const stale = clientAnswering(409, { code: 'WBN_003' });

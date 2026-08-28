@@ -6,6 +6,8 @@ import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, t
 import { APP_NAME } from '@server/constants';
 
 export interface NovelPushBody {
+  /** Our own identity for the novel, not the reader's: it, not the slug, decides which row a push lands on, so a new slug renames rather than duplicates. */
+  sourceRef: string;
   title: string;
   blurb?: string;
   coverPath?: string;

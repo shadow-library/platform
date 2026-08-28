@@ -54,11 +54,11 @@ export class PublishingService {
    * Creates or updates the novel's publication record — metadata plus go-live (design §4). An
    * omitted `novelSlug` is derived from the title and walked past collisions on a suffix ladder; a
    * supplied one is taken verbatim — the only way out for a publication every candidate slug has
-   * been refused for. Supplying a different one later republishes the novel at the new URL rather
-   * than renaming it: the reader has no rename, so the next converge repushes every published
-   * chapter under the new slug and the reader novel at the old slug stays live until someone
-   * retires it by hand. Any reader-facing metadata change bumps the forge-assigned `revision` that
-   * drives the reader's optimistic concurrency.
+   * been refused for. Supplying a different one later renames the novel: the converge push carries
+   * the project's `sourceRef`, so the reader moves the row it already holds — chapters and wiki
+   * included — and nothing is left serving at the old URL, which stops resolving. Any reader-facing
+   * metadata change bumps the forge-assigned `revision` that drives the reader's optimistic
+   * concurrency.
    */
   async publishNovel(projectId: bigint, body: PublishNovelBody): Promise<Publishing.Publication> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
@@ -119,7 +119,7 @@ export class PublishingService {
     );
     if (!updated) throw AppErrorCode.PUB_001.create();
     if (updated.novelSlug !== stored.novelSlug)
-      this.logger.warn('publication republished under an explicit novelSlug; the reader novel at the old slug stays live', {
+      this.logger.warn('publication moved to an explicit novelSlug; the next converge renames the reader novel and the old URL stops resolving', {
         projectId,
         from: stored.novelSlug,
         to: updated.novelSlug,
@@ -196,22 +196,15 @@ export class PublishingService {
 
   /**
    * Moves the publication onto the next free slug near `base`, skipping the ones a caller already
-   * knows are unusable. Safe only while nothing of ours is served under the current slug: a refusal
-   * normally means the push never landed there, but a reader row that was deleted and re-claimed —
-   * or a rotated forge `clientId` — makes the reader refuse URLs it still serves for us, and moving
-   * then orphans them and duplicates the novel. A ledgered `published` row is that evidence, so it
-   * bars the move. Answers `undefined` whenever no move is available, so the caller decides how to
-   * give up.
+   * knows are unusable. Published chapters no longer bar the move: the converge push carries the
+   * project's `sourceRef`, so the reader resolves by it and re-slugging renames the row it already
+   * holds — chapters, wiki and access included. The one refusal that survives that is an ownership
+   * change (a rotated forge `clientId`, or a reader row deleted and re-claimed), where the ref
+   * lookup misses too and the ladder builds a second novel; refusing the move would not recover the
+   * first one, which is unaddressable either way, only leave the project unable to publish at all.
+   * Answers `undefined` whenever no move is available, so the caller decides how to give up.
    */
   async reassignSlug(publication: Publishing.Publication, base: string, unusable: ReadonlySet<string>): Promise<Publishing.Publication | undefined> {
-    const live = await this.db.query.chapterPublications.findFirst({
-      where: and(eq(schema.chapterPublications.projectId, publication.projectId), eq(schema.chapterPublications.status, 'published')),
-      columns: { id: true },
-    });
-    if (live) {
-      this.logger.warn('refusing to re-slug a publication that already serves live reader URLs', { projectId: publication.projectId, novelSlug: publication.novelSlug });
-      return undefined;
-    }
     for (let attempt = 1; attempt <= SLUG_ATTEMPT_LIMIT; attempt++) {
       const novelSlug = slugCandidate(base, attempt);
       if (novelSlug === publication.novelSlug || unusable.has(novelSlug)) continue;

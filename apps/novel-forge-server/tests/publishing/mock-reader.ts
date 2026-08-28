@@ -22,6 +22,8 @@ export interface MockReaderWikiEntry {
 }
 
 export interface MockReaderNovel {
+  /** The publisher's own identifier for the row; when a push carries one it, not the map key, decides which row is resolved. */
+  sourceRef: string | null;
   title: string;
   blurb: string | null;
   coverPath: string | null;
@@ -51,8 +53,11 @@ interface RecordedRequest {
  * An in-process reader service speaking web-novel-server's exact `/internal/*` contract: PUT novel /
  * chapter answering 200 applied, 204 no-op (same revision + same content), 409 `WBN_003` on a stale
  * incoming revision, 409 `WBN_010` on a slug another publisher owns and 400 `WBN_011` on a payload
- * whose hash it recomputes differently; idempotent DELETE 204; bare-array manifest. State is
- * inspectable and wipeable so specs can drive retry, conflict, and wipe-and-rebuild scenarios.
+ * whose hash it recomputes differently; idempotent DELETE 204; bare-array manifest. A novel push is
+ * resolved by its `sourceRef` first and by the slug only as a fallback, so a push under a new slug
+ * renames the row — the map key moves and the chapters, wiki and access record travel with it —
+ * exactly as `publish.service.ts`'s `lockNovel` does. State is inspectable and wipeable so specs can
+ * drive retry, conflict, and wipe-and-rebuild scenarios.
  */
 
 export class MockReaderService {
@@ -143,7 +148,10 @@ export class MockReaderService {
 
   private upsertNovel(slug: string, body: Record<string, unknown>): Response {
     const revision = body.revision as number;
-    const stored = this.novels.get(slug);
+    const sourceRef = (body.sourceRef as string | undefined) ?? null;
+    const held = this.resolveNovel(slug, sourceRef);
+    if (held === 'foreign') return Response.json({ code: 'WBN_010' }, { status: 409 });
+    const [storedSlug, stored] = held;
     if (stored && revision < stored.revision) return Response.json({ code: 'WBN_003' }, { status: 409 });
     if (!this.isVocabulary(body.genres, isGenre) || !this.isVocabulary(body.tags, isTag)) return Response.json({ code: 'WBN_002' }, { status: 422 });
     const ratings = CONTENT_RATING_DIMENSIONS.map(dimension => [dimension, body[dimension]] as const);
@@ -164,7 +172,9 @@ export class MockReaderService {
     };
     const unchanged =
       stored &&
+      storedSlug === slug &&
       revision === stored.revision &&
+      stored.sourceRef === (sourceRef ?? stored.sourceRef) &&
       next.title === stored.title &&
       next.blurb === stored.blurb &&
       next.coverPath === stored.coverPath &&
@@ -176,9 +186,14 @@ export class MockReaderService {
       JSON.stringify(next.genres) === JSON.stringify(stored.genres) &&
       JSON.stringify(next.tags) === JSON.stringify(stored.tags);
     if (unchanged) return new Response(null, { status: 204 });
+    // A rename onto a slug another row of ours already holds violates the reader's unique slug, which its update path reports as WBN_010.
+    if (storedSlug !== slug && this.novels.has(slug)) return Response.json({ code: 'WBN_010' }, { status: 409 });
 
+    this.novels.delete(storedSlug);
     this.novels.set(slug, {
       ...next,
+      /** An omitted ref never clears a stored one — a publisher must not un-identify its own row by regressing. */
+      sourceRef: sourceRef ?? stored?.sourceRef ?? null,
       organisationId: stored?.organisationId ?? null,
       subjectIds: stored?.subjectIds ?? [],
       accessRevision: stored?.accessRevision ?? 1,
@@ -186,6 +201,21 @@ export class MockReaderService {
       wiki: stored?.wiki ?? new Map(),
     });
     return Response.json({ slug, outcome: 'applied', revision });
+  }
+
+  /**
+   * `lockNovel`'s resolution order: the publisher's own ref wins, and the slug answers only when no ref
+   * matches. A slug held under a different ref is another novel of ours, refused rather than overwritten.
+   */
+  private resolveNovel(slug: string, sourceRef: string | null): [string, MockReaderNovel | undefined] | 'foreign' {
+    if (sourceRef) {
+      // A row parked on a foreign slug belongs to another publisher, whose refs live in a different key space: it can never match ours.
+      const owned = [...this.novels.entries()].find(([key, novel]) => novel.sourceRef === sourceRef && !this.foreignSlugs.has(key));
+      if (owned) return owned;
+    }
+    const bySlug = this.novels.get(slug);
+    if (bySlug && sourceRef && bySlug.sourceRef && bySlug.sourceRef !== sourceRef) return 'foreign';
+    return [slug, bySlug];
   }
 
   /** Mirrors the reader's access sub-resource, including its own revision ladder. */

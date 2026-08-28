@@ -176,7 +176,9 @@ export class PublishRunner {
    * must land before any chapter, and the only ones that can discover the slug belongs to someone
    * else. A `WBN_010` is resolved rather than ledgered: the publication moves to the next free slug
    * near the one it entered with and the whole header replays under it. Slugs the reader has already
-   * refused in this pass are carried forward, so within a pass the ladder only ever climbs.
+   * refused in this pass are carried forward, so within a pass the ladder only ever climbs. The push
+   * carries our `sourceRef`, so replaying under a new slug renames the reader's row — chapters, wiki
+   * and access ride along — rather than leaving a populated novel behind at the refused slug.
    */
   private async convergeHeader(
     publication: Publishing.Publication,
@@ -189,7 +191,9 @@ export class PublishRunner {
 
     for (let attempt = 1; attempt <= SLUG_ATTEMPT_LIMIT; attempt++) {
       try {
+        /** Decimal `projectId`: never reassigned for the project's life, and 19 digits at most against the reader's `varchar(64)`. */
         const novelResult = await this.pushClient.upsertNovel(current.novelSlug, {
+          sourceRef: current.projectId.toString(),
           title: current.title,
           blurb: current.blurb ?? undefined,
           coverPath: current.coverPath ?? undefined,
