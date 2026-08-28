@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'bun:test';
 import { schema } from '@server/modules/datastore';
 
 import { csrfPair, TEST_REGEX, TestEnvironment } from '../test-environment';
-import { idp, LOGIN_COOKIE_NAME, LOGIN_SCOPES, SESSION_COOKIE_NAME } from '../test-idp';
+import { FORGE_CLIENT_ID, idp, LOGIN_COOKIE_NAME, LOGIN_SCOPES, SESSION_COOKIE_NAME } from '../test-idp';
 
 const env = new TestEnvironment('reader').init();
 
@@ -17,7 +17,7 @@ const seedNovel = async (slug = 'moonfall') => {
   const db = env.getPostgresClient();
   const [novel] = await db
     .insert(schema.novels)
-    .values({ slug, title: 'Moonfall', coverPath: 'moonfall-cover.jpg', genres: ['fantasy'], revision: 1 })
+    .values({ slug, sourceClientId: FORGE_CLIENT_ID, title: 'Moonfall', coverPath: 'moonfall-cover.jpg', genres: ['fantasy'], revision: 1 })
     .returning();
   return novel as { id: bigint };
 };

@@ -13,6 +13,7 @@ export const AUDIENCE = 'api://web-novel';
 export const WEB_NOVEL_CLIENT_ID = 'web-novel';
 export const WEB_NOVEL_CLIENT_SECRET = 'web-novel-test-secret';
 export const FORGE_CLIENT_ID = 'novel-forge';
+export const INGEST_CLIENT_ID = 'webnovel-ingest';
 export const REDIRECT_URI = 'http://localhost:8080/api/auth/callback';
 export const LOGIN_SCOPES = ['openid', 'profile', 'email'];
 
@@ -25,11 +26,18 @@ export const idp = await createTestIdP({
   app: { appId: WEB_NOVEL_CLIENT_ID, audience: AUDIENCE, redirectUris: [REDIRECT_URI], scopes: LOGIN_SCOPES },
 });
 
-idp.setServiceAccess([{ callerClientId: FORGE_CLIENT_ID, method: '*', path: '/internal/*' }]);
+idp.setServiceAccess([
+  { callerClientId: FORGE_CLIENT_ID, method: '*', path: '/internal/*' },
+  { callerClientId: INGEST_CLIENT_ID, method: '*', path: '/internal/*' },
+]);
 process.env.AUTH_ISSUER = idp.issuer;
 
 export function forgeToken(overrides: Partial<TestTokenInput> = {}): Promise<string> {
   return idp.issueToken({ sub: FORGE_CLIENT_ID, kind: 'service', clientId: FORGE_CLIENT_ID, audience: AUDIENCE, scopes: ['web-novel:publish'], ...overrides });
+}
+
+export function ingestToken(overrides: Partial<TestTokenInput> = {}): Promise<string> {
+  return idp.issueToken({ sub: INGEST_CLIENT_ID, kind: 'service', clientId: INGEST_CLIENT_ID, audience: AUDIENCE, scopes: ['web-novel:publish'], ...overrides });
 }
 
 export function userToken(sub: string, overrides: Partial<TestTokenInput> = {}): Promise<string> {

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { schema } from '@server/modules/datastore';
 
 import { TestEnvironment } from '../test-environment';
-import { userToken } from '../test-idp';
+import { FORGE_CLIENT_ID, userToken } from '../test-idp';
 
 const env = new TestEnvironment('wiki').init();
 
@@ -11,7 +11,7 @@ async function seedNovel(slug = 'moonfall', visibility: 'PUBLIC' | 'RESTRICTED' 
   const db = env.getPostgresClient();
   const [novel] = await db
     .insert(schema.novels)
-    .values({ slug, title: 'Moonfall', genres: ['fantasy'], visibility, revision: 1, accessRevision: 1 })
+    .values({ slug, sourceClientId: FORGE_CLIENT_ID, title: 'Moonfall', genres: ['fantasy'], visibility, revision: 1, accessRevision: 1 })
     .returning();
   const novelId = (novel as { id: bigint }).id;
 

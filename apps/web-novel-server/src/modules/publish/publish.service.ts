@@ -9,6 +9,7 @@ import { APP_NAME } from '@server/constants';
 import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
 
 import { PublishAuditService } from './publish-audit.service';
+import { assertNovelOwnership, loadOwnedNovel, loadReadableNovel, publishCaller, type PublishCaller } from './publish-ownership';
 import { type ChapterUpsertBody, type ManifestItem, type NovelAccessBody, type NovelAccessResponse, type NovelUpsertBody } from './publish.dto';
 import { type PublishAuditEntry } from './publish.types';
 
@@ -20,6 +21,8 @@ export interface UpsertResult {
 export interface UnpublishResult {
   outcome: 'applied' | 'noop';
 }
+
+type PublishTransaction = Parameters<Parameters<PrimaryDatabase['transaction']>[0]>[0];
 
 interface StaleMarker {
   outcome: 'stale';
@@ -39,7 +42,7 @@ export class PublishService {
   private readonly db: PrimaryDatabase;
 
   constructor(
-    databaseService: DatabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly auditService: PublishAuditService,
     private readonly context: ContextService,
   ) {
@@ -51,6 +54,8 @@ export class PublishService {
     const result = await this.db.transaction(async tx => {
       const [stored] = await tx.select().from(schema.novels).where(eq(schema.novels.slug, slug)).for('update');
       const base: Omit<PublishAuditEntry, 'outcome'> = { action: 'novel.upsert', novelSlug: slug, incomingRevision: body.revision, storedRevision: stored?.revision, ...caller };
+      /** Ahead of the revision ladder: WBN_003 quotes the stored revision, which a foreign caller has no business learning. */
+      if (stored) assertNovelOwnership(stored, caller);
 
       if (stored && body.revision < stored.revision) {
         await this.auditService.record({ ...base, outcome: 'stale_rejected' }, tx);
@@ -72,7 +77,7 @@ export class PublishService {
         updatedAt: new Date(),
       };
       if (stored) await tx.update(schema.novels).set(values).where(eq(schema.novels.id, stored.id));
-      else await tx.insert(schema.novels).values({ slug, ...values });
+      else await this.insertNovel(tx, { slug, sourceClientId: caller.callerClientId, ...values });
       await this.auditService.record({ ...base, outcome: 'applied' }, tx);
       return { outcome: 'applied', revision: body.revision } satisfies UpsertResult;
     });
@@ -85,7 +90,7 @@ export class PublishService {
 
   async upsertChapter(slug: string, ordinal: number, body: ChapterUpsertBody): Promise<UpsertResult> {
     const caller = this.caller();
-    const novel = await this.getNovelBySlug(slug);
+    const novel = await loadOwnedNovel(this.db, slug, caller);
     const result = await this.db.transaction(async tx => {
       const [stored] = await tx.select().from(schema.publishedChapters).where(this.chapterFilter(novel.id, ordinal)).for('update');
       const base: Omit<PublishAuditEntry, 'outcome'> = {
@@ -139,6 +144,7 @@ export class PublishService {
       this.auditService.markRecorded();
       return { outcome: 'noop' };
     }
+    assertNovelOwnership(novel, caller);
 
     const result = await this.db.transaction(async tx => {
       const deleted = await tx.delete(schema.publishedChapters).where(this.chapterFilter(novel.id, ordinal)).returning();
@@ -171,6 +177,7 @@ export class PublishService {
     const result = await this.db.transaction(async tx => {
       const [stored] = await tx.select().from(schema.novels).where(eq(schema.novels.slug, slug)).for('update');
       if (!stored) throw AppErrorCode.WBN_001.create();
+      assertNovelOwnership(stored, caller);
       const base: Omit<PublishAuditEntry, 'outcome'> = {
         action: 'novel.access',
         novelSlug: slug,
@@ -207,7 +214,7 @@ export class PublishService {
   }
 
   async getAccess(slug: string): Promise<NovelAccessResponse> {
-    const novel = await this.getNovelBySlug(slug);
+    const novel = await loadReadableNovel(this.db, slug, this.caller());
     const grants = await this.db
       .select({ subjectId: schema.novelGrants.subjectId })
       .from(schema.novelGrants)
@@ -222,7 +229,7 @@ export class PublishService {
   }
 
   async getManifest(slug: string): Promise<ManifestItem[]> {
-    const novel = await this.getNovelBySlug(slug);
+    const novel = await loadReadableNovel(this.db, slug, this.caller());
     const chapters = await this.db
       .select({ ordinal: schema.publishedChapters.ordinal, contentHash: schema.publishedChapters.contentHash, revision: schema.publishedChapters.revision })
       .from(schema.publishedChapters)
@@ -231,9 +238,10 @@ export class PublishService {
     return chapters;
   }
 
-  private async getNovelBySlug(slug: string): Promise<Novel> {
-    const [novel] = await this.db.select().from(schema.novels).where(eq(schema.novels.slug, slug));
-    return novel ?? AppErrorCode.WBN_001.throw();
+  private async insertNovel(tx: PublishTransaction, values: typeof schema.novels.$inferInsert): Promise<void> {
+    await this.databaseService.run(async () => {
+      await tx.insert(schema.novels).values(values);
+    });
   }
 
   private chapterFilter(novelId: bigint, ordinal: number): SQL {
@@ -265,8 +273,7 @@ export class PublishService {
     return content.split(/\s+/).filter(Boolean).length;
   }
 
-  private caller(): Pick<PublishAuditEntry, 'callerSub' | 'callerClientId'> {
-    const principal = this.context.getAuthPrincipalOrNull();
-    return { callerSub: principal?.sub, callerClientId: principal?.clientId };
+  private caller(): PublishCaller {
+    return publishCaller(this.context);
   }
 }

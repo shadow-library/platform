@@ -33,8 +33,12 @@ export const novelVisibility = pgEnum('novel_visibility', ['PUBLIC', 'ORGANISATI
 export const novels = pgTable('novels', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   slug: varchar('slug', { length: 128 }).notNull().unique(),
-  /** Backfilled to 'novel-forge', the only publisher to date; the default survives only until writers set this from the authenticated principal. */
-  sourceClientId: varchar('source_client_id', { length: 64 }).notNull().default('novel-forge'),
+  /**
+   * The publishing client that created the row, and the only one allowed to mutate it thereafter: slugs are
+   * caller-supplied, so without this two publishers pushing the same slug silently overwrite each other.
+   * Deliberately undefaulted — a default would hand its holder authority over rows it never published.
+   */
+  sourceClientId: varchar('source_client_id', { length: 64 }).notNull(),
   title: varchar('title', { length: 256 }).notNull(),
   blurb: text('blurb'),
   coverPath: varchar('cover_path', { length: 512 }),

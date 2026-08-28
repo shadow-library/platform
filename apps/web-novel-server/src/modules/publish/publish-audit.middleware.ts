@@ -4,6 +4,7 @@ import { AuthGuardErrorCode } from '@shadow-library/auth/module';
 import { AppError, Logger, tryCatch } from '@shadow-library/common';
 import { type HttpRequest, type HttpResponse, Middleware, type RouteHandler } from '@shadow-library/fastify';
 
+import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
 import { PublishAuditService } from './publish-audit.service';
@@ -67,7 +68,7 @@ export class PublishAuditTrailer {
   }
 
   private toOutcome(error: Error): PublishAuditEntry['outcome'] {
-    const isAuthFailure = AppError.is(error, AuthGuardErrorCode.IAM_001) || AppError.is(error, AuthGuardErrorCode.IAM_002);
+    const isAuthFailure = AppError.is(error, AuthGuardErrorCode.IAM_001) || AppError.is(error, AuthGuardErrorCode.IAM_002) || AppError.is(error, AppErrorCode.WBN_010);
     return isAuthFailure ? 'unauthorized' : 'error';
   }
 

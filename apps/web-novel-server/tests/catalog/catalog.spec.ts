@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { schema } from '@server/modules/datastore';
 
 import { TestEnvironment } from '../test-environment';
-import { forgeToken } from '../test-idp';
+import { FORGE_CLIENT_ID, forgeToken } from '../test-idp';
 
 const env = new TestEnvironment('catalog').init();
 
@@ -14,6 +14,7 @@ const seedCatalog = async () => {
     .values([
       {
         slug: 'aurora-blade',
+        sourceClientId: FORGE_CLIENT_ID,
         title: 'Aurora Blade',
         blurb: 'Steel under polar light',
         coverPath: 'aurora-blade-cover.jpg',
@@ -22,8 +23,8 @@ const seedCatalog = async () => {
         revision: 1,
         updatedAt: new Date('2026-01-03'),
       },
-      { slug: 'silent-harbor', title: 'Silent Harbor', genres: ['mystery'], status: 'live', revision: 1, updatedAt: new Date('2026-01-02') },
-      { slug: 'old-embers', title: 'Old Embers', genres: ['fantasy'], status: 'retired', revision: 1, updatedAt: new Date('2026-01-01') },
+      { slug: 'silent-harbor', sourceClientId: FORGE_CLIENT_ID, title: 'Silent Harbor', genres: ['mystery'], status: 'live', revision: 1, updatedAt: new Date('2026-01-02') },
+      { slug: 'old-embers', sourceClientId: FORGE_CLIENT_ID, title: 'Old Embers', genres: ['fantasy'], status: 'retired', revision: 1, updatedAt: new Date('2026-01-01') },
     ])
     .returning();
   await db.insert(schema.publishedChapters).values([

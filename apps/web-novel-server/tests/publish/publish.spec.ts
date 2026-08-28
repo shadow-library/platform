@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
+import { SQL } from 'bun';
 import { asc, eq } from 'drizzle-orm';
 
 import { schema } from '@server/modules/datastore';
 
 import { TestEnvironment } from '../test-environment';
-import { AUDIENCE, forgeToken, idp, userToken } from '../test-idp';
+import { AUDIENCE, FORGE_CLIENT_ID, forgeToken, idp, INGEST_CLIENT_ID, ingestToken, userToken } from '../test-idp';
 
 interface PushOptions {
   body?: object;
@@ -43,6 +44,15 @@ async function push(method: 'put' | 'delete' | 'get', path: string, options: Pus
 const auditRows = () => env.getPostgresClient().select().from(schema.publishAuditLog).orderBy(asc(schema.publishAuditLog.id));
 const novelRows = () => env.getPostgresClient().select().from(schema.novels).where(eq(schema.novels.slug, SLUG));
 const chapterRows = () => env.getPostgresClient().select().from(schema.publishedChapters).orderBy(asc(schema.publishedChapters.ordinal));
+
+async function waitUntilBlocked(probe: SQL): Promise<void> {
+  for (let attempt = 0; attempt < 500; attempt++) {
+    const [row] = await probe`select count(*)::int as blocked from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'`;
+    if (row.blocked > 0) return;
+    await Bun.sleep(10);
+  }
+  throw new Error('the publish insert never blocked on the slug unique index');
+}
 
 const publishNovel = async (revision = 1) => {
   const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(revision) });
@@ -307,6 +317,180 @@ describe('Internal publish API', () => {
       expect(rows[0]).toMatchObject({ action: 'novel.upsert', novelSlug: SLUG, outcome: 'unauthorized' });
       expect(rows[0]?.callerSub).toBe(longSub.slice(0, 128));
       expect(rows[0]?.callerSub).toHaveLength(128);
+    });
+  });
+  describe('publisher ownership', () => {
+    const wikiBody = (revision: number, contentHash: string) => ({
+      type: 'character',
+      name: 'Selene',
+      firstVisibleOrdinal: 0,
+      contentHash,
+      revision,
+      facets: [],
+      images: [],
+    });
+
+    const foreign = async (method: 'put' | 'delete' | 'get', path: string, body?: object) => push(method, path, { body, token: await ingestToken() });
+
+    it('should stamp the creating client on the novel it publishes', async () => {
+      await publishNovel(1);
+      const [novel] = await novelRows();
+      expect(novel).toMatchObject({ sourceClientId: 'novel-forge' });
+    });
+
+    it('should let a second publisher own a slug of its own', async () => {
+      const response = await foreign('put', '/internal/novels/ingested-tale', novelBody(1));
+      expect(response.statusCode).toBe(200);
+
+      const [novel] = await env.getPostgresClient().select().from(schema.novels).where(eq(schema.novels.slug, 'ingested-tale'));
+      expect(novel).toMatchObject({ sourceClientId: INGEST_CLIENT_ID });
+    });
+
+    it('should reject a metadata push from another source with WBN_010 and leave the row untouched', async () => {
+      await publishNovel(1);
+      const response = await foreign('put', `/internal/novels/${SLUG}`, novelBody(9, { title: 'Hijacked' }));
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'WBN_010' });
+
+      const [novel] = await novelRows();
+      expect(novel).toMatchObject({ title: 'Moonfall', revision: 1, sourceClientId: 'novel-forge' });
+    });
+
+    it('should answer WBN_010 rather than WBN_003 when a foreign push is also stale', async () => {
+      await publishNovel(5);
+      const foreignPush = await foreign('put', `/internal/novels/${SLUG}`, novelBody(2, { title: 'Hijacked' }));
+      expect(foreignPush.json()).toMatchObject({ code: 'WBN_010' });
+
+      const ownStale = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(2, { title: 'Stale Title' }) });
+      expect(ownStale.json()).toMatchObject({ code: 'WBN_003' });
+    });
+
+    it('should reject a chapter push from another source with WBN_010', async () => {
+      await publishNovel(1);
+      const response = await foreign('put', `/internal/novels/${SLUG}/chapters/1`, chapterBody(1, 'hash-a'));
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'WBN_010' });
+      expect(await chapterRows()).toHaveLength(0);
+    });
+
+    it('should reject a chapter unpublish from another source with WBN_010 and keep the chapter', async () => {
+      await publishNovel(1);
+      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1, 'hash-a') });
+
+      const response = await foreign('delete', `/internal/novels/${SLUG}/chapters/1`);
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'WBN_010' });
+      expect(await chapterRows()).toHaveLength(1);
+    });
+
+    it('should reject an access push from another source with WBN_010', async () => {
+      await publishNovel(1);
+      const response = await foreign('put', `/internal/novels/${SLUG}/access`, { visibility: 'RESTRICTED', subjectIds: ['900001'], revision: 2 });
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'WBN_010' });
+
+      const [novel] = await novelRows();
+      expect(novel).toMatchObject({ visibility: 'PUBLIC', accessRevision: 1 });
+    });
+
+    it('should reject a wiki push and a wiki delete from another source with WBN_010', async () => {
+      await publishNovel(1);
+      const upsert = await foreign('put', `/internal/novels/${SLUG}/wiki/selene`, wikiBody(1, 'wiki-a'));
+      expect(upsert.statusCode).toBe(409);
+      expect(upsert.json()).toMatchObject({ code: 'WBN_010' });
+
+      await push('put', `/internal/novels/${SLUG}/wiki/selene`, { body: wikiBody(1, 'wiki-a') });
+      const remove = await foreign('delete', `/internal/novels/${SLUG}/wiki/selene`);
+      expect(remove.statusCode).toBe(409);
+      expect(remove.json()).toMatchObject({ code: 'WBN_010' });
+      expect(await env.getPostgresClient().select().from(schema.wikiEntries)).toHaveLength(1);
+    });
+
+    it('should audit a rejected foreign push as unauthorized', async () => {
+      await publishNovel(1);
+      await foreign('put', `/internal/novels/${SLUG}`, novelBody(9, { title: 'Hijacked' }));
+
+      const rows = await auditRows();
+      expect(rows[rows.length - 1]).toMatchObject({ action: 'novel.upsert', novelSlug: SLUG, outcome: 'unauthorized', callerClientId: INGEST_CLIENT_ID });
+    });
+
+    it('should read a foreign novel as WBN_001 on the manifest and access reads, never WBN_010', async () => {
+      await publishNovel(1);
+      const manifest = await foreign('get', `/internal/novels/${SLUG}/manifest`);
+      expect(manifest.statusCode).toBe(404);
+      expect(manifest.json()).toMatchObject({ code: 'WBN_001' });
+
+      const access = await foreign('get', `/internal/novels/${SLUG}/access`);
+      expect(access.statusCode).toBe(404);
+      expect(access.json()).toMatchObject({ code: 'WBN_001' });
+
+      const wiki = await foreign('get', `/internal/novels/${SLUG}/wiki/manifest`);
+      expect(wiki.statusCode).toBe(404);
+      expect(wiki.json()).toMatchObject({ code: 'WBN_001' });
+    });
+
+    it('should answer a foreign novel exactly as it answers an unknown one on the manifest read', async () => {
+      await publishNovel(1);
+      const foreignRead = await foreign('get', `/internal/novels/${SLUG}/manifest`);
+      const unknownRead = await foreign('get', '/internal/novels/never-published/manifest');
+      expect(foreignRead.statusCode).toBe(unknownRead.statusCode);
+      expect(foreignRead.json()).toEqual(unknownRead.json());
+    });
+
+    it('should stay a 204 no-op for a foreign caller on an unknown slug rather than leaking WBN_010', async () => {
+      const chapter = await foreign('delete', '/internal/novels/never-published/chapters/1');
+      expect(chapter.statusCode).toBe(204);
+
+      const wiki = await foreign('delete', '/internal/novels/never-published/wiki/selene');
+      expect(wiki.statusCode).toBe(204);
+    });
+
+    /**
+     * An uncommitted row on another connection is invisible to the request's `SELECT … FOR UPDATE` yet already
+     * holds the index entry, so the request reaches its insert and blocks there — no timing assumption. The held
+     * row is forge-owned on purpose: had the select seen it, the push would have applied, so a 409 can only come
+     * from the `23505` translation.
+     */
+    it('should answer WBN_010 when the insert loses the slug unique index to a concurrent publisher', async () => {
+      const holder = new SQL(env.getDatabaseUrl(), { max: 1 });
+      const probe = new SQL(env.getDatabaseUrl(), { max: 1 });
+      let commit!: () => void;
+      let held!: () => void;
+      const committed = new Promise<void>(resolve => (commit = resolve));
+      const holdsSlug = new Promise<void>(resolve => (held = resolve));
+
+      try {
+        const holding = holder.begin(async tx => {
+          await tx`insert into novels (slug, source_client_id, title, revision) values ('race', ${FORGE_CLIENT_ID}, 'Race', 1)`;
+          held();
+          await committed;
+        });
+        await holdsSlug;
+
+        const attempt = push('put', '/internal/novels/race', { body: novelBody(5, { title: 'Race' }) });
+        await waitUntilBlocked(probe);
+        commit();
+        await holding;
+
+        const response = await attempt;
+        expect(response.statusCode).toBe(409);
+        expect(response.json()).toMatchObject({ code: 'WBN_010' });
+      } finally {
+        commit();
+        await Promise.all([holder.close(), probe.close()]);
+      }
+    });
+
+    it('should let the owning publisher keep mutating its own novel', async () => {
+      await publishNovel(1);
+      await foreign('put', `/internal/novels/${SLUG}`, novelBody(9, { title: 'Hijacked' }));
+
+      const metadata = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(2, { title: 'Moonfall II' }) });
+      expect(metadata.statusCode).toBe(200);
+      const chapter = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1, 'hash-a') });
+      expect(chapter.statusCode).toBe(200);
+      const manifest = await push('get', `/internal/novels/${SLUG}/manifest`);
+      expect(manifest.json()).toEqual([{ ordinal: 1, contentHash: 'hash-a', revision: 1 }]);
     });
   });
 });

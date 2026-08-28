@@ -6,9 +6,10 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
+import { type PrimaryDatabase, schema } from '@server/modules/datastore';
 
 import { PublishAuditService } from './publish-audit.service';
+import { assertNovelOwnership, loadOwnedNovel, loadReadableNovel, publishCaller, type PublishCaller } from './publish-ownership';
 import { type UnpublishResult, type UpsertResult } from './publish.service';
 import { type PublishAuditEntry } from './publish.types';
 import { type WikiEntryUpsertBody, type WikiManifestItem } from './wiki-ingest.dto';
@@ -41,7 +42,7 @@ export class WikiIngestService {
 
   async upsertEntry(slug: string, entryKey: string, body: WikiEntryUpsertBody): Promise<UpsertResult> {
     const caller = this.caller();
-    const novel = await this.getNovelBySlug(slug);
+    const novel = await loadOwnedNovel(this.db, slug, caller);
     const result = await this.db.transaction(async tx => {
       const [stored] = await tx.select().from(schema.wikiEntries).where(this.entryFilter(novel.id, entryKey)).for('update');
       const base: Omit<PublishAuditEntry, 'outcome'> = {
@@ -123,6 +124,7 @@ export class WikiIngestService {
       this.auditService.markRecorded();
       return { outcome: 'noop' };
     }
+    assertNovelOwnership(novel, caller);
 
     const result = await this.db.transaction(async tx => {
       const deleted = await tx.delete(schema.wikiEntries).where(this.entryFilter(novel.id, entryKey)).returning();
@@ -138,7 +140,7 @@ export class WikiIngestService {
   }
 
   async getManifest(slug: string): Promise<WikiManifestItem[]> {
-    const novel = await this.getNovelBySlug(slug);
+    const novel = await loadReadableNovel(this.db, slug, this.caller());
     return this.db
       .select({ entryKey: schema.wikiEntries.entryKey, revision: schema.wikiEntries.revision, contentHash: schema.wikiEntries.contentHash })
       .from(schema.wikiEntries)
@@ -146,17 +148,11 @@ export class WikiIngestService {
       .orderBy(asc(schema.wikiEntries.entryKey));
   }
 
-  private async getNovelBySlug(slug: string): Promise<Novel> {
-    const [novel] = await this.db.select().from(schema.novels).where(eq(schema.novels.slug, slug));
-    return novel ?? AppErrorCode.WBN_001.throw();
-  }
-
   private entryFilter(novelId: bigint, entryKey: string): SQL {
     return and(eq(schema.wikiEntries.novelId, novelId), eq(schema.wikiEntries.entryKey, entryKey)) as SQL;
   }
 
-  private caller(): Pick<PublishAuditEntry, 'callerSub' | 'callerClientId'> {
-    const principal = this.context.getAuthPrincipalOrNull();
-    return { callerSub: principal?.sub, callerClientId: principal?.clientId };
+  private caller(): PublishCaller {
+    return publishCaller(this.context);
   }
 }

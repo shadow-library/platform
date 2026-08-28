@@ -8,13 +8,13 @@ for conventions and commands.
 
 ## Surfaces
 
-| Surface                           | Paths                                                                                                                                                                                                    | Auth                                                                                             |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Internal publish (forge → reader) | `PUT /internal/novels/:slug`, `PUT`/`DELETE /internal/novels/:slug/chapters/:ordinal`, `GET /internal/novels/:slug/manifest`                                                                             | Identity-issued M2M bearer with scope `web-novel:publish` + admin-configured service-access rule |
-| Public catalog                    | `GET /api/novels` (search/genre/status/sort/pagination), `GET /api/novels/:slug`, `GET /api/novels/:slug/chapters`, `GET /api/novels/:slug/chapters/:ordinal` (ETag = contentHash, 304 on If-None-Match) | none                                                                                             |
-| Session                           | `GET /api/auth/login?returnTo=`, `GET /api/auth/callback`, `GET /api/auth/session` (flat `{ userId, email?, name? }` or 401), `POST /api/auth/logout`                                                    | OIDC via identity; stateless signed session cookie                                               |
-| Reader                            | `GET /api/me/progress`, `GET`/`PUT /api/novels/:slug/progress`, `GET`/`POST /api/library`, `DELETE /api/library/:slug`                                                                                   | session cookie                                                                                   |
-| Health                            | `GET /health`, `GET /health/ready` on :8080; `/health/live` + `/health/ready` on :8081 (`HEALTH_ENABLED`)                                                                                                | none                                                                                             |
+| Surface                                | Paths                                                                                                                                                                                                    | Auth                                                                                             |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Internal publish (publishers → reader) | `PUT /internal/novels/:slug`, `PUT`/`GET .../access`, `PUT`/`DELETE .../chapters/:ordinal`, `PUT`/`DELETE .../wiki/:entryKey`, `GET .../manifest`, `GET .../wiki/manifest`                               | Identity-issued M2M bearer with scope `web-novel:publish` + admin-configured service-access rule |
+| Public catalog                         | `GET /api/novels` (search/genre/status/sort/pagination), `GET /api/novels/:slug`, `GET /api/novels/:slug/chapters`, `GET /api/novels/:slug/chapters/:ordinal` (ETag = contentHash, 304 on If-None-Match) | none                                                                                             |
+| Session                                | `GET /api/auth/login?returnTo=`, `GET /api/auth/callback`, `GET /api/auth/session` (flat `{ userId, email?, name? }` or 401), `POST /api/auth/logout`                                                    | OIDC via identity; stateless signed session cookie                                               |
+| Reader                                 | `GET /api/me/progress`, `GET`/`PUT /api/novels/:slug/progress`, `GET`/`POST /api/library`, `DELETE /api/library/:slug`                                                                                   | session cookie                                                                                   |
+| Health                                 | `GET /health`, `GET /health/ready` on :8080; `/health/live` + `/health/ready` on :8081 (`HEALTH_ENABLED`)                                                                                                | none                                                                                             |
 
 ## Publish semantics
 
@@ -24,6 +24,12 @@ anything else upserts and stores the incoming revision. Every internal mutation 
 rejected attempt — writes exactly one `publish_audit_log` row. Unpublish is idempotent. `GET
 .../manifest` returns `[{ ordinal, contentHash, revision }]` for forge-side reconciliation and is not
 audited.
+
+A slug belongs to the client that created it (`novels.source_client_id`, stamped from the authenticated
+principal), and only that client may mutate it. A mutation on a slug owned by another publisher is `409`
+(`WBN_010`, audited `unauthorized`) and is **retryable under a different slug** — unlike `WBN_003`, which is
+fatal — so publishers discriminate on the code, not the status. A read of a foreign-owned slug answers `404`
+(`WBN_001`) exactly as an unknown slug does; the owning client is never named.
 
 ## Running locally
 

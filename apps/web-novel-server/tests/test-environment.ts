@@ -40,6 +40,7 @@ export class TestEnvironment {
 
   private readonly app = new ShadowApplication(AppModule);
   private readonly databaseName: string;
+  private databaseUrl = '';
 
   constructor(databaseSuffix: string) {
     const suffix = databaseSuffix.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
@@ -48,8 +49,8 @@ export class TestEnvironment {
 
   init(): this {
     TestEnvironment.logger.info(`Setting up test environment with database: '${this.databaseName}'`);
-    const databaseUrl = baseConnectionString.replace(/\/[^/]*$/, `/${this.databaseName}`);
-    Config['cache'].set('database.postgres.url', databaseUrl);
+    this.databaseUrl = baseConnectionString.replace(/\/[^/]*$/, `/${this.databaseName}`);
+    Config['cache'].set('database.postgres.url', this.databaseUrl);
 
     beforeAll(async () => {
       await createDatabaseFromTemplate(this.databaseName);
@@ -58,6 +59,10 @@ export class TestEnvironment {
     beforeEach(() => createDatabaseFromTemplate(this.databaseName));
     afterAll(() => this.app.stop());
     return this;
+  }
+
+  getDatabaseUrl(): string {
+    return this.databaseUrl;
   }
 
   getRouter(): FastifyRouter {

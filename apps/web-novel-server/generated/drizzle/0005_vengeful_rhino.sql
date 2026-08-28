@@ -1,0 +1,1 @@
+ALTER TABLE "novels" ALTER COLUMN "source_client_id" DROP DEFAULT;

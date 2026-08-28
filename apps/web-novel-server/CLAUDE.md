@@ -130,8 +130,9 @@ thin adapters; **all business logic lives in services.**
   `this.db.transaction(async tx => { … })`, row locks with `.for('update')`. Schema lives in
   `src/modules/datastore/schemas/` (barrel `index.ts`); migrations in `generated/drizzle/`. After any schema
   change run `bun scripts/db.ts apps/web-novel-server generate` (from the repo root), commit the SQL, and keep
-  `bun scripts/db.ts apps/web-novel-server migrate` working. This repo does
-  **not** use a `run()`/`constraintErrorMap` wrapper — follow the direct-client pattern already in the services.
+  `bun scripts/db.ts apps/web-novel-server migrate` working. Services use the direct
+  client; `databaseService.run()` with the module's `constraintErrorMap` is reserved for the few writes whose
+  unique-constraint violation is a meaningful domain answer rather than a defect.
 - **Config & env:** typed keys are declared in `bootstrap.ts` via `Config.load(...)` + `ConfigRecords`
   augmentation; read with `Config.get(...)`, never `process.env` directly in app code. Env vars are
   `SCREAMING_SNAKE_CASE` grouped by owner: `DATABASE_POSTGRES_*` (DatabaseModule), `AUTH_*`
