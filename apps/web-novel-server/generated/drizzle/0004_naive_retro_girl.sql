@@ -1,0 +1,1 @@
+ALTER TABLE "novels" ADD COLUMN "source_client_id" varchar(64) DEFAULT 'novel-forge' NOT NULL;
