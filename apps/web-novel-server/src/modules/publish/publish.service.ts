@@ -101,6 +101,10 @@ export class PublishService {
         blurb: body.blurb ?? null,
         coverPath: body.coverPath ?? null,
         genres: body.genres ?? [],
+        tags: body.tags ?? [],
+        sexualContent: body.sexualContent ?? null,
+        violence: body.violence ?? null,
+        darkContent: body.darkContent ?? null,
         status: body.status ?? ('live' as const),
         visibility: body.visibility,
         revision: body.revision,
@@ -287,9 +291,16 @@ export class PublishService {
       stored.coverPath === (body.coverPath ?? null) &&
       stored.status === (body.status ?? 'live') &&
       stored.visibility === body.visibility &&
-      stored.genres.length === (body.genres ?? []).length &&
-      stored.genres.every((genre, index) => genre === (body.genres ?? [])[index])
+      stored.sexualContent === (body.sexualContent ?? null) &&
+      stored.violence === (body.violence ?? null) &&
+      stored.darkContent === (body.darkContent ?? null) &&
+      this.isSameVocabulary(stored.genres, body.genres) &&
+      this.isSameVocabulary(stored.tags, body.tags)
     );
+  }
+
+  private isSameVocabulary(stored: readonly string[], incoming: readonly string[] = []): boolean {
+    return stored.length === incoming.length && stored.every((value, index) => value === incoming[index]);
   }
 
   /** Order-insensitive on the grant set: the forge sends a share list, and the order it happened to build it in is not a change. */

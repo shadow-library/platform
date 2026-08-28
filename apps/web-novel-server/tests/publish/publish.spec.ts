@@ -21,7 +21,7 @@ const SLUG = 'moonfall';
 const novelBody = (revision: number, overrides: object = {}) => ({
   title: 'Moonfall',
   blurb: 'A city under a falling moon',
-  genres: ['fantasy'],
+  genres: ['Fantasy'],
   status: 'live',
   visibility: 'PUBLIC',
   revision,
@@ -79,7 +79,7 @@ describe('Internal publish API', () => {
       expect(response.json()).toEqual({ slug: SLUG, outcome: 'applied', revision: 1 });
 
       const [novel] = await novelRows();
-      expect(novel).toMatchObject({ slug: SLUG, title: 'Moonfall', genres: ['fantasy'], status: 'live', revision: 1 });
+      expect(novel).toMatchObject({ slug: SLUG, title: 'Moonfall', genres: ['Fantasy'], status: 'live', revision: 1 });
 
       const rows = await auditRows();
       expect(rows).toHaveLength(1);
@@ -120,11 +120,11 @@ describe('Internal publish API', () => {
 
     it('should apply an equal-revision push that carries different metadata', async () => {
       await publishNovel(1);
-      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { title: 'Moonfall: Definitive Edition', genres: ['fantasy', 'drama'] }) });
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { title: 'Moonfall: Definitive Edition', genres: ['Fantasy', 'Drama'] }) });
       expect(response.statusCode).toBe(200);
 
       const [novel] = await novelRows();
-      expect(novel).toMatchObject({ title: 'Moonfall: Definitive Edition', genres: ['fantasy', 'drama'], revision: 1 });
+      expect(novel).toMatchObject({ title: 'Moonfall: Definitive Edition', genres: ['Fantasy', 'Drama'], revision: 1 });
     });
 
     it('should apply a higher revision and store it', async () => {
@@ -135,6 +135,106 @@ describe('Internal publish API', () => {
 
       const [novel] = await novelRows();
       expect(novel).toMatchObject({ status: 'retired', revision: 5 });
+    });
+  });
+
+  describe('novel vocabulary and content ratings', () => {
+    it('should persist the pushed genres, tags and rating dimensions', async () => {
+      const body = novelBody(1, {
+        genres: ['Fantasy', 'Adventure'],
+        tags: ['Cultivation', 'Weak to Strong'],
+        sexualContent: 'suggestive',
+        violence: 'graphic',
+        darkContent: 'mild',
+      });
+      const response = await push('put', `/internal/novels/${SLUG}`, { body });
+      expect(response.statusCode).toBe(200);
+
+      const [novel] = await novelRows();
+      expect(novel).toMatchObject({
+        genres: ['Fantasy', 'Adventure'],
+        tags: ['Cultivation', 'Weak to Strong'],
+        sexualContent: 'suggestive',
+        violence: 'graphic',
+        darkContent: 'mild',
+      });
+    });
+
+    it('should reject a genre outside the vocabulary without touching the row', async () => {
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { genres: ['Fantasy', 'Grimdark'] }) });
+      expect(response.statusCode).toBe(422);
+      expect(await novelRows()).toHaveLength(0);
+    });
+
+    it('should reject a tag outside the vocabulary without touching the row', async () => {
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { tags: ['Cultivation', 'Sentient Toaster'] }) });
+      expect(response.statusCode).toBe(422);
+      expect(await novelRows()).toHaveLength(0);
+    });
+
+    it('should reject a duplicated genre without touching the row', async () => {
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { genres: ['Fantasy', 'Fantasy'] }) });
+      expect(response.statusCode).toBe(422);
+      expect(await novelRows()).toHaveLength(0);
+    });
+
+    it('should reject a rating level outside its own dimension', async () => {
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { darkContent: 'extreme' }) });
+      expect(response.statusCode).toBe(422);
+      expect(await novelRows()).toHaveLength(0);
+    });
+
+    it('should leave an omitted rating dimension null rather than reading it back as none', async () => {
+      await publishNovel(1);
+
+      const [novel] = await novelRows();
+      expect(novel).toMatchObject({ sexualContent: null, violence: null, darkContent: null, tags: [] });
+    });
+
+    it('should clear a stored rating when a later push omits the dimension', async () => {
+      await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { violence: 'extreme' }) });
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(2) });
+      expect(response.statusCode).toBe(200);
+
+      const [novel] = await novelRows();
+      expect(novel).toMatchObject({ violence: null });
+    });
+
+    it('should apply an equal-revision push whose only change is its tags', async () => {
+      await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { tags: ['Cultivation'] }) });
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { tags: ['Cultivation', 'Alchemy'] }) });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ outcome: 'applied', revision: 1 });
+
+      const [novel] = await novelRows();
+      expect(novel).toMatchObject({ tags: ['Cultivation', 'Alchemy'] });
+    });
+
+    it('should apply an equal-revision push whose only change is a rating dimension', async () => {
+      await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { sexualContent: 'none' }) });
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { sexualContent: 'explicit' }) });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ outcome: 'applied', revision: 1 });
+
+      const [novel] = await novelRows();
+      expect(novel).toMatchObject({ sexualContent: 'explicit' });
+    });
+
+    it('should apply an equal-revision push that drops a rating a stored row asserts', async () => {
+      await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { sexualContent: 'none' }) });
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1) });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ outcome: 'applied', revision: 1 });
+
+      const [novel] = await novelRows();
+      expect(novel).toMatchObject({ sexualContent: null });
+    });
+
+    it('should answer 204 no-op when the tags and ratings are unchanged too', async () => {
+      const body = novelBody(1, { tags: ['Cultivation'], sexualContent: 'moderate' });
+      await push('put', `/internal/novels/${SLUG}`, { body });
+      const response = await push('put', `/internal/novels/${SLUG}`, { body });
+      expect(response.statusCode).toBe(204);
     });
   });
 

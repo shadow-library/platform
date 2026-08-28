@@ -17,7 +17,7 @@ const seedNovel = async (slug = 'moonfall') => {
   const db = env.getPostgresClient();
   const [novel] = await db
     .insert(schema.novels)
-    .values({ slug, sourceClientId: FORGE_CLIENT_ID, title: 'Moonfall', coverPath: 'moonfall-cover.jpg', genres: ['fantasy'], revision: 1 })
+    .values({ slug, sourceClientId: FORGE_CLIENT_ID, title: 'Moonfall', coverPath: 'moonfall-cover.jpg', genres: ['Fantasy'], revision: 1 })
     .returning();
   return novel as { id: bigint };
 };
@@ -121,7 +121,7 @@ describe('Reader progress and library', () => {
         slug: 'moonfall',
         title: 'Moonfall',
         coverUrl: 'http://localhost:9000/wiki-assets/moonfall-cover.jpg',
-        genres: ['fantasy'],
+        genres: ['Fantasy'],
         status: 'live',
       });
 

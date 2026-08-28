@@ -1,5 +1,6 @@
 import { InferEnum, InferSelectModel } from 'drizzle-orm';
 import { bigint, bigserial, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
 
 export type Novel = InferSelectModel<typeof novels>;
 export namespace Novel {
@@ -42,8 +43,20 @@ export const novels = pgTable('novels', {
   title: varchar('title', { length: 256 }).notNull(),
   blurb: text('blurb'),
   coverPath: varchar('cover_path', { length: 512 }),
-  /** Free-form genre strings drive the public catalog filters; carried in the metadata PUT payload */
-  genres: varchar('genres', { length: 64 }).array().notNull().default([]),
+  /**
+   * Closed vocabularies from `@shadow-library/sdk`, kept as `varchar` rather than a native enum and validated
+   * at the DTO boundary instead: adding a genre or tag stays a code change rather than a schema migration.
+   */
+  genres: varchar('genres', { length: 64 }).array().notNull().default([]).$type<Genre[]>(),
+  tags: varchar('tags', { length: 64 }).array().notNull().default([]).$type<Tag[]>(),
+  /**
+   * `NULL` is *unrated*, and never interchangeable with `'none'` — a source that cannot determine a level must
+   * not assert the absence of content — so these carry no default. One column per dimension so the catalog can
+   * filter each independently.
+   */
+  sexualContent: varchar('sexual_content', { length: 16 }).$type<SexualContentLevel>(),
+  violence: varchar('violence', { length: 16 }).$type<ViolenceLevel>(),
+  darkContent: varchar('dark_content', { length: 16 }).$type<DarkContentLevel>(),
   status: novelStatus('status').notNull().default('live'),
   /** Defaulted for the migration's benefit only — every push carries it explicitly, so a row never relies on the default. */
   visibility: novelVisibility('visibility').notNull().default('PUBLIC'),

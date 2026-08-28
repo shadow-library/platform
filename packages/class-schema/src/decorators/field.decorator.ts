@@ -18,7 +18,7 @@ import { ArrayFieldSchema, BooleanFieldSchema, EnumFieldSchema, FieldSchema, Num
  * Defining types
  */
 
-export type ReturnTypeFunc = (returns?: void) => EnumType | Class<any> | Class<any>[];
+export type ReturnTypeFunc = (returns?: void) => EnumType | EnumType[] | Class<any> | Class<any>[];
 
 /**
  * Declaring the constants
@@ -30,7 +30,7 @@ export function Field(returnTypeFn: (returns?: void) => Class<String>, options?:
 export function Field(returnTypeFn: (returns?: void) => Class<Boolean>, options?: BooleanFieldSchema): PropertyDecorator;
 export function Field(returnTypeFn: (returns?: void) => Class<Number>, options?: NumberFieldSchema): PropertyDecorator;
 export function Field(returnTypeFn: (returns?: void) => Class<any>, options?: ObjectFieldSchema): PropertyDecorator;
-export function Field(returnTypeFn: (returns?: void) => Class<any>[], options?: ArrayFieldSchema): PropertyDecorator;
+export function Field(returnTypeFn: (returns?: void) => Class<any>[] | EnumType[], options?: ArrayFieldSchema): PropertyDecorator;
 export function Field(returnTypeFn: (returns?: void) => Class<Integer>, options?: NumberFieldSchema): PropertyDecorator; // eslint-disable-line @typescript-eslint/unified-signatures
 export function Field(typeOrOptions?: ReturnTypeFunc | FieldSchema, fieldOptions?: FieldSchema): PropertyDecorator {
   const isTypeFn = typeof typeOrOptions === 'function';

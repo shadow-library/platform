@@ -14,7 +14,7 @@ const ORG_ID = '4242';
 
 const novelBody = (revision: number, overrides: object = {}) => ({
   title: 'The Quiet Archive',
-  genres: ['mystery'],
+  genres: ['Mystery'],
   status: 'live',
   visibility: 'PUBLIC',
   revision,

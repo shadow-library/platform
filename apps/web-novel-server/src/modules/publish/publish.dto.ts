@@ -1,5 +1,8 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
+import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
+
+import { DarkContentRating, NovelGenre, NovelTag, SexualContentRating, ViolenceRating } from '@server/classes';
 
 /** Every numeric field here lands in an int4 column (including the audit trail) — values beyond this must be rejected, not passed through to the database */
 export const INT4_MAX = 2_147_483_647;
@@ -36,8 +39,20 @@ export class NovelUpsertBody {
   @Field(() => String, { optional: true, maxLength: 512 })
   coverPath?: string;
 
-  @Field(() => [String], { optional: true })
-  genres?: string[];
+  @Field(() => [NovelGenre], { optional: true, uniqueItems: true })
+  genres?: Genre[];
+
+  @Field(() => [NovelTag], { optional: true, uniqueItems: true })
+  tags?: Tag[];
+
+  @Field(() => SexualContentRating, { optional: true, description: 'Omit when unrated. An absent dimension is stored as unrated and is never inferred to be "none".' })
+  sexualContent?: SexualContentLevel;
+
+  @Field(() => ViolenceRating, { optional: true, description: 'Omit when unrated. An absent dimension is stored as unrated and is never inferred to be "none".' })
+  violence?: ViolenceLevel;
+
+  @Field(() => DarkContentRating, { optional: true, description: 'Omit when unrated. An absent dimension is stored as unrated and is never inferred to be "none".' })
+  darkContent?: DarkContentLevel;
 
   @Field(() => String, { enum: ['live', 'retired'], optional: true })
   status?: 'live' | 'retired';

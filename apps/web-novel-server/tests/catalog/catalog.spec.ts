@@ -20,13 +20,13 @@ const seedCatalog = async () => {
         title: 'Aurora Blade',
         blurb: 'Steel under polar light',
         coverPath: 'aurora-blade-cover.jpg',
-        genres: ['fantasy', 'action'],
+        genres: ['Fantasy', 'Action'],
         status: 'live',
         revision: 1,
         updatedAt: new Date('2026-01-03'),
       },
-      { slug: 'silent-harbor', sourceClientId: FORGE_CLIENT_ID, title: 'Silent Harbor', genres: ['mystery'], status: 'live', revision: 1, updatedAt: new Date('2026-01-02') },
-      { slug: 'old-embers', sourceClientId: FORGE_CLIENT_ID, title: 'Old Embers', genres: ['fantasy'], status: 'retired', revision: 1, updatedAt: new Date('2026-01-01') },
+      { slug: 'silent-harbor', sourceClientId: FORGE_CLIENT_ID, title: 'Silent Harbor', genres: ['Mystery'], status: 'live', revision: 1, updatedAt: new Date('2026-01-02') },
+      { slug: 'old-embers', sourceClientId: FORGE_CLIENT_ID, title: 'Old Embers', genres: ['Fantasy'], status: 'retired', revision: 1, updatedAt: new Date('2026-01-01') },
     ])
     .returning();
   await db.insert(schema.publishedChapters).values([
@@ -57,7 +57,7 @@ describe('Public catalog API', () => {
       expect(body.items[0]).toMatchObject({
         slug: 'aurora-blade',
         title: 'Aurora Blade',
-        genres: ['fantasy', 'action'],
+        genres: ['Fantasy', 'Action'],
         status: 'live',
         chapterCount: 2,
         coverUrl: 'http://localhost:9000/wiki-assets/aurora-blade-cover.jpg',
@@ -72,7 +72,7 @@ describe('Public catalog API', () => {
     });
 
     it('should filter by genre', async () => {
-      const response = await env.getRouter().mockRequest().get('/api/novels?genre=fantasy');
+      const response = await env.getRouter().mockRequest().get('/api/novels?genre=Fantasy');
       const body = response.json() as { total: number; items: { slug: string }[] };
       expect(body.total).toBe(2);
       expect(body.items.map(item => item.slug)).toEqual(['aurora-blade', 'old-embers']);

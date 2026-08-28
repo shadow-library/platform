@@ -43,6 +43,13 @@
       "when": 1787900826617,
       "tag": "0005_vengeful_rhino",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787915352381,
+      "tag": "0006_unusual_warlock",
+      "breakpoints": true
     }
   ]
 }

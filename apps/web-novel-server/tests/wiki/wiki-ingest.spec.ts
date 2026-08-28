@@ -36,7 +36,7 @@ async function push(method: 'put' | 'delete' | 'get', path: string, options: Pus
   return options.body ? chain.body(options.body) : chain;
 }
 
-const novelBody = (revision = 1) => ({ title: 'Moonfall', genres: ['fantasy'], status: 'live', visibility: 'PUBLIC', revision });
+const novelBody = (revision = 1) => ({ title: 'Moonfall', genres: ['Fantasy'], status: 'live', visibility: 'PUBLIC', revision });
 const publishNovel = async () => expect((await push('put', `/internal/novels/${SLUG}`, { body: novelBody() })).statusCode).toBe(200);
 
 const entryRows = () => env.getPostgresClient().select().from(schema.wikiEntries).orderBy(asc(schema.wikiEntries.entryKey));

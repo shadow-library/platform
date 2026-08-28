@@ -11,7 +11,7 @@ async function seedNovel(slug = 'moonfall', visibility: 'PUBLIC' | 'RESTRICTED' 
   const db = env.getPostgresClient();
   const [novel] = await db
     .insert(schema.novels)
-    .values({ slug, sourceClientId: FORGE_CLIENT_ID, title: 'Moonfall', genres: ['fantasy'], visibility, revision: 1, accessRevision: 1 })
+    .values({ slug, sourceClientId: FORGE_CLIENT_ID, title: 'Moonfall', genres: ['Fantasy'], visibility, revision: 1, accessRevision: 1 })
     .returning();
   const novelId = (novel as { id: bigint }).id;
 
