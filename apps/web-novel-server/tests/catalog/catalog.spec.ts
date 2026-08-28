@@ -21,12 +21,36 @@ const seedCatalog = async () => {
         blurb: 'Steel under polar light',
         coverPath: 'aurora-blade-cover.jpg',
         genres: ['Fantasy', 'Action'],
+        tags: ['Slow Romance'],
+        sexualContent: 'moderate',
+        violence: 'mild',
+        darkContent: 'mild',
         status: 'live',
         revision: 1,
         updatedAt: new Date('2026-01-03'),
       },
-      { slug: 'silent-harbor', sourceClientId: FORGE_CLIENT_ID, title: 'Silent Harbor', genres: ['Mystery'], status: 'live', revision: 1, updatedAt: new Date('2026-01-02') },
-      { slug: 'old-embers', sourceClientId: FORGE_CLIENT_ID, title: 'Old Embers', genres: ['Fantasy'], status: 'retired', revision: 1, updatedAt: new Date('2026-01-01') },
+      {
+        slug: 'silent-harbor',
+        sourceClientId: FORGE_CLIENT_ID,
+        title: 'Silent Harbor',
+        genres: ['Mystery'],
+        tags: ['Slow Romance'],
+        sexualContent: 'explicit',
+        violence: 'extreme',
+        darkContent: 'heavy',
+        status: 'live',
+        revision: 1,
+        updatedAt: new Date('2026-01-02'),
+      },
+      {
+        slug: 'old-embers',
+        sourceClientId: FORGE_CLIENT_ID,
+        title: 'Old Embers',
+        genres: ['Fantasy'],
+        status: 'retired',
+        revision: 1,
+        updatedAt: new Date('2026-01-01'),
+      },
     ])
     .returning();
   await db.insert(schema.publishedChapters).values([
@@ -76,6 +100,88 @@ describe('Public catalog API', () => {
       const body = response.json() as { total: number; items: { slug: string }[] };
       expect(body.total).toBe(2);
       expect(body.items.map(item => item.slug)).toEqual(['aurora-blade', 'old-embers']);
+    });
+
+    it('should reject an unrecognised genre at the boundary', async () => {
+      const response = await env.getRouter().mockRequest().get('/api/novels?genre=NotARealGenre');
+      expect(response.statusCode).toBe(422);
+    });
+
+    it('should filter by tag', async () => {
+      const response = await env.getRouter().mockRequest().get('/api/novels?tag=Slow+Romance');
+      const body = response.json() as { total: number; items: { slug: string }[] };
+      expect(body.total).toBe(2);
+      expect(body.items.map(item => item.slug)).toEqual(['aurora-blade', 'silent-harbor']);
+    });
+
+    it('should reject an unrecognised tag at the boundary', async () => {
+      const response = await env.getRouter().mockRequest().get('/api/novels?tag=NotARealTag');
+      expect(response.statusCode).toBe(422);
+    });
+
+    it('should return novels at or below a sexual-content ceiling, in rank order not alphabetical order', async () => {
+      const response = await env.getRouter().mockRequest().get('/api/novels?maxSexualContent=moderate');
+      const body = response.json() as { total: number; items: { slug: string }[] };
+      expect(body.items.map(item => item.slug)).toEqual(['aurora-blade']);
+      expect(body.total).toBe(1);
+    });
+
+    it('should exclude an unrated novel under any rating ceiling', async () => {
+      const response = await env.getRouter().mockRequest().get('/api/novels?maxSexualContent=explicit');
+      const body = response.json() as { total: number; items: { slug: string }[] };
+      expect(body.items.map(item => item.slug)).toEqual(['aurora-blade', 'silent-harbor']);
+      expect(body.items.map(item => item.slug)).not.toContain('old-embers');
+    });
+
+    it('should reject an unrecognised sexual-content ceiling at the boundary', async () => {
+      const response = await env.getRouter().mockRequest().get('/api/novels?maxSexualContent=nope');
+      expect(response.statusCode).toBe(422);
+    });
+
+    it('should return novels at or below a violence ceiling, in rank order not alphabetical order', async () => {
+      const response = await env.getRouter().mockRequest().get('/api/novels?maxViolence=mild');
+      const body = response.json() as { total: number; items: { slug: string }[] };
+      expect(body.items.map(item => item.slug)).toEqual(['aurora-blade']);
+      expect(body.total).toBe(1);
+    });
+
+    it('should exclude an unrated novel under the widest violence ceiling', async () => {
+      const response = await env.getRouter().mockRequest().get('/api/novels?maxViolence=extreme');
+      const body = response.json() as { total: number; items: { slug: string }[] };
+      expect(body.items.map(item => item.slug)).toEqual(['aurora-blade', 'silent-harbor']);
+      expect(body.items.map(item => item.slug)).not.toContain('old-embers');
+    });
+
+    it('should return novels at or below a dark-content ceiling, in rank order not alphabetical order', async () => {
+      const response = await env.getRouter().mockRequest().get('/api/novels?maxDarkContent=mild');
+      const body = response.json() as { total: number; items: { slug: string }[] };
+      expect(body.items.map(item => item.slug)).toEqual(['aurora-blade']);
+      expect(body.total).toBe(1);
+    });
+
+    it('should exclude an unrated novel under the widest dark-content ceiling', async () => {
+      const response = await env.getRouter().mockRequest().get('/api/novels?maxDarkContent=heavy');
+      const body = response.json() as { total: number; items: { slug: string }[] };
+      expect(body.items.map(item => item.slug)).toEqual(['aurora-blade', 'silent-harbor']);
+      expect(body.items.map(item => item.slug)).not.toContain('old-embers');
+    });
+
+    it('should include an unrated novel when no rating filter is supplied', async () => {
+      const response = await env.getRouter().mockRequest().get('/api/novels');
+      const body = response.json() as { total: number; items: { slug: string }[] };
+      expect(body.items.map(item => item.slug)).toContain('old-embers');
+    });
+
+    it('should serialise tags and ratings for a rated novel, and omit the rating field entirely for an unrated one', async () => {
+      const response = await env.getRouter().mockRequest().get('/api/novels');
+      const body = response.json() as { items: Record<string, unknown>[] };
+      const rated = body.items.find(item => item.slug === 'aurora-blade');
+      const unrated = body.items.find(item => item.slug === 'old-embers');
+      expect(rated).toMatchObject({ tags: ['Slow Romance'], sexualContent: 'moderate' });
+      expect(unrated).not.toHaveProperty('sexualContent');
+      expect(unrated).not.toHaveProperty('violence');
+      expect(unrated).not.toHaveProperty('darkContent');
+      expect(unrated?.sexualContent).not.toBe('none');
     });
 
     it('should filter by status', async () => {

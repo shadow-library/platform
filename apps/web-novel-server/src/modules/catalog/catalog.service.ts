@@ -1,8 +1,10 @@
 import { and, asc, count, desc, eq, ilike, sql, type SQL } from 'drizzle-orm';
+import { type PgColumn } from 'drizzle-orm/pg-core';
 import { Injectable } from '@shadow-library/app';
 import { type AuthPrincipal } from '@shadow-library/auth';
 import { AppError, Config, Logger, LRUCache } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
+import { CONTENT_RATING_LEVELS, type ContentRatingDimension, type ContentRatingLevel, ratingRank } from '@shadow-library/sdk';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
@@ -26,6 +28,12 @@ export interface ChapterRef {
  * no explicit invalidation path exists or is needed.
  */
 const CHAPTER_CACHE_CAPACITY = 512;
+
+const RATING_COLUMNS = {
+  sexualContent: schema.novels.sexualContent,
+  violence: schema.novels.violence,
+  darkContent: schema.novels.darkContent,
+} as const satisfies Record<ContentRatingDimension, PgColumn>;
 
 @Injectable()
 export class CatalogService {
@@ -163,8 +171,26 @@ export class CatalogService {
     const filters: SQL[] = [eq(schema.novels.visibility, 'PUBLIC')];
     if (query.search) filters.push(ilike(schema.novels.title, `%${query.search}%`));
     if (query.genre) filters.push(sql`${query.genre} = ANY(${schema.novels.genres})`);
+    if (query.tag) filters.push(sql`${query.tag} = ANY(${schema.novels.tags})`);
     if (query.status) filters.push(eq(schema.novels.status, query.status));
+    if (query.maxSexualContent) filters.push(this.ratingCeiling('sexualContent', query.maxSexualContent));
+    if (query.maxViolence) filters.push(this.ratingCeiling('violence', query.maxViolence));
+    if (query.maxDarkContent) filters.push(this.ratingCeiling('darkContent', query.maxDarkContent));
     return and(...filters) as SQL;
+  }
+
+  /**
+   * The levels are ordered but stored as `varchar`, so a raw `<=` on the column would compare
+   * alphabetically (`'explicit' < 'moderate'`). This maps each stored value to its rank via `CASE`
+   * before comparing. A column value outside `CONTENT_RATING_LEVELS[dimension]` — including `NULL`,
+   * i.e. unrated — matches no `WHEN` branch, so the `CASE` yields SQL `NULL` and `NULL <= n` is
+   * `NULL`, which `WHERE` treats as false: unrated novels are excluded, not passed through.
+   */
+  private ratingCeiling<D extends ContentRatingDimension>(dimension: D, ceiling: ContentRatingLevel<D>): SQL {
+    const column = RATING_COLUMNS[dimension];
+    const cases = CONTENT_RATING_LEVELS[dimension].map(level => sql`WHEN ${level} THEN ${ratingRank(dimension, level as ContentRatingLevel<D>)}`);
+    const rank = sql`CASE ${column} ${sql.join(cases, sql` `)} END`;
+    return sql`(${rank}) <= ${ratingRank(dimension, ceiling)}`;
   }
 
   private buildOrder(query: NovelCatalogQuery): SQL {
@@ -184,6 +210,10 @@ export class CatalogService {
       blurb: novel.blurb ?? undefined,
       coverUrl: this.imageUrl(novel.coverPath),
       genres: novel.genres,
+      tags: novel.tags,
+      sexualContent: novel.sexualContent ?? undefined,
+      violence: novel.violence ?? undefined,
+      darkContent: novel.darkContent ?? undefined,
       status: novel.status,
       visibility: novel.visibility,
       chapterCount,

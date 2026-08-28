@@ -1,5 +1,7 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
+import { type Genre } from '@shadow-library/sdk';
 
+import { NovelGenre } from '@server/classes';
 import { NOVEL_VISIBILITIES } from '@server/modules/publish';
 
 @Schema()
@@ -55,8 +57,8 @@ export class LibraryItem {
   @Field(() => String, { optional: true, description: 'Absolute public URL; absent when the novel has no cover.' })
   coverUrl?: string;
 
-  @Field(() => [String])
-  genres: string[];
+  @Field(() => [NovelGenre])
+  genres: Genre[];
 
   @Field(() => String, { enum: ['live', 'retired'] })
   status: 'live' | 'retired';
