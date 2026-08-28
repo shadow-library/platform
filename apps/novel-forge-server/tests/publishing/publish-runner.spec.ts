@@ -455,20 +455,6 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     expect([...(reader.novels.get(`${slug}-2`)?.chapters.keys() ?? [])]).toEqual([1]);
   });
 
-  it('should adopt a reader row pushed before the forge sent a ref instead of publishing a second novel', async () => {
-    const { projectId, slug } = await seedPublishedProject(1);
-    await runner.converge(projectId);
-    const served = reader.novels.get(slug);
-    if (!served) throw new Error('reader lost the novel');
-    served.sourceRef = null;
-
-    await publishingService.publishNovel(projectId, { blurb: 'Adopted on the next converge.' });
-    const result = await runner.converge(projectId);
-    expect(result).toMatchObject({ novel: 'applied', failed: [] });
-    expect(reader.novels.get(slug)).toMatchObject({ sourceRef: String(projectId), blurb: 'Adopted on the next converge.' });
-    expect([...(reader.novels.get(slug)?.chapters.keys() ?? [])]).toEqual([1]);
-  });
-
   it('should sweep a bare slug conflict while still parking stale, malformed and unattributed rejections', () => {
     expect(UNSWEEPABLE_ERROR_PREFIXES).not.toContain(SLUG_CONFLICT_ERROR_PREFIX);
     expect(UNSWEEPABLE_ERROR_PREFIXES).toEqual([STALE_ERROR_PREFIX, HASH_MISMATCH_ERROR_PREFIX, SLUG_EXHAUSTED_ERROR_PREFIX, UNKNOWN_CONFLICT_ERROR_PREFIX]);

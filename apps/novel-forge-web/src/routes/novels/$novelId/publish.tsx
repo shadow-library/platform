@@ -196,7 +196,7 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
             error={fieldErrors['novelSlug'] ?? slugConflict}
             helper={
               publication
-                ? 'Changing it moves the novel to the new URL, chapters and all. The old URL stops resolving, so links readers saved will break.'
+                ? 'The novel moves to the new URL, chapters and all, on its next publish. The old URL then stops resolving, so links readers saved will break.'
                 : 'Lowercase and dashes; left blank it is derived from the title.'
             }
           >

@@ -25,24 +25,29 @@ rejected attempt — writes exactly one `publish_audit_log` row. Unpublish is id
 .../manifest` returns `[{ ordinal, contentHash, revision }]` for forge-side reconciliation and is not
 audited.
 
-A novel is identified by the publisher's own `sourceRef` when the metadata push carries one: it is resolved
-by `(source_client_id, source_ref)` rather than by slug, so a push arriving under a new slug **renames that
-row** instead of publishing a second novel, and a retried create converges on the row it already made. The
-column is optional — a push without one still resolves by slug, and a publisher that starts sending a ref
-adopts the row it already owns at that slug. Reader-facing URLs still use the slug, so a rename does change
-where a novel is served from. An `applied` outcome from any of the three publish-upsert routes (novel, access,
-chapter) carries the reader's own novel `id` (a string, since it is 64-bit) for diagnostics; a `204` no-op or
-unpublish response has no body, and correctness never depends on a publisher persisting the `id` either way.
+**A novel is identified by the publisher's own `sourceRef`, which is required on every metadata push.** The
+row is resolved by `(source_client_id, source_ref)` and never by slug, so a push arriving under a new slug
+**renames that row** instead of publishing a second novel, and a retried create converges on the row it
+already made. A publisher must therefore mint a stable identifier of its own — one it assigns before the
+first push and never reassigns for the novel's life (the forge sends its `projectId`) — and at most 64
+characters; refs live in a key space per publisher, so two publishers may use the same one. There is no
+slug fallback: a push without a `sourceRef` is rejected at validation (`422`), not resolved by slug.
+
+The slug is mutable metadata, not identity. Reader-facing URLs still use it, so a rename does change where a
+novel is served from and the old URL stops resolving. The chapter, access and wiki sub-resources are still
+addressed by slug — they mutate a novel that already exists, and a converge pushes the metadata first, so the
+slug they use is the one that push just settled on. An `applied` outcome from any of the three publish-upsert
+routes (novel, access, chapter) carries the reader's own novel `id` (a string, since it is 64-bit) for
+diagnostics; a `204` no-op or unpublish response has no body, and correctness never depends on a publisher
+persisting the `id` either way.
 
 A slug belongs to the client that created it (`novels.source_client_id`, stamped from the authenticated
-principal), and only that client may mutate it. A mutation on a slug owned by another publisher — including
-a rename onto one — is `409` (`WBN_010`, audited `unauthorized`) and is **retryable under a different slug**,
-unlike `WBN_003`, which is fatal, so publishers discriminate on the code, not the status. A slug already held
-by the same publisher **under a different `sourceRef`** answers `WBN_010` too, for the same remedy — but a
-slug already held by the same publisher with **no `sourceRef` on the stored row** is adopted, not refused: a
-publisher that is only now starting to send refs cannot be told apart from one pushing a genuinely new novel
-at an old slug, so the ref-less row is claimed rather than rejected. A read of a foreign-owned slug answers
-`404` (`WBN_001`) exactly as an unknown slug does; the owning client is never named.
+principal), and only that client may mutate it. A metadata push whose slug is already held by any other
+novel — another publisher's, or another of this publisher's own under a different `sourceRef` — is `409`
+(`WBN_010`, audited `unauthorized`) and is **retryable under a different slug**, unlike `WBN_003`, which is
+fatal, so publishers discriminate on the code, not the status. A sub-resource mutation under a foreign-owned
+slug answers `WBN_010` the same way; a _read_ of one answers `404` (`WBN_001`) exactly as an unknown slug
+does, so the surface never becomes an oracle over another publisher's slugs.
 
 ## Running locally
 

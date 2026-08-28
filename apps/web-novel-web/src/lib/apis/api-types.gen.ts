@@ -529,8 +529,8 @@ export interface components {
       postgres: 'up' | 'down';
     };
     NovelUpsertBody: {
-      /** @description The publisher's own stable identifier. When present it, not the slug, identifies the novel: a push under a new slug renames it rather than publishing a second one. */
-      sourceRef?: string;
+      /** @description Required. The publisher's own stable id — it, not the slug, identifies the novel, so a push under a new slug renames it rather than publishing a second one. */
+      sourceRef: string;
       title: string;
       blurb?: string;
       coverPath?: string;

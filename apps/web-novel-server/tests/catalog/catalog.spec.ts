@@ -17,6 +17,7 @@ const seedCatalog = async () => {
       {
         slug: 'aurora-blade',
         sourceClientId: FORGE_CLIENT_ID,
+        sourceRef: 'forge-aurora-blade',
         title: 'Aurora Blade',
         blurb: 'Steel under polar light',
         coverPath: 'aurora-blade-cover.jpg',
@@ -32,6 +33,7 @@ const seedCatalog = async () => {
       {
         slug: 'silent-harbor',
         sourceClientId: FORGE_CLIENT_ID,
+        sourceRef: 'forge-silent-harbor',
         title: 'Silent Harbor',
         genres: ['Mystery'],
         tags: ['Slow Romance'],
@@ -45,6 +47,7 @@ const seedCatalog = async () => {
       {
         slug: 'old-embers',
         sourceClientId: FORGE_CLIENT_ID,
+        sourceRef: 'forge-old-embers',
         title: 'Old Embers',
         genres: ['Fantasy'],
         status: 'retired',
@@ -255,7 +258,7 @@ describe('Public catalog API', () => {
 
     const publishChapter = async (revision: number, content: string) => {
       const contentHash = chapterContentHash({ title: 'One', content });
-      await publish('/internal/novels/etag-novel', { title: 'ETag Novel', genres: [], visibility: 'PUBLIC', revision: 1 });
+      await publish('/internal/novels/etag-novel', { sourceRef: 'forge-etag-novel', title: 'ETag Novel', genres: [], visibility: 'PUBLIC', revision: 1 });
       await publish('/internal/novels/etag-novel/chapters/1', { title: 'One', content, contentHash, revision });
       return contentHash;
     };
@@ -317,7 +320,7 @@ describe('Public catalog API', () => {
     });
 
     it('should answer 404 for an unknown chapter', async () => {
-      await publish('/internal/novels/etag-novel', { title: 'ETag Novel', genres: [], visibility: 'PUBLIC', revision: 1 });
+      await publish('/internal/novels/etag-novel', { sourceRef: 'forge-etag-novel', title: 'ETag Novel', genres: [], visibility: 'PUBLIC', revision: 1 });
       const response = await env.getRouter().mockRequest().get('/api/novels/etag-novel/chapters/99');
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'WBN_002' });

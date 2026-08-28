@@ -13,6 +13,7 @@ const ORG_MEMBER = '900003';
 const ORG_ID = '4242';
 
 const novelBody = (revision: number, overrides: object = {}) => ({
+  sourceRef: 'forge-quiet-archive',
   title: 'The Quiet Archive',
   genres: ['Mystery'],
   status: 'live',
@@ -46,7 +47,7 @@ async function read(path: string, sub?: string, org?: string) {
 }
 
 async function seed(slug: string, visibility: string, access: object = {}): Promise<void> {
-  expect((await push('put', `/internal/novels/${slug}`, novelBody(1, { visibility }))).statusCode).toBe(200);
+  expect((await push('put', `/internal/novels/${slug}`, novelBody(1, { sourceRef: slug, visibility }))).statusCode).toBe(200);
   expect([200, 204]).toContain((await push('put', `/internal/novels/${slug}/access`, { visibility, revision: 1, ...access })).statusCode);
   expect((await push('put', `/internal/novels/${slug}/chapters/1`, chapterBody(1))).statusCode).toBe(200);
 }
@@ -97,7 +98,7 @@ describe('Novel access', () => {
     });
 
     it('should reject a novel push that carries no visibility, rather than defaulting it open', async () => {
-      const response = await push('put', '/internal/novels/no-visibility', { title: 'Untiered', genres: [], revision: 1 });
+      const response = await push('put', '/internal/novels/no-visibility', { sourceRef: 'forge-untiered', title: 'Untiered', genres: [], revision: 1 });
       expect(response.statusCode).toBe(422);
     });
 

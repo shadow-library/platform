@@ -65,8 +65,8 @@ export class PublishService {
   /**
    * A first push locks nothing — the row does not exist yet — so two converge passes of the same
    * publisher can both reach the insert, and the index rejects the loser. That is a self-race, not
-   * foreign ownership: the loser re-runs against the now-committed row, where the ownership check
-   * converges our own row and still refuses another publisher's with `WBN_010`.
+   * foreign ownership: the loser re-runs against the now-committed row, where its own `sourceRef`
+   * resolves the row it just lost and only another publisher's slug still answers `WBN_010`.
    */
   async upsertNovel(slug: string, body: NovelUpsertBody): Promise<UpsertResult> {
     const caller = this.caller();
@@ -85,8 +85,6 @@ export class PublishService {
     return this.db.transaction(async tx => {
       const stored = await this.lockNovel(tx, slug, body, caller);
       const base: Omit<PublishAuditEntry, 'outcome'> = { action: 'novel.upsert', novelSlug: slug, incomingRevision: body.revision, storedRevision: stored?.revision, ...caller };
-      /** Ahead of the revision ladder: WBN_003 quotes the stored revision, which a foreign caller has no business learning. */
-      if (stored) assertNovelOwnership(stored, caller);
 
       if (stored && body.revision < stored.revision) {
         await this.auditService.record({ ...base, outcome: 'stale_rejected' }, tx);
@@ -99,8 +97,7 @@ export class PublishService {
 
       const values = {
         slug,
-        /** An omitted ref never clears a stored one: a publisher that has started sending refs must not un-identify its own row by regressing. */
-        sourceRef: body.sourceRef ?? stored?.sourceRef ?? null,
+        sourceRef: body.sourceRef,
         title: body.title,
         blurb: body.blurb ?? null,
         coverPath: body.coverPath ?? null,
@@ -273,21 +270,19 @@ export class PublishService {
   }
 
   /**
-   * Identity is the publisher's `sourceRef`, and only its absence falls back to the slug — that fallback is
-   * what lets a publisher which has not started sending refs keep pushing, and what lets one that just
-   * started adopt the row it already owns. A slug the caller owns under a *different* ref is a collision
-   * between two of its own novels, answered with the same WBN_010 as a foreign slug because the remedy is
-   * the same: publish under a slug this novel can hold.
+   * `(sourceClientId, sourceRef)` is the only thing that resolves a novel; the slug is read solely to find
+   * out whether the row this push would create or rename onto can hold it. Anything already sitting there
+   * is therefore some other novel — another publisher's, or another of this caller's — and both answer
+   * WBN_010 because both take the same remedy: publish under a slug this novel can hold. Deciding that
+   * ahead of the revision ladder also keeps WBN_003 from quoting a stored revision to a foreign caller.
    */
   private async lockNovel(tx: PublishTransaction, slug: string, body: NovelUpsertBody, caller: PublishCaller): Promise<Novel | undefined> {
-    if (body.sourceRef) {
-      const filter = and(eq(schema.novels.sourceClientId, caller.callerClientId), eq(schema.novels.sourceRef, body.sourceRef)) as SQL;
-      const [owned] = await tx.select().from(schema.novels).where(filter).for('update');
-      if (owned) return owned;
-    }
+    const filter = and(eq(schema.novels.sourceClientId, caller.callerClientId), eq(schema.novels.sourceRef, body.sourceRef)) as SQL;
+    const [owned] = await tx.select().from(schema.novels).where(filter).for('update');
+    if (owned) return owned;
     const [bySlug] = await tx.select().from(schema.novels).where(eq(schema.novels.slug, slug)).for('update');
-    if (bySlug && body.sourceRef && bySlug.sourceRef && bySlug.sourceRef !== body.sourceRef) throw AppErrorCode.WBN_010.create();
-    return bySlug;
+    if (bySlug) throw AppErrorCode.WBN_010.create();
+    return undefined;
   }
 
   /**
@@ -317,7 +312,6 @@ export class PublishService {
   private isNovelUnchanged(stored: Novel, body: NovelUpsertBody, slug: string): boolean {
     return (
       stored.slug === slug &&
-      stored.sourceRef === (body.sourceRef ?? stored.sourceRef) &&
       stored.title === body.title &&
       stored.blurb === (body.blurb ?? null) &&
       stored.coverPath === (body.coverPath ?? null) &&

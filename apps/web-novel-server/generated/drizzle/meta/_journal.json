@@ -57,6 +57,13 @@
       "when": 1787932306558,
       "tag": "0007_small_elektra",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787935554446,
+      "tag": "0008_mushy_miracleman",
+      "breakpoints": true
     }
   ]
 }

@@ -46,11 +46,10 @@ export const novels = pgTable(
      * The publisher's own stable identifier for the novel, unique per publisher. It, not the slug, is what
      * a push identifies a novel by, so a changed slug is a rename of this row rather than a second novel;
      * and because the publisher assigns it before pushing, a retried create finds the same row instead of
-     * making another. Nullable only until every publisher sends one — they deploy independently of this
-     * service, so there is no flag day. NULLs never collide under the unique constraint, which is exactly
-     * what an optional column needs.
+     * making another. Mandatory: a row without one is addressable only by slug, which is the identity
+     * mistake this column exists to remove.
      */
-    sourceRef: varchar('source_ref', { length: 64 }),
+    sourceRef: varchar('source_ref', { length: 64 }).notNull(),
     title: varchar('title', { length: 256 }).notNull(),
     blurb: text('blurb'),
     coverPath: varchar('cover_path', { length: 512 }),
