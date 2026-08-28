@@ -1,6 +1,6 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
-import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
+import { type DarkContentLevel, type Genre, MAX_NOVEL_GENRES, MAX_NOVEL_TAGS, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
 
 import {
   ChapterPublicationStatus,
@@ -13,10 +13,6 @@ import {
   SexualContentRating,
   ViolenceRating,
 } from '@server/common';
-
-/** The reader rejects a duplicate outright, so the cap and the uniqueness both belong at this boundary rather than at the push. */
-export const MAX_NOVEL_GENRES = 10;
-export const MAX_NOVEL_TAGS = 30;
 
 const RATING_DESCRIPTION = 'Content rating level; null clears it back to unrated, omission keeps the stored level. No level means unrated — never send "none" to say it.';
 
@@ -58,6 +54,7 @@ export class PublishNovelBody {
   @Field(() => String, { optional: true, nullable: true, maxLength: 512 })
   coverPath?: string | null;
 
+  // The reader rejects a duplicate outright, so the cap and the uniqueness both belong at this boundary rather than at the push.
   @Field(() => [NovelGenre], {
     optional: true,
     nullable: true,

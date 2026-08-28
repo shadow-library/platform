@@ -135,6 +135,7 @@
     "apps/novel-forge-web": {
       "name": "novel-forge-web",
       "dependencies": {
+        "@shadow-library/sdk": "workspace:*",
         "@shadow-library/ui": "workspace:*",
         "@shadow-library/web": "workspace:*",
         "@tanstack/react-query": "catalog:",

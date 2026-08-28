@@ -38,6 +38,8 @@ export const NOVEL_GENRES = [
 
 export type Genre = (typeof NOVEL_GENRES)[number];
 
+export const MAX_NOVEL_GENRES = 10;
+
 export function isGenre(value: unknown): value is Genre {
   return (NOVEL_GENRES as readonly string[]).includes(value as string);
 }

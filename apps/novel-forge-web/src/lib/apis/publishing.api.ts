@@ -1,3 +1,4 @@
+import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
 import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
 import { type AccessGrantItem, type PublicationAccessBody, type PublicationAccessResponse } from './api-types.gen';
@@ -18,7 +19,11 @@ export interface Publication {
   title: string;
   blurb?: string | null;
   coverPath?: string | null;
-  genres?: string[] | null;
+  genres?: Genre[] | null;
+  tags?: Tag[] | null;
+  sexualContent?: SexualContentLevel | null;
+  violence?: ViolenceLevel | null;
+  darkContent?: DarkContentLevel | null;
   status: PublicationStatus;
   revision: number;
   updatedAt: string;
@@ -47,12 +52,19 @@ export interface PublicationsLedger {
 }
 
 export interface PublishNovelBody {
-  /** Immutable after first publish — it anchors reader URLs. Omitted, it is derived from the title. */
+  /** Changing it republishes at the new URL; the old slug stays live as a stale copy. Omitted, it is derived from the title. */
   novelSlug?: string;
   title?: string;
   blurb?: string | null;
   coverPath?: string | null;
-  genres?: string[];
+  /** Omitted retains the stored genres; `null` clears them. */
+  genres?: Genre[] | null;
+  /** Omitted retains the stored tags; `null` clears them. */
+  tags?: Tag[] | null;
+  /** Omitted retains the stored level; `null` clears it back to unrated — never send `'none'` to mean that. */
+  sexualContent?: SexualContentLevel | null;
+  violence?: ViolenceLevel | null;
+  darkContent?: DarkContentLevel | null;
   /** Omitted on `POST /publish` (the go-live action) always means `live`. */
   status?: PublicationStatus;
 }

@@ -1,6 +1,21 @@
+import {
+  CONTENT_RATING_LEVEL_LABELS,
+  CONTENT_RATING_LEVELS,
+  type ContentRatingDimension,
+  type ContentRatingLevel,
+  type DarkContentLevel,
+  type Genre,
+  MAX_NOVEL_GENRES,
+  MAX_NOVEL_TAGS,
+  NOVEL_GENRES,
+  NOVEL_TAG_GROUPS,
+  type SexualContentLevel,
+  type Tag,
+  type ViolenceLevel,
+} from '@shadow-library/sdk';
+import { Alert, Button, Dialog, FormField, Input, MultiSelect, type MultiSelectOption, SegmentedControl, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-import { Alert, Button, Dialog, FormField, Input, SegmentedControl, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
 import { type ChipIntent, PageContainer, PageHeader, QueryState, SectionCard, StatusChip } from '@/components/nf';
 import {
@@ -35,6 +50,40 @@ export const Route = createFileRoute('/novels/$novelId/publish')({
 
 const STATUS_CHIP: Record<ChapterPublicationStatus, ChipIntent> = { scheduled: 'info', published: 'success', failed: 'danger', unpublished: 'neutral' };
 
+const GENRE_OPTIONS: MultiSelectOption[] = NOVEL_GENRES.map(genre => ({ value: genre, label: genre }));
+const TAG_OPTIONS: MultiSelectOption[] = NOVEL_TAG_GROUPS.flatMap(({ label, tags }) => tags.map(tag => ({ value: tag, label: `${label} — ${tag}` })));
+
+const UNRATED = '__unrated__';
+
+interface RatingFieldProps<D extends ContentRatingDimension> {
+  label: string;
+  helper: string;
+  dimension: D;
+  value: ContentRatingLevel<D> | typeof UNRATED;
+  onValueChange: (value: ContentRatingLevel<D> | typeof UNRATED) => void;
+  error?: string;
+}
+
+// "Unrated" is a first-class option, not the same as the mildest real level — a novel nobody has
+// characterised must never be published as if someone had confirmed it clean.
+function RatingField<D extends ContentRatingDimension>({ label, helper, dimension, value, onValueChange, error }: RatingFieldProps<D>): React.JSX.Element {
+  return (
+    <FormField label={label} error={error} helper={value === UNRATED ? `${helper} Not yet characterised.` : helper}>
+      <Select value={value} onValueChange={next => onValueChange(next as ContentRatingLevel<D> | typeof UNRATED)} size="sm">
+        <Select.Item value={UNRATED} description="Nobody has assessed this dimension yet">
+          Unrated
+        </Select.Item>
+        <Select.Separator />
+        {CONTENT_RATING_LEVELS[dimension].map(level => (
+          <Select.Item key={level} value={level}>
+            {CONTENT_RATING_LEVEL_LABELS[level]}
+          </Select.Item>
+        ))}
+      </Select>
+    </FormField>
+  );
+}
+
 function isApproved(draft: DraftResponse): boolean {
   return draft.reviewStatus === 'approved' || draft.reviewStatus === 'final';
 }
@@ -63,7 +112,16 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
   const [title, setTitle] = useState('');
   const [blurb, setBlurb] = useState('');
   const [coverPath, setCoverPath] = useState('');
-  const [genres, setGenres] = useState('');
+  const [genres, setGenres] = useState<string[]>([]);
+  const [genresTouched, setGenresTouched] = useState(false);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagsTouched, setTagsTouched] = useState(false);
+  const [sexualContent, setSexualContent] = useState<SexualContentLevel | typeof UNRATED>(UNRATED);
+  const [sexualContentTouched, setSexualContentTouched] = useState(false);
+  const [violence, setViolence] = useState<ViolenceLevel | typeof UNRATED>(UNRATED);
+  const [violenceTouched, setViolenceTouched] = useState(false);
+  const [darkContent, setDarkContent] = useState<DarkContentLevel | typeof UNRATED>(UNRATED);
+  const [darkContentTouched, setDarkContentTouched] = useState(false);
   const [status, setStatus] = useState<PublicationStatus>('live');
   const [hydrated, setHydrated] = useState(false);
 
@@ -73,7 +131,11 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
     setTitle(publication?.title ?? defaultTitle);
     setBlurb(publication?.blurb ?? '');
     setCoverPath(publication?.coverPath ?? '');
-    setGenres((publication?.genres ?? []).join(', '));
+    setGenres(publication?.genres ?? []);
+    setTags(publication?.tags ?? []);
+    setSexualContent(publication?.sexualContent ?? UNRATED);
+    setViolence(publication?.violence ?? UNRATED);
+    setDarkContent(publication?.darkContent ?? UNRATED);
     setStatus(publication?.status ?? 'live');
     setHydrated(true);
   }, [publication, ready, hydrated, defaultTitle]);
@@ -83,10 +145,12 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
       title: title.trim() || undefined,
       blurb: blurb.trim() || null,
       coverPath: coverPath.trim() || null,
-      genres: genres
-        .split(',')
-        .map(genre => genre.trim())
-        .filter(Boolean),
+      // Untouched fields stay absent so the server retains what is stored; only a field the author actually edited travels.
+      genres: genresTouched ? (genres.length ? (genres as Genre[]) : null) : undefined,
+      tags: tagsTouched ? (tags.length ? (tags as Tag[]) : null) : undefined,
+      sexualContent: sexualContentTouched ? (sexualContent === UNRATED ? null : sexualContent) : undefined,
+      violence: violenceTouched ? (violence === UNRATED ? null : violence) : undefined,
+      darkContent: darkContentTouched ? (darkContent === UNRATED ? null : darkContent) : undefined,
     };
     // The slug travels only when it would change something, so a republish at a new URL is always a deliberate
     // act here. Status travels only once the listing exists — on first publish an omitted one goes live.
@@ -95,6 +159,11 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
     publishNovel.mutate(body, {
       onSuccess: result => {
         setSlug(result.novelSlug);
+        setGenresTouched(false);
+        setTagsTouched(false);
+        setSexualContentTouched(false);
+        setViolenceTouched(false);
+        setDarkContentTouched(false);
         toast.success(publication ? 'Publication updated' : `Live as “${result.novelSlug}”`);
       },
       onError: error => toast.danger(error.message),
@@ -144,10 +213,71 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
           <FormField label="Cover path" error={fieldErrors['coverPath']} helper="A forge asset path; the push renders it for the reader.">
             <Input value={coverPath} onValueChange={setCoverPath} placeholder="assets/cover.png" />
           </FormField>
-          <FormField label="Genres" error={fieldErrors['genres']} helper="Comma-separated.">
-            <Input value={genres} onValueChange={setGenres} placeholder="fantasy, adventure" />
+          <FormField label="Genres" error={fieldErrors['genres']} helper={`Up to ${MAX_NOVEL_GENRES}.`}>
+            <MultiSelect
+              options={GENRE_OPTIONS}
+              value={genres}
+              onValueChange={value => {
+                setGenres(value);
+                setGenresTouched(true);
+              }}
+              placeholder="Select genres…"
+              searchable
+              maxSelected={MAX_NOVEL_GENRES}
+              aria-label="Genres"
+            />
           </FormField>
         </div>
+        <FormField label="Tags" error={fieldErrors['tags']} helper={`Grouped by theme; up to ${MAX_NOVEL_TAGS}.`}>
+          <MultiSelect
+            options={TAG_OPTIONS}
+            value={tags}
+            onValueChange={value => {
+              setTags(value);
+              setTagsTouched(true);
+            }}
+            placeholder="Select tags…"
+            searchable
+            maxSelected={MAX_NOVEL_TAGS}
+            maxVisibleTags={8}
+            aria-label="Tags"
+          />
+        </FormField>
+        <div className={styles.formGrid}>
+          <RatingField
+            label="Sexual content"
+            helper="How explicit the novel gets."
+            dimension="sexualContent"
+            value={sexualContent}
+            onValueChange={value => {
+              setSexualContent(value);
+              setSexualContentTouched(true);
+            }}
+            error={fieldErrors['sexualContent']}
+          />
+          <RatingField
+            label="Violence"
+            helper="How graphic the violence gets."
+            dimension="violence"
+            value={violence}
+            onValueChange={value => {
+              setViolence(value);
+              setViolenceTouched(true);
+            }}
+            error={fieldErrors['violence']}
+          />
+        </div>
+        <RatingField
+          label="Dark content"
+          helper="Trauma, abuse, and other heavy themes."
+          dimension="darkContent"
+          value={darkContent}
+          onValueChange={value => {
+            setDarkContent(value);
+            setDarkContentTouched(true);
+          }}
+          error={fieldErrors['darkContent']}
+        />
         {publication && (
           <FormField label="Status" error={fieldErrors['status']} helper="Retired novels stay readable but leave the catalog.">
             <SegmentedControl value={status} onValueChange={value => setStatus(value as PublicationStatus)} size="sm">

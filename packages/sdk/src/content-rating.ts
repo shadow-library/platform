@@ -18,6 +18,17 @@ export type ViolenceLevel = ContentRatingLevel<'violence'>;
 
 export type DarkContentLevel = ContentRatingLevel<'darkContent'>;
 
+export const CONTENT_RATING_LEVEL_LABELS: Record<ContentRatingLevel<ContentRatingDimension>, string> = {
+  none: 'None',
+  mild: 'Mild',
+  suggestive: 'Suggestive',
+  moderate: 'Moderate',
+  explicit: 'Explicit',
+  graphic: 'Graphic',
+  extreme: 'Extreme',
+  heavy: 'Heavy',
+};
+
 /**
  * Every dimension is optional and absence means *unrated* — never `'none'`. A source that cannot determine
  * a rating (a scraper, a partial import) must leave the field out rather than assert the absence of content,

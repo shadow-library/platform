@@ -2,6 +2,8 @@ export const TAG_GROUPS = ['Protagonist', 'Romance', 'Cultivation', 'Fantasy', '
 
 export type TagGroup = (typeof TAG_GROUPS)[number];
 
+export const MAX_NOVEL_TAGS = 30;
+
 const PROTAGONIST_TAGS = [
   'Male Protagonist',
   'Female Protagonist',
