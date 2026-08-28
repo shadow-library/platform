@@ -18,7 +18,7 @@
     "url": "git+ssh://git@github.com/shadow-library/app.git"
   },
   "author": "Leander Paul <leanderpaul97@outlook.com>",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/shadow-library/app/issues"
   },
