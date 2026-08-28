@@ -36,8 +36,9 @@ export function forgeToken(overrides: Partial<TestTokenInput> = {}): Promise<str
   return idp.issueToken({ sub: FORGE_CLIENT_ID, kind: 'service', clientId: FORGE_CLIENT_ID, audience: AUDIENCE, scopes: ['web-novel:publish'], ...overrides });
 }
 
+/** Mirrors the seeded `webnovel-ingest` client, which is granted `web-novel:ingest` and never `web-novel:publish` */
 export function ingestToken(overrides: Partial<TestTokenInput> = {}): Promise<string> {
-  return idp.issueToken({ sub: INGEST_CLIENT_ID, kind: 'service', clientId: INGEST_CLIENT_ID, audience: AUDIENCE, scopes: ['web-novel:publish'], ...overrides });
+  return idp.issueToken({ sub: INGEST_CLIENT_ID, kind: 'service', clientId: INGEST_CLIENT_ID, audience: AUDIENCE, scopes: ['web-novel:ingest'], ...overrides });
 }
 
 export function userToken(sub: string, overrides: Partial<TestTokenInput> = {}): Promise<string> {

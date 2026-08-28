@@ -239,6 +239,76 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/internal/ingest/novels/{slug}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Upsert Novel */
+    put: operations['put_internal_ingest_novels_slug'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/internal/ingest/novels/{slug}/access': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Access */
+    get: operations['get_internal_ingest_novels_slug_access'];
+    /** Upsert Access */
+    put: operations['put_internal_ingest_novels_slug_access'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/internal/ingest/novels/{slug}/chapters/{ordinal}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Upsert Chapter */
+    put: operations['put_internal_ingest_novels_slug_chapters_ordinal'];
+    post?: never;
+    /** Unpublish Chapter */
+    delete: operations['delete_internal_ingest_novels_slug_chapters_ordinal'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/internal/ingest/novels/{slug}/manifest': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Manifest */
+    get: operations['get_internal_ingest_novels_slug_manifest'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/internal/novels/{slug}/wiki/{entryKey}': {
     parameters: {
       query?: never;
@@ -1601,6 +1671,253 @@ export interface operations {
       };
     };
   };
+  put_internal_ingest_novels_slug: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['NovelUpsertBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PublishResultResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_internal_ingest_novels_slug_access: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NovelAccessResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_internal_ingest_novels_slug_access: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['NovelAccessBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PublishResultResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_internal_ingest_novels_slug_chapters_ordinal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+        /** @description A positive chapter ordinal of at most 9 digits. */
+        ordinal: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChapterUpsertBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PublishResultResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_internal_ingest_novels_slug_chapters_ordinal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+        /** @description A positive chapter ordinal of at most 9 digits. */
+        ordinal: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_internal_ingest_novels_slug_manifest: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ManifestItem'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   put_internal_novels_slug_wiki_entryKey: {
     parameters: {
       query?: never;
@@ -2291,8 +2608,10 @@ export type WikiImageItem = components['schemas']['WikiImageItem'];
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
-export type GetAccessPathParams = Exclude<paths['/internal/novels/{slug}/access']['get']['parameters']['path'], undefined>;
+export type InternalNovelsSlugAccessPathParams = Exclude<paths['/internal/novels/{slug}/access']['get']['parameters']['path'], undefined>;
 export type InternalNovelsSlugManifestPathParams = Exclude<paths['/internal/novels/{slug}/manifest']['get']['parameters']['path'], undefined>;
+export type InternalIngestNovelsSlugAccessPathParams = Exclude<paths['/internal/ingest/novels/{slug}/access']['get']['parameters']['path'], undefined>;
+export type InternalIngestNovelsSlugManifestPathParams = Exclude<paths['/internal/ingest/novels/{slug}/manifest']['get']['parameters']['path'], undefined>;
 export type InternalNovelsSlugWikiManifestPathParams = Exclude<paths['/internal/novels/{slug}/wiki/manifest']['get']['parameters']['path'], undefined>;
 export type ListNovelsQueryParams = Exclude<paths['/api/novels']['get']['parameters']['query'], undefined>;
 export type GetNovelPathParams = Exclude<paths['/api/novels/{slug}']['get']['parameters']['path'], undefined>;

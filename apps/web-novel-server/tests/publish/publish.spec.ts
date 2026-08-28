@@ -68,6 +68,9 @@ async function waitUntilBlocked(probe: SQL): Promise<void> {
   throw new Error('the publish insert never blocked on the slug unique index');
 }
 
+const INGEST_BASE = '/internal/ingest/novels';
+const ingestPath = (path: string) => path.replace('/internal/novels', INGEST_BASE);
+
 const publishNovel = async (revision = 1) => {
   const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(revision) });
   expect(response.statusCode).toBe(200);
@@ -509,7 +512,7 @@ describe('Internal publish API', () => {
       images: [],
     });
 
-    const foreign = async (method: 'put' | 'delete' | 'get', path: string, body?: object) => push(method, path, { body, token: await ingestToken() });
+    const foreign = async (method: 'put' | 'delete' | 'get', path: string, body?: object) => push(method, ingestPath(path), { body, token: await ingestToken() });
 
     it('should stamp the creating client on the novel it publishes', async () => {
       await publishNovel(1);
@@ -580,17 +583,19 @@ describe('Internal publish API', () => {
       expect(novel).toMatchObject({ visibility: 'PUBLIC', accessRevision: 1 });
     });
 
-    it('should reject a wiki push and a wiki delete from another source with WBN_010', async () => {
-      await publishNovel(1);
-      const upsert = await foreign('put', `/internal/novels/${SLUG}/wiki/selene`, wikiBody(1, 'wiki-a'));
+    /** The ingest surface carries no wiki twin, so the foreign caller on the wiki routes is the forge, aimed at an ingest-owned novel */
+    it('should reject a wiki push and a wiki delete against another publisher’s novel with WBN_010', async () => {
+      const created = await foreign('put', '/internal/novels/ingested-tale', novelBody(1));
+      expect(created.statusCode).toBe(200);
+
+      const upsert = await push('put', '/internal/novels/ingested-tale/wiki/selene', { body: wikiBody(1, 'wiki-a') });
       expect(upsert.statusCode).toBe(409);
       expect(upsert.json()).toMatchObject({ code: 'WBN_010' });
 
-      await push('put', `/internal/novels/${SLUG}/wiki/selene`, { body: wikiBody(1, 'wiki-a') });
-      const remove = await foreign('delete', `/internal/novels/${SLUG}/wiki/selene`);
+      const remove = await push('delete', '/internal/novels/ingested-tale/wiki/selene');
       expect(remove.statusCode).toBe(409);
       expect(remove.json()).toMatchObject({ code: 'WBN_010' });
-      expect(await env.getPostgresClient().select().from(schema.wikiEntries)).toHaveLength(1);
+      expect(await env.getPostgresClient().select().from(schema.wikiEntries)).toHaveLength(0);
     });
 
     it('should audit a rejected foreign push as unauthorized', async () => {
@@ -611,7 +616,8 @@ describe('Internal publish API', () => {
       expect(access.statusCode).toBe(404);
       expect(access.json()).toMatchObject({ code: 'WBN_001' });
 
-      const wiki = await foreign('get', `/internal/novels/${SLUG}/wiki/manifest`);
+      await foreign('put', '/internal/novels/ingested-tale', novelBody(1));
+      const wiki = await push('get', '/internal/novels/ingested-tale/wiki/manifest');
       expect(wiki.statusCode).toBe(404);
       expect(wiki.json()).toMatchObject({ code: 'WBN_001' });
     });
@@ -628,7 +634,7 @@ describe('Internal publish API', () => {
       const chapter = await foreign('delete', '/internal/novels/never-published/chapters/1');
       expect(chapter.statusCode).toBe(204);
 
-      const wiki = await foreign('delete', '/internal/novels/never-published/wiki/selene');
+      const wiki = await push('delete', '/internal/novels/never-published/wiki/selene');
       expect(wiki.statusCode).toBe(204);
     });
 
@@ -704,6 +710,115 @@ describe('Internal publish API', () => {
       expect(manifest.json()).toEqual([{ ordinal: 1, contentHash: CHAPTER_HASH, revision: 1 }]);
     });
   });
+  describe('ingest publish surface', () => {
+    const INGEST_SLUG = 'scraped-tale';
+    const ingest = async (method: 'put' | 'delete' | 'get', path: string, body?: object) => push(method, `${INGEST_BASE}${path}`, { body, token: await ingestToken() });
+
+    it('should let an ingest-scoped publisher run a whole publish cycle', async () => {
+      const novel = await ingest('put', `/${INGEST_SLUG}`, novelBody(1, { sourceRef: 'scrape-source-77' }));
+      expect(novel.statusCode).toBe(200);
+      expect(novel.json()).toMatchObject({ slug: INGEST_SLUG, outcome: 'applied', revision: 1 });
+
+      const chapter = await ingest('put', `/${INGEST_SLUG}/chapters/1`, chapterBody(1));
+      expect(chapter.statusCode).toBe(200);
+
+      const manifest = await ingest('get', `/${INGEST_SLUG}/manifest`);
+      expect(manifest.statusCode).toBe(200);
+      expect(manifest.json()).toEqual([{ ordinal: 1, contentHash: CHAPTER_HASH, revision: 1 }]);
+
+      const [row] = await env.getPostgresClient().select().from(schema.novels).where(eq(schema.novels.slug, INGEST_SLUG));
+      expect(row).toMatchObject({ sourceClientId: INGEST_CLIENT_ID, sourceRef: 'scrape-source-77' });
+    });
+
+    it('should carry the access surface too', async () => {
+      await ingest('put', `/${INGEST_SLUG}`, novelBody(1));
+      const access = await ingest('put', `/${INGEST_SLUG}/access`, { visibility: 'RESTRICTED', subjectIds: ['900001'], revision: 2 });
+      expect(access.statusCode).toBe(200);
+
+      const read = await ingest('get', `/${INGEST_SLUG}/access`);
+      expect(read.json()).toMatchObject({ visibility: 'RESTRICTED', subjectIds: ['900001'], revision: 2 });
+    });
+
+    it('should unpublish a chapter it published', async () => {
+      await ingest('put', `/${INGEST_SLUG}`, novelBody(1));
+      await ingest('put', `/${INGEST_SLUG}/chapters/1`, chapterBody(1));
+
+      const response = await ingest('delete', `/${INGEST_SLUG}/chapters/1`);
+      expect(response.statusCode).toBe(204);
+      expect(await chapterRows()).toHaveLength(0);
+    });
+
+    it('should refuse a publish-scoped token on the ingest surface', async () => {
+      const response = await push('put', `${INGEST_BASE}/${INGEST_SLUG}`, { body: novelBody(1) });
+      expect(response.statusCode).toBe(403);
+      expect(await env.getPostgresClient().select().from(schema.novels)).toHaveLength(0);
+    });
+
+    it('should refuse an ingest-scoped token on the publish surface', async () => {
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1), token: await ingestToken() });
+      expect(response.statusCode).toBe(403);
+      expect(await env.getPostgresClient().select().from(schema.novels)).toHaveLength(0);
+    });
+
+    it('should refuse a non-service principal on the ingest surface', async () => {
+      const response = await push('put', `${INGEST_BASE}/${INGEST_SLUG}`, { body: novelBody(1), token: await userToken('900042', { scopes: ['web-novel:ingest'] }) });
+      expect(response.statusCode).toBe(403);
+      expect(await env.getPostgresClient().select().from(schema.novels)).toHaveLength(0);
+    });
+
+    it('should verify the chapter content hash on the ingest path', async () => {
+      await ingest('put', `/${INGEST_SLUG}`, novelBody(1));
+      const response = await ingest('put', `/${INGEST_SLUG}/chapters/1`, chapterBody(1, { contentHash: 'not-the-real-hash' }));
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ code: 'WBN_011' });
+      expect(await chapterRows()).toHaveLength(0);
+    });
+
+    it('should hold the stale ladder on the ingest path', async () => {
+      await ingest('put', `/${INGEST_SLUG}`, novelBody(5));
+      const stale = await ingest('put', `/${INGEST_SLUG}`, novelBody(4, { title: 'Stale' }));
+      expect(stale.statusCode).toBe(409);
+      expect(stale.json()).toMatchObject({ code: 'WBN_003' });
+
+      const noop = await ingest('put', `/${INGEST_SLUG}`, novelBody(5));
+      expect(noop.statusCode).toBe(204);
+    });
+
+    it('should refuse an ingest push at a slug the forge owns and answer its read as unknown', async () => {
+      await publishNovel(1);
+      const hijack = await ingest('put', `/${SLUG}`, novelBody(9, { title: 'Hijacked', sourceRef: 'scrape-source-77' }));
+      expect(hijack.statusCode).toBe(409);
+      expect(hijack.json()).toMatchObject({ code: 'WBN_010' });
+
+      const manifest = await ingest('get', `/${SLUG}/manifest`);
+      expect(manifest.statusCode).toBe(404);
+      expect(manifest.json()).toMatchObject({ code: 'WBN_001' });
+    });
+
+    it('should keep the forge out of a novel the ingest publisher created', async () => {
+      await ingest('put', `/${INGEST_SLUG}`, novelBody(1));
+      const response = await push('put', `/internal/novels/${INGEST_SLUG}`, { body: novelBody(2, { title: 'Hijacked' }) });
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'WBN_010' });
+
+      const read = await push('get', `/internal/novels/${INGEST_SLUG}/manifest`);
+      expect(read.statusCode).toBe(404);
+      expect(read.json()).toMatchObject({ code: 'WBN_001' });
+    });
+
+    it('should audit an ingest push against the ingest client', async () => {
+      await ingest('put', `/${INGEST_SLUG}`, novelBody(1));
+      const rows = await auditRows();
+      expect(rows[rows.length - 1]).toMatchObject({ action: 'novel.upsert', novelSlug: INGEST_SLUG, outcome: 'applied', callerClientId: INGEST_CLIENT_ID });
+    });
+
+    it('should not expose the wiki surface to the ingest scope', () => {
+      const fastify = env.getRouter().getInstance();
+      expect(fastify.hasRoute({ method: 'PUT', url: '/internal/novels/:slug/wiki/:entryKey' })).toBe(true);
+      expect(fastify.hasRoute({ method: 'PUT', url: `${INGEST_BASE}/:slug/wiki/:entryKey` })).toBe(false);
+      expect(fastify.hasRoute({ method: 'GET', url: `${INGEST_BASE}/:slug/wiki/manifest` })).toBe(false);
+    });
+  });
   describe('publisher source refs', () => {
     const allNovels = () => env.getPostgresClient().select().from(schema.novels).orderBy(asc(schema.novels.id));
     const bySlug = (slug: string) => env.getPostgresClient().select().from(schema.novels).where(eq(schema.novels.slug, slug));
@@ -762,7 +877,7 @@ describe('Internal publish API', () => {
 
     it('should refuse a rename onto a slug another publisher owns and leave both rows untouched', async () => {
       await pushRef(SLUG, 1);
-      const foreignPush = await push('put', '/internal/novels/ingested-tale', { body: novelBody(1, { sourceRef: 'ingest-novel-7' }), token: await ingestToken() });
+      const foreignPush = await push('put', `${INGEST_BASE}/ingested-tale`, { body: novelBody(1, { sourceRef: 'ingest-novel-7' }), token: await ingestToken() });
       expect(foreignPush.statusCode).toBe(200);
 
       const response = await pushRef('ingested-tale', 2, { title: 'Hijacked' });
@@ -787,7 +902,7 @@ describe('Internal publish API', () => {
 
     it('should let two publishers hold the same sourceRef without colliding', async () => {
       const mine = await pushRef(SLUG, 1);
-      const theirs = await push('put', '/internal/novels/ingested-tale', { body: novelBody(1), token: await ingestToken() });
+      const theirs = await push('put', `${INGEST_BASE}/ingested-tale`, { body: novelBody(1), token: await ingestToken() });
       expect(theirs.statusCode).toBe(200);
       expect(theirs.json().id).not.toBe(mine.json().id);
 

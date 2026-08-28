@@ -8,13 +8,14 @@ for conventions and commands.
 
 ## Surfaces
 
-| Surface                                | Paths                                                                                                                                                                                                    | Auth                                                                                             |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Internal publish (publishers → reader) | `PUT /internal/novels/:slug`, `PUT`/`GET .../access`, `PUT`/`DELETE .../chapters/:ordinal`, `PUT`/`DELETE .../wiki/:entryKey`, `GET .../manifest`, `GET .../wiki/manifest`                               | Identity-issued M2M bearer with scope `web-novel:publish` + admin-configured service-access rule |
-| Public catalog                         | `GET /api/novels` (search/genre/status/sort/pagination), `GET /api/novels/:slug`, `GET /api/novels/:slug/chapters`, `GET /api/novels/:slug/chapters/:ordinal` (ETag = contentHash, 304 on If-None-Match) | none                                                                                             |
-| Session                                | `GET /api/auth/login?returnTo=`, `GET /api/auth/callback`, `GET /api/auth/session` (flat `{ userId, email?, name? }` or 401), `POST /api/auth/logout`                                                    | OIDC via identity; stateless signed session cookie                                               |
-| Reader                                 | `GET /api/me/progress`, `GET`/`PUT /api/novels/:slug/progress`, `GET`/`POST /api/library`, `DELETE /api/library/:slug`                                                                                   | session cookie                                                                                   |
-| Health                                 | `GET /health`, `GET /health/ready` on :8080; `/health/live` + `/health/ready` on :8081 (`HEALTH_ENABLED`)                                                                                                | none                                                                                             |
+| Surface                             | Paths                                                                                                                                                                                                    | Auth                                                                                             |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Internal publish (forge → reader)   | `PUT /internal/novels/:slug`, `PUT`/`GET .../access`, `PUT`/`DELETE .../chapters/:ordinal`, `PUT`/`DELETE .../wiki/:entryKey`, `GET .../manifest`, `GET .../wiki/manifest`                               | Identity-issued M2M bearer with scope `web-novel:publish` + admin-configured service-access rule |
+| Internal ingest (scrapers → reader) | the same routes under `/internal/ingest/novels/:slug`, minus the wiki ones                                                                                                                               | Identity-issued M2M bearer with scope `web-novel:ingest` + admin-configured service-access rule  |
+| Public catalog                      | `GET /api/novels` (search/genre/status/sort/pagination), `GET /api/novels/:slug`, `GET /api/novels/:slug/chapters`, `GET /api/novels/:slug/chapters/:ordinal` (ETag = contentHash, 304 on If-None-Match) | none                                                                                             |
+| Session                             | `GET /api/auth/login?returnTo=`, `GET /api/auth/callback`, `GET /api/auth/session` (flat `{ userId, email?, name? }` or 401), `POST /api/auth/logout`                                                    | OIDC via identity; stateless signed session cookie                                               |
+| Reader                              | `GET /api/me/progress`, `GET`/`PUT /api/novels/:slug/progress`, `GET`/`POST /api/library`, `DELETE /api/library/:slug`                                                                                   | session cookie                                                                                   |
+| Health                              | `GET /health`, `GET /health/ready` on :8080; `/health/live` + `/health/ready` on :8081 (`HEALTH_ENABLED`)                                                                                                | none                                                                                             |
 
 ## Publish semantics
 
@@ -48,6 +49,29 @@ novel — another publisher's, or another of this publisher's own under a differ
 fatal, so publishers discriminate on the code, not the status. A sub-resource mutation under a foreign-owned
 slug answers `WBN_010` the same way; a _read_ of one answers `404` (`WBN_001`) exactly as an unknown slug
 does, so the surface never becomes an oracle over another publisher's slugs.
+
+## Onboarding a second publisher
+
+The reader is not forge-only. A publisher other than the forge — the scraper is the first — is admitted by:
+
+1. **A service client in identity** granted `web-novel:ingest` on `api://web-novel`, plus a service-access
+   rule for its client id on `/internal/*`. Both are seeded for `webnovel-ingest`. The rule is a prefix
+   match, so it covers the ingest prefix without a second entry.
+2. **The `/internal/ingest/novels/:slug` prefix.** It carries the identical protocol, DTOs, error codes and
+   audit rows as `/internal/novels/:slug` — novel upsert, `PUT`/`GET .../access`, `PUT`/`DELETE
+.../chapters/:ordinal`, `GET .../manifest` — and only the prefix and the required scope differ. The two
+   prefixes exist because the scope check is all-of: one prefix listing both scopes would demand both and
+   admit neither publisher. A token is accepted on exactly one prefix; the other answers `403`.
+3. **No wiki routes.** A scraped source has no wiki projection, so `PUT`/`DELETE .../wiki/:entryKey` and
+   `GET .../wiki/manifest` exist only under `/internal/novels`. They can be mirrored the day a publisher
+   actually has entries to push.
+
+Everything else is unchanged and non-negotiable for any publisher: `sourceRef` is **required** on every
+metadata push and is what identifies the novel (the slug never does); chapter pushes must carry a
+`contentHash` the server recomputes, and a mismatch is `400` (`WBN_011`); the revision ladder applies
+identically. Ownership is by client id, so two publishers never see or touch each other's novels — a
+`WBN_010` is **retryable under a different slug**, a `WBN_003` is fatal, and both are `409`, so discriminate
+on the code.
 
 ## Running locally
 

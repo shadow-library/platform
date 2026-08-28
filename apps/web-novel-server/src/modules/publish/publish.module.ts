@@ -3,6 +3,7 @@ import { FastifyModule } from '@shadow-library/fastify';
 
 import { DatabaseModule } from '@server/modules/datastore';
 
+import { IngestPublishController } from './ingest-publish.controller';
 import { InternalServiceGuard } from './internal-service.middleware';
 import { PublishAuditTrailer } from './publish-audit.middleware';
 import { PublishAuditService } from './publish-audit.service';
@@ -13,7 +14,7 @@ import { WikiIngestService } from './wiki-ingest.service';
 
 @Module({
   imports: [DatabaseModule, FastifyModule],
-  controllers: [PublishController, WikiIngestController, InternalServiceGuard, PublishAuditTrailer],
+  controllers: [PublishController, IngestPublishController, WikiIngestController, InternalServiceGuard, PublishAuditTrailer],
   providers: [PublishService, WikiIngestService, PublishAuditService],
   exports: [PublishService],
 })
