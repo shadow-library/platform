@@ -1,4 +1,5 @@
-import { computeContentHash } from '@server/common';
+import { chapterContentHash } from '@shadow-library/sdk/publishing';
+
 import { type Chapter } from '@server/database';
 
 /** The complete reader-facing chapter payload — nothing forge-internal may ever be added here (reader-publish design §4, hard rule 7) */
@@ -25,7 +26,7 @@ export function renderChapterPayload(chapter: Pick<Chapter.Row, 'number' | 'titl
   const content = (chapter.content ?? '').trim();
   const authorNote = chapter.note?.trim() || undefined;
   const wordCount = chapter.wordCount ?? countWords(content);
-  const contentHash = computeContentHash({ title, content, authorNote: authorNote ?? null });
+  const contentHash = chapterContentHash({ title, content, authorNote });
   const payload: ReaderChapterPayload = { title, content, wordCount, contentHash };
   if (authorNote) payload.authorNote = authorNote;
   return payload;

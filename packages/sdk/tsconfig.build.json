@@ -1,0 +1,6 @@
+{
+  "extends": ["./tsconfig.json", "../tsconfig.build.json"],
+  "tsc-alias": { "resolveFullPaths": true },
+  "compilerOptions": { "rootDir": "src" },
+  "include": ["src/**/*.ts"]
+}

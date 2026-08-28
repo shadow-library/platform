@@ -113,6 +113,7 @@
         "@shadow-library/common": "workspace:*",
         "@shadow-library/fastify": "workspace:*",
         "@shadow-library/modules": "workspace:*",
+        "@shadow-library/sdk": "workspace:*",
         "ajv": "catalog:",
         "drizzle-orm": "catalog:",
         "fflate": "^0.8.3",
@@ -484,6 +485,14 @@
         "ioredis",
         "memcached",
       ],
+    },
+    "packages/sdk": {
+      "name": "@shadow-library/sdk",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
     },
     "packages/ui": {
       "name": "@shadow-library/ui",
@@ -1237,6 +1246,8 @@
     "@shadow-library/novel-forge-server": ["@shadow-library/novel-forge-server@workspace:apps/novel-forge-server"],
 
     "@shadow-library/pulse-server": ["@shadow-library/pulse-server@workspace:apps/pulse-server"],
+
+    "@shadow-library/sdk": ["@shadow-library/sdk@workspace:packages/sdk"],
 
     "@shadow-library/shadow-memoir-server": ["@shadow-library/shadow-memoir-server@workspace:apps/shadow-memoir-server"],
 

@@ -54,6 +54,7 @@
     "@shadow-library/common": "workspace:*",
     "@shadow-library/fastify": "workspace:*",
     "@shadow-library/modules": "workspace:*",
+    "@shadow-library/sdk": "workspace:*",
     "ajv": "catalog:",
     "drizzle-orm": "catalog:",
     "fflate": "^0.8.3",

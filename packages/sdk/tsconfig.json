@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.lib.json",
+  /**
+   * paths GOTCHA: extends replaces `paths` wholesale. Only the self-name mappings are declared — src uses
+   * relative imports throughout, so `@lib/*` is deliberately absent; the tests import the package the way an
+   * external consumer does, which is what the two subpath mappings pin.
+   */
+  "compilerOptions": {
+    "paths": {
+      "@shadow-library/sdk": ["./src/index.ts"],
+      "@shadow-library/sdk/publishing": ["./src/publishing/index.ts"]
+    }
+  }
+}

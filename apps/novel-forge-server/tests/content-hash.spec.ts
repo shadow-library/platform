@@ -1,31 +1,55 @@
 import { describe, expect, it } from 'bun:test';
 
-import { computeContentHash } from '@server/common';
+import { arcContentHash, briefContentHash, computeBibleDocHash, seedContentHash, volumeContentHash } from '@server/common';
 
-describe('computeContentHash', () => {
-  it('should return a stable sha256 hex digest', () => {
-    const hash = computeContentHash({ title: 'Arc One', objective: 'survive the trial' });
-    expect(hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(computeContentHash({ title: 'Arc One', objective: 'survive the trial' })).toBe(hash);
+describe('volumeContentHash', () => {
+  it('should hash only the contracted fields', () => {
+    const base = volumeContentHash({ volumeKey: 'v1', ordinal: 1, title: 'Ascent' });
+    expect(base).toMatch(/^[0-9a-f]{64}$/);
+    expect(volumeContentHash({ volumeKey: 'v1', ordinal: 1, title: 'Ascent', draftNotes: 'ignored' })).toBe(base);
+    expect(volumeContentHash({ volumeKey: 'v1', ordinal: 1, title: 'Descent' })).not.toBe(base);
   });
 
-  it('should be independent of key order, including nested objects', () => {
-    const a = computeContentHash({ title: 'Arc One', meta: { hook: 'cliffhanger', beat: 'dread' } });
-    const b = computeContentHash({ meta: { beat: 'dread', hook: 'cliffhanger' }, title: 'Arc One' });
-    expect(a).toBe(b);
+  it('should treat an absent field and an explicit null identically', () => {
+    expect(volumeContentHash({ volumeKey: 'v1' })).toBe(volumeContentHash({ volumeKey: 'v1', objective: null }));
+  });
+});
+
+describe('arcContentHash', () => {
+  it('should hash only the contracted fields', () => {
+    const base = arcContentHash({ arcKey: 'a1', volumeKey: 'v1', title: 'The Trial' });
+    expect(base).toBe(arcContentHash({ arcKey: 'a1', volumeKey: 'v1', title: 'The Trial', revision: 7 }));
+    expect(base).not.toBe(arcContentHash({ arcKey: 'a1', volumeKey: 'v1', title: 'The Retreat' }));
+  });
+});
+
+describe('briefContentHash', () => {
+  it('should hash only the contracted fields', () => {
+    const base = briefContentHash({ chapter: 1, body: 'b' });
+    expect(base).toBe(briefContentHash({ chapter: 1, body: 'b', updatedAt: new Date(0).toISOString() }));
+    expect(base).not.toBe(briefContentHash({ chapter: 2, body: 'b' }));
+  });
+});
+
+describe('seedContentHash', () => {
+  it('should hash the fields sheet, treating null and undefined as empty', () => {
+    const empty = seedContentHash({});
+    expect(seedContentHash(null)).toBe(empty);
+    expect(seedContentHash(undefined)).toBe(empty);
+    expect(seedContentHash({ premise: 'a salvager' })).not.toBe(empty);
+  });
+});
+
+describe('computeBibleDocHash', () => {
+  it('should treat null and undefined inputs identically', () => {
+    expect(computeBibleDocHash(undefined, 'body')).toBe(computeBibleDocHash(null, 'body'));
   });
 
-  it('should preserve array order and element identity', () => {
-    const base = computeContentHash({ cast: ['hero', 'rival'] });
-    expect(computeContentHash({ cast: ['hero', 'rival'] })).toBe(base);
-    expect(computeContentHash({ cast: ['rival', 'hero'] })).not.toBe(base);
-  });
-
-  it('should change when content changes', () => {
-    expect(computeContentHash({ body: 'v1' })).not.toBe(computeContentHash({ body: 'v2' }));
-  });
-
-  it('should treat undefined values as null', () => {
-    expect(computeContentHash({ body: undefined })).toBe(computeContentHash({ body: null }));
+  // Frontmatter key order is deliberately significant here — stored hashes were computed without
+  // canonicalization, so this pins the behaviour that keeps documents from spuriously re-versioning.
+  it('should be sensitive to frontmatter key order', () => {
+    const a = computeBibleDocHash({ title: 'Promise', status: 'draft' }, 'body');
+    const b = computeBibleDocHash({ status: 'draft', title: 'Promise' }, 'body');
+    expect(a).not.toBe(b);
   });
 });

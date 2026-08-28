@@ -1,0 +1,46 @@
+{
+  "name": "@shadow-library/sdk",
+  "type": "module",
+  "version": "0.1.0",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./publishing": {
+      "types": "./dist/publishing/index.d.ts",
+      "default": "./dist/publishing/index.js"
+    }
+  },
+  "description": "Shared Shadow Library novel vocabulary (genres, tags, content ratings) and the cross-app publishing content-hash contract",
+  "scripts": {
+    "prepublishOnly": "echo 'Publish the built package, not this directory: bun scripts/build.ts packages/sdk && npm publish packages/sdk/dist' >&2 && exit 1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/shadow-library/platform.git",
+    "directory": "packages/sdk"
+  },
+  "keywords": [
+    "novel",
+    "genres",
+    "tags",
+    "content-rating"
+  ],
+  "author": "Leander Paul <leanderpaul97@outlook.com>",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/shadow-library/platform/issues"
+  },
+  "homepage": "https://github.com/shadow-library/platform#readme",
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}
