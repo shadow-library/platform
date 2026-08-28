@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 
+import { chapterContentHash } from '@shadow-library/sdk/publishing';
+
 import { schema } from '@server/modules/datastore';
 
 import { TestEnvironment } from '../test-environment';
@@ -145,49 +147,67 @@ describe('Public catalog API', () => {
       expect([200, 204]).toContain(response.statusCode);
     };
 
-    const publishChapter = async (revision: number, contentHash: string, content: string) => {
+    const publishChapter = async (revision: number, content: string) => {
+      const contentHash = chapterContentHash({ title: 'One', content });
       await publish('/internal/novels/etag-novel', { title: 'ETag Novel', genres: [], visibility: 'PUBLIC', revision: 1 });
       await publish('/internal/novels/etag-novel/chapters/1', { title: 'One', content, contentHash, revision });
+      return contentHash;
     };
 
     it('should serve the chapter with the contentHash as ETag and public cache headers', async () => {
-      await publishChapter(1, 'hash-a', 'The first draft of history.');
+      const contentHash = await publishChapter(1, 'The first draft of history.');
       const response = await env.getRouter().mockRequest().get('/api/novels/etag-novel/chapters/1');
       expect(response.statusCode).toBe(200);
-      expect(response.headers.etag).toBe('"hash-a"');
+      expect(response.headers.etag).toBe(`"${contentHash}"`);
       expect(response.headers['cache-control']).toBe('public, max-age=300');
       expect(response.json()).toMatchObject({ novelSlug: 'etag-novel', ordinal: 1, title: 'One', content: 'The first draft of history.', revision: 1 });
     });
 
     it('should answer 304 for a matching If-None-Match, including weak tags', async () => {
-      await publishChapter(1, 'hash-a', 'The first draft of history.');
-      const exact = await env.getRouter().mockRequest().get('/api/novels/etag-novel/chapters/1').headers({ 'if-none-match': '"hash-a"' });
+      const contentHash = await publishChapter(1, 'The first draft of history.');
+      const exact = await env
+        .getRouter()
+        .mockRequest()
+        .get('/api/novels/etag-novel/chapters/1')
+        .headers({ 'if-none-match': `"${contentHash}"` });
       expect(exact.statusCode).toBe(304);
       expect(exact.body).toBe('');
-      expect(exact.headers.etag).toBe('"hash-a"');
+      expect(exact.headers.etag).toBe(`"${contentHash}"`);
 
-      const weak = await env.getRouter().mockRequest().get('/api/novels/etag-novel/chapters/1').headers({ 'if-none-match': 'W/"hash-a"' });
+      const weak = await env
+        .getRouter()
+        .mockRequest()
+        .get('/api/novels/etag-novel/chapters/1')
+        .headers({ 'if-none-match': `W/"${contentHash}"` });
       expect(weak.statusCode).toBe(304);
     });
 
     it('should serve fresh content when the If-None-Match no longer matches after a republish', async () => {
-      await publishChapter(1, 'hash-a', 'The first draft of history.');
-      await publish('/internal/novels/etag-novel/chapters/1', { title: 'One', content: 'The corrected draft.', contentHash: 'hash-b', revision: 2 });
+      const staleHash = await publishChapter(1, 'The first draft of history.');
+      const freshContent = 'The corrected draft.';
+      const freshHash = chapterContentHash({ title: 'One', content: freshContent });
+      await publish('/internal/novels/etag-novel/chapters/1', { title: 'One', content: freshContent, contentHash: freshHash, revision: 2 });
 
-      const response = await env.getRouter().mockRequest().get('/api/novels/etag-novel/chapters/1').headers({ 'if-none-match': '"hash-a"' });
+      const response = await env
+        .getRouter()
+        .mockRequest()
+        .get('/api/novels/etag-novel/chapters/1')
+        .headers({ 'if-none-match': `"${staleHash}"` });
       expect(response.statusCode).toBe(200);
-      expect(response.headers.etag).toBe('"hash-b"');
-      expect(response.json()).toMatchObject({ content: 'The corrected draft.', revision: 2 });
+      expect(response.headers.etag).toBe(`"${freshHash}"`);
+      expect(response.json()).toMatchObject({ content: freshContent, revision: 2 });
     });
 
     it('should never serve a stale cached body for an equal-revision republish', async () => {
-      await publishChapter(3, 'hash-a', 'Original text.');
+      await publishChapter(3, 'Original text.');
       await env.getRouter().mockRequest().get('/api/novels/etag-novel/chapters/1');
-      await publish('/internal/novels/etag-novel/chapters/1', { title: 'One', content: 'Silently patched text.', contentHash: 'hash-b', revision: 3 });
+      const freshContent = 'Silently patched text.';
+      const freshHash = chapterContentHash({ title: 'One', content: freshContent });
+      await publish('/internal/novels/etag-novel/chapters/1', { title: 'One', content: freshContent, contentHash: freshHash, revision: 3 });
 
       const response = await env.getRouter().mockRequest().get('/api/novels/etag-novel/chapters/1');
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toMatchObject({ content: 'Silently patched text.', revision: 3 });
+      expect(response.json()).toMatchObject({ content: freshContent, revision: 3 });
     });
 
     it('should answer 404 for an unknown chapter', async () => {

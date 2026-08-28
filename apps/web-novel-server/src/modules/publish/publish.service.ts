@@ -3,6 +3,7 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
+import { chapterContentHash } from '@shadow-library/sdk/publishing';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
@@ -91,6 +92,8 @@ export class PublishService {
   async upsertChapter(slug: string, ordinal: number, body: ChapterUpsertBody): Promise<UpsertResult> {
     const caller = this.caller();
     const novel = await loadOwnedNovel(this.db, slug, caller);
+    const expectedHash = chapterContentHash({ title: body.title, content: body.content, authorNote: body.authorNote });
+    if (expectedHash !== body.contentHash) throw AppErrorCode.WBN_011.create();
     const result = await this.db.transaction(async tx => {
       const [stored] = await tx.select().from(schema.publishedChapters).where(this.chapterFilter(novel.id, ordinal)).for('update');
       const base: Omit<PublishAuditEntry, 'outcome'> = {

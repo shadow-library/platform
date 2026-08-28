@@ -42,6 +42,12 @@ export class AppErrorCode extends ServerErrorCode {
    * who holds a slug is the very disclosure the ownership check exists to prevent.
    */
   static readonly WBN_010 = AppErrorCode.conflict('WBN_010', 'The novel slug is published by a different source');
+  /**
+   * The pushed `contentHash` does not match the hash recomputed from the pushed `title`/`content`/
+   * `authorNote`. A malformed push, not a conflict — unlike WBN_003 (a stale but internally
+   * consistent revision) and WBN_010 (a well-formed push against a slug this caller doesn't own).
+   */
+  static readonly WBN_011 = AppErrorCode.badRequest('WBN_011', 'The supplied contentHash does not match the pushed chapter payload');
 
   /*!
    * Session Error Codes

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import { chapterContentHash } from '@shadow-library/sdk/publishing';
+
 import { TestEnvironment } from '../test-environment';
 import { forgeToken, userToken } from '../test-idp';
 
@@ -19,13 +21,11 @@ const novelBody = (revision: number, overrides: object = {}) => ({
   ...overrides,
 });
 
-const chapterBody = (revision: number, overrides: object = {}) => ({
-  title: 'Chapter One',
-  content: 'The archive kept better secrets than its keepers.',
-  contentHash: `hash-${revision}`,
-  revision,
-  ...overrides,
-});
+const CHAPTER_TITLE = 'Chapter One';
+const CHAPTER_CONTENT = 'The archive kept better secrets than its keepers.';
+const CHAPTER_HASH = chapterContentHash({ title: CHAPTER_TITLE, content: CHAPTER_CONTENT });
+
+const chapterBody = (revision: number, overrides: object = {}) => ({ title: CHAPTER_TITLE, content: CHAPTER_CONTENT, contentHash: CHAPTER_HASH, revision, ...overrides });
 
 async function push(method: 'put' | 'get', path: string, body?: object) {
   const bearer = await forgeToken();
@@ -162,7 +162,7 @@ describe('Novel access', () => {
       const chapter = await read('/api/novels/cache-public/chapters/1');
       expect(chapter.headers['cache-control']).toContain('public, max-age=');
       expect(chapter.headers['vary']).toBeUndefined();
-      expect(chapter.headers['etag']).toBe('"hash-1"');
+      expect(chapter.headers['etag']).toBe(`"${CHAPTER_HASH}"`);
     });
 
     it('should admit a reader acting in the organisation a novel was shared with', async () => {

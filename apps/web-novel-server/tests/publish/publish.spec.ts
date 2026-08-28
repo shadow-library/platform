@@ -3,6 +3,8 @@ import { describe, expect, it } from 'bun:test';
 import { SQL } from 'bun';
 import { asc, eq } from 'drizzle-orm';
 
+import { chapterContentHash } from '@shadow-library/sdk/publishing';
+
 import { schema } from '@server/modules/datastore';
 
 import { TestEnvironment } from '../test-environment';
@@ -25,14 +27,24 @@ const novelBody = (revision: number, overrides: object = {}) => ({
   revision,
   ...overrides,
 });
-const chapterBody = (revision: number, contentHash: string, overrides: object = {}) => ({
-  title: 'The Falling Sky',
-  content: 'The moon hung lower that night than it ever had before.',
-  contentHash,
-  revision,
-  wordCount: 11,
-  ...overrides,
-});
+const CHAPTER_TITLE = 'The Falling Sky';
+const CHAPTER_CONTENT = 'The moon hung lower that night than it ever had before.';
+const CHAPTER_HASH = chapterContentHash({ title: CHAPTER_TITLE, content: CHAPTER_CONTENT });
+
+interface ChapterBodyOverrides {
+  title?: string;
+  content?: string;
+  authorNote?: string;
+  contentHash?: string;
+  wordCount?: number;
+}
+
+const chapterBody = (revision: number, overrides: ChapterBodyOverrides = {}) => {
+  const title = overrides.title ?? CHAPTER_TITLE;
+  const content = overrides.content ?? CHAPTER_CONTENT;
+  const contentHash = overrides.contentHash ?? chapterContentHash({ title, content, authorNote: overrides.authorNote });
+  return { title, content, revision, wordCount: 11, ...overrides, contentHash };
+};
 
 async function push(method: 'put' | 'delete' | 'get', path: string, options: PushOptions = {}) {
   const bearer = options.token ?? (await forgeToken());
@@ -129,12 +141,12 @@ describe('Internal publish API', () => {
   describe('chapter upsert', () => {
     it('should create the chapter and record an applied audit row with the content hash', async () => {
       await publishNovel();
-      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1, 'hash-a') });
+      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1) });
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual({ slug: SLUG, outcome: 'applied', revision: 1 });
 
       const [chapter] = await chapterRows();
-      expect(chapter).toMatchObject({ ordinal: 1, title: 'The Falling Sky', contentHash: 'hash-a', revision: 1, wordCount: 11 });
+      expect(chapter).toMatchObject({ ordinal: 1, title: 'The Falling Sky', contentHash: CHAPTER_HASH, revision: 1, wordCount: 11 });
 
       const rows = await auditRows();
       expect(rows).toHaveLength(2);
@@ -142,7 +154,7 @@ describe('Internal publish API', () => {
         action: 'chapter.upsert',
         novelSlug: SLUG,
         ordinal: 1,
-        contentHash: 'hash-a',
+        contentHash: CHAPTER_HASH,
         incomingRevision: 1,
         storedRevision: null,
         outcome: 'applied',
@@ -151,8 +163,8 @@ describe('Internal publish API', () => {
 
     it('should answer 204 no-op when the revision and content hash both match', async () => {
       await publishNovel();
-      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1, 'hash-a') });
-      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1, 'hash-a') });
+      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1) });
+      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1) });
       expect(response.statusCode).toBe(204);
 
       const rows = await auditRows();
@@ -162,30 +174,31 @@ describe('Internal publish API', () => {
 
     it('should reject a stale chapter revision with 409 and keep the stored content', async () => {
       await publishNovel();
-      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(4, 'hash-d') });
-      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(3, 'hash-c') });
+      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(4) });
+      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(3) });
       expect(response.statusCode).toBe(409);
       expect(response.json()).toMatchObject({ code: 'WBN_003' });
 
       const [chapter] = await chapterRows();
-      expect(chapter).toMatchObject({ contentHash: 'hash-d', revision: 4 });
+      expect(chapter).toMatchObject({ contentHash: CHAPTER_HASH, revision: 4 });
 
       const rows = await auditRows();
-      expect(rows[rows.length - 1]).toMatchObject({ action: 'chapter.upsert', outcome: 'stale_rejected', incomingRevision: 3, storedRevision: 4, contentHash: 'hash-c' });
+      expect(rows[rows.length - 1]).toMatchObject({ action: 'chapter.upsert', outcome: 'stale_rejected', incomingRevision: 3, storedRevision: 4, contentHash: CHAPTER_HASH });
     });
 
     it('should apply an equal-revision push whose content hash differs', async () => {
       await publishNovel();
-      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(2, 'hash-a') });
-      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(2, 'hash-b', { content: 'Rewritten under the same revision.' }) });
+      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(2) });
+      const rewritten = chapterBody(2, { content: 'Rewritten under the same revision.' });
+      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: rewritten });
       expect(response.statusCode).toBe(200);
 
       const [chapter] = await chapterRows();
-      expect(chapter).toMatchObject({ contentHash: 'hash-b', revision: 2 });
+      expect(chapter).toMatchObject({ contentHash: rewritten.contentHash, revision: 2 });
     });
 
     it('should answer 404 for an unknown novel and record an error audit row', async () => {
-      const response = await push('put', '/internal/novels/unknown-novel/chapters/1', { body: chapterBody(1, 'hash-a') });
+      const response = await push('put', '/internal/novels/unknown-novel/chapters/1', { body: chapterBody(1) });
       expect(response.statusCode).toBe(404);
 
       const rows = await auditRows();
@@ -193,12 +206,75 @@ describe('Internal publish API', () => {
       expect(rows[0]).toMatchObject({ action: 'chapter.upsert', novelSlug: 'unknown-novel', ordinal: 1, outcome: 'error', callerSub: 'novel-forge' });
       expect(rows[0]?.error).toBeString();
     });
+
+    it('should accept a push whose contentHash matches the recomputed hash', async () => {
+      await publishNovel();
+      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1) });
+      expect(response.statusCode).toBe(200);
+    });
+
+    it('should reject a push whose contentHash does not match the payload with WBN_011 and write nothing', async () => {
+      await publishNovel();
+      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1, { contentHash: 'not-the-real-hash' }) });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ code: 'WBN_011' });
+      expect(await chapterRows()).toHaveLength(0);
+    });
+
+    it('should reject a mismatched contentHash on an update and leave the stored row untouched', async () => {
+      await publishNovel();
+      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1) });
+      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, {
+        body: chapterBody(2, { content: 'A rewrite the hash was never updated for.', contentHash: 'stale-literal-hash' }),
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ code: 'WBN_011' });
+
+      const rows = await chapterRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ contentHash: CHAPTER_HASH, revision: 1 });
+    });
+
+    it('should verify a push with no authorNote and a push with one, both matching their recomputed hash', async () => {
+      await publishNovel();
+      const bare = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1) });
+      expect(bare.statusCode).toBe(200);
+
+      const noted = chapterBody(2, { authorNote: 'Thanks for reading this arc.' });
+      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: noted });
+      expect(response.statusCode).toBe(200);
+
+      const [chapter] = await chapterRows();
+      expect(chapter).toMatchObject({ authorNote: 'Thanks for reading this arc.', contentHash: noted.contentHash });
+    });
+
+    it('should treat an absent and a null authorNote as identical inputs to the shared hash contract', () => {
+      const withUndefined = chapterContentHash({ title: CHAPTER_TITLE, content: CHAPTER_CONTENT, authorNote: undefined });
+      const withNull = chapterContentHash({ title: CHAPTER_TITLE, content: CHAPTER_CONTENT, authorNote: null });
+      expect(withUndefined).toBe(withNull);
+      expect(withUndefined).toBe(CHAPTER_HASH);
+    });
+
+    it('should accept a hash produced directly by chapterContentHash, pinning the shared wire contract', async () => {
+      await publishNovel();
+      const title = 'A Different Chapter Title';
+      const content = 'Entirely different prose for this push.';
+      const authorNote = 'From the shared-contract round trip.';
+      const hash = chapterContentHash({ title, content, authorNote });
+      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, {
+        body: { title, content, authorNote, contentHash: hash, revision: 1, wordCount: 6 },
+      });
+      expect(response.statusCode).toBe(200);
+
+      const [chapter] = await chapterRows();
+      expect(chapter).toMatchObject({ title, content, authorNote, contentHash: hash });
+    });
   });
 
   describe('chapter unpublish', () => {
     it('should delete the chapter, record applied, and stay idempotent with a noop on repeat', async () => {
       await publishNovel();
-      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1, 'hash-a') });
+      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1) });
 
       const first = await push('delete', `/internal/novels/${SLUG}/chapters/1`);
       expect(first.statusCode).toBe(204);
@@ -209,7 +285,7 @@ describe('Internal publish API', () => {
 
       const rows = await auditRows();
       expect(rows).toHaveLength(4);
-      expect(rows[2]).toMatchObject({ action: 'chapter.unpublish', ordinal: 1, outcome: 'applied', storedRevision: 1, contentHash: 'hash-a' });
+      expect(rows[2]).toMatchObject({ action: 'chapter.unpublish', ordinal: 1, outcome: 'applied', storedRevision: 1, contentHash: CHAPTER_HASH });
       expect(rows[3]).toMatchObject({ action: 'chapter.unpublish', ordinal: 1, outcome: 'noop' });
     });
 
@@ -226,17 +302,18 @@ describe('Internal publish API', () => {
   describe('manifest', () => {
     it('should reflect the served chapters exactly, ordered by ordinal', async () => {
       await publishNovel();
-      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1, 'hash-1a') });
-      await push('put', `/internal/novels/${SLUG}/chapters/2`, { body: chapterBody(1, 'hash-2a') });
-      await push('put', `/internal/novels/${SLUG}/chapters/3`, { body: chapterBody(1, 'hash-3a') });
+      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1) });
+      await push('put', `/internal/novels/${SLUG}/chapters/2`, { body: chapterBody(1) });
+      await push('put', `/internal/novels/${SLUG}/chapters/3`, { body: chapterBody(1) });
       await push('delete', `/internal/novels/${SLUG}/chapters/2`);
-      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(2, 'hash-1b') });
+      const revised = chapterBody(2, { content: 'Chapter one, revised.' });
+      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: revised });
 
       const response = await push('get', `/internal/novels/${SLUG}/manifest`);
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual([
-        { ordinal: 1, contentHash: 'hash-1b', revision: 2 },
-        { ordinal: 3, contentHash: 'hash-3a', revision: 1 },
+        { ordinal: 1, contentHash: revised.contentHash, revision: 2 },
+        { ordinal: 3, contentHash: CHAPTER_HASH, revision: 1 },
       ]);
     });
 
@@ -367,7 +444,15 @@ describe('Internal publish API', () => {
 
     it('should reject a chapter push from another source with WBN_010', async () => {
       await publishNovel(1);
-      const response = await foreign('put', `/internal/novels/${SLUG}/chapters/1`, chapterBody(1, 'hash-a'));
+      const response = await foreign('put', `/internal/novels/${SLUG}/chapters/1`, chapterBody(1));
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'WBN_010' });
+      expect(await chapterRows()).toHaveLength(0);
+    });
+
+    it('should answer WBN_010 rather than WBN_011 for a foreign-owned slug even when the contentHash is also wrong', async () => {
+      await publishNovel(1);
+      const response = await foreign('put', `/internal/novels/${SLUG}/chapters/1`, chapterBody(1, { contentHash: 'garbage-hash' }));
       expect(response.statusCode).toBe(409);
       expect(response.json()).toMatchObject({ code: 'WBN_010' });
       expect(await chapterRows()).toHaveLength(0);
@@ -375,7 +460,7 @@ describe('Internal publish API', () => {
 
     it('should reject a chapter unpublish from another source with WBN_010 and keep the chapter', async () => {
       await publishNovel(1);
-      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1, 'hash-a') });
+      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1) });
 
       const response = await foreign('delete', `/internal/novels/${SLUG}/chapters/1`);
       expect(response.statusCode).toBe(409);
@@ -487,10 +572,10 @@ describe('Internal publish API', () => {
 
       const metadata = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(2, { title: 'Moonfall II' }) });
       expect(metadata.statusCode).toBe(200);
-      const chapter = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1, 'hash-a') });
+      const chapter = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1) });
       expect(chapter.statusCode).toBe(200);
       const manifest = await push('get', `/internal/novels/${SLUG}/manifest`);
-      expect(manifest.json()).toEqual([{ ordinal: 1, contentHash: 'hash-a', revision: 1 }]);
+      expect(manifest.json()).toEqual([{ ordinal: 1, contentHash: CHAPTER_HASH, revision: 1 }]);
     });
   });
 });
