@@ -16,7 +16,14 @@ declare module '@shadow-library/modules' {
 export const DatastoreModule = CoreDatabaseModule.forRoot({
   postgres: {
     factory: (config, connection) => drizzle({ ...config, schema, connection: { url: connection.url, max: connection.maxConnections } }),
-    /** Two publishers can race past the by-slug lookup and both insert; the index rejects the loser, whose re-read decides whether the row is its own or truly foreign. */
-    constraintErrorMap: { novels_slug_unique: AppErrorCode.WBN_010.create() },
+    /**
+     * Two pushes can race past the lookup and both insert; whichever index rejects the loser, its re-read
+     * decides whether the row is its own or truly foreign. Both map to WBN_010 because both are answered
+     * the same way — publish under a slug this caller can hold.
+     */
+    constraintErrorMap: {
+      novels_slug_unique: AppErrorCode.WBN_010.create(),
+      novels_source_client_id_source_ref_unique: AppErrorCode.WBN_010.create(),
+    },
   },
 });

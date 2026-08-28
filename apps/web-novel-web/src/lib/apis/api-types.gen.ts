@@ -529,6 +529,8 @@ export interface components {
       postgres: 'up' | 'down';
     };
     NovelUpsertBody: {
+      /** @description The publisher's own stable identifier. When present it, not the slug, identifies the novel: a push under a new slug renames it rather than publishing a second one. */
+      sourceRef?: string;
       title: string;
       blurb?: string;
       coverPath?: string;
@@ -739,6 +741,8 @@ export interface components {
     /** @enum {string} */
     DarkContentRating: 'none' | 'mild' | 'heavy';
     PublishResultResponse: {
+      /** @description The reader's own novel id, as a string because it is a 64-bit value. Diagnostics only — no publisher may depend on having persisted it. */
+      id: string;
       slug: string;
       /** @enum {string} */
       outcome: 'applied';

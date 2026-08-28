@@ -36,12 +36,13 @@ export class AppErrorCode extends ServerErrorCode {
   /** Optimistic-concurrency rejection: the forge pushed a revision older than the stored one */
   static readonly WBN_003 = AppErrorCode.conflict('WBN_003', 'Stale publish rejected: incoming revision {incoming} is behind stored revision {stored}');
   /**
-   * The slug is already published by a different source. Shares its 409 with WBN_003 and means the
-   * opposite: a stale publish is fatal, this one is answered by retrying under a slug the caller owns,
-   * so publishers discriminate on the code. The owning client is never named — telling one publisher
-   * who holds a slug is the very disclosure the ownership check exists to prevent.
+   * The slug already belongs to another published novel — a different source's, or another of the caller's
+   * own, which a rename can also collide with. Shares its 409 with WBN_003 and means the opposite: a stale
+   * publish is fatal, this one is answered by retrying under a slug the caller can hold, so publishers
+   * discriminate on the code. The holder is never named — telling one publisher who holds a slug is the
+   * very disclosure the ownership check exists to prevent.
    */
-  static readonly WBN_010 = AppErrorCode.conflict('WBN_010', 'The novel slug is published by a different source');
+  static readonly WBN_010 = AppErrorCode.conflict('WBN_010', 'The novel slug is already published under a different novel');
   /**
    * The pushed `contentHash` does not match the hash recomputed from the pushed `title`/`content`/
    * `authorNote`. A malformed push, not a conflict — unlike WBN_003 (a stale but internally

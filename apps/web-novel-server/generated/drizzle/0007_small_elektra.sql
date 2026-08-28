@@ -1,0 +1,2 @@
+ALTER TABLE "novels" ADD COLUMN "source_ref" varchar(64);--> statement-breakpoint
+ALTER TABLE "novels" ADD CONSTRAINT "novels_source_client_id_source_ref_unique" UNIQUE("source_client_id","source_ref");

@@ -50,6 +50,13 @@
       "when": 1787915352381,
       "tag": "0006_unusual_warlock",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787932306558,
+      "tag": "0007_small_elektra",
+      "breakpoints": true
     }
   ]
 }

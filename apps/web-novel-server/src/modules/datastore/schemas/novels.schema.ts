@@ -31,43 +31,56 @@ export const novelStatus = pgEnum('novel_status', ['live', 'retired']);
  */
 export const novelVisibility = pgEnum('novel_visibility', ['PUBLIC', 'ORGANISATION', 'RESTRICTED']);
 
-export const novels = pgTable('novels', {
-  id: bigserial('id', { mode: 'bigint' }).primaryKey(),
-  slug: varchar('slug', { length: 128 }).notNull().unique(),
-  /**
-   * The publishing client that created the row, and the only one allowed to mutate it thereafter: slugs are
-   * caller-supplied, so without this two publishers pushing the same slug silently overwrite each other.
-   * Deliberately undefaulted — a default would hand its holder authority over rows it never published.
-   */
-  sourceClientId: varchar('source_client_id', { length: 64 }).notNull(),
-  title: varchar('title', { length: 256 }).notNull(),
-  blurb: text('blurb'),
-  coverPath: varchar('cover_path', { length: 512 }),
-  /**
-   * Closed vocabularies from `@shadow-library/sdk`, kept as `varchar` rather than a native enum and validated
-   * at the DTO boundary instead: adding a genre or tag stays a code change rather than a schema migration.
-   */
-  genres: varchar('genres', { length: 64 }).array().notNull().default([]).$type<Genre[]>(),
-  tags: varchar('tags', { length: 64 }).array().notNull().default([]).$type<Tag[]>(),
-  /**
-   * `NULL` is *unrated*, and never interchangeable with `'none'` — a source that cannot determine a level must
-   * not assert the absence of content — so these carry no default. One column per dimension so the catalog can
-   * filter each independently.
-   */
-  sexualContent: varchar('sexual_content', { length: 16 }).$type<SexualContentLevel>(),
-  violence: varchar('violence', { length: 16 }).$type<ViolenceLevel>(),
-  darkContent: varchar('dark_content', { length: 16 }).$type<DarkContentLevel>(),
-  status: novelStatus('status').notNull().default('live'),
-  /** Defaulted for the migration's benefit only — every push carries it explicitly, so a row never relies on the default. */
-  visibility: novelVisibility('visibility').notNull().default('PUBLIC'),
-  /** The identity organisation an `ORGANISATION` novel is shared with; null on every other tier. */
-  organisationId: varchar('organisation_id', { length: 64 }),
-  /** Forge-assigned, and independent of `revision`: adding a viewer must not churn the metadata row. */
-  accessRevision: integer('access_revision').notNull().default(1),
-  revision: integer('revision').notNull(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const novels = pgTable(
+  'novels',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    slug: varchar('slug', { length: 128 }).notNull().unique(),
+    /**
+     * The publishing client that created the row, and the only one allowed to mutate it thereafter: slugs are
+     * caller-supplied, so without this two publishers pushing the same slug silently overwrite each other.
+     * Deliberately undefaulted — a default would hand its holder authority over rows it never published.
+     */
+    sourceClientId: varchar('source_client_id', { length: 64 }).notNull(),
+    /**
+     * The publisher's own stable identifier for the novel, unique per publisher. It, not the slug, is what
+     * a push identifies a novel by, so a changed slug is a rename of this row rather than a second novel;
+     * and because the publisher assigns it before pushing, a retried create finds the same row instead of
+     * making another. Nullable only until every publisher sends one — they deploy independently of this
+     * service, so there is no flag day. NULLs never collide under the unique constraint, which is exactly
+     * what an optional column needs.
+     */
+    sourceRef: varchar('source_ref', { length: 64 }),
+    title: varchar('title', { length: 256 }).notNull(),
+    blurb: text('blurb'),
+    coverPath: varchar('cover_path', { length: 512 }),
+    /**
+     * Closed vocabularies from `@shadow-library/sdk`, kept as `varchar` rather than a native enum and validated
+     * at the DTO boundary instead: adding a genre or tag stays a code change rather than a schema migration.
+     */
+    genres: varchar('genres', { length: 64 }).array().notNull().default([]).$type<Genre[]>(),
+    tags: varchar('tags', { length: 64 }).array().notNull().default([]).$type<Tag[]>(),
+    /**
+     * `NULL` is *unrated*, and never interchangeable with `'none'` — a source that cannot determine a level must
+     * not assert the absence of content — so these carry no default. One column per dimension so the catalog can
+     * filter each independently.
+     */
+    sexualContent: varchar('sexual_content', { length: 16 }).$type<SexualContentLevel>(),
+    violence: varchar('violence', { length: 16 }).$type<ViolenceLevel>(),
+    darkContent: varchar('dark_content', { length: 16 }).$type<DarkContentLevel>(),
+    status: novelStatus('status').notNull().default('live'),
+    /** Defaulted for the migration's benefit only — every push carries it explicitly, so a row never relies on the default. */
+    visibility: novelVisibility('visibility').notNull().default('PUBLIC'),
+    /** The identity organisation an `ORGANISATION` novel is shared with; null on every other tier. */
+    organisationId: varchar('organisation_id', { length: 64 }),
+    /** Forge-assigned, and independent of `revision`: adding a viewer must not churn the metadata row. */
+    accessRevision: integer('access_revision').notNull().default(1),
+    revision: integer('revision').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  table => [unique('novels_source_client_id_source_ref_unique').on(table.sourceClientId, table.sourceRef)],
+);
 
 /** `(novel_id, ordinal)` anchors reader URLs, bookmarks, and progress; the forge never renumbers it */
 export const publishedChapters = pgTable(

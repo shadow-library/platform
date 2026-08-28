@@ -30,6 +30,14 @@ export class ChapterOrdinalParams extends NovelSlugParams {
 
 @Schema()
 export class NovelUpsertBody {
+  @Field(() => String, {
+    optional: true,
+    maxLength: 64,
+    description:
+      "The publisher's own stable identifier. When present it, not the slug, identifies the novel: a push under a new slug renames it rather than publishing a second one.",
+  })
+  sourceRef?: string;
+
   @Field({ maxLength: 256 })
   title: string;
 
@@ -137,6 +145,9 @@ export class ChapterUpsertBody {
 
 @Schema()
 export class PublishResultResponse {
+  @Field({ description: "The reader's own novel id, as a string because it is a 64-bit value. Diagnostics only — no publisher may depend on having persisted it." })
+  id: string;
+
   @Field()
   slug: string;
 

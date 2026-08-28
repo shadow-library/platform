@@ -16,6 +16,7 @@ import { type PublishAuditEntry } from './publish.types';
 
 export interface UpsertResult {
   outcome: 'applied' | 'noop';
+  novelId: bigint;
   revision: number;
 }
 
@@ -82,7 +83,7 @@ export class PublishService {
 
   private runNovelUpsert(slug: string, body: NovelUpsertBody, caller: PublishCaller): Promise<UpsertResult | StaleMarker> {
     return this.db.transaction(async tx => {
-      const [stored] = await tx.select().from(schema.novels).where(eq(schema.novels.slug, slug)).for('update');
+      const stored = await this.lockNovel(tx, slug, body, caller);
       const base: Omit<PublishAuditEntry, 'outcome'> = { action: 'novel.upsert', novelSlug: slug, incomingRevision: body.revision, storedRevision: stored?.revision, ...caller };
       /** Ahead of the revision ladder: WBN_003 quotes the stored revision, which a foreign caller has no business learning. */
       if (stored) assertNovelOwnership(stored, caller);
@@ -91,12 +92,15 @@ export class PublishService {
         await this.auditService.record({ ...base, outcome: 'stale_rejected' }, tx);
         return { outcome: 'stale', stored: stored.revision } satisfies StaleMarker;
       }
-      if (stored && body.revision === stored.revision && this.isNovelUnchanged(stored, body)) {
+      if (stored && body.revision === stored.revision && this.isNovelUnchanged(stored, body, slug)) {
         await this.auditService.record({ ...base, outcome: 'noop' }, tx);
-        return { outcome: 'noop', revision: stored.revision } satisfies UpsertResult;
+        return { outcome: 'noop', novelId: stored.id, revision: stored.revision } satisfies UpsertResult;
       }
 
       const values = {
+        slug,
+        /** An omitted ref never clears a stored one: a publisher that has started sending refs must not un-identify its own row by regressing. */
+        sourceRef: body.sourceRef ?? stored?.sourceRef ?? null,
         title: body.title,
         blurb: body.blurb ?? null,
         coverPath: body.coverPath ?? null,
@@ -110,10 +114,9 @@ export class PublishService {
         revision: body.revision,
         updatedAt: new Date(),
       };
-      if (stored) await tx.update(schema.novels).set(values).where(eq(schema.novels.id, stored.id));
-      else await this.insertNovel(tx, { slug, sourceClientId: caller.callerClientId, ...values });
+      const novelId = await this.saveNovel(tx, stored, { ...values, sourceClientId: caller.callerClientId });
       await this.auditService.record({ ...base, outcome: 'applied' }, tx);
-      return { outcome: 'applied', revision: body.revision } satisfies UpsertResult;
+      return { outcome: 'applied', novelId, revision: body.revision } satisfies UpsertResult;
     });
   }
 
@@ -140,7 +143,7 @@ export class PublishService {
       }
       if (stored && body.revision === stored.revision && body.contentHash === stored.contentHash) {
         await this.auditService.record({ ...base, outcome: 'noop' }, tx);
-        return { outcome: 'noop', revision: stored.revision } satisfies UpsertResult;
+        return { outcome: 'noop', novelId: novel.id, revision: stored.revision } satisfies UpsertResult;
       }
 
       const values = {
@@ -156,7 +159,7 @@ export class PublishService {
       if (stored) await tx.update(schema.publishedChapters).set(values).where(eq(schema.publishedChapters.id, stored.id));
       else await tx.insert(schema.publishedChapters).values({ novelId: novel.id, ordinal, ...values });
       await this.auditService.record({ ...base, outcome: 'applied' }, tx);
-      return { outcome: 'applied', revision: body.revision } satisfies UpsertResult;
+      return { outcome: 'applied', novelId: novel.id, revision: body.revision } satisfies UpsertResult;
     });
 
     this.auditService.markRecorded();
@@ -225,7 +228,7 @@ export class PublishService {
       const current = await tx.select({ subjectId: schema.novelGrants.subjectId }).from(schema.novelGrants).where(eq(schema.novelGrants.novelId, stored.id));
       if (body.revision === stored.accessRevision && this.isAccessUnchanged(stored, body, subjectIds, current)) {
         await this.auditService.record({ ...base, outcome: 'noop' }, tx);
-        return { outcome: 'noop', revision: stored.accessRevision } satisfies UpsertResult;
+        return { outcome: 'noop', novelId: stored.id, revision: stored.accessRevision } satisfies UpsertResult;
       }
 
       await tx
@@ -235,7 +238,7 @@ export class PublishService {
       await tx.delete(schema.novelGrants).where(eq(schema.novelGrants.novelId, stored.id));
       if (subjectIds.length > 0) await tx.insert(schema.novelGrants).values(subjectIds.map(subjectId => ({ novelId: stored.id, subjectId })));
       await this.auditService.record({ ...base, outcome: 'applied' }, tx);
-      return { outcome: 'applied', revision: body.revision } satisfies UpsertResult;
+      return { outcome: 'applied', novelId: stored.id, revision: body.revision } satisfies UpsertResult;
     });
 
     this.auditService.markRecorded();
@@ -269,23 +272,52 @@ export class PublishService {
     return chapters;
   }
 
-  private async insertNovel(tx: PublishTransaction, values: typeof schema.novels.$inferInsert): Promise<void> {
-    await this.databaseService
-      .run(async () => {
-        await tx.insert(schema.novels).values(values);
-      })
-      .catch((err: unknown) => {
-        if (AppError.is(err, AppErrorCode.WBN_010)) throw new NovelInsertRace();
-        throw err;
-      });
+  /**
+   * Identity is the publisher's `sourceRef`, and only its absence falls back to the slug — that fallback is
+   * what lets a publisher which has not started sending refs keep pushing, and what lets one that just
+   * started adopt the row it already owns. A slug the caller owns under a *different* ref is a collision
+   * between two of its own novels, answered with the same WBN_010 as a foreign slug because the remedy is
+   * the same: publish under a slug this novel can hold.
+   */
+  private async lockNovel(tx: PublishTransaction, slug: string, body: NovelUpsertBody, caller: PublishCaller): Promise<Novel | undefined> {
+    if (body.sourceRef) {
+      const filter = and(eq(schema.novels.sourceClientId, caller.callerClientId), eq(schema.novels.sourceRef, body.sourceRef)) as SQL;
+      const [owned] = await tx.select().from(schema.novels).where(filter).for('update');
+      if (owned) return owned;
+    }
+    const [bySlug] = await tx.select().from(schema.novels).where(eq(schema.novels.slug, slug)).for('update');
+    if (bySlug && body.sourceRef && bySlug.sourceRef && bySlug.sourceRef !== body.sourceRef) throw AppErrorCode.WBN_010.create();
+    return bySlug;
+  }
+
+  /**
+   * A conflict on the update is a decided rename onto a slug this novel cannot hold, so it surfaces as
+   * WBN_010 rather than a re-read: the re-read would find the same row and attempt the same rename. On the
+   * insert it is a race with a concurrent create, which only the committed row can adjudicate.
+   */
+  private async saveNovel(tx: PublishTransaction, stored: Novel | undefined, values: typeof schema.novels.$inferInsert): Promise<bigint> {
+    if (!stored) {
+      const [inserted] = await this.databaseService
+        .run(() => tx.insert(schema.novels).values(values).returning({ id: schema.novels.id }))
+        .catch((err: unknown) => {
+          if (AppError.is(err, AppErrorCode.WBN_010)) throw new NovelInsertRace();
+          throw err;
+        });
+      if (!inserted) throw AppError.internal('novel insert returned no row');
+      return inserted.id;
+    }
+    await this.databaseService.run(() => tx.update(schema.novels).set(values).where(eq(schema.novels.id, stored.id)));
+    return stored.id;
   }
 
   private chapterFilter(novelId: bigint, ordinal: number): SQL {
     return and(eq(schema.publishedChapters.novelId, novelId), eq(schema.publishedChapters.ordinal, ordinal)) as SQL;
   }
 
-  private isNovelUnchanged(stored: Novel, body: NovelUpsertBody): boolean {
+  private isNovelUnchanged(stored: Novel, body: NovelUpsertBody, slug: string): boolean {
     return (
+      stored.slug === slug &&
+      stored.sourceRef === (body.sourceRef ?? stored.sourceRef) &&
       stored.title === body.title &&
       stored.blurb === (body.blurb ?? null) &&
       stored.coverPath === (body.coverPath ?? null) &&

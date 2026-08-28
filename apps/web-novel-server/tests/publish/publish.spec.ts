@@ -76,10 +76,9 @@ describe('Internal publish API', () => {
     it('should create the novel, store the incoming revision, and record an applied audit row', async () => {
       const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1) });
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toEqual({ slug: SLUG, outcome: 'applied', revision: 1 });
-
       const [novel] = await novelRows();
-      expect(novel).toMatchObject({ slug: SLUG, title: 'Moonfall', genres: ['Fantasy'], status: 'live', revision: 1 });
+      expect(response.json()).toEqual({ id: String(novel?.id), slug: SLUG, outcome: 'applied', revision: 1 });
+      expect(novel).toMatchObject({ slug: SLUG, title: 'Moonfall', genres: ['Fantasy'], status: 'live', revision: 1, sourceRef: null });
 
       const rows = await auditRows();
       expect(rows).toHaveLength(1);
@@ -243,7 +242,8 @@ describe('Internal publish API', () => {
       await publishNovel();
       const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1) });
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toEqual({ slug: SLUG, outcome: 'applied', revision: 1 });
+      const [novel] = await novelRows();
+      expect(response.json()).toEqual({ id: String(novel?.id), slug: SLUG, outcome: 'applied', revision: 1 });
 
       const [chapter] = await chapterRows();
       expect(chapter).toMatchObject({ ordinal: 1, title: 'The Falling Sky', contentHash: CHAPTER_HASH, revision: 1, wordCount: 11 });
@@ -700,6 +700,151 @@ describe('Internal publish API', () => {
       expect(chapter.statusCode).toBe(200);
       const manifest = await push('get', `/internal/novels/${SLUG}/manifest`);
       expect(manifest.json()).toEqual([{ ordinal: 1, contentHash: CHAPTER_HASH, revision: 1 }]);
+    });
+  });
+  describe('publisher source refs', () => {
+    const REF = 'forge-project-4291';
+    const allNovels = () => env.getPostgresClient().select().from(schema.novels).orderBy(asc(schema.novels.id));
+    const bySlug = (slug: string) => env.getPostgresClient().select().from(schema.novels).where(eq(schema.novels.slug, slug));
+    const refBody = (revision: number, overrides: object = {}) => novelBody(revision, { sourceRef: REF, ...overrides });
+    const pushRef = (slug: string, revision: number, overrides: object = {}) => push('put', `/internal/novels/${slug}`, { body: refBody(revision, overrides) });
+
+    it('should store the pushed sourceRef and answer with the reader id of the row it wrote', async () => {
+      const response = await pushRef(SLUG, 1);
+      expect(response.statusCode).toBe(200);
+
+      const [novel] = await novelRows();
+      expect(novel).toMatchObject({ sourceRef: REF, sourceClientId: FORGE_CLIENT_ID });
+      expect(response.json()).toEqual({ id: String(novel?.id), slug: SLUG, outcome: 'applied', revision: 1 });
+    });
+
+    it('should keep a repeated create under the same ref on one row', async () => {
+      const first = await pushRef(SLUG, 1);
+      const second = await pushRef(SLUG, 2, { title: 'Moonfall II' });
+      expect(second.statusCode).toBe(200);
+      expect(second.json()).toMatchObject({ id: first.json().id });
+      expect(await allNovels()).toHaveLength(1);
+    });
+
+    it('should rename the same row when a later push carries a new slug, publishing nothing new', async () => {
+      const created = await pushRef(SLUG, 1);
+      await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(1) });
+
+      const renamed = await pushRef('moonrise', 2);
+      expect(renamed.statusCode).toBe(200);
+      expect(renamed.json()).toMatchObject({ id: created.json().id, slug: 'moonrise', revision: 2 });
+
+      const novels = await allNovels();
+      expect(novels).toHaveLength(1);
+      expect(novels[0]).toMatchObject({ slug: 'moonrise', sourceRef: REF, revision: 2 });
+      expect(await chapterRows()).toHaveLength(1);
+    });
+
+    it('should rename on an equal revision rather than reading the unchanged metadata as a no-op', async () => {
+      await pushRef(SLUG, 1);
+      const renamed = await pushRef('moonrise', 1);
+      expect(renamed.statusCode).toBe(200);
+
+      const novels = await allNovels();
+      expect(novels).toHaveLength(1);
+      expect(novels[0]).toMatchObject({ slug: 'moonrise', revision: 1 });
+    });
+
+    it('should keep serving the renamed novel under its new slug and stop under the old one', async () => {
+      await pushRef(SLUG, 1);
+      await pushRef('moonrise', 2);
+
+      const manifest = await push('get', '/internal/novels/moonrise/manifest');
+      expect(manifest.statusCode).toBe(200);
+      const stale = await push('get', `/internal/novels/${SLUG}/manifest`);
+      expect(stale.statusCode).toBe(404);
+    });
+
+    it('should refuse a rename onto a slug another publisher owns and leave both rows untouched', async () => {
+      await pushRef(SLUG, 1);
+      const foreignPush = await push('put', '/internal/novels/ingested-tale', { body: novelBody(1), token: await ingestToken() });
+      expect(foreignPush.statusCode).toBe(200);
+
+      const response = await pushRef('ingested-tale', 2, { title: 'Hijacked' });
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'WBN_010' });
+
+      expect(await novelRows()).toHaveLength(1);
+      const [foreign] = await bySlug('ingested-tale');
+      expect(foreign).toMatchObject({ sourceClientId: INGEST_CLIENT_ID, title: 'Moonfall', sourceRef: null });
+    });
+
+    it('should refuse a push whose slug is held by another novel of the same publisher', async () => {
+      await pushRef(SLUG, 1);
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: refBody(1, { sourceRef: 'forge-project-9999', title: 'A Second Novel' }) });
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'WBN_010' });
+
+      const novels = await allNovels();
+      expect(novels).toHaveLength(1);
+      expect(novels[0]).toMatchObject({ sourceRef: REF, title: 'Moonfall' });
+    });
+
+    it('should let two publishers hold the same sourceRef without colliding', async () => {
+      const mine = await pushRef(SLUG, 1);
+      const theirs = await push('put', '/internal/novels/ingested-tale', { body: refBody(1), token: await ingestToken() });
+      expect(theirs.statusCode).toBe(200);
+      expect(theirs.json().id).not.toBe(mine.json().id);
+
+      const novels = await allNovels();
+      expect(novels).toHaveLength(2);
+      expect(novels.map(novel => novel.sourceClientId)).toEqual([FORGE_CLIENT_ID, INGEST_CLIENT_ID]);
+      expect(novels.every(novel => novel.sourceRef === REF)).toBe(true);
+    });
+
+    it('should adopt the row a publisher already owns when it starts sending a ref', async () => {
+      const created = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1) });
+      const adopted = await pushRef(SLUG, 1);
+      expect(adopted.statusCode).toBe(200);
+      expect(adopted.json()).toMatchObject({ id: created.json().id });
+
+      const novels = await allNovels();
+      expect(novels).toHaveLength(1);
+      expect(novels[0]).toMatchObject({ sourceRef: REF, revision: 1 });
+    });
+
+    it('should refuse the adoption of a row another publisher owns', async () => {
+      await push('put', '/internal/novels/ingested-tale', { body: novelBody(1), token: await ingestToken() });
+      const response = await pushRef('ingested-tale', 2);
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'WBN_010' });
+
+      const [novel] = await bySlug('ingested-tale');
+      expect(novel).toMatchObject({ sourceClientId: INGEST_CLIENT_ID, sourceRef: null });
+    });
+
+    it('should never clear a stored ref when a later push omits it', async () => {
+      await pushRef(SLUG, 1);
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(2, { title: 'Moonfall II' }) });
+      expect(response.statusCode).toBe(200);
+
+      const [novel] = await novelRows();
+      expect(novel).toMatchObject({ sourceRef: REF, title: 'Moonfall II' });
+    });
+
+    it('should resolve a ref-less push by slug exactly as before', async () => {
+      await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1) });
+      const repeat = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1) });
+      expect(repeat.statusCode).toBe(204);
+
+      const moved = await push('put', '/internal/novels/moonrise', { body: novelBody(2) });
+      expect(moved.statusCode).toBe(200);
+      expect(await allNovels()).toHaveLength(2);
+    });
+
+    it('should still honour the stale ladder and the ownership check on a ref-resolved push', async () => {
+      await pushRef(SLUG, 5);
+      const stale = await pushRef('moonrise', 4, { title: 'Stale rename' });
+      expect(stale.statusCode).toBe(409);
+      expect(stale.json()).toMatchObject({ code: 'WBN_003' });
+
+      const [novel] = await novelRows();
+      expect(novel).toMatchObject({ slug: SLUG, revision: 5 });
     });
   });
 });

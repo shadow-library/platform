@@ -25,11 +25,24 @@ rejected attempt — writes exactly one `publish_audit_log` row. Unpublish is id
 .../manifest` returns `[{ ordinal, contentHash, revision }]` for forge-side reconciliation and is not
 audited.
 
+A novel is identified by the publisher's own `sourceRef` when the metadata push carries one: it is resolved
+by `(source_client_id, source_ref)` rather than by slug, so a push arriving under a new slug **renames that
+row** instead of publishing a second novel, and a retried create converges on the row it already made. The
+column is optional — a push without one still resolves by slug, and a publisher that starts sending a ref
+adopts the row it already owns at that slug. Reader-facing URLs still use the slug, so a rename does change
+where a novel is served from. An `applied` outcome from any of the three publish-upsert routes (novel, access,
+chapter) carries the reader's own novel `id` (a string, since it is 64-bit) for diagnostics; a `204` no-op or
+unpublish response has no body, and correctness never depends on a publisher persisting the `id` either way.
+
 A slug belongs to the client that created it (`novels.source_client_id`, stamped from the authenticated
-principal), and only that client may mutate it. A mutation on a slug owned by another publisher is `409`
-(`WBN_010`, audited `unauthorized`) and is **retryable under a different slug** — unlike `WBN_003`, which is
-fatal — so publishers discriminate on the code, not the status. A read of a foreign-owned slug answers `404`
-(`WBN_001`) exactly as an unknown slug does; the owning client is never named.
+principal), and only that client may mutate it. A mutation on a slug owned by another publisher — including
+a rename onto one — is `409` (`WBN_010`, audited `unauthorized`) and is **retryable under a different slug**,
+unlike `WBN_003`, which is fatal, so publishers discriminate on the code, not the status. A slug already held
+by the same publisher **under a different `sourceRef`** answers `WBN_010` too, for the same remedy — but a
+slug already held by the same publisher with **no `sourceRef` on the stored row** is adopted, not refused: a
+publisher that is only now starting to send refs cannot be told apart from one pushing a genuinely new novel
+at an old slug, so the ref-less row is claimed rather than rejected. A read of a foreign-owned slug answers
+`404` (`WBN_001`) exactly as an unknown slug does; the owning client is never named.
 
 ## Running locally
 

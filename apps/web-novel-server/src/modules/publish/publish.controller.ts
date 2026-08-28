@@ -27,7 +27,7 @@ export class PublishController {
   async upsertNovel(@Params() params: NovelSlugParams, @Body() body: NovelUpsertBody, @Res() response: HttpResponse): Promise<PublishResultResponse | undefined> {
     const result = await this.publishService.upsertNovel(params.slug, body);
     if (result.outcome === 'noop') return void response.status(204).send();
-    return { slug: params.slug, outcome: 'applied', revision: result.revision };
+    return { id: String(result.novelId), slug: params.slug, outcome: 'applied', revision: result.revision };
   }
 
   @Put('/:slug/access')
@@ -36,7 +36,7 @@ export class PublishController {
   async upsertAccess(@Params() params: NovelSlugParams, @Body() body: NovelAccessBody, @Res() response: HttpResponse): Promise<PublishResultResponse | undefined> {
     const result = await this.publishService.upsertAccess(params.slug, body);
     if (result.outcome === 'noop') return void response.status(204).send();
-    return { slug: params.slug, outcome: 'applied', revision: result.revision };
+    return { id: String(result.novelId), slug: params.slug, outcome: 'applied', revision: result.revision };
   }
 
   @Get('/:slug/access')
@@ -51,7 +51,7 @@ export class PublishController {
   async upsertChapter(@Params() params: ChapterOrdinalParams, @Body() body: ChapterUpsertBody, @Res() response: HttpResponse): Promise<PublishResultResponse | undefined> {
     const result = await this.publishService.upsertChapter(params.slug, params.ordinal, body);
     if (result.outcome === 'noop') return void response.status(204).send();
-    return { slug: params.slug, outcome: 'applied', revision: result.revision };
+    return { id: String(result.novelId), slug: params.slug, outcome: 'applied', revision: result.revision };
   }
 
   @Delete('/:slug/chapters/:ordinal')

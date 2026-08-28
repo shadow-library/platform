@@ -60,7 +60,7 @@ export class WikiIngestService {
       }
       if (stored && body.revision === stored.revision && body.contentHash === stored.contentHash) {
         await this.auditService.record({ ...base, outcome: 'noop' }, tx);
-        return { outcome: 'noop', revision: stored.revision } satisfies UpsertResult;
+        return { outcome: 'noop', novelId: novel.id, revision: stored.revision } satisfies UpsertResult;
       }
 
       const values = {
@@ -105,7 +105,7 @@ export class WikiIngestService {
         );
       }
       await this.auditService.record({ ...base, outcome: 'applied' }, tx);
-      return { outcome: 'applied', revision: body.revision } satisfies UpsertResult;
+      return { outcome: 'applied', novelId: novel.id, revision: body.revision } satisfies UpsertResult;
     });
 
     this.auditService.markRecorded();
