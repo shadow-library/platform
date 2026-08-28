@@ -10,16 +10,7 @@ import { type PrimaryDatabase, type Publishing, schema } from '@server/database'
 import { PublicationAccessService } from './publication-access.service';
 import { renderChapterPayload } from './publish-payload';
 import { PublishingService } from './publishing.service';
-import {
-  type AccessPushBody,
-  type AccessState,
-  type ChapterPushBody,
-  type ManifestItem,
-  ReaderPushClient,
-  ReaderPushError,
-  StaleRevisionError,
-  type WikiManifestItem,
-} from './reader-push.client';
+import { type AccessPushBody, type AccessState, type ChapterPushBody, type ManifestItem, ReaderPushClient, type WikiManifestItem } from './reader-push.client';
 import { type WikiEntryProjection } from './wiki-projection';
 import { WikiPublishingService } from './wiki-publishing.service';
 
@@ -62,6 +53,22 @@ export interface ConvergeResult {
 
 /** Failed rows carrying this prefix are revision conflicts — retried only by explicit reconcile/republish, never by the sweep */
 export const STALE_ERROR_PREFIX = 'stale revision:';
+
+/** The reader rehashed our payload and disagreed: the push itself is malformed, so an identical retry cannot pass */
+export const HASH_MISMATCH_ERROR_PREFIX = 'payload hash mismatch:';
+
+/** The reader serves this slug for another publisher — clearable only by publishing under a different slug, which nothing does yet */
+export const SLUG_CONFLICT_ERROR_PREFIX = 'slug conflict:';
+
+/** A 409 the reader attributed to no code — which of its conflicts fired is unknown, so it is handled as the fatal reading */
+export const UNKNOWN_CONFLICT_ERROR_PREFIX = 'unattributed conflict:';
+
+/** Ledgered failures an identical retry can never clear; the sweep skips them and only an explicit reconcile/republish revisits them */
+export const UNSWEEPABLE_ERROR_PREFIXES = [STALE_ERROR_PREFIX, HASH_MISMATCH_ERROR_PREFIX, SLUG_CONFLICT_ERROR_PREFIX, UNKNOWN_CONFLICT_ERROR_PREFIX];
+
+function isUnsweepable(error: string | null | undefined): boolean {
+  return UNSWEEPABLE_ERROR_PREFIXES.some(prefix => error?.startsWith(prefix) === true);
+}
 
 /**
  * The convergence engine behind the `publish` job, the janitor sweep, and the reconcile endpoint
@@ -188,7 +195,7 @@ export class PublishRunner {
         .where(eq(schema.chapterPublications.id, row.id));
       result.pushed.push(row.publishedOrdinal);
     } catch (err) {
-      const message = err instanceof StaleRevisionError || err instanceof ReaderPushError ? err.message : String(err instanceof Error ? err.message : err);
+      const message = err instanceof Error ? err.message : String(err);
       await this.markFailed(row, message);
       result.failed.push({ ordinal: row.publishedOrdinal, error: message });
       this.logger.warn('chapter push failed', { projectId, ordinal: row.publishedOrdinal, message });
@@ -259,7 +266,7 @@ export class PublishRunner {
         .where(eq(schema.wikiPublications.id, row.id));
       result.wiki.pushed.push(row.entryKey);
     } catch (err) {
-      const message = err instanceof StaleRevisionError || err instanceof ReaderPushError ? err.message : String(err instanceof Error ? err.message : err);
+      const message = err instanceof Error ? err.message : String(err);
       await this.markWikiFailed(row, message);
       result.wiki.failed.push({ entryKey: row.entryKey, error: message });
       this.logger.warn('wiki entry push failed', { slug, entryKey: row.entryKey, message });
@@ -277,10 +284,10 @@ export class PublishRunner {
     }
   }
 
-  /** Due = a fresh/changed projection awaiting a push, or a non-stale failure retrying; reconcile widens it to every failure */
+  /** Due = a fresh/changed projection awaiting a push, or a retryable failure; reconcile widens it to every failure */
   private isWikiDue(row: Publishing.WikiPublication, options: ConvergeOptions): boolean {
     if (row.state === 'pending') return true;
-    if (row.state === 'failed') return options.reconcile ? true : !row.error?.startsWith(STALE_ERROR_PREFIX);
+    if (row.state === 'failed') return options.reconcile ? true : !isUnsweepable(row.error);
     return false;
   }
 
@@ -304,10 +311,10 @@ export class PublishRunner {
     return payload;
   }
 
-  /** Due = awaiting its first/next push: scheduled past its gate or failed; reconcile widens this to drift checks elsewhere */
+  /** Due = awaiting its first/next push: scheduled past its gate, or failed in a way a retry can clear; reconcile widens this to drift checks elsewhere */
   private isDue(row: Publishing.ChapterPublication, options: ConvergeOptions): boolean {
     if (row.status === 'scheduled') return !row.scheduledAt || row.scheduledAt.getTime() <= Date.now();
-    if (row.status === 'failed') return options.reconcile ? true : !row.error?.startsWith(STALE_ERROR_PREFIX);
+    if (row.status === 'failed') return options.reconcile ? true : !isUnsweepable(row.error);
     return false;
   }
 

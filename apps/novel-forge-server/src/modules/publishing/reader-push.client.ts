@@ -99,6 +99,59 @@ export class StaleRevisionError extends Error {
 }
 
 /**
+ * A 409 the reader attributed to no error code. Handled exactly as a stale revision is — fatal,
+ * ledgered, never swept — because retrying a conflict nobody has read is the outcome that must not
+ * happen; it claims no cause, since which of the reader's conflicts fired is precisely what is unknown.
+ */
+export class UnknownConflictError extends Error {
+  constructor(
+    readonly slug: string,
+    readonly incoming: number,
+  ) {
+    super(`unattributed conflict: the reader rejected revision ${incoming} for '${slug}' with a 409 naming no error code — resolve the ledger before republishing`);
+    this.name = 'UnknownConflictError';
+  }
+}
+
+/** The reader serves this slug for a different publisher (WBN_010) — every push and unpublish under it is refused until the project publishes under a slug it owns */
+export class SlugConflictError extends Error {
+  constructor(readonly slug: string) {
+    super(`slug conflict: the reader serves '${slug}' for a different publisher — this project cannot write to it`);
+    this.name = 'SlugConflictError';
+  }
+}
+
+/** The reader rehashed our payload and got something else (WBN_011): the forge built the hash and the body inconsistently, so an identical retry cannot pass */
+export class PayloadHashMismatchError extends Error {
+  constructor(readonly slug: string) {
+    super(`payload hash mismatch: the reader rehashed our payload for '${slug}' and got a different contentHash — the push is malformed, not retryable`);
+    this.name = 'PayloadHashMismatchError';
+  }
+}
+
+const STALE_REVISION_CODE = 'WBN_003';
+const SLUG_TAKEN_CODE = 'WBN_010';
+const HASH_MISMATCH_CODE = 'WBN_011';
+
+/** The reader's error handler sends the `AppError` object as the whole response body — `{ code, message }`, with no envelope around it */
+function readErrorCode(data: unknown): string | undefined {
+  if (typeof data !== 'object' || data === null) return undefined;
+  const code = (data as { code?: unknown }).code;
+  return typeof code === 'string' ? code : undefined;
+}
+
+function readErrorMessage(data: unknown): string | undefined {
+  if (typeof data !== 'object' || data === null) return undefined;
+  const message = (data as { message?: unknown }).message;
+  return typeof message === 'string' ? message : undefined;
+}
+
+function describeRejection(data: unknown): string {
+  const parts = [readErrorCode(data), readErrorMessage(data)].filter(Boolean);
+  return parts.length > 0 ? ` (${parts.join(': ')})` : '';
+}
+
+/**
  * The one-way HTTP client for the reader's `/internal/*` surface (reader-publish design §5). Every
  * call rides an identity-issued M2M token addressed to `api://web-novel` and carrying the
  * cross-application scope `web-novel:publish`, minted by the DI-injected `AuthClient` — built from the
@@ -114,12 +167,12 @@ export class ReaderPushClient {
 
   async upsertNovel(slug: string, body: NovelPushBody): Promise<PushResult> {
     const response = await this.send('PUT', `/internal/novels/${slug}`, body);
-    return this.toUpsertResult(response, body.revision);
+    return this.toUpsertResult(response, slug, body.revision);
   }
 
   async upsertAccess(slug: string, body: AccessPushBody): Promise<PushResult> {
     const response = await this.send('PUT', `/internal/novels/${slug}/access`, body);
-    return this.toUpsertResult(response, body.revision);
+    return this.toUpsertResult(response, slug, body.revision);
   }
 
   /** The access counterpart of `getManifest`; an unknown novel reads as nothing shared, since the next push creates it. */
@@ -132,13 +185,15 @@ export class ReaderPushClient {
 
   async upsertChapter(slug: string, ordinal: number, body: ChapterPushBody): Promise<PushResult> {
     const response = await this.send('PUT', `/internal/novels/${slug}/chapters/${ordinal}`, body);
-    return this.toUpsertResult(response, body.revision);
+    return this.toUpsertResult(response, slug, body.revision);
   }
 
   /** Idempotent on the reader — deleting an absent chapter still answers 204 */
   async deleteChapter(slug: string, ordinal: number): Promise<void> {
     const response = await this.send('DELETE', `/internal/novels/${slug}/chapters/${ordinal}`);
-    if (response.statusCode !== 204) throw new ReaderPushError(`reader unpublish answered http ${response.statusCode}`, response.statusCode);
+    if (response.statusCode === 204) return;
+    if (readErrorCode(response.data) === SLUG_TAKEN_CODE) throw new SlugConflictError(slug);
+    throw new ReaderPushError(`reader unpublish answered http ${response.statusCode}${describeRejection(response.data)}`, response.statusCode);
   }
 
   /** The reconciliation primitive — an unknown novel reads as an empty shelf, since the next novel push creates it */
@@ -151,13 +206,15 @@ export class ReaderPushClient {
 
   async upsertWiki(slug: string, entryKey: string, body: WikiPushBody): Promise<PushResult> {
     const response = await this.send('PUT', `/internal/novels/${slug}/wiki/${entryKey}`, body);
-    return this.toUpsertResult(response, body.revision);
+    return this.toUpsertResult(response, slug, body.revision);
   }
 
   /** Idempotent on the reader — deleting an absent wiki entry still answers 204 */
   async deleteWiki(slug: string, entryKey: string): Promise<void> {
     const response = await this.send('DELETE', `/internal/novels/${slug}/wiki/${entryKey}`);
-    if (response.statusCode !== 204) throw new ReaderPushError(`reader wiki unpublish answered http ${response.statusCode}`, response.statusCode);
+    if (response.statusCode === 204) return;
+    if (readErrorCode(response.data) === SLUG_TAKEN_CODE) throw new SlugConflictError(slug);
+    throw new ReaderPushError(`reader wiki unpublish answered http ${response.statusCode}${describeRejection(response.data)}`, response.statusCode);
   }
 
   /** The wiki reconciliation primitive — an unknown novel reads as an empty wiki, since the next entry push creates it */
@@ -184,10 +241,16 @@ export class ReaderPushClient {
     }
   }
 
-  private toUpsertResult(response: APIResponse<unknown>, revision: number): PushResult {
+  /** The reader's three rejections differ in kind, not in status: WBN_003 and WBN_010 share a 409, so the body's code decides, never the status */
+  private toUpsertResult(response: APIResponse<unknown>, slug: string, revision: number): PushResult {
     if (response.statusCode === 200) return { outcome: 'applied' };
     if (response.statusCode === 204) return { outcome: 'noop' };
-    if (response.statusCode === 409) throw new StaleRevisionError(revision);
-    throw new ReaderPushError(`reader push answered http ${response.statusCode}`, response.statusCode);
+
+    const code = readErrorCode(response.data);
+    if (code === HASH_MISMATCH_CODE && response.statusCode === 400) throw new PayloadHashMismatchError(slug);
+    if (response.statusCode !== 409) throw new ReaderPushError(`reader push answered http ${response.statusCode}${describeRejection(response.data)}`, response.statusCode);
+    if (code === SLUG_TAKEN_CODE) throw new SlugConflictError(slug);
+    if (code === STALE_REVISION_CODE) throw new StaleRevisionError(revision);
+    throw new UnknownConflictError(slug, revision);
   }
 }

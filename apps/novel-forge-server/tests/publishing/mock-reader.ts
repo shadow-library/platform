@@ -44,8 +44,9 @@ interface RecordedRequest {
 /**
  * An in-process reader service speaking web-novel-server's exact `/internal/*` contract: PUT novel /
  * chapter answering 200 applied, 204 no-op (same revision + same content), 409 `WBN_003` on a stale
- * incoming revision; idempotent DELETE 204; bare-array manifest. State is inspectable and wipeable
- * so specs can drive retry, stale-conflict, and wipe-and-rebuild scenarios.
+ * incoming revision, 409 `WBN_010` on a slug another publisher owns and 400 `WBN_011` on a payload
+ * whose hash it recomputes differently; idempotent DELETE 204; bare-array manifest. State is
+ * inspectable and wipeable so specs can drive retry, conflict, and wipe-and-rebuild scenarios.
  */
 
 export class MockReaderService {
@@ -55,6 +56,10 @@ export class MockReaderService {
   readonly failOrdinals = new Set<number>();
   /** Entry keys whose wiki PUT answers http 500 — simulates a reader-side failure for wiki retry tests */
   readonly failWikiEntries = new Set<string>();
+  /** Slugs the reader serves for another publisher — writes are refused `WBN_010`, reads answer `WBN_001` as `publish-ownership.ts` does */
+  readonly foreignSlugs = new Set<string>();
+  /** Ordinals whose chapter PUT answers 400 `WBN_011` — simulates a payload whose hash the reader recomputes differently */
+  readonly mismatchOrdinals = new Set<number>();
   private server: ReturnType<typeof Bun.serve> | null = null;
 
   start(): string {
@@ -90,6 +95,13 @@ export class MockReaderService {
     const hasBearer = request.headers.get('authorization')?.startsWith('Bearer ') ?? false;
     this.requests.push({ method: request.method, path: url.pathname, hasBearer });
     if (!hasBearer) return Response.json({ code: 'IAM_001' }, { status: 401 });
+
+    // A read of a foreign slug must be indistinguishable from a missing one, or 409-vs-404 becomes an oracle over another publisher's slugs.
+    const owned = /^\/internal\/novels\/([a-z0-9-]+)(?:\/|$)/.exec(url.pathname);
+    if (owned && this.foreignSlugs.has(owned[1] as string)) {
+      if (request.method === 'GET') return Response.json({ code: 'WBN_001' }, { status: 404 });
+      return Response.json({ code: 'WBN_010' }, { status: 409 });
+    }
 
     const novelMatch = /^\/internal\/novels\/([a-z0-9-]+)$/.exec(url.pathname);
     if (novelMatch && request.method === 'PUT') return this.upsertNovel(novelMatch[1] as string, (await request.json()) as Record<string, unknown>);
@@ -189,6 +201,7 @@ export class MockReaderService {
     const novel = this.novels.get(slug);
     if (!novel) return Response.json({ code: 'WBN_001' }, { status: 404 });
     if (this.failOrdinals.has(ordinal)) return Response.json({ code: 'WBN_500' }, { status: 500 });
+    if (this.mismatchOrdinals.has(ordinal)) return Response.json({ code: 'WBN_011' }, { status: 400 });
 
     const revision = body.revision as number;
     const contentHash = body.contentHash as string;

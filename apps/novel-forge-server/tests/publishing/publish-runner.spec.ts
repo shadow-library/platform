@@ -5,7 +5,7 @@
 import { APP_ID, AUTH_AUDIENCE, CLIENT_SECRET, testIdP } from '@tests/test-idp';
 
 import { SQL } from 'bun';
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AuthClient } from '@shadow-library/auth';
@@ -15,7 +15,7 @@ import { JobExecutor } from '@modules/jobs/job.executor';
 import { JobService } from '@modules/jobs/job.service';
 import { PublicationJanitor } from '@modules/jobs/publication.janitor';
 import { PublicationAccessService } from '@modules/publishing/publication-access.service';
-import { PublishRunner } from '@modules/publishing/publish-runner';
+import { HASH_MISMATCH_ERROR_PREFIX, PublishRunner, SLUG_CONFLICT_ERROR_PREFIX, STALE_ERROR_PREFIX } from '@modules/publishing/publish-runner';
 import { PublishingService } from '@modules/publishing/publishing.service';
 import { ReaderPushClient } from '@modules/publishing/reader-push.client';
 import { WikiPublishingService } from '@modules/publishing/wiki-publishing.service';
@@ -49,6 +49,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
   let accessService: PublicationAccessService;
   let wikiService: WikiPublishingService;
   let runner: PublishRunner;
+  let pushClient: ReaderPushClient;
 
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
@@ -60,13 +61,20 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     const authClient = new AuthClient({ issuer: testIdP.issuer, appId: APP_ID, client: { id: APP_ID, secret: CLIENT_SECRET } });
     accessService = new PublicationAccessService(databaseService, publishingService, authClient);
     wikiService = new WikiPublishingService(databaseService);
-    runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(authClient), accessService, wikiService);
+    pushClient = new ReaderPushClient(authClient);
+    runner = new PublishRunner(databaseService, publishingService, pushClient, accessService, wikiService);
 
     process.env['SERVICE_URL_WEB_NOVEL_SERVER'] = reader.start();
   });
 
   // The reader URL env is process-global; leaving it set would point a dead reader at every later
   // spec file. Closing the pool keeps later suites from starving.
+  // Poisoned ordinals and foreign slugs are shared state; a failed assertion must not leak them into the next test.
+  afterEach(() => {
+    reader.foreignSlugs.clear();
+    reader.mismatchOrdinals.clear();
+  });
+
   afterAll(() => {
     reader.stop();
     delete process.env['SERVICE_URL_WEB_NOVEL_SERVER'];
@@ -94,6 +102,11 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     return db.query.chapterPublications.findFirst({
       where: and(eq(schema.chapterPublications.projectId, projectId), eq(schema.chapterPublications.publishedOrdinal, ordinal)),
     });
+  }
+
+  /** Only the sweep's selection is under test here; `sweep()` itself dispatches real converge jobs and would race the assertions */
+  function dueProjects(): Promise<bigint[]> {
+    return new PublicationJanitor(databaseService, {} as never, {} as never).dueProjects();
   }
 
   it('should push the novel and due chapters with a scoped M2M token and ledger them published', async () => {
@@ -302,5 +315,52 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     const deadline = Date.now() + 5000;
     while (Date.now() < deadline && (await ledgerRow(projectId, 1))?.status !== 'published') await new Promise(resolve => setTimeout(resolve, 50));
     expect(await ledgerRow(projectId, 1)).toMatchObject({ status: 'published', error: null });
+  });
+  it('should ledger a slug another publisher owns distinguishably from a stale rejection, and park it', async () => {
+    const { projectId, slug } = await seedPublishedProject(1);
+    reader.foreignSlugs.add(slug);
+
+    await expect(runner.converge(projectId)).rejects.toThrow(/Reader service push failed/);
+    const row = await ledgerRow(projectId, 1);
+    expect(row).toMatchObject({ status: 'failed', error: expect.stringContaining(SLUG_CONFLICT_ERROR_PREFIX) });
+    expect(String(row?.error)).not.toStartWith(STALE_ERROR_PREFIX);
+
+    // Reads must not distinguish a foreign slug from a missing one, or 409-vs-404 is an oracle over another publisher's slugs.
+    expect(await pushClient.getManifest(slug)).toEqual([]);
+    expect(await pushClient.getWikiManifest(slug)).toEqual([]);
+    expect(await pushClient.getAccess(slug)).toBeUndefined();
+
+    // Nothing re-assigns the slug yet, so an identical retry can never clear it: the sweep must park the row.
+    expect((await dueProjects()).map(String)).not.toContain(String(projectId));
+  });
+
+  it('should ledger a reader hash rejection as a malformed push and keep it out of the sweep', async () => {
+    const { projectId } = await seedPublishedProject(1);
+    reader.mismatchOrdinals.add(1);
+
+    const result = await runner.converge(projectId);
+    expect(result.failed).toEqual([{ ordinal: 1, error: expect.stringContaining(HASH_MISMATCH_ERROR_PREFIX) }]);
+    expect(await ledgerRow(projectId, 1)).toMatchObject({ status: 'failed', error: expect.stringContaining(HASH_MISMATCH_ERROR_PREFIX) });
+
+    expect((await dueProjects()).map(String)).not.toContain(String(projectId));
+  });
+
+  it('should keep stale rows out of the janitor sweep', async () => {
+    const { projectId, slug } = await seedPublishedProject(1);
+    await runner.converge(projectId);
+
+    const served = reader.novels.get(slug)?.chapters.get(1);
+    if (!served) throw new Error('reader lost the chapter');
+    served.revision = 5;
+    await db
+      .update(schema.chapters)
+      .set({ content: 'Repaired prose.' })
+      .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, 1)));
+    await publishingService.publishChapter(projectId, 1, {});
+
+    const result = await runner.converge(projectId);
+    expect(result.failed).toEqual([{ ordinal: 1, error: expect.stringContaining(STALE_ERROR_PREFIX) }]);
+
+    expect((await dueProjects()).map(String)).not.toContain(String(projectId));
   });
 });
