@@ -233,6 +233,30 @@
   gap: 4px;
 }
 
+.filterHelper {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sh-text-tertiary);
+}
+
+.ratingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.ratingRowLabel {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ratingSelect {
+  width: 190px;
+}
+
 .skeletonGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));

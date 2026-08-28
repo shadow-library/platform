@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { type LibraryEntry, type LibraryListResponse, type ReadingProgress, toLibraryEntry, toReadingProgress } from '@/lib/apis';
+import { type NovelSummary as ServerNovelSummary } from '@/lib/apis/api-types.gen';
+import { type LibraryEntry, type LibraryListResponse, type ReadingProgress, toLibraryEntry, toReadingProgress, toSummary } from '@/lib/apis';
 
 const LIBRARY_RESPONSE: LibraryListResponse = {
   items: [
@@ -67,6 +68,7 @@ describe('toLibraryEntry', () => {
         title: 'Omniscient Sovereigns',
         author: 'Shadow Novelist',
         genres: ['Fantasy', 'System', 'Romance'],
+        tags: ['Reincarnation', 'Kingdom Building'],
         status: 'ongoing',
         rating: 4.8,
         ratingCount: 31204,
@@ -80,6 +82,29 @@ describe('toLibraryEntry', () => {
     const entry = toLibraryEntry(LIBRARY_RESPONSE.items[0]!, local);
     expect(entry.novel).toBe(local.novel);
     expect(entry.addedAt).toBe('2026-07-01T10:00:00.000Z');
+  });
+});
+
+describe('toSummary', () => {
+  const CATALOG_ITEM: ServerNovelSummary = {
+    slug: 'omniscient-sovereigns',
+    title: 'Omniscient Sovereigns',
+    genres: ['Fantasy', 'Supernatural'],
+    tags: ['Time Travel', 'Revenge'],
+    status: 'live',
+    visibility: 'PUBLIC',
+    chapterCount: 47,
+    updatedAt: '2026-07-01T08:00:00.000Z',
+  };
+
+  it('should take tags from the server tags field, not the genres field', () => {
+    const summary = toSummary(CATALOG_ITEM);
+    expect(summary.tags).toEqual(['Time Travel', 'Revenge']);
+    expect(summary.tags).not.toEqual(summary.genres);
+  });
+
+  it('should leave sexualContent undefined when the server omits it, never coercing to a string', () => {
+    expect(toSummary(CATALOG_ITEM).sexualContent).toBeUndefined();
   });
 });
 

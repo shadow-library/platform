@@ -11,6 +11,7 @@ function novel(overrides: Partial<NovelSummary> = {}): NovelSummary {
     title: 'Clockwork Saint',
     author: 'A. Wren',
     genres: ['Fantasy'],
+    tags: [],
     status: 'ongoing',
     rating: 4.6,
     ratingCount: 120,

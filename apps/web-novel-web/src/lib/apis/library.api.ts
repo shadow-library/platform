@@ -52,6 +52,7 @@ export function toLibraryEntry(item: LibraryItem, local?: LibraryEntry): Library
     title: item.title,
     author: 'Unknown author',
     genres: item.genres,
+    tags: [],
     status: STATUS_FROM_SERVER[item.status],
     rating: 0,
     ratingCount: 0,

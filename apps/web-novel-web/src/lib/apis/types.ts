@@ -1,3 +1,5 @@
+import { type DarkContentLevel, type SexualContentLevel, type ViolenceLevel } from '@shadow-library/sdk';
+
 /**
  * The reader's internal client view-model — the presentation shapes every screen is built on. It is
  * deliberately distinct from the generated wire contract (`api-types.gen.ts`): it carries derived, client-only
@@ -22,6 +24,13 @@ export interface NovelSummary {
   title: string;
   author: string;
   genres: string[];
+  tags: string[];
+  /** Absent when unrated on this dimension — never render an absent rating as "none". */
+  sexualContent?: SexualContentLevel;
+  /** Absent when unrated on this dimension — never render an absent rating as "none". */
+  violence?: ViolenceLevel;
+  /** Absent when unrated on this dimension — never render an absent rating as "none". */
+  darkContent?: DarkContentLevel;
   status: NovelStatus;
   rating: number;
   ratingCount: number;
@@ -79,7 +88,6 @@ export interface NovelComment extends NovelCommentReply {
 
 export interface NovelDetail extends NovelSummary {
   alternativeTitles: string[];
-  tags: string[];
   language: string;
   translator?: string;
   mature: boolean;
@@ -116,7 +124,14 @@ export interface ChapterContent {
 export interface CatalogQuery {
   q?: string;
   genre?: string;
+  tag?: string;
   status?: NovelStatus;
+  /** Highest acceptable level, inclusive; a novel with no rating on this dimension is excluded, not passed. */
+  maxSexualContent?: SexualContentLevel;
+  /** Highest acceptable level, inclusive; a novel with no rating on this dimension is excluded, not passed. */
+  maxViolence?: ViolenceLevel;
+  /** Highest acceptable level, inclusive; a novel with no rating on this dimension is excluded, not passed. */
+  maxDarkContent?: DarkContentLevel;
   sort?: CatalogSort;
   page?: number;
   limit?: number;

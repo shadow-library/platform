@@ -75,12 +75,16 @@ export function coverFor(slug: string, coverUrl?: string): NovelCover {
   return coverUrl ? { ...gradient, imageUrl: coverUrl } : gradient;
 }
 
-function toSummary(item: ServerNovelSummary): NovelSummary {
+export function toSummary(item: ServerNovelSummary): NovelSummary {
   return {
     slug: item.slug,
     title: item.title,
     author: 'Unknown author',
     genres: item.genres,
+    tags: item.tags,
+    sexualContent: item.sexualContent,
+    violence: item.violence,
+    darkContent: item.darkContent,
     status: STATUS_FROM_SERVER[item.status],
     rating: 0,
     ratingCount: 0,
@@ -92,8 +96,8 @@ function toSummary(item: ServerNovelSummary): NovelSummary {
   };
 }
 
-function toDetail(item: NovelDetailResponse): NovelDetail {
-  return { ...toSummary(item), alternativeTitles: [], tags: item.genres, language: 'English', mature: false };
+export function toDetail(item: NovelDetailResponse): NovelDetail {
+  return { ...toSummary(item), alternativeTitles: [], language: 'English', mature: false };
 }
 
 /** Nav derives from the published chapter list — ordinals may hold gaps after an unpublish */
@@ -126,7 +130,11 @@ export const catalogQueryOptions = (query: CatalogQuery = {}) =>
         .query({
           search: query.q,
           genre: query.genre,
+          tag: query.tag,
           status: query.status && STATUS_TO_SERVER[query.status],
+          maxSexualContent: query.maxSexualContent,
+          maxViolence: query.maxViolence,
+          maxDarkContent: query.maxDarkContent,
           sortBy: sort.sortBy,
           sortOrder: sort.sortOrder,
           limit,

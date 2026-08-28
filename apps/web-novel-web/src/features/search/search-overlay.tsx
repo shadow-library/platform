@@ -89,6 +89,12 @@ export function SearchOverlay({ open, onOpenChange }: SearchOverlayProps): React
     close();
   };
 
+  const goTag = (tag: string): void => {
+    recordRecent(tag);
+    void navigate({ to: '/browse', search: { tag } });
+    close();
+  };
+
   const openNovel = (novel: NovelSummary): void => {
     if (term) recordRecent(term);
     void navigate({ to: '/novels/$slug', params: { slug: novel.slug } });
@@ -124,14 +130,14 @@ export function SearchOverlay({ open, onOpenChange }: SearchOverlayProps): React
         </div>
         <div className={styles.body}>
           {term.length === 0 ? (
-            <EmptyState recents={recents} trending={TRENDING} onPick={goSearch} />
+            <EmptyState recents={recents} trending={TRENDING} onPick={goSearch} onTag={goTag} />
           ) : noMatch ? (
             <div className={styles.none}>
               <h3 className={styles.noneTitle}>No matches for “{term}”</h3>
               <p className={styles.noneText}>Check your spelling or try a broader term.</p>
             </div>
           ) : (
-            <Results novels={novels} authors={authors} genres={genres} tags={tags} onOpenNovel={openNovel} onSearch={goSearch} onGenre={goGenre} />
+            <Results novels={novels} authors={authors} genres={genres} tags={tags} onOpenNovel={openNovel} onSearch={goSearch} onGenre={goGenre} onTag={goTag} />
           )}
         </div>
       </div>
@@ -139,7 +145,7 @@ export function SearchOverlay({ open, onOpenChange }: SearchOverlayProps): React
   );
 }
 
-function EmptyState(props: { recents: string[]; trending: string[]; onPick: (term: string) => void }): React.JSX.Element {
+function EmptyState(props: { recents: string[]; trending: string[]; onPick: (term: string) => void; onTag: (tag: string) => void }): React.JSX.Element {
   return (
     <>
       {props.recents.length > 0 && (
@@ -159,7 +165,7 @@ function EmptyState(props: { recents: string[]; trending: string[]; onPick: (ter
         <div className={styles.sectionLabel}>Trending searches</div>
         <div className={styles.chips}>
           {props.trending.map(entry => (
-            <button key={entry} type="button" className={styles.trendChip} onClick={() => props.onPick(entry)}>
+            <button key={entry} type="button" className={styles.trendChip} onClick={() => props.onTag(entry)}>
               <TrendingIcon size={13} />
               {entry}
             </button>
@@ -178,6 +184,7 @@ function Results(props: {
   onOpenNovel: (novel: NovelSummary) => void;
   onSearch: (term: string) => void;
   onGenre: (genre: string) => void;
+  onTag: (tag: string) => void;
 }): React.JSX.Element {
   return (
     <>
@@ -218,7 +225,7 @@ function Results(props: {
               </button>
             ))}
             {props.tags.map(tag => (
-              <button key={tag} type="button" className={styles.tagChip} onClick={() => props.onSearch(tag)}>
+              <button key={tag} type="button" className={styles.tagChip} onClick={() => props.onTag(tag)}>
                 #{tag}
               </button>
             ))}

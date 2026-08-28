@@ -1,18 +1,17 @@
+import { type Genre, type Tag } from '@shadow-library/sdk';
+
 /**
  * The curated browse taxonomy the discovery surfaces render as static chips — the genres panel and the search
  * overlay's suggestions. This is presentation content, not API data: the live catalog derives the genres it
  * actually holds from the `/api/novels` response, while these lists give the reader a stable set of entry
- * points to explore before any query runs.
+ * points to explore before any query runs. Typed against the sdk's `Genre`/`Tag` unions so a curated entry
+ * can never drift from the real vocabulary the server actually filters on.
  */
-export const CATALOG_GENRES = [
+export const CATALOG_GENRES: readonly Genre[] = [
   'Fantasy',
-  'Cultivation',
-  'LitRPG',
   'Romance',
-  'Sci-Fi',
   'Action',
   'Martial Arts',
-  'System',
   'Horror',
   'Mystery',
   'Slice of Life',
@@ -23,20 +22,18 @@ export const CATALOG_GENRES = [
   'Mecha',
   'Comedy',
   'Tragedy',
-  'Villainess',
-  'Dungeon',
-  'Regression',
+  'Sci-fi',
 ];
 
-export const CATALOG_TAGS = [
-  'Overpowered MC',
+export const CATALOG_TAGS: readonly Tag[] = [
+  'Overpowered Protagonist',
   'Weak to Strong',
   'Kingdom Building',
-  'Female Lead',
+  'Female Protagonist',
   'Time Travel',
-  'Magic Academy',
+  'Magic',
   'Revenge',
-  'Slow Burn',
+  'Slow Romance',
   'Politics',
   'Dragons',
   'Level System',

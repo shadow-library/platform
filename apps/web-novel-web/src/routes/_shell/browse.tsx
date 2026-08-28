@@ -1,3 +1,4 @@
+import { isRatingLevel, isTag } from '@shadow-library/sdk';
 import { createFileRoute } from '@tanstack/react-router';
 
 import { BROWSE_PAGE_SIZE, BrowseScreen, type BrowseSearch, type UpdatedWindow } from '@/features/browse';
@@ -13,7 +14,11 @@ function validateSearch(search: Record<string, unknown>): BrowseSearch {
   return {
     q: typeof search.q === 'string' && search.q ? search.q : undefined,
     genre: typeof search.genre === 'string' && search.genre ? search.genre : undefined,
+    tag: isTag(search.tag) ? search.tag : undefined,
     status: STATUSES.includes(search.status as NovelStatus) ? (search.status as NovelStatus) : undefined,
+    maxSexualContent: isRatingLevel('sexualContent', search.maxSexualContent) ? search.maxSexualContent : undefined,
+    maxViolence: isRatingLevel('violence', search.maxViolence) ? search.maxViolence : undefined,
+    maxDarkContent: isRatingLevel('darkContent', search.maxDarkContent) ? search.maxDarkContent : undefined,
     sort: SORTS.includes(search.sort as CatalogSort) ? (search.sort as CatalogSort) : undefined,
     view: search.view === 'list' ? 'list' : undefined,
     page: typeof search.page === 'number' && search.page > 1 ? Math.floor(search.page) : undefined,
@@ -32,7 +37,18 @@ export const Route = createFileRoute('/_shell/browse')({
   loader: ({ context, deps }) => {
     // Seed the catalog grid server-side on the exact key the screen reads; failures fall through to client fetch.
     void context.queryClient.prefetchQuery(
-      catalogQueryOptions({ q: deps.q, genre: deps.genre, status: deps.status, sort: deps.sort ?? 'trending', page: deps.page ?? 1, limit: BROWSE_PAGE_SIZE }),
+      catalogQueryOptions({
+        q: deps.q,
+        genre: deps.genre,
+        tag: deps.tag,
+        status: deps.status,
+        maxSexualContent: deps.maxSexualContent,
+        maxViolence: deps.maxViolence,
+        maxDarkContent: deps.maxDarkContent,
+        sort: deps.sort ?? 'trending',
+        page: deps.page ?? 1,
+        limit: BROWSE_PAGE_SIZE,
+      }),
     );
   },
   component: BrowseScreen,

@@ -37,7 +37,7 @@ export function GenresScreen(): React.JSX.Element {
       <h2 className={styles.tagsTitle}>Popular tags</h2>
       <div className={styles.tags}>
         {CATALOG_TAGS.map(tag => (
-          <Link key={tag} to="/browse" search={{ q: tag }} className={styles.tagChip}>
+          <Link key={tag} to="/browse" search={{ tag }} className={styles.tagChip}>
             #{tag}
           </Link>
         ))}

@@ -15,6 +15,7 @@
     "verifyTest": true
   },
   "dependencies": {
+    "@shadow-library/sdk": "workspace:*",
     "@shadow-library/ui": "workspace:*",
     "@shadow-library/web": "workspace:*",
     "@tanstack/react-query": "catalog:",

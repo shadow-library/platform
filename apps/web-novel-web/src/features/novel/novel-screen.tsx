@@ -1,7 +1,8 @@
+import { CONTENT_RATING_LEVEL_LABELS, type ContentRating, type ContentRatingDimension } from '@shadow-library/sdk';
+import { Avatar, Button, cn, Input, Pagination, Tabs, Textarea, toast, Tooltip } from '@shadow-library/ui';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useRouter } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Avatar, Button, cn, Input, Pagination, Tabs, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
 import {
   AlertIcon,
@@ -319,12 +320,14 @@ function OverviewPanel({ novel }: { novel: NovelDetail }): React.JSX.Element {
         </button>
         <div className={styles.tagRow}>
           {novel.tags.map(tag => (
-            <Link key={tag} to="/browse" search={{ q: tag }} className={styles.tagChip}>
+            <Link key={tag} to="/browse" search={{ tag }} className={styles.tagChip}>
               #{tag}
             </Link>
           ))}
         </div>
       </section>
+
+      <ContentRatingsSection novel={novel} />
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Characters</h2>
@@ -371,6 +374,27 @@ function OverviewPanel({ novel }: { novel: NovelDetail }): React.JSX.Element {
         </section>
       )}
     </div>
+  );
+}
+
+const RATING_DIMENSION_LABELS: Record<ContentRatingDimension, string> = { sexualContent: 'Sexual content', violence: 'Violence', darkContent: 'Dark content' };
+
+/** Every dimension is optional and absence means unrated, never "none" — see `ContentRating` in `@shadow-library/sdk`. */
+function ContentRatingsSection({ novel }: { novel: ContentRating }): React.JSX.Element {
+  return (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>Content ratings</h2>
+      <div className={styles.tagRow}>
+        {(Object.keys(RATING_DIMENSION_LABELS) as ContentRatingDimension[]).map(dimension => {
+          const level = novel[dimension];
+          return (
+            <span key={dimension} className={styles.tagChip}>
+              {RATING_DIMENSION_LABELS[dimension]}: {level ? CONTENT_RATING_LEVEL_LABELS[level] : 'Unrated'}
+            </span>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

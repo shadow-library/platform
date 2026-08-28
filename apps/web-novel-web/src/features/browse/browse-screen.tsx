@@ -1,7 +1,16 @@
+import {
+  CONTENT_RATING_LEVEL_LABELS,
+  CONTENT_RATING_LEVELS,
+  type ContentRatingDimension,
+  type DarkContentLevel,
+  NOVEL_TAG_GROUPS,
+  type SexualContentLevel,
+  type ViolenceLevel,
+} from '@shadow-library/sdk';
+import { Alert, Button, cn, Combobox, type ComboboxOption, Drawer, EmptyState, Pagination, SegmentedControl, Select, Skeleton, Slider, Switch, Tag } from '@shadow-library/ui';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-import { Button, cn, Drawer, EmptyState, Pagination, SegmentedControl, Select, Skeleton, Slider, Switch, Tag } from '@shadow-library/ui';
 
 import { SearchIcon, SettingsSlidersIcon } from '@/components/icons';
 import { Cover, NovelCard, RatingRow, StatusBadge } from '@/components/novel';
@@ -15,7 +24,14 @@ export type UpdatedWindow = 'day' | 'week' | 'month' | 'year';
 export interface BrowseSearch {
   q?: string;
   genre?: string;
+  tag?: string;
   status?: NovelStatus;
+  /** Highest acceptable level, inclusive; applying it hides novels with no rating on that dimension. */
+  maxSexualContent?: SexualContentLevel;
+  /** Highest acceptable level, inclusive; applying it hides novels with no rating on that dimension. */
+  maxViolence?: ViolenceLevel;
+  /** Highest acceptable level, inclusive; applying it hides novels with no rating on that dimension. */
+  maxDarkContent?: DarkContentLevel;
   sort?: CatalogSort;
   view?: 'grid' | 'list';
   page?: number;
@@ -47,6 +63,24 @@ const SORT_LABELS: Record<CatalogSort, string> = {
 };
 const STATUS_OPTIONS: NovelStatus[] = ['ongoing', 'completed', 'hiatus'];
 
+/** Grouped-prefix labels, same construction as the forge's publish-screen tag picker (`a878d96d`) — flat
+ *  options for `Combobox`'s search, never a second group-aware component. */
+const TAG_OPTIONS: ComboboxOption[] = NOVEL_TAG_GROUPS.flatMap(({ label, tags }) => tags.map(tag => ({ value: tag, label: `${label} — ${tag}` })));
+
+interface RatingCeilingConfig<D extends ContentRatingDimension> {
+  dimension: D;
+  label: string;
+  searchKey: 'maxSexualContent' | 'maxViolence' | 'maxDarkContent';
+}
+
+const ANY_RATING = '__any__';
+
+const RATING_CEILINGS: [RatingCeilingConfig<'sexualContent'>, RatingCeilingConfig<'violence'>, RatingCeilingConfig<'darkContent'>] = [
+  { dimension: 'sexualContent', label: 'Sexual content', searchKey: 'maxSexualContent' },
+  { dimension: 'violence', label: 'Violence', searchKey: 'maxViolence' },
+  { dimension: 'darkContent', label: 'Dark content', searchKey: 'maxDarkContent' },
+];
+
 const RATING_OPTIONS: { value: number; label: string }[] = [
   { value: 4.5, label: '4.5+' },
   { value: 4, label: '4.0+' },
@@ -72,7 +106,11 @@ const CHAPTER_STEP = 100;
 
 const CLEARED_FILTERS: Partial<BrowseSearch> = {
   genre: undefined,
+  tag: undefined,
   status: undefined,
+  maxSexualContent: undefined,
+  maxViolence: undefined,
+  maxDarkContent: undefined,
   minRating: undefined,
   chapters: undefined,
   updatedWithin: undefined,
@@ -122,7 +160,18 @@ export function BrowseScreen(): React.JSX.Element {
   const navigate = route.useNavigate();
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const query = { q: search.q, genre: search.genre, status: search.status, sort: search.sort ?? 'trending', page: search.page ?? 1, limit: BROWSE_PAGE_SIZE };
+  const query = {
+    q: search.q,
+    genre: search.genre,
+    tag: search.tag,
+    status: search.status,
+    maxSexualContent: search.maxSexualContent,
+    maxViolence: search.maxViolence,
+    maxDarkContent: search.maxDarkContent,
+    sort: search.sort ?? 'trending',
+    page: search.page ?? 1,
+    limit: BROWSE_PAGE_SIZE,
+  };
   const catalog = useQuery(catalogQueryOptions(query));
   const view = search.view ?? 'grid';
 
@@ -133,9 +182,12 @@ export function BrowseScreen(): React.JSX.Element {
   const resetFilters = (): void => patch(CLEARED_FILTERS);
   const clearAll = (): void => patch({ q: undefined, ...CLEARED_FILTERS });
 
-  // genre/status refetch server-side; the rest narrow the fetched page client-side.
+  // genre/tag/status/rating ceilings refetch server-side; the rest narrow the fetched page client-side.
   const clientFilterCount = [search.minRating != null, search.chapters, search.updatedWithin, search.language, search.translatedOnly, search.hideMature].filter(Boolean).length;
-  const activeFilterCount = (search.genre ? 1 : 0) + (search.status ? 1 : 0) + clientFilterCount;
+  const serverFilterCount =
+    (search.genre ? 1 : 0) + (search.tag ? 1 : 0) + (search.status ? 1 : 0) + (search.maxSexualContent ? 1 : 0) + (search.maxViolence ? 1 : 0) + (search.maxDarkContent ? 1 : 0);
+  const activeFilterCount = serverFilterCount + clientFilterCount;
+  const ratingCeilingActive = Boolean(search.maxSexualContent || search.maxViolence || search.maxDarkContent);
 
   const serverItems = catalog.data?.items ?? [];
   const items = clientFilterCount > 0 ? filterCatalog(serverItems, search) : serverItems;
@@ -176,7 +228,11 @@ export function BrowseScreen(): React.JSX.Element {
         <div className={styles.chips}>
           {search.q && <Tag onRemove={() => patch({ q: undefined })}>“{search.q}”</Tag>}
           {search.genre && <Tag onRemove={() => patch({ genre: undefined })}>{search.genre}</Tag>}
+          {search.tag && <Tag onRemove={() => patch({ tag: undefined })}>#{search.tag}</Tag>}
           {search.status && <Tag onRemove={() => patch({ status: undefined })}>{search.status}</Tag>}
+          {search.maxSexualContent && <Tag onRemove={() => patch({ maxSexualContent: undefined })}>Sexual content ≤ {CONTENT_RATING_LEVEL_LABELS[search.maxSexualContent]}</Tag>}
+          {search.maxViolence && <Tag onRemove={() => patch({ maxViolence: undefined })}>Violence ≤ {CONTENT_RATING_LEVEL_LABELS[search.maxViolence]}</Tag>}
+          {search.maxDarkContent && <Tag onRemove={() => patch({ maxDarkContent: undefined })}>Dark content ≤ {CONTENT_RATING_LEVEL_LABELS[search.maxDarkContent]}</Tag>}
           {search.minRating != null && <Tag onRemove={() => patch({ minRating: undefined })}>★ {search.minRating.toFixed(1)}+</Tag>}
           {chapterRange && (
             <Tag onRemove={() => patch({ chapters: undefined })}>
@@ -191,6 +247,12 @@ export function BrowseScreen(): React.JSX.Element {
             Clear all
           </Button>
         </div>
+      )}
+
+      {ratingCeilingActive && (
+        <Alert intent="info" title="Hiding unrated novels">
+          A content-rating filter is active. Novels with no rating on that dimension are excluded, not assumed to be within it.
+        </Alert>
       )}
 
       {catalog.isLoading && (
@@ -267,6 +329,7 @@ function ListRow({ novel }: { novel: NovelSummary }): React.JSX.Element {
           <span>{novel.chapterCount.toLocaleString()} ch</span>
           <StatusBadge status={novel.status} />
           {novel.genres[0] && <span className={styles.genrePill}>{novel.genres[0]}</span>}
+          {novel.tags[0] && <span className={styles.genrePill}>#{novel.tags[0]}</span>}
         </div>
       </div>
     </Link>
@@ -342,6 +405,40 @@ function FilterDrawer(props: FilterDrawerProps): React.JSX.Element {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className={styles.filterGroup}>
+          <div className={styles.filterLabel}>Tag</div>
+          <Combobox options={TAG_OPTIONS} value={search.tag ?? null} onValueChange={value => patch({ tag: value ?? undefined })} placeholder="Select tags…" aria-label="Tag" />
+        </div>
+
+        <div className={styles.filterGroup}>
+          <div className={styles.filterLabel}>Content ratings</div>
+          {RATING_CEILINGS.map(({ dimension, label, searchKey }) => {
+            const value = search[searchKey];
+            return (
+              <div key={dimension} className={styles.ratingRow}>
+                <span className={styles.ratingRowLabel}>{label}</span>
+                <div className={styles.ratingSelect}>
+                  <Select
+                    value={value ?? ANY_RATING}
+                    onValueChange={next => patch({ [searchKey]: next === ANY_RATING ? undefined : next } as Partial<BrowseSearch>)}
+                    size="sm"
+                    aria-label={label}
+                  >
+                    <Select.Item value={ANY_RATING}>Any</Select.Item>
+                    <Select.Separator />
+                    {CONTENT_RATING_LEVELS[dimension].map(level => (
+                      <Select.Item key={level} value={level}>
+                        At most {CONTENT_RATING_LEVEL_LABELS[level]}
+                      </Select.Item>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+            );
+          })}
+          <p className={styles.filterHelper}>A ceiling hides novels that have not been rated on that dimension — an unrated novel is never assumed to be within the limit.</p>
         </div>
 
         <div className={styles.filterGroup}>
