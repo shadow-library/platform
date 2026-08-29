@@ -24,6 +24,7 @@ export const JobStatus = EnumType.create('JobStatus', schema.jobStatus.enumValue
 export const ValidationScope = EnumType.create('ValidationScope', schema.validationScope.enumValues);
 export const BibleSection = EnumType.create('BibleSection', schema.bibleSection.enumValues);
 export const DraftReviewStatus = EnumType.create('DraftReviewStatus', schema.draftReviewStatus.enumValues);
+export const BriefWriteMode = EnumType.create('BriefWriteMode', schema.briefWriteMode.enumValues);
 export const WorkflowRunStatus = EnumType.create('WorkflowRunStatus', schema.workflowRunStatus.enumValues);
 export const ModelCallStatus = EnumType.create('ModelCallStatus', schema.modelCallStatus.enumValues);
 export const ToolCallStatus = EnumType.create('ToolCallStatus', schema.toolCallStatus.enumValues);

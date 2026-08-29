@@ -37,5 +37,18 @@ export * from './publishing.api';
 export type { ReforgeChapterStatus, ReforgeConfigBody, ReforgeFidelity, ReforgeMode, ReforgeStartBody } from './reforge.api';
 export type { ChapterPublicationStatus, PublicationStatus, PublishNovelBody } from './publishing.api';
 
-/** `api-types.gen.ts` still describes the pre-containment import body; `interstitial.api.ts` carries the current one. */
-export type { ImportDraftBody } from './interstitial.api';
+/**
+ * `api-types.gen.ts` still describes the pre-containment/pre-write-mode shapes; `interstitial.api.ts`
+ * carries the current ones, extended with the fields the generated file predates.
+ */
+export type {
+  BriefResponse,
+  BriefSummaryResponse,
+  BriefWriteMode,
+  DraftResponse,
+  ImportDraftBody,
+  JobEnqueueResponse,
+  ListBriefSummaryResponse,
+  ListDraftResponse,
+  ReviewQueueResponse,
+} from './interstitial.api';

@@ -480,10 +480,10 @@ export class GenerationService {
     );
   }
 
-  listBriefs(projectId: bigint): Promise<Pick<Generation.Brief, 'chapter' | 'volumeKey' | 'arcKey' | 'title' | 'staleReason' | 'updatedAt'>[]> {
+  listBriefs(projectId: bigint): Promise<Pick<Generation.Brief, 'chapter' | 'volumeKey' | 'arcKey' | 'title' | 'staleReason' | 'writeMode' | 'insertedAt' | 'updatedAt'>[]> {
     return this.db.query.briefs.findMany({
       where: eq(schema.briefs.projectId, projectId),
-      columns: { chapter: true, volumeKey: true, arcKey: true, title: true, staleReason: true, updatedAt: true },
+      columns: { chapter: true, volumeKey: true, arcKey: true, title: true, staleReason: true, writeMode: true, insertedAt: true, updatedAt: true },
       orderBy: asc(schema.briefs.chapter),
     });
   }

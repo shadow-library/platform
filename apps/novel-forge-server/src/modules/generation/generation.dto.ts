@@ -1,8 +1,9 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
-import { type DarkContentLevel, type SexualContentLevel, type ViolenceLevel } from '@shadow-library/sdk';
+import { type ContentRating, type DarkContentLevel, type SexualContentLevel, type ViolenceLevel } from '@shadow-library/sdk';
 
 import {
+  BriefWriteMode,
   DarkContentRating,
   DraftReviewStatus,
   DraftRevisionSource,
@@ -367,6 +368,15 @@ export class DraftResponse {
   @Field(() => String)
   generator: Generation.Draft['generator'];
 
+  @Field({
+    description:
+      "Firewalls this chapter's prose from the vector index, continuity extraction, and the verbatim-prose adjacency rule. Independent of `generator` — a pasted chapter can be `generator: 'human'` and still isolated.",
+  })
+  isolated: boolean;
+
+  @Field(() => ContentRatingInput, { optional: true, nullable: true, description: 'Content rating of this draft\'s prose; null means unrated — never "none".' })
+  contentRating?: ContentRating | null;
+
   @Field(() => String, { optional: true, nullable: true })
   judge?: Generation.JudgeVerdict | null;
 
@@ -403,6 +413,20 @@ export class BriefResponse {
   @Field(() => [String], { optional: true, nullable: true, description: 'Artifact keys for the retrieval context used to build this draft.' })
   contextRefs?: string[] | null;
 
+  @Field(() => BriefWriteMode, {
+    description:
+      "'external' means the primary writer's batch loop skips this slot; fill it via generate-unrestricted or POST /drafts/:n/import instead of the normal generate button.",
+  })
+  writeMode: Generation.BriefWriteMode;
+
+  @Field(() => String, {
+    optional: true,
+    nullable: true,
+    format: 'date-time',
+    description: 'Set when this brief was created by the insert operation rather than by an outline pass.',
+  })
+  insertedAt?: Date | null;
+
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
 
@@ -426,6 +450,20 @@ export class BriefSummaryResponse {
 
   @Field({ optional: true, nullable: true })
   staleReason?: string | null;
+
+  @Field(() => BriefWriteMode, {
+    description:
+      "'external' means the primary writer's batch loop skips this slot; fill it via generate-unrestricted or POST /drafts/:n/import instead of the normal generate button.",
+  })
+  writeMode: Generation.BriefWriteMode;
+
+  @Field(() => String, {
+    optional: true,
+    nullable: true,
+    format: 'date-time',
+    description: 'Set when this brief was created by the insert operation rather than by an outline pass.',
+  })
+  insertedAt?: Date | null;
 
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;

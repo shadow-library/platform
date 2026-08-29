@@ -1,6 +1,7 @@
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
-import { type BriefResponse, type ListBriefSummaryResponse, type UpdateBriefBody } from './api-types.gen';
+import { type UpdateBriefBody } from './api-types.gen';
+import { type BriefResponse, type ListBriefSummaryResponse } from './interstitial.api';
 import { ApiError, APIRequest } from './transport';
 
 const briefKeys = {

@@ -27,6 +27,7 @@ import { ForgeBar } from '@/components/nf/ForgeBar';
 import { ImageGallery } from '@/components/nf/ImageGallery';
 import {
   type AmendChapterResponse,
+  type BriefWriteMode,
   type DraftResponse,
   externalStopChapter,
   type InsertChapterBody,
@@ -66,8 +67,6 @@ function toneOf(intent: ChipIntent): 'success' | 'danger' | 'warning' {
 interface ChaptersSearch {
   chapter?: number;
   job?: string;
-  /** The external-write slot that truncated the last batch — the read models carry no write-mode flag, so the URL is what remembers it. */
-  slot?: number;
 }
 
 // Which chapter editor / generation-progress view is open lives in the URL, so a refresh returns to
@@ -75,11 +74,9 @@ interface ChaptersSearch {
 export const Route = createFileRoute('/novels/$novelId/chapters')({
   validateSearch: (search: Record<string, unknown>): ChaptersSearch => {
     const chapter = Number(search.chapter);
-    const slot = Number(search.slot);
     return {
       chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : undefined,
       job: typeof search.job === 'string' && search.job ? search.job : undefined,
-      slot: Number.isInteger(slot) && slot > 0 ? slot : undefined,
     };
   },
   loader: async ({ context, params }) => {
@@ -410,16 +407,16 @@ interface ChapterRow {
   chapter: number;
   title?: string | null;
   draft?: DraftResponse;
+  writeMode?: BriefWriteMode;
 }
 
 interface ChapterListProps {
   novelId: string;
-  externalSlot?: number;
   onOpen: (n: number) => void;
-  onProgress: (jobId: string, externalSlot?: number) => void;
+  onProgress: (jobId: string) => void;
 }
 
-function ChapterList({ novelId, externalSlot, onOpen, onProgress }: ChapterListProps): React.JSX.Element {
+function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.JSX.Element {
   const draftsQuery = useListDraftsQuery(novelId);
   const briefsQuery = useListBriefsQuery(novelId);
   const statusQuery = useProjectStatusQuery(novelId);
@@ -451,8 +448,8 @@ function ChapterList({ novelId, externalSlot, onOpen, onProgress }: ChapterListP
 
   const createManual = useUpdateDraftMutation(novelId, nextManualChapter);
 
-  // A batch truncates rather than skips at an external-write slot, so the response names the chapter
-  // the author has to fill by hand before generation continues past it.
+  // A batch truncates rather than skips at an external-write slot; the brief's own `writeMode` marks
+  // that slot in the row list regardless, but the toast still gives immediate feedback on *this* run.
   const runGenerate = (limit: number): void => {
     generate.mutate(
       { limit },
@@ -460,7 +457,7 @@ function ChapterList({ novelId, externalSlot, onOpen, onProgress }: ChapterListP
         onSuccess: job => {
           const stopped = externalStopChapter(job);
           if (stopped) toast.warning(`Batch stopped at chapter ${stopped} — it is written outside the primary model`);
-          onProgress(job.jobId, stopped);
+          onProgress(job.jobId);
         },
         onError: e => toast.danger(e.message),
       },
@@ -507,7 +504,7 @@ function ChapterList({ novelId, externalSlot, onOpen, onProgress }: ChapterListP
   // fills it, and it has to be reachable from this list to be fillable at all.
   const rows: ChapterRow[] = [
     ...visible.map(draft => ({ chapter: draft.chapter, title: draft.title, draft })),
-    ...(filter === 'all' ? briefs.filter(b => !drafted.has(b.chapter)).map(b => ({ chapter: b.chapter, title: b.title })) : []),
+    ...(filter === 'all' ? briefs.filter(b => !drafted.has(b.chapter)).map(b => ({ chapter: b.chapter, title: b.title, writeMode: b.writeMode })) : []),
   ].sort((a, b) => a.chapter - b.chapter);
 
   // Mirrors the backend's CHP_003 gate — a finalized chapter never moves, so nothing inserts below it.
@@ -578,13 +575,13 @@ function ChapterList({ novelId, externalSlot, onOpen, onProgress }: ChapterListP
           emptyAction={{ label: 'Generate first chapter', onClick: startGeneration }}
         >
           <div className={styles.listBody}>
-            {rows.map(({ chapter, title, draft }) => {
+            {rows.map(({ chapter, title, draft, writeMode }) => {
               if (!draft) {
                 return (
                   <div key={`slot-${chapter}`} className={`${styles.rowChapter} ${styles.rowSlot}`}>
                     <span className={styles.rowNum}>{String(chapter).padStart(2, '0')}</span>
                     <span className={styles.rowTitle}>{title ?? 'Untitled chapter'}</span>
-                    {chapter === externalSlot && (
+                    {writeMode === 'external' && (
                       <Tooltip content="The primary writer skips this slot — fill it with the unrestricted writer or your own prose.">
                         <span>
                           <StatusChip intent="warning">external slot</StatusChip>
@@ -891,7 +888,7 @@ function AmendDialog({ novelId, chapter, draft, onOpenChange, onAmended }: Amend
   const [content, setContent] = useState(draft.body ?? '');
   const [title, setTitle] = useState(draft.title ?? '');
   const [note, setNote] = useState('');
-  const [rating, setRating] = useState<ContentRating>({});
+  const [rating, setRating] = useState<ContentRating>(draft.contentRating ?? {});
 
   const submit = (): void => {
     amend.mutate(
@@ -1255,16 +1252,16 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
 
 function ChaptersScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
-  const { chapter, job, slot } = Route.useSearch();
+  const { chapter, job } = Route.useSearch();
   const navigate = Route.useNavigate();
 
-  const openChapter = (n?: number): Promise<void> => navigate({ search: { chapter: n, slot } });
-  const openJob = (jobId?: string, externalSlot?: number): Promise<void> => navigate({ search: { job: jobId, slot: externalSlot ?? slot } });
+  const openChapter = (n?: number): Promise<void> => navigate({ search: { chapter: n } });
+  const openJob = (jobId?: string): Promise<void> => navigate({ search: { job: jobId } });
 
   if (job) return <GenerationProgress novelId={novelId} jobId={job} onBack={() => openJob(undefined)} />;
   return chapter != null ? (
     <ChapterEditor novelId={novelId} chapter={chapter} onBack={() => openChapter(undefined)} onPick={openChapter} />
   ) : (
-    <ChapterList novelId={novelId} externalSlot={slot} onOpen={openChapter} onProgress={openJob} />
+    <ChapterList novelId={novelId} onOpen={openChapter} onProgress={openJob} />
   );
 }
