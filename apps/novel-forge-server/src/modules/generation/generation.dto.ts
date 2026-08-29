@@ -1,10 +1,25 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
+import { type DarkContentLevel, type SexualContentLevel, type ViolenceLevel } from '@shadow-library/sdk';
 
-import { DraftReviewStatus, DraftRevisionSource, DraftStatus, JobKind, JobStatus, PlanStatus, UserFeedbackDisposition, WorkflowRunStatus } from '@server/common';
+import {
+  DarkContentRating,
+  DraftReviewStatus,
+  DraftRevisionSource,
+  DraftStatus,
+  JobKind,
+  JobStatus,
+  PlanStatus,
+  SexualContentRating,
+  UserFeedbackDisposition,
+  ViolenceRating,
+  WorkflowRunStatus,
+} from '@server/common';
 import { type Ai, type Generation } from '@server/database';
 
 import { KnowledgeContractSchema } from '../ai/schemas';
+
+const RATING_DESCRIPTION = 'Content rating level; an omitted dimension is unrated — never send "none" to say it.';
 
 @Schema()
 export class ProjectParams {
@@ -176,6 +191,18 @@ export class ApproveDraftBody {
 }
 
 @Schema()
+export class ContentRatingInput {
+  @Field(() => SexualContentRating, { optional: true, description: RATING_DESCRIPTION })
+  sexualContent?: SexualContentLevel;
+
+  @Field(() => ViolenceRating, { optional: true, description: RATING_DESCRIPTION })
+  violence?: ViolenceLevel;
+
+  @Field(() => DarkContentRating, { optional: true, description: RATING_DESCRIPTION })
+  darkContent?: DarkContentLevel;
+}
+
+@Schema()
 export class ImportDraftBody {
   @Field()
   prose: string;
@@ -185,6 +212,19 @@ export class ImportDraftBody {
 
   @Field({ optional: true })
   summary?: string;
+
+  @Field(() => ContentRatingInput, { optional: true, description: 'Rating of the pasted prose; omission keeps the stored rating, an empty object clears it back to unrated.' })
+  contentRating?: ContentRatingInput;
+
+  @Field(() => Object, { additionalProperties: true, optional: true, description: 'Continuation state the next chapter builds on; omission keeps the stored state.' })
+  state?: Record<string, unknown>;
+
+  @Field({
+    optional: true,
+    description:
+      'Firewalls this prose from the vector index, continuity extraction, and the verbatim-prose adjacency rule. Omission keeps the stored value — send false to lift an existing firewall.',
+  })
+  isolated?: boolean;
 }
 
 @Schema()
@@ -197,6 +237,9 @@ export class FinalizeBody {
 export class GenerateUnrestrictedBody {
   @Field({ optional: true })
   guidance?: string;
+
+  @Field(() => ContentRatingInput, { optional: true, description: 'Rating of the generated prose; omission keeps the stored rating, an empty object clears it back to unrated.' })
+  contentRating?: ContentRatingInput;
 }
 
 @Schema()
@@ -608,6 +651,12 @@ export class JobEnqueueResponse {
 
   @Field()
   target: string;
+
+  @Field(() => Integer, {
+    optional: true,
+    description: 'Present when the batch was cut short of its limit: this chapter is an external-write slot that must be filled by hand before generation continues past it.',
+  })
+  stoppedAtExternalChapter?: number;
 }
 
 @Schema()

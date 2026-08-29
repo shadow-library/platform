@@ -5,7 +5,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertActiveProject, markDescendantDraftsStale, renderBriefBody, renderChapterBrief } from '@server/common';
+import { assertActiveProject, declaredDraftFields, markDescendantDraftsStale, renderBriefBody, renderChapterBrief, selectGenerationBatch } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -102,6 +102,8 @@ export interface JobEnqueueResult {
   kind: string;
   status: string;
   target: string;
+  /** Set when an unfilled external-write slot truncated the batch before its limit (interstitial-chapter-design §8). */
+  stoppedAtExternalChapter?: number;
 }
 
 const PLAN_BIBLE_DOC_TOKEN_CAP = 1_500;
@@ -526,15 +528,20 @@ export class GenerationService {
     const contradiction = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.reviewStatus, 'contradiction')) });
     if (contradiction) throw AppErrorCode.DRF_003.create();
 
-    // Generate strictly in ascending chapter order: the next chapters that have a brief but no draft yet.
-    // Because each chapter is drafted before the next begins, generation only advances once the previous
-    // chapter is done — no gaps, no skipping ahead.
+    // Generate strictly in ascending chapter order: the next chapters that have a brief but no draft yet,
+    // truncated at the first unfilled external-write slot (see `selectGenerationBatch`). Because each chapter
+    // is drafted before the next begins, generation only advances once the previous chapter is done — no gaps,
+    // no skipping ahead.
     const allBriefs = await this.db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), orderBy: asc(schema.briefs.chapter) });
     const existingDrafts = await this.db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), columns: { chapter: true } });
+    const finalizedChapters = await this.db.query.chapters.findMany({
+      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')),
+      columns: { number: true },
+    });
     const started = new Set(existingDrafts.map(d => d.chapter));
-    const pending = allBriefs.map(b => b.chapter).filter(chapter => !started.has(chapter));
+    const finalized = new Set(finalizedChapters.map(c => c.number));
 
-    const chapters = pending.slice(0, limit);
+    const { chapters, stoppedAtExternalChapter } = selectGenerationBatch(allBriefs, started, finalized, limit);
     if (chapters.length === 0 && allBriefs.length === 0) throw AppErrorCode.BRF_001.create();
 
     const briefByChapter = new Map(allBriefs.map(brief => [brief.chapter, brief]));
@@ -555,12 +562,12 @@ export class GenerationService {
 
     const target = [...chapters].sort((a, b) => a - b).join(',');
     const payload = { chapters, autoFix: body.autoFix, maxFixes: body.maxFixes, guidance: body.guidance };
-    this.logger.info('generate: enqueueing chapters', { projectId, chapters, limit, autoFix: body.autoFix });
+    this.logger.info('generate: enqueueing chapters', { projectId, chapters, limit, autoFix: body.autoFix, stoppedAtExternalChapter });
 
     const jobId = await this.jobService.enqueue(projectId, 'generate', target, payload);
     this.jobExecutor.dispatch(jobId).catch(err => this.logger.error('generate job dispatch failed', { err, jobId }));
 
-    return { jobId, kind: 'generate', status: 'pending', target };
+    return { jobId, kind: 'generate', status: 'pending', target, stoppedAtExternalChapter };
   }
 
   async listDrafts(projectId: bigint): Promise<Generation.Draft[]> {
@@ -833,6 +840,7 @@ export class GenerationService {
     const existing = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
     if (existing?.status === 'final') throw AppErrorCode.DRF_002.create();
 
+    const declared = declaredDraftFields(body);
     const [draft] = await this.db
       .insert(schema.drafts)
       .values({
@@ -845,6 +853,7 @@ export class GenerationService {
         reviewStatus: 'needs_review',
         staleReason: null,
         generator: 'human',
+        ...declared,
       })
       .onConflictDoUpdate({
         target: [schema.drafts.projectId, schema.drafts.chapter],
@@ -856,6 +865,7 @@ export class GenerationService {
           reviewStatus: 'needs_review',
           staleReason: null,
           generator: 'human',
+          ...declared,
           updatedAt: new Date(),
         },
       })
@@ -1058,6 +1068,7 @@ export class GenerationService {
     // The replacement and the descendant invalidation it forces commit together: a crash between them
     // would leave later drafts looking valid against prose that no longer exists. `setWhere` re-checks
     // finality as part of the write itself, closing the window the pre-model guard above cannot.
+    const declared = declaredDraftFields({ contentRating: body.contentRating });
     const draft = await this.db.transaction(async tx => {
       const [row] = await tx
         .insert(schema.drafts)
@@ -1073,6 +1084,7 @@ export class GenerationService {
           reviewStatus: 'needs_review',
           staleReason: null,
           status: 'draft',
+          ...declared,
         })
         .onConflictDoUpdate({
           target: [schema.drafts.projectId, schema.drafts.chapter],
@@ -1086,6 +1098,7 @@ export class GenerationService {
             revision: sql`${schema.drafts.revision} + 1`,
             reviewStatus: 'needs_review',
             staleReason: null,
+            ...declared,
             updatedAt: new Date(),
           },
           setWhere: ne(schema.drafts.status, 'final'),
