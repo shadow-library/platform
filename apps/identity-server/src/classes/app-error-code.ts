@@ -37,6 +37,14 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly APP_007 = AppErrorCode.forbidden('APP_007', 'Access to this application is denied');
   /** Only a RESTRICTED application can be released to an organisation (PUBLIC is already universal, INTERNAL is staff-only) */
   static readonly APP_008 = AppErrorCode.validation('APP_008', 'Only a restricted application can be released to an organisation', 400);
+  /** Thrown wherever a platform-level application operation refuses an org-owned app: release, org assignment, and admin update/delete */
+  static readonly APP_009 = AppErrorCode.conflict('APP_009', 'The application is owned by an organisation');
+  /** The scope cannot be granted to an organisation-owned application */
+  static readonly APP_010 = AppErrorCode.validation('APP_010', 'This scope cannot be granted to an organisation-owned application', 400);
+  /** The organisation has reached its maximum number of registered applications */
+  static readonly APP_011 = AppErrorCode.conflict('APP_011', 'Organisation has reached its maximum number of registered applications');
+  /** The redirect uri is not valid for a third-party application */
+  static readonly APP_012 = AppErrorCode.validation('APP_012', 'Invalid redirect uri for a third-party application', 400);
 
   /*!
    * User Error Codes
