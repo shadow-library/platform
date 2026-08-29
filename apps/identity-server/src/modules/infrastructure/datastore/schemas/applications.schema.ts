@@ -19,20 +19,25 @@ export const applicationVisibility = pgEnum('application_visibility', ['PUBLIC',
 
 export const organisationApplicationSource = pgEnum('organisation_application_source', ['PLATFORM_RELEASE', 'ORG_ASSIGNMENT']);
 
-export const applications = pgTable('applications', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 255 }).notNull().unique(),
-  displayName: varchar('display_name', { length: 255 }),
-  description: text('description'),
-  isActive: boolean('is_active').notNull().default(true),
-  visibility: applicationVisibility('visibility').notNull().default('PUBLIC'),
-  subDomain: varchar('sub_domain', { length: 255 }).notNull(),
-  publicUrls: text('public_urls').array().notNull().default([]),
-  homePageUrl: text('home_page_url'),
-  logoUrl: text('logo_url'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const applications = pgTable(
+  'applications',
+  {
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 255 }).notNull().unique(),
+    displayName: varchar('display_name', { length: 255 }),
+    description: text('description'),
+    isActive: boolean('is_active').notNull().default(true),
+    visibility: applicationVisibility('visibility').notNull().default('PUBLIC'),
+    subDomain: varchar('sub_domain', { length: 255 }).notNull(),
+    publicUrls: text('public_urls').array().notNull().default([]),
+    homePageUrl: text('home_page_url'),
+    logoUrl: text('logo_url'),
+    ownerOrganisationId: bigint('owner_organisation_id', { mode: 'bigint' }).references(() => organisations.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  t => [index('applications_owner_organisation_id_idx').on(t.ownerOrganisationId)],
+);
 
 export const organisationApplications = pgTable(
   'organisation_applications',
@@ -95,11 +100,12 @@ export const applicationMembers = pgTable(
   t => [primaryKey({ columns: [t.applicationId, t.userId] }), index('application_members_user_id_idx').on(t.userId)],
 );
 
-export const applicationRelations = relations(applications, ({ many }) => ({
+export const applicationRelations = relations(applications, ({ many, one }) => ({
   configurations: many(applicationConfigurations),
   roles: many(applicationRoles),
   members: many(applicationMembers),
   organisationGrants: many(organisationApplications),
+  ownerOrganisation: one(organisations, { fields: [applications.ownerOrganisationId], references: [organisations.id] }),
 }));
 
 export const organisationApplicationRelations = relations(organisationApplications, ({ one }) => ({

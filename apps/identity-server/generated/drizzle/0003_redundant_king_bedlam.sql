@@ -1,0 +1,3 @@
+ALTER TABLE "applications" ADD COLUMN "owner_organisation_id" bigint;--> statement-breakpoint
+ALTER TABLE "applications" ADD CONSTRAINT "applications_owner_organisation_id_organisations_id_fk" FOREIGN KEY ("owner_organisation_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "applications_owner_organisation_id_idx" ON "applications" USING btree ("owner_organisation_id");
