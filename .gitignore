@@ -70,3 +70,4 @@ apps/web-novel-web/public/manifest.webmanifest
 packages/ui/*storybook.log
 packages/ui/storybook-static
 scratch-pad/
+.worktrees/
