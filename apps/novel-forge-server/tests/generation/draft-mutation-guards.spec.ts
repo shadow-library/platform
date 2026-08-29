@@ -144,6 +144,30 @@ describe.if(pgAvailable)('GenerationService draft mutation guards', () => {
 
       expect(imported.chapter).toBe(2);
       expect(imported.body).toBe('fresh import');
+      expect(imported.generator).toBe('human');
+    });
+
+    it('should overwrite a stale generator tag on re-import, while leaving the isolation flag untouched', async () => {
+      const projectId = await seedProject();
+      await db.insert(schema.drafts).values({
+        projectId,
+        chapter: 1,
+        title: 'original title',
+        body: 'original body',
+        summary: 'original summary',
+        status: 'draft',
+        reviewStatus: 'approved',
+        generator: 'unrestricted',
+        isolated: true,
+      });
+
+      const imported = await service.importDraft(projectId, 1, { prose: 'pasted prose' });
+
+      // The row was `generator: 'unrestricted'` before the re-import; ImportDraftBody has no field yet
+      // to declare isolation (that lands with the DTO extension), so the prior `isolated` flag is left
+      // exactly as it was rather than silently cleared to false or forced to true.
+      expect(imported.generator).toBe('human');
+      expect(imported.isolated).toBe(true);
     });
   });
 
@@ -334,5 +358,82 @@ describe.if(pgAvailable)('GenerationService draft mutation guards', () => {
       expect(descendant?.status).toBe('final');
       expect(descendant?.reviewStatus).toBe('final');
     });
+  });
+});
+
+describe('GenerationService.generateUnrestricted model routing', () => {
+  interface StubProject {
+    id: bigint;
+    contentMode: string;
+    config?: { models?: Record<string, { provider: string; model: string }> };
+  }
+
+  function stubDb(project: StubProject): PrimaryDatabase {
+    const updateChain = { set: () => ({ where: async () => undefined }) };
+    const tx = {
+      insert: () => ({
+        values: () => ({
+          onConflictDoUpdate: () => ({
+            returning: async () => [{ id: 1n, projectId: project.id, chapter: 2, generator: 'unrestricted', isolated: true, revision: 1 }],
+          }),
+        }),
+      }),
+      update: () => updateChain,
+      query: { drafts: { findFirst: async () => undefined } },
+    };
+    return {
+      query: {
+        drafts: { findFirst: async () => undefined },
+        briefs: { findFirst: async () => undefined },
+        projects: { findFirst: async () => project },
+      },
+      transaction: async (cb: (tx: unknown) => unknown) => cb(tx),
+    } as unknown as PrimaryDatabase;
+  }
+
+  function buildService(project: StubProject, structured: (...args: unknown[]) => Promise<unknown>): GenerationService {
+    const noop = {} as never;
+    const modelRouter = { structured } as never;
+    const contextAssembler = { forChapter: async () => ({ rendered: '', renderedStable: '', renderedVolatile: '' }) } as never;
+    const db = stubDb(project);
+    return new GenerationService({ getPostgresClient: () => db } as never, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop);
+  }
+
+  it('passes the real project row into modelRouter.structured, with contentMode forced to unrestricted', async () => {
+    const project: StubProject = {
+      id: 42n,
+      contentMode: 'standard',
+      config: { models: { generation: { provider: 'openrouter', model: 'moonshotai/kimi-k3' } } },
+    };
+    let capturedProject: unknown;
+    const structured = async (..._args: unknown[]) => {
+      capturedProject = _args[3];
+      return { title: 't', body: 'b', summary: 's', state: {} };
+    };
+    const service = buildService(project, structured);
+
+    await service.generateUnrestricted(project.id, 2, {});
+
+    // Before the fix this arg was a literal `{ contentMode: 'unrestricted' }` stub, so `config.models`
+    // never reached `resolveModel` and a project-level override was silently ignored.
+    expect(capturedProject).toMatchObject({
+      id: 42n,
+      contentMode: 'unrestricted',
+      config: { models: { generation: { provider: 'openrouter', model: 'moonshotai/kimi-k3' } } },
+    });
+  });
+
+  it('forces unrestricted routing even on a project whose own contentMode is standard', async () => {
+    const project: StubProject = { id: 7n, contentMode: 'standard' };
+    let capturedProject: unknown;
+    const structured = async (..._args: unknown[]) => {
+      capturedProject = _args[3];
+      return { title: 't', body: 'b', summary: 's', state: {} };
+    };
+    const service = buildService(project, structured);
+
+    await service.generateUnrestricted(project.id, 2, {});
+
+    expect((capturedProject as StubProject).contentMode).toBe('unrestricted');
   });
 });
