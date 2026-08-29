@@ -243,6 +243,15 @@ export class GenerateUnrestrictedBody {
 }
 
 @Schema()
+export class ChapterSummarizeResponse {
+  @Field({ minLength: 1, description: '2-3 sentence summary of what happened in the chapter, past tense — not persisted until saved through PUT /drafts/:n.' })
+  summary: string;
+
+  @Field(() => Object, { additionalProperties: true, description: 'Continuation state the next chapter would build on — review and edit before saving through PUT /drafts/:n.' })
+  state: Record<string, unknown>;
+}
+
+@Schema()
 export class UpdateContinuityBody {
   @Field(() => Object, { additionalProperties: true, description: 'Continuity findings and suggested edits produced by the continuity model.' })
   proposal: Record<string, unknown>;

@@ -7,6 +7,7 @@ import { plotPrompt } from './bible-builder/plot.prompt';
 import { volumesPrompt } from './bible-builder/volumes.prompt';
 import { worldPowerPrompt } from './bible-builder/world-power.prompt';
 import { chapterExtractPrompt } from './chapter-extract.prompt';
+import { chapterSummarizePrompt } from './chapter-summarize.prompt';
 import { chatCompactPrompt } from './chat-compact.prompt';
 import { chatRefinePrompt } from './chat-refine.prompt';
 import { continuityPrompt } from './continuity.prompt';
@@ -51,6 +52,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   title: titlePrompt as PromptModule<unknown>,
   revision: revisionPrompt as PromptModule<unknown>,
   continuity: continuityPrompt as PromptModule<unknown>,
+  'chapter-summarize': chapterSummarizePrompt as PromptModule<unknown>,
   epitome: epitomePrompt as PromptModule<unknown>,
   validation: validationPrompt as PromptModule<unknown>,
   review: reviewPrompt as PromptModule<unknown>,

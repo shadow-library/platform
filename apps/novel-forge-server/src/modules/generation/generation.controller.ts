@@ -11,6 +11,7 @@ import {
   BriefResponse,
   ChapterParams,
   ChapterReviewResponse,
+  ChapterSummarizeResponse,
   ContinuityProposalResponse,
   DraftResponse,
   DraftRevisionResponse,
@@ -205,6 +206,12 @@ export class GenerationController {
   @RespondFor(200, DraftResponse)
   generateUnrestricted(@Params() params: ChapterParams, @Body() body: GenerateUnrestrictedBody): Promise<DraftResponse> {
     return this.generationService.generateUnrestricted(params.projectId, params.n, body);
+  }
+
+  @Post('/chapters/:n/summarize')
+  @RespondFor(200, ChapterSummarizeResponse)
+  summarizeChapter(@Params() params: ChapterParams): Promise<ChapterSummarizeResponse> {
+    return this.generationService.summarizeChapter(params.projectId, params.n);
   }
 
   @Post('/chapters/:n/propose-continuity')

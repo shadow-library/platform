@@ -5,7 +5,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertActiveProject, declaredDraftFields, markDescendantDraftsStale, renderBriefBody, renderChapterBrief, selectGenerationBatch } from '@server/common';
+import { assertActiveProject, declaredDraftFields, isFinalizable, markDescendantDraftsStale, renderBriefBody, renderChapterBrief, selectGenerationBatch } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -36,6 +36,7 @@ import { type ChangeOp } from '../refinement/change-set';
 import { ProposalService } from '../refinement/proposal.service';
 import { ChapterImageService } from './chapter-image.service';
 import {
+  type ChapterSummarizeResponse,
   type FeedbackBody,
   type FinalizeBody,
   type GenerateBody,
@@ -899,6 +900,7 @@ export class GenerationService {
       if (await this.isChapterFinalized(projectId, draft.chapter, draft.isolated)) throw AppErrorCode.DRF_002.create();
       this.logger.warn('finalize: resuming a partially finalized chapter', { projectId, chapter: draft.chapter, draftId: draft.id });
     } else if (draft.reviewStatus !== 'approved') throw AppErrorCode.DRF_004.create();
+    if (!isFinalizable(draft)) throw AppErrorCode.CHP_005.create();
     this.logger.info('finalize: finalizing chapter', { projectId, chapter: draft.chapter, draftId: draft.id, generator: draft.generator });
 
     if (draft.chapter > 1) {
@@ -1118,6 +1120,31 @@ export class GenerationService {
 
     if (!draft) throw AppErrorCode.DRF_001.create();
     return draft;
+  }
+
+  /**
+   * Runs a permissive model over a draft's existing prose and returns `{ summary, state }` without
+   * persisting anything — the author reviews and edits before saving through `PUT /drafts/:n`, so a bad
+   * result is simply discarded rather than becoming the value the finalize gate (CHP_005) checks.
+   */
+  async summarizeChapter(projectId: bigint, chapter: number): Promise<ChapterSummarizeResponse> {
+    const draft = await this.getDraft(projectId, chapter);
+    if (!draft.body || draft.body.trim().length === 0) throw AppErrorCode.CHP_007.create();
+
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const ctx = {
+      projectId,
+      promptKey: PROMPT_REGISTRY['chapter-summarize'].key,
+      promptVersion: PROMPT_REGISTRY['chapter-summarize'].version,
+      role: PROMPT_REGISTRY['chapter-summarize'].key,
+    };
+
+    const result = (await this.modelRouter.structured(PROMPT_REGISTRY['chapter-summarize'], { chapterProse: draft.body }, ctx, {
+      ...project,
+      contentMode: 'unrestricted',
+    } as never)) as { summary: string; state: Record<string, unknown> };
+
+    return { summary: result.summary, state: result.state };
   }
 
   async proposeContinuity(projectId: bigint, chapter: number): Promise<Generation.ContinuityProposal> {

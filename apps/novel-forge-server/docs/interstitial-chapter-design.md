@@ -163,6 +163,7 @@ Extending the existing `CHP` group in `src/classes/app-error-code.ts` (currently
 | `CHP_004` | 409  | Insert collides with an in-flight `generate` job for this project                 |
 | `CHP_005` | 400  | Finalize refused — isolated chapter has no summary or continuation state          |
 | `CHP_006` | 400  | Amend refused — chapter is not finalized canon (`status !== 'done'`)              |
+| `CHP_007` | 400  | Summarize refused — draft has no prose yet                                        |
 
 Baseline migration regenerated with `bun scripts/db.ts apps/novel-forge-server generate`; template DB rebuilt
 with `create-template`.

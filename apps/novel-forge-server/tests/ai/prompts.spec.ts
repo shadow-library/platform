@@ -12,6 +12,7 @@ import {
 import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
 import {
   BibleStageSchema,
+  ChapterSummarizeSchema,
   ChatRefineSchema,
   ContinuitySchema,
   EndingContractSchema,
@@ -1051,6 +1052,27 @@ describe('Prompt modules', () => {
       expect(parseSchema(IllustrationComposeSchema, base).success).toBe(true);
       expect(parseSchema(IllustrationComposeSchema, { ...base, negativePrompt: 'text, watermark' }).success).toBe(true);
       expect(parseSchema(IllustrationComposeSchema, { ...base, basePrompt: 'a man' }).success).toBe(false);
+    });
+  });
+
+  describe('chapter-summarize prompt module', () => {
+    it('is registered as analytical work routed through the continuity role', () => {
+      expect(PROMPT_REGISTRY['chapter-summarize'].kind).toBe('analytical');
+      expect(PROMPT_REGISTRY['chapter-summarize'].role).toBe('continuity');
+      expect(PROMPT_REGISTRY['chapter-summarize'].version).toBe('1.0.0');
+    });
+
+    it('renders the chapter prose into the human message', async () => {
+      const messages = await PROMPT_REGISTRY['chapter-summarize'].template.formatMessages({ chapterProse: 'SOURCE-PROSE-TEXT' });
+      expect(messages).toHaveLength(2);
+      expect(messages[0]?.getType()).toBe('system');
+      expect(String(messages[1]?.content)).toContain('SOURCE-PROSE-TEXT');
+    });
+
+    it('requires a summary and a state object', () => {
+      expect(parseSchema(ChapterSummarizeSchema, { summary: 'Ash fled the tower.', state: { lastBeat: 'Ash jumps' } }).success).toBe(true);
+      expect(parseSchema(ChapterSummarizeSchema, { summary: '', state: {} }).success).toBe(false);
+      expect(parseSchema(ChapterSummarizeSchema, { state: {} }).success).toBe(false);
     });
   });
 });

@@ -25,4 +25,5 @@ export * from './chat-refine.schema';
 export * from './ideation.schema';
 export * from './arc-plan.schema';
 export * from './illustration.schema';
+export * from './chapter-summarize.schema';
 export * from './validate';

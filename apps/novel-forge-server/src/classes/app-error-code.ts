@@ -48,6 +48,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly CHP_004 = AppErrorCode.conflict('CHP_004', 'A generation job is already running for this project — wait for it to finish before inserting a chapter');
   static readonly CHP_005 = AppErrorCode.badRequest('CHP_005', 'Isolated chapter has no summary or continuation state — summarize the chapter before finalizing');
   static readonly CHP_006 = AppErrorCode.badRequest('CHP_006', 'Chapter is not finalized canon — amend is only available once the chapter is finalized');
+  static readonly CHP_007 = AppErrorCode.badRequest('CHP_007', 'Draft has no prose yet — import or generate the chapter before summarizing it');
 
   /*!
    * Planning Errors
