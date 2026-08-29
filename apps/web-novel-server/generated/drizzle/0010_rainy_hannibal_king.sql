@@ -1,0 +1,1 @@
+ALTER TABLE "novels" ADD COLUMN "original_author" varchar(256);

@@ -127,6 +127,7 @@ export class ReaderService {
     return {
       slug: novel.slug,
       title: novel.title,
+      author: novel.originalAuthor ?? undefined,
       coverUrl: this.catalogService.imageUrl(novel.coverPath),
       genres: novel.genres,
       status: novel.status,

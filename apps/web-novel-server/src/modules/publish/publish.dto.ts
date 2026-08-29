@@ -41,6 +41,15 @@ export class NovelUpsertBody {
   @Field({ maxLength: 256 })
   title: string;
 
+  @Field(() => String, {
+    optional: true,
+    minLength: 1,
+    maxLength: 256,
+    description: "The work's own author, as the reader should see them. Omit when the publisher does not know it; readers fall back to their own placeholder.",
+  })
+  @Transform('string:trim')
+  originalAuthor?: string;
+
   @Field(() => String, { optional: true })
   blurb?: string;
 

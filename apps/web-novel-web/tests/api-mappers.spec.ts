@@ -47,6 +47,15 @@ describe('toLibraryEntry', () => {
     expect(entry.novel.cover.from).toMatch(/^#/);
   });
 
+  it('should carry the server author through instead of the placeholder', () => {
+    const entry = toLibraryEntry({ ...LIBRARY_RESPONSE.items[0]!, author: 'Selene Marchetti' });
+    expect(entry.novel.author).toBe('Selene Marchetti');
+  });
+
+  it('should fall back to the placeholder when the server author is an empty string', () => {
+    expect(toLibraryEntry({ ...LIBRARY_RESPONSE.items[0]!, author: '' }).novel.author).toBe('Unknown author');
+  });
+
   it('should map the server retired status to the internal completed status', () => {
     expect(toLibraryEntry(LIBRARY_RESPONSE.items[1]!).novel.status).toBe('completed');
   });
@@ -105,6 +114,12 @@ describe('toSummary', () => {
 
   it('should leave sexualContent undefined when the server omits it, never coercing to a string', () => {
     expect(toSummary(CATALOG_ITEM).sexualContent).toBeUndefined();
+  });
+
+  it('should carry the server author through, falling back to the placeholder when it is absent or empty', () => {
+    expect(toSummary({ ...CATALOG_ITEM, author: 'Selene Marchetti' }).author).toBe('Selene Marchetti');
+    expect(toSummary(CATALOG_ITEM).author).toBe('Unknown author');
+    expect(toSummary({ ...CATALOG_ITEM, author: '' }).author).toBe('Unknown author');
   });
 });
 

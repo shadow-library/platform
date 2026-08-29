@@ -1,4 +1,3 @@
-export * from './ingest-publish.controller';
 export * from './internal-service.middleware';
 export * from './publish-audit.middleware';
 export * from './publish-audit.service';

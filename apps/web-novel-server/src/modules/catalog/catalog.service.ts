@@ -207,6 +207,7 @@ export class CatalogService {
     return {
       slug: novel.slug,
       title: novel.title,
+      author: novel.originalAuthor ?? undefined,
       blurb: novel.blurb ?? undefined,
       coverUrl: this.imageUrl(novel.coverPath),
       genres: novel.genres,

@@ -100,6 +100,7 @@ export class PublishService {
         slug,
         sourceRef: body.sourceRef,
         title: body.title,
+        originalAuthor: body.originalAuthor || null,
         blurb: body.blurb ?? null,
         coverPath: body.coverPath ?? null,
         genres: body.genres ?? [],
@@ -317,6 +318,7 @@ export class PublishService {
     return (
       stored.slug === slug &&
       stored.title === body.title &&
+      stored.originalAuthor === (body.originalAuthor || null) &&
       stored.blurb === (body.blurb ?? null) &&
       stored.coverPath === (body.coverPath ?? null) &&
       stored.status === (body.status ?? 'live') &&

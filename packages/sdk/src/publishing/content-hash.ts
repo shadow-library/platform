@@ -29,7 +29,7 @@ export function computeContentHash(content: Record<string, unknown>): string {
 }
 
 /**
- * Wire contract between novel-forge-server, web-novel-server and webnovel-ingest: the reader recomputes this
+ * Wire contract between novel-forge-server and web-novel-server: the reader recomputes this
  * digest from the payload it receives and rejects a mismatch, and the forge's ledger decides republish-vs-no-op
  * by comparing it. What governs the field set is therefore not "never change it" — `contentRating` was added
  * after this comment first declared the set frozen (interstitial-chapter design §11), because a rating change

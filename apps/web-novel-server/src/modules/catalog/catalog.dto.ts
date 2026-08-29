@@ -48,6 +48,9 @@ export class NovelSummary {
   @Field()
   title: string;
 
+  @Field(() => String, { optional: true, description: "The work's own author; absent when the publisher did not supply one." })
+  author?: string;
+
   @Field(() => String, { optional: true })
   blurb?: string;
 

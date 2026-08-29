@@ -25,8 +25,8 @@ import {
 
 /**
  * The live webnovel-server wire shapes come straight from the generated contract (`api-types.gen`), aliased to
- * `Server*` names at the import. The server publishes a leaner model than the client one — no author/rating/
- * views, `blurb` for `synopsis`, `live`/`retired` for status, raw `content` text, and `limit`/`offset` paging —
+ * `Server*` names at the import. The server publishes a leaner model than the client one — no rating/views, an
+ * optional `author`, `blurb` for `synopsis`, `live`/`retired` for status, raw `content` text, and `limit`/`offset` paging —
  * so the mappers below normalize every response into the client model at this boundary and the rest of the app
  * stays shape-agnostic.
  */
@@ -79,7 +79,7 @@ export function toSummary(item: ServerNovelSummary): NovelSummary {
   return {
     slug: item.slug,
     title: item.title,
-    author: 'Unknown author',
+    author: item.author || 'Unknown author',
     genres: item.genres,
     tags: item.tags,
     sexualContent: item.sexualContent,

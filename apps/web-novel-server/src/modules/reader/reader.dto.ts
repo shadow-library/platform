@@ -54,6 +54,9 @@ export class LibraryItem {
   @Field()
   title: string;
 
+  @Field(() => String, { optional: true, description: "The work's own author; absent when the publisher did not supply one." })
+  author?: string;
+
   @Field(() => String, { optional: true, description: 'Absolute public URL; absent when the novel has no cover.' })
   coverUrl?: string;
 

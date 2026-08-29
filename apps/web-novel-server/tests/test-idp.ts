@@ -13,7 +13,7 @@ export const AUDIENCE = 'api://web-novel';
 export const WEB_NOVEL_CLIENT_ID = 'web-novel';
 export const WEB_NOVEL_CLIENT_SECRET = 'web-novel-test-secret';
 export const FORGE_CLIENT_ID = 'novel-forge';
-export const INGEST_CLIENT_ID = 'webnovel-ingest';
+export const SECOND_PUBLISHER_CLIENT_ID = 'webnovel-second';
 export const REDIRECT_URI = 'http://localhost:8080/api/auth/callback';
 export const LOGIN_SCOPES = ['openid', 'profile', 'email'];
 
@@ -28,7 +28,7 @@ export const idp = await createTestIdP({
 
 idp.setServiceAccess([
   { callerClientId: FORGE_CLIENT_ID, method: '*', path: '/internal/*' },
-  { callerClientId: INGEST_CLIENT_ID, method: '*', path: '/internal/*' },
+  { callerClientId: SECOND_PUBLISHER_CLIENT_ID, method: '*', path: '/internal/*' },
 ]);
 process.env.AUTH_ISSUER = idp.issuer;
 
@@ -36,9 +36,10 @@ export function forgeToken(overrides: Partial<TestTokenInput> = {}): Promise<str
   return idp.issueToken({ sub: FORGE_CLIENT_ID, kind: 'service', clientId: FORGE_CLIENT_ID, audience: AUDIENCE, scopes: ['web-novel:publish'], ...overrides });
 }
 
-/** Mirrors the seeded `webnovel-ingest` client, which is granted `web-novel:ingest` and never `web-novel:publish` */
-export function ingestToken(overrides: Partial<TestTokenInput> = {}): Promise<string> {
-  return idp.issueToken({ sub: INGEST_CLIENT_ID, kind: 'service', clientId: INGEST_CLIENT_ID, audience: AUDIENCE, scopes: ['web-novel:ingest'], ...overrides });
+/** A publisher other than the forge, holding the same scope on the same prefix: ownership is by client id, not by scope or route */
+export function secondPublisherToken(overrides: Partial<TestTokenInput> = {}): Promise<string> {
+  const clientId = SECOND_PUBLISHER_CLIENT_ID;
+  return idp.issueToken({ sub: clientId, kind: 'service', clientId, audience: AUDIENCE, scopes: ['web-novel:publish'], ...overrides });
 }
 
 export function userToken(sub: string, overrides: Partial<TestTokenInput> = {}): Promise<string> {

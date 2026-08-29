@@ -9,7 +9,7 @@ import { type LibraryEntry, type NovelSummary } from './types';
 
 /**
  * The live `GET /api/library` wire shape comes from the generated contract: a wrapped `{ items }` list of lean
- * `LibraryItem` shelf entries — no author/rating/chapter count, `live`/`retired` status — keyed by `slug`, not
+ * `LibraryItem` shelf entries — no rating or chapter count, an optional `author`, `live`/`retired` status — keyed by `slug`, not
  * the client's `novelSlug`. `toLibraryEntry` normalizes each item into the internal model at this boundary.
  */
 
@@ -50,7 +50,7 @@ export function toLibraryEntry(item: LibraryItem, local?: LibraryEntry): Library
   const novel: NovelSummary = local?.novel ?? {
     slug: item.slug,
     title: item.title,
-    author: 'Unknown author',
+    author: item.author || 'Unknown author',
     genres: item.genres,
     tags: [],
     status: STATUS_FROM_SERVER[item.status],

@@ -53,6 +53,8 @@ export const novels = pgTable(
      */
     sourceRef: varchar('source_ref', { length: 64 }).notNull(),
     title: varchar('title', { length: 256 }).notNull(),
+    /** The work's own author as the reader should see them, which is not the publishing client and is unknown for many pushes. */
+    originalAuthor: varchar('original_author', { length: 256 }),
     blurb: text('blurb'),
     coverPath: varchar('cover_path', { length: 512 }),
     /**
