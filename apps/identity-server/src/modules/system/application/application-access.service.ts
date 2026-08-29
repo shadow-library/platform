@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
@@ -127,7 +127,19 @@ export class ApplicationAccessService {
   }
 
   private async computeOrganisationGrants(organisation: Organisation): Promise<Set<number>> {
-    const applications = await this.db.query.applications.findMany({ where: eq(schema.applications.isActive, true) });
+    const reachable = and(
+      eq(schema.applications.isActive, true),
+      or(isNull(schema.applications.ownerOrganisationId), eq(schema.applications.ownerOrganisationId, organisation.id)),
+    );
+    const applications = await this.db.query.applications.findMany({ where: reachable });
+
+    const platformApplications = applications.filter(application => application.ownerOrganisationId === null);
+    const grants = await this.computePlatformGrants(organisation, platformApplications);
+    for (const application of applications) if (application.ownerOrganisationId === organisation.id) grants.add(application.id);
+    return grants;
+  }
+
+  private async computePlatformGrants(organisation: Organisation, applications: Application[]): Promise<Set<number>> {
     const publicIds = applications.filter(application => application.visibility === 'PUBLIC').map(application => application.id);
 
     if (organisation.type === 'PERSONAL') return new Set(publicIds);
