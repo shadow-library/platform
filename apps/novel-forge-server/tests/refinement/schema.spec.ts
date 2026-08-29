@@ -55,7 +55,24 @@ describe.if(pgAvailable)('refinement & arc schemas', () => {
     expect(volume).toMatchObject({ revision: 1, contentHash: null, staleReason: null, targetChapterCount: 12 });
 
     const [brief] = await db.insert(schema.briefs).values({ projectId, chapter: 1, volumeKey: 'vol_1', arcKey: 'vol_1_arc_1', body: 'brief body' }).returning();
-    expect(brief).toMatchObject({ revision: 1, arcKey: 'vol_1_arc_1', endingContract: null, staleReason: null });
+    expect(brief).toMatchObject({ revision: 1, arcKey: 'vol_1_arc_1', endingContract: null, staleReason: null, writeMode: 'standard', insertedAt: null });
+  });
+
+  it('should accept an external write mode and inserted-at timestamp on a brief', async () => {
+    const insertedAt = new Date();
+    const [brief] = await db
+      .insert(schema.briefs)
+      .values({ projectId, chapter: 2, volumeKey: 'vol_1', arcKey: 'vol_1_arc_1', body: 'inserted slot', writeMode: 'external', insertedAt, handEdited: true })
+      .returning();
+    expect(brief).toMatchObject({ writeMode: 'external' });
+    expect(brief?.insertedAt).toBeInstanceOf(Date);
+  });
+
+  it('should accept the amended draft revision source', async () => {
+    const [draft] = await db.insert(schema.drafts).values({ projectId, chapter: 3, body: 'finalized prose' }).returning();
+    if (!draft) throw new Error('failed to insert draft');
+    const [revision] = await db.insert(schema.draftRevisions).values({ projectId, draftId: draft.id, revision: 1, source: 'amended', body: 'amended prose' }).returning();
+    expect(revision).toMatchObject({ source: 'amended' });
   });
 
   it('should insert an arc and enforce the chapter range check', async () => {

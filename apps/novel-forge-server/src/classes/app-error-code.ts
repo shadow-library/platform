@@ -44,6 +44,10 @@ export class AppErrorCode extends ServerErrorCode {
    * Chapter Errors
    */
   static readonly CHP_001 = AppErrorCode.notFound('CHP_001', 'Chapter not found');
+  static readonly CHP_003 = AppErrorCode.badRequest('CHP_003', 'Insert position is behind the write frontier — only chapters ahead of the last finalized chapter can be inserted');
+  static readonly CHP_004 = AppErrorCode.conflict('CHP_004', 'A generation job is already running for this project — wait for it to finish before inserting a chapter');
+  static readonly CHP_005 = AppErrorCode.badRequest('CHP_005', 'Isolated chapter has no summary or continuation state — summarize the chapter before finalizing');
+  static readonly CHP_006 = AppErrorCode.badRequest('CHP_006', 'Chapter is not finalized canon — amend is only available once the chapter is finalized');
 
   /*!
    * Planning Errors

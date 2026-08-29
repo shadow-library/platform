@@ -42,6 +42,17 @@ describe('AppErrorCode', () => {
     expect(AppErrorCode.PRM_001).toBeDefined();
   });
 
+  it('should define interstitial chapter error codes', () => {
+    expect(AppErrorCode.CHP_003.code).toBe('CHP_003');
+    expect(AppErrorCode.CHP_003.status).toBe(400);
+    expect(AppErrorCode.CHP_004.code).toBe('CHP_004');
+    expect(AppErrorCode.CHP_004.status).toBe(409);
+    expect(AppErrorCode.CHP_005.code).toBe('CHP_005');
+    expect(AppErrorCode.CHP_005.status).toBe(400);
+    expect(AppErrorCode.CHP_006.code).toBe('CHP_006');
+    expect(AppErrorCode.CHP_006.status).toBe(400);
+  });
+
   it('should define transform reforge error codes', () => {
     expect(AppErrorCode.REF_004.status).toBe(404);
     expect(AppErrorCode.REF_005.status).toBe(400);

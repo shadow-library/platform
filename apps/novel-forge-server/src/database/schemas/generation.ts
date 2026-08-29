@@ -14,12 +14,14 @@ export namespace Generation {
   export type JudgeVerdict = InferEnum<typeof judgeVerdict>;
   export type ContinuityProposalStatus = InferEnum<typeof continuityProposalStatus>;
   export type DraftReviewStatus = InferEnum<typeof draftReviewStatus>;
+  export type BriefWriteMode = InferEnum<typeof briefWriteMode>;
 }
 
 export const draftStatus = pgEnum('draft_status', ['draft', 'final']);
 export const judgeVerdict = pgEnum('judge_verdict', ['consistent', 'contradiction', 'evaluation_failed']);
 export const continuityProposalStatus = pgEnum('continuity_proposal_status', ['pending', 'applied', 'discarded']);
 export const draftReviewStatus = pgEnum('draft_review_status', ['generating', 'needs_review', 'contradiction', 'approved', 'final']);
+export const briefWriteMode = pgEnum('brief_write_mode', ['standard', 'external']);
 
 export const drafts = pgTable(
   'drafts',
@@ -97,6 +99,12 @@ export const briefs = pgTable(
     staleReason: varchar('stale_reason'),
     // Set by the human edit paths; arc reconciliation refuses to overwrite a brief carrying it.
     handEdited: boolean('hand_edited').notNull().default(false),
+    // Planning-time declaration, independent of the runtime `isolated` containment flag on chapters/drafts — a
+    // brief can be marked `external` before any prose exists. `'external'` tells the primary writer's batch
+    // loop to skip this slot; it is filled by generate-unrestricted or drafts/:n/import instead.
+    writeMode: briefWriteMode('write_mode').notNull().default('standard'),
+    // Non-null marks a brief created by the insert operation rather than by an outline pass.
+    insertedAt: timestamp('inserted_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
