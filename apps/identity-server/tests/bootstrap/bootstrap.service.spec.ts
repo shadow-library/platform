@@ -72,7 +72,7 @@ describe('BootstrapService', () => {
     expect(pulseApps).toHaveLength(1);
 
     const clients = await env.getPostgresClient().select().from(schema.oauthClients);
-    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'novel-forge', 'pulse', 'shadow-memoir', 'web-novel', 'webnovel-ingest']);
+    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'novel-forge', 'pulse', 'shadow-memoir', 'web-novel']);
   });
 
   it('should seed the ecosystem applications, their clients and the notification access rule', async () => {
@@ -86,7 +86,7 @@ describe('BootstrapService', () => {
     expect(pulsePermissions).toEqual(expect.arrayContaining(['pulse:templates:read', 'pulse:templates:write', 'pulse:templates:publish', 'pulse:layouts:write']));
 
     const clients = await env.getPostgresClient().select().from(schema.oauthClients);
-    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'novel-forge', 'pulse', 'shadow-memoir', 'web-novel', 'webnovel-ingest']);
+    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'novel-forge', 'pulse', 'shadow-memoir', 'web-novel']);
 
     const pulseClient = clients.find(client => client.id === 'pulse');
     expect(pulseClient?.grantTypes).toEqual(expect.arrayContaining(['authorization_code', 'client_credentials', 'urn:ietf:params:oauth:grant-type:token-exchange']));
@@ -160,6 +160,21 @@ describe('BootstrapService', () => {
     expect(pulse.roles.every(role => !role.isDefault)).toBe(true);
   });
 
+  it('should grant the bootstrap administrator NovelForgeCurator in the platform organisation', async () => {
+    const admin = await env.getService(UserService).getUser(ADMIN_EMAIL);
+    const platform = await env.getService(OrganisationService).ensureTeamOrganisation(PLATFORM_ORG_NAME);
+    const novelForge = env.getService(ApplicationService).getApplicationOrThrow('novel-forge');
+    const curatorRole = novelForge.roles.find(role => role.roleName === 'NovelForgeCurator');
+    expect(curatorRole).not.toBeUndefined();
+
+    const curatorPermissions = (await env.getService(PolicyDecisionService).listPermissionsForApplication(novelForge.id)).map(permission => permission.name);
+    expect(curatorPermissions).toContain('novel-forge:curate');
+
+    const assignments = await env.getPostgresClient().select().from(schema.roleAssignments);
+    const granted = assignments.find(assignment => assignment.principalType === 'USER' && assignment.principalId === admin?.id.toString() && assignment.roleId === curatorRole?.id);
+    expect(granted?.organisationId).toBe(platform.id);
+  });
+
   it('should bind each app client to its in-cluster workload subject and drop the legacy publisher client', async () => {
     const clients = await env.getPostgresClient().select().from(schema.oauthClients);
     const subjectOf = (id: string) => clients.find(client => client.id === id)?.workloadSubjects ?? [];
@@ -176,36 +191,6 @@ describe('BootstrapService', () => {
     const rules = await env.getService(ServiceAccessService).listForApplication(webNovel.id);
     const internalRule = rules.find(rule => rule.callerClientId === 'novel-forge' && rule.pathPattern === '/internal/*');
     expect(internalRule?.method).toBe('*');
-  });
-
-  it('should seed the webnovel-ingest service client owned by web-novel with only the ingest scope', async () => {
-    const clientService = env.getService(OAuthClientService);
-    const client = await clientService.getClient('webnovel-ingest');
-    expect(client?.kind).toBe('SERVICE');
-    expect(client?.isFirstParty).toBe(true);
-
-    const application = env.getService(ApplicationService).getApplicationOrThrow('web-novel');
-    const clients = await env.getPostgresClient().select().from(schema.oauthClients);
-    expect(clients.find(row => row.id === 'webnovel-ingest')?.applicationId).toBe(application.id);
-
-    const grantedScopes = await clientService.getGrantedScopeNames('webnovel-ingest');
-    expect(grantedScopes).toEqual(['web-novel:ingest']);
-  });
-
-  it('should allow webnovel-ingest to reach web-novel internal routes via its own service-access rule', async () => {
-    const webNovel = env.getService(ApplicationService).getApplicationOrThrow('web-novel');
-    const rules = await env.getService(ServiceAccessService).listForApplication(webNovel.id);
-    const ingestRule = rules.find(rule => rule.callerClientId === 'webnovel-ingest' && rule.pathPattern === '/internal/*');
-    expect(ingestRule?.method).toBe('*');
-  });
-
-  it('should register web-novel:ingest as a service-only scope distinct from web-novel:publish', async () => {
-    const scopes = await env.getPostgresClient().select().from(schema.scopes);
-    const ingestScope = scopes.find(scope => scope.name === 'web-novel:ingest');
-    expect(ingestScope?.principalType).toBe('SERVICE');
-
-    const forgeGrants = await env.getService(OAuthClientService).getGrantedScopeNames('novel-forge');
-    expect(forgeGrants).not.toContain('web-novel:ingest');
   });
 
   it('should derive each app relying party redirect URI from the issuer host', async () => {

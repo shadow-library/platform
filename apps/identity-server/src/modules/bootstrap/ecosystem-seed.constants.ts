@@ -138,6 +138,15 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       description: 'Long-form fiction authoring platform for the Shadow ecosystem',
       resourceName: 'Novel Forge API',
       publicHost: 'novelforge',
+      permissions: [{ name: 'novel-forge:curate', description: 'Publish third-party novels under their original author and manage curated-ingest API keys' }],
+      roles: [
+        {
+          name: 'NovelForgeCurator',
+          description: 'Internal platform admin who brings third-party novels into the platform',
+          permissions: ['novel-forge:curate'],
+          grantToBootstrapAdmin: true,
+        },
+      ],
       grants: [AUTHZ_CHECK, APP_SESSION, USERS_RESOLVE, { resource: 'api://web-novel', scope: 'web-novel:publish' }],
     },
     {
@@ -152,17 +161,9 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
           description: 'Publish rendered novels to the reader',
           principalType: 'SERVICE',
         },
-        {
-          name: 'web-novel:ingest',
-          description: 'Ingest scraped novels into the reader catalogue',
-          principalType: 'SERVICE',
-        },
       ],
       grants: [AUTHZ_CHECK, APP_SESSION, USERS_RESOLVE],
-      serviceAccess: [
-        { callerClientId: 'novel-forge', method: '*', pathPattern: '/internal/*' },
-        { callerClientId: 'webnovel-ingest', method: '*', pathPattern: '/internal/*' },
-      ],
+      serviceAccess: [{ callerClientId: 'novel-forge', method: '*', pathPattern: '/internal/*' }],
     },
     {
       name: 'shadow-memoir',
@@ -184,13 +185,6 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       label: 'identity outbound',
       application: PLATFORM_APPLICATION,
       grants: [{ resource: 'api://pulse', scope: 'notifications:send' }],
-    },
-    {
-      /** External scraper (a sibling repo, not a first-party app) pushing into web-novel's `/internal/*` surface. */
-      id: 'webnovel-ingest',
-      label: 'web-novel ingest',
-      application: 'web-novel',
-      grants: [{ resource: 'api://web-novel', scope: 'web-novel:ingest' }],
     },
   ],
 };
