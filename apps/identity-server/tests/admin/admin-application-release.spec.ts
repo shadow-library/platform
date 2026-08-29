@@ -50,6 +50,12 @@ describe('Admin application release API', () => {
     return org!.id;
   };
 
+  const createOrgOwnedApp = async (ownerOrganisationId: bigint): Promise<number> => {
+    const name = uniq('org-app');
+    const application = await env.getService(ApplicationService).createApplication({ name, subDomain: name, visibility: 'RESTRICTED', ownerOrganisationId });
+    return application.id;
+  };
+
   const auditActions = async (action: string): Promise<number> => {
     const rows = await db.select().from(schema.auditEvents).where(eq(schema.auditEvents.action, action));
     return rows.length;
@@ -131,6 +137,15 @@ describe('Admin application release API', () => {
     const personalOrgId = (await env.getService(UserService).getUser(personalHolder.id))?.personalOrganisationId?.toString() as string;
     const personal = await request('post', `/api/v1/admin/applications/${appId}/organisations`, adminSecret, { organisationId: personalOrgId });
     expect(personal.statusCode).toBe(409);
+  });
+
+  it('should refuse to release an org-owned application (APP_009)', async () => {
+    const ownerOrgId = await createTeam();
+    const appId = await createOrgOwnedApp(ownerOrgId);
+
+    const released = await request('post', `/api/v1/admin/applications/${appId}/organisations`, adminSecret, { organisationId: orgId.toString() });
+    expect(released.statusCode).toBe(409);
+    expect(released.json()).toMatchObject({ code: 'APP_009' });
   });
 
   it('should require the applications permission and a step-up', async () => {

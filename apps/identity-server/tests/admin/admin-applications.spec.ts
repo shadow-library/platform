@@ -7,6 +7,7 @@ import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/sessio
 import { PolicyDecisionService } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
+import { PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationMemberService, ApplicationService } from '@server/modules/system/application';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
@@ -14,6 +15,7 @@ import { csrfPair, TestEnvironment } from '../test-environment';
 const env = new TestEnvironment('admin-applications').init();
 
 describe('Admin application API', () => {
+  let db: PrimaryDatabase;
   let adminSecret: string;
   let platformOrgId: string;
   let platformAppId: number;
@@ -25,6 +27,20 @@ describe('Admin application API', () => {
   };
 
   const uniqueName = (prefix: string): string => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  const createOrg = async (): Promise<bigint> => {
+    const [org] = await db
+      .insert(schema.organisations)
+      .values({ name: uniqueName('org'), slug: uniqueName('org-slug'), type: 'TEAM', status: 'ACTIVE' })
+      .returning({ id: schema.organisations.id });
+    return org!.id;
+  };
+
+  const createOrgOwnedApp = async (ownerOrganisationId: bigint): Promise<number> => {
+    const name = uniqueName('org-app');
+    const application = await env.getService(ApplicationService).createApplication({ name, subDomain: name, visibility: 'RESTRICTED', ownerOrganisationId });
+    return application.id;
+  };
 
   const asAdmin = async (): Promise<string> => {
     const application = env.getService(ApplicationService).getApplicationOrThrow(APP_NAME);
@@ -38,6 +54,7 @@ describe('Admin application API', () => {
   };
 
   beforeEach(async () => {
+    db = env.getPostgresClient();
     const organisation = await env.getService(OrganisationService).findTeamByName(PLATFORM_ORG_NAME);
     platformOrgId = String(organisation?.id);
     platformAppId = env.getService(ApplicationService).getApplicationOrThrow(APP_NAME).id;
@@ -185,5 +202,40 @@ describe('Admin application API', () => {
     const rp = clients.find(client => client.kind === 'WEB_CONFIDENTIAL');
     const rpDetail = await env.getService(OAuthClientService).getClientDetail(rp!.id);
     expect(rpDetail?.redirectUris).toEqual(['https://pulse.example.com/api/auth/callback']);
+  });
+
+  describe('org-owned application fencing', () => {
+    it('should refuse to patch an org-owned application, in particular a publicUrls change', async () => {
+      const orgId = await createOrg();
+      const appId = await createOrgOwnedApp(orgId);
+
+      const patched = await request('patch', `/api/v1/admin/applications/${appId}`).body({ publicUrls: ['https://evil.example.com'] });
+      expect(patched.statusCode).toBe(409);
+      expect(patched.json()).toMatchObject({ code: 'APP_009' });
+    });
+
+    it('should refuse to delete an org-owned application', async () => {
+      const orgId = await createOrg();
+      const appId = await createOrgOwnedApp(orgId);
+
+      const removed = await request('delete', `/api/v1/admin/applications/${appId}`);
+      expect(removed.statusCode).toBe(409);
+      expect(removed.json()).toMatchObject({ code: 'APP_009' });
+    });
+
+    it('should still remove an application member on an org-owned application', async () => {
+      const orgId = await createOrg();
+      const appId = await createOrgOwnedApp(orgId);
+      const user = await env
+        .getService(UserService)
+        .createUserWithPassword({ email: uniqueName('org-member') + '@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true });
+      await env.getService(ApplicationMemberService).ensureMembership(appId, user.id);
+
+      const removed = await request('delete', `/api/v1/admin/applications/${appId}/members/${user.id}`);
+      expect(removed.statusCode).toBe(200);
+
+      const after = await request('get', `/api/v1/admin/applications/${appId}/members`);
+      expect((after.json() as { items: unknown[] }).items).toHaveLength(0);
+    });
   });
 });

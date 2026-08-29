@@ -298,6 +298,83 @@ describe('ApplicationAccessService', () => {
     });
   });
 
+  describe('resolveAccessibleApplicationIds — org-owned application isolation', () => {
+    it('should not grant a PUBLIC app owned by another organisation, even under ALL_APPS', async () => {
+      const ownerOrgId = await createOrg();
+      const app = await createApp('PUBLIC');
+      await db.update(schema.applications).set({ ownerOrganisationId: ownerOrgId }).where(eq(schema.applications.id, app));
+
+      const outsiderId = await createUser();
+      const outsiderOrg = await createOrg({ appAccessMode: 'ALL_APPS' });
+      await addMember(outsiderOrg, outsiderId);
+
+      const grants = await service.resolveAccessibleApplicationIds(outsiderId);
+      expect(grants.has(app)).toBe(false);
+      await expect(service.assertUserAccess(outsiderId, app)).rejects.toMatchObject({ code: 'APP_007' });
+    });
+
+    it('should not grant a RESTRICTED app owned by another organisation, even under ALL_APPS', async () => {
+      const ownerOrgId = await createOrg();
+      const app = await createApp('RESTRICTED');
+      await db.update(schema.applications).set({ ownerOrganisationId: ownerOrgId }).where(eq(schema.applications.id, app));
+
+      const outsiderId = await createUser();
+      const outsiderOrg = await createOrg({ appAccessMode: 'ALL_APPS' });
+      await addMember(outsiderOrg, outsiderId);
+
+      const grants = await service.resolveAccessibleApplicationIds(outsiderId);
+      expect(grants.has(app)).toBe(false);
+    });
+
+    it('should grant an owning organisation its own app even under ASSIGNED_ONLY with no ORG_ASSIGNMENT row', async () => {
+      const ownerOrgId = await createOrg({ appAccessMode: 'ASSIGNED_ONLY' });
+      const app = await createApp('RESTRICTED');
+      await db.update(schema.applications).set({ ownerOrganisationId: ownerOrgId }).where(eq(schema.applications.id, app));
+
+      const memberId = await createUser();
+      await addMember(ownerOrgId, memberId);
+
+      const grants = await service.resolveAccessibleApplicationIds(memberId);
+      expect(grants.has(app)).toBe(true);
+    });
+
+    it('should grant an owning organisation member its own app under ALL_APPS', async () => {
+      const ownerOrgId = await createOrg({ appAccessMode: 'ALL_APPS' });
+      const app = await createApp('RESTRICTED');
+      await db.update(schema.applications).set({ ownerOrganisationId: ownerOrgId }).where(eq(schema.applications.id, app));
+
+      const memberId = await createUser();
+      await addMember(ownerOrgId, memberId);
+
+      const grants = await service.resolveAccessibleApplicationIds(memberId);
+      expect(grants.has(app)).toBe(true);
+    });
+
+    it('should not grant an owning organisation its own app through an inactive membership', async () => {
+      const ownerOrgId = await createOrg();
+      const app = await createApp('RESTRICTED');
+      await db.update(schema.applications).set({ ownerOrganisationId: ownerOrgId }).where(eq(schema.applications.id, app));
+
+      const memberId = await createUser();
+      await addMember(ownerOrgId, memberId, 'SUSPENDED', new Date(Date.now() + 60_000));
+
+      const grants = await service.resolveAccessibleApplicationIds(memberId);
+      expect(grants.has(app)).toBe(false);
+    });
+
+    it('should not grant an owning organisation its own app when the organisation is not ACTIVE', async () => {
+      const ownerOrgId = await createOrg({ status: 'SUSPENDED' });
+      const app = await createApp('RESTRICTED');
+      await db.update(schema.applications).set({ ownerOrganisationId: ownerOrgId }).where(eq(schema.applications.id, app));
+
+      const memberId = await createUser();
+      await addMember(ownerOrgId, memberId);
+
+      const grants = await service.resolveAccessibleApplicationIds(memberId);
+      expect(grants.has(app)).toBe(false);
+    });
+  });
+
   describe('cache invalidation', () => {
     it('should serve a stale grant set until the organisation is invalidated', async () => {
       const userId = await createUser();

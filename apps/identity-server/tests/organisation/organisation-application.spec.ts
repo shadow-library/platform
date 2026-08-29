@@ -46,6 +46,12 @@ describe('Organisation application assignment', () => {
     await db.insert(schema.organisationApplications).values({ organisationId: BigInt(orgId), applicationId, source: 'PLATFORM_RELEASE' });
   };
 
+  const createOrgOwnedApp = async (ownerOrganisationId: bigint): Promise<number> => {
+    const name = uniq('org-app');
+    const application = await env.getService(ApplicationService).createApplication({ name, subDomain: name, visibility: 'RESTRICTED', ownerOrganisationId });
+    return application.id;
+  };
+
   const setMode = async (mode: 'ALL_APPS' | 'ASSIGNED_ONLY'): Promise<void> => {
     await db
       .update(schema.organisations)
@@ -128,6 +134,31 @@ describe('Organisation application assignment', () => {
     await releaseToOrg(restricted);
     const acceptedReleased = await request('post', `/api/v1/organisations/${orgId}/applications`, adminSecret, { applicationId: String(restricted) });
     expect(acceptedReleased.statusCode).toBe(200);
+  });
+
+  it('should refuse to assign an org-owned application (APP_009), even to its owning organisation', async () => {
+    const [otherOrg] = await db
+      .insert(schema.organisations)
+      .values({ name: uniq('Other Org'), slug: uniq('other-org'), type: 'TEAM', status: 'ACTIVE' })
+      .returning({ id: schema.organisations.id });
+    const ownedByOther = await createOrgOwnedApp(otherOrg!.id);
+    const rejectedForeign = await request('post', `/api/v1/organisations/${orgId}/applications`, adminSecret, { applicationId: String(ownedByOther) });
+    expect(rejectedForeign.statusCode).toBe(409);
+    expect(rejectedForeign.json()).toMatchObject({ code: 'APP_009' });
+
+    const ownedBySelf = await createOrgOwnedApp(BigInt(orgId));
+    const rejectedSelf = await request('post', `/api/v1/organisations/${orgId}/applications`, adminSecret, { applicationId: String(ownedBySelf) });
+    expect(rejectedSelf.statusCode).toBe(409);
+    expect(rejectedSelf.json()).toMatchObject({ code: 'APP_009' });
+  });
+
+  it('should never offer an org-owned application through listForOrganisation, not even to its owner', async () => {
+    const ownApp = await createOrgOwnedApp(BigInt(orgId));
+
+    const listed = await request('get', `/api/v1/organisations/${orgId}/applications`, adminSecret);
+    expect(listed.statusCode).toBe(200);
+    const ids = (listed.json() as { applications: { id: number }[] }).applications.map(application => application.id);
+    expect(ids).not.toContain(ownApp);
   });
 
   it('should require an elevated ADMIN to assign', async () => {

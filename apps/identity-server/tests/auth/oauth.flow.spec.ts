@@ -641,4 +641,82 @@ describe('OAuth authorization-code flow', () => {
       expect(response.statusCode).toBe(401);
     });
   });
+
+  describe('org-owned application authorization', () => {
+    const orgRedirectUri = 'https://org-app.example.com/callback';
+
+    const registerOrgApp = async (organisationId: bigint) => {
+      const name = `org-${organisationId}-app-${Date.now()}`;
+      const application = await env.getService(ApplicationService).createApplication({ name, subDomain: name, visibility: 'RESTRICTED', ownerOrganisationId: organisationId });
+      const client = await env.getService(OAuthClientService).register({
+        applicationId: application.id,
+        name: 'Org App',
+        kind: 'WEB_CONFIDENTIAL',
+        isFirstParty: false,
+        organisationId,
+        grantTypes: ['authorization_code'],
+        redirectUris: [orgRedirectUri],
+      });
+      return { application, client };
+    };
+
+    const createOrg = async (): Promise<bigint> => {
+      const db = env.getPostgresClient();
+      const [org] = await db
+        .insert(schema.organisations)
+        .values({ name: `Org ${Date.now()}`, slug: `org-${Date.now()}-${Math.floor(Math.random() * 1e6)}`, type: 'TEAM', status: 'ACTIVE', appAccessMode: 'ALL_APPS' })
+        .returning({ id: schema.organisations.id });
+      return org!.id;
+    };
+
+    const addMember = async (organisationId: bigint, userId: bigint): Promise<void> => {
+      await env.getPostgresClient().insert(schema.organisationMembers).values({ organisationId, userId, role: 'MEMBER', status: 'ACTIVE' });
+    };
+
+    const authorizeOrgApp = (clientId: string, secret: string) => {
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: orgRedirectUri,
+        response_type: 'code',
+        scope: 'openid',
+        state: 'xyz',
+        code_challenge: pkce().challenge,
+        code_challenge_method: 'S256',
+      });
+      return env
+        .getRouter()
+        .mockRequest()
+        .get(`/oauth2/authorize?${params.toString()}`)
+        .cookies({ [SESSION_COOKIE_NAME]: secret });
+    };
+
+    it('should deny a user who is not a member of the owning organisation with access_denied', async () => {
+      const ownerOrgId = await createOrg();
+      const { client } = await registerOrgApp(ownerOrgId);
+
+      const outsiderOrgId = await createOrg();
+      const outsider = await env.getService(UserService).createUserWithPassword({ email: `outsider-${Date.now()}@example.com`, password: 'Password@123', status: 'ACTIVE' });
+      await addMember(outsiderOrgId, outsider.id);
+      const outsiderSecret = (await env.getService(SessionService).create({ userId: outsider.id })).secret;
+
+      const response = await authorizeOrgApp(client.clientId, outsiderSecret);
+      expect(response.statusCode).toBe(302);
+      const location = new URL(response.headers.location ?? '');
+      expect(location.origin + location.pathname).toBe(orgRedirectUri);
+      expect(location.searchParams.get('error')).toBe('access_denied');
+    });
+
+    it('should send a member of the owning organisation to consent rather than granting silently', async () => {
+      const ownerOrgId = await createOrg();
+      const { client } = await registerOrgApp(ownerOrgId);
+
+      const member = await env.getService(UserService).createUserWithPassword({ email: `org-member-${Date.now()}@example.com`, password: 'Password@123', status: 'ACTIVE' });
+      await addMember(ownerOrgId, member.id);
+      const memberSecret = (await env.getService(SessionService).create({ userId: member.id })).secret;
+
+      const response = await authorizeOrgApp(client.clientId, memberSecret);
+      expect(response.statusCode).toBe(302);
+      expect(response.headers.location).toContain('/login');
+    });
+  });
 });
