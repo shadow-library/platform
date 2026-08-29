@@ -463,10 +463,10 @@ export class ContextAssembler {
     const sections: ContextSection[] = [];
 
     if (prevChapter) {
-      const isGrok = prevChapter.generator === 'unrestricted';
+      const isIsolated = prevChapter.isolated;
       const isFinal = prevChapter.status === 'done';
       const tier: ContextTier = isFinal ? 'canonical' : 'working';
-      if (isGrok) {
+      if (isIsolated) {
         const stateStr = prevDraft?.state ? JSON.stringify(prevDraft.state) : 'null';
         const content = `Summary: ${prevChapter.summary ?? ''}\nState: ${stateStr}`;
         sections.push(makeSection('prev_ending', content, tier, [`chapter:${chapter - 1}`]));
@@ -741,10 +741,10 @@ export class ContextAssembler {
     const sections: ContextSection[] = [];
 
     if (prevChapter) {
-      const isGrok = prevChapter.generator === 'unrestricted';
+      const isIsolated = prevChapter.isolated;
       const isFinal = prevChapter.status === 'done';
       const tier: ContextTier = isFinal ? 'canonical' : 'working';
-      if (isGrok) {
+      if (isIsolated) {
         const stateStr = prevDraft?.state ? JSON.stringify(prevDraft.state) : 'null';
         sections.push(makeSection('prev_ending', `Summary: ${prevChapter.summary ?? ''}\nState: ${stateStr}`, tier, [`chapter:${chapter - 1}`]));
       } else {

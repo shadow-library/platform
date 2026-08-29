@@ -903,7 +903,7 @@ export class GenerationService {
 
     if (!draft) throw AppErrorCode.DRF_001.create();
     if (draft.status === 'final') {
-      if (await this.isChapterFinalized(projectId, draft.chapter, draft.generator)) throw AppErrorCode.DRF_002.create();
+      if (await this.isChapterFinalized(projectId, draft.chapter, draft.isolated)) throw AppErrorCode.DRF_002.create();
       this.logger.warn('finalize: resuming a partially finalized chapter', { projectId, chapter: draft.chapter, draftId: draft.id });
     } else if (draft.reviewStatus !== 'approved') throw AppErrorCode.DRF_004.create();
     this.logger.info('finalize: finalizing chapter', { projectId, chapter: draft.chapter, draftId: draft.id, generator: draft.generator });
@@ -938,6 +938,7 @@ export class GenerationService {
       title: draft.title ?? undefined,
       continuationState: draft.state as Record<string, string> | undefined,
       generator: draft.generator,
+      isolated: draft.isolated,
     });
 
     if (result.status !== 'completed') return result;
@@ -953,14 +954,14 @@ export class GenerationService {
    * the cursor advance run, so a draft's own status cannot answer this — a failure anywhere downstream
    * leaves a `final` draft over a half-finalized chapter that must be allowed to finish.
    */
-  private async isChapterFinalized(projectId: bigint, chapter: number, generator: string): Promise<boolean> {
+  private async isChapterFinalized(projectId: bigint, chapter: number, isolated: boolean): Promise<boolean> {
     const [chapterRow, project] = await Promise.all([
       this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter)) }),
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
     if (!chapterRow) return false;
-    // unrestricted chapters bypass continuity extraction entirely, so their flag never turns true.
-    if (!chapterRow.continuityApplied && generator !== 'unrestricted') return false;
+    // Isolated chapters bypass continuity extraction entirely, so their flag never turns true.
+    if (!chapterRow.continuityApplied && !isolated) return false;
     return (project?.storyCurrentChapter ?? 0) >= chapter;
   }
 
@@ -1082,6 +1083,7 @@ export class GenerationService {
           summary: result.summary,
           state: result.state as never,
           generator: 'unrestricted',
+          isolated: true,
           reviewStatus: 'needs_review',
           staleReason: null,
           status: 'draft',
@@ -1094,6 +1096,7 @@ export class GenerationService {
             summary: result.summary,
             state: result.state as never,
             generator: 'unrestricted',
+            isolated: true,
             revision: sql`${schema.drafts.revision} + 1`,
             reviewStatus: 'needs_review',
             staleReason: null,

@@ -41,6 +41,7 @@ export interface ChapterFinalizationInput {
   title?: string;
   continuationState?: Record<string, string>;
   generator?: string;
+  isolated?: boolean;
   jobId?: string;
 }
 
@@ -250,6 +251,7 @@ export class WorkflowRunService {
           title: input.title ?? '',
           continuationState: input.continuationState ?? {},
           generator: input.generator ?? 'standard',
+          isolated: input.isolated ?? false,
           runId,
         },
         { configurable: { thread_id: runId } },

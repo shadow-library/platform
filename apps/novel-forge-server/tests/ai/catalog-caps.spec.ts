@@ -57,6 +57,19 @@ describe.if(pgAvailable)('catalog and validation-window caps', () => {
     expect(pack.rendered).not.toContain('very long description');
   });
 
+  it('tags catalog chapters by isolation rather than by provenance', async () => {
+    const projectId = await seedProject(`catalog-isolated-${Date.now()}`);
+    await db.insert(schema.chapters).values([
+      { projectId, number: 1, title: 'Imported', status: 'done', generator: 'human', isolated: false },
+      { projectId, number: 2, title: 'Pasted', status: 'done', generator: 'human', isolated: true },
+    ]);
+
+    const rendered = await catalog.render(projectId);
+
+    expect(rendered).toContain('1 — Imported\n');
+    expect(rendered).toContain('2 — Pasted [grok]');
+  });
+
   it('caps catalog chapters to the most recent N and reports the omitted count', async () => {
     const projectId = await seedProject(`catalog-caps-chapters-${Date.now()}`);
     const total = 55;

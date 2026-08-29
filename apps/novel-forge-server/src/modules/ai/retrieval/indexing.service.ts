@@ -23,10 +23,10 @@ export class IndexingService {
   }
 
   // Add (or re-add) prose chunks for a chapter. Deletes existing chunks first (idempotent).
-  // Does NOT embed unrestricted chapters — silently skips if generator === 'unrestricted'.
-  async addProse(projectId: bigint, chapter: number, content: string, generator: string): Promise<void> {
-    if (generator === 'unrestricted') {
-      this.logger.debug('addProse: skipping unrestricted chapter (not indexed)', { projectId, chapter });
+  // Containment keys on `isolated`, never on provenance: hand-pasted explicit prose is `generator: 'human'`.
+  async addProse(projectId: bigint, chapter: number, content: string, isolated: boolean): Promise<void> {
+    if (isolated) {
+      this.logger.debug('addProse: skipping isolated chapter (not indexed)', { projectId, chapter });
       return;
     }
 
@@ -67,15 +67,15 @@ export class IndexingService {
       });
   }
 
-  // Backfill: find all chapters for projectId with status='done' and generator!='unrestricted'
+  // Backfill: find all non-isolated chapters for projectId with status='done'
   // that have zero chapter_chunks rows, then addProse for each.
   async backfill(projectId: bigint): Promise<{ indexed: number; skipped: number }> {
     const doneChapters = await this.db.query.chapters.findMany({
       where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')),
     });
 
-    const standardChapters = doneChapters.filter(c => c.generator !== 'unrestricted');
-    this.logger.info('backfill: reindexing prose', { projectId, doneChapters: doneChapters.length, standardChapters: standardChapters.length });
+    const indexableChapters = doneChapters.filter(c => !c.isolated);
+    this.logger.info('backfill: reindexing prose', { projectId, doneChapters: doneChapters.length, indexableChapters: indexableChapters.length });
 
     const indexedCounts = await this.db.execute<{ chapter: number; cnt: number }>(sql`
       SELECT chapter, COUNT(*)::int AS cnt
@@ -89,14 +89,14 @@ export class IndexingService {
     let indexed = 0;
     let skipped = 0;
 
-    for (const chapter of standardChapters) {
+    for (const chapter of indexableChapters) {
       if (indexedChapters.has(chapter.number)) continue;
       if (!chapter.content) {
         skipped++;
         continue;
       }
       try {
-        await this.addProse(projectId, chapter.number, chapter.content, chapter.generator);
+        await this.addProse(projectId, chapter.number, chapter.content, chapter.isolated);
         indexed++;
       } catch (err) {
         this.logger.warn('Backfill failed for chapter', { projectId, chapter: chapter.number, err });

@@ -162,9 +162,8 @@ function makeAssembler(dbOverrides: Record<string, unknown> = {}, catalogText = 
   return new ContextAssembler(fakeDatabaseService, fakeCatalog);
 }
 
-describe('ContextAssembler.forChapter — grok-adjacency', () => {
-  it('prev_ending section contains "Summary:" when prev chapter generator is grok', async () => {
-    const prevChapter = { number: 4, generator: 'unrestricted', status: 'done', summary: 'Iron treaty signed', content: 'Long prose...', title: 'Ch4' };
+describe('ContextAssembler.forChapter — isolated-adjacency', () => {
+  async function prevEndingFor(prevChapter: Record<string, unknown>): Promise<string | undefined> {
     const prevDraft = { chapter: 4, state: { power: 50 }, body: 'body text' };
 
     const dbOverrides = {
@@ -188,12 +187,36 @@ describe('ContextAssembler.forChapter — grok-adjacency', () => {
 
     const assembler = makeAssembler(dbOverrides);
     const pack = await assembler.forChapter(1n, 5, { dryRun: true });
+    return pack.sections.find(s => s.key === 'prev_ending')?.rendered;
+  }
 
-    const prevEndingSection = pack.sections.find(s => s.key === 'prev_ending');
-    expect(prevEndingSection).toBeDefined();
-    expect(prevEndingSection?.rendered).toContain('Summary:');
-    // Raw prose tail should NOT be in the section (grok-adjacency renders summary+state, not content)
-    expect(prevEndingSection?.rendered).not.toContain('Long prose...');
+  it('should render summary+state instead of the prose tail when the previous chapter is isolated', async () => {
+    const rendered = await prevEndingFor({
+      number: 4,
+      generator: 'unrestricted',
+      status: 'done',
+      summary: 'Iron treaty signed',
+      content: 'Long prose...',
+      title: 'Ch4',
+      isolated: true,
+    });
+
+    expect(rendered).toBeDefined();
+    expect(rendered).toContain('Summary:');
+    expect(rendered).not.toContain('Long prose...');
+  });
+
+  it('should contain a human-written previous chapter that is isolated', async () => {
+    const rendered = await prevEndingFor({ number: 4, generator: 'human', status: 'done', summary: 'Iron treaty signed', content: 'Long prose...', title: 'Ch4', isolated: true });
+
+    expect(rendered).toContain('Summary:');
+    expect(rendered).not.toContain('Long prose...');
+  });
+
+  it('should render the verbatim prose tail for a human-written previous chapter that is not isolated', async () => {
+    const rendered = await prevEndingFor({ number: 4, generator: 'human', status: 'done', summary: 'Iron treaty signed', content: 'Long prose...', title: 'Ch4', isolated: false });
+
+    expect(rendered).toContain('Long prose...');
   });
 });
 

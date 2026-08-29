@@ -44,7 +44,7 @@ export class CatalogService {
       const omitted = Math.max(0, chapters.length - CATALOG_CHAPTER_CAP);
       const shown = omitted > 0 ? chapters.slice(-CATALOG_CHAPTER_CAP) : chapters;
       const lines = shown.map(ch => {
-        const tag = ch.generator === 'unrestricted' ? ' [grok]' : ch.status === 'done' ? '' : ' [draft]';
+        const tag = ch.isolated ? ' [grok]' : ch.status === 'done' ? '' : ' [draft]';
         const suffix = ch.status === 'done' && ch.summary && ch.summary.length <= 60 ? ` (${ch.summary})` : '';
         return `${ch.number} — ${ch.title ?? `Chapter ${ch.number}`}${tag}${suffix}`;
       });

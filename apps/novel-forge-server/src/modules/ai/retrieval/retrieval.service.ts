@@ -33,7 +33,7 @@ export class RetrievalService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  // Search prose index. Excludes grok-interlude chapters. Returns [] on embed failure.
+  // Search prose index. Excludes isolated chapters, whatever their provenance. Returns [] on embed failure.
   async searchProse(projectId: bigint, query: string, k = DEFAULT_PROSE_K): Promise<RetrievalHit[]> {
     try {
       const embedding = await this.embeddingService.embed(query);
@@ -48,7 +48,7 @@ export class RetrievalService {
         JOIN chapters ch ON ch.project_id = cc.project_id AND ch.number = cc.chapter
         WHERE cc.project_id = ${projectId}
           AND cc.embedding IS NOT NULL
-          AND ch.generator != 'unrestricted'
+          AND ch.isolated = false
         ORDER BY cc.embedding <=> ${sql.raw(`'${vecLiteral}'`)}::vector
         LIMIT ${k}
       `);

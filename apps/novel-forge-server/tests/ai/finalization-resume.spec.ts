@@ -94,7 +94,11 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
       .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, 1)));
   }
 
-  function invoke(projectId: bigint, draftId: bigint, options: Parameters<typeof buildGraph>[0] & { runId?: string } = {}): Promise<unknown> {
+  function invoke(
+    projectId: bigint,
+    draftId: bigint,
+    options: Parameters<typeof buildGraph>[0] & { runId?: string; generator?: string; isolated?: boolean } = {},
+  ): Promise<unknown> {
     return buildGraph(options).invoke(
       {
         projectId: String(projectId),
@@ -103,7 +107,8 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
         prose: 'ch1',
         summary: 's1',
         title: 'One',
-        generator: 'standard',
+        generator: options.generator ?? 'standard',
+        isolated: options.isolated ?? false,
         runId: options.runId ?? 'run-resume',
       },
       { configurable: { thread_id: `resume-${draftId}-${options.runId ?? 'run-resume'}` } },
@@ -293,5 +298,44 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
     const { projectId, draftId } = await seedPartiallyFinalizedChapter('needs_review');
 
     await expect(invoke(projectId, draftId)).rejects.toThrow(/is not approved/);
+  });
+
+  async function seedUncommittedChapter(generator: 'standard' | 'unrestricted' | 'human', isolated: boolean): Promise<{ projectId: bigint; draftId: bigint }> {
+    const [project] = await db
+      .insert(schema.projects)
+      .values({ name: `containment-${Date.now()}-${Math.random()}`, kind: 'new_novel' })
+      .returning();
+    if (!project) throw new Error('failed to seed project');
+    const [draft] = await db
+      .insert(schema.drafts)
+      .values({ projectId: project.id, chapter: 1, body: 'ch1', summary: 's1', status: 'draft', reviewStatus: 'approved', generator, isolated })
+      .returning();
+    if (!draft) throw new Error('failed to seed draft');
+    return { projectId: project.id, draftId: draft.id };
+  }
+
+  it('should persist isolation onto the chapter row and skip continuity extraction for an isolated human chapter', async () => {
+    const { projectId, draftId } = await seedUncommittedChapter('human', true);
+
+    await invoke(projectId, draftId, { generator: 'human', isolated: true, runId: 'run-isolated' });
+
+    const chapter = await readChapter(projectId);
+    const entities = await db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId) });
+    expect(chapter?.isolated).toBe(true);
+    expect(chapter?.generator).toBe('human');
+    expect(chapter?.continuityApplied).toBe(false);
+    expect(entities).toHaveLength(0);
+  });
+
+  it('should extract continuity for a non-isolated human chapter (the novel-import final-mode shape)', async () => {
+    const { projectId, draftId } = await seedUncommittedChapter('human', false);
+
+    await invoke(projectId, draftId, { generator: 'human', isolated: false, runId: 'run-imported' });
+
+    const chapter = await readChapter(projectId);
+    const entities = await db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId) });
+    expect(chapter?.isolated).toBe(false);
+    expect(chapter?.continuityApplied).toBe(true);
+    expect(entities.map(e => e.entityKey)).toEqual(['char_hero']);
   });
 });

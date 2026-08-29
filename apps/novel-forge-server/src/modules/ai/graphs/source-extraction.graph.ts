@@ -30,7 +30,7 @@ const SourceExtractionAnnotation = Annotation.Root({
   runId: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   chapterId: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   chapterContent: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
-  chapterGenerator: Annotation<string>({ reducer: (_, n) => n, default: () => 'standard' }),
+  chapterIsolated: Annotation<boolean>({ reducer: (_, n) => n, default: () => false }),
   extracted: Annotation<ExtractionOutput | null>({ reducer: (_, n) => n, default: () => null }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   nodeTrace: Annotation<string[]>({ reducer: (a, n) => [...a, ...n], default: () => [] }),
@@ -54,7 +54,7 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
     if (!ch) throw AppError.internal(`[loadChapter] Chapter ${state.chapter} not found for project ${state.projectId}`);
 
     logger.debug('extraction loadChapter', { runId: state.runId, chapter: state.chapter, chapterId: String(ch.id), contentLength: (ch.content ?? '').length });
-    return { chapterId: String(ch.id), chapterContent: ch.content ?? '', chapterGenerator: ch.generator, nodeTrace: ['loadChapter'] };
+    return { chapterId: String(ch.id), chapterContent: ch.content ?? '', chapterIsolated: ch.isolated, nodeTrace: ['loadChapter'] };
   }
 
   async function extractKnowledge(state: ExtractionState) {
@@ -254,7 +254,7 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
     const projectId = BigInt(state.projectId);
     try {
       if (state.chapterContent) {
-        await indexingService.addProse(projectId, state.chapter, state.chapterContent, state.chapterGenerator);
+        await indexingService.addProse(projectId, state.chapter, state.chapterContent, state.chapterIsolated);
       }
     } catch (err) {
       logger.warn('embedProse: addProse failed (non-fatal)', { err });

@@ -35,6 +35,7 @@ const ChapterFinalizationAnnotation = Annotation.Root({
   title: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   continuationState: Annotation<Record<string, string>>({ reducer: (_, n) => n, default: () => ({}) }),
   generator: Annotation<string>({ reducer: (_, n) => n, default: () => 'standard' }),
+  isolated: Annotation<boolean>({ reducer: (_, n) => n, default: () => false }),
   continuityDelta: Annotation<ContinuityOutput | null>({ reducer: (_, n) => n, default: () => null }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   nodeTrace: Annotation<string[]>({ reducer: (a, n) => [...a, ...n], default: () => [] }),
@@ -93,6 +94,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
           summary: state.summary || null,
           status: 'done',
           generator: (state.generator as 'standard' | 'unrestricted') || 'standard',
+          isolated: state.isolated,
           wordCount: state.prose.split(/\s+/).length,
           locked: true,
         })
@@ -104,6 +106,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
             title: sql`EXCLUDED.title`,
             status: sql`EXCLUDED.status`,
             generator: sql`EXCLUDED.generator`,
+            isolated: sql`EXCLUDED.isolated`,
             wordCount: sql`EXCLUDED.word_count`,
             locked: true,
             updatedAt: new Date(),
@@ -153,8 +156,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
   }
 
   async function extractContinuity(state: FinalizationState) {
-    // grok chapters skip continuity extraction.
-    if (state.generator === 'unrestricted') return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
+    if (state.isolated) return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
 
     const projectId = BigInt(state.projectId);
     const chapterWhere = and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter));
@@ -272,7 +274,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
 
     // Best-effort — never fails the run.
     try {
-      await indexingService.addProse(projectId, state.chapter, state.prose, state.generator);
+      await indexingService.addProse(projectId, state.chapter, state.prose, state.isolated);
     } catch (err) {
       logger.warn('updateIndexes: addProse failed (non-fatal)', { err });
     }
