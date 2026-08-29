@@ -164,7 +164,7 @@ function makeAssembler(dbOverrides: Record<string, unknown> = {}, catalogText = 
 
 describe('ContextAssembler.forChapter — grok-adjacency', () => {
   it('prev_ending section contains "Summary:" when prev chapter generator is grok', async () => {
-    const prevChapter = { number: 4, generator: 'grok', status: 'done', summary: 'Iron treaty signed', content: 'Long prose...', title: 'Ch4' };
+    const prevChapter = { number: 4, generator: 'unrestricted', status: 'done', summary: 'Iron treaty signed', content: 'Long prose...', title: 'Ch4' };
     const prevDraft = { chapter: 4, state: { power: 50 }, body: 'body text' };
 
     const dbOverrides = {

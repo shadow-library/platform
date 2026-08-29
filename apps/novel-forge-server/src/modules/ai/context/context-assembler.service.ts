@@ -463,7 +463,7 @@ export class ContextAssembler {
     const sections: ContextSection[] = [];
 
     if (prevChapter) {
-      const isGrok = prevChapter.generator === 'grok';
+      const isGrok = prevChapter.generator === 'unrestricted';
       const isFinal = prevChapter.status === 'done';
       const tier: ContextTier = isFinal ? 'canonical' : 'working';
       if (isGrok) {
@@ -741,7 +741,7 @@ export class ContextAssembler {
     const sections: ContextSection[] = [];
 
     if (prevChapter) {
-      const isGrok = prevChapter.generator === 'grok';
+      const isGrok = prevChapter.generator === 'unrestricted';
       const isFinal = prevChapter.status === 'done';
       const tier: ContextTier = isFinal ? 'canonical' : 'working';
       if (isGrok) {

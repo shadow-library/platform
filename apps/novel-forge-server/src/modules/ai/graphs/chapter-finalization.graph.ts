@@ -92,7 +92,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
           content: state.prose,
           summary: state.summary || null,
           status: 'done',
-          generator: (state.generator as 'standard' | 'grok') || 'standard',
+          generator: (state.generator as 'standard' | 'unrestricted') || 'standard',
           wordCount: state.prose.split(/\s+/).length,
           locked: true,
         })
@@ -154,7 +154,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
 
   async function extractContinuity(state: FinalizationState) {
     // grok chapters skip continuity extraction.
-    if (state.generator === 'grok') return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
+    if (state.generator === 'unrestricted') return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
 
     const projectId = BigInt(state.projectId);
     const chapterWhere = and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter));

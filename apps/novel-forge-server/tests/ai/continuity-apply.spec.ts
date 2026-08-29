@@ -93,7 +93,7 @@ describe.if(pgAvailable)('continuity delta application', () => {
   }
 
   async function applyViaEndpoint(projectId: bigint, output: ContinuityOutput, chapter = 1): Promise<void> {
-    await db.insert(schema.chapters).values({ projectId, number: chapter, content: 'ch', status: 'done', generator: 'grok', locked: true }).onConflictDoNothing();
+    await db.insert(schema.chapters).values({ projectId, number: chapter, content: 'ch', status: 'done', generator: 'unrestricted', locked: true }).onConflictDoNothing();
     await db
       .insert(schema.continuityProposals)
       .values({ projectId, chapter, proposal: output as never, model: 'test', status: 'pending' })
@@ -260,7 +260,7 @@ describe.if(pgAvailable)('continuity delta application', () => {
 
   it('should still apply an edited pending proposal through the manual endpoint and flag the chapter', async () => {
     const projectId = await seedProject(`cont-manual-${Date.now()}`);
-    await db.insert(schema.chapters).values({ projectId, number: 1, content: 'ch', status: 'done', generator: 'grok', locked: true });
+    await db.insert(schema.chapters).values({ projectId, number: 1, content: 'ch', status: 'done', generator: 'unrestricted', locked: true });
     await db.insert(schema.continuityProposals).values({ projectId, chapter: 1, proposal: delta() as never, model: 'test', status: 'pending' });
 
     await service.updateContinuityProposal(projectId, 1, {

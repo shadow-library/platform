@@ -23,10 +23,10 @@ export class IndexingService {
   }
 
   // Add (or re-add) prose chunks for a chapter. Deletes existing chunks first (idempotent).
-  // Does NOT embed grok chapters — silently skips if generator === 'grok'.
+  // Does NOT embed unrestricted chapters — silently skips if generator === 'unrestricted'.
   async addProse(projectId: bigint, chapter: number, content: string, generator: string): Promise<void> {
-    if (generator === 'grok') {
-      this.logger.debug('addProse: skipping grok chapter (not indexed)', { projectId, chapter });
+    if (generator === 'unrestricted') {
+      this.logger.debug('addProse: skipping unrestricted chapter (not indexed)', { projectId, chapter });
       return;
     }
 
@@ -67,14 +67,14 @@ export class IndexingService {
       });
   }
 
-  // Backfill: find all chapters for projectId with status='done' and generator!='grok'
+  // Backfill: find all chapters for projectId with status='done' and generator!='unrestricted'
   // that have zero chapter_chunks rows, then addProse for each.
   async backfill(projectId: bigint): Promise<{ indexed: number; skipped: number }> {
     const doneChapters = await this.db.query.chapters.findMany({
       where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')),
     });
 
-    const standardChapters = doneChapters.filter(c => c.generator !== 'grok');
+    const standardChapters = doneChapters.filter(c => c.generator !== 'unrestricted');
     this.logger.info('backfill: reindexing prose', { projectId, doneChapters: doneChapters.length, standardChapters: standardChapters.length });
 
     const indexedCounts = await this.db.execute<{ chapter: number; cnt: number }>(sql`

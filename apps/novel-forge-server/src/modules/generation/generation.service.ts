@@ -959,8 +959,8 @@ export class GenerationService {
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
     if (!chapterRow) return false;
-    // grok chapters bypass continuity extraction entirely, so their flag never turns true.
-    if (!chapterRow.continuityApplied && generator !== 'grok') return false;
+    // unrestricted chapters bypass continuity extraction entirely, so their flag never turns true.
+    if (!chapterRow.continuityApplied && generator !== 'unrestricted') return false;
     return (project?.storyCurrentChapter ?? 0) >= chapter;
   }
 
@@ -1081,7 +1081,7 @@ export class GenerationService {
           body: result.body,
           summary: result.summary,
           state: result.state as never,
-          generator: 'grok',
+          generator: 'unrestricted',
           reviewStatus: 'needs_review',
           staleReason: null,
           status: 'draft',
@@ -1093,7 +1093,7 @@ export class GenerationService {
             body: result.body,
             summary: result.summary,
             state: result.state as never,
-            generator: 'grok',
+            generator: 'unrestricted',
             revision: sql`${schema.drafts.revision} + 1`,
             reviewStatus: 'needs_review',
             staleReason: null,

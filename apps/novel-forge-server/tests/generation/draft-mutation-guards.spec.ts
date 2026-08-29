@@ -172,7 +172,7 @@ describe.if(pgAvailable)('GenerationService draft mutation guards', () => {
 
       expect(generated.body).toBe('revised body');
       expect(generated.title).toBe('revised title');
-      expect(generated.generator).toBe('grok');
+      expect(generated.generator).toBe('unrestricted');
       expect(generated.reviewStatus).toBe('needs_review');
       expect(generated.staleReason).toBeNull();
       expect(generated.revision).toBe(1);
@@ -222,7 +222,7 @@ describe.if(pgAvailable)('GenerationService draft mutation guards', () => {
       expect(ancestor?.body).toBe('original body');
       expect(ancestor?.title).toBe('original title');
       expect(ancestor?.revision).toBe(0);
-      expect(ancestor?.generator).not.toBe('grok');
+      expect(ancestor?.generator).not.toBe('unrestricted');
 
       const descendant = await draftAt(projectId, 2);
       expect(descendant?.staleReason).toBeNull();

@@ -148,6 +148,13 @@
       "when": 1787919309341,
       "tag": "0020_dapper_professor_monster",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787978382306,
+      "tag": "0021_productive_green_goblin",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { type ContentRating } from '@shadow-library/sdk';
 
 import { jsonb } from './jsonb';
 import { contentGenerator, projects } from './projects';
@@ -32,6 +33,12 @@ export const chapters = pgTable(
     wordCount: integer('word_count'),
     status: chapterStatus('status').notNull(),
     generator: contentGenerator('generator').notNull().default('standard'),
+    // Independent of `generator`: that records who wrote the chapter, this records whether its prose is
+    // firewalled from the vector index, continuity extraction, and the verbatim-prose adjacency rule — a
+    // `novel-import` final-mode chapter is `human` and not isolated; pasted explicit prose is `human` and isolated.
+    isolated: boolean('isolated').notNull().default(false),
+    /** Null is *unrated*, never `'none'` — the reader stores and filters the two differently, so an unset dimension must never be defaulted. */
+    contentRating: jsonb('content_rating').$type<ContentRating>(),
     // Set true when finalization commits the canonical prose; a locked chapter is immutable at the write path.
     locked: boolean('locked').notNull().default(false),
     // Set true when a dependency (bible doc or an earlier chapter) changed after this chapter was validated.

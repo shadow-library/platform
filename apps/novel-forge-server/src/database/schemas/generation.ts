@@ -1,5 +1,6 @@
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { type ContentRating } from '@shadow-library/sdk';
 
 import { jsonb } from './jsonb';
 import { contentGenerator, projects } from './projects';
@@ -37,6 +38,12 @@ export const drafts = pgTable(
     body: text('body').notNull(),
     state: jsonb('state').$type<Record<string, unknown>>(),
     generator: contentGenerator('generator').notNull().default('standard'),
+    // Independent of `generator`: that records who wrote the draft, this records whether its prose is
+    // firewalled from the vector index, continuity extraction, and the verbatim-prose adjacency rule — a
+    // `novel-import` final-mode chapter is `human` and not isolated; pasted explicit prose is `human` and isolated.
+    isolated: boolean('isolated').notNull().default(false),
+    /** Null is *unrated*, never `'none'` — the reader stores and filters the two differently, so an unset dimension must never be defaulted. */
+    contentRating: jsonb('content_rating').$type<ContentRating>(),
     judge: judgeVerdict('judge'),
     judgeNote: text('judge_note'),
     reviewStatus: draftReviewStatus('review_status').notNull().default('generating'),

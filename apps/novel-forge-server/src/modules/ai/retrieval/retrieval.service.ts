@@ -48,7 +48,7 @@ export class RetrievalService {
         JOIN chapters ch ON ch.project_id = cc.project_id AND ch.number = cc.chapter
         WHERE cc.project_id = ${projectId}
           AND cc.embedding IS NOT NULL
-          AND ch.generator != 'grok'
+          AND ch.generator != 'unrestricted'
         ORDER BY cc.embedding <=> ${sql.raw(`'${vecLiteral}'`)}::vector
         LIMIT ${k}
       `);
