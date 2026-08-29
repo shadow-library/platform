@@ -50,6 +50,7 @@ chapter_publications            -- the publication ledger, one row per pushed ch
   published_ordinal  integer NOT NULL         -- reader-facing sequence; assigned once, never changes
   title              varchar NOT NULL
   author_note        text
+  content_rating     jsonb                    -- the chapter's ContentRating at publish time; NULL is unrated, never 'none'
   content_hash       varchar NOT NULL         -- hash of the rendered payload
   scheduled_at       timestamp
   published_at       timestamp
@@ -74,8 +75,11 @@ Error codes: `PUB_001` (NOT_FOUND, publication not found), `PUB_002` (CLIENT_ERR
 - **Edits after publish** (the Wattpad rule — every major platform allows silent post-publish edits): fix in the forge, republish. Same `PUT`, new `contentHash`, new
   reader-side revision (which doubles as the cache-invalidation signal). There is **no edit surface on the reader side**, not even an admin one.
 - **Unpublish/stubbing** is first-class: `DELETE` on the reader, ledger row → `unpublished`. Re-publishing later reuses the same ordinal.
-- **Payload is reader-clean:** title, prose rendered to the reader's format, author's note, word count, ordinal, hash. No forge internals (state jsonb, summaries,
-  refs, judge output) ever cross the boundary.
+- **Payload is reader-clean:** title, prose rendered to the reader's format, author's note, word count, ordinal, hash, and the chapter's `contentRating`. No forge internals
+  (state jsonb, summaries, refs, judge output) ever cross the boundary. `contentRating` was admitted by `interstitial-chapter-design.md` §11 as an explicitly reader-safe
+  field — a rating level is metadata _about_ the content, not the content or a spoiler — and it is the only field ever readmitted; the bar for the next one is the same
+  argument, made in writing. An absent rating means _unrated_ and is never sent, stored, or inferred as `'none'`, and it is covered by `contentHash`, so a rating change
+  republishes exactly like a prose change.
 
 ## 5. Push protocol (PB2–PB3)
 
@@ -113,7 +117,7 @@ Deliberately boring: Bun + Fastify (no DI framework needed), own small Postgres,
 
 ```
 novels              slug PK-ish, title, blurb, cover, status
-published_chapters  (novel, ordinal) unique, title, content, author_note, content_hash, revision, word_count, published_at
+published_chapters  (novel, ordinal) unique, title, content, author_note, content_rating, content_hash, revision, word_count, published_at
 users / sessions    reader auth
 reading_progress    (user, novel) → ordinal + position
 ```
@@ -130,4 +134,10 @@ the personalized calls are single-row lookups.
 4. The forge never reads or writes reader-owned tables (accounts, progress, comments); audience data reaches the forge only through a read-only analytics endpoint, if ever.
 5. Every push is idempotent, keyed `(novelSlug, publishedOrdinal)` + `contentHash`; retries and replays are always safe.
 6. `publishedOrdinal` is assigned once by the forge and never re-derived from internal chapter numbers.
-7. Nothing spoiler-grade ever appears in a push payload — the reader database must be printable on the inside of the front cover.
+7. Nothing spoiler-grade ever appears in a push payload — the reader database must be printable on the inside of the front cover. Amended by
+   `interstitial-chapter-design.md` §11: a chapter's `contentRating` crosses, because a rating level describes the content without revealing any of it. The rule is
+   otherwise unchanged, and nothing else has been readmitted.
+8. `chapterContentHash` (`@shadow-library/sdk/publishing`) may gain fields, but **no change to it may move the digest of a chapter whose reader-visible content did not
+   change** — the reader recomputes the digest and rejects a mismatch (`WBN_011`), so a digest that moves for nothing breaks every in-flight push during a deploy window
+   and re-pushes the whole back catalogue for no reader-visible change. New fields are therefore additive and absent-by-default, or ship as a versioned hash alongside the
+   existing one. The reader deploys before the forge whenever the payload gains a field (`interstitial-chapter-design.md` §11's deploy note).

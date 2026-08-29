@@ -1,6 +1,6 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
-import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
+import { type ContentRating, type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
 
 import { DarkContentRating, NovelGenre, NovelTag, SexualContentRating, ViolenceRating } from '@server/classes';
 
@@ -14,6 +14,8 @@ export const NOVEL_VISIBILITIES = ['PUBLIC', 'ORGANISATION', 'RESTRICTED'] as co
  * rather than a product limit — an author who needs more than this wants `ORGANISATION`.
  */
 export const MAX_GRANT_SUBJECTS = 500;
+
+const RATING_DESCRIPTION = 'Omit when unrated. An absent dimension is stored as unrated and is never inferred to be "none".';
 
 @Schema()
 export class NovelSlugParams {
@@ -51,13 +53,13 @@ export class NovelUpsertBody {
   @Field(() => [NovelTag], { optional: true, uniqueItems: true })
   tags?: Tag[];
 
-  @Field(() => SexualContentRating, { optional: true, description: 'Omit when unrated. An absent dimension is stored as unrated and is never inferred to be "none".' })
+  @Field(() => SexualContentRating, { optional: true, description: RATING_DESCRIPTION })
   sexualContent?: SexualContentLevel;
 
-  @Field(() => ViolenceRating, { optional: true, description: 'Omit when unrated. An absent dimension is stored as unrated and is never inferred to be "none".' })
+  @Field(() => ViolenceRating, { optional: true, description: RATING_DESCRIPTION })
   violence?: ViolenceLevel;
 
-  @Field(() => DarkContentRating, { optional: true, description: 'Omit when unrated. An absent dimension is stored as unrated and is never inferred to be "none".' })
+  @Field(() => DarkContentRating, { optional: true, description: RATING_DESCRIPTION })
   darkContent?: DarkContentLevel;
 
   @Field(() => String, { enum: ['live', 'retired'], optional: true })
@@ -117,6 +119,19 @@ export class NovelAccessResponse {
   revision: number;
 }
 
+/** The per-chapter rating, three independent optional dimensions. Omitting one leaves it unrated; there is no way to say "no content" other than the explicit `'none'`. */
+@Schema()
+export class ChapterContentRating {
+  @Field(() => SexualContentRating, { optional: true, description: RATING_DESCRIPTION })
+  sexualContent?: SexualContentLevel;
+
+  @Field(() => ViolenceRating, { optional: true, description: RATING_DESCRIPTION })
+  violence?: ViolenceLevel;
+
+  @Field(() => DarkContentRating, { optional: true, description: RATING_DESCRIPTION })
+  darkContent?: DarkContentLevel;
+}
+
 @Schema()
 export class ChapterUpsertBody {
   @Field({ maxLength: 256 })
@@ -127,6 +142,12 @@ export class ChapterUpsertBody {
 
   @Field(() => String, { optional: true })
   authorNote?: string;
+
+  @Field(() => ChapterContentRating, {
+    optional: true,
+    description: 'Omit when the chapter is unrated — an absent rating is stored as unrated, never as "none". It is covered by contentHash, so changing it changes the hash.',
+  })
+  contentRating?: ContentRating;
 
   @Field({ maxLength: 128 })
   contentHash: string;

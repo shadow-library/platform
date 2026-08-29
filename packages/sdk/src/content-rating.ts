@@ -66,3 +66,15 @@ export function isRatingAtMost<D extends ContentRatingDimension>(dimension: D, l
 export function isRated<D extends ContentRatingDimension>(rating: ContentRating, dimension: D): rating is ContentRating & Record<D, ContentRatingLevel<D>> {
   return rating[dimension] !== undefined;
 }
+
+/**
+ * Drops dimensions a source left unset — including an explicit `null`, which a JSON producer writes for the same
+ * "not stated" a missing key means — and answers `undefined` when none remain, so every spelling of unrated is one
+ * value everywhere the rating crosses a boundary: the wire, the hash, and the stored column. No dimension is ever
+ * invented, so unrated never becomes `'none'`.
+ */
+export function normalizeContentRating(rating: ContentRating | null | undefined): ContentRating | undefined {
+  if (!rating) return undefined;
+  const rated = CONTENT_RATING_DIMENSIONS.filter(dimension => rating[dimension] !== undefined && rating[dimension] !== null).map(dimension => [dimension, rating[dimension]]);
+  return rated.length ? (Object.fromEntries(rated) as ContentRating) : undefined;
+}

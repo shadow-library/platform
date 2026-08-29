@@ -1,4 +1,5 @@
 export * from './publish-payload';
+export * from './rating-invariant';
 export * from './wiki-projection';
 export * from './wiki-publishing.service';
 export * from './publication-access.service';

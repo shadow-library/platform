@@ -23,7 +23,7 @@ const testEnv = new TestEnvironment('publishing_api');
 const READER_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 describe('renderChapterPayload', () => {
-  const chapter = { number: 4, title: '  The Vale Gate ', content: 'One two three.\n\nFour five.', note: 'thanks for reading', wordCount: null };
+  const chapter = { number: 4, title: '  The Vale Gate ', content: 'One two three.\n\nFour five.', note: 'thanks for reading', wordCount: null, contentRating: null };
 
   it('should render exactly the reader-clean fields and nothing forge-internal', () => {
     const payload = renderChapterPayload(chapter);
@@ -40,6 +40,25 @@ describe('renderChapterPayload', () => {
   it('should keep the hash stable for unchanged prose and move it when prose changes', () => {
     expect(renderChapterPayload(chapter).contentHash).toBe(renderChapterPayload({ ...chapter, wordCount: 99 }).contentHash);
     expect(renderChapterPayload(chapter).contentHash).not.toBe(renderChapterPayload({ ...chapter, content: 'Different prose.' }).contentHash);
+  });
+
+  it('should carry the chapter rating and omit it when the chapter is unrated', () => {
+    const rated = renderChapterPayload({ ...chapter, contentRating: { violence: 'graphic' } });
+    expect(rated.contentRating).toEqual({ violence: 'graphic' });
+    expect('contentRating' in renderChapterPayload(chapter)).toBe(false);
+    expect('contentRating' in renderChapterPayload({ ...chapter, contentRating: {} })).toBe(false);
+  });
+
+  it('should move the hash when the rating changes and hold it when only unrated spellings differ', () => {
+    const base = renderChapterPayload(chapter).contentHash;
+    expect(renderChapterPayload({ ...chapter, contentRating: {} }).contentHash).toBe(base);
+    expect(renderChapterPayload({ ...chapter, contentRating: { violence: 'mild' } }).contentHash).not.toBe(base);
+    expect(renderChapterPayload({ ...chapter, contentRating: { violence: 'mild' } }).contentHash).toBe(
+      renderChapterPayload({ ...chapter, contentRating: { violence: 'mild' } }).contentHash,
+    );
+    expect(renderChapterPayload({ ...chapter, contentRating: { violence: 'graphic' } }).contentHash).not.toBe(
+      renderChapterPayload({ ...chapter, contentRating: { violence: 'mild' } }).contentHash,
+    );
   });
 });
 

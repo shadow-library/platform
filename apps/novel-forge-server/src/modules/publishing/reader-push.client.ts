@@ -1,7 +1,7 @@
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { type APIResponse, Logger } from '@shadow-library/common';
-import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
+import { type ContentRating, type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
 
 import { APP_NAME } from '@server/constants';
 
@@ -41,6 +41,8 @@ export interface ChapterPushBody {
   title: string;
   content: string;
   authorNote?: string;
+  /** Omission is how a rating is cleared, exactly as on the novel push: the reader stores an absent dimension as unrated. */
+  contentRating?: ContentRating;
   contentHash: string;
   revision: number;
   wordCount?: number;

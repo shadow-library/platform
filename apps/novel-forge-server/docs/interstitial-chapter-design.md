@@ -441,14 +441,34 @@ per-chapter fact some chapters don't carry.
   `content_rating jsonb` column mirroring it (the ledger is the outbox; the payload is rendered from the
   ledger's own columns, per existing precedent — see how `title`/`authorNote`/`contentHash` are already
   duplicated onto the ledger row).
-- **`chapterContentHash` (`@shadow-library/sdk/publishing`) includes `contentRating`.** This directly
-  contradicts that function's own doc comment — _"the field set is frozen; extend the payload only with a
-  versioned hash alongside this one"_ — because the task requires the existing hash to change. Do it anyway,
-  update that comment to describe the new frozen set, and accept the consequence stated in the comment's own
-  reasoning: **every already-published chapter re-hashes differently the moment this ships**, which is a
-  three-repo coordinated deploy (`novel-forge-server`, `web-novel-server`, and the `webnovel-ingest` client all
-  read `ChapterHashInput`) followed by one deliberate `reconcile` run (`reader-publish-design.md` §5–6) to
-  re-converge every existing publication rather than have them look "changed" to no purpose.
+- **`chapterContentHash` (`@shadow-library/sdk/publishing`) includes `contentRating`.** This overrides that
+  function's own doc comment — _"the field set is frozen; extend the payload only with a versioned hash
+  alongside this one"_ — because a rating change must reach readers and the ledger's whole republish/no-op
+  decision is hash-driven. The comment is rewritten to state what actually governs the set now: not "never
+  change it", but **no edit may move the digest of a chapter whose reader-visible content did not change.**
+  `contentRating` is hashed only when it carries at least one dimension — an unrated chapter omits the key
+  entirely and keeps its historical digest.
+
+  As implemented this is narrower than the consequence this section first anticipated ("every already-published
+  chapter re-hashes"). It is deliberate: because absence is omitted rather than hashed as `null`, no chapter
+  carrying no rating moves, so **the back catalogue is untouched and no reconcile sweep is required** — the
+  pinned wire digests in `packages/sdk/tests/content-hash.spec.ts` still hold, and only a chapter that actually
+  gains, changes or loses a rating re-hashes and republishes through the ordinary path. Unconditional inclusion
+  was rejected because there is no deploy order that survives it: an old forge's legacy digest and a new forge's
+  `null`-bearing digest disagree with whichever reader is live, so every push fails for the length of the window
+  (and a re-push of the whole catalogue only churns reader ETags and caches for no reader-visible change).
+
+- **Deploy order: `web-novel-server` first, then `novel-forge-server`.** The reader recomputes the digest from
+  the payload it receives and rejects a mismatch with `WBN_011` (`PublishService.upsertChapter`); the forge
+  ledgers that under the unsweepable `payload hash mismatch:` prefix, so failures need an explicit
+  reconcile/republish rather than clearing on the next sweep. Forge-first therefore breaks every rated push —
+  the old reader's DTO refuses the unknown `contentRating` property and could not reproduce the digest anyway.
+  Reader-first is safe in both directions: an old forge sends no rating and its legacy digest, which the new
+  reader reproduces exactly, leaving `published_chapters.content_rating` NULL (unrated). The third consumer,
+  `webnovel-ingest`, needs no coordinated release — its unrated pushes keep validating — and can adopt the
+  field whenever it can determine a rating. One in-flight caveat inside the forge: a ledger row scheduled
+  before the deploy whose chapter is rated afterwards fails `renderLedgeredPayload`'s drift guard with
+  "canonical prose changed since this publish was decided"; republishing the chapter clears it.
 - **`web-novel-server`:** the table is actually named `published_chapters`
   (`src/modules/datastore/schemas/novels.schema.ts`), not `chapters` — add `content_rating jsonb` there;
   extend `ChapterUpsertBody` (`src/modules/publish/publish.dto.ts`) with the same optional field; the ingest
@@ -461,7 +481,11 @@ per-chapter fact some chapters don't carry.
   dimension (`undefined`) contributes nothing to the max (never coerce it to `'none'`); an unrated _novel_
   dimension with at least one rated chapter on that dimension is the violation to catch. Enforce it as a
   `PublishingService` check at `publish`/`schedule`/republish time, not a DB constraint (the two live in
-  different columns/shapes and the comparison needs the SDK's rank tables).
+  different columns/shapes and the comparison needs the SDK's rank tables). A violation **refuses the publish**
+  with `PUB_009` naming every offending dimension; the novel rating is the author's published promise and is
+  never raised automatically behind them. The check also guards `publishNovel`'s metadata update — a gate only
+  on the chapter side would be bypassed by lowering the novel rating afterwards. The comparison itself lives in
+  `src/modules/publishing/rating-invariant.ts` as a pure `findRatingViolations`, tested without a database.
 
 ## 12. Web UI (`novel-forge-web`)
 

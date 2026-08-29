@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { SQL } from 'bun';
 import { asc, eq } from 'drizzle-orm';
 
+import { type ContentRating } from '@shadow-library/sdk';
 import { chapterContentHash } from '@shadow-library/sdk/publishing';
 
 import { schema } from '@server/modules/datastore';
@@ -37,6 +38,7 @@ interface ChapterBodyOverrides {
   title?: string;
   content?: string;
   authorNote?: string;
+  contentRating?: ContentRating;
   contentHash?: string;
   wordCount?: number;
 }
@@ -44,7 +46,7 @@ interface ChapterBodyOverrides {
 const chapterBody = (revision: number, overrides: ChapterBodyOverrides = {}) => {
   const title = overrides.title ?? CHAPTER_TITLE;
   const content = overrides.content ?? CHAPTER_CONTENT;
-  const contentHash = overrides.contentHash ?? chapterContentHash({ title, content, authorNote: overrides.authorNote });
+  const contentHash = overrides.contentHash ?? chapterContentHash({ title, content, authorNote: overrides.authorNote, contentRating: overrides.contentRating });
   return { title, content, revision, wordCount: 11, ...overrides, contentHash };
 };
 
@@ -358,6 +360,26 @@ describe('Internal publish API', () => {
       const withNull = chapterContentHash({ title: CHAPTER_TITLE, content: CHAPTER_CONTENT, authorNote: null });
       expect(withUndefined).toBe(withNull);
       expect(withUndefined).toBe(CHAPTER_HASH);
+    });
+
+    it('should persist a pushed rating, keep an omitted one unrated, and reject one the hash does not cover', async () => {
+      await publishNovel();
+      const rated = chapterBody(1, { contentRating: { violence: 'graphic' } });
+      expect((await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: rated })).statusCode).toBe(200);
+      expect((await chapterRows())[0]).toMatchObject({ contentRating: { violence: 'graphic' }, contentHash: rated.contentHash });
+
+      expect((await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: chapterBody(2) })).statusCode).toBe(200);
+      expect((await chapterRows())[0]?.contentRating).toBeNull();
+
+      const undeclared = { ...chapterBody(3), contentRating: { violence: 'graphic' as const } };
+      const response = await push('put', `/internal/novels/${SLUG}/chapters/1`, { body: undeclared });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ code: 'WBN_011' });
+    });
+
+    it('should leave an unrated push on the digest an older publisher computes for it', () => {
+      expect(chapterContentHash({ title: CHAPTER_TITLE, content: CHAPTER_CONTENT, contentRating: {} })).toBe(CHAPTER_HASH);
+      expect(chapterContentHash({ title: CHAPTER_TITLE, content: CHAPTER_CONTENT, contentRating: { violence: 'mild' } })).not.toBe(CHAPTER_HASH);
     });
 
     it('should accept a hash produced directly by chapterContentHash, pinning the shared wire contract', async () => {

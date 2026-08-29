@@ -3,6 +3,7 @@ import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
+import { normalizeContentRating } from '@shadow-library/sdk';
 import { chapterContentHash } from '@shadow-library/sdk/publishing';
 
 import { AppErrorCode } from '@server/classes';
@@ -120,7 +121,9 @@ export class PublishService {
   async upsertChapter(slug: string, ordinal: number, body: ChapterUpsertBody): Promise<UpsertResult> {
     const caller = this.caller();
     const novel = await loadOwnedNovel(this.db, slug, caller);
-    const expectedHash = chapterContentHash({ title: body.title, content: body.content, authorNote: body.authorNote });
+    // Absent stays absent all the way through: it is what an older publisher sends, what the hash omits, and what the column stores as unrated.
+    const contentRating = normalizeContentRating(body.contentRating);
+    const expectedHash = chapterContentHash({ title: body.title, content: body.content, authorNote: body.authorNote, contentRating });
     if (expectedHash !== body.contentHash) throw AppErrorCode.WBN_011.create();
     const result = await this.db.transaction(async tx => {
       const [stored] = await tx.select().from(schema.publishedChapters).where(this.chapterFilter(novel.id, ordinal)).for('update');
@@ -147,6 +150,7 @@ export class PublishService {
         title: body.title,
         content: body.content,
         authorNote: body.authorNote ?? null,
+        contentRating: contentRating ?? null,
         contentHash: body.contentHash,
         revision: body.revision,
         wordCount: body.wordCount ?? this.countWords(body.content),

@@ -2,6 +2,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
+import { type ContentRating, normalizeContentRating } from '@shadow-library/sdk';
 
 import { AppErrorCode } from '@server/classes';
 import { assertActiveProject } from '@server/common';
@@ -10,6 +11,7 @@ import { type PrimaryDatabase, type Publishing, schema } from '@server/database'
 
 import { renderChapterPayload } from './publish-payload';
 import { type PublishChapterBody, type PublishNovelBody } from './publishing.dto';
+import { describeRatingViolations, findRatingViolations } from './rating-invariant';
 
 export interface PublicationsLedger {
   publication: Publishing.Publication | null;
@@ -39,6 +41,15 @@ function slugCandidate(base: string, attempt: number): string {
   if (attempt === 1) return trimSlug(base);
   const suffix = `-${attempt}`;
   return `${trimSlug(base, MAX_SLUG_LENGTH - suffix.length)}${suffix}`;
+}
+
+/** The publication's three rating columns read as one `ContentRating`; a null column is unrated and stays absent. */
+function publicationRating(publication: Pick<Publishing.Publication, 'sexualContent' | 'violence' | 'darkContent'>): ContentRating | undefined {
+  return normalizeContentRating({
+    sexualContent: publication.sexualContent ?? undefined,
+    violence: publication.violence ?? undefined,
+    darkContent: publication.darkContent ?? undefined,
+  });
 }
 
 @Injectable()
@@ -109,6 +120,11 @@ export class PublishingService {
       JSON.stringify(next.genres ?? null) === JSON.stringify(stored.genres ?? null) &&
       JSON.stringify(next.tags ?? null) === JSON.stringify(stored.tags ?? null);
     if (unchanged) return stored;
+    const ledgered = await this.loadLedger(projectId);
+    this.assertRatingCeiling(
+      publicationRating(next),
+      ledgered.filter(row => row.status !== 'unpublished').map(row => row.contentRating),
+    );
 
     const [updated] = await this.databaseService.run(() =>
       this.db
@@ -138,7 +154,7 @@ export class PublishingService {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { status: true } });
     if (!project) throw AppErrorCode.PRJ_001.create();
     assertActiveProject(project);
-    await this.getPublication(projectId);
+    const publication = await this.getPublication(projectId);
 
     const chapter = await this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapterNumber)) });
     if (!chapter) throw AppErrorCode.CHP_001.create();
@@ -148,6 +164,8 @@ export class PublishingService {
     const ledger = await this.loadLedger(projectId);
     const existing = ledger.filter(row => row.chapter === chapterNumber).at(-1);
     const scheduledAt = body.scheduledAt ? new Date(body.scheduledAt) : null;
+    const published = ledger.filter(row => row.status !== 'unpublished' && row.id !== existing?.id).map(row => row.contentRating);
+    this.assertRatingCeiling(publicationRating(publication), [...published, payload.contentRating]);
 
     if (existing) {
       this.assertNoHolesBelow(ledger, existing.publishedOrdinal);
@@ -158,6 +176,7 @@ export class PublishingService {
           chapter: chapterNumber,
           title: payload.title,
           authorNote: payload.authorNote ?? null,
+          contentRating: payload.contentRating ?? null,
           contentHash: payload.contentHash,
           revision: hashChanged ? existing.revision + 1 : existing.revision,
           scheduledAt,
@@ -184,6 +203,7 @@ export class PublishingService {
         publishedOrdinal: nextOrdinal,
         title: payload.title,
         authorNote: payload.authorNote ?? null,
+        contentRating: payload.contentRating ?? null,
         contentHash: payload.contentHash,
         scheduledAt,
         status: 'scheduled',
@@ -303,6 +323,12 @@ export class PublishingService {
       if (publication) return publication;
     }
     throw AppErrorCode.PUB_008.create({ base });
+  }
+
+  /** PUB_009: the catalog's promise must cover every chapter behind it, so a publish that would break the invariant is refused rather than silently raising the novel */
+  private assertRatingCeiling(novel: ContentRating | undefined, chapters: readonly (ContentRating | null | undefined)[]): void {
+    const violations = findRatingViolations(novel, chapters);
+    if (violations.length) throw AppErrorCode.PUB_009.create({ violations: describeRatingViolations(violations) });
   }
 
   /** PUB_003 half 1: nothing may go (back) live above an unpublished hole — readers would see chapter 7 with 6 missing */

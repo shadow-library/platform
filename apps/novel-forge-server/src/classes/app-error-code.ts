@@ -238,4 +238,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PUB_006 = AppErrorCode.badRequest('PUB_006', 'Organisation visibility requires the session to be acting in an organisation');
   static readonly PUB_007 = AppErrorCode.conflict('PUB_007', 'That novel slug already belongs to another project');
   static readonly PUB_008 = AppErrorCode.conflict('PUB_008', 'No free novel slug remains near “{base}” — publish with an explicit novelSlug');
+  // Refused rather than auto-raised: the novel-level rating is the author's published promise to readers, and
+  // silently rewriting it from a chapter edit changes what the catalog advertises without anyone deciding to.
+  static readonly PUB_009 = AppErrorCode.badRequest('PUB_009', 'The novel rating is below a published chapter’s — raise it first ({violations})');
 }

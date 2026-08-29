@@ -1,6 +1,8 @@
 import { InferEnum, InferSelectModel } from 'drizzle-orm';
 import { bigint, bigserial, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
-import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
+import { type ContentRating, type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
+
+import { jsonb } from './jsonb';
 
 export type Novel = InferSelectModel<typeof novels>;
 export namespace Novel {
@@ -93,6 +95,13 @@ export const publishedChapters = pgTable(
     title: varchar('title', { length: 256 }).notNull(),
     content: text('content').notNull(),
     authorNote: text('author_note'),
+    /**
+     * The chapter's own rating, independent of the novel's three columns: one is a per-novel classification the
+     * author sets once, the other a per-chapter fact most chapters do not carry. `NULL` is *unrated* and never
+     * `'none'` — a publisher that omits the field asserts nothing, so an older publisher can neither invent nor
+     * wipe a level, and the catalog filters the two apart.
+     */
+    contentRating: jsonb('content_rating').$type<ContentRating>(),
     contentHash: varchar('content_hash', { length: 128 }).notNull(),
     revision: integer('revision').notNull(),
     wordCount: integer('word_count'),

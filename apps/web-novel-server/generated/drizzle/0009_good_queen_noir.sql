@@ -1,0 +1,1 @@
+ALTER TABLE "published_chapters" ADD COLUMN "content_rating" jsonb;

@@ -1,6 +1,6 @@
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
-import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
+import { type ContentRating, type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
 
 import { jsonb } from './jsonb';
 import { projects } from './projects';
@@ -113,6 +113,8 @@ export const chapterPublications = pgTable(
     publishedOrdinal: integer('published_ordinal').notNull(),
     title: varchar('title', { length: 256 }).notNull(),
     authorNote: text('author_note'),
+    /** The chapter's rating as of the publish decision, mirrored here because the ledger is what the push renders from. Null is *unrated*, never `'none'`. */
+    contentRating: jsonb('content_rating').$type<ContentRating>(),
     contentHash: varchar('content_hash', { length: 128 }).notNull(),
     revision: integer('revision').notNull().default(1),
     scheduledAt: timestamp('scheduled_at'),
