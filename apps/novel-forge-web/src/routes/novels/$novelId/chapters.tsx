@@ -1,19 +1,42 @@
+import { type ContentRating, normalizeContentRating } from '@shadow-library/sdk';
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import DOMPurify from 'dompurify';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, ButtonGroup, Dialog, Drawer, DropdownMenu, IconButton, SegmentedControl, Spinner, toast, Tooltip } from '@shadow-library/ui';
+import {
+  Alert,
+  Button,
+  ButtonGroup,
+  Checkbox,
+  Dialog,
+  Drawer,
+  DropdownMenu,
+  FormField,
+  IconButton,
+  Input,
+  SegmentedControl,
+  Spinner,
+  Textarea,
+  toast,
+  Tooltip,
+} from '@shadow-library/ui';
 
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, SparkIcon, TrashIcon, WarningIcon } from '@/components/icons';
-import { type ChipIntent, Markdown, PaneError, PaneLoader, QueryState, RowAction, StatusChip } from '@/components/nf';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, SparkIcon, TrashIcon, UploadIcon, WarningIcon } from '@/components/icons';
+import { type ChipIntent, ContentRatingPicker, Markdown, PaneError, PaneLoader, QueryState, RowAction, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import { ImageGallery } from '@/components/nf/ImageGallery';
 import {
+  type AmendChapterResponse,
   type DraftResponse,
+  externalStopChapter,
+  type InsertChapterBody,
+  isFinalizeBlocked,
+  isIsolated,
   listBriefsQueryOptions,
   listDraftsQueryOptions,
   projectStatusQueryOptions,
   useAddChapterImageMutation,
+  useAmendChapterMutation,
   useApproveDraftMutation,
   useChapterImagesQuery,
   useDeleteChapterImageMutation,
@@ -21,12 +44,16 @@ import {
   useDraftQuery,
   useExtractToBibleMutation,
   useGenerateMutation,
+  useGenerateUnrestrictedMutation,
+  useImportDraftMutation,
+  useInsertChapterMutation,
   useJudgeDraftMutation,
   useListBriefsQuery,
   useListDraftsQuery,
   useListJobsQuery,
   useListRunsQuery,
   useProjectStatusQuery,
+  useSummarizeChapterMutation,
   useUpdateDraftMutation,
 } from '@/lib/apis';
 
@@ -39,6 +66,8 @@ function toneOf(intent: ChipIntent): 'success' | 'danger' | 'warning' {
 interface ChaptersSearch {
   chapter?: number;
   job?: string;
+  /** The external-write slot that truncated the last batch — the read models carry no write-mode flag, so the URL is what remembers it. */
+  slot?: number;
 }
 
 // Which chapter editor / generation-progress view is open lives in the URL, so a refresh returns to
@@ -46,9 +75,11 @@ interface ChaptersSearch {
 export const Route = createFileRoute('/novels/$novelId/chapters')({
   validateSearch: (search: Record<string, unknown>): ChaptersSearch => {
     const chapter = Number(search.chapter);
+    const slot = Number(search.slot);
     return {
       chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : undefined,
       job: typeof search.job === 'string' && search.job ? search.job : undefined,
+      slot: Number.isInteger(slot) && slot > 0 ? slot : undefined,
     };
   },
   loader: async ({ context, params }) => {
@@ -172,15 +203,223 @@ function GenerationProgress({ novelId, jobId, onBack }: GenerationProgressProps)
   );
 }
 
+function UnrestrictedBadge(): React.JSX.Element {
+  return (
+    <Tooltip content="Firewalled: this chapter's prose is never indexed, retrieved, or fed to continuity extraction. Downstream chapters see only its summary and continuation state.">
+      <span>
+        <StatusChip intent="warning">unrestricted</StatusChip>
+      </span>
+    </Tooltip>
+  );
+}
+
+interface InsertChapterDialogProps {
+  novelId: string;
+  afterChapter: number;
+  downstream: number[];
+  onOpenChange: (open: boolean) => void;
+}
+
+// The consequences are spelled out before the call, not after: the insert is one transaction that
+// renumbers every downstream chapter, and there is no undo to review afterwards.
+function InsertChapterDialog({ novelId, afterChapter, downstream, onOpenChange }: InsertChapterDialogProps): React.JSX.Element {
+  const insert = useInsertChapterMutation(novelId);
+  const [origin, setOrigin] = useState<'hand' | 'planner'>('hand');
+  const [briefBody, setBriefBody] = useState('');
+  const [intent, setIntent] = useState('');
+  const newChapter = afterChapter + 1;
+  const shifted = downstream.filter(n => n > afterChapter).sort((a, b) => a - b);
+  const invalid = origin === 'hand' ? !briefBody.trim() : !intent.trim();
+
+  const submit = (): void => {
+    const body: InsertChapterBody = origin === 'hand' ? { briefOrigin: 'hand', briefBody: briefBody.trim() } : { briefOrigin: 'planner', intent: intent.trim() };
+    insert.mutate(
+      { afterChapter, body },
+      {
+        onSuccess: result => {
+          toast.success(`Chapter ${result.newChapter} inserted — ${result.shiftedChapters} renumbered`);
+          onOpenChange(false);
+        },
+        onError: error => toast.danger(error.message),
+      },
+    );
+  };
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <Dialog.Content size="lg">
+        <Dialog.Header
+          title={`Insert chapter ${newChapter}`}
+          description={afterChapter === 0 ? 'The new chapter goes ahead of chapter 1.' : `The new chapter goes immediately after chapter ${afterChapter}.`}
+        />
+        <Dialog.Body>
+          <div className={styles.dialogForm}>
+            <div className={styles.consequences}>
+              <div className={styles.consequencesTitle}>What this changes</div>
+              <ul className={styles.consequencesList}>
+                <li>
+                  {shifted.length === 0
+                    ? 'Nothing downstream to renumber — the new chapter lands at the end of the plan.'
+                    : `Chapters ${shifted[0]}–${shifted[shifted.length - 1]} move up by one: ${shifted.length} briefs are renumbered and re-rendered.`}
+                </li>
+                <li>The arc and volume around this point each grow by one chapter; later arcs and volumes shift. This happens silently — the plan is not re-approved.</li>
+                <li>Every draft after the insert point is marked stale.</li>
+                <li>Finalized chapters never move, so the insert is refused below the write frontier.</li>
+              </ul>
+            </div>
+            <FormField label="Where the brief comes from">
+              <SegmentedControl value={origin} onValueChange={value => setOrigin(value as 'hand' | 'planner')}>
+                <SegmentedControl.Item value="hand">Write the brief</SegmentedControl.Item>
+                <SegmentedControl.Item value="planner">Plan it from an intent</SegmentedControl.Item>
+              </SegmentedControl>
+            </FormField>
+            {origin === 'hand' ? (
+              <FormField label="Brief" required helper="Stored verbatim as the new chapter's brief.">
+                <Textarea
+                  value={briefBody}
+                  onValueChange={setBriefBody}
+                  minRows={6}
+                  autoGrow
+                  autoFocus
+                  placeholder="What happens in this chapter, who is present, what changes by the end…"
+                />
+              </FormField>
+            ) : (
+              <FormField label="Intent" required helper="One line. The planner drafts the brief from it plus the surrounding chapters and the arc objective.">
+                <Input value={intent} onValueChange={setIntent} autoFocus placeholder="Kael finally tells Amara what happened in the vault." />
+              </FormField>
+            )}
+          </div>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Dialog.Close asChild>
+            <Button variant="ghost">Cancel</Button>
+          </Dialog.Close>
+          <Button variant="primary" disabled={invalid} loading={insert.isPending} onClick={submit}>
+            Insert chapter {newChapter}
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog>
+  );
+}
+
+type FillMode = 'generate' | 'paste';
+
+interface FillSlotDialogProps {
+  novelId: string;
+  chapter: number;
+  onOpenChange: (open: boolean) => void;
+  onFilled: (chapter: number) => void;
+}
+
+function FillSlotDialog({ novelId, chapter, onOpenChange, onFilled }: FillSlotDialogProps): React.JSX.Element {
+  const generate = useGenerateUnrestrictedMutation(novelId, chapter);
+  const importDraft = useImportDraftMutation(novelId, chapter);
+  const [mode, setMode] = useState<FillMode>('generate');
+  const [guidance, setGuidance] = useState('');
+  const [prose, setProse] = useState('');
+  const [title, setTitle] = useState('');
+  const [summary, setSummary] = useState('');
+  const [isolated, setIsolated] = useState(true);
+  const [rating, setRating] = useState<ContentRating>({});
+
+  const done = (): void => {
+    onFilled(chapter);
+    onOpenChange(false);
+  };
+
+  const submit = (): void => {
+    const contentRating = normalizeContentRating(rating);
+    if (mode === 'generate') {
+      generate.mutate({ guidance: guidance.trim() || undefined, contentRating }, { onSuccess: done, onError: error => toast.danger(error.message) });
+      return;
+    }
+    importDraft.mutate(
+      { prose: sanitizeSource(prose), title: title.trim() || undefined, summary: summary.trim() || undefined, isolated, contentRating },
+      { onSuccess: done, onError: error => toast.danger(error.message) },
+    );
+  };
+
+  const pending = generate.isPending || importDraft.isPending;
+  const invalid = mode === 'generate' ? false : !prose.trim();
+
+  return (
+    <Dialog open onOpenChange={open => !pending && onOpenChange(open)}>
+      <Dialog.Content size="lg">
+        <Dialog.Header
+          title={`Fill chapter ${chapter}`}
+          description="This slot is written outside the primary model — either generated by the unrestricted writer or pasted in by you."
+        />
+        <Dialog.Body>
+          <div className={styles.dialogForm}>
+            <SegmentedControl value={mode} onValueChange={value => setMode(value as FillMode)}>
+              <SegmentedControl.Item value="generate">Generate unrestricted</SegmentedControl.Item>
+              <SegmentedControl.Item value="paste">Paste prose</SegmentedControl.Item>
+            </SegmentedControl>
+            {mode === 'generate' ? (
+              <>
+                <Alert intent="warning" title="Written by the permissive model">
+                  The prose is firewalled: never indexed, never retrieved, never fed to continuity extraction. Chapter {chapter + 1} will see only its summary and continuation
+                  state.
+                </Alert>
+                <FormField label="Guidance" helper="What this chapter has to put on the page. Optional — the brief is used either way.">
+                  <Textarea value={guidance} onValueChange={setGuidance} minRows={4} autoGrow autoFocus />
+                </FormField>
+              </>
+            ) : (
+              <>
+                <FormField label="Prose" required helper="Markdown. Replaces whatever is in the slot.">
+                  <Textarea value={prose} onValueChange={setProse} minRows={8} autoGrow autoFocus />
+                </FormField>
+                <div className={styles.dialogGrid}>
+                  <FormField label="Title">
+                    <Input value={title} onValueChange={setTitle} />
+                  </FormField>
+                  <FormField label="Summary" helper="Required before a firewalled chapter can be finalized.">
+                    <Input value={summary} onValueChange={setSummary} />
+                  </FormField>
+                </div>
+                <Checkbox
+                  checked={isolated}
+                  onCheckedChange={checked => setIsolated(checked === true)}
+                  label="Firewall this chapter"
+                  description="Keeps the prose out of the index, retrieval, and continuity extraction. Leave it on for explicit content."
+                />
+              </>
+            )}
+            <ContentRatingPicker value={rating} onValueChange={setRating} />
+          </div>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Dialog.Close asChild>
+            <Button variant="ghost">Cancel</Button>
+          </Dialog.Close>
+          <Button variant="primary" disabled={invalid} loading={pending} onClick={submit}>
+            {mode === 'generate' ? 'Generate chapter' : 'Save prose'}
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog>
+  );
+}
+
 type Filter = 'all' | 'needs_review' | 'draft' | 'final';
+
+interface ChapterRow {
+  chapter: number;
+  title?: string | null;
+  draft?: DraftResponse;
+}
 
 interface ChapterListProps {
   novelId: string;
+  externalSlot?: number;
   onOpen: (n: number) => void;
-  onProgress: (jobId: string) => void;
+  onProgress: (jobId: string, externalSlot?: number) => void;
 }
 
-function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.JSX.Element {
+function ChapterList({ novelId, externalSlot, onOpen, onProgress }: ChapterListProps): React.JSX.Element {
   const draftsQuery = useListDraftsQuery(novelId);
   const briefsQuery = useListBriefsQuery(novelId);
   const statusQuery = useProjectStatusQuery(novelId);
@@ -212,13 +451,25 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
 
   const createManual = useUpdateDraftMutation(novelId, nextManualChapter);
 
-  const startGeneration = (): void => {
-    generate.mutate({ limit: 1 }, { onSuccess: job => onProgress(job.jobId), onError: e => toast.danger(e.message) });
+  // A batch truncates rather than skips at an external-write slot, so the response names the chapter
+  // the author has to fill by hand before generation continues past it.
+  const runGenerate = (limit: number): void => {
+    generate.mutate(
+      { limit },
+      {
+        onSuccess: job => {
+          const stopped = externalStopChapter(job);
+          if (stopped) toast.warning(`Batch stopped at chapter ${stopped} — it is written outside the primary model`);
+          onProgress(job.jobId, stopped);
+        },
+        onError: e => toast.danger(e.message),
+      },
+    );
   };
 
-  const startBatch = (): void => {
-    generate.mutate({ limit: 5 }, { onSuccess: job => onProgress(job.jobId), onError: e => toast.danger(e.message) });
-  };
+  const startGeneration = (): void => runGenerate(1);
+
+  const startBatch = (): void => runGenerate(5);
 
   const writeManually = (): void => {
     createManual.mutate({ body: '' }, { onSuccess: () => onOpen(nextManualChapter), onError: e => toast.danger(e.message) });
@@ -226,6 +477,8 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
 
   const deleteDraft = useDeleteDraftMutation(novelId);
   const [deleteTarget, setDeleteTarget] = useState<DraftResponse | undefined>();
+  const [insertAfter, setInsertAfter] = useState<number | undefined>();
+  const [fillTarget, setFillTarget] = useState<number | undefined>();
   const doDelete = (): void => {
     if (!deleteTarget) return;
     deleteDraft.mutate(deleteTarget.chapter, {
@@ -249,6 +502,17 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
     return d.status === filter;
   });
   const totalWords = drafts.reduce((sum, d) => sum + wordCount(d.body), 0);
+
+  // Unwritten brief slots are rows too — an external-write slot only exists as a brief until someone
+  // fills it, and it has to be reachable from this list to be fillable at all.
+  const rows: ChapterRow[] = [
+    ...visible.map(draft => ({ chapter: draft.chapter, title: draft.title, draft })),
+    ...(filter === 'all' ? briefs.filter(b => !drafted.has(b.chapter)).map(b => ({ chapter: b.chapter, title: b.title })) : []),
+  ].sort((a, b) => a.chapter - b.chapter);
+
+  // Mirrors the backend's CHP_003 gate — a finalized chapter never moves, so nothing inserts below it.
+  const frontier = Math.max(0, ...drafts.filter(d => d.status === 'final').map(d => d.chapter));
+  const planned = [...drafts.map(d => d.chapter), ...briefs.map(b => b.chapter)];
 
   return (
     <div className={`nf-scroll ${styles.screenScroll}`}>
@@ -281,6 +545,9 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
                 <DropdownMenu.Item disabled={!canGenerate} onSelect={startBatch}>
                   Draft the next 5 chapters (no review)
                 </DropdownMenu.Item>
+                <DropdownMenu.Item disabled={frontier > 0} onSelect={() => setInsertAfter(0)}>
+                  Insert a chapter ahead of ch 1
+                </DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu>
           </ButtonGroup>
@@ -305,14 +572,42 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
         <QueryState
           isLoading={draftsQuery.isLoading}
           error={draftsQuery.error}
-          isEmpty={drafts.length === 0}
+          isEmpty={rows.length === 0}
           emptyTitle="No chapters drafted yet"
           emptyDescription="Generate your first chapter from its brief."
           emptyAction={{ label: 'Generate first chapter', onClick: startGeneration }}
         >
           <div className={styles.listBody}>
-            {visible.map(draft => {
+            {rows.map(({ chapter, title, draft }) => {
+              if (!draft) {
+                return (
+                  <div key={`slot-${chapter}`} className={`${styles.rowChapter} ${styles.rowSlot}`}>
+                    <span className={styles.rowNum}>{String(chapter).padStart(2, '0')}</span>
+                    <span className={styles.rowTitle}>{title ?? 'Untitled chapter'}</span>
+                    {chapter === externalSlot && (
+                      <Tooltip content="The primary writer skips this slot — fill it with the unrestricted writer or your own prose.">
+                        <span>
+                          <StatusChip intent="warning">external slot</StatusChip>
+                        </span>
+                      </Tooltip>
+                    )}
+                    <span className={styles.rowWords} />
+                    <span className={styles.rowStatus}>
+                      <StatusChip intent="neutral" dot>
+                        Not written
+                      </StatusChip>
+                    </span>
+                    <div className={styles.slotActions}>
+                      <Button variant="secondary" size="sm" prefix={<UploadIcon size={14} />} onClick={() => setFillTarget(chapter)}>
+                        Fill slot
+                      </Button>
+                    </div>
+                    <ChevronRightIcon size={16} className={styles.iconPlaceholder} />
+                  </div>
+                );
+              }
               const meta = statusMeta(draft);
+              const blocked = isFinalizeBlocked(draft);
               return (
                 <div
                   key={draft.id}
@@ -324,6 +619,14 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
                 >
                   <span className={styles.rowNum}>{String(draft.chapter).padStart(2, '0')}</span>
                   <span className={styles.rowTitle}>{draft.title ?? 'Untitled chapter'}</span>
+                  {isIsolated(draft) && <UnrestrictedBadge />}
+                  {blocked && (
+                    <Tooltip content="Finalize is refused until this chapter has a summary and continuation state.">
+                      <span>
+                        <StatusChip intent="danger">needs summary</StatusChip>
+                      </span>
+                    </Tooltip>
+                  )}
                   <StatusChip intent={draft.generator === 'human' ? 'neutral' : 'accent'}>{draft.generator === 'human' ? 'You' : 'AI'}</StatusChip>
                   <span className={styles.rowWords}>{wordCount(draft.body).toLocaleString()} words</span>
                   <span className={styles.rowStatus}>
@@ -332,6 +635,11 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
                     </StatusChip>
                   </span>
                   <div className="nf-rowactions">
+                    {draft.chapter >= frontier && (
+                      <RowAction label={`Insert a chapter after ${draft.chapter}`} onClick={() => setInsertAfter(draft.chapter)}>
+                        <PlusIcon size={14} />
+                      </RowAction>
+                    )}
                     <RowAction label={`Delete chapter ${draft.chapter}`} danger onClick={() => setDeleteTarget(draft)}>
                       <TrashIcon size={14} />
                     </RowAction>
@@ -343,6 +651,12 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
           </div>
         </QueryState>
       </div>
+
+      {insertAfter !== undefined && (
+        <InsertChapterDialog novelId={novelId} afterChapter={insertAfter} downstream={planned} onOpenChange={open => !open && setInsertAfter(undefined)} />
+      )}
+
+      {fillTarget !== undefined && <FillSlotDialog novelId={novelId} chapter={fillTarget} onOpenChange={open => !open && setFillTarget(undefined)} onFilled={onOpen} />}
 
       <Dialog open={Boolean(deleteTarget)} onOpenChange={o => !o && setDeleteTarget(undefined)}>
         <Dialog.Content size="sm">
@@ -473,6 +787,162 @@ function ProseToolbar({ onBold, onItalic, onBulleted, onNumbered, onTable }: Pro
   );
 }
 
+interface SummarizeDialogProps {
+  novelId: string;
+  chapter: number;
+  body: string;
+  onOpenChange: (open: boolean) => void;
+}
+
+// The endpoint deliberately persists nothing — the author reads what the permissive model produced,
+// edits it, and only then saves it as the value the finalize gate checks.
+function SummarizeDialog({ novelId, chapter, body, onOpenChange }: SummarizeDialogProps): React.JSX.Element {
+  const summarize = useSummarizeChapterMutation(novelId, chapter);
+  const updateDraft = useUpdateDraftMutation(novelId, chapter);
+  const [summary, setSummary] = useState('');
+  const [stateText, setStateText] = useState('{}');
+  const requestedRef = useRef(false);
+
+  useEffect(() => {
+    if (requestedRef.current) return;
+    requestedRef.current = true;
+    summarize.mutate(undefined, {
+      onSuccess: result => {
+        setSummary(result.summary);
+        setStateText(JSON.stringify(result.state, null, 2));
+      },
+      onError: error => toast.danger(error.message),
+    });
+  }, [summarize]);
+
+  const parsedState = useMemo(() => {
+    try {
+      const value: unknown = JSON.parse(stateText);
+      return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+    } catch {
+      return undefined;
+    }
+  }, [stateText]);
+
+  const save = (): void => {
+    updateDraft.mutate(
+      { body, summary: summary.trim(), state: parsedState },
+      {
+        onSuccess: () => {
+          toast.success('Summary and continuation state saved');
+          onOpenChange(false);
+        },
+        onError: error => toast.danger(error.message),
+      },
+    );
+  };
+
+  return (
+    <Dialog open onOpenChange={open => !updateDraft.isPending && onOpenChange(open)}>
+      <Dialog.Content size="lg">
+        <Dialog.Header title={`Summarize chapter ${chapter}`} description="Nothing is saved until you apply it — review both fields first." />
+        <Dialog.Body>
+          {summarize.isPending ? (
+            <div className={styles.summarizeWaiting}>
+              <Spinner size="sm" />
+              <span>Reading the chapter…</span>
+            </div>
+          ) : (
+            <div className={styles.dialogForm}>
+              <FormField label="Summary" required helper="2–3 sentences, past tense. This is all the next chapter gets to see of this one.">
+                <Textarea value={summary} onValueChange={setSummary} minRows={4} autoGrow />
+              </FormField>
+              <FormField
+                label="Continuation state"
+                required
+                error={parsedState ? undefined : 'Must be a JSON object'}
+                helper="What the next chapter builds on — positions, injuries, who knows what."
+              >
+                <Textarea value={stateText} onValueChange={setStateText} minRows={8} autoGrow className={styles.jsonField} />
+              </FormField>
+            </div>
+          )}
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Dialog.Close asChild>
+            <Button variant="ghost">Cancel</Button>
+          </Dialog.Close>
+          <Button variant="primary" disabled={!summary.trim() || !parsedState} loading={updateDraft.isPending} onClick={save}>
+            Apply to draft
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog>
+  );
+}
+
+interface AmendDialogProps {
+  novelId: string;
+  chapter: number;
+  draft: DraftResponse;
+  onOpenChange: (open: boolean) => void;
+  onAmended: (result: AmendChapterResponse) => void;
+}
+
+// Amend is the only writer allowed past the immutability lock. It replaces prose and nothing else —
+// the bible keeps whatever this chapter already put there, hence the re-derive follow-up afterwards.
+function AmendDialog({ novelId, chapter, draft, onOpenChange, onAmended }: AmendDialogProps): React.JSX.Element {
+  const amend = useAmendChapterMutation(novelId, chapter);
+  const [content, setContent] = useState(draft.body ?? '');
+  const [title, setTitle] = useState(draft.title ?? '');
+  const [note, setNote] = useState('');
+  const [rating, setRating] = useState<ContentRating>({});
+
+  const submit = (): void => {
+    amend.mutate(
+      { content: sanitizeSource(content), title: title.trim() || undefined, note: note.trim() || undefined, contentRating: normalizeContentRating(rating) },
+      {
+        onSuccess: result => {
+          toast.success(`Chapter ${chapter} amended — ${result.wordCount.toLocaleString()} words${result.republished ? ', republish scheduled' : ''}`);
+          onAmended(result);
+          onOpenChange(false);
+        },
+        onError: error => toast.danger(error.message),
+      },
+    );
+  };
+
+  return (
+    <Dialog open onOpenChange={open => !amend.isPending && onOpenChange(open)}>
+      <Dialog.Content size="lg">
+        <Dialog.Header title={`Amend chapter ${chapter}`} description="Rewrites finalized canon in place. The chapter stays locked and keeps its number." />
+        <Dialog.Body>
+          <div className={styles.dialogForm}>
+            <Alert intent="warning" title="Prose only">
+              The bible, continuity, and every downstream chapter are untouched. Anything this chapter already contributed to canon keeps propagating until you re-derive it.
+            </Alert>
+            <FormField label="Prose" required>
+              <Textarea value={content} onValueChange={setContent} minRows={10} autoGrow />
+            </FormField>
+            <div className={styles.dialogGrid}>
+              <FormField label="Title">
+                <Input value={title} onValueChange={setTitle} />
+              </FormField>
+              <FormField label="Author's note" helper="Reaches the reader — changing it republishes the chapter.">
+                <Input value={note} onValueChange={setNote} />
+              </FormField>
+            </div>
+            <ContentRatingPicker value={rating} onValueChange={setRating} />
+          </div>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Dialog.Close asChild>
+            <Button variant="ghost">Cancel</Button>
+          </Dialog.Close>
+          <Button variant="danger" disabled={!content.trim()} loading={amend.isPending} onClick={submit}>
+            Amend chapter {chapter}
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog>
+  );
+}
+
 interface ChapterEditorProps {
   novelId: string;
   chapter: number;
@@ -493,6 +963,9 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
 
   const [reviewOpen, setReviewOpen] = useState(false);
   const [chaptersOpen, setChaptersOpen] = useState(false);
+  const [summarizeOpen, setSummarizeOpen] = useState(false);
+  const [amendOpen, setAmendOpen] = useState(false);
+  const [amendResult, setAmendResult] = useState<AmendChapterResponse | undefined>();
   const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<'write' | 'preview'>('write');
   const [text, setText] = useState('');
@@ -519,6 +992,7 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
 
   const meta = statusMeta(draft);
   const canApprove = draft.reviewStatus !== 'contradiction' && draft.reviewStatus !== 'generating' && draft.status !== 'final';
+  const finalizeBlocked = isFinalizeBlocked(draft);
 
   const enterEdit = (): void => {
     setText(draft.body ?? '');
@@ -622,6 +1096,7 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
           <ChevronRightIcon size={15} className={styles.iconTertiary} />
         </button>
         <div className={styles.spacer} />
+        {isIsolated(draft) && <UnrestrictedBadge />}
         <button onClick={() => setReviewOpen(true)} className={styles.statusPill} data-tone={toneOf(meta.intent)}>
           {meta.label}
         </button>
@@ -647,9 +1122,17 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
             <Button variant="secondary" size="sm" loading={judge.isPending} disabled={!draft.body?.trim()} onClick={runJudge}>
               Verify
             </Button>
-            <Button variant="primary" size="sm" disabled={!canApprove} loading={approveDraft.isPending} onClick={approve}>
-              Approve draft
-            </Button>
+            {draft.status === 'final' ? (
+              <Tooltip content="Rewrite this finalized chapter's prose in place — the only path past the immutability lock">
+                <Button variant="secondary" size="sm" onClick={() => setAmendOpen(true)}>
+                  Amend
+                </Button>
+              </Tooltip>
+            ) : (
+              <Button variant="primary" size="sm" disabled={!canApprove} loading={approveDraft.isPending} onClick={approve}>
+                Approve draft
+              </Button>
+            )}
           </>
         )}
       </div>
@@ -694,6 +1177,28 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
         ) : (
           <div className={`nf-scroll ${styles.scrollFill}`}>
             <article className={`nf-page ${styles.reader}`}>
+              {finalizeBlocked && (
+                <Alert
+                  intent="danger"
+                  title="Finalize is blocked until this chapter is summarized"
+                  action={{ label: 'Summarize', onClick: () => setSummarizeOpen(true) }}
+                  className={styles.notice}
+                >
+                  This chapter’s prose is firewalled, so chapter {chapter + 1} sees only its summary and continuation state — and both are empty. Summarizing proposes them; you
+                  review and apply before anything is saved.
+                </Alert>
+              )}
+              {amendResult?.suggestExtractToBible && (
+                <Alert
+                  intent="warning"
+                  title="Canon was not re-derived"
+                  action={{ label: 'Add to bible', onClick: runExtract }}
+                  onDismiss={() => setAmendResult(undefined)}
+                  className={styles.notice}
+                >
+                  The amendment replaced prose only. Anything this chapter already contributed to the bible is still there and still propagating.
+                </Alert>
+              )}
               {draft.title && <div className={styles.chapterEyebrow}>Chapter {chapter}</div>}
               {draft.body?.trim() ? (
                 <Markdown content={draft.body} />
@@ -738,6 +1243,10 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
         )}
       </div>
 
+      {summarizeOpen && <SummarizeDialog novelId={novelId} chapter={chapter} body={draft.body ?? ''} onOpenChange={setSummarizeOpen} />}
+
+      {amendOpen && <AmendDialog novelId={novelId} chapter={chapter} draft={draft} onOpenChange={setAmendOpen} onAmended={setAmendResult} />}
+
       <ReviewDrawer open={reviewOpen} onOpenChange={setReviewOpen} draft={draft} />
       <ChapterSwitchDrawer open={chaptersOpen} onOpenChange={setChaptersOpen} novelId={novelId} current={chapter} onPick={onPick} />
     </div>
@@ -746,16 +1255,16 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
 
 function ChaptersScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
-  const { chapter, job } = Route.useSearch();
+  const { chapter, job, slot } = Route.useSearch();
   const navigate = Route.useNavigate();
 
-  const openChapter = (n?: number): Promise<void> => navigate({ search: { chapter: n } });
-  const openJob = (jobId?: string): Promise<void> => navigate({ search: { job: jobId } });
+  const openChapter = (n?: number): Promise<void> => navigate({ search: { chapter: n, slot } });
+  const openJob = (jobId?: string, externalSlot?: number): Promise<void> => navigate({ search: { job: jobId, slot: externalSlot ?? slot } });
 
   if (job) return <GenerationProgress novelId={novelId} jobId={job} onBack={() => openJob(undefined)} />;
   return chapter != null ? (
     <ChapterEditor novelId={novelId} chapter={chapter} onBack={() => openChapter(undefined)} onPick={openChapter} />
   ) : (
-    <ChapterList novelId={novelId} onOpen={openChapter} onProgress={openJob} />
+    <ChapterList novelId={novelId} externalSlot={slot} onOpen={openChapter} onProgress={openJob} />
   );
 }

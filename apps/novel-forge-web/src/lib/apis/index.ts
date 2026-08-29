@@ -10,6 +10,7 @@ export * from './chapter-image.api';
 export * from './illustration.api';
 export * from './draft.api';
 export * from './brief.api';
+export * from './interstitial.api';
 export * from './bible.api';
 export * from './fact.api';
 export * from './insight.api';
@@ -35,3 +36,6 @@ export * from './publishing.api';
  */
 export type { ReforgeChapterStatus, ReforgeConfigBody, ReforgeFidelity, ReforgeMode, ReforgeStartBody } from './reforge.api';
 export type { ChapterPublicationStatus, PublicationStatus, PublishNovelBody } from './publishing.api';
+
+/** `api-types.gen.ts` still describes the pre-containment import body; `interstitial.api.ts` carries the current one. */
+export type { ImportDraftBody } from './interstitial.api';

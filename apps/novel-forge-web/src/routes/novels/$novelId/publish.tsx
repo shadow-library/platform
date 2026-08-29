@@ -1,8 +1,4 @@
 import {
-  CONTENT_RATING_LEVEL_LABELS,
-  CONTENT_RATING_LEVELS,
-  type ContentRatingDimension,
-  type ContentRatingLevel,
   type DarkContentLevel,
   type Genre,
   MAX_NOVEL_GENRES,
@@ -13,11 +9,11 @@ import {
   type Tag,
   type ViolenceLevel,
 } from '@shadow-library/sdk';
-import { Alert, Button, Dialog, FormField, Input, MultiSelect, type MultiSelectOption, SegmentedControl, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
+import { Alert, Button, Dialog, FormField, Input, MultiSelect, type MultiSelectOption, SegmentedControl, Textarea, toast, Tooltip } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 
-import { type ChipIntent, PageContainer, PageHeader, QueryState, SectionCard, StatusChip } from '@/components/nf';
+import { type ChipIntent, PageContainer, PageHeader, QueryState, RatingField, SectionCard, StatusChip, UNRATED } from '@/components/nf';
 import {
   type ChapterPublication,
   type ChapterPublicationStatus,
@@ -52,37 +48,6 @@ const STATUS_CHIP: Record<ChapterPublicationStatus, ChipIntent> = { scheduled: '
 
 const GENRE_OPTIONS: MultiSelectOption[] = NOVEL_GENRES.map(genre => ({ value: genre, label: genre }));
 const TAG_OPTIONS: MultiSelectOption[] = NOVEL_TAG_GROUPS.flatMap(({ label, tags }) => tags.map(tag => ({ value: tag, label: `${label} — ${tag}` })));
-
-const UNRATED = '__unrated__';
-
-interface RatingFieldProps<D extends ContentRatingDimension> {
-  label: string;
-  helper: string;
-  dimension: D;
-  value: ContentRatingLevel<D> | typeof UNRATED;
-  onValueChange: (value: ContentRatingLevel<D> | typeof UNRATED) => void;
-  error?: string;
-}
-
-// "Unrated" is a first-class option, not the same as the mildest real level — a novel nobody has
-// characterised must never be published as if someone had confirmed it clean.
-function RatingField<D extends ContentRatingDimension>({ label, helper, dimension, value, onValueChange, error }: RatingFieldProps<D>): React.JSX.Element {
-  return (
-    <FormField label={label} error={error} helper={value === UNRATED ? `${helper} Not yet characterised.` : helper}>
-      <Select value={value} onValueChange={next => onValueChange(next as ContentRatingLevel<D> | typeof UNRATED)} size="sm">
-        <Select.Item value={UNRATED} description="Nobody has assessed this dimension yet">
-          Unrated
-        </Select.Item>
-        <Select.Separator />
-        {CONTENT_RATING_LEVELS[dimension].map(level => (
-          <Select.Item key={level} value={level}>
-            {CONTENT_RATING_LEVEL_LABELS[level]}
-          </Select.Item>
-        ))}
-      </Select>
-    </FormField>
-  );
-}
 
 function isApproved(draft: DraftResponse): boolean {
   return draft.reviewStatus === 'approved' || draft.reviewStatus === 'final';

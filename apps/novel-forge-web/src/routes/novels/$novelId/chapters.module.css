@@ -530,3 +530,70 @@
   justify-content: center;
   z-index: 5;
 }
+
+.rowSlot {
+  display: flex;
+  align-items: center;
+  background: var(--sh-surface-well);
+}
+
+.rowSlot .rowTitle {
+  color: var(--sh-text-secondary);
+}
+
+.slotActions {
+  flex-shrink: 0;
+}
+
+.dialogForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dialogGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.consequences {
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-md);
+  padding: 14px 16px;
+}
+
+.consequencesTitle {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.consequencesList {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.jsonField {
+  font-family: var(--sh-font-mono);
+  font-size: 12px;
+}
+
+.summarizeWaiting {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.notice {
+  margin-bottom: 20px;
+}
