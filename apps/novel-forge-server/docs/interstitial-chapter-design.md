@@ -405,16 +405,22 @@ autofill, human-reviewed before it becomes the value the gate checks.
   `chapter-finalization.graph.ts`'s `commitProse` uses (§4) — that guard exists to make a first-time commit
   refuse to clobber an already-final row; amend's entire purpose is to clobber an already-final row on
   purpose, deliberately and by explicit author action. `locked` stays `true` throughout; amend never unlocks.
-- Append a `draft_revisions` row with `source: 'amended'` (§3.4) capturing the prior content, even though there
-  may be no live `drafts` row for this chapter to attach it to conventionally — key it the same way
-  `chapter_reforges`/`reforge_outputs` key their revision history: by `(projectId, chapter)`, not by a
-  `draftId` FK.
+- Append a `draft_revisions` row with `source: 'amended'` (§3.4) capturing the **post-amend** body — the same
+  convention its `hand_edited`/`imported` neighbours use, recording what became canon rather than what preceded
+  it — even though there may be no live `drafts` row for this chapter to attach it to conventionally — key it
+  the same way `chapter_reforges`/`reforge_outputs` key their revision history: by `(projectId, chapter)`, not
+  by a `draftId` FK. Consequence: the pre-amend prose is recoverable only as the _preceding_ row in that same
+  chain, and for a chapter with no draft row at all (nothing to key the history to) it is not recoverable at
+  all — amend replaces it outright.
 - Re-embed via `indexingService.addProse` — it already calls `deleteProse` first (§4's site), so the
   re-embed is idempotent — **skipped automatically when `isolated`** (the same re-keyed condition, §4).
 - If a `chapter_publications` row exists for this chapter: re-render the payload (`renderChapterPayload`,
   §11), and **only when `contentHash` moved**, bump `revision` and set `status = 'scheduled'` so the existing
   push outbox (`reader-publish-design.md` §5) picks it up on its normal sweep — an amend that changes nothing
-  observable (e.g. only `note`) must not force a republish.
+  observable must not force a republish. `note` is not exempt from that: `renderChapterPayload` maps it to
+  `authorNote`, and `chapterContentHash` covers `authorNote`, so a note-only amend does move the digest and
+  correctly republishes. The true no-op is an amend whose title, content and note all come out identical to
+  what was already published — e.g. a rating-only amend that leaves an already-unrated chapter unrated.
 - Response carries a flag (`{ suggestExtractToBible: true }` or similar) telling the web UI to offer the
   existing `POST /chapters/:n/extract-to-bible` endpoint as a follow-up. It is **not** called automatically.
 
@@ -438,9 +444,14 @@ per-chapter fact some chapters don't carry.
 
 - **`novel-forge-server`:** `ReaderChapterPayload` (`src/modules/publishing/publish-payload.ts`) gains
   `contentRating?: ContentRating`, sourced from `chapters.contentRating`. `chapter_publications` gains a
-  `content_rating jsonb` column mirroring it (the ledger is the outbox; the payload is rendered from the
-  ledger's own columns, per existing precedent — see how `title`/`authorNote`/`contentHash` are already
-  duplicated onto the ledger row).
+  `content_rating jsonb` column mirroring it — not because the push renders from it (`renderLedgeredPayload`,
+  `src/modules/publishing/publish-runner.ts`, always re-renders from the canonical `chapters` row, drift-guarded
+  against the ledgered hash), but so the rating invariant below can rank every currently-published chapter's
+  rating (`PublishingService`'s `assertRatingCeiling`) without a join back to canon for each ledger row.
+  `title`/`authorNote`/`contentHash` are already duplicated onto the ledger row for their own reasons
+  (`contentHash` drives the republish/drift decisions above; `title`/`authorNote` are historical record of
+  what was actually pushed) — `content_rating` is the first ledger column whose reader lives outside the push
+  path.
 - **`chapterContentHash` (`@shadow-library/sdk/publishing`) includes `contentRating`.** This overrides that
   function's own doc comment — _"the field set is frozen; extend the payload only with a versioned hash
   alongside this one"_ — because a rating change must reach readers and the ledger's whole republish/no-op
@@ -516,8 +527,11 @@ non-atomic-contract rule as §11.
   chapters is untouched; §8's truncation is the only change to `GenerationService.generate`'s selection logic.
 - `chapter_publications.publishedOrdinal` assignment and the reader's one-way push protocol
   (`reader-publish-design.md` §5–6) are unchanged; §11 only adds a field to an existing payload and ledger row.
-- No new `AiRole`. Insertion's planner-origin brief reuses the existing brief-drafting prompt; summarize reuses
-  the unrestricted writing group's model selection; amend needs no model call of its own beyond an optional
+- No new `AiRole`. Insertion's planner-origin brief reuses the existing brief-drafting prompt; summarize
+  registers under the existing `role: 'continuity'` (`ROLE_GROUP.continuity === 'review'`), so on an
+  Unrestricted project it runs on `deepseek-v4-pro`, not the writing group's `grok-4.6` — deliberately: the
+  job is to _read_ explicit prose without refusing, which is a review concern (same reasoning that keeps the
+  judge on the review group), not an authoring one. Amend needs no model call of its own beyond an optional
   future re-summarize, which is out of scope here.
 - The bible schema and the extraction/judge pipeline are untouched (decision 11) — amendment is a prose
   replace with an offered, not automatic, follow-up.

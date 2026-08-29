@@ -113,7 +113,7 @@ export const chapterPublications = pgTable(
     publishedOrdinal: integer('published_ordinal').notNull(),
     title: varchar('title', { length: 256 }).notNull(),
     authorNote: text('author_note'),
-    /** The chapter's rating as of the publish decision, mirrored here because the ledger is what the push renders from. Null is *unrated*, never `'none'`. */
+    /** The chapter's rating as of the publish decision, mirrored here so the rating-ceiling invariant can rank every published chapter without a join back to canon. Null is *unrated*, never `'none'`. */
     contentRating: jsonb('content_rating').$type<ContentRating>(),
     contentHash: varchar('content_hash', { length: 128 }).notNull(),
     revision: integer('revision').notNull().default(1),
