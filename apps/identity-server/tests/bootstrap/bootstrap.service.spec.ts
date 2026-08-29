@@ -72,12 +72,12 @@ describe('BootstrapService', () => {
     expect(pulseApps).toHaveLength(1);
 
     const clients = await env.getPostgresClient().select().from(schema.oauthClients);
-    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'novel-forge', 'pulse', 'shadow-memoir', 'web-novel']);
+    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'memoir', 'novel-forge', 'pulse', 'web-novel']);
   });
 
   it('should seed the ecosystem applications, their clients and the notification access rule', async () => {
     const applications = await env.getPostgresClient().select().from(schema.applications);
-    expect(applications.map(app => app.name).sort()).toEqual(['novel-forge', 'pulse', 'shadow-identity', 'shadow-memoir', 'web-novel']);
+    expect(applications.map(app => app.name).sort()).toEqual(['memoir', 'novel-forge', 'pulse', 'shadow-identity', 'web-novel']);
 
     const pulse = env.getService(ApplicationService).getApplication('pulse');
     expect(pulse?.roles.map(role => role.roleName).sort()).toEqual(['PulseAdmin', 'PulseOperator', 'PulseViewer']);
@@ -86,7 +86,7 @@ describe('BootstrapService', () => {
     expect(pulsePermissions).toEqual(expect.arrayContaining(['pulse:templates:read', 'pulse:templates:write', 'pulse:templates:publish', 'pulse:layouts:write']));
 
     const clients = await env.getPostgresClient().select().from(schema.oauthClients);
-    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'novel-forge', 'pulse', 'shadow-memoir', 'web-novel']);
+    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'memoir', 'novel-forge', 'pulse', 'web-novel']);
 
     const pulseClient = clients.find(client => client.id === 'pulse');
     expect(pulseClient?.grantTypes).toEqual(expect.arrayContaining(['authorization_code', 'client_credentials', 'urn:ietf:params:oauth:grant-type:token-exchange']));
@@ -99,14 +99,14 @@ describe('BootstrapService', () => {
     const notificationRule = accessRules.find(rule => rule.callerClientId === 'identity-server' && rule.pathPattern === '/api/v1/notifications');
     expect(notificationRule?.method).toBe('POST');
 
-    const memoirNotificationRule = accessRules.find(rule => rule.callerClientId === 'shadow-memoir' && rule.pathPattern === '/api/v1/notifications');
+    const memoirNotificationRule = accessRules.find(rule => rule.callerClientId === 'memoir' && rule.pathPattern === '/api/v1/notifications');
     expect(memoirNotificationRule?.method).toBe('POST');
   });
 
-  it('should seed shadow-memoir with its own scopes, sensitive destructive scope, and platform grants', async () => {
+  it('should seed memoir with its own scopes, sensitive destructive scope, and platform grants', async () => {
     const clientService = env.getService(OAuthClientService);
-    const description = await clientService.describeApplication('shadow-memoir');
-    const resource = (await env.getPostgresClient().select().from(schema.apiResources)).find(row => row.identifier === 'api://shadow-memoir');
+    const description = await clientService.describeApplication('memoir');
+    const resource = (await env.getPostgresClient().select().from(schema.apiResources)).find(row => row.identifier === 'api://memoir');
     expect(resource).not.toBeUndefined();
 
     const scopes = resource ? await env.getPostgresClient().select().from(schema.scopes).where(eq(schema.scopes.apiResourceId, resource.id)) : [];
@@ -114,7 +114,7 @@ describe('BootstrapService', () => {
     expect(scopes.find(scope => scope.name === 'memoir:destructive')?.isSensitive).toBe(true);
     expect(scopes.find(scope => scope.name === 'memoir:sync')?.isSensitive).toBe(false);
 
-    const grantedScopes = await clientService.getGrantedScopeNames('shadow-memoir');
+    const grantedScopes = await clientService.getGrantedScopeNames('memoir');
     expect(grantedScopes).toEqual(expect.arrayContaining(['authz:check', 'app-session:manage', 'users:resolve']));
 
     const pulseGrant = description?.grants.find(grant => grant.audience === 'api://pulse');
@@ -181,7 +181,7 @@ describe('BootstrapService', () => {
     expect(subjectOf('pulse')).toEqual(['system:serviceaccount:pulse:pulse-server']);
     expect(subjectOf('novel-forge')).toEqual(['system:serviceaccount:novel-forge:novel-forge-server']);
     expect(subjectOf('web-novel')).toEqual(['system:serviceaccount:web-novel:web-novel-server']);
-    expect(subjectOf('shadow-memoir')).toEqual(['system:serviceaccount:shadow-memoir:shadow-memoir-server']);
+    expect(subjectOf('memoir')).toEqual(['system:serviceaccount:memoir:memoir-server']);
 
     expect(clients.find(client => client.id === 'novel-forge-service')).toBeUndefined();
   });
@@ -197,8 +197,8 @@ describe('BootstrapService', () => {
     const redirects = (await env.getService(OAuthClientService).getClientDetail('pulse'))?.redirectUris ?? [];
     expect(redirects).toContain('https://pulse.shadow-apps.com/api/auth/callback');
 
-    const memoirRedirects = (await env.getService(OAuthClientService).getClientDetail('shadow-memoir'))?.redirectUris ?? [];
-    expect(memoirRedirects).toContain('https://shadow-memoir.shadow-apps.com/api/auth/callback');
+    const memoirRedirects = (await env.getService(OAuthClientService).getClientDetail('memoir'))?.redirectUris ?? [];
+    expect(memoirRedirects).toContain('https://memoir.shadow-apps.com/api/auth/callback');
   });
 
   it('should redirect through the deployed host of an application whose hostname drops the hyphen', async () => {
@@ -221,7 +221,7 @@ describe('BootstrapService', () => {
 
   it('should register first-party API resources and the service-only publish scope', async () => {
     const resources = await env.getPostgresClient().select().from(schema.apiResources);
-    expect(resources.map(resource => resource.identifier).sort()).toEqual(['api://novel-forge', 'api://pulse', 'api://shadow-memoir', 'api://web-novel', 'shadow-identity']);
+    expect(resources.map(resource => resource.identifier).sort()).toEqual(['api://memoir', 'api://novel-forge', 'api://pulse', 'api://web-novel', 'shadow-identity']);
 
     const publishScope = (await env.getPostgresClient().select().from(schema.scopes)).find(scope => scope.name === 'web-novel:publish');
     expect(publishScope?.principalType).toBe('SERVICE');
@@ -266,12 +266,12 @@ describe('BootstrapService', () => {
     const clientService = env.getService(OAuthClientService);
     const scopeId = await platformScopeId('authz:check');
 
-    await db.delete(schema.oauthClientScopeGrants).where(and(eq(schema.oauthClientScopeGrants.clientId, 'shadow-memoir'), eq(schema.oauthClientScopeGrants.scopeId, scopeId)));
-    expect(await clientService.getGrantedScopeNames('shadow-memoir')).not.toContain('authz:check');
+    await db.delete(schema.oauthClientScopeGrants).where(and(eq(schema.oauthClientScopeGrants.clientId, 'memoir'), eq(schema.oauthClientScopeGrants.scopeId, scopeId)));
+    expect(await clientService.getGrantedScopeNames('memoir')).not.toContain('authz:check');
 
     await env.getService(EcosystemSeedService).seed(await seedOperator());
 
-    expect(await clientService.getGrantedScopeNames('shadow-memoir')).toContain('authz:check');
+    expect(await clientService.getGrantedScopeNames('memoir')).toContain('authz:check');
   });
 
   it('should not create duplicate scope grants when seeded repeatedly', async () => {
@@ -280,29 +280,29 @@ describe('BootstrapService', () => {
     const operator = await seedOperator();
 
     await seedService.seed(operator);
-    const before = (await db.select().from(schema.oauthClientScopeGrants)).filter(grant => grant.clientId === 'shadow-memoir');
+    const before = (await db.select().from(schema.oauthClientScopeGrants)).filter(grant => grant.clientId === 'memoir');
 
     await seedService.seed(operator);
-    const after = (await db.select().from(schema.oauthClientScopeGrants)).filter(grant => grant.clientId === 'shadow-memoir');
+    const after = (await db.select().from(schema.oauthClientScopeGrants)).filter(grant => grant.clientId === 'memoir');
 
     expect(after).toHaveLength(before.length);
     expect(after.map(grant => grant.scopeId).sort()).toEqual(before.map(grant => grant.scopeId).sort());
   });
 
   it('should grant a scope added to an already-seeded application entry on the next boot', async () => {
-    const memoir = ECOSYSTEM_SEED.applications.find(application => application.name === 'shadow-memoir');
-    if (!memoir) throw new Error('shadow-memoir seed entry missing');
+    const memoir = ECOSYSTEM_SEED.applications.find(application => application.name === 'memoir');
+    if (!memoir) throw new Error('memoir seed entry missing');
     const grants = memoir.grants as { resource: string; scope: string }[];
     const newGrant = { resource: 'shadow-identity', scope: 'authz:roles:sync' };
     grants.push(newGrant);
 
     try {
       const clientService = env.getService(OAuthClientService);
-      expect(await clientService.getGrantedScopeNames('shadow-memoir')).not.toContain('authz:roles:sync');
+      expect(await clientService.getGrantedScopeNames('memoir')).not.toContain('authz:roles:sync');
 
       await env.getService(EcosystemSeedService).seed(await seedOperator());
 
-      expect(await clientService.getGrantedScopeNames('shadow-memoir')).toContain('authz:roles:sync');
+      expect(await clientService.getGrantedScopeNames('memoir')).toContain('authz:roles:sync');
     } finally {
       grants.pop();
     }
@@ -370,11 +370,11 @@ describe('BootstrapService', () => {
     const clientService = env.getService(OAuthClientService);
     const scopeId = await resourceScopeId('api://web-novel', 'web-novel:publish');
 
-    await clientService.grantScope('shadow-memoir', scopeId);
-    expect(await clientService.getGrantedScopeNames('shadow-memoir')).toContain('web-novel:publish');
+    await clientService.grantScope('memoir', scopeId);
+    expect(await clientService.getGrantedScopeNames('memoir')).toContain('web-novel:publish');
 
     await env.getService(EcosystemSeedService).seed(await seedOperator());
 
-    expect(await clientService.getGrantedScopeNames('shadow-memoir')).toContain('web-novel:publish');
+    expect(await clientService.getGrantedScopeNames('memoir')).toContain('web-novel:publish');
   });
 });
