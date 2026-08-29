@@ -73,6 +73,7 @@ export class OrganisationApplicationService {
 
   async release(actor: AppAccessActor, applicationId: number, organisationId: bigint): Promise<void> {
     const application = this.applicationService.getApplicationByIdOrThrow(applicationId);
+    if (application.ownerOrganisationId !== null) throw AppErrorCode.APP_009.create();
     if (application.visibility !== 'RESTRICTED') throw AppErrorCode.APP_008.create();
     await this.assertReleasableOrganisation(organisationId);
 
@@ -153,6 +154,7 @@ export class OrganisationApplicationService {
 
   async assertReachable(organisationId: bigint, applicationId: number): Promise<void> {
     const application = this.applicationService.getApplicationByIdOrThrow(applicationId);
+    if (application.ownerOrganisationId !== null) throw AppErrorCode.APP_009.create();
     if (!application.isActive || application.visibility === 'INTERNAL') throw AppErrorCode.ORG_011.create();
     if (application.visibility === 'RESTRICTED' && !(await this.hasRelease(organisationId, applicationId))) throw AppErrorCode.ORG_011.create();
   }

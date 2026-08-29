@@ -133,6 +133,7 @@ export class AdminApplicationController {
     const actor = Context.getActor();
     const application = this.applicationService.getApplicationByIdOrThrow(params.applicationId);
     if (application.name === APP_NAME && body.isActive === false) throw AppErrorCode.APP_004.create();
+    if (application.ownerOrganisationId !== null) throw AppErrorCode.APP_009.create();
 
     const update: ApplicationUpdate = {};
     if (body.subDomain !== undefined) update.subDomain = body.subDomain;
@@ -175,6 +176,7 @@ export class AdminApplicationController {
     const actor = Context.getActor();
     const application = this.applicationService.getApplicationByIdOrThrow(params.applicationId);
     if (application.name === APP_NAME) throw AppErrorCode.APP_004.create();
+    if (application.ownerOrganisationId !== null) throw AppErrorCode.APP_009.create();
 
     const clients = (await this.clientService.listClients()).filter(client => client.applicationId === application.id);
     if (clients.some(client => client.id !== application.name)) throw AppErrorCode.APP_005.create();
