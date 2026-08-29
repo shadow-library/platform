@@ -252,4 +252,15 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly KEY_002 = AppErrorCode.unauthenticated('KEY_002', 'API key has been revoked');
   static readonly KEY_003 = AppErrorCode.forbidden('KEY_003', 'The API key owner no longer holds the permission required for this operation');
   static readonly KEY_004 = AppErrorCode.notFound('KEY_004', 'API key not found');
+
+  /*!
+   * Curated Ingest Errors
+   */
+  // A source reference another curator's key already holds is answered exactly as one that was never
+  // pushed, mirroring PRJ_001: the ingest surface must not be an oracle for what else is in the forge.
+  static readonly ING_001 = AppErrorCode.notFound('ING_001', 'Ingested novel not found');
+  static readonly ING_002 = AppErrorCode.conflict('ING_002', 'Chapters must be pushed in source order with no gaps');
+  // The forge owns the prose once it has landed, so a changed push is refused rather than applied — the
+  // curator amends the finalized chapter in the forge, which keeps the amendment trail intact.
+  static readonly ING_003 = AppErrorCode.conflict('ING_003', 'A different chapter has already been ingested at this source ordinal');
 }

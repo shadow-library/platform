@@ -16,6 +16,7 @@ import { AiModule } from '@modules/ai';
 import { ApiKeyModule } from '@modules/api-key';
 import { AppAuthModule } from '@modules/auth';
 import { BibleModule } from '@modules/bible';
+import { CuratedIngestModule } from '@modules/curated-ingest';
 import { ExportModule } from '@modules/export';
 import { ExtractionModule } from '@modules/extraction';
 import { GenerationModule } from '@modules/generation';
@@ -51,6 +52,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     AppAuthModule,
     AiModule,
     ApiKeyModule,
+    CuratedIngestModule,
     ExportModule,
     ExtractionModule,
     GenerationModule,

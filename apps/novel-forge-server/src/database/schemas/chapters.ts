@@ -27,6 +27,12 @@ export const chapters = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
     number: integer('number').notNull(),
+    // Interstitial insertion renumbers `number`, so a curated ingest cannot key on it: `sourceOrdinal` is the
+    // chapter's position at the source and never moves. Null for everything the forge itself wrote.
+    sourceOrdinal: integer('source_ordinal'),
+    // The digest of the prose as it landed, stamped once by the curated-ingest path so the manifest a scraper
+    // polls is a projection rather than a re-hash of every chapter. Null for everything the forge itself wrote.
+    contentHash: varchar('content_hash', { length: 64 }),
     title: varchar('title', { length: 500 }),
     content: text('content'),
     summary: text('summary'),
@@ -56,7 +62,11 @@ export const chapters = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  t => [unique('chapters_project_id_number_unique').on(t.projectId, t.number), index('chapters_project_id_status_idx').on(t.projectId, t.status)],
+  t => [
+    unique('chapters_project_id_number_unique').on(t.projectId, t.number),
+    unique('chapters_project_id_source_ordinal_unique').on(t.projectId, t.sourceOrdinal),
+    index('chapters_project_id_status_idx').on(t.projectId, t.status),
+  ],
 );
 
 export const chaptersRelations = relations(chapters, ({ one }) => ({

@@ -60,6 +60,12 @@ describe('AppErrorCode', () => {
     expect(AppErrorCode.KEY_004.status).toBe(404);
   });
 
+  it('should define curated ingest error codes', () => {
+    expect(AppErrorCode.ING_001.status).toBe(404);
+    expect(AppErrorCode.ING_002.status).toBe(409);
+    expect(AppErrorCode.ING_003.status).toBe(409);
+  });
+
   it('should define transform reforge error codes', () => {
     expect(AppErrorCode.REF_004.status).toBe(404);
     expect(AppErrorCode.REF_005.status).toBe(400);

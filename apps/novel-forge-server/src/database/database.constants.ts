@@ -14,4 +14,7 @@ export const constraintErrorMap: Record<string, AppError> = {
   // Two projects whose titles slugify identically race for one reader URL; PublishingService walks a
   // suffix ladder off this error, so it is a retry signal there as much as a response here.
   publications_novel_slug_unique: AppErrorCode.PUB_007.create(),
+  // Two ingest pushes of the same source ordinal that both read "absent" before either wrote; the row
+  // that lands wins, and the loser is told what a serialized retry would have told it.
+  chapters_project_id_source_ordinal_unique: AppErrorCode.ING_003.create(),
 };
