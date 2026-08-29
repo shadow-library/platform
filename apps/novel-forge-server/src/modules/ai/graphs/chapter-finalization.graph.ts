@@ -3,7 +3,7 @@ import { and, eq, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase } from '@server/database';
+import { type PrimaryDatabase, type Project } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import { type ContextAssembler } from '../context/context-assembler.service';
@@ -93,7 +93,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
           content: state.prose,
           summary: state.summary || null,
           status: 'done',
-          generator: (state.generator as 'standard' | 'unrestricted') || 'standard',
+          generator: (state.generator as Project.ContentGenerator) || 'standard',
           isolated: state.isolated,
           wordCount: state.prose.split(/\s+/).length,
           locked: true,

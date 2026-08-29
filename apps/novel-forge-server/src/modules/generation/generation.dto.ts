@@ -194,7 +194,7 @@ export class FinalizeBody {
 }
 
 @Schema()
-export class GenerateGrokBody {
+export class GenerateUnrestrictedBody {
   @Field({ optional: true })
   guidance?: string;
 }

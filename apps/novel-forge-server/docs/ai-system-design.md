@@ -142,7 +142,7 @@ flowchart TD
 - `repairRewrite` — full re-draft with findings appended; canon refs cited by the findings are resolved and added to the pack so the rewrite sees exactly what it contradicted; `attempt++`, `previousFindings = findings`.
 - Early stop — repeated finding (normalized-substring comparison) or budget exhaustion → `acceptAsIs`: draft kept with `contradiction` status and findings preserved; the human resolves via revise/edit.
 
-**Failure handling:** a failed run stops the parent batch job (autopilot needs a working judge) but keeps completed chapters — they are already committed. **Human review points:** terminal `needs_review` or `contradiction` (§6). **Grok variant:** same graph with `forceProvider: 'xai'`, `autoFix: false`, and the judge node skipped by a conditional — human review replaces the judge.
+**Failure handling:** a failed run stops the parent batch job (autopilot needs a working judge) but keeps completed chapters — they are already committed. **Human review points:** terminal `needs_review` or `contradiction` (§6). **Unrestricted variant:** same graph with `forceProvider: 'xai'`, `autoFix: false`, and the judge node skipped by a conditional — human review replaces the judge.
 
 ### 2.3 `chapter-revision`
 
@@ -157,9 +157,9 @@ Rewrite a draft to explicit user feedback, then re-judge. One feedback note in, 
 Promote an approved draft to canon, in order, with the continuity write-back. Mostly deterministic, but its steps are individually fallible and must resume, not restart — that is why it is a graph.
 
 - **State:** `{ projectId, chapter, draftId, prose, summary, continuationState, continuityDelta, generator, outcome }`.
-- **Nodes:** `guard` (in-order check, draft `approved`) → `commitProse` (chapter upsert; draft → `final`) → `extractContinuity` (CONTINUITY chain over the final prose + a minimal entity roster — keys, aliases, status one-liners, not full cards; **skipped** for grok chapters) → `applyContinuity` (deterministic write-back: planned→active, register generated entities, tracker upserts) → `updateIndexes` (best-effort: prose chunks + refresh touched lore chunks) → `advanceCursor` → `finish`.
+- **Nodes:** `guard` (in-order check, draft `approved`) → `commitProse` (chapter upsert; draft → `final`) → `extractContinuity` (CONTINUITY chain over the final prose + a minimal entity roster — keys, aliases, status one-liners, not full cards; **skipped** for isolated chapters) → `applyContinuity` (deterministic write-back: planned→active, register generated entities, tracker upserts) → `updateIndexes` (best-effort: prose chunks + refresh touched lore chunks) → `advanceCursor` → `finish`.
 - **Tiered failure handling:** `commitProse` failure fails the run cleanly (nothing happened). `extractContinuity`/`applyContinuity` failure marks the run `failed` _after_ prose commit — re-invoking resumes at the failed node from checkpoint. `updateIndexes` is best-effort: log and continue (embedding failure never fails the chapter).
-- **Continuity deltas route through the `continuity_proposals` staging table for all chapters** — `autoApply: true` for standard chapters, human-gated for grok. One write-back code path, one audit trail of what changed canon and why.
+- **Continuity deltas route through the `continuity_proposals` staging table for all chapters** — `autoApply: true` for standard chapters, human-gated for isolated chapters. One write-back code path, one audit trail of what changed canon and why.
 
 ### 2.5 `bible-builder`
 
@@ -188,12 +188,12 @@ Map-reduce so whole-novel validation fits any context window: `planWindows` (spl
 
 Every piece of context has a **canon status**; the assembler never mixes tiers silently:
 
-| Tier                | Contents                                                                                                                               | Usage                                                                                  |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| **Canonical**       | finalized chapters (prose/summaries), bible docs, active/dead entities, applied trackers, approved volumes                             | ground truth; the judge judges _against_ this                                          |
-| **Approved-intent** | approved volume plans, hand-edited briefs, `planned` entities                                                                          | intent to honor — prompts state "it is INTENT, not established canon; continuity wins" |
-| **Working**         | unfinalized drafts of chapters `< n` (summaries + continuation state), pending continuity proposals                                    | included for serial continuity, always labeled `[draft — not yet canon]`               |
-| **Excluded**        | grok prose (adjacency rule: summary+state instead), raw model outputs, other projects' data, discarded proposals, superseded revisions | never in any prompt                                                                    |
+| Tier                | Contents                                                                                                                                   | Usage                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| **Canonical**       | finalized chapters (prose/summaries), bible docs, active/dead entities, applied trackers, approved volumes                                 | ground truth; the judge judges _against_ this                                          |
+| **Approved-intent** | approved volume plans, hand-edited briefs, `planned` entities                                                                              | intent to honor — prompts state "it is INTENT, not established canon; continuity wins" |
+| **Working**         | unfinalized drafts of chapters `< n` (summaries + continuation state), pending continuity proposals                                        | included for serial continuity, always labeled `[draft — not yet canon]`               |
+| **Excluded**        | isolated prose (adjacency rule: summary+state instead), raw model outputs, other projects' data, discarded proposals, superseded revisions | never in any prompt                                                                    |
 
 This is how **finalized knowledge differs from draft knowledge**: finalized content is unlabeled ground truth and is indexed for retrieval; draft content flows only through the Working tier, explicitly labeled, and is never embedded into any index.
 
@@ -204,7 +204,7 @@ Context is **routed, not dumped** — selection and consumption are two separate
 1. **Selection happens at outline time.** The `chapter-outliner` receives the **context catalog** — a compact, titles-only listing of the project's available knowledge: entities as `key — type, one-line descriptor (status)`, world-fact keys, open plot threads, unresolved mysteries, and one-line summaries of finalized chapters. The catalog costs a few hundred tokens; the full cards it points to cost thousands. Retrieval hits (prose + lore, queried by the volume objective) are appended to inform selection. For each chapter brief the outliner emits `requiredContext: string[]` — refs like `entity:iron_covenant`, `world_fact:mana_debt`, `thread:heir_mystery`, `chapter:12` — most-important first, validated at parse time against the catalog (invented refs are dropped and logged). Stored as `briefs.contextRefs`, hand-editable exactly like the rest of the brief.
 2. **Resolution happens at generation time.** The assembler resolves exactly those refs — fresh from PostgreSQL, so the _content_ is current even though the _selection_ was made earlier — renders them as full cards / facts / thread summaries, and adds nothing else beyond the mandatory serial core.
 
-**The mandatory serial core is always present**, regardless of what the brief selected: previous-chapter ending (verbatim tail; summary+state if grok), continuation state + current situation, the brief itself + current volume objective, the writing style, and a short recent-summaries window (last 3, configurable). Without this core the drafter branches the story; with it, "only what the brief mentions" is safe — the brief declares everything _situational_, the core guarantees everything _serial_.
+**The mandatory serial core is always present**, regardless of what the brief selected: previous-chapter ending (verbatim tail; summary+state if isolated), continuation state + current situation, the brief itself + current volume objective, the writing style, and a short recent-summaries window (last 3, configurable). Without this core the drafter branches the story; with it, "only what the brief mentions" is safe — the brief declares everything _situational_, the core guarantees everything _serial_.
 
 **Resolution rules:** unknown or renamed refs are skipped and recorded on the pack manifest (`unresolvedRefs`) — never a failure. A brief with no `contextRefs` (hand-written, imported, pre-routing) falls back to broad legacy assembly with a warning. Resolved refs are deduped against core sections by `refKey`.
 
@@ -216,7 +216,7 @@ Context is **routed, not dumped** — selection and consumption are two separate
 - **LlamaIndex retrieval** — three places only: outline time (informs `requiredContext` selection), verification tools (`search_lore` / `search_prose`), and the user-facing search endpoint. **Never at draft time.** Retrieval is additive and best-effort; empty results degrade gracefully.
 - **Graph state** — _working products of this run only_: prose being repaired, findings, attempt counters, and a `contextPackId` reference. **Never put assembled canon text in graph state** — it bloats every checkpoint and goes stale mid-run; nodes re-read the pack by id.
 - **Prompts** — only the rendered `ContextPack` plus operation-specific inputs (guidance, feedback, findings, target words).
-- **Never sent to the LLM:** database ids, JSONB blobs, tool schemas a node doesn't use, other projects' data, grok prose in non-grok context, raw prior model outputs, superseded draft bodies, checkpoint internals, the catalog outside the outliner, roster/world-doc dumps at draft time.
+- **Never sent to the LLM:** database ids, JSONB blobs, tool schemas a node doesn't use, other projects' data, isolated prose in non-isolated context, raw prior model outputs, superseded draft bodies, checkpoint internals, the catalog outside the outliner, roster/world-doc dumps at draft time.
 
 ### 3.4 Per-job context matrix
 
@@ -253,7 +253,7 @@ One service, `ContextAssembler` (`modules/ai/context/`), with one public method 
 
 **Generation-pack priority order** (highest first — evicted last):
 
-1. Previous-chapter ending (verbatim tail; summary+state if the previous chapter is grok)
+1. Previous-chapter ending (verbatim tail; summary+state if the previous chapter is isolated)
 2. Continuation state + current situation
 3. This chapter's brief; current volume objective
 4. Resolved `contextRefs`, in brief order — the outliner's ordering _is_ the eviction order, which is why the outline prompt demands most-important first
@@ -341,7 +341,7 @@ interface ToolContext {
 | `search_lore`           | `{ query, kinds? }`        | top-6 lore cards (canonical tier only)                               | judge, validateWindow, review |
 | `get_entity`            | `{ entityKey }`            | full entity card: attributes, status, relationships, first/last seen | judge, validateWindow, review |
 | `get_chapter_summaries` | `{ from, to }` (span ≤ 20) | numbered summaries for the span                                      | judge, validateWindow         |
-| `search_prose`          | `{ query, k? ≤ 8 }`        | prose snippets with chapter numbers (grok excluded)                  | judge, review                 |
+| `search_prose`          | `{ query, k? ≤ 8 }`        | prose snippets with chapter numbers (isolated chapters excluded)     | judge, review                 |
 | `get_world_facts`       | `{ category? }`            | keyed facts for the category                                         | judge, validateWindow         |
 | `get_plot_threads`      | `{ status? }`              | thread summaries with opened/closed chapters                         | judge, validateWindow         |
 
@@ -451,8 +451,8 @@ Draft ──► User Review ──► Revision ──► Approval ──► Cano
 
 ```mermaid
 stateDiagram-v2
-  [*] --> generating: generate / generate-grok / import
-  generating --> needs_review: judge consistent (or grok/import - no judge)
+  [*] --> generating: generate / generate-unrestricted / import
+  generating --> needs_review: judge consistent (or unrestricted/import - no judge)
   generating --> contradiction: judge hard finding / budget exhausted
   contradiction --> generating: revise (feedback)
   needs_review --> generating: revise (feedback)
@@ -500,8 +500,8 @@ The same shape covers every reviewable artifact: continuity proposals (propose �
 ### 7.3 Embedding and retrieval strategy
 
 - **Embedding model:** `ollama/qwen3-embedding:8b`, dim 1024 (shared `EMBEDDING_DIM` constant; a dim change is a migration, not a runtime branch). Tests use `qwen3-embedding:0.6b` truncated to 1024 — same family, same dimension path.
-- **Retrieval:** `VectorIndexRetriever` with metadata filters; `retrieve(projectId, query, { index, k, excludeGrok: true })` returns `{ text, score, metadata }[]`. No query engines, no synthesis — retrieval only.
-- **Exclusions:** grok-interlude chapters (`generator = grok`) are excluded from prose retrieval. Unrestricted projects retrieve normally — embeddings have no content policy.
+- **Retrieval:** `VectorIndexRetriever` with metadata filters; `retrieve(projectId, query, { index, k, excludeIsolated: true })` returns `{ text, score, metadata }[]`. No query engines, no synthesis — retrieval only.
+- **Exclusions:** isolated chapters (`isolated = true`) are excluded from prose retrieval. Unrestricted projects retrieve normally — embeddings have no content policy.
 
 ### 7.4 Exactly when retrieval happens
 
@@ -550,7 +550,7 @@ One env var selects the role→model profile at bootstrap: `AI_PROFILE=prod | lo
 - **Context routing tests (rung 1):** catalog render golden; outline schema drops invented refs and preserves ordering; ref resolution (fresh content after a canon edit, unknown-ref skip → `unresolvedRefs`, zero-ref legacy fallback); per-purpose pack goldens asserting the §3.4 matrix — the generation pack contains the serial core + resolved refs and _nothing else_.
 - **Graph testing (rung 2):** build each `StateGraph` with fake node functions; assert topology — contradiction routes to repair only when `autoFix`; patch-uniqueness failure routes to rewrite; repeated finding early-stops; budget exhaustion ⇒ `acceptAsIs`; **checkpoint-resume**: kill between nodes, re-invoke same `thread_id`, assert `draftChapter` executed once.
 - **Tool testing (rung 1, real handlers):** per tool — happy path, projectId isolation (cannot see project B), arg-validation error string, call budget, output truncation, `tool_calls` audit rows.
-- **Retrieval testing (rung 3-lite: real embedder, no chat model):** seed 3 chapters + lore; prose search returns the right chapter; lore search returns the right entity; grok-interlude chapters excluded; Unrestricted projects retrieve; edit-driven re-embed (`sourceUpdatedAt` newer ⇒ refresh).
+- **Retrieval testing (rung 3-lite: real embedder, no chat model):** seed 3 chapters + lore; prose search returns the right chapter; lore search returns the right entity; isolated chapters excluded; Unrestricted projects retrieve; edit-driven re-embed (`sourceUpdatedAt` newer ⇒ refresh).
 - **Structured output testing:** schema fixtures (rung 1: ok/repaired/extracted/`AI_001` ladder paths, judge normalization corners) plus a rung-3 **torture test**: run each schema 5× against the local model, record parse/repair/fail counts to a report file — a regression tripwire, not a hard gate.
 - **End-to-end workflow (rung 3, ~6 scenarios):** (1) seed-from-brief on a 3-sentence brief ⇒ every bible section has rows, all Zod-parsed; (2) generate chapter 1 of the micro-project ⇒ prose 300+ words, valid continuation state, judge returns a verdict; (3) judge a fixture draft that kills an already-dead character ⇒ hard assertion: verdict parses; soft assertion (logged, non-failing): verdict is contradiction; (4) fix-loop on a planted unique find-string ⇒ patch applies byte-identically outside the edit; (5) judge tool loop against seeded canon ⇒ valid `tool_calls` rows, no crash, final verdict parses; (6) the torture report.
 - **Smoke test:** `bun run ai:smoke` — one end-to-end micro-novel on Ollama: seed → plan → approve → generate 2 chapters (autofix) → feedback + revise → approve → finalize both; assert canon rows, `lore_chunks`, `model_calls`/`tool_calls` populated, checkpoints pruned; print a run report (tokens, latency, parse stats).
@@ -595,7 +595,7 @@ Rules that make this work:
 - **One correlation key:** `runId` appears on logs, `model_calls`, `tool_calls`, `draft_revisions`, and the job's `progress.currentRun`.
 - **Prompts are not stored per call** — the exact prompt is recoverable from `contextPackId` + `promptKey@version` + input refs; an env-gated debug mode stores it verbatim when needed.
 - **Retries and failures** are visible as `model_calls.attempt` + `status`, and `workflow_runs.error` names the failing node.
-- Token/cost aggregation is `GET /projects/:id/ai-usage` (SQL over `model_calls`); latency percentiles per role/model are plain SQL. No metrics stack at this scale. Optional LangSmith tracing stays behind an env seam (`LANGSMITH_TRACING`) — the Postgres telemetry must stand alone, especially for grok-isolated content that must not go to third-party trace services.
+- Token/cost aggregation is `GET /projects/:id/ai-usage` (SQL over `model_calls`); latency percentiles per role/model are plain SQL. No metrics stack at this scale. Optional LangSmith tracing stays behind an env seam (`LANGSMITH_TRACING`) — the Postgres telemetry must stand alone, especially for isolated content that must not go to third-party trace services.
 
 ### 9.2 Debugging a failed generation — the playbook
 
@@ -629,16 +629,16 @@ _Tests:_ render goldens per prompt; schema fixtures (known-good and known-bad ou
 **Phase A3 — Model router, telemetry, repair ladder.** _Objective:_ `ModelRouterService.chatFor(role)` + `structured()` + `model_calls` writing.
 _Create:_ `src/modules/ai/{models,defaults,model-router.service,telemetry.handler}.ts`, provider constructors, `AI_PROFILE` bootstrap key, `FakeModelRouter` test double.
 _Result:_ role-resolution precedence matrix passes (unrestricted allowlist, forceProvider, env gating); parse-fail fixture yields `repaired` then `AI_001` with raw output persisted first.
-_Tests:_ router precedence; repair ladder (ok/repaired/extracted/fail); grok-isolation spy tests.
+_Tests:_ router precedence; repair ladder (ok/repaired/extracted/fail); isolation spy tests.
 
 **Phase A4 — Context Assembly Service.** _Objective:_ `ContextAssembler` + `context_packs` (the crown jewel — golden tests first, port second).
 _Create:_ `src/modules/ai/context/{context-assembler.service,catalog,ref-resolver,sections,budget}.ts`.
-_Result:_ golden packs per purpose (§3.4 matrix enforced); catalog golden; ref resolution covers fresh-content, unknown-ref, and zero-ref legacy-fallback paths; eviction order verified by shrinking the budget stepwise; grok-previous chapter yields summary+state instead of verbatim tail; preview dry-run works.
+_Result:_ golden packs per purpose (§3.4 matrix enforced); catalog golden; ref resolution covers fresh-content, unknown-ref, and zero-ref legacy-fallback paths; eviction order verified by shrinking the budget stepwise; isolated-previous chapter yields summary+state instead of verbatim tail; preview dry-run works.
 _Tests:_ assembler unit suite (routing, budgeting, eviction, paragraph-boundary truncation, tier labels, manifest + `unresolvedRefs` correctness, ref dedupe against core).
 
 **Phase A5 — Retrieval and indexing.** _Objective:_ both LlamaIndex-backed indexes live.
 _Create:_ `src/modules/ai/retrieval/{retrieval.service,ingestion,lore-cards}.ts`, backfill script.
-_Result:_ paragraph chunker + lore-card renderers work; metadata-filtered retrieval with grok-interlude exclusions; upsert-on-edit re-embeds.
+_Result:_ paragraph chunker + lore-card renderers work; metadata-filtered retrieval with isolation exclusions; upsert-on-edit re-embeds.
 _Tests:_ `test:ai:retrieval` green against the local embedder at dim 1024.
 
 **Phase A6 — Tool system.** _Objective:_ the six read-only tools + bounded loop + audit.
@@ -682,7 +682,10 @@ _Result:_ `bun test` green; nightly green-or-skipped; docs current.
 5. Every structured call goes through the repair ladder; every output is Zod-validated; domain-invalid output never enters the DB as canon.
 6. Context is assembled once per run, token-budgeted, tier-labeled, and persisted as a pack.
 7. Drafting sees only the mandatory serial core plus the refs its brief declared; broad canon access belongs to the outliner (catalog, titles only) and the judge (tools) — never the drafter.
-8. Draft and grok-interlude content never enter an index. Unrestricted projects retrieve like Standard.
+8. Draft and isolated content never enter an index, never retrieve, and never feed continuity extraction. Containment is
+   driven by `chapters.isolated` / `drafts.isolated`, never by `generator` — provenance and containment are independent
+   axes. Unrestricted projects retrieve like Standard; a project's `contentMode` never implies a chapter is isolated, and
+   a chapter being isolated never implies its project is `unrestricted`. (Amended by `interstitial-chapter-design.md` §2.)
 9. Review state lives in `drafts.reviewStatus`, not in paused graphs; feedback starts a new run.
 10. Prompt text lives in versioned code modules; every call logs `promptKey@promptVersion`.
 11. `runId` correlates everything; a failed generation is debuggable from the database alone.

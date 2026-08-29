@@ -17,7 +17,7 @@ import {
   FeedbackBody,
   FinalizeBody,
   GenerateBody,
-  GenerateGrokBody,
+  GenerateUnrestrictedBody,
   ImportDraftBody,
   JobEnqueueResponse,
   JudgeResponse,
@@ -201,10 +201,10 @@ export class GenerationController {
     return this.generationService.finalize(params.projectId, body);
   }
 
-  @Post('/chapters/:n/generate-grok')
+  @Post('/chapters/:n/generate-unrestricted')
   @RespondFor(200, DraftResponse)
-  generateGrok(@Params() params: ChapterParams, @Body() body: GenerateGrokBody): Promise<DraftResponse> {
-    return this.generationService.generateGrok(params.projectId, params.n, body);
+  generateUnrestricted(@Params() params: ChapterParams, @Body() body: GenerateUnrestrictedBody): Promise<DraftResponse> {
+    return this.generationService.generateUnrestricted(params.projectId, params.n, body);
   }
 
   @Post('/chapters/:n/propose-continuity')

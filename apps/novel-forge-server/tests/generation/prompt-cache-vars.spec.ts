@@ -113,18 +113,18 @@ describe.if(pgAvailable)('generation path prompt-cache vars', () => {
     expectSplitVars(generationCall?.input ?? {});
   });
 
-  it('passes the same split vars — and the ending contract — from generateGrok', async () => {
+  it('passes the same split vars — and the ending contract — from generateUnrestricted', async () => {
     const projectId = await seedProject();
     const structured = mock(async () => draftOutput);
     const databaseService = { getPostgresClient: () => db } as never;
     const noop = {} as never;
     const service = new GenerationService(databaseService, noop, { structured } as never, assembler(), noop, noop, noop, noop, noop, noop, noop, noop);
 
-    await service.generateGrok(projectId, 2, { guidance: 'GUIDANCE_MARKER' } as never);
+    await service.generateUnrestricted(projectId, 2, { guidance: 'GUIDANCE_MARKER' } as never);
 
     const [, input] = (structured.mock.calls[0] ?? []) as unknown as [unknown, Record<string, unknown>];
     expectSplitVars(input);
-    // The prompt declares endingContract; omitting it made every grok generation throw on render.
+    // The prompt declares endingContract; omitting it made every unrestricted generation throw on render.
     expect(input['endingContract']).toBeDefined();
     expect(input['guidance']).toBe('GUIDANCE_MARKER');
   });

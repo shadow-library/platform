@@ -147,12 +147,12 @@ describe.if(pgAvailable)('GenerationService draft mutation guards', () => {
     });
   });
 
-  describe('generateGrok', () => {
+  describe('generateUnrestricted', () => {
     it('should reject a finalized draft and leave its prose untouched', async () => {
       const projectId = await seedProject();
       await seedDraft(projectId, 1, 'final');
 
-      expect(await codeOf(service.generateGrok(projectId, 1, {}))).toBe('DRF_002');
+      expect(await codeOf(service.generateUnrestricted(projectId, 1, {}))).toBe('DRF_002');
 
       const draft = await draftAt(projectId, 1);
       expect(draft?.body).toBe('original body');
@@ -168,7 +168,7 @@ describe.if(pgAvailable)('GenerationService draft mutation guards', () => {
       await seedDraft(projectId, 2, 'draft', { reviewStatus: 'approved' });
       await seedDraft(projectId, 3, 'draft', { reviewStatus: 'needs_review' });
 
-      const generated = await service.generateGrok(projectId, 1, {});
+      const generated = await service.generateUnrestricted(projectId, 1, {});
 
       expect(generated.body).toBe('revised body');
       expect(generated.title).toBe('revised title');
@@ -216,7 +216,7 @@ describe.if(pgAvailable)('GenerationService draft mutation guards', () => {
         },
       }) as PrimaryDatabase;
 
-      expect(await codeOf(buildService(failingDb).generateGrok(projectId, 1, {}))).toContain('descendant invalidation failed');
+      expect(await codeOf(buildService(failingDb).generateUnrestricted(projectId, 1, {}))).toContain('descendant invalidation failed');
 
       const ancestor = await draftAt(projectId, 1);
       expect(ancestor?.body).toBe('original body');
@@ -236,7 +236,7 @@ describe.if(pgAvailable)('GenerationService draft mutation guards', () => {
       await seedDraft(projectId, 2, 'draft');
       await seedDraft(otherProjectId, 2, 'draft', { reviewStatus: 'approved' });
 
-      await service.generateGrok(projectId, 2, {});
+      await service.generateUnrestricted(projectId, 2, {});
 
       const ancestor = await draftAt(projectId, 1);
       expect(ancestor?.body).toBe('original body');

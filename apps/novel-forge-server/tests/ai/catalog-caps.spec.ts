@@ -67,7 +67,7 @@ describe.if(pgAvailable)('catalog and validation-window caps', () => {
     const rendered = await catalog.render(projectId);
 
     expect(rendered).toContain('1 — Imported\n');
-    expect(rendered).toContain('2 — Pasted [grok]');
+    expect(rendered).toContain('2 — Pasted [unrestricted]');
   });
 
   it('caps catalog chapters to the most recent N and reports the omitted count', async () => {

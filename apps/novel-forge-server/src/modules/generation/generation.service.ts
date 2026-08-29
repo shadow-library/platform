@@ -39,7 +39,7 @@ import {
   type FeedbackBody,
   type FinalizeBody,
   type GenerateBody,
-  type GenerateGrokBody,
+  type GenerateUnrestrictedBody,
   type ImportDraftBody,
   type OutlineArcBody,
   type OutlineBody,
@@ -1042,7 +1042,7 @@ export class GenerationService {
       .catch(err => this.logger.warn('finalize: volume epitome failed', { projectId, volumeKey: volume.volumeKey, chapter, err }));
   }
 
-  async generateGrok(projectId: bigint, chapter: number, body: GenerateGrokBody): Promise<Generation.Draft> {
+  async generateUnrestricted(projectId: bigint, chapter: number, body: GenerateUnrestrictedBody): Promise<Generation.Draft> {
     const locked = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
     if (locked?.status === 'final') throw AppErrorCode.DRF_002.create();
 
