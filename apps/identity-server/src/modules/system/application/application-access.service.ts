@@ -56,6 +56,12 @@ export class ApplicationAccessService {
     return grants;
   }
 
+  async listOrganisationApplicationIds(organisationId: bigint): Promise<Set<number>> {
+    const organisation = await this.db.query.organisations.findFirst({ where: eq(schema.organisations.id, organisationId) });
+    if (!organisation) throw AppErrorCode.ORG_002.create();
+    return this.resolveOrganisationGrants(organisation);
+  }
+
   async assertUserAccess(userId: bigint, applicationId: number): Promise<void> {
     const application = await this.db.query.applications.findFirst({ where: eq(schema.applications.id, applicationId) });
     if (!application || !application.isActive) throw AppErrorCode.APP_006.create();

@@ -45,6 +45,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly APP_011 = AppErrorCode.conflict('APP_011', 'Organisation has reached its maximum number of registered applications');
   /** The redirect uri is not valid for a third-party application */
   static readonly APP_012 = AppErrorCode.validation('APP_012', 'Invalid redirect uri for a third-party application', 400);
+  /** A public client authenticates with PKCE alone, so it holds no secret that could be rotated */
+  static readonly APP_013 = AppErrorCode.validation('APP_013', 'A public application has no client secret to rotate', 400);
 
   /*!
    * User Error Codes

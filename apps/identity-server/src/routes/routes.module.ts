@@ -17,6 +17,7 @@ import { AccountCloseModule } from '@server/modules/identity/account';
 import { ContactModule } from '@server/modules/identity/contact';
 import { DirectoryModule } from '@server/modules/identity/directory';
 import { OrganisationModule } from '@server/modules/identity/organisation';
+import { OrgOAuthAppModule } from '@server/modules/identity/organisation/org-oauth-app.module';
 import { UserModule } from '@server/modules/identity/user';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { HealthModule } from '@server/modules/infrastructure/health';
@@ -60,6 +61,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     MfaModule,
     ContactModule,
     OrganisationModule,
+    OrgOAuthAppModule,
     DirectoryModule,
     UserModule,
     AuditModule,
