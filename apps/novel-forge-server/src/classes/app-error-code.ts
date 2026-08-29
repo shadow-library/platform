@@ -241,4 +241,15 @@ export class AppErrorCode extends ServerErrorCode {
   // Refused rather than auto-raised: the novel-level rating is the author's published promise to readers, and
   // silently rewriting it from a chapter edit changes what the catalog advertises without anyone deciding to.
   static readonly PUB_009 = AppErrorCode.badRequest('PUB_009', 'The novel rating is below a published chapter’s — raise it first ({violations})');
+
+  /*!
+   * API Key Errors
+   */
+  // Revoked is told apart from invalid on purpose: the caller already holds the plaintext, so the
+  // distinction reveals nothing it could not confirm anyway, and it is the difference between
+  // "rotate the key" and "check what you pasted".
+  static readonly KEY_001 = AppErrorCode.unauthenticated('KEY_001', 'Invalid API key');
+  static readonly KEY_002 = AppErrorCode.unauthenticated('KEY_002', 'API key has been revoked');
+  static readonly KEY_003 = AppErrorCode.forbidden('KEY_003', 'The API key owner no longer holds the permission required for this operation');
+  static readonly KEY_004 = AppErrorCode.notFound('KEY_004', 'API key not found');
 }

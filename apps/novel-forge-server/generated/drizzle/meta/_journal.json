@@ -169,6 +169,13 @@
       "when": 1787987421395,
       "tag": "0023_strange_talisman",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788001789019,
+      "tag": "0024_exotic_sugar_man",
+      "breakpoints": true
     }
   ]
 }

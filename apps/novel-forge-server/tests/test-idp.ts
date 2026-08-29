@@ -22,6 +22,9 @@ export const CALLBACK_URI = 'http://localhost:8080/api/auth/callback';
 
 export const TEST_USER = { userId: '42' };
 
+/** Every token the suite mints acts in this organisation, so permission-guarded routes have one to evaluate in */
+export const TEST_ORG = 'org-test';
+
 export const testIdP = await createTestIdP({
   clientId: APP_ID,
   clientSecret: CLIENT_SECRET,
@@ -45,5 +48,5 @@ Config['cache'].set('publishing.auto-push', false);
 
 /** Mints a bearer token accepted by the app's AuthGuard for the shared test user */
 export function issueTestToken(overrides: { sub?: string; scopes?: string[]; ttlSeconds?: number } = {}): Promise<string> {
-  return testIdP.issueToken({ sub: overrides.sub ?? TEST_USER.userId, audience: AUTH_AUDIENCE, scopes: overrides.scopes, ttlSeconds: overrides.ttlSeconds });
+  return testIdP.issueToken({ sub: overrides.sub ?? TEST_USER.userId, audience: AUTH_AUDIENCE, org: TEST_ORG, scopes: overrides.scopes, ttlSeconds: overrides.ttlSeconds });
 }

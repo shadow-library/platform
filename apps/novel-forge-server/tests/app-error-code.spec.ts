@@ -53,6 +53,13 @@ describe('AppErrorCode', () => {
     expect(AppErrorCode.CHP_006.status).toBe(400);
   });
 
+  it('should define api key error codes', () => {
+    expect(AppErrorCode.KEY_001.status).toBe(401);
+    expect(AppErrorCode.KEY_002.status).toBe(401);
+    expect(AppErrorCode.KEY_003.status).toBe(403);
+    expect(AppErrorCode.KEY_004.status).toBe(404);
+  });
+
   it('should define transform reforge error codes', () => {
     expect(AppErrorCode.REF_004.status).toBe(404);
     expect(AppErrorCode.REF_005.status).toBe(400);

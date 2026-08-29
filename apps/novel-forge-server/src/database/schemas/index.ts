@@ -15,3 +15,4 @@ export * from './illustration';
 export * from './jobs';
 export * from './vectors';
 export * from './ai';
+export * from './api-keys';
