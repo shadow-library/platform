@@ -7,6 +7,7 @@ import { APP_ID, CLIENT_SECRET, testIdP } from '@tests/test-idp';
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AuthClient } from '@shadow-library/auth';
+import { ContextService } from '@shadow-library/fastify';
 
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { type NovelBundle } from '@modules/novel-import/novel-import.dto';
@@ -97,7 +98,7 @@ describe.if(pgAvailable)('Novel import (final mode) → publish (mocked reader)'
     // reader — proving the imported chapters push through the exact publishing path production uses.
     const databaseService = createTestDatabaseService(testEnv.getPostgresClient()) as never;
     const authClient = new AuthClient({ issuer: testIdP.issuer, appId: APP_ID, client: { id: APP_ID, secret: CLIENT_SECRET } });
-    const publishingService = new PublishingService(databaseService);
+    const publishingService = new PublishingService(databaseService, new ContextService(), authClient);
     const accessService = new PublicationAccessService(databaseService, publishingService, authClient);
     const runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(authClient), accessService, new WikiPublishingService(databaseService));
 

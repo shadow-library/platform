@@ -17,6 +17,7 @@ export interface Publication {
   id: string;
   novelSlug: string;
   title: string;
+  originalAuthor?: string | null;
   blurb?: string | null;
   coverPath?: string | null;
   genres?: Genre[] | null;
@@ -55,6 +56,8 @@ export interface PublishNovelBody {
   /** Changing it moves the novel to the new URL and the old one stops resolving. Omitted, it is derived from the title. */
   novelSlug?: string;
   title?: string;
+  /** The work's own author for a curated import; `null` clears it. Naming one requires the `novel-forge:curate` permission. */
+  originalAuthor?: string | null;
   blurb?: string | null;
   coverPath?: string | null;
   /** Omitted retains the stored genres; `null` clears them. */

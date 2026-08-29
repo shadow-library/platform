@@ -1,0 +1,1 @@
+ALTER TABLE "publications" ADD COLUMN "original_author" varchar(256);

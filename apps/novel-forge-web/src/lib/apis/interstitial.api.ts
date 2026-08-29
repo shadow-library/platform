@@ -1,113 +1,17 @@
-import { type ContentRating } from '@shadow-library/sdk';
 import { useMutation, type UseMutationResult, useQueryClient } from '@tanstack/react-query';
 
 import {
-  type ContinuityProposalResponse,
-  type BriefResponse as GenBriefResponse,
-  type BriefSummaryResponse as GenBriefSummaryResponse,
-  type DraftResponse as GenDraftResponse,
-  type JobEnqueueResponse as GenJobEnqueueResponse,
+  type AmendChapterBody,
+  type AmendChapterResponse,
+  type ChapterSummarizeResponse,
+  type DraftResponse,
+  type GenerateUnrestrictedBody,
+  type ImportDraftBody,
+  type InsertChapterBody,
+  type InsertChapterResponse,
+  type JobEnqueueResponse,
 } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
-
-/**
- * TEMPORARY STAND-IN — delete this whole file once `api-types.gen.ts` is regenerated against a running
- * novel-forge-server (`bun scripts/gen-api-types.ts novel-forge-web`), then re-point these imports at the
- * generated names, which are identical. The generated file is eleven commits stale and cannot be refreshed
- * without a Postgres the generator can boot the server against. Every shape below mirrors a DTO in
- * `apps/novel-forge-server/src/modules/generation/generation.dto.ts` by hand; nothing here is invented.
- * `DraftResponse`/`BriefResponse`/`BriefSummaryResponse`/`JobEnqueueResponse` extend the generated shapes
- * with the fields the generated file predates — `brief.api.ts` and `draft.api.ts` import the extended
- * names from here instead of `api-types.gen` directly.
- */
-
-export interface InsertChapterBody {
-  /** `'hand'` takes `briefBody` verbatim; `'planner'` drafts the brief from `intent`. */
-  briefOrigin: 'hand' | 'planner';
-  briefBody?: string;
-  intent?: string;
-}
-
-export type BriefWriteMode = 'standard' | 'external';
-
-export type DraftResponse = GenDraftResponse & {
-  /** Firewalls this chapter's prose from the vector index, continuity extraction, and the adjacency rule — independent of `generator`. */
-  isolated: boolean;
-  contentRating?: ContentRating | null;
-};
-
-export interface ListDraftResponse {
-  items: DraftResponse[];
-}
-
-export type BriefResponse = GenBriefResponse & {
-  /** `'external'` means the primary writer's batch loop skips this slot. */
-  writeMode: BriefWriteMode;
-  insertedAt?: string | null;
-};
-
-export type BriefSummaryResponse = GenBriefSummaryResponse & {
-  writeMode: BriefWriteMode;
-  insertedAt?: string | null;
-};
-
-export interface ListBriefSummaryResponse {
-  items: BriefSummaryResponse[];
-}
-
-export type JobEnqueueResponse = GenJobEnqueueResponse & {
-  /** Present when the batch was cut short at an unfilled external-write slot. */
-  stoppedAtExternalChapter?: number;
-};
-
-export interface ReviewQueueResponse {
-  drafts: DraftResponse[];
-  proposals: ContinuityProposalResponse[];
-}
-
-export interface InsertChapterResponse {
-  brief: BriefResponse;
-  newChapter: number;
-  shiftedChapters: number;
-}
-
-export interface GenerateUnrestrictedBody {
-  guidance?: string;
-  /** Omission keeps the stored rating; an empty object clears it back to unrated. */
-  contentRating?: ContentRating;
-}
-
-export interface ImportDraftBody {
-  prose: string;
-  title?: string;
-  summary?: string;
-  contentRating?: ContentRating;
-  state?: Record<string, unknown>;
-  /** Firewalls the prose from the index, continuity extraction, and the adjacency rule. */
-  isolated?: boolean;
-}
-
-export interface ChapterSummarizeResponse {
-  summary: string;
-  state: Record<string, unknown>;
-}
-
-export interface AmendChapterBody {
-  content: string;
-  title?: string;
-  note?: string;
-  contentRating?: ContentRating;
-}
-
-export interface AmendChapterResponse {
-  chapter: number;
-  wordCount: number;
-  indexed: boolean;
-  republished: boolean;
-  publicationRevision?: number;
-  /** Always true — amend replaces prose only, so canon already derived from this chapter keeps propagating. */
-  suggestExtractToBible: boolean;
-}
 
 export function isIsolated(draft: DraftResponse): boolean {
   return draft.isolated;

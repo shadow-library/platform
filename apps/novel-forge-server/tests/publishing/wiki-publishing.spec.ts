@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AuthClient } from '@shadow-library/auth';
+import { ContextService } from '@shadow-library/fastify';
 
 import { ConcurrencyController } from '@modules/jobs/concurrency.controller';
 import { JobExecutor } from '@modules/jobs/job.executor';
@@ -63,9 +64,9 @@ describe.if(pgAvailable)('Wiki publish pipeline (mocked reader service)', () => 
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
     databaseService = createTestDatabaseService(db) as never;
-    publishingService = new PublishingService(databaseService);
     wikiService = new WikiPublishingService(databaseService);
     const authClient = new AuthClient({ issuer: testIdP.issuer, appId: APP_ID, client: { id: APP_ID, secret: CLIENT_SECRET } });
+    publishingService = new PublishingService(databaseService, new ContextService(), authClient);
     const accessService = new PublicationAccessService(databaseService, publishingService, authClient);
     runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(authClient), accessService, wikiService);
 

@@ -183,6 +183,13 @@
       "when": 1788005104344,
       "tag": "0025_slim_starbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1788005928419,
+      "tag": "0026_nice_electro",
+      "breakpoints": true
     }
   ]
 }

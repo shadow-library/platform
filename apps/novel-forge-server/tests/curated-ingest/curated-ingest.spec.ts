@@ -103,6 +103,30 @@ describe.if(pgAvailable)('Curated ingest', () => {
       expect(bible).toHaveLength(schema.bibleSection.enumValues.length);
     });
 
+    it('should refuse a blank original author and land a padded one trimmed', async () => {
+      const blank = await ingest()
+        .mockRequest()
+        .put(`/api/v1/ingest/novels/${SOURCE_REF}`)
+        .body({ ...NOVEL, originalAuthor: '' });
+      expect(blank.statusCode).toBe(422);
+
+      const padded = await ingest()
+        .mockRequest()
+        .put(`/api/v1/ingest/novels/${SOURCE_REF}`)
+        .body({ ...NOVEL, originalAuthor: '  Wen Qing  ' });
+      expect(padded.statusCode).toBe(201);
+      const project = await testEnv.getPostgresClient().query.projects.findFirst({ where: eq(schema.projects.id, BigInt(padded.json().projectId as string)) });
+      expect(project?.originalAuthor).toBe('Wen Qing');
+
+      const whitespace = await ingest()
+        .mockRequest()
+        .put('/api/v1/ingest/novels/mvlempyr:5678')
+        .body({ ...NOVEL, originalAuthor: '   ' });
+      expect(whitespace.statusCode).toBe(201);
+      const unnamed = await testEnv.getPostgresClient().query.projects.findFirst({ where: eq(schema.projects.id, BigInt(whitespace.json().projectId as string)) });
+      expect(unnamed?.originalAuthor).toBeNull();
+    });
+
     it('should return the existing project without touching its metadata on a repeat push', async () => {
       const projectId = await createNovel();
       await testEnv.getPostgresClient().update(schema.projects).set({ title: 'Curated Title' }).where(eq(schema.projects.id, projectId));

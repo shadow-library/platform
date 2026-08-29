@@ -35,7 +35,8 @@ export class IngestNovelBody {
   @Field({ minLength: 1, maxLength: 20_000, description: 'The source’s blurb; lands as the project brief.' })
   synopsis: string;
 
-  @Field({ optional: true, maxLength: 256, description: 'The novel’s author at the source, shown to readers alongside the title.' })
+  // `minLength` matches the reader's own declaration: a blank name would ride the publish adoption all the way to a push the reader rejects.
+  @Field({ optional: true, minLength: 1, maxLength: 256, description: 'The novel’s author at the source, shown to readers alongside the title.' })
   originalAuthor?: string;
 
   @Field(() => [NovelGenre], { optional: true, uniqueItems: true, maxItems: MAX_NOVEL_GENRES, description: 'Catalog genres claimed by the source.' })

@@ -152,6 +152,232 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/api-keys': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Api Keys */
+    get: operations['get_api_v1_api_keys'];
+    put?: never;
+    /** Create Api Key */
+    post: operations['post_api_v1_api_keys'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/api-keys/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Revoke Api Key */
+    delete: operations['delete_api_v1_api_keys_id'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ingest/novels/{sourceRef}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Upsert Novel */
+    put: operations['put_api_v1_ingest_novels_sourceRef'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ingest/novels/{sourceRef}/chapters/{sourceOrdinal}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Push Chapter */
+    put: operations['put_api_v1_ingest_novels_sourceRef_chapters_sourceOrdinal'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ingest/novels/{sourceRef}/cover': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Set Cover */
+    post: operations['post_api_v1_ingest_novels_sourceRef_cover'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ingest/novels/{sourceRef}/manifest': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Manifest */
+    get: operations['get_api_v1_ingest_novels_sourceRef_manifest'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Projects */
+    get: operations['get_api_v1_projects'];
+    put?: never;
+    /** Create Project */
+    post: operations['post_api_v1_projects'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Project */
+    get: operations['get_api_v1_projects_projectId'];
+    put?: never;
+    post?: never;
+    /** Delete Project */
+    delete: operations['delete_api_v1_projects_projectId'];
+    options?: never;
+    head?: never;
+    /** Update Project */
+    patch: operations['patch_api_v1_projects_projectId'];
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Project Status */
+    get: operations['get_api_v1_projects_projectId_status'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/clone': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Clone Project */
+    post: operations['post_api_v1_projects_projectId_clone'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reset': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reset Project */
+    post: operations['post_api_v1_projects_projectId_reset'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/cost': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Project Cost */
+    get: operations['get_api_v1_projects_projectId_cost'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/cover': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Upload Cover */
+    post: operations['post_api_v1_projects_projectId_cover'];
+    /** Delete Cover */
+    delete: operations['delete_api_v1_projects_projectId_cover'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/export/novel': {
     parameters: {
       query?: never;
@@ -512,7 +738,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/projects/{projectId}/chapters/{n}/generate-grok': {
+  '/api/v1/projects/{projectId}/chapters/{n}/generate-unrestricted': {
     parameters: {
       query?: never;
       header?: never;
@@ -521,8 +747,25 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Generate Grok */
-    post: operations['post_api_v1_projects_projectId_chapters_n_generate_grok'];
+    /** Generate Unrestricted */
+    post: operations['post_api_v1_projects_projectId_chapters_n_generate_unrestricted'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chapters/{n}/summarize': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Summarize Chapter */
+    post: operations['post_api_v1_projects_projectId_chapters_n_summarize'];
     delete?: never;
     options?: never;
     head?: never;
@@ -832,6 +1075,40 @@ export interface paths {
     post?: never;
     /** Remove Chapter Image */
     delete: operations['delete_api_v1_projects_projectId_chapters_n_images_imageId'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chapters/{afterChapter}/insert': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Insert Chapter */
+    post: operations['post_api_v1_projects_projectId_chapters_afterChapter_insert'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chapters/{n}/amend': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Amend Chapter */
+    post: operations['post_api_v1_projects_projectId_chapters_n_amend'];
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -1548,129 +1825,6 @@ export interface paths {
     /** Graduate Seed */
     post: operations['post_api_v1_projects_projectId_seed_graduate'];
     delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Projects */
-    get: operations['get_api_v1_projects'];
-    put?: never;
-    /** Create Project */
-    post: operations['post_api_v1_projects'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Project */
-    get: operations['get_api_v1_projects_projectId'];
-    put?: never;
-    post?: never;
-    /** Delete Project */
-    delete: operations['delete_api_v1_projects_projectId'];
-    options?: never;
-    head?: never;
-    /** Update Project */
-    patch: operations['patch_api_v1_projects_projectId'];
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/status': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Project Status */
-    get: operations['get_api_v1_projects_projectId_status'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/clone': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Clone Project */
-    post: operations['post_api_v1_projects_projectId_clone'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/reset': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Reset Project */
-    post: operations['post_api_v1_projects_projectId_reset'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/cost': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Project Cost */
-    get: operations['get_api_v1_projects_projectId_cost'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/cover': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Upload Cover */
-    post: operations['post_api_v1_projects_projectId_cover'];
-    /** Delete Cover */
-    delete: operations['delete_api_v1_projects_projectId_cover'];
     options?: never;
     head?: never;
     patch?: never;
@@ -2514,6 +2668,391 @@ export interface components {
       provider: string;
       model: string;
     };
+    CreateApiKeyBody: {
+      /** @description Human-readable label; it is the only way to tell two keys apart once the secret is gone. */
+      name: string;
+    };
+    CreateApiKeyResponse: {
+      id: string;
+      name: string;
+      /** @description The first 8 characters of the secret, for identification only — it authenticates nothing. */
+      keyPrefix: string;
+      /** Format: date-time */
+      createdAt: string;
+      /**
+       * Format: date-time
+       * @description Recorded at most once a minute, so it lags real usage by up to 60 seconds.
+       */
+      lastUsedAt?: null | string;
+      /** Format: date-time */
+      revokedAt?: null | string;
+      /** @description The plaintext secret. Returned by this call alone — the server keeps only its hash and can never show it again. */
+      secret: string;
+    };
+    ListApiKeysResponse: {
+      keys: components['schemas']['ApiKeyResponse'][];
+    };
+    ApiKeyResponse: {
+      id: string;
+      name: string;
+      /** @description The first 8 characters of the secret, for identification only — it authenticates nothing. */
+      keyPrefix: string;
+      /** Format: date-time */
+      createdAt: string;
+      /**
+       * Format: date-time
+       * @description Recorded at most once a minute, so it lags real usage by up to 60 seconds.
+       */
+      lastUsedAt?: null | string;
+      /** Format: date-time */
+      revokedAt?: null | string;
+    };
+    IngestNovelBody: {
+      title: string;
+      /** @description The source’s blurb; lands as the project brief. */
+      synopsis: string;
+      /** @description The novel’s author at the source, shown to readers alongside the title. */
+      originalAuthor?: string;
+      /** @description Catalog genres claimed by the source. */
+      genres?: components['schemas']['NovelGenre'][];
+      /** @description Catalog tags claimed by the source. */
+      tags?: components['schemas']['NovelTag'][];
+      sexualContent?: components['schemas']['SexualContentRating'];
+      violence?: components['schemas']['ViolenceRating'];
+      darkContent?: components['schemas']['DarkContentRating'];
+    };
+    /** @enum {string} */
+    NovelGenre:
+      | 'Action'
+      | 'Adult'
+      | 'Adventure'
+      | 'Comedy'
+      | 'Drama'
+      | 'Ecchi'
+      | 'Fantasy'
+      | 'Gender Bender'
+      | 'Harem'
+      | 'Historical'
+      | 'Horror'
+      | 'Josei'
+      | 'Martial Arts'
+      | 'Mature'
+      | 'Mecha'
+      | 'Mystery'
+      | 'Psychological'
+      | 'Romance'
+      | 'School Life'
+      | 'Sci-fi'
+      | 'Seinen'
+      | 'Shoujo'
+      | 'Shoujo Ai'
+      | 'Shounen'
+      | 'Shounen Ai'
+      | 'Slice of Life'
+      | 'Smut'
+      | 'Sports'
+      | 'Supernatural'
+      | 'Tragedy'
+      | 'Wuxia'
+      | 'Xianxia'
+      | 'Xuanhuan'
+      | 'Yaoi'
+      | 'Yuri';
+    /** @enum {string} */
+    NovelTag:
+      | 'Male Protagonist'
+      | 'Female Protagonist'
+      | 'Overpowered Protagonist'
+      | 'Weak to Strong'
+      | 'Protagonist Strong from the Start'
+      | 'Antihero Protagonist'
+      | 'Evil Protagonist'
+      | 'Ruthless Protagonist'
+      | 'Genius Protagonist'
+      | 'Calm Protagonist'
+      | 'Lazy Protagonist'
+      | 'Loner Protagonist'
+      | 'Underestimated Protagonist'
+      | 'Multiple Protagonists'
+      | 'Slow Romance'
+      | 'Love Triangles'
+      | 'Childhood Friends'
+      | 'Arranged Marriage'
+      | 'Marriage of Convenience'
+      | 'Enemies Become Lovers'
+      | 'Fated Lovers'
+      | 'Unrequited Love'
+      | 'Obsessive Love'
+      | 'Secret Relationship'
+      | 'Office Romance'
+      | 'Reverse Harem'
+      | 'Polygamy'
+      | 'Tsundere'
+      | 'Yandere'
+      | 'Cross-dressing'
+      | 'Cultivation'
+      | 'Sect Development'
+      | 'Master-Disciple Relationship'
+      | 'Dao Companion'
+      | 'Alchemy'
+      | 'Martial Spirits'
+      | 'Immortals'
+      | 'Multiple Realms'
+      | 'Strength-based Social Hierarchy'
+      | 'Bloodlines'
+      | 'Ancient China'
+      | 'Magic'
+      | 'Magic Beasts'
+      | 'Dragons'
+      | 'Elves'
+      | 'Demons'
+      | 'Demon Lord'
+      | 'Gods'
+      | 'Vampires'
+      | 'Werebeasts'
+      | 'Zombies'
+      | 'Ghosts'
+      | 'Witches'
+      | 'Necromancer'
+      | 'Beastkin'
+      | 'Monster Tamer'
+      | 'Curses'
+      | 'Artificial Intelligence'
+      | 'Androids'
+      | 'Aliens'
+      | 'Cosmic Wars'
+      | 'Apocalypse'
+      | 'Post-apocalyptic'
+      | 'Dystopia'
+      | 'Genetic Modifications'
+      | 'Virtual Reality'
+      | 'Time Travel'
+      | 'Game Elements'
+      | 'Level System'
+      | 'MMORPG'
+      | 'Dungeons'
+      | 'Tower Climbing'
+      | 'Cheats'
+      | 'Hidden Abilities'
+      | 'Transported into a Game World'
+      | 'Survival Game'
+      | 'e-Sports'
+      | 'Modern Knowledge'
+      | 'Business Management'
+      | 'Showbiz'
+      | 'Celebrities'
+      | 'Medical Knowledge'
+      | 'Organized Crime'
+      | 'Academy'
+      | 'College/University'
+      | 'Nobles'
+      | 'Royalty'
+      | 'Court Official'
+      | 'Imperial Harem'
+      | 'Kingdom Building'
+      | 'Politics'
+      | 'Schemes And Conspiracies'
+      | 'Wars'
+      | 'Military'
+      | 'Medieval'
+      | 'Reincarnation'
+      | 'Transmigration'
+      | 'Transported to Another World'
+      | 'Returning from Another World'
+      | 'Parallel Worlds'
+      | 'Time Loop'
+      | 'Time Skip'
+      | 'Second Chance'
+      | 'Amnesia'
+      | 'Hiding True Identity'
+      | 'Mistaken Identity'
+      | 'Body Swap'
+      | 'Possession'
+      | 'Prophecies'
+      | 'Revenge'
+      | 'Villainess Noble Girls'
+      | 'Assassins'
+      | 'Mercenaries'
+      | 'Knights'
+      | 'Ninjas'
+      | 'Samurai'
+      | 'Pirates'
+      | 'Hunters'
+      | 'Strategic Battles'
+      | 'Battle Competition'
+      | 'Harsh Training'
+      | 'Sword Wielder'
+      | 'Firearms'
+      | 'Farming'
+      | 'Cooking'
+      | 'Crafting'
+      | 'Blacksmith'
+      | 'Herbalist'
+      | 'Merchants'
+      | 'Healers'
+      | 'Easy Going Life'
+      | 'Found Family'
+      | 'Survival'
+      | 'Betrayal'
+      | 'Past Trauma'
+      | 'Death of Loved Ones'
+      | 'Bullying'
+      | 'Discrimination'
+      | 'Slaves'
+      | 'Human Experimentation'
+      | 'Drugs'
+      | 'Depression'
+      | 'Terminal Illness';
+    /** @enum {string} */
+    SexualContentRating: 'none' | 'suggestive' | 'moderate' | 'explicit';
+    /** @enum {string} */
+    ViolenceRating: 'none' | 'mild' | 'graphic' | 'extreme';
+    /** @enum {string} */
+    DarkContentRating: 'none' | 'mild' | 'heavy';
+    IngestNovelResponse: {
+      projectId: string;
+      /** @description False when the source reference already named a project — the push carried no metadata across, because the forge owns it once landed. */
+      created: boolean;
+    };
+    IngestChapterBody: {
+      title: string;
+      /** @description The chapter prose, landed verbatim as a locked human final. */
+      content: string;
+      /** @description Reader-facing author note; not part of the identity the idempotent re-push compares. */
+      authorNote?: string;
+    };
+    IngestCoverBody: {
+      /** @enum {string} */
+      mime: 'image/png' | 'image/jpeg' | 'image/webp';
+      /** @description Base64-encoded image bytes without a data URL prefix. */
+      image: string;
+    };
+    IngestManifestResponse: {
+      projectId: string;
+      /** @description Every ingested chapter in source order; chapters the forge itself inserted carry no source ordinal and are absent. */
+      chapters: components['schemas']['IngestManifestChapter'][];
+    };
+    IngestManifestChapter: {
+      sourceOrdinal: number;
+      /** @description Digest of exactly `{ title, content, authorNote: null }` as pushed, stamped once when the chapter landed, so a scraper can re-hash its own copy and skip an unchanged chapter. It is deliberately not the published digest, which also covers the author note and the content rating. */
+      contentHash: string;
+    };
+    CreateProjectBody: {
+      name: string;
+      kind: components['schemas']['ProjectKind'];
+      title?: string;
+      /** @description Instructions for chapter voice, craft, and length; omission uses the application default. */
+      instructions?: string;
+      contentMode?: components['schemas']['ContentMode'];
+    };
+    /** @enum {string} */
+    ProjectKind: 'source' | 'new_novel';
+    /** @enum {string} */
+    ContentMode: 'standard' | 'unrestricted';
+    ProjectResponse: {
+      id: string;
+      name: string;
+      kind: components['schemas']['ProjectKind'];
+      /** @description A `seed` project is an Ideation Studio idea and has no bible, plan, or chapters until it graduates. */
+      status: components['schemas']['ProjectStatus'];
+      title?: null | string;
+      /** @description Absolute public cover URL resolved by the server; absent when the project has no cover. */
+      coverUrl?: null | string;
+      contentMode: components['schemas']['ContentMode'];
+      config?: components['schemas']['ProjectConfig'];
+      brief?: null | string;
+      /** @description Effective chapter-writing instructions, including the application default. */
+      instructions?: null | string;
+      storyCurrentChapter?: null | number;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    ProjectStatus: 'seed' | 'active';
+    ProjectConfig: {
+      models?: components['schemas']['ProjectModelOverrides'];
+    };
+    /** @description Optional provider and model overrides keyed by AI role. */
+    ProjectModelOverrides: {
+      extraction?: components['schemas']['ProjectModelRef'];
+      generation?: components['schemas']['ProjectModelRef'];
+      judge?: components['schemas']['ProjectModelRef'];
+      fix?: components['schemas']['ProjectModelRef'];
+      outline?: components['schemas']['ProjectModelRef'];
+      revision?: components['schemas']['ProjectModelRef'];
+      title?: components['schemas']['ProjectModelRef'];
+      continuity?: components['schemas']['ProjectModelRef'];
+      validation?: components['schemas']['ProjectModelRef'];
+      review?: components['schemas']['ProjectModelRef'];
+      plan?: components['schemas']['ProjectModelRef'];
+      skeleton?: components['schemas']['ProjectModelRef'];
+      bible?: components['schemas']['ProjectModelRef'];
+      premise?: components['schemas']['ProjectModelRef'];
+      audit?: components['schemas']['ProjectModelRef'];
+      chat?: components['schemas']['ProjectModelRef'];
+      compact?: components['schemas']['ProjectModelRef'];
+      arc?: components['schemas']['ProjectModelRef'];
+      embedding?: components['schemas']['ProjectModelRef'];
+      image?: components['schemas']['ProjectModelRef'];
+    };
+    /** @description Provider and model reference used for a project-level AI role override. */
+    ProjectModelRef: {
+      provider: string;
+      model: string;
+    };
+    /** @enum {string} */
+    SortOrder: 'asc' | 'desc';
+    /** @enum {string} */
+    SortByTime: 'createdAt' | 'updatedAt';
+    ListProjectResponse: {
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['ProjectResponse'][];
+    };
+    ProjectStatusResponse: {
+      kind: components['schemas']['ProjectKind'];
+      chaptersTotal?: number;
+      chaptersExtracted?: number;
+      draftsTotal?: number;
+      draftsFinal?: number;
+      planApproved?: boolean;
+      volumesTotal?: number;
+    };
+    UpdateProjectBody: {
+      title?: string;
+      config?: components['schemas']['ProjectConfig'];
+      contentMode?: components['schemas']['ContentMode'];
+      brief?: string;
+      /** @description Chapter-writing instructions; send an empty string to restore the application default. */
+      instructions?: string | null;
+    };
+    CloneProjectBody: {
+      name: string;
+      config?: components['schemas']['ProjectConfig'];
+      contentMode?: components['schemas']['ContentMode'];
+      resetDerived?: boolean;
+    };
+    ResetBody: {
+      /** @enum {string} */
+      stage: 'extract' | 'plan' | 'generate' | 'all';
+    };
+    ResetResponse: {
+      stage: string;
+      tablesCleared: string[];
+    };
+    CostResponse: {
+      estimate: null | string;
+      message: string;
+    };
+    UploadImageBody: {
+      /** @enum {string} */
+      mime: 'image/png' | 'image/jpeg' | 'image/webp';
+      /** @description Base64-encoded image bytes without a data URL prefix. */
+      image: string;
+    };
     SeedFromBriefBody: {
       brief: string;
       force?: boolean;
@@ -2571,11 +3110,20 @@ export interface components {
       body: string;
       /** @description Artifact keys for the retrieval context used to build this draft. */
       contextRefs?: null | string[];
+      /** @description 'external' means the primary writer's batch loop skips this slot; fill it via generate-unrestricted or POST /drafts/:n/import instead of the normal generate button. */
+      writeMode: components['schemas']['BriefWriteMode'];
+      /**
+       * Format: date-time
+       * @description Set when this brief was created by the insert operation rather than by an outline pass.
+       */
+      insertedAt?: null | string;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
     };
+    /** @enum {string} */
+    BriefWriteMode: 'standard' | 'external';
     OutlineArcBody: {
       context?: string;
     };
@@ -2589,6 +3137,13 @@ export interface components {
       arcKey?: null | string;
       title?: null | string;
       staleReason?: null | string;
+      /** @description 'external' means the primary writer's batch loop skips this slot; fill it via generate-unrestricted or POST /drafts/:n/import instead of the normal generate button. */
+      writeMode: components['schemas']['BriefWriteMode'];
+      /**
+       * Format: date-time
+       * @description Set when this brief was created by the insert operation rather than by an outline pass.
+       */
+      insertedAt?: null | string;
       /** Format: date-time */
       updatedAt: string;
     };
@@ -2621,6 +3176,8 @@ export interface components {
       kind: string;
       status: string;
       target: string;
+      /** @description Present when the batch was cut short of its limit: this chapter is an external-write slot that must be filled by hand before generation continues past it. */
+      stoppedAtExternalChapter?: number;
     };
     ListGenerationJobResponse: {
       items: components['schemas']['GenerationJobItem'][];
@@ -2668,6 +3225,10 @@ export interface components {
       reviewStatus: components['schemas']['DraftReviewStatus'];
       staleReason?: null | string;
       generator: string;
+      /** @description Firewalls this chapter's prose from the vector index, continuity extraction, and the verbatim-prose adjacency rule. Independent of `generator` — a pasted chapter can be `generator: 'human'` and still isolated. */
+      isolated: boolean;
+      /** @description Content rating of this draft's prose; null means unrated — never "none". */
+      contentRating?: components['schemas']['ContentRatingInput'] | null;
       judge?: null | string;
       judgeNote?: null | string;
       /** Format: date-time */
@@ -2679,6 +3240,14 @@ export interface components {
     DraftStatus: 'draft' | 'final';
     /** @enum {string} */
     DraftReviewStatus: 'generating' | 'needs_review' | 'contradiction' | 'approved' | 'final';
+    ContentRatingInput: {
+      /** @description Content rating level; an omitted dimension is unrated — never send "none" to say it. */
+      sexualContent?: components['schemas']['SexualContentRating'];
+      /** @description Content rating level; an omitted dimension is unrated — never send "none" to say it. */
+      violence?: components['schemas']['ViolenceRating'];
+      /** @description Content rating level; an omitted dimension is unrated — never send "none" to say it. */
+      darkContent?: components['schemas']['DarkContentRating'];
+    };
     UpdateDraftBody: {
       title?: string;
       body: string;
@@ -2737,7 +3306,7 @@ export interface components {
       createdAt: string;
     };
     /** @enum {string} */
-    DraftRevisionSource: 'generated' | 'patched' | 'rewritten' | 'revised' | 'imported' | 'hand_edited' | 'chat_edited';
+    DraftRevisionSource: 'generated' | 'patched' | 'rewritten' | 'revised' | 'imported' | 'hand_edited' | 'chat_edited' | 'amended';
     MarkdownResponse: {
       markdown: string;
     };
@@ -2745,12 +3314,30 @@ export interface components {
       prose: string;
       title?: string;
       summary?: string;
+      /** @description Rating of the pasted prose; omission keeps the stored rating, an empty object clears it back to unrated. */
+      contentRating?: components['schemas']['ContentRatingInput'];
+      /** @description Continuation state the next chapter builds on; omission keeps the stored state. */
+      state?: {
+        [key: string]: unknown;
+      };
+      /** @description Firewalls this prose from the vector index, continuity extraction, and the verbatim-prose adjacency rule. Omission keeps the stored value — send false to lift an existing firewall. */
+      isolated?: boolean;
     };
     FinalizeBody: {
       chapter?: number;
     };
-    GenerateGrokBody: {
+    GenerateUnrestrictedBody: {
       guidance?: string;
+      /** @description Rating of the generated prose; omission keeps the stored rating, an empty object clears it back to unrated. */
+      contentRating?: components['schemas']['ContentRatingInput'];
+    };
+    ChapterSummarizeResponse: {
+      /** @description 2-3 sentence summary of what happened in the chapter, past tense — not persisted until saved through PUT /drafts/:n. */
+      summary: string;
+      /** @description Continuation state the next chapter would build on — review and edit before saving through PUT /drafts/:n. */
+      state: {
+        [key: string]: unknown;
+      };
     };
     ContinuityProposalResponse: {
       id: string;
@@ -3005,6 +3592,49 @@ export interface components {
       image: string;
       caption?: string;
     };
+    InsertChapterBody: {
+      /**
+       * @description 'hand' takes briefBody verbatim; 'planner' drafts the brief from intent.
+       * @enum {string}
+       */
+      briefOrigin: 'hand' | 'planner';
+      /** @description The brief body to store verbatim. Required when briefOrigin is 'hand'. */
+      briefBody?: string;
+      /** @description One line describing what the inserted chapter must do. Required when briefOrigin is 'planner'. */
+      intent?: string;
+    };
+    /** @description The brief created in the freed slot, plus the extent of the renumber that freed it. */
+    InsertChapterResponse: {
+      brief: components['schemas']['BriefResponse'];
+      /** @description Number the inserted chapter now occupies. */
+      newChapter: number;
+      /** @description How many briefs the insert renumbered. */
+      shiftedChapters: number;
+    };
+    AmendChapterBody: {
+      /** @description Replacement prose for the finalized chapter. Amend is the only path that writes past the immutability lock, and it never unlocks the chapter. */
+      content: string;
+      /** @description Replacement title; omission keeps the stored title. */
+      title?: string;
+      /** @description Replacement author's note; omission keeps the stored note. The note reaches the reader, so changing it does move the published payload. */
+      note?: string;
+      /** @description Rating of the amended prose; omission keeps the stored rating, an empty object clears it back to unrated. */
+      contentRating?: components['schemas']['ContentRatingInput'];
+    };
+    /** @description Outcome of amending finalized canon in place. The amendment is prose-only: the bible, continuity, and downstream chapters are untouched. */
+    AmendChapterResponse: {
+      chapter: number;
+      /** @description Word count recomputed from the amended prose. */
+      wordCount: number;
+      /** @description False when the chapter is isolated (isolated prose is never indexed) or the re-embed failed. A failed re-embed leaves the chapter unindexed until the next backfill; the amended prose is committed either way. */
+      indexed: boolean;
+      /** @description True when the reader-facing payload hash moved and the publication was rescheduled for the next push sweep. An unchanged payload never republishes. */
+      republished: boolean;
+      /** @description Publication revision after the bump; absent when nothing was republished. */
+      publicationRevision?: number;
+      /** @description Always true. Amend replaces prose only, so anything this chapter already contributed to the bible stays there and keeps propagating — offer POST /chapters/:n/extract-to-bible so the author can re-derive canon deliberately. */
+      suggestExtractToBible: boolean;
+    };
     JobResponse: {
       id: string;
       projectId: string;
@@ -3028,10 +3658,6 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
-    /** @enum {string} */
-    SortOrder: 'asc' | 'desc';
-    /** @enum {string} */
-    SortByTime: 'createdAt' | 'updatedAt';
     /** @enum {string} */
     ChapterStatus: 'done' | 'failed' | 'skipped';
     ListChapterResponse: {
@@ -3470,7 +4096,7 @@ export interface components {
       appearance?: string;
       aliases?: string[];
     };
-    UploadImageBody: {
+    UploadImageBody1: {
       /** @enum {string} */
       mime: 'image/png' | 'image/jpeg' | 'image/webp';
       /** @description Base64-encoded image bytes without a data URL prefix. */
@@ -3668,8 +4294,6 @@ export interface components {
       /** @description Content policy for the seed. Unrestricted routes studio chat through models that will write adult material. */
       contentMode?: components['schemas']['ContentMode'];
     };
-    /** @enum {string} */
-    ContentMode: 'standard' | 'unrestricted';
     ListSeedsResponse: {
       total: number;
       limit: number;
@@ -3742,116 +4366,6 @@ export interface components {
       source?: 'author' | 'studio' | 'crossed';
       /** @description The chat ordinal that settled the field; null when no conversational turn did. */
       turnOrdinal?: null | number;
-    };
-    CreateProjectBody: {
-      name: string;
-      kind: components['schemas']['ProjectKind'];
-      title?: string;
-      /** @description Instructions for chapter voice, craft, and length; omission uses the application default. */
-      instructions?: string;
-      contentMode?: components['schemas']['ContentMode'];
-    };
-    /** @enum {string} */
-    ProjectKind: 'source' | 'new_novel';
-    ProjectResponse: {
-      id: string;
-      name: string;
-      kind: components['schemas']['ProjectKind'];
-      /** @description A `seed` project is an Ideation Studio idea and has no bible, plan, or chapters until it graduates. */
-      status: components['schemas']['ProjectStatus'];
-      title?: null | string;
-      /** @description Absolute public cover URL resolved by the server; absent when the project has no cover. */
-      coverUrl?: null | string;
-      contentMode: components['schemas']['ContentMode'];
-      config?: components['schemas']['ProjectConfig'];
-      brief?: null | string;
-      /** @description Effective chapter-writing instructions, including the application default. */
-      instructions?: null | string;
-      storyCurrentChapter?: null | number;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    /** @enum {string} */
-    ProjectStatus: 'seed' | 'active';
-    ProjectConfig: {
-      models?: components['schemas']['ProjectModelOverrides'];
-    };
-    /** @description Optional provider and model overrides keyed by AI role. */
-    ProjectModelOverrides: {
-      extraction?: components['schemas']['ProjectModelRef'];
-      generation?: components['schemas']['ProjectModelRef'];
-      judge?: components['schemas']['ProjectModelRef'];
-      fix?: components['schemas']['ProjectModelRef'];
-      outline?: components['schemas']['ProjectModelRef'];
-      revision?: components['schemas']['ProjectModelRef'];
-      title?: components['schemas']['ProjectModelRef'];
-      continuity?: components['schemas']['ProjectModelRef'];
-      validation?: components['schemas']['ProjectModelRef'];
-      review?: components['schemas']['ProjectModelRef'];
-      plan?: components['schemas']['ProjectModelRef'];
-      skeleton?: components['schemas']['ProjectModelRef'];
-      bible?: components['schemas']['ProjectModelRef'];
-      premise?: components['schemas']['ProjectModelRef'];
-      audit?: components['schemas']['ProjectModelRef'];
-      chat?: components['schemas']['ProjectModelRef'];
-      compact?: components['schemas']['ProjectModelRef'];
-      arc?: components['schemas']['ProjectModelRef'];
-      embedding?: components['schemas']['ProjectModelRef'];
-      image?: components['schemas']['ProjectModelRef'];
-    };
-    /** @description Provider and model reference used for a project-level AI role override. */
-    ProjectModelRef: {
-      provider: string;
-      model: string;
-    };
-    ListProjectResponse: {
-      total: number;
-      limit: number;
-      offset: number;
-      items: components['schemas']['ProjectResponse'][];
-    };
-    ProjectStatusResponse: {
-      kind: components['schemas']['ProjectKind'];
-      chaptersTotal?: number;
-      chaptersExtracted?: number;
-      draftsTotal?: number;
-      draftsFinal?: number;
-      planApproved?: boolean;
-      volumesTotal?: number;
-    };
-    UpdateProjectBody: {
-      title?: string;
-      config?: components['schemas']['ProjectConfig'];
-      contentMode?: components['schemas']['ContentMode'];
-      brief?: string;
-      /** @description Chapter-writing instructions; send an empty string to restore the application default. */
-      instructions?: string | null;
-    };
-    CloneProjectBody: {
-      name: string;
-      config?: components['schemas']['ProjectConfig'];
-      contentMode?: components['schemas']['ContentMode'];
-      resetDerived?: boolean;
-    };
-    ResetBody: {
-      /** @enum {string} */
-      stage: 'extract' | 'plan' | 'generate' | 'all';
-    };
-    ResetResponse: {
-      stage: string;
-      tablesCleared: string[];
-    };
-    CostResponse: {
-      estimate: null | string;
-      message: string;
-    };
-    UploadImageBody1: {
-      /** @enum {string} */
-      mime: 'image/png' | 'image/jpeg' | 'image/webp';
-      /** @description Base64-encoded image bytes without a data URL prefix. */
-      image: string;
     };
     StartIllustrationBody: {
       subjectType: components['schemas']['IllustrationSubjectType'];
@@ -4487,6 +5001,8 @@ export interface components {
       /** @description Reader URL slug; omission derives it from the title. A slug another project holds is rejected. A different one on a later publish renames the novel: the next converge moves it, chapters and all, and the old reader URL stops resolving. */
       novelSlug?: string;
       title?: string;
+      /** @description The work’s own author, shown to readers alongside the title; null clears it, omission keeps the stored one and otherwise adopts the project’s. Setting a non-null value requires the novel-forge:curate permission — the forge only attributes work it did not write. */
+      originalAuthor?: string | null;
       blurb?: string | null;
       coverPath?: string | null;
       /** @description Reader catalog genres; null clears them, omission keeps the stored ones. */
@@ -4505,198 +5021,11 @@ export interface components {
        */
       status?: 'live' | 'retired';
     };
-    /** @enum {string} */
-    NovelGenre:
-      | 'Action'
-      | 'Adult'
-      | 'Adventure'
-      | 'Comedy'
-      | 'Drama'
-      | 'Ecchi'
-      | 'Fantasy'
-      | 'Gender Bender'
-      | 'Harem'
-      | 'Historical'
-      | 'Horror'
-      | 'Josei'
-      | 'Martial Arts'
-      | 'Mature'
-      | 'Mecha'
-      | 'Mystery'
-      | 'Psychological'
-      | 'Romance'
-      | 'School Life'
-      | 'Sci-fi'
-      | 'Seinen'
-      | 'Shoujo'
-      | 'Shoujo Ai'
-      | 'Shounen'
-      | 'Shounen Ai'
-      | 'Slice of Life'
-      | 'Smut'
-      | 'Sports'
-      | 'Supernatural'
-      | 'Tragedy'
-      | 'Wuxia'
-      | 'Xianxia'
-      | 'Xuanhuan'
-      | 'Yaoi'
-      | 'Yuri';
-    /** @enum {string} */
-    NovelTag:
-      | 'Male Protagonist'
-      | 'Female Protagonist'
-      | 'Overpowered Protagonist'
-      | 'Weak to Strong'
-      | 'Protagonist Strong from the Start'
-      | 'Antihero Protagonist'
-      | 'Evil Protagonist'
-      | 'Ruthless Protagonist'
-      | 'Genius Protagonist'
-      | 'Calm Protagonist'
-      | 'Lazy Protagonist'
-      | 'Loner Protagonist'
-      | 'Underestimated Protagonist'
-      | 'Multiple Protagonists'
-      | 'Slow Romance'
-      | 'Love Triangles'
-      | 'Childhood Friends'
-      | 'Arranged Marriage'
-      | 'Marriage of Convenience'
-      | 'Enemies Become Lovers'
-      | 'Fated Lovers'
-      | 'Unrequited Love'
-      | 'Obsessive Love'
-      | 'Secret Relationship'
-      | 'Office Romance'
-      | 'Reverse Harem'
-      | 'Polygamy'
-      | 'Tsundere'
-      | 'Yandere'
-      | 'Cross-dressing'
-      | 'Cultivation'
-      | 'Sect Development'
-      | 'Master-Disciple Relationship'
-      | 'Dao Companion'
-      | 'Alchemy'
-      | 'Martial Spirits'
-      | 'Immortals'
-      | 'Multiple Realms'
-      | 'Strength-based Social Hierarchy'
-      | 'Bloodlines'
-      | 'Ancient China'
-      | 'Magic'
-      | 'Magic Beasts'
-      | 'Dragons'
-      | 'Elves'
-      | 'Demons'
-      | 'Demon Lord'
-      | 'Gods'
-      | 'Vampires'
-      | 'Werebeasts'
-      | 'Zombies'
-      | 'Ghosts'
-      | 'Witches'
-      | 'Necromancer'
-      | 'Beastkin'
-      | 'Monster Tamer'
-      | 'Curses'
-      | 'Artificial Intelligence'
-      | 'Androids'
-      | 'Aliens'
-      | 'Cosmic Wars'
-      | 'Apocalypse'
-      | 'Post-apocalyptic'
-      | 'Dystopia'
-      | 'Genetic Modifications'
-      | 'Virtual Reality'
-      | 'Time Travel'
-      | 'Game Elements'
-      | 'Level System'
-      | 'MMORPG'
-      | 'Dungeons'
-      | 'Tower Climbing'
-      | 'Cheats'
-      | 'Hidden Abilities'
-      | 'Transported into a Game World'
-      | 'Survival Game'
-      | 'e-Sports'
-      | 'Modern Knowledge'
-      | 'Business Management'
-      | 'Showbiz'
-      | 'Celebrities'
-      | 'Medical Knowledge'
-      | 'Organized Crime'
-      | 'Academy'
-      | 'College/University'
-      | 'Nobles'
-      | 'Royalty'
-      | 'Court Official'
-      | 'Imperial Harem'
-      | 'Kingdom Building'
-      | 'Politics'
-      | 'Schemes And Conspiracies'
-      | 'Wars'
-      | 'Military'
-      | 'Medieval'
-      | 'Reincarnation'
-      | 'Transmigration'
-      | 'Transported to Another World'
-      | 'Returning from Another World'
-      | 'Parallel Worlds'
-      | 'Time Loop'
-      | 'Time Skip'
-      | 'Second Chance'
-      | 'Amnesia'
-      | 'Hiding True Identity'
-      | 'Mistaken Identity'
-      | 'Body Swap'
-      | 'Possession'
-      | 'Prophecies'
-      | 'Revenge'
-      | 'Villainess Noble Girls'
-      | 'Assassins'
-      | 'Mercenaries'
-      | 'Knights'
-      | 'Ninjas'
-      | 'Samurai'
-      | 'Pirates'
-      | 'Hunters'
-      | 'Strategic Battles'
-      | 'Battle Competition'
-      | 'Harsh Training'
-      | 'Sword Wielder'
-      | 'Firearms'
-      | 'Farming'
-      | 'Cooking'
-      | 'Crafting'
-      | 'Blacksmith'
-      | 'Herbalist'
-      | 'Merchants'
-      | 'Healers'
-      | 'Easy Going Life'
-      | 'Found Family'
-      | 'Survival'
-      | 'Betrayal'
-      | 'Past Trauma'
-      | 'Death of Loved Ones'
-      | 'Bullying'
-      | 'Discrimination'
-      | 'Slaves'
-      | 'Human Experimentation'
-      | 'Drugs'
-      | 'Depression'
-      | 'Terminal Illness';
-    /** @enum {string} */
-    SexualContentRating: 'none' | 'suggestive' | 'moderate' | 'explicit';
-    /** @enum {string} */
-    ViolenceRating: 'none' | 'mild' | 'graphic' | 'extreme';
-    /** @enum {string} */
-    DarkContentRating: 'none' | 'mild' | 'heavy';
     PublicationResponse: {
       id: string;
       novelSlug: string;
       title: string;
+      originalAuthor?: null | string;
       blurb?: null | string;
       coverPath?: null | string;
       genres?: null | components['schemas']['NovelGenre'][];
@@ -5233,6 +5562,740 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AiModelsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_api_keys: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListApiKeysResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_api_keys: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateApiKeyBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CreateApiKeyResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_api_keys_id: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_ingest_novels_sourceRef: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Stable external identity of the novel at its source, e.g. `mvlempyr:1234`. It is the only key the ingest surface accepts. */
+        sourceRef: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['IngestNovelBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IngestNovelResponse'];
+        };
+      };
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IngestNovelResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_ingest_novels_sourceRef_chapters_sourceOrdinal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Stable external identity of the novel at its source, e.g. `mvlempyr:1234`. It is the only key the ingest surface accepts. */
+        sourceRef: string;
+        /** @description The chapter’s position at the source, counting from 1. It never changes, even when the forge renumbers its own chapters around an inserted one. */
+        sourceOrdinal: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['IngestChapterBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_ingest_novels_sourceRef_cover: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Stable external identity of the novel at its source, e.g. `mvlempyr:1234`. It is the only key the ingest surface accepts. */
+        sourceRef: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['IngestCoverBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_ingest_novels_sourceRef_manifest: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Stable external identity of the novel at its source, e.g. `mvlempyr:1234`. It is the only key the ingest surface accepts. */
+        sourceRef: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IngestManifestResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects: {
+    parameters: {
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+        sortOrder?: components['schemas']['SortOrder'];
+        sortBy?: components['schemas']['SortByTime'];
+        kind?: components['schemas']['ProjectKind'];
+        status?: components['schemas']['ProjectStatus'];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListProjectResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateProjectBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_projects_projectId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateProjectBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_status: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectStatusResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_clone: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CloneProjectBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_reset: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResetBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResetResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_cost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CostResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_cover: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UploadImageBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_cover: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectResponse'];
         };
       };
       /** @description Default Response */
@@ -6260,7 +7323,7 @@ export interface operations {
       };
     };
   };
-  post_api_v1_projects_projectId_chapters_n_generate_grok: {
+  post_api_v1_projects_projectId_chapters_n_generate_unrestricted: {
     parameters: {
       query?: never;
       header?: never;
@@ -6272,7 +7335,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        'application/json': components['schemas']['GenerateGrokBody'];
+        'application/json': components['schemas']['GenerateUnrestrictedBody'];
       };
     };
     responses: {
@@ -6283,6 +7346,47 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['DraftResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_chapters_n_summarize: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterSummarizeResponse'];
         };
       };
       /** @description Default Response */
@@ -7103,6 +8207,97 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_chapters_afterChapter_insert: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Insert the new chapter immediately after this number; 0 inserts ahead of chapter 1. */
+        afterChapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['InsertChapterBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InsertChapterResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_chapters_n_amend: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AmendChapterBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AmendChapterResponse'];
+        };
+      };
       /** @description Default Response */
       '4XX': {
         headers: {
@@ -8519,7 +9714,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        'application/json': components['schemas']['UploadImageBody'];
+        'application/json': components['schemas']['UploadImageBody1'];
       };
     };
     responses: {
@@ -9656,460 +10851,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['GraduationResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects: {
-    parameters: {
-      query?: {
-        limit?: number | string;
-        offset?: number | string;
-        sortOrder?: components['schemas']['SortOrder'];
-        sortBy?: components['schemas']['SortByTime'];
-        kind?: components['schemas']['ProjectKind'];
-        status?: components['schemas']['ProjectStatus'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListProjectResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateProjectBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_projects_projectId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  patch_api_v1_projects_projectId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateProjectBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_status: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectStatusResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_clone: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CloneProjectBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_reset: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ResetBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ResetResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_cost: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CostResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_cover: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UploadImageBody1'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_projects_projectId_cover: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectResponse'];
         };
       };
       /** @description Default Response */
@@ -12383,6 +13124,39 @@ export type SwitchOrganisationResponse = components['schemas']['SwitchOrganisati
 export type AiModelsResponse = components['schemas']['AiModelsResponse'];
 export type AiModelOption = components['schemas']['AiModelOption'];
 export type AiRoleDefault = components['schemas']['AiRoleDefault'];
+export type CreateApiKeyBody = components['schemas']['CreateApiKeyBody'];
+export type CreateApiKeyResponse = components['schemas']['CreateApiKeyResponse'];
+export type ListApiKeysResponse = components['schemas']['ListApiKeysResponse'];
+export type ApiKeyResponse = components['schemas']['ApiKeyResponse'];
+export type IngestNovelBody = components['schemas']['IngestNovelBody'];
+export type NovelGenre = components['schemas']['NovelGenre'];
+export type NovelTag = components['schemas']['NovelTag'];
+export type SexualContentRating = components['schemas']['SexualContentRating'];
+export type ViolenceRating = components['schemas']['ViolenceRating'];
+export type DarkContentRating = components['schemas']['DarkContentRating'];
+export type IngestNovelResponse = components['schemas']['IngestNovelResponse'];
+export type IngestChapterBody = components['schemas']['IngestChapterBody'];
+export type IngestCoverBody = components['schemas']['IngestCoverBody'];
+export type IngestManifestResponse = components['schemas']['IngestManifestResponse'];
+export type IngestManifestChapter = components['schemas']['IngestManifestChapter'];
+export type CreateProjectBody = components['schemas']['CreateProjectBody'];
+export type ProjectKind = components['schemas']['ProjectKind'];
+export type ContentMode = components['schemas']['ContentMode'];
+export type ProjectResponse = components['schemas']['ProjectResponse'];
+export type ProjectStatus = components['schemas']['ProjectStatus'];
+export type ProjectConfig = components['schemas']['ProjectConfig'];
+export type ProjectModelOverrides = components['schemas']['ProjectModelOverrides'];
+export type ProjectModelRef = components['schemas']['ProjectModelRef'];
+export type SortOrder = components['schemas']['SortOrder'];
+export type SortByTime = components['schemas']['SortByTime'];
+export type ListProjectResponse = components['schemas']['ListProjectResponse'];
+export type ProjectStatusResponse = components['schemas']['ProjectStatusResponse'];
+export type UpdateProjectBody = components['schemas']['UpdateProjectBody'];
+export type CloneProjectBody = components['schemas']['CloneProjectBody'];
+export type ResetBody = components['schemas']['ResetBody'];
+export type ResetResponse = components['schemas']['ResetResponse'];
+export type CostResponse = components['schemas']['CostResponse'];
+export type UploadImageBody = components['schemas']['UploadImageBody'];
 export type SeedFromBriefBody = components['schemas']['SeedFromBriefBody'];
 export type WorkflowRunResponse = components['schemas']['WorkflowRunResponse'];
 export type PlanBody = components['schemas']['PlanBody'];
@@ -12393,6 +13167,7 @@ export type ApprovePlanResponse = components['schemas']['ApprovePlanResponse'];
 export type OutlineBody = components['schemas']['OutlineBody'];
 export type OutlineResponse = components['schemas']['OutlineResponse'];
 export type BriefResponse = components['schemas']['BriefResponse'];
+export type BriefWriteMode = components['schemas']['BriefWriteMode'];
 export type OutlineArcBody = components['schemas']['OutlineArcBody'];
 export type ListBriefSummaryResponse = components['schemas']['ListBriefSummaryResponse'];
 export type BriefSummaryResponse = components['schemas']['BriefSummaryResponse'];
@@ -12409,6 +13184,7 @@ export type ListDraftResponse = components['schemas']['ListDraftResponse'];
 export type DraftResponse = components['schemas']['DraftResponse'];
 export type DraftStatus = components['schemas']['DraftStatus'];
 export type DraftReviewStatus = components['schemas']['DraftReviewStatus'];
+export type ContentRatingInput = components['schemas']['ContentRatingInput'];
 export type UpdateDraftBody = components['schemas']['UpdateDraftBody'];
 export type ReviseDraftBody = components['schemas']['ReviseDraftBody'];
 export type JudgeResponse = components['schemas']['JudgeResponse'];
@@ -12423,7 +13199,8 @@ export type DraftRevisionSource = components['schemas']['DraftRevisionSource'];
 export type MarkdownResponse = components['schemas']['MarkdownResponse'];
 export type ImportDraftBody = components['schemas']['ImportDraftBody'];
 export type FinalizeBody = components['schemas']['FinalizeBody'];
-export type GenerateGrokBody = components['schemas']['GenerateGrokBody'];
+export type GenerateUnrestrictedBody = components['schemas']['GenerateUnrestrictedBody'];
+export type ChapterSummarizeResponse = components['schemas']['ChapterSummarizeResponse'];
 export type ContinuityProposalResponse = components['schemas']['ContinuityProposalResponse'];
 export type ProposalResponse = components['schemas']['ProposalResponse'];
 export type ChatScope = components['schemas']['ChatScope'];
@@ -12451,9 +13228,11 @@ export type SearchHitResponse = components['schemas']['SearchHitResponse'];
 export type ListChapterImageResponse = components['schemas']['ListChapterImageResponse'];
 export type ChapterImageResponse = components['schemas']['ChapterImageResponse'];
 export type AddChapterImageBody = components['schemas']['AddChapterImageBody'];
+export type InsertChapterBody = components['schemas']['InsertChapterBody'];
+export type InsertChapterResponse = components['schemas']['InsertChapterResponse'];
+export type AmendChapterBody = components['schemas']['AmendChapterBody'];
+export type AmendChapterResponse = components['schemas']['AmendChapterResponse'];
 export type JobResponse = components['schemas']['JobResponse'];
-export type SortOrder = components['schemas']['SortOrder'];
-export type SortByTime = components['schemas']['SortByTime'];
 export type ChapterStatus = components['schemas']['ChapterStatus'];
 export type ListChapterResponse = components['schemas']['ListChapterResponse'];
 export type ChapterListResponse = components['schemas']['ChapterListResponse'];
@@ -12509,7 +13288,7 @@ export type EntityResponse = components['schemas']['EntityResponse'];
 export type EntityImageResponse = components['schemas']['EntityImageResponse'];
 export type ListEntityResponse = components['schemas']['ListEntityResponse'];
 export type UpdateEntityBody = components['schemas']['UpdateEntityBody'];
-export type UploadImageBody = components['schemas']['UploadImageBody'];
+export type UploadImageBody1 = components['schemas']['UploadImageBody1'];
 export type AddEntityImageBody = components['schemas']['AddEntityImageBody'];
 export type ApprovePlanResponse1 = components['schemas']['ApprovePlanResponse1'];
 export type CreateVolumeBody = components['schemas']['CreateVolumeBody'];
@@ -12532,7 +13311,6 @@ export type FactSource = components['schemas']['FactSource'];
 export type UpsertFactBody = components['schemas']['UpsertFactBody'];
 export type RevealFactBody = components['schemas']['RevealFactBody'];
 export type CreateSeedBody = components['schemas']['CreateSeedBody'];
-export type ContentMode = components['schemas']['ContentMode'];
 export type ListSeedsResponse = components['schemas']['ListSeedsResponse'];
 export type SeedSummaryResponse = components['schemas']['SeedSummaryResponse'];
 export type SeedStressResponse = components['schemas']['SeedStressResponse'];
@@ -12541,21 +13319,6 @@ export type GraduationResponse = components['schemas']['GraduationResponse'];
 export type GraduatedProjectResponse = components['schemas']['GraduatedProjectResponse'];
 export type ProvenanceSummaryResponse = components['schemas']['ProvenanceSummaryResponse'];
 export type ProvenanceFieldResponse = components['schemas']['ProvenanceFieldResponse'];
-export type CreateProjectBody = components['schemas']['CreateProjectBody'];
-export type ProjectKind = components['schemas']['ProjectKind'];
-export type ProjectResponse = components['schemas']['ProjectResponse'];
-export type ProjectStatus = components['schemas']['ProjectStatus'];
-export type ProjectConfig = components['schemas']['ProjectConfig'];
-export type ProjectModelOverrides = components['schemas']['ProjectModelOverrides'];
-export type ProjectModelRef = components['schemas']['ProjectModelRef'];
-export type ListProjectResponse = components['schemas']['ListProjectResponse'];
-export type ProjectStatusResponse = components['schemas']['ProjectStatusResponse'];
-export type UpdateProjectBody = components['schemas']['UpdateProjectBody'];
-export type CloneProjectBody = components['schemas']['CloneProjectBody'];
-export type ResetBody = components['schemas']['ResetBody'];
-export type ResetResponse = components['schemas']['ResetResponse'];
-export type CostResponse = components['schemas']['CostResponse'];
-export type UploadImageBody1 = components['schemas']['UploadImageBody1'];
 export type StartIllustrationBody = components['schemas']['StartIllustrationBody'];
 export type IllustrationSubjectType = components['schemas']['IllustrationSubjectType'];
 export type IllustrationResponse = components['schemas']['IllustrationResponse'];
@@ -12653,11 +13416,6 @@ export type ReforgeCutKind = components['schemas']['ReforgeCutKind'];
 export type ReforgeCutDisposition = components['schemas']['ReforgeCutDisposition'];
 export type ReforgeManuscriptResponse = components['schemas']['ReforgeManuscriptResponse'];
 export type PublishNovelBody = components['schemas']['PublishNovelBody'];
-export type NovelGenre = components['schemas']['NovelGenre'];
-export type NovelTag = components['schemas']['NovelTag'];
-export type SexualContentRating = components['schemas']['SexualContentRating'];
-export type ViolenceRating = components['schemas']['ViolenceRating'];
-export type DarkContentRating = components['schemas']['DarkContentRating'];
 export type PublicationResponse = components['schemas']['PublicationResponse'];
 export type PublicationStatus = components['schemas']['PublicationStatus'];
 export type PublishChapterBody = components['schemas']['PublishChapterBody'];
@@ -12692,6 +13450,11 @@ export type ApprovalResult = components['schemas']['ApprovalResult'];
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
+export type GetManifestPathParams = Exclude<paths['/api/v1/ingest/novels/{sourceRef}/manifest']['get']['parameters']['path'], undefined>;
+export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
+export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
+export type GetProjectStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/status']['get']['parameters']['path'], undefined>;
+export type GetProjectCostPathParams = Exclude<paths['/api/v1/projects/{projectId}/cost']['get']['parameters']['path'], undefined>;
 export type ExportNovelPathParams = Exclude<paths['/api/v1/projects/{projectId}/export/novel']['get']['parameters']['path'], undefined>;
 export type ListBriefsPathParams = Exclude<paths['/api/v1/projects/{projectId}/briefs']['get']['parameters']['path'], undefined>;
 export type GetBriefPathParams = Exclude<paths['/api/v1/projects/{projectId}/briefs/{n}']['get']['parameters']['path'], undefined>;
@@ -12742,10 +13505,6 @@ export type ListFactsPathParams = Exclude<paths['/api/v1/projects/{projectId}/fa
 export type GetFactPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts/{factKey}']['get']['parameters']['path'], undefined>;
 export type ListSeedsQueryParams = Exclude<paths['/api/v1/seeds']['get']['parameters']['query'], undefined>;
 export type GetSeedPathParams = Exclude<paths['/api/v1/projects/{projectId}/seed']['get']['parameters']['path'], undefined>;
-export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
-export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
-export type GetProjectStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/status']['get']['parameters']['path'], undefined>;
-export type GetProjectCostPathParams = Exclude<paths['/api/v1/projects/{projectId}/cost']['get']['parameters']['path'], undefined>;
 export type ListIllustrationsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['query'], undefined>;
 export type ListIllustrationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['path'], undefined>;
 export type GetAssetsPathParams = Exclude<paths['/api/v1/projects/{projectId}/assets']['get']['parameters']['path'], undefined>;

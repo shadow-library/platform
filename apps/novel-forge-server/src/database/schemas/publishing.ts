@@ -50,6 +50,8 @@ export const publications = pgTable('publications', {
     .unique('publications_project_id_unique'),
   novelSlug: varchar('novel_slug', { length: 128 }).notNull().unique('publications_novel_slug_unique'),
   title: varchar('title', { length: 256 }).notNull(),
+  /** The work's own author as readers should see them — set only for curated imports the forge did not write, and never an empty string: the reader's `minLength: 1` rejects one. */
+  originalAuthor: varchar('original_author', { length: 256 }),
   blurb: text('blurb'),
   coverPath: varchar('cover_path', { length: 512 }),
   genres: jsonb('genres').$type<Genre[]>(),

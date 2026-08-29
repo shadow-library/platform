@@ -56,7 +56,8 @@ export class CuratedIngestService {
           title: body.title,
           brief: body.synopsis,
           themes: body.tags ?? null,
-          originalAuthor: body.originalAuthor ?? null,
+          // Trimmed here, not at the publish that adopts it: the two ledgers must hold the same text, and a whitespace-only name is no name.
+          originalAuthor: body.originalAuthor?.trim() || null,
           importedMeta: this.importedMeta(body),
           sourceRef,
         })

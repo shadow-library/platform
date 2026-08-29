@@ -1,13 +1,15 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
+import { AuthClient } from '@shadow-library/auth';
 import { AppError, Logger } from '@shadow-library/common';
+import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { type ContentRating, normalizeContentRating } from '@shadow-library/sdk';
 
 import { AppErrorCode } from '@server/classes';
 import { assertActiveProject } from '@server/common';
-import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type Publishing, schema } from '@server/database';
+import { APP_NAME, CURATE_PERMISSION } from '@server/constants';
+import { type ImportedNovelMetaData, type PrimaryDatabase, type Publishing, schema } from '@server/database';
 
 import { renderChapterPayload } from './publish-payload';
 import { type PublishChapterBody, type PublishNovelBody } from './publishing.dto';
@@ -52,12 +54,22 @@ function publicationRating(publication: Pick<Publishing.Publication, 'sexualCont
   });
 }
 
+/** The reader's `originalAuthor` carries `minLength: 1`, so a blank one must reach it as a clear rather than as an empty string. */
+function trimmedAuthor(body: PublishNovelBody): string | null | undefined {
+  if (body.originalAuthor === undefined) return undefined;
+  return body.originalAuthor?.trim() || null;
+}
+
 @Injectable()
 export class PublishingService {
   private readonly logger = Logger.getLogger(APP_NAME, PublishingService.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly databaseService: DatabaseService) {
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly context: ContextService,
+    private readonly authClient: AuthClient,
+  ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
@@ -77,20 +89,31 @@ export class PublishingService {
     assertActiveProject(project);
 
     const stored = await this.db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId) });
+    /**
+     * The body always wins, including an explicit null; anything else falls back to what the row already
+     * holds, or — on the create only — to what the curated ingest claimed. The ingest seeds a publication
+     * once and is never re-consulted: a null on an existing row is the curator's decision, and re-adopting
+     * over it would make a clear un-saveable and re-trip the attribution gate on an author without `curate`.
+     */
+    const adopt = <T>(supplied: T | null | undefined, fallback: T | undefined): T | null => (supplied !== undefined ? supplied : (fallback ?? null));
+
     if (!stored) {
+      const imported: ImportedNovelMetaData = project.importedMeta ?? {};
       const title = body.title?.trim() || project.title?.trim() || project.name;
       const values = {
         projectId,
         title,
+        originalAuthor: adopt(trimmedAuthor(body), project.originalAuthor?.trim() || undefined),
         blurb: body.blurb ?? null,
         coverPath: body.coverPath ?? null,
-        genres: body.genres ?? null,
-        tags: body.tags ?? null,
-        sexualContent: body.sexualContent ?? null,
-        violence: body.violence ?? null,
-        darkContent: body.darkContent ?? null,
+        genres: adopt(body.genres, imported.genres),
+        tags: adopt(body.tags, imported.tags),
+        sexualContent: adopt(body.sexualContent, imported.sexualContent),
+        violence: adopt(body.violence, imported.violence),
+        darkContent: adopt(body.darkContent, imported.darkContent),
         status: body.status ?? ('live' as const),
       };
+      await this.assertAttributionPermitted(projectId, values.originalAuthor, null);
       const publication = body.novelSlug ? await this.insertWithGivenSlug(values, body.novelSlug) : await this.insertWithFreeSlug(values, slugify(title));
       this.logger.info('publication created', { projectId, novelSlug: publication.novelSlug, status: publication.status });
       return publication;
@@ -99,18 +122,20 @@ export class PublishingService {
     const next = {
       novelSlug: body.novelSlug ?? stored.novelSlug,
       title: body.title?.trim() || stored.title,
+      originalAuthor: adopt(trimmedAuthor(body), stored.originalAuthor ?? undefined),
       blurb: body.blurb !== undefined ? body.blurb : stored.blurb,
       coverPath: body.coverPath !== undefined ? body.coverPath : stored.coverPath,
-      genres: body.genres !== undefined ? body.genres : stored.genres,
-      tags: body.tags !== undefined ? body.tags : stored.tags,
-      sexualContent: body.sexualContent !== undefined ? body.sexualContent : stored.sexualContent,
-      violence: body.violence !== undefined ? body.violence : stored.violence,
-      darkContent: body.darkContent !== undefined ? body.darkContent : stored.darkContent,
+      genres: adopt(body.genres, stored.genres ?? undefined),
+      tags: adopt(body.tags, stored.tags ?? undefined),
+      sexualContent: adopt(body.sexualContent, stored.sexualContent ?? undefined),
+      violence: adopt(body.violence, stored.violence ?? undefined),
+      darkContent: adopt(body.darkContent, stored.darkContent ?? undefined),
       status: body.status ?? ('live' as const),
     };
     const unchanged =
       next.novelSlug === stored.novelSlug &&
       next.title === stored.title &&
+      next.originalAuthor === stored.originalAuthor &&
       next.blurb === stored.blurb &&
       next.coverPath === stored.coverPath &&
       next.status === stored.status &&
@@ -120,6 +145,7 @@ export class PublishingService {
       JSON.stringify(next.genres ?? null) === JSON.stringify(stored.genres ?? null) &&
       JSON.stringify(next.tags ?? null) === JSON.stringify(stored.tags ?? null);
     if (unchanged) return stored;
+    await this.assertAttributionPermitted(projectId, next.originalAuthor, stored.originalAuthor);
     const ledgered = await this.loadLedger(projectId);
     this.assertRatingCeiling(
       publicationRating(next),
@@ -323,6 +349,25 @@ export class PublishingService {
       if (publication) return publication;
     }
     throw AppErrorCode.PUB_008.create({ base });
+  }
+
+  /**
+   * PUB_010: naming someone outside the platform as the work's author is a curation claim, so it is
+   * gated on `novel-forge:curate` wherever the value came from — the body or the project the ingest
+   * landed. Only a *move* to a non-null name is gated: clearing needs nothing, and neither does a
+   * publish that leaves the stored attribution exactly as it stands, so an ordinary author can still
+   * save metadata on a novel a curator attributed.
+   */
+  private async assertAttributionPermitted(projectId: bigint, next: string | null, held: string | null): Promise<void> {
+    if (!next || next === held) return;
+
+    // `getAuthPrincipalOrNull` throws outside a request store, and a background converge or job has none.
+    const principal = this.context.isInitialized() ? this.context.getAuthPrincipalOrNull() : null;
+    const permitted = principal ? await this.authClient.check({ action: CURATE_PERMISSION, organisationId: principal.org, principal }) : false;
+    if (permitted) return;
+
+    this.logger.warn('refused an attribution from a caller without the curate permission', { projectId, sub: principal?.sub, organisationId: principal?.org });
+    throw AppErrorCode.PUB_010.create();
   }
 
   /** PUB_009: the catalog's promise must cover every chapter behind it, so a publish that would break the invariant is refused rather than silently raising the novel */

@@ -9,6 +9,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AuthClient } from '@shadow-library/auth';
+import { ContextService } from '@shadow-library/fastify';
 
 import { ConcurrencyController } from '@modules/jobs/concurrency.controller';
 import { JobExecutor } from '@modules/jobs/job.executor';
@@ -63,10 +64,11 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
     databaseService = createTestDatabaseService(db) as never;
-    publishingService = new PublishingService(databaseService);
     // The shared, discovery-backed client the AuthModule would inject in a real boot — here built
     // directly against the mock issuer with the app's own credential.
     const authClient = new AuthClient({ issuer: testIdP.issuer, appId: APP_ID, client: { id: APP_ID, secret: CLIENT_SECRET } });
+    // No request is in flight here, so the context reports itself uninitialized and the attribution gate stays out of the way.
+    publishingService = new PublishingService(databaseService, new ContextService(), authClient);
     accessService = new PublicationAccessService(databaseService, publishingService, authClient);
     wikiService = new WikiPublishingService(databaseService);
     pushClient = new ReaderPushClient(authClient);
@@ -168,6 +170,22 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     await publishingService.publishNovel(projectId, { violence: null });
     await runner.converge(projectId);
     expect(reader.novels.get(slug)).toMatchObject({ violence: null, darkContent: 'heavy' });
+  });
+
+  // The attribution is written straight onto the ledger row: the service gate needs a request-bound curator
+  // principal, and this spec drives the runner with no request in flight.
+  it('should carry the original author to the reader and clear it by omission', async () => {
+    const { projectId, slug } = await seedPublishedProject(1);
+    await db.update(schema.publications).set({ originalAuthor: 'Mo Xiang', revision: 2 }).where(eq(schema.publications.projectId, projectId));
+
+    const attributed = await runner.converge(projectId);
+    expect(attributed.novel).toBe('applied');
+    expect(reader.novels.get(slug)?.originalAuthor).toBe('Mo Xiang');
+
+    await db.update(schema.publications).set({ originalAuthor: null, revision: 3 }).where(eq(schema.publications.projectId, projectId));
+    const cleared = await runner.converge(projectId);
+    expect(cleared.novel).toBe('applied');
+    expect(reader.novels.get(slug)?.originalAuthor).toBeNull();
   });
 
   it('should drop duplicate and unknown vocabulary stored before the reader closed it', async () => {

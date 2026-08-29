@@ -241,6 +241,9 @@ export class AppErrorCode extends ServerErrorCode {
   // Refused rather than auto-raised: the novel-level rating is the author's published promise to readers, and
   // silently rewriting it from a chapter edit changes what the catalog advertises without anyone deciding to.
   static readonly PUB_009 = AppErrorCode.badRequest('PUB_009', 'The novel rating is below a published chapter’s — raise it first ({violations})');
+  // Attribution to someone outside the platform is a curation decision, not an authoring one: it is what tells readers
+  // the work is not the author's own, so an ordinary publisher may clear it but never assert one.
+  static readonly PUB_010 = AppErrorCode.forbidden('PUB_010', 'Naming an original author requires the curate permission');
 
   /*!
    * API Key Errors

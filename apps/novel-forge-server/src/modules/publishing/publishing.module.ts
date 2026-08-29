@@ -1,6 +1,7 @@
 import { Module } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { resolveAuthClientConfig } from '@shadow-library/auth/module';
+import { FastifyModule } from '@shadow-library/fastify';
 import { DatabaseModule } from '@shadow-library/modules';
 
 import { PublicationAccessService } from './publication-access.service';
@@ -17,7 +18,8 @@ import { WikiPublishingService } from './wiki-publishing.service';
 // here — JobsModule imports THIS module for the publish executor, and the publishing controller lives
 // in PipelineModule (the HTTP-wiring seam), keeping the module graph acyclic.
 @Module({
-  imports: [DatabaseModule],
+  // FastifyModule supplies the ContextService the attribution gate reads the request principal from.
+  imports: [DatabaseModule, FastifyModule],
   providers: [
     PublishingService,
     WikiPublishingService,

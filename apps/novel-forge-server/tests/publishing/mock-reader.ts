@@ -25,6 +25,7 @@ export interface MockReaderNovel {
   /** The publisher's own identifier for the row; it, not the map key, decides which row a push resolves. */
   sourceRef: string;
   title: string;
+  originalAuthor: string | null;
   blurb: string | null;
   coverPath: string | null;
   genres: string[];
@@ -154,11 +155,15 @@ export class MockReaderService {
     const [storedSlug, stored] = held;
     if (stored && revision < stored.revision) return Response.json({ code: 'WBN_003' }, { status: 409 });
     if (!this.isVocabulary(body.genres, isGenre) || !this.isVocabulary(body.tags, isTag)) return Response.json({ code: 'WBN_002' }, { status: 422 });
+    // The reader declares `originalAuthor` with `minLength: 1`, so a blank one is a rejected payload rather than a clear.
+    if (body.originalAuthor !== undefined && (typeof body.originalAuthor !== 'string' || body.originalAuthor.length === 0 || body.originalAuthor.length > 256))
+      return Response.json({ code: 'WBN_002' }, { status: 422 });
     const ratings = CONTENT_RATING_DIMENSIONS.map(dimension => [dimension, body[dimension]] as const);
     if (ratings.some(([dimension, level]) => level !== undefined && !isRatingLevel(dimension, level))) return Response.json({ code: 'WBN_002' }, { status: 422 });
 
     const next = {
       title: body.title as string,
+      originalAuthor: (body.originalAuthor as string | undefined) ?? null,
       blurb: (body.blurb as string | undefined) ?? null,
       coverPath: (body.coverPath as string | undefined) ?? null,
       genres: (body.genres as string[] | undefined) ?? [],
@@ -175,6 +180,7 @@ export class MockReaderService {
       storedSlug === slug &&
       revision === stored.revision &&
       next.title === stored.title &&
+      next.originalAuthor === stored.originalAuthor &&
       next.blurb === stored.blurb &&
       next.coverPath === stored.coverPath &&
       next.status === stored.status &&

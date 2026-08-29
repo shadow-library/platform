@@ -195,6 +195,7 @@ export class PublishRunner {
         const novelResult = await this.pushClient.upsertNovel(current.novelSlug, {
           sourceRef: current.projectId.toString(),
           title: current.title,
+          originalAuthor: current.originalAuthor ?? undefined,
           blurb: current.blurb ?? undefined,
           coverPath: current.coverPath ?? undefined,
           genres: this.vocabulary(current.genres, isGenre, 'genres', current.projectId),
