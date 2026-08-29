@@ -5,7 +5,7 @@ import { describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { type AuthPrincipal } from '@shadow-library/auth';
 import { AppError, Reflector } from '@shadow-library/common';
-import { type ContextService, HttpMethod } from '@shadow-library/fastify';
+import { type ContextService, type FastifyRouter, HttpMethod } from '@shadow-library/fastify';
 
 import { API_KEY_ROUTE_METADATA, ApiKeyAuthenticated, ApiKeyGuard, ApiKeyService } from '@modules/api-key';
 import { CURATE_PERMISSION } from '@server/constants';
@@ -152,6 +152,87 @@ describe.if(pgAvailable)('API keys', () => {
       const other = await testEnv.getRouter().mockRequest().delete(`/api/v1/api-keys/${foreignId}`);
       expect(other.statusCode).toBe(404);
       expect(other.json().code).toBe('KEY_004');
+    });
+  });
+
+  describe('DELETE /api/v1/api-keys/current', () => {
+    const withKey = (secret: string): FastifyRouter => {
+      const router = testEnv.getRouter({ authenticated: false });
+      return new Proxy(router, {
+        get(target, property, receiver) {
+          if (property !== 'mockRequest') return Reflect.get(target, property, receiver) as unknown;
+          return () => target.mockRequest().headers({ 'x-api-key': secret });
+        },
+      });
+    };
+
+    it('should revoke the presenting key and leave it unusable', async () => {
+      const created = await createKey('cli-rotating');
+      const response = await withKey(created.secret).mockRequest().delete('/api/v1/api-keys/current');
+      expect(response.statusCode).toBe(204);
+
+      const stored = await testEnv.getPostgresClient().query.apiKeys.findFirst({ where: eq(schema.apiKeys.id, BigInt(created.id)) });
+      expect(stored?.revokedAt).toBeInstanceOf(Date);
+      await expect(testEnv.getService(ApiKeyService).authenticate(created.secret)).rejects.toThrow(expect.objectContaining({ code: 'KEY_002' }));
+    });
+
+    it('should answer a repeat call KEY_002 because the guard refuses the now-revoked key', async () => {
+      const created = await createKey('cli-twice');
+      await withKey(created.secret).mockRequest().delete('/api/v1/api-keys/current');
+
+      const again = await withKey(created.secret).mockRequest().delete('/api/v1/api-keys/current');
+      expect(again.statusCode).toBe(401);
+      expect(again.json().code).toBe('KEY_002');
+    });
+
+    it('should reject a missing and an unknown key with KEY_001', async () => {
+      const router = testEnv.getRouter({ authenticated: false });
+      const missing = await router.mockRequest().delete('/api/v1/api-keys/current');
+      expect(missing.statusCode).toBe(401);
+      expect(missing.json().code).toBe('KEY_001');
+
+      const unknown = await withKey('nfk_absent').mockRequest().delete('/api/v1/api-keys/current');
+      expect(unknown.statusCode).toBe(401);
+      expect(unknown.json().code).toBe('KEY_001');
+    });
+
+    it('should refuse a bearer-authenticated caller carrying no key, since the route has no identity guard', async () => {
+      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/api-keys/current');
+      expect(response.statusCode).toBe(401);
+      expect(response.json().code).toBe('KEY_001');
+    });
+
+    it('should let an owner who no longer holds the curate permission retire their own key', async () => {
+      const secret = 'nfk_unentitled-self';
+      const id = await insertKey(900_005n, secret, UNENTITLED_OWNER, 'unentitled-self');
+
+      const ingest = await withKey(secret).mockRequest().get(`/api/v1/ingest/novels/mvlempyr:1/manifest`);
+      expect(ingest.statusCode).toBe(403);
+      expect(ingest.json().code).toBe('KEY_003');
+
+      const revoked = await withKey(secret).mockRequest().delete('/api/v1/api-keys/current');
+      expect(revoked.statusCode).toBe(204);
+
+      const stored = await testEnv.getPostgresClient().query.apiKeys.findFirst({ where: eq(schema.apiKeys.id, id) });
+      expect(stored?.revokedAt).toBeInstanceOf(Date);
+    });
+
+    it('should not let `current` reach the :id handler, nor an id reach the self handler', async () => {
+      const created = await createKey('router-disambiguation');
+
+      // Bearer-authenticated: the `:id` route would answer 400 on the digits-only pattern, or 404 for a
+      // missing key — a 401 proves the static segment won and the api-key guard ran instead.
+      const asCurator = await testEnv.getRouter().mockRequest().delete('/api/v1/api-keys/current');
+      expect(asCurator.statusCode).toBe(401);
+      expect(asCurator.json().code).toBe('KEY_001');
+
+      // The reverse: a numeric id presented with a key alone must not be served by the self route.
+      const byId = await withKey(created.secret).mockRequest().delete(`/api/v1/api-keys/${created.id}`);
+      expect(byId.statusCode).toBe(401);
+      expect(byId.json().code).toBe('IAM_001');
+
+      const stillLive = await testEnv.getPostgresClient().query.apiKeys.findFirst({ where: eq(schema.apiKeys.id, BigInt(created.id)) });
+      expect(stillLive?.revokedAt).toBeNull();
     });
   });
 

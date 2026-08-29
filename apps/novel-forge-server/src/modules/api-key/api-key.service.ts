@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { AppError, Logger } from '@shadow-library/common';
@@ -69,11 +69,34 @@ export class ApiKeyService {
     const key = await this.db.query.apiKeys.findFirst({ where: and(eq(schema.apiKeys.id, id), eq(schema.apiKeys.ownerId, ownerId)) });
     if (!key) throw AppErrorCode.KEY_004.create();
 
-    this.forget(key);
+    this.forget(key.id);
     if (key.revokedAt) return;
 
     await this.db.update(schema.apiKeys).set({ revokedAt: new Date() }).where(eq(schema.apiKeys.id, key.id));
     this.logger.info('api key revoked', { id: key.id.toString(), keyPrefix: key.keyPrefix, ownerId: ownerId.toString() });
+  }
+
+  /**
+   * Retires the key the caller authenticated with, so a CLI replacing its credential can stand down the
+   * old one holding nothing but that old one. The guard has already resolved the secret and refused a
+   * revoked key, so there is no ownership question left to ask and no second call ever reaches here — a
+   * repeat answers `KEY_002` at the guard rather than a second 204.
+   */
+  async revokeSelf(): Promise<void> {
+    const principal = this.context.getAuthPrincipal();
+    const apiKeyId = principal.claims['api_key_id'];
+    if (typeof apiKeyId !== 'string') throw AppError.internal('the api key self-revoke route was reached by a principal naming no api key');
+
+    const id = BigInt(apiKeyId);
+    this.forget(id);
+    const [key] = await this.db
+      .update(schema.apiKeys)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(schema.apiKeys.id, id), isNull(schema.apiKeys.revokedAt)))
+      .returning();
+    if (!key) return;
+
+    this.logger.info('api key revoked itself', { id: apiKeyId, keyPrefix: key.keyPrefix, ownerId: principal.sub, organisationId: principal.org });
   }
 
   /**
@@ -130,8 +153,8 @@ export class ApiKeyService {
       .catch((error: Error) => this.logger.warn('could not record api key usage', { id: cacheKey, reason: error.message }));
   }
 
-  private forget(key: ApiKey.Row): void {
-    this.lastUsedWrites.delete(key.id.toString());
+  private forget(id: bigint): void {
+    this.lastUsedWrites.delete(id.toString());
   }
 
   private evictExpired(): void {

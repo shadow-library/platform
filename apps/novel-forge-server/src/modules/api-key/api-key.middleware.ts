@@ -46,7 +46,7 @@ export class ApiKeyGuard {
       if (typeof header !== 'string' || header.length === 0) throw AppErrorCode.KEY_001.create();
 
       const key = await this.apiKeyService.authenticate(header);
-      await this.apiKeyService.assertOwnerPermitted(key);
+      if (!route.skipOwnerCheck) await this.apiKeyService.assertOwnerPermitted(key);
 
       const principal: AuthPrincipal = {
         kind: 'user',

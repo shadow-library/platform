@@ -187,6 +187,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/api-keys/current': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Revoke Current Api Key
+     * @description Revokes the key presented in the `x-api-key` header, so a client rotating its credential can retire the old one holding nothing but that old one. Not idempotent: a repeat call is answered 401 `KEY_002` by the authentication guard, which a client should treat as already-retired rather than as a failure.
+     */
+    delete: operations['delete_api_v1_api_keys_current'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/ingest/novels/{sourceRef}': {
     parameters: {
       query?: never;
@@ -5671,6 +5691,35 @@ export interface operations {
       path: {
         id: string;
       };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_api_keys_current: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
       cookie?: never;
     };
     requestBody?: never;

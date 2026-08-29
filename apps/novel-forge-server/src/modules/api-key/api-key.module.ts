@@ -4,7 +4,7 @@ import { resolveAuthClientConfig } from '@shadow-library/auth/module';
 import { FastifyModule } from '@shadow-library/fastify';
 import { DatabaseModule } from '@shadow-library/modules';
 
-import { ApiKeyController } from './api-key.controller';
+import { ApiKeyController, ApiKeySelfController } from './api-key.controller';
 import { ApiKeyGuard } from './api-key.middleware';
 import { ApiKeyService } from './api-key.service';
 
@@ -13,7 +13,7 @@ import { ApiKeyService } from './api-key.service';
 // re-exporting its instance would make this module's wiring order-dependent.
 @Module({
   imports: [DatabaseModule, FastifyModule],
-  controllers: [ApiKeyController, ApiKeyGuard],
+  controllers: [ApiKeyController, ApiKeySelfController, ApiKeyGuard],
   providers: [{ token: AuthClient, useFactory: () => new AuthClient(resolveAuthClientConfig()) }, ApiKeyService],
   exports: [ApiKeyService],
 })
