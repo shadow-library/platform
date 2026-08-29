@@ -267,13 +267,45 @@ interface InsertOptions {
    racing a running batch would shift numbers out from under drafts the batch is mid-writing.
 
 **Shift (two-phase negative parking).** `chapters_project_id_number_unique`,
-`briefs_project_id_chapter_unique`, and `drafts_project_id_chapter_unique` are all non-deferrable, so a
+`briefs_project_id_chapter_unique`, `drafts_project_id_chapter_unique` and the chapter-bearing keys on
+`entity_appearances`, `entity_relationships` and `relationship_observations` are all non-deferrable, so a
 straight `UPDATE ... SET number = number + 1` collides with itself mid-statement on the first row it touches.
-Follow `recombine.service.ts:227`'s pattern exactly: phase 1 parks every affected row at
-`number = -number` (descending order, so no two parked rows can collide with each other or a still-positive
-row); phase 2 re-lands them at `number = -number - 1` (ascending, most-negative first). Apply this to `briefs`,
-`drafts`, `chapters`, `chapter_images`, and `continuity_proposals` — every table keyed on `(projectId, chapter
-or number)` above `afterChapter`.
+Take `recombine.service.ts:227`'s pattern but park at the value's own negation rather than at a remapped one:
+phase 1 sets `number = -number`, an involution onto a range no live row occupies, so no two parked values and
+no parked-vs-unmoved pair can collide whatever order the rows are touched in; phase 2 lands them at
+`number = -number + 1`, bounded below by `afterChapter + 2` and so clear of every unmoved row. Neither phase
+depends on row ordering, unlike recombine's, whose remapped parking does.
+
+**Which columns get shifted is an allow-list, not an analysis.** Shift _every_ integer column in
+`src/database/schemas` that stores a forge chapter number, `WHERE value > afterChapter`, by the same two-phase
+pass whether or not a unique constraint covers it. Do not reason about which columns can hold a value above
+the write frontier: an earlier draft of this section claimed everything outside `briefs`/`drafts`/`chapters`/
+`chapter_images`/`continuity_proposals` was written only at finalize of a `done` chapter, and that was wrong
+twice — `character_knowledge.learned_in_chapter` is written at draft approval, which runs several chapters
+ahead of the frontier in a single `generate` batch, and `applyContinuityDelta` writes the entity, thread and
+mystery columns from a _draft_ via `applyContinuityProposal`. Both leaks are silent: the first opens
+`knowledge-view.ts`'s `lt(learnedInChapter, chapter)` spoiler gate one chapter early. Reachability analysis is
+what failed here and will fail again the next time a column is added, so the rule is mechanical.
+
+The columns shifted are therefore `briefs.chapter`, `drafts.chapter`, `chapters.number`,
+`chapter_images.chapter`, `continuity_proposals.chapter`, `context_packs.chapter`,
+`entities.first_seen_chapter`, `entity_relationships.chapter`, `entity_appearances.chapter`/`first_chapter`/
+`last_chapter`, `relationship_observations.chapter`, `canon_facts.reveal_chapter`,
+`character_knowledge.learned_in_chapter`, `character_states.last_updated_chapter`, `beats.chapter`,
+`world_facts.chapter`, `plot_threads.opened_chapter`/`closed_chapter`/`last_advanced_chapter`/`payoff_window`,
+and `mysteries.opened_chapter`/`resolved_chapter`/`last_advanced_chapter`/`payoff_window`. The two
+`payoff_window` columns matter beyond tidiness: `dormant-threads.ts` computes `currentChapter > payoffWindow`
+and renders the verdict into arc-planning context, so leaving them behind reports a thread overdue one chapter
+early to the planner.
+
+Everything omitted is omitted by an explicit deny-list entry, each carrying its reason in the code:
+`chapter_publications.chapter` and `.published_ordinal` (frozen historical pointers — moving one moves a
+reader's URL); `projects.story_current_chapter` (a cursor over finalized prose, never above the frontier);
+`chapter_chunks.chapter`, `validation_reports.chapter` and `extraction_runs.chapter` (written only from `done`
+chapters); `volumes.start_chapter`/`end_chapter` and `arcs.chapter_start`/`chapter_end` (ranges, grown below
+rather than shifted); `chapter_conversions`, `chapter_reforges`, `rebrand_glossary` and the `reforge_*` tables
+(keyed to source projects, outside this path); and every `ordinal`, `*_count` and `chapters_analyzed` column
+(positions and counts, not chapter numbers).
 
 **Re-render and rewrite, per shifted brief:**
 
@@ -281,8 +313,7 @@ or number)` above `afterChapter`.
   own chapter number in prose stays correct.
 - Rewrite `contextRefs` entries of the form `chapter:N` to `chapter:N+1` for every `N > afterChapter`.
 - Rewrite `knowledgeContract` chapter references (the `learns[].factKey`/`pov` entries don't carry chapter
-  numbers, but any chapter-number literal inside the contract's free-form fields does) and `canon_facts.reveal_chapter`
-  values greater than `afterChapter`.
+  numbers, but any chapter-number literal inside the contract's free-form fields does).
 
 **Plan growth.** The arc whose `[chapterStart, chapterEnd]` contains `afterChapter` (or whose range starts
 after it) grows `chapterEnd` by one; later arcs' `chapterStart`/`chapterEnd` both shift by one. The containing

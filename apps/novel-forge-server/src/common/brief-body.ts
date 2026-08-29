@@ -6,17 +6,19 @@ export interface BriefBodyInput {
   handoffBeat?: string;
 }
 
+export const CONTINUES_LINE = "[CONTINUES INTO NEXT CHAPTER] Do not resolve this chapter's central action/tension.";
+export const STARTS_LINE =
+  "[STARTS FROM PREVIOUS CHAPTER] Continue forward in new sentences from the exact beat the previous chapter handed off — no time skip, no recap, and never repeat the previous chapter's closing line(s) verbatim; the reader already read them.";
+export const HANDOFF_PREFIX = 'Handoff beat: ';
+
 // Folds outline-time continuation decisions into the stored brief body so the drafter — which only
 // ever reads `chapterBrief` as plain text — actually sees them. Shared by the outline flow and the
 // plan-import endpoint so an authored brief renders byte-identically to an AI-outlined one.
 export function renderBriefBody(c: BriefBodyInput): string {
   const lines = [c.objective, ...(c.events ?? [])];
-  if (c.continuesIntoNextChapter) lines.push("[CONTINUES INTO NEXT CHAPTER] Do not resolve this chapter's central action/tension.");
-  if (c.startsFromPreviousChapter)
-    lines.push(
-      "[STARTS FROM PREVIOUS CHAPTER] Continue forward in new sentences from the exact beat the previous chapter handed off — no time skip, no recap, and never repeat the previous chapter's closing line(s) verbatim; the reader already read them.",
-    );
-  if (c.handoffBeat) lines.push(`Handoff beat: ${c.handoffBeat}`);
+  if (c.continuesIntoNextChapter) lines.push(CONTINUES_LINE);
+  if (c.startsFromPreviousChapter) lines.push(STARTS_LINE);
+  if (c.handoffBeat) lines.push(`${HANDOFF_PREFIX}${c.handoffBeat}`);
   return lines.join('\n');
 }
 

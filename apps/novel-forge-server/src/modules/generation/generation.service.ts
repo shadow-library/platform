@@ -5,7 +5,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertActiveProject, renderBriefBody, renderChapterBrief } from '@server/common';
+import { assertActiveProject, markDescendantDraftsStale, renderBriefBody, renderChapterBrief } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -103,9 +103,6 @@ export interface JobEnqueueResult {
   status: string;
   target: string;
 }
-
-/** The narrow database surface staleness propagation needs — satisfied by both the client and a transaction. */
-type DraftWriter = Pick<PrimaryDatabase, 'update'>;
 
 const PLAN_BIBLE_DOC_TOKEN_CAP = 1_500;
 
@@ -576,21 +573,6 @@ export class GenerationService {
     return draft;
   }
 
-  /**
-   * A drafted chapter is written against its predecessor's prose and continuation state, so editing
-   * chapter N leaves every later non-final draft resting on content that no longer exists. Flag them
-   * and revoke any approval that was granted against the superseded ancestor.
-   */
-  private async markDescendantDraftsStale(projectId: bigint, chapter: number, reason: string, db: DraftWriter = this.db): Promise<void> {
-    const descendants = and(eq(schema.drafts.projectId, projectId), gt(schema.drafts.chapter, chapter), ne(schema.drafts.status, 'final'));
-
-    await db.update(schema.drafts).set({ staleReason: reason, updatedAt: new Date() }).where(descendants);
-    await db
-      .update(schema.drafts)
-      .set({ reviewStatus: 'needs_review', updatedAt: new Date() })
-      .where(and(descendants, eq(schema.drafts.reviewStatus, 'approved')));
-  }
-
   async updateDraft(projectId: bigint, chapter: number, body: UpdateDraftBody): Promise<Generation.Draft> {
     const existing = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
     if (existing?.status === 'final') throw AppErrorCode.DRF_002.create();
@@ -630,7 +612,7 @@ export class GenerationService {
       .values({ projectId, draftId: draft.id, revision: draft.revision, source: 'hand_edited', body: draft.body, summary: draft.summary })
       .onConflictDoNothing();
 
-    await this.markDescendantDraftsStale(projectId, chapter, `ancestor chapter ${chapter} was hand_edited`);
+    await markDescendantDraftsStale(this.db, projectId, chapter, `ancestor chapter ${chapter} was hand_edited`);
 
     return draft;
   }
@@ -689,7 +671,7 @@ export class GenerationService {
       })
       .onConflictDoNothing();
 
-    await this.markDescendantDraftsStale(projectId, chapter, `ancestor chapter ${chapter} was revised`);
+    await markDescendantDraftsStale(this.db, projectId, chapter, `ancestor chapter ${chapter} was revised`);
 
     return updated;
   }
@@ -885,7 +867,7 @@ export class GenerationService {
       .values({ projectId, draftId: draft.id, revision: draft.revision, source: 'imported', body: draft.body, summary: draft.summary })
       .onConflictDoNothing();
 
-    await this.markDescendantDraftsStale(projectId, chapter, `ancestor chapter ${chapter} was imported`);
+    await markDescendantDraftsStale(this.db, projectId, chapter, `ancestor chapter ${chapter} was imported`);
 
     return draft;
   }
@@ -1116,7 +1098,7 @@ export class GenerationService {
         throw AppErrorCode.DRF_001.create();
       }
 
-      await this.markDescendantDraftsStale(projectId, chapter, `ancestor chapter ${chapter} was regenerated`, tx);
+      await markDescendantDraftsStale(tx, projectId, chapter, `ancestor chapter ${chapter} was regenerated`);
 
       return row;
     });
