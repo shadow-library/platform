@@ -15,7 +15,7 @@ import {
 import { ModelRouterService, resolveProvider, supportsPromptCaching } from '@modules/ai/model-router.service';
 import { MODEL_REGISTRY } from '@modules/ai/models';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
-import { Config } from '@shadow-library/common';
+import { type AppError, Config } from '@shadow-library/common';
 
 // Minimal DatabaseService stub: cache always misses, cache writes are no-ops.
 function stubDatabaseService(): never {
@@ -136,6 +136,20 @@ describe('ModelRouterService.buildClient', () => {
       expect(client.clientConfig.baseURL).toBe('https://openrouter.ai/api/v1');
       expect(client.clientConfig.apiKey).toBe('test-openrouter-key');
     }
+  });
+
+  it('should refuse to build an openrouter client with no credential rather than let the SDK fail mid-call', () => {
+    setConfig('ai.openrouter.api.key', undefined);
+    let error: AppError | null = null;
+    try {
+      router.buildClient({ provider: 'openrouter', model: 'anthropic/claude-sonnet-5' });
+    } catch (err) {
+      error = err as AppError;
+    } finally {
+      setConfig('ai.openrouter.api.key', 'test-openrouter-key');
+    }
+    expect(error?.code).toBe('AI_006');
+    expect(error?.status).toBe(500);
   });
 
   it('should point the openrouter client at its configured base url', () => {

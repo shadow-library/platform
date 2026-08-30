@@ -90,6 +90,8 @@ export class AppErrorCode extends ServerErrorCode {
   // be swallowed by the internal() mask.
   static readonly AI_004 = new AppErrorCode('AI_004', 'Image generation is not configured — set AI_OPENROUTER_API_KEY', 500);
   static readonly AI_005 = new AppErrorCode('AI_005', 'Image generation failed — see the model call log', 500);
+  static readonly AI_006 = new AppErrorCode('AI_006', 'AI is not configured — set AI_OPENROUTER_API_KEY', 500);
+  static readonly AI_007 = new AppErrorCode('AI_007', 'AI model call failed — see the model call log', 502);
 
   /*!
    * Illustration Errors

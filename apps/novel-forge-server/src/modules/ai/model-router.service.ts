@@ -184,9 +184,13 @@ export class ModelRouterService {
         // not part of the OpenAI chat-completions schema — modelKwargs is what ChatOpenAI splices into
         // the request verbatim. Omitting it entirely is what disables reasoning on `optional` models.
         const effort = opts?.role ? resolveReasoningEffort(resolved.model, ROLE_GROUP[opts.role]) : undefined;
+        // Without this, ChatOpenAI falls back to OPENAI_API_KEY, fails deep inside the SDK, and the
+        // missing-configuration fault surfaces three pointless retries later as a 400 "unparseable response".
+        const apiKey = Config.get('ai.openrouter.api.key');
+        if (!apiKey) throw AppErrorCode.AI_006.create();
         return new ChatOpenAI({
           model: resolved.model,
-          apiKey: Config.get('ai.openrouter.api.key'),
+          apiKey,
           configuration: { baseURL: Config.get('ai.openrouter.api.url') },
           ...(effort ? { modelKwargs: { reasoning: { effort } } } : {}),
         });
@@ -439,8 +443,8 @@ export class ModelRouterService {
         }
       }
     }
-    this.logger.error('LLM call failed after retries', { role, err: lastErr });
-    throw AppErrorCode.AI_001.create();
+    this.logger.error('LLM call failed after retries', { role, attempts: this.llmMaxRetries + 1, err: lastErr });
+    throw AppErrorCode.AI_007.create();
   }
 
   private withTimeout<R>(promise: Promise<R>, ms: number): Promise<R> {
