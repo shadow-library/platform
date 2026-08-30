@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { and, asc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
+import { type AppError } from '@shadow-library/common';
+
 import { ChapterInsertService } from '@modules/generation/chapter-insert.service';
 import { parseBriefBody, renderBriefBody, shiftBriefBody, shiftChapterMentions, shiftChapterNumber, shiftChapterReferences } from '@server/common';
 import { type PrimaryDatabase } from '@server/database';
@@ -284,11 +286,20 @@ describe.if(pgAvailable)('ChapterInsertService.insertAfter', () => {
     },
   ];
 
+  // `toThrow` matches the message, never the code — asserting the code is what these guards are about.
+  async function expectCode(promise: Promise<unknown>, code: string): Promise<void> {
+    const error = (await promise.then(
+      () => null,
+      (err: AppError) => err,
+    )) as AppError | null;
+    expect(error?.code).toBe(code);
+  }
+
   describe('guards', () => {
     it('should refuse an insert behind the write frontier with CHP_003', async () => {
       const { service } = buildService();
       const projectId = await seed({ finalizedThrough: 5 });
-      await expect(service.insertAfter(projectId, 4, HAND)).rejects.toThrow(/CHP_003/);
+      await expectCode(service.insertAfter(projectId, 4, HAND), 'CHP_003');
     });
 
     it('should allow an insert exactly at the write frontier', async () => {
@@ -339,8 +350,8 @@ describe.if(pgAvailable)('ChapterInsertService.insertAfter', () => {
     it('should refuse an insert past the highest planned chapter with CHP_001', async () => {
       const { service } = buildService();
       const projectId = await seed({ chapters: 8 });
-      await expect(service.insertAfter(projectId, 9, HAND)).rejects.toThrow(/CHP_001/);
-      await expect(service.insertAfter(projectId, 10_000, HAND)).rejects.toThrow(/CHP_001/);
+      await expectCode(service.insertAfter(projectId, 9, HAND), 'CHP_001');
+      await expectCode(service.insertAfter(projectId, 10_000, HAND), 'CHP_001');
     });
 
     it('should allow an insert after the highest planned chapter itself', async () => {
@@ -368,7 +379,7 @@ describe.if(pgAvailable)('ChapterInsertService.insertAfter', () => {
         } as never,
       );
 
-      await expect(service.insertAfter(projectId, 5, { briefOrigin: 'planner', intent: 'a dark interlude' })).rejects.toThrow(/CHP_004/);
+      await expectCode(service.insertAfter(projectId, 5, { briefOrigin: 'planner', intent: 'a dark interlude' }), 'CHP_004');
       expect(observed).toEqual(['model']);
 
       const briefs = await db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), orderBy: asc(schema.briefs.chapter) });
@@ -379,7 +390,7 @@ describe.if(pgAvailable)('ChapterInsertService.insertAfter', () => {
       const { service } = buildService();
       for (const activeJobStatus of ['pending', 'in_progress'] as const) {
         const projectId = await seed({ activeJobStatus });
-        await expect(service.insertAfter(projectId, 5, HAND)).rejects.toThrow(/CHP_004/);
+        await expectCode(service.insertAfter(projectId, 5, HAND), 'CHP_004');
       }
     });
 
@@ -399,7 +410,7 @@ describe.if(pgAvailable)('ChapterInsertService.insertAfter', () => {
 
     it('should refuse an insert on an unknown project with PRJ_001', async () => {
       const { service } = buildService();
-      await expect(service.insertAfter(9_999_999n, 5, HAND)).rejects.toThrow(/PRJ_001/);
+      await expectCode(service.insertAfter(9_999_999n, 5, HAND), 'PRJ_001');
     });
   });
 

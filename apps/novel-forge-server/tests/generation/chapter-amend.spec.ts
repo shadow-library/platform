@@ -248,7 +248,7 @@ describe.if(pgAvailable)('ChapterAmendService.amend', () => {
     const projectId = await seed({ published: 'published' });
     const { service } = buildService();
 
-    const result = await service.amend(projectId, 1, { content: PROSE, contentRating: { violence: 'graphic' } });
+    const result = await service.amend(projectId, 1, { content: PROSE });
 
     const ledger = await ledgerRow(projectId);
     expect(result.republished).toBe(false);
@@ -256,6 +256,21 @@ describe.if(pgAvailable)('ChapterAmendService.amend', () => {
     expect(ledger?.revision).toBe(2);
     expect(ledger?.status).toBe('published');
     expect(ledger?.publishedOrdinal).toBe(9);
+  });
+
+  // The rating is inside chapterContentHash, so a rating-only amend is reader-visible: a chapter whose
+  // rating rose must reach the reader before the prose it warns about does.
+  it('should republish when a rating change is all that moves the payload hash', async () => {
+    const projectId = await seed({ published: 'published' });
+    const { service } = buildService();
+
+    const result = await service.amend(projectId, 1, { content: PROSE, contentRating: { violence: 'graphic' } });
+
+    const ledger = await ledgerRow(projectId);
+    expect(result.republished).toBe(true);
+    expect(ledger?.revision).toBe(3);
+    expect(ledger?.status).toBe('scheduled');
+    expect(ledger?.contentHash).toBe(chapterContentHash({ title: 'Old Title', content: PROSE, contentRating: { violence: 'graphic' } }));
     expect((await chapterRow(projectId))?.contentRating).toEqual({ violence: 'graphic' });
   });
 
