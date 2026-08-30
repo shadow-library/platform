@@ -107,7 +107,7 @@ export class IdeationService {
     const project = await this.projectService.create({ name: PLACEHOLDER_SEED_NAME, kind: 'new_novel', contentMode: body.contentMode }, { status: 'seed' });
 
     try {
-      return await this.db.transaction(async tx => {
+      const created = await this.db.transaction(async tx => {
         const [seed] = await tx
           .insert(schema.storySeeds)
           .values({
@@ -140,8 +140,14 @@ export class IdeationService {
         }
 
         this.logger.info('seed created', { projectId: project.id, seedId: seed.id, sessionId: session.id, hasSpark: Boolean(spark) });
-        return this.present(seed, session.id);
+        return { response: this.present(seed, session.id), sessionId: session.id };
       });
+
+      // After the commit, never inside it: the turn reads the sheet and the session back off `this.db`,
+      // which cannot see this transaction's writes. Detached so the author is not held on a model call
+      // for the length of the create — the run row it opens is what `pendingTurn` reports meanwhile.
+      if (spark) void this.openingTurn(project.id, created.sessionId, spark);
+      return created.response;
     } catch (err) {
       // The project insert already committed outside this transaction (ProjectService.create owns no
       // tx of its own and inserts nothing else for seeds), so a failure here would otherwise strand a
@@ -152,6 +158,22 @@ export class IdeationService {
         .where(eq(schema.projects.id, project.id))
         .catch(deleteErr => this.logger.error('failed to compensate orphan seed project', { projectId: project.id, error: deleteErr }));
       throw err;
+    }
+  }
+
+  /**
+   * The studio's reply to the spark. A seed created from a spark used to leave the author looking at
+   * their own message with nothing scheduled behind it — no run, no reply, and nothing for the pending
+   * indicator to report, so the thread read as hung when it was simply finished. `turn` adopts the
+   * already-persisted spark rather than echoing it back into the transcript.
+   */
+  private async openingTurn(projectId: bigint, sessionId: string, spark: string): Promise<void> {
+    try {
+      await this.turn(projectId, sessionId, spark);
+    } catch (err) {
+      // runChain has already marked the run failed with this error, which is what the transcript reads
+      // to offer a retry; losing it here would only lose the log line.
+      this.logger.error('opening studio turn failed', { projectId, sessionId, err });
     }
   }
 
@@ -616,7 +638,25 @@ export class IdeationService {
     return { ...project, config: { ...base, models: { ...(base.models ?? {}), chat: model } } } as ProjectConfig;
   }
 
+  /**
+   * The turn's user message, adopting one already sitting unanswered at the end of the transcript rather
+   * than echoing it. Two writers put a message there before any turn claims it: `createSeed`, which
+   * persists the spark so the thread is never blank while the opening turn spins up, and a turn that
+   * died after this point — whose retry would otherwise show the author's words twice.
+   */
   private async persistUserMessage(tx: DbExecutor, session: Refinement.ChatSession, content: string, runId: string | null): Promise<Refinement.ChatMessage> {
+    const unanswered = await this.unansweredUserMessage(session.id, content);
+    if (unanswered) {
+      const [adopted] = await tx
+        .update(schema.chatMessages)
+        .set({ runId, tokens: countTokens(content) })
+        .where(eq(schema.chatMessages.id, unanswered.id))
+        .returning()
+        .catch(err => this.databaseService.translateError(err));
+      if (!adopted) throw AppErrorCode.CHT_001.create();
+      return adopted;
+    }
+
     const ordinal = (await this.latestOrdinal(session.id)) + 1;
     const [message] = await tx
       .insert(schema.chatMessages)
@@ -656,6 +696,12 @@ export class IdeationService {
 
     await tx.update(schema.chatSessions).set({ lastTurnAt: new Date(), updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id));
     return message;
+  }
+
+  private async unansweredUserMessage(sessionId: string, content: string): Promise<Refinement.ChatMessage | undefined> {
+    const last = await this.db.query.chatMessages.findFirst({ where: eq(schema.chatMessages.sessionId, sessionId), orderBy: desc(schema.chatMessages.ordinal) });
+    if (!last || last.role !== 'user' || last.content !== content) return undefined;
+    return last;
   }
 
   private async latestOrdinal(sessionId: string): Promise<number> {

@@ -304,8 +304,10 @@ describe.if(pgAvailable)('Ideation API', () => {
   });
 
   describe('POST /api/v1/projects/:projectId/seed/graduate', () => {
+    // No spark: one dispatches the studio's opening turn, and graduation refuses to run while a turn is
+    // in flight (IDE_006). These cases assert graduation, and set the sheet up directly anyway.
     async function seedReadyToGraduate(): Promise<bigint> {
-      const projectId = BigInt((await createSeed('a salvager')).json().projectId);
+      const projectId = BigInt((await createSeed()).json().projectId);
       await db
         .update(schema.storySeeds)
         .set({
@@ -370,6 +372,48 @@ describe.if(pgAvailable)('Ideation API', () => {
       const response = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${theirs?.id}/seed/graduate`).body({ title: 'Mine now' });
       expect(response.statusCode).toBe(404);
       expect(response.json().code).toBe('PRJ_001');
+    });
+  });
+
+  describe('the opening turn', () => {
+    async function settledTurn(projectId: string, sessionId: string): Promise<Record<string, unknown>> {
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const body = (await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${projectId}/chat/sessions/${sessionId}/messages`)).json();
+        if (body.pendingTurn || body.failedTurn || body.messages.length > 1) return body;
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      throw new Error('the opening turn never started');
+    }
+
+    it('should answer a spark instead of leaving the author unanswered', async () => {
+      const created = (await createSeed('a salvager who can hear dead ships')).json();
+
+      const body = await settledTurn(created.projectId, created.sessionId);
+
+      expect(body.pendingTurn ?? body.failedTurn).toBeTruthy();
+      const runs = await db.query.workflowRuns.findMany({ where: eq(schema.workflowRuns.projectId, BigInt(created.projectId)) });
+      expect(runs.map(run => run.target)).toContain(`session:${created.sessionId}`);
+    });
+
+    it('should adopt the persisted spark rather than echoing it back into the transcript', async () => {
+      const created = (await createSeed('a salvager who can hear dead ships')).json();
+
+      await settledTurn(created.projectId, created.sessionId);
+
+      const messages = await db.query.chatMessages.findMany({ where: eq(schema.chatMessages.sessionId, created.sessionId) });
+      const user = messages.filter(message => message.role === 'user');
+      expect(user).toHaveLength(1);
+      expect(user[0]).toMatchObject({ ordinal: 1, content: 'a salvager who can hear dead ships' });
+    });
+
+    it('should not open a turn for a seed created without a spark', async () => {
+      const created = (await createSeed()).json();
+
+      const body = (await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${created.projectId}/chat/sessions/${created.sessionId}/messages`)).json();
+
+      expect(body.messages).toHaveLength(0);
+      expect(body.pendingTurn).toBeNull();
+      expect(body.failedTurn).toBeNull();
     });
   });
 
