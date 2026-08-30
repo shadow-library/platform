@@ -50,9 +50,12 @@ export class ChatController {
   async listMessages(@Params() params: ChatSessionParams, @Query() query: ListChatMessagesQuery): Promise<ListChatMessagesResponse> {
     const [messages, pendingTurn] = await Promise.all([
       this.chatService.listMessages(params.projectId, params.sessionId, query),
-      this.chatService.hasPendingTurn(params.projectId, params.sessionId),
+      this.chatService.pendingTurn(params.projectId, params.sessionId),
     ]);
-    return { messages: messages.map(serialiseMessage), pendingTurn };
+    // Only looked up once nothing is running: a live turn is the answer, and the previous failure it is
+    // retrying would otherwise be reported alongside it.
+    const failedTurn = pendingTurn ? null : await this.chatService.failedTurn(params.projectId, params.sessionId);
+    return { messages: messages.map(serialiseMessage), pendingTurn, failedTurn };
   }
 
   /**

@@ -3825,8 +3825,10 @@ export interface components {
     };
     ListChatMessagesResponse: {
       messages: components['schemas']['ChatMessageResponse'][];
-      /** @description Whether a chat turn is currently running for this session. */
-      pendingTurn: boolean;
+      /** @description Present while a chat turn is running for this session; null otherwise. */
+      pendingTurn?: components['schemas']['PendingTurnResponse'] | null;
+      /** @description Present when the last turn failed and left the transcript unanswered. */
+      failedTurn?: components['schemas']['FailedTurnResponse'] | null;
     };
     ChatMessageResponse: {
       id: string;
@@ -3842,6 +3844,27 @@ export interface components {
       modelId?: null | string;
       /** Format: date-time */
       createdAt: string;
+    };
+    /** @description The turn running right now, so a client can name the phase and count the wait instead of showing a bare spinner. */
+    PendingTurnResponse: {
+      runId: string;
+      /** @description Workflow graph driving the turn — `chat-turn`, `ideation-turn`, `ideation-concepts` or `ideation-stress`. */
+      graph: string;
+      /**
+       * Format: date-time
+       * @description When the turn started; elapsed time is measured from here so it survives a refresh.
+       */
+      startedAt: string;
+    };
+    /** @description The turn that died on a transcript still ending in an unanswered user message, so a reload shows the failure instead of a silent thread. */
+    FailedTurnResponse: {
+      runId: string;
+      graph: string;
+      /** Format: date-time */
+      failedAt: string;
+      /** @description Application error code, when the failure carried one. */
+      code?: string | null;
+      message?: string | null;
     };
     ChatTurnBody: {
       /** @description Chat content; accepts long premises, chapters, and reference documents up to 200,000 characters. */
@@ -13305,6 +13328,8 @@ export type ChatSessionStatus = components['schemas']['ChatSessionStatus'];
 export type ListChatSessionResponse = components['schemas']['ListChatSessionResponse'];
 export type ListChatMessagesResponse = components['schemas']['ListChatMessagesResponse'];
 export type ChatMessageResponse = components['schemas']['ChatMessageResponse'];
+export type PendingTurnResponse = components['schemas']['PendingTurnResponse'];
+export type FailedTurnResponse = components['schemas']['FailedTurnResponse'];
 export type ChatTurnBody = components['schemas']['ChatTurnBody'];
 export type ChatTurnResponse = components['schemas']['ChatTurnResponse'];
 export type TurnAppliedResult = components['schemas']['TurnAppliedResult'];

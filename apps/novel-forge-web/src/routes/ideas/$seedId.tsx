@@ -1,10 +1,10 @@
 import { createFileRoute, notFound, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
-import { Button, Dialog, FormField, Input, Spinner, Textarea, toast } from '@shadow-library/ui';
+import { Button, Dialog, FormField, Input, Textarea, toast } from '@shadow-library/ui';
 
 import { AppShell } from '@/components/Layout';
 import { ProposalsIcon, SendIcon, SparkIcon } from '@/components/icons';
-import { type ChipIntent, Markdown, PaneError, PaneLoader, StatusChip } from '@/components/nf';
+import { type ChipIntent, Markdown, PaneError, PaneLoader, StatusChip, TurnStatus } from '@/components/nf';
 import { MessageModelTag } from '@/components/nf/ChatModel';
 import {
   type ChatMessageResponse,
@@ -15,6 +15,7 @@ import {
   type SeedFieldsResponse,
   seedQueryOptions,
   type SeedResponse,
+  turnState,
   useChatMessagesQuery,
   useChatTurnMutation,
   useGraduateSeedMutation,
@@ -572,7 +573,10 @@ function StudioScreen(): React.JSX.Element {
   const changesQuery = useListChangesQuery(seedId);
 
   const messages = messagesQuery.data?.messages ?? [];
-  const pending = turn.isPending || (messagesQuery.data?.pendingTurn ?? false);
+  const state = turnState(messagesQuery.data);
+  // The composer locks on this tab's own request OR a turn the server still has running — the latter is
+  // what stops a second tab or a refresh from racing a reply that is already on its way.
+  const pending = turn.isPending || state.kind === 'pending';
   // The change feed carries applied and reverted proposals only, so it is what tells a turn that moved the
   // sheet apart from one whose proposal is still sitting there pending.
   const appliedChanges = new Map((changesQuery.data?.items ?? []).filter(change => change.status === 'applied').map(change => [change.id, change]));
@@ -652,11 +656,13 @@ function StudioScreen(): React.JSX.Element {
                 </div>
               );
             })}
-            {pending && (
-              <div className={styles.thinking}>
-                <Spinner size="sm" /> The studio is thinking…
-              </div>
-            )}
+            <TurnStatus
+              pending={state.kind === 'pending' ? state.pending : null}
+              sending={turn.isPending}
+              failed={state.kind === 'failed' ? state.failed : null}
+              fallbackLabel="The studio is reading what you wrote"
+              onRetry={state.kind === 'failed' ? () => send(state.retryContent) : undefined}
+            />
           </div>
         </div>
 

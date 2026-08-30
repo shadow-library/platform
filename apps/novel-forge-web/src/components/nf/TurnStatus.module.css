@@ -1,0 +1,99 @@
+.row {
+  display: flex;
+  gap: 12px;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(140deg, var(--sh-indigo-500), var(--sh-indigo-700));
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.row[data-state='failed'] .avatar {
+  background: var(--sh-surface-subtle);
+  border: 1px solid var(--sh-border-subtle);
+  color: var(--sh-text-tertiary);
+}
+
+.body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.line {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--sh-text-tertiary);
+  font-size: var(--sh-text-body-sm);
+}
+
+.phase {
+  color: var(--sh-text-secondary);
+}
+
+.elapsed {
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  color: var(--sh-text-tertiary);
+  font-size: var(--sh-text-body-sm);
+  margin: 0;
+}
+
+.failedTitle {
+  color: var(--sh-text-primary);
+  font-size: var(--sh-text-body-sm);
+}
+
+.failedActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* The bar reads as forward motion without claiming a percentage the server cannot report. */
+.track {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--sh-border-subtle);
+  overflow: hidden;
+}
+
+.track::after {
+  content: '';
+  display: block;
+  height: 100%;
+  width: 35%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--sh-indigo-500), transparent);
+  animation: sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track::after {
+    animation: none;
+    width: 100%;
+    background: var(--sh-border-strong);
+  }
+}

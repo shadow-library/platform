@@ -32,6 +32,20 @@ export interface CreateSessionInput {
   mode?: Refinement.ChatMode;
 }
 
+export interface PendingTurn {
+  runId: string;
+  graph: string;
+  startedAt: Date;
+}
+
+export interface FailedTurn {
+  runId: string;
+  graph: string;
+  failedAt: Date;
+  code: string | null;
+  message: string | null;
+}
+
 export interface ChatTurnResult {
   userMessage: Refinement.ChatMessage;
   assistantMessage: Refinement.ChatMessage;
@@ -58,6 +72,7 @@ const CHAT_HUB_NODE = 'chat-hub';
 // A chat-turn run older than this is treated as orphaned, never "in progress", so a crashed process
 // can't leave a session's thinking indicator stuck on forever.
 const PENDING_TURN_MAX_AGE_MS = 15 * 60 * 1000;
+const TURN_GRAPHS = ['chat-turn', 'ideation-turn', 'ideation-concepts', 'ideation-stress'];
 
 // Which planning discipline each chat scope belongs to. A chat scoped to an arc IS arc-planning
 // work, so it defaults to the model the author configured for arc planning in the project settings —
@@ -230,23 +245,68 @@ export class ChatService {
   }
 
   /**
-   * Whether a chat-turn is currently running for this session — the recovery signal a refresh or a
-   * second tab uses to show that Forge is working (the user message is already persisted, the reply
-   * is not yet). Bounded by a generous cutoff so an orphaned run can never pin the indicator on.
+   * The turn currently running for this session — the recovery signal a refresh or a second tab uses to
+   * show that Forge is working (the user message is already persisted, the reply is not yet). `graph`
+   * and `startedAt` are what let the client name the phase and count the wait rather than showing a bare
+   * spinner. Bounded by a generous cutoff so an orphaned run can never pin the indicator on.
    */
-  async hasPendingTurn(projectId: bigint, sessionId: string): Promise<boolean> {
+  async pendingTurn(projectId: bigint, sessionId: string): Promise<PendingTurn | null> {
     const cutoff = new Date(Date.now() - PENDING_TURN_MAX_AGE_MS);
     const row = await this.db.query.workflowRuns.findFirst({
       where: and(
         eq(schema.workflowRuns.projectId, projectId),
-        inArray(schema.workflowRuns.graph, ['chat-turn', 'ideation-turn', 'ideation-concepts', 'ideation-stress']),
+        inArray(schema.workflowRuns.graph, TURN_GRAPHS),
         eq(schema.workflowRuns.target, `session:${sessionId}`),
         eq(schema.workflowRuns.status, 'running'),
         gt(schema.workflowRuns.startedAt, cutoff),
       ),
-      columns: { id: true },
+      columns: { id: true, graph: true, startedAt: true },
+      orderBy: desc(schema.workflowRuns.startedAt),
     });
-    return Boolean(row);
+    return row ? { runId: row.id, graph: row.graph, startedAt: row.startedAt } : null;
+  }
+
+  async hasPendingTurn(projectId: bigint, sessionId: string): Promise<boolean> {
+    return Boolean(await this.pendingTurn(projectId, sessionId));
+  }
+
+  /**
+   * The turn that died, for a session whose transcript ends on an unanswered user message. Without this
+   * a failed turn is a toast that expires: reload, and the thread is indistinguishable from one that was
+   * never asked. Reported only while the failure is the last thing that happened — any assistant message
+   * written after the run ended means the author has already moved past it.
+   */
+  async failedTurn(projectId: bigint, sessionId: string): Promise<FailedTurn | null> {
+    const run = await this.db.query.workflowRuns.findFirst({
+      where: and(
+        eq(schema.workflowRuns.projectId, projectId),
+        inArray(schema.workflowRuns.graph, TURN_GRAPHS),
+        eq(schema.workflowRuns.target, `session:${sessionId}`),
+        eq(schema.workflowRuns.status, 'failed'),
+      ),
+      columns: { id: true, graph: true, error: true, endedAt: true, startedAt: true },
+      orderBy: desc(schema.workflowRuns.startedAt),
+    });
+    if (!run) return null;
+
+    const last = await this.db.query.chatMessages.findFirst({
+      where: eq(schema.chatMessages.sessionId, sessionId),
+      columns: { role: true, createdAt: true },
+      orderBy: desc(schema.chatMessages.ordinal),
+    });
+    if (!last || last.role !== 'user') return null;
+
+    const failedAt = run.endedAt ?? run.startedAt;
+    if (last.createdAt > failedAt) return null;
+
+    const error = run.error as { code?: unknown; message?: unknown } | null;
+    return {
+      runId: run.id,
+      graph: run.graph,
+      failedAt,
+      code: typeof error?.code === 'string' ? error.code : null,
+      message: typeof error?.message === 'string' ? error.message : null,
+    };
   }
 
   /**

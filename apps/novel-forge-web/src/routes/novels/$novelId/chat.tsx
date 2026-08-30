@@ -3,12 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, Checkbox, Dialog, FormField, Input, SegmentedControl, Select, Spinner, Textarea, toast } from '@shadow-library/ui';
 
 import { ArchiveIcon, ProposalsIcon, SendIcon, TrashIcon } from '@/components/icons';
-import { type ChipIntent, Markdown, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
+import { type ChipIntent, Markdown, PaneError, PaneLoader, RowAction, StatusChip, TurnStatus } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import {
   type ChangeItemResponse,
   type ChatScope,
   type ChatSessionResponse,
+  turnState,
   useApplyProposalMutation,
   useChatMessagesQuery,
   useChatTurnMutation,
@@ -490,9 +491,10 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
   const messages = messagesQuery.data?.messages ?? [];
   const isAuto = session.mode === 'auto';
   const isHub = session.scopeType === 'project';
-  // "Forge is working" comes from this tab's own request OR the server flag — the latter is what lets a
-  // refresh or a second tab recover an in-flight turn instead of showing a silent, unanswered message.
-  const pending = turn.isPending || (messagesQuery.data?.pendingTurn ?? false);
+  // The composer locks on this tab's own request OR a turn the server still has running — the latter is
+  // what lets a refresh or a second tab recover an in-flight turn instead of showing a silent message.
+  const state = turnState(messagesQuery.data);
+  const pending = turn.isPending || state.kind === 'pending';
 
   // Stay pinned to the newest message ChatGPT-style: inline change cards load after the transcript,
   // so a one-shot scroll lands short — follow content growth while the user is near the bottom, and
@@ -524,6 +526,13 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
     const content = input.trim();
     if (!content || pending) return;
     setInput('');
+    resend(content, content);
+  };
+
+  // A retry re-sends the message that never got an answer, so there is nothing in the composer to
+  // restore on a second failure; the ordinary send passes its draft so a failure hands it back.
+  const resend = (content: string, draft?: string): void => {
+    if (!content || pending) return;
     turn.mutate(content, {
       onSuccess: result => {
         if (result.applied) {
@@ -536,7 +545,7 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
       },
       onError: err => {
         toast.danger(err.message);
-        setInput(content);
+        if (draft !== undefined) setInput(current => current || draft);
       },
     });
   };
@@ -596,11 +605,13 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
               </div>
             ),
           )}
-          {pending && (
-            <div className={styles.thinking}>
-              <Spinner size="sm" /> {isAuto ? 'Forge is working…' : 'Forge is thinking…'}
-            </div>
-          )}
+          <TurnStatus
+            pending={state.kind === 'pending' ? state.pending : null}
+            sending={turn.isPending}
+            failed={state.kind === 'failed' ? state.failed : null}
+            fallbackLabel={isAuto ? 'Forge is working' : 'Forge is reading your ask'}
+            onRetry={state.kind === 'failed' ? () => resend(state.retryContent) : undefined}
+          />
         </div>
       </div>
 

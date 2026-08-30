@@ -345,14 +345,6 @@
   color: var(--sh-text-tertiary);
 }
 
-.thinking {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  color: var(--sh-text-tertiary);
-  font-size: var(--sh-text-body-sm);
-}
-
 .composer {
   flex-shrink: 0;
   padding: 6px 20px 16px;

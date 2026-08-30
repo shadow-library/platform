@@ -170,13 +170,46 @@ export class ChatMessageResponse {
   createdAt: Date;
 }
 
+@Schema({ description: 'The turn running right now, so a client can name the phase and count the wait instead of showing a bare spinner.' })
+export class PendingTurnResponse {
+  @Field()
+  runId: string;
+
+  @Field({ description: 'Workflow graph driving the turn — `chat-turn`, `ideation-turn`, `ideation-concepts` or `ideation-stress`.' })
+  graph: string;
+
+  @Field(() => String, { format: 'date-time', description: 'When the turn started; elapsed time is measured from here so it survives a refresh.' })
+  startedAt: Date;
+}
+
+@Schema({ description: 'The turn that died on a transcript still ending in an unanswered user message, so a reload shows the failure instead of a silent thread.' })
+export class FailedTurnResponse {
+  @Field()
+  runId: string;
+
+  @Field()
+  graph: string;
+
+  @Field(() => String, { format: 'date-time' })
+  failedAt: Date;
+
+  @Field({ optional: true, nullable: true, description: 'Application error code, when the failure carried one.' })
+  code?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  message?: string | null;
+}
+
 @Schema()
 export class ListChatMessagesResponse {
   @Field(() => [ChatMessageResponse])
   messages: ChatMessageResponse[];
 
-  @Field({ description: 'Whether a chat turn is currently running for this session.' })
-  pendingTurn: boolean;
+  @Field(() => PendingTurnResponse, { optional: true, nullable: true, description: 'Present while a chat turn is running for this session; null otherwise.' })
+  pendingTurn?: PendingTurnResponse | null;
+
+  @Field(() => FailedTurnResponse, { optional: true, nullable: true, description: 'Present when the last turn failed and left the transcript unanswered.' })
+  failedTurn?: FailedTurnResponse | null;
 }
 
 @Schema()

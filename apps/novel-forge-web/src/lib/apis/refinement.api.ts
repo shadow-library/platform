@@ -6,11 +6,13 @@ import {
   type ChatSessionResponse,
   type ChatTurnResponse,
   type CreateChatSessionBody,
+  type FailedTurnResponse,
   type ListChangesResponse,
   type ListChatMessagesResponse,
   type ListChatSessionResponse,
   type ListProposalResponse,
   type ListProposalsQueryParams,
+  type PendingTurnResponse,
   type ProposalResponse,
   type RevertProposalResponse,
   type RollbackResponse,
@@ -87,14 +89,37 @@ export function useListChatSessionsQuery(projectId: string, params?: ListSession
   });
 }
 
+/**
+ * What the transcript is waiting on, derived once so both chat screens agree. `pending` carries the
+ * running turn's graph and start time, which is what lets the UI name a phase and count the wait
+ * instead of showing an unlabelled spinner.
+ */
+export type TurnState = { kind: 'idle' } | { kind: 'pending'; pending: PendingTurnResponse | null } | { kind: 'failed'; failed: FailedTurnResponse | null; retryContent: string };
+
+// A turn opens its workflow run within a beat of the user message landing, so a trailing unanswered
+// message younger than this is a turn still spinning up. Older than it, with no run either way, means
+// nothing is coming — the state that used to read as a hung chat with no way out but a reload.
+const TURN_SPINUP_GRACE_MS = 2 * 60 * 1000;
+
+export function turnState(data: ListChatMessagesResponse | undefined): TurnState {
+  if (data?.pendingTurn) return { kind: 'pending', pending: data.pendingTurn };
+
+  const last = data?.messages.at(-1);
+  if (!last || last.role !== 'user') return { kind: 'idle' };
+  if (data?.failedTurn) return { kind: 'failed', failed: data.failedTurn, retryContent: last.content };
+
+  const strandedFor = Date.now() - new Date(last.createdAt).getTime();
+  return strandedFor > TURN_SPINUP_GRACE_MS ? { kind: 'failed', failed: null, retryContent: last.content } : { kind: 'pending', pending: null };
+}
+
 export function useChatMessagesQuery(projectId: string, sessionId: string | undefined, enabled = true): UseQueryResult<ListChatMessagesResponse, ApiError> {
   return useQuery<ListChatMessagesResponse, ApiError>({
     queryKey: refinementKeys.messages(projectId, sessionId ?? ''),
     queryFn: () => APIRequest.get(`/projects/${projectId}/chat/sessions/${sessionId}/messages`).query({ limit: 200 }).execute(),
     enabled: enabled && Boolean(projectId) && Boolean(sessionId),
-    // Follow an in-flight turn to completion: the server sets pendingTurn while a chat-turn is still
-    // running, so a refresh or a second tab keeps polling until the reply lands, then stops.
-    refetchInterval: query => (query.state.data?.pendingTurn ? 1500 : false),
+    // Follow an in-flight turn to completion: the server reports the run while a chat-turn is still
+    // going, so a refresh or a second tab keeps polling until the reply lands, then stops.
+    refetchInterval: query => (turnState(query.state.data).kind === 'pending' ? 1500 : false),
   });
 }
 
@@ -124,7 +149,9 @@ export function useChatTurnMutation(projectId: string, sessionId: string): UseMu
         content,
         createdAt: new Date().toISOString(),
       };
-      queryClient.setQueryData<ListChatMessagesResponse>(messagesKey, old => ({ messages: [...(old?.messages ?? []), optimistic], pendingTurn: true }));
+      // No run to name yet — the fresh trailing user message is what `turnState` reads as pending, and
+      // clearing `failedTurn` retires the previous attempt's card the moment this one is sent.
+      queryClient.setQueryData<ListChatMessagesResponse>(messagesKey, old => ({ messages: [...(old?.messages ?? []), optimistic], pendingTurn: null, failedTurn: null }));
       return { previous };
     },
     onError: (_err, _content, context) => {
