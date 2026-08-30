@@ -15,6 +15,7 @@ COPY packages/fastify/package.json packages/fastify/package.json
 COPY packages/modules/package.json packages/modules/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY packages/web/package.json packages/web/package.json
+COPY packages/sdk/package.json packages/sdk/package.json
 COPY apps/identity-server/package.json apps/identity-server/package.json
 COPY apps/identity-web/package.json apps/identity-web/package.json
 COPY apps/novel-forge-server/package.json apps/novel-forge-server/package.json
@@ -33,6 +34,7 @@ COPY scripts/ scripts/
 COPY packages/common/ packages/common/
 COPY packages/ui/ packages/ui/
 COPY packages/web/ packages/web/
+COPY packages/sdk/ packages/sdk/
 RUN bun scripts/build.ts apps/pulse-web --deps
 COPY apps/pulse-web/ apps/pulse-web/
 RUN bun scripts/build.ts apps/pulse-web
