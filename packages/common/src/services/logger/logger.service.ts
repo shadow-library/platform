@@ -104,7 +104,7 @@ class LoggerStatic {
     let transport: Transport;
     const appName = Config.get('app.name');
     const metadataFormat = customFormat(info => Object.assign(info, this.getLogMetadata(), this.getLogContext()));
-    const baseFormats = [formats.errors({ stack: true }), metadataFormat()];
+    const baseFormats = [formats.errors({ stack: true }), formats.serialiseErrors(), metadataFormat()];
     if (format) baseFormats.push(format);
 
     switch (type) {
@@ -149,7 +149,7 @@ class LoggerStatic {
   addDefaultTransports(format?: Logform.Format): this {
     const env = Config.get('app.env');
     const metadataFormat = customFormat(info => Object.assign(info, this.getLogMetadata()));
-    const baseFormats = [formats.errors({ stack: true }), metadataFormat()];
+    const baseFormats = [formats.errors({ stack: true }), formats.serialiseErrors(), metadataFormat()];
     if (format) baseFormats.unshift(format);
 
     if (env === 'development') {
