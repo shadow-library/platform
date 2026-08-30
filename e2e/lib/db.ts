@@ -22,7 +22,7 @@ type DatabaseKey = 'identity' | 'memoir' | 'pulse' | 'webNovel' | 'novelForge';
  * and cached per database, so repeated `identityDb()` calls in one run share a single pool. `closeDbs()` (wired
  * into Playwright's global teardown) drains them so the process exits cleanly instead of hanging on open sockets.
  *
- * The dev cluster's Postgres is reachable from the host on `127.0.0.1:5432` (Traefik raw-TCP entrypoint) with the
+ * The dev cluster's Postgres is reachable from the host on `127.0.0.1:7070` (Traefik raw-TCP entrypoint) with the
  * deliberately well-known `postgres:postgres` superuser. Each connection string is overridable via `E2E_PG_URL_*`
  * to point at another environment; unlike the seed, a blank override is not meaningful here — a spec that calls
  * `identityDb()` needs a real connection, so an unset var falls back to the local default.
@@ -51,7 +51,7 @@ const clients = new Map<DatabaseKey, Sql>();
 /** Resolves `key`'s connection string — the env override when set to something non-blank, else the local cluster default. */
 function resolveUrl(key: DatabaseKey): string {
   const override = process.env[DATABASE_ENV_VARS[key]]?.trim();
-  return override ? override : `postgresql://postgres:postgres@127.0.0.1:5432/${DATABASE_NAMES[key]}`;
+  return override ? override : `postgresql://postgres:postgres@127.0.0.1:7070/${DATABASE_NAMES[key]}`;
 }
 
 /** Returns the cached client for `key`, opening one on first use. `max: 4` keeps the suite well under Postgres' connection ceiling. */

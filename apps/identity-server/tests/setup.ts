@@ -8,7 +8,7 @@ const REPO_ROOT = path.resolve(import.meta.dir, '../../..');
 
 /** A crashed run can leave counters and locks in the dedicated test Redis DB, so clear it before any suite starts. */
 async function flushTestRedisDb(): Promise<void> {
-  const url = process.env.DATABASE_REDIS_URL ?? 'redis://localhost:6379/15';
+  const url = process.env.DATABASE_REDIS_URL ?? 'redis://localhost:7080/15';
   const redis = new Redis(url, { lazyConnect: true, maxRetriesPerRequest: 1 });
   await redis.connect();
   await redis.flushdb();

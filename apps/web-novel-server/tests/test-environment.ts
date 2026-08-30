@@ -13,7 +13,7 @@ import { PrimaryDatabase } from '@server/modules/datastore';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 Logger.attachTransport('file:json');
-const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost:5432/shadow_webnovel';
+const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost:7070/shadow_webnovel';
 
 export const TEST_REGEX = {
   id: /^\d+$/,

@@ -73,7 +73,7 @@ function first<T>(rows: T[]): T {
  */
 function resolveUrl(key: DatabaseKey): string | null {
   const raw = process.env[DATABASE_ENV_VARS[key]];
-  if (raw === undefined) return `postgresql://postgres:postgres@127.0.0.1:5432/${DATABASE_NAMES[key]}`;
+  if (raw === undefined) return `postgresql://postgres:postgres@127.0.0.1:7070/${DATABASE_NAMES[key]}`;
   const trimmed = raw.trim();
   return trimmed ? trimmed : null;
 }

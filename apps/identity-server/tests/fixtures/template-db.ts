@@ -2,7 +2,7 @@ import { SQL } from 'bun';
 import { Logger } from '@shadow-library/common';
 
 const logger = Logger.getLogger('Tests', 'TemplateDBCloner');
-const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost:5432/shadow_identity';
+const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost:7070/shadow_identity';
 const baseUrl = baseConnectionString.replace(/\/[^/]*$/, '');
 const templateDbName = process.env.POSTGRES_TEMPLATE_DB_NAME ?? 'shadow_identity_template';
 

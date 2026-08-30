@@ -8,4 +8,4 @@ process.env.AUTH_WORKLOAD_JWKS_URI ??= 'http://127.0.0.1:45123/jwks';
 process.env.DATABASE_POSTGRES_MAX_CONNECTIONS ??= '1';
 
 /** Keep destructive test flushes isolated from the developer's default Redis database. */
-process.env.DATABASE_REDIS_URL ??= 'redis://localhost:6379/15';
+process.env.DATABASE_REDIS_URL ??= 'redis://localhost:7080/15';

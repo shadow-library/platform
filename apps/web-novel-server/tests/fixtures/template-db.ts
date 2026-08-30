@@ -7,7 +7,7 @@ import { Logger } from '@shadow-library/common';
  * `CREATE DATABASE ... TEMPLATE`, through `TestEnvironment`.
  */
 const logger = Logger.getLogger('Tests', 'TemplateDBCloner');
-const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost:5432/shadow_webnovel';
+const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost:7070/shadow_webnovel';
 const baseUrl = baseConnectionString.replace(/\/[^/]*$/, '');
 const templateDbName = process.env.POSTGRES_TEMPLATE_DB_NAME ?? 'shadow_webnovel_template';
 

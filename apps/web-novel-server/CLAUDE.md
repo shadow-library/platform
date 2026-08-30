@@ -75,7 +75,7 @@ the ecosystem already provides, and do not begin work before the skill is loaded
 
 This workspace's own scripts run from **inside** `web-novel-server/`; `build`/`verify` are root tooling and
 always run from the **repo root** by path. Prerequisites: **Bun ≥ 1.3** and **PostgreSQL** (dev DSN
-`postgresql://postgres:postgres@localhost:5432/shadow_webnovel`, see `.env`).
+`postgresql://postgres:postgres@localhost:7070/shadow_webnovel`, see `.env`).
 
 | Purpose                | Command                                                   | Notes                                                                                                      |
 | ---------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
