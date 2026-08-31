@@ -28,6 +28,63 @@ interface PendingCall {
   promptTokensEstimate: number;
 }
 
+export interface TokenUsage {
+  inputTokens: number;
+  cachedInputTokens: number | null;
+  outputTokens: number;
+}
+
+type UsageBag = Record<string, unknown> | undefined;
+
+const INPUT_KEYS = ['input_tokens', 'prompt_tokens', 'promptTokens', 'prompt_eval_count'];
+const OUTPUT_KEYS = ['output_tokens', 'completion_tokens', 'completionTokens', 'eval_count'];
+const CACHE_READ_KEYS = ['cache_read', 'cached_tokens', 'cache_read_input_tokens'];
+const CACHE_CREATION_KEYS = ['cache_creation', 'cache_creation_input_tokens', 'cache_creation_tokens'];
+
+// `minimum` is what separates a reported count from a missing one: @langchain/ollama seeds
+// `usage_metadata` with zeros and @langchain/core's `mergeUsageMetadata` zero-fills every field it
+// merges across stream chunks, while @langchain/openai only assigns `usage_metadata.input_tokens`
+// when the provider sent a truthy `prompt_tokens`. So a 0 prompt/completion count means "not
+// reported" and must keep falling through — while a 0 cache read genuinely means "no cache hit".
+function readTokens(sources: UsageBag[], keys: string[], minimum = 1): number | undefined {
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = source?.[key];
+      if (typeof value === 'number' && Number.isFinite(value) && value >= minimum) return value;
+    }
+  }
+  return undefined;
+}
+
+export function extractTokenUsage(output: LLMResult, promptTokensEstimate: number, rawOutput: string): TokenUsage {
+  const llmOutput = output.llmOutput as Record<string, UsageBag> | undefined;
+  const generation = output.generations?.[0]?.[0] as
+    { message?: { usage_metadata?: Record<string, unknown> & { input_token_details?: UsageBag } }; generationInfo?: UsageBag } | undefined;
+  const usageMetadata = generation?.message?.usage_metadata;
+  // Counts live in a different place per provider and in a different spelling per transport: cloud SDKs
+  // put them on `llmOutput.usage`, LangChain normalises them onto the message's `usage_metadata`,
+  // @langchain/openai reports camelCase `tokenUsage` (or `estimatedTokenUsage` when streaming), and
+  // Ollama reports raw `*_eval_count` on the generation info.
+  const sources: UsageBag[] = [llmOutput?.['usage'], usageMetadata, llmOutput?.['tokenUsage'], generation?.generationInfo, llmOutput?.['estimatedTokenUsage']];
+  const cacheSources: UsageBag[] = [usageMetadata?.input_token_details, llmOutput?.['usage']?.['prompt_tokens_details'] as UsageBag, ...sources];
+
+  const cacheRead = readTokens(cacheSources, CACHE_READ_KEYS, 0);
+  const cachedPrefix = (cacheRead ?? 0) + (readTokens(cacheSources, CACHE_CREATION_KEYS, 0) ?? 0);
+  const reportedInput = readTokens(sources, INPUT_KEYS);
+  // Anthropic bills the cached prefix separately, so `prompt_tokens` arriving from an Anthropic-backed
+  // OpenAI-compatible endpoint is the uncached tail alone — a fully cached prompt lands as 2 — whereas
+  // OpenAI reports it inclusive of its cached subset. Fold the prefix back in only when it plainly sits
+  // outside the reported count, then floor on the measured prompt so a provider that reports no cache
+  // accounting at all still cannot record a thousand-token prompt as two tokens.
+  const providerInput = reportedInput === undefined ? cachedPrefix : reportedInput < cachedPrefix ? reportedInput + cachedPrefix : reportedInput;
+
+  return {
+    inputTokens: Math.max(providerInput, promptTokensEstimate),
+    cachedInputTokens: cacheRead ?? null,
+    outputTokens: readTokens(sources, OUTPUT_KEYS) ?? countTokens(rawOutput),
+  };
+}
+
 @Injectable()
 export class TelemetryHandler extends BaseCallbackHandler {
   name = 'novel-forge-telemetry';
@@ -97,27 +154,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
     const latencyMs = Date.now() - call.startedAt;
     const generation = output.generations?.[0]?.[0];
     const rawOutput = generation ? (typeof generation.text === 'string' ? generation.text : JSON.stringify(generation)) : '';
-    const usage = output.llmOutput?.usage ?? output.llmOutput?.tokenUsage ?? null;
-    // Token counts live in different places by provider: cloud SDKs put them on `llmOutput.usage`;
-    // LangChain normalises them onto the message's `usage_metadata`; Ollama reports raw `*_eval_count`
-    // on the generation info. Fall through all three so local runs report real token usage too.
-    const meta = generation as
-      | {
-          message?: { usage_metadata?: { input_tokens?: number; output_tokens?: number; input_token_details?: { cache_read?: number } } };
-          generationInfo?: { prompt_eval_count?: number; eval_count?: number };
-        }
-      | undefined;
-    // When no layer reports usage, fall back to tokenizer estimates so the run detail and usage
-    // dashboards never show blank counts.
-    const inputTokens: number =
-      usage?.input_tokens ?? usage?.prompt_tokens ?? meta?.message?.usage_metadata?.input_tokens ?? meta?.generationInfo?.prompt_eval_count ?? call.promptTokensEstimate;
-    const outputTokens: number =
-      usage?.output_tokens ?? usage?.completion_tokens ?? meta?.message?.usage_metadata?.output_tokens ?? meta?.generationInfo?.eval_count ?? countTokens(rawOutput);
-    // OpenRouter reports cache reads as `usage.prompt_tokens_details.cached_tokens`, which
-    // @langchain/openai normalises onto `usage_metadata.input_token_details.cache_read`. This is the
-    // only signal that the injected Anthropic cache_control breakpoints are actually being hit.
-    const cachedInputTokens: number | null =
-      meta?.message?.usage_metadata?.input_token_details?.cache_read ?? usage?.prompt_tokens_details?.cached_tokens ?? usage?.cached_tokens ?? null;
+    const { inputTokens, cachedInputTokens, outputTokens } = extractTokenUsage(output, call.promptTokensEstimate, rawOutput);
 
     this.logger.debug('LLM call completed', { runId, role: call.ctx.role, model: call.model, latencyMs, inputTokens, cachedInputTokens, outputTokens, attempt: call.attempt });
 
@@ -132,9 +169,9 @@ export class TelemetryHandler extends BaseCallbackHandler {
         promptKey: call.ctx.promptKey,
         promptVersion: call.ctx.promptVersion,
         status: 'ok',
-        inputTokens: inputTokens ?? null,
+        inputTokens,
         cachedInputTokens,
-        outputTokens: outputTokens ?? null,
+        outputTokens,
         latencyMs,
         attempt: call.attempt,
         rawOutput,
