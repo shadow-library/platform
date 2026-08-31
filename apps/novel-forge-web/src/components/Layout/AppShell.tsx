@@ -4,7 +4,7 @@ import { type CommandItem, CommandPalette, IconButton, Kbd, toast, Tooltip, useT
 import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
 
-import { useListProjectsQuery, useListProposalsQuery, useLogoutMutation, useMeQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery } from '@/lib/apis';
+import { useListProjectsQuery, useListProposalsQuery, useLogoutMutation, useMeQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery, useSeedQuery } from '@/lib/apis';
 import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle } from '@/lib/format';
 
 import { BookIcon, GridIcon, MoonIcon, SearchIcon, SparkIcon, SunIcon } from '../icons';
@@ -28,8 +28,10 @@ function ThemeToggle(): React.JSX.Element {
 export default function AppShell({ children }: PropsWithChildren): React.JSX.Element {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { novelId } = useParams({ strict: false }) as NovelParams;
+  const { novelId, seedId } = useParams({ strict: false }) as NovelParams;
   const inProject = Boolean(novelId);
+  const inIdeas = pathname === '/ideas' || pathname.startsWith('/ideas/');
+  const onIdeaStudio = inIdeas && Boolean(seedId);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   const meQuery = useMeQuery();
@@ -42,6 +44,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   const statusQuery = useProjectStatusQuery(novelId ?? '', inProject);
   const reviewQuery = useReviewQueueQuery(novelId ?? '', inProject);
   const proposalsQuery = useListProposalsQuery(novelId ?? '', { status: 'pending', limit: PROJECT_LIMIT }, inProject);
+  const seedQuery = useSeedQuery(seedId ?? '', onIdeaStudio);
 
   const project = projectQuery.data;
   const status = statusQuery.data;
@@ -144,8 +147,8 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   };
 
   const leafSegment = pathname.split('/').filter(Boolean).pop();
-  const crumbLeaf = inProject && leafSegment != null ? SCREEN_LABEL.get(leafSegment) : undefined;
-  const crumbRoot = inProject && project ? projectTitle(project) : 'Projects';
+  const crumbLeaf = inProject && leafSegment != null ? SCREEN_LABEL.get(leafSegment) : onIdeaStudio ? (seedQuery.data?.fields.workingTitle?.trim() ?? 'Idea') : undefined;
+  const crumbRoot = inProject && project ? projectTitle(project) : inIdeas ? 'Ideas' : 'Projects';
 
   return (
     <Chrome
