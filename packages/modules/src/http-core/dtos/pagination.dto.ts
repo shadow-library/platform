@@ -56,12 +56,21 @@ export function Paginated<T>(Item: Class<T>): Class<IPagination<T>> {
   return Pagination;
 }
 
-export function PaginationQuery<T extends string>(SortBy: EnumType<T>, defaults: Partial<IPaginationQuery<T>> = {}): Class<IPaginationQuery<T>> {
+export interface PaginationQueryOptions {
+  /** Highest `limit` the endpoint accepts; raise it for genuine load-all list views. Defaults to 100. */
+  maximumLimit?: number;
+}
+
+export function PaginationQuery<T extends string>(
+  SortBy: EnumType<T>,
+  defaults: Partial<IPaginationQuery<T>> = {},
+  options: PaginationQueryOptions = {},
+): Class<IPaginationQuery<T>> {
   assert(SortBy.values.length > 0, 'sortBy must have at least one value');
 
   @Schema()
   class PaginationQuery implements IPaginationQuery<T> {
-    @Field({ default: defaults.limit ?? 20, minimum: 1, maximum: 100 })
+    @Field({ default: defaults.limit ?? 20, minimum: 1, maximum: options.maximumLimit ?? 100 })
     limit: number;
 
     @Field({ default: defaults.offset ?? 0, minimum: 0 })

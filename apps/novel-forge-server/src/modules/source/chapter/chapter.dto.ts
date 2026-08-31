@@ -24,7 +24,7 @@ export class ChapterParams {
 }
 
 @Schema()
-export class ListChaptersQuery extends PaginationQuery(SortByTime) {
+export class ListChaptersQuery extends PaginationQuery(SortByTime, {}, { maximumLimit: 500 }) {
   @Field(() => ChapterStatus, { optional: true })
   status?: Chapter.Status;
 }

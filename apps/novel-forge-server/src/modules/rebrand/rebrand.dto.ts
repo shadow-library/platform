@@ -64,7 +64,7 @@ export class GlossaryListQuery {
   @Field(() => Integer, { optional: true, minimum: 1 })
   page?: number;
 
-  @Field(() => Integer, { optional: true, minimum: 1 })
+  @Field(() => Integer, { optional: true, minimum: 1, maximum: 500 })
   limit?: number;
 }
 
