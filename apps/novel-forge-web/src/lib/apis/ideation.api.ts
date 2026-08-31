@@ -23,6 +23,14 @@ const seedKeys = {
   sheet: (projectId: string) => ['projects', projectId, 'seed'] as const,
 };
 
+/**
+ * Project ids that have graduated or been deleted this session. `removeQueries` alone isn't enough: a
+ * component still mounted on the seed key (the studio route, the app shell's banner crumb) rebuilds and
+ * refetches it on its very next render, re-hitting the endpoint the project no longer answers as a seed.
+ * This gate keeps that refetch from firing regardless of which observer triggers the render.
+ */
+const closedSeedIds = new Set<string>();
+
 export const listSeedsQueryOptions = (params?: ListSeedsQueryParams): UseQueryOptions<ListSeedsResponse, ApiError> =>
   queryOptions<ListSeedsResponse, ApiError>({
     queryKey: seedKeys.list(params),
@@ -43,7 +51,7 @@ export function useListSeedsQuery(params?: ListSeedsQueryParams): UseQueryResult
 }
 
 export function useSeedQuery(projectId: string, enabled = true): UseQueryResult<SeedResponse, ApiError> {
-  return useQuery({ ...seedQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
+  return useQuery({ ...seedQueryOptions(projectId), enabled: enabled && Boolean(projectId) && !closedSeedIds.has(projectId) });
 }
 
 export function useCreateSeedMutation(): UseMutationResult<SeedResponse, ApiError, CreateSeedBody> {
@@ -74,6 +82,7 @@ export function useGraduateSeedMutation(projectId: string): UseMutationResult<Gr
   return useMutation<GraduationResponse, ApiError, GraduateSeedBody>({
     mutationFn: body => APIRequest.post(`/projects/${projectId}/seed/graduate`).body(body).execute(),
     onSuccess: () => {
+      closedSeedIds.add(projectId);
       queryClient.removeQueries({ queryKey: seedKeys.sheet(projectId) });
       queryClient.invalidateQueries({ queryKey: seedKeys.all });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -86,6 +95,7 @@ export function useDeleteSeedMutation(): UseMutationResult<undefined, ApiError, 
   return useMutation<undefined, ApiError, string>({
     mutationFn: projectId => APIRequest.delete(`/projects/${projectId}`).execute(),
     onSuccess: (_result, projectId) => {
+      closedSeedIds.add(projectId);
       queryClient.removeQueries({ queryKey: seedKeys.sheet(projectId) });
       queryClient.invalidateQueries({ queryKey: seedKeys.all });
     },
