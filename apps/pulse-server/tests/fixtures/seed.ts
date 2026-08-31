@@ -52,10 +52,12 @@ async function bootstrapDemoMessages(db: Database): Promise<void> {
 }
 
 /**
- * Idempotently bootstraps the datastore for dev and the CI template DB: the production baseline (layouts, partials, the
- * template catalogue) via the shared `seedBaseline`, plus the test-only operator config (sender profiles / endpoints /
- * routing rules) and demo messages that only the test and dev surfaces need. Safe to run repeatedly — every step
- * creates only what is absent, so nothing an operator has authored is overwritten.
+ * Idempotently bootstraps the datastore for dev and the CI template DB: the production baseline (layouts, partials,
+ * the template catalogue, and — via `seedBaseline`'s own empty-table gate — a catch-all `default` sender profile at
+ * ids `1`) via the shared `seedBaseline`, plus the test-only operator config (sender profiles / endpoints / routing
+ * rules, explicitly numbered from `2` so they never contend with that reserved baseline row) and demo messages that
+ * only the test and dev surfaces need. Safe to run repeatedly — every step creates only what is absent, so nothing
+ * an operator has authored is overwritten.
  */
 export async function seed(db?: Database): Promise<void> {
   if (!db) {

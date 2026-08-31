@@ -121,7 +121,7 @@ describe('Sender Profile', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        total: 6,
+        total: 7,
         limit: 20,
         offset: 0,
         items: expect.arrayContaining([
@@ -146,7 +146,7 @@ describe('Sender Profile', () => {
         offset: 0,
         items: [
           {
-            id: '1',
+            id: '2',
             key: 'marketing-default',
             displayName: 'Marketing Default',
             isActive: true,
@@ -194,7 +194,7 @@ describe('Sender Profile', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        total: 6,
+        total: 7,
         limit: 2,
         offset: 0,
       });
@@ -206,7 +206,7 @@ describe('Sender Profile', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        total: 6,
+        total: 7,
         limit: 2,
         offset: 2,
       });
@@ -216,11 +216,11 @@ describe('Sender Profile', () => {
 
   describe('GET /v1/sender-profiles/:profileId', () => {
     it('should get a sender profile by ID', async () => {
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/2');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
-        id: '1',
+        id: '2',
         key: 'marketing-default',
         displayName: 'Marketing Default',
         isActive: true,
@@ -230,11 +230,11 @@ describe('Sender Profile', () => {
     });
 
     it('should get sender profile without displayName', async () => {
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/4');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/5');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
-        id: '4',
+        id: '5',
         key: 'otp-shortcodes',
         isActive: false,
         createdAt: expect.stringMatching(TEST_REGEX.dateISO),
@@ -263,11 +263,11 @@ describe('Sender Profile', () => {
         isActive: false,
       };
 
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/2').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
-        id: '1',
+        id: '2',
         key: 'marketing-default',
         displayName: updateBody.displayName,
         isActive: updateBody.isActive,
@@ -279,11 +279,11 @@ describe('Sender Profile', () => {
     it('should partially update only displayName', async () => {
       const updateBody = { displayName: 'New Display Name' };
 
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/2').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/3').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        id: '2',
+        id: '3',
         key: 'transactional-core',
         displayName: updateBody.displayName,
         isActive: true,
@@ -293,11 +293,11 @@ describe('Sender Profile', () => {
     it('should partially update only isActive', async () => {
       const updateBody = { isActive: false };
 
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/3').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/4').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        id: '3',
+        id: '4',
         isActive: false,
       });
     });
@@ -328,11 +328,11 @@ describe('Sender Profile', () => {
     it('should ignore key field in update body', async () => {
       const updateBody = { key: 'new-key', displayName: 'Updated With Key' };
 
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/5').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/6').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        id: '5',
+        id: '6',
         key: 'system-service',
         displayName: 'Updated With Key',
       });
@@ -344,16 +344,16 @@ describe('Sender Profile', () => {
       const db = testEnv.getPostgresClient();
       await db.delete(db._.fullSchema.senderRoutingRules);
 
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete(`/api/v1/sender-profiles/1`);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete(`/api/v1/sender-profiles/2`);
 
       expect(response.statusCode).toBe(204);
 
-      const getResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get(`/api/v1/sender-profiles/1`);
+      const getResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get(`/api/v1/sender-profiles/2`);
       expect(getResponse.statusCode).toBe(404);
     });
 
     it('should fail when deleting profile with active routing rules', async () => {
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-profiles/2');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-profiles/3');
 
       expect(response.statusCode).toBe(409);
       expect(response.json()).toMatchObject({ code: 'SND_PRF_003' });

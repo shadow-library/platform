@@ -4,10 +4,11 @@ import * as schema from '@server/database/schemas';
 
 type SenderEndpointInsertModel = InferInsertModel<typeof schema.senderEndpoints>;
 
+/** Ids start at `4` — `1`-`3` belong to the baseline `default` profile's endpoints `seedBaseline` creates. */
 export const senderEndpoints: SenderEndpointInsertModel[] = [
   {
-    id: 1n,
-    senderProfileId: 1n,
+    id: 4n,
+    senderProfileId: 2n,
     channel: 'EMAIL',
     provider: 'SENDGRID',
     identifier: 'marketing@shadow.test',
@@ -15,8 +16,8 @@ export const senderEndpoints: SenderEndpointInsertModel[] = [
     isActive: true,
   },
   {
-    id: 2n,
-    senderProfileId: 1n,
+    id: 5n,
+    senderProfileId: 2n,
     channel: 'EMAIL',
     provider: 'AWS_SES',
     identifier: 'marketing-ses@shadow.test',
@@ -24,8 +25,8 @@ export const senderEndpoints: SenderEndpointInsertModel[] = [
     isActive: true,
   },
   {
-    id: 3n,
-    senderProfileId: 1n,
+    id: 6n,
+    senderProfileId: 2n,
     channel: 'SMS',
     provider: 'TWILIO',
     identifier: '+15551230010',
@@ -33,8 +34,8 @@ export const senderEndpoints: SenderEndpointInsertModel[] = [
     isActive: true,
   },
   {
-    id: 4n,
-    senderProfileId: 1n,
+    id: 7n,
+    senderProfileId: 2n,
     channel: 'PUSH',
     provider: 'FIREBASE',
     identifier: 'firebase-marketing-app',
@@ -42,8 +43,8 @@ export const senderEndpoints: SenderEndpointInsertModel[] = [
     isActive: false,
   },
   {
-    id: 5n,
-    senderProfileId: 2n,
+    id: 8n,
+    senderProfileId: 3n,
     channel: 'EMAIL',
     provider: 'AWS_SES',
     identifier: 'noreply@shadow.test',
@@ -51,8 +52,8 @@ export const senderEndpoints: SenderEndpointInsertModel[] = [
     isActive: true,
   },
   {
-    id: 6n,
-    senderProfileId: 3n,
+    id: 9n,
+    senderProfileId: 4n,
     channel: 'SMS',
     provider: 'TWILIO',
     identifier: '+15551230001',
@@ -60,8 +61,8 @@ export const senderEndpoints: SenderEndpointInsertModel[] = [
     isActive: true,
   },
   {
-    id: 7n,
-    senderProfileId: 4n,
+    id: 10n,
+    senderProfileId: 5n,
     channel: 'SMS',
     provider: 'TWILIO',
     identifier: '+15551230002',
@@ -69,8 +70,8 @@ export const senderEndpoints: SenderEndpointInsertModel[] = [
     isActive: true,
   },
   {
-    id: 8n,
-    senderProfileId: 5n,
+    id: 11n,
+    senderProfileId: 6n,
     channel: 'PUSH',
     provider: 'FIREBASE',
     identifier: 'firebase-app-main',
@@ -78,15 +79,15 @@ export const senderEndpoints: SenderEndpointInsertModel[] = [
     isActive: true,
   },
   {
-    id: 9n,
-    senderProfileId: 6n,
+    id: 12n,
+    senderProfileId: 7n,
     channel: 'EMAIL',
     provider: 'DEV',
     identifier: 'Shadow Dev Apps <no-reply@dev.shadow-apps.com>',
   },
   {
-    id: 10n,
-    senderProfileId: 6n,
+    id: 13n,
+    senderProfileId: 7n,
     channel: 'SMS',
     provider: 'DEV',
     identifier: '+919999999999',

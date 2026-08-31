@@ -1,11 +1,13 @@
+import assert from 'node:assert';
+
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
-import { Logger } from '@shadow-library/common';
+import { Config, Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
-import { BASELINE_LAYOUTS, BASELINE_PARTIALS, BASELINE_TEMPLATES } from './baseline.data';
+import { BASELINE_LAYOUTS, BASELINE_PARTIALS, BASELINE_SENDER_PROFILE, BASELINE_TEMPLATES } from './baseline.data';
 
 const logger = Logger.getLogger(APP_NAME, 'BaselineSeed');
 const SEQUENCE_RESET = `
@@ -107,17 +109,59 @@ async function bootstrapTemplates(db: PrimaryDatabase): Promise<void> {
   }
 }
 
+/**
+ * Bootstraps the catch-all sender profile, its per-channel `DEV` endpoints, and a global fallback routing rule
+ * (`service`/`region`/`messageType` all `NULL`) so `resolveSenderRoutingRule` always has a lowest-priority match to
+ * fall back to — without one, every notification job hits `SND_RTR_001` and is marked `PERMANENTLY_FAILED` on a
+ * fresh deployment. Gated on the sender-profile table being completely empty rather than per-row `onConflictDoNothing`
+ * (as the other bootstrap* steps use): `sender_routing_rules`' unique constraint doesn't dedupe all-`NULL` rows
+ * (Postgres treats `NULL` as distinct from `NULL`), so there's no constraint to upsert against, and a from-scratch
+ * table is the only signal this step can use for "nobody has configured sending yet". Once any sender profile
+ * exists — operator-created or seeded by something else — this step steps back permanently and touches nothing.
+ *
+ * Also gated on `!Config.isProductionDeployment()`: the `DEV` provider only writes to `notification_messages`
+ * and never actually sends, so on a real deployment this catch-all would turn every unrouted OTP or security
+ * alert into a silent `SENT` — worse than the loud `SND_RTR_001`/`PERMANENTLY_FAILED` it's meant to replace,
+ * because that failure is at least alertable. A fresh prod deployment must still have an operator wire up a
+ * real sender profile before anything can send; dev, staging, and the CI template DB (which set `APP_STAGE=dev`)
+ * keep getting the baseline row so the fixtures that assume it exist stay valid.
+ */
+async function bootstrapSenderConfiguration(db: PrimaryDatabase): Promise<void> {
+  if (Config.isProductionDeployment()) return;
+
+  const existingProfileCount = await db.$count(schema.senderProfiles);
+  if (existingProfileCount > 0) return;
+
+  const [profile] = await db.insert(schema.senderProfiles).values({ key: BASELINE_SENDER_PROFILE.key, displayName: BASELINE_SENDER_PROFILE.displayName }).returning();
+  assert(profile, 'Failed to create baseline sender profile');
+
+  await db.insert(schema.senderEndpoints).values(
+    BASELINE_SENDER_PROFILE.endpoints.map(endpoint => ({
+      senderProfileId: profile.id,
+      channel: endpoint.channel,
+      provider: endpoint.provider,
+      identifier: endpoint.identifier,
+    })),
+  );
+
+  await db.insert(schema.senderRoutingRules).values({ senderProfileId: profile.id, service: null, region: null, messageType: null });
+}
+
 /** Re-syncs every serial sequence to its column's current max, so explicit-id inserts elsewhere never leave a sequence behind. */
 export async function resetSequences(db: PrimaryDatabase): Promise<void> {
   await db.execute(SEQUENCE_RESET);
 }
 
 /**
- * Idempotently bootstraps the datastore to its overwritable baseline — the branded layouts, reusable partials, and the
- * template catalogue (including the identity `auth.*`/`security.*`/`user.*` keys). Safe to run repeatedly (dev, CI
- * template DB, and production): every step creates only what is absent, so nothing an operator has authored is
- * overwritten. This is the production baseline the migration step ensures; it deliberately seeds no sender profiles,
- * endpoints, or routing rules — those are operator-configured — and no demo messages.
+ * Idempotently bootstraps the datastore to its overwritable baseline — the branded layouts, reusable partials, and
+ * the template catalogue (including the identity `auth.*`/`security.*`/`user.*` keys) run unconditionally on every
+ * environment. The catch-all `DEV` sender profile and its global fallback routing rule are dev/staging/CI-only
+ * (`!Config.isProductionDeployment()`): they let a fresh dev or CI deployment deliver every baseline template out
+ * of the box, but a fresh *production* deployment gets none of it — an operator must configure a real sender
+ * profile before anything can send, so a misrouted OTP or security alert fails loudly instead of being silently
+ * swallowed by the `DEV` provider. Safe to run repeatedly: every step creates only what is absent, so nothing an
+ * operator has authored — including a real, more specific routing rule or provider — is overwritten. It seeds no
+ * demo messages.
  */
 export async function seedBaseline(db?: PrimaryDatabase): Promise<void> {
   if (!db) {
@@ -129,6 +173,7 @@ export async function seedBaseline(db?: PrimaryDatabase): Promise<void> {
   await bootstrapLayouts(db);
   await bootstrapPartials(db);
   await bootstrapTemplates(db);
+  await bootstrapSenderConfiguration(db);
   await resetSequences(db);
   logger.info('Baseline seeding completed successfully');
 }

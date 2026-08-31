@@ -10,7 +10,7 @@ describe('Sender Routing Rule', () => {
   describe('POST /v1/sender-routing-rules', () => {
     it('should create a routing rule with all fields', async () => {
       const body = {
-        senderProfileId: '1',
+        senderProfileId: '2',
         service: 'new-service',
         region: 'AP',
         messageType: 'TRANSACTIONAL',
@@ -36,7 +36,7 @@ describe('Sender Routing Rule', () => {
         .mockRequest()
         .headers(testEnv.authHeaders())
         .post('/api/v1/sender-routing-rules')
-        .body({ senderProfileId: '1', service: 'addressable' });
+        .body({ senderProfileId: '2', service: 'addressable' });
 
       expect(create.statusCode).toBe(201);
       const { id } = create.json();
@@ -51,7 +51,7 @@ describe('Sender Routing Rule', () => {
       const db = testEnv.getPostgresClient();
       await db.delete(db._.fullSchema.senderRoutingRules);
 
-      const body = { senderProfileId: '1' };
+      const body = { senderProfileId: '2' };
 
       const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-routing-rules').body(body);
 
@@ -66,7 +66,7 @@ describe('Sender Routing Rule', () => {
 
     it('should create a routing rule with service only', async () => {
       const body = {
-        senderProfileId: '2',
+        senderProfileId: '3',
         service: 'billing',
       };
 
@@ -81,7 +81,7 @@ describe('Sender Routing Rule', () => {
 
     it('should create a routing rule with service and region', async () => {
       const body = {
-        senderProfileId: '3',
+        senderProfileId: '4',
         service: 'payments',
         region: 'EU',
       };
@@ -98,7 +98,7 @@ describe('Sender Routing Rule', () => {
 
     it('should create a routing rule with service and messageType', async () => {
       const body = {
-        senderProfileId: '1',
+        senderProfileId: '2',
         service: 'notifications',
         messageType: 'OTP',
       };
@@ -129,7 +129,7 @@ describe('Sender Routing Rule', () => {
 
     it('should return 409 conflict when sender profile is inactive', async () => {
       const body = {
-        senderProfileId: '4',
+        senderProfileId: '5',
         service: 'otp-test',
         region: 'US',
         messageType: 'OTP',
@@ -143,7 +143,7 @@ describe('Sender Routing Rule', () => {
 
     it('should return 409 conflict when routing rule with same service, region, and messageType already exists', async () => {
       const body = {
-        senderProfileId: '1',
+        senderProfileId: '2',
         service: 'auth',
         region: 'US',
         messageType: 'TRANSACTIONAL',
@@ -157,7 +157,7 @@ describe('Sender Routing Rule', () => {
 
     it('should return 409 conflict when routing rule with same service exists (both region and messageType null)', async () => {
       const duplicateResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-routing-rules').body({
-        senderProfileId: '2',
+        senderProfileId: '3',
         service: 'marketing',
       });
 
@@ -196,7 +196,7 @@ describe('Sender Routing Rule', () => {
 
     it('should return 422 for invalid messageType value', async () => {
       const body = {
-        senderProfileId: '1',
+        senderProfileId: '2',
         service: 'test-service',
         messageType: 'INVALID_TYPE',
       };
@@ -213,7 +213,7 @@ describe('Sender Routing Rule', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        total: 6,
+        total: 7,
         limit: 20,
         offset: 0,
         items: expect.arrayContaining([
@@ -284,7 +284,7 @@ describe('Sender Routing Rule', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        total: 6,
+        total: 7,
         limit: 2,
         offset: 0,
       });
@@ -296,7 +296,7 @@ describe('Sender Routing Rule', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        total: 6,
+        total: 7,
         limit: 2,
         offset: 2,
       });
@@ -326,19 +326,19 @@ describe('Sender Routing Rule', () => {
 
   describe('GET /v1/sender-routing-rules/:routingRuleId', () => {
     it('should get a sender routing rule with profile details', async () => {
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-routing-rules/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-routing-rules/2');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
-        id: '1',
-        senderProfileId: '2',
+        id: '2',
+        senderProfileId: '3',
         service: 'auth',
         region: 'US',
         messageType: 'TRANSACTIONAL',
         createdAt: expect.stringMatching(TEST_REGEX.dateISO),
         updatedAt: expect.stringMatching(TEST_REGEX.dateISO),
         profile: {
-          id: '2',
+          id: '3',
           key: 'transactional-core',
           displayName: 'Transactional Core',
           isActive: true,
@@ -349,12 +349,12 @@ describe('Sender Routing Rule', () => {
     });
 
     it('should get routing rule with null optional fields', async () => {
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-routing-rules/6');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-routing-rules/7');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        senderProfileId: '6',
-        profile: expect.objectContaining({ id: '6' }),
+        senderProfileId: '7',
+        profile: expect.objectContaining({ id: '7' }),
       });
       expect(response.json().service).toBeUndefined();
       expect(response.json().region).toBeUndefined();
@@ -377,13 +377,13 @@ describe('Sender Routing Rule', () => {
 
   describe('PATCH /v1/sender-routing-rules/:routingRuleId', () => {
     it('should update a routing rule sender profile', async () => {
-      const body = { senderProfileId: '3' };
+      const body = { senderProfileId: '4' };
 
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-routing-rules/1').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-routing-rules/2').body(body);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        senderProfileId: '3',
+        senderProfileId: '4',
         service: 'auth',
         region: 'US',
         messageType: 'TRANSACTIONAL',
@@ -391,7 +391,7 @@ describe('Sender Routing Rule', () => {
     });
 
     it('should return 404 when routing rule does not exist', async () => {
-      const body = { senderProfileId: '1' };
+      const body = { senderProfileId: '2' };
 
       const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-routing-rules/99999').body(body);
 
@@ -402,29 +402,29 @@ describe('Sender Routing Rule', () => {
     it('should return 404 when target sender profile does not exist', async () => {
       const body = { senderProfileId: '99999' };
 
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-routing-rules/1').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-routing-rules/2').body(body);
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'SND_PRF_001' });
     });
 
     it('should return 409 conflict when target sender profile is inactive', async () => {
-      const body = { senderProfileId: '4' };
+      const body = { senderProfileId: '5' };
 
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-routing-rules/1').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-routing-rules/2').body(body);
 
       expect(response.statusCode).toBe(409);
       expect(response.json()).toMatchObject({ code: 'SND_RTR_003' });
     });
 
     it('should return 422 when senderProfileId is missing', async () => {
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-routing-rules/1').body({});
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-routing-rules/2').body({});
 
       expect(response.statusCode).toBe(422);
     });
 
     it('should return 422 for invalid routing rule ID format', async () => {
-      const body = { senderProfileId: '1' };
+      const body = { senderProfileId: '2' };
 
       const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-routing-rules/invalid-id').body(body);
 
@@ -434,7 +434,7 @@ describe('Sender Routing Rule', () => {
     it('should return 422 for invalid senderProfileId format', async () => {
       const body = { senderProfileId: 'invalid-id' };
 
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-routing-rules/1').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-routing-rules/2').body(body);
 
       expect(response.statusCode).toBe(422);
     });
@@ -442,22 +442,22 @@ describe('Sender Routing Rule', () => {
 
   describe('DELETE /v1/sender-routing-rules/:routingRuleId', () => {
     it('should delete a sender routing rule', async () => {
-      const deleteResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-routing-rules/1');
+      const deleteResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-routing-rules/2');
 
       expect(deleteResponse.statusCode).toBe(204);
 
-      const getResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-routing-rules/1');
+      const getResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-routing-rules/2');
       expect(getResponse.statusCode).toBe(404);
     });
 
     it('should delete a routing rule with only service set', async () => {
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-routing-rules/2');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-routing-rules/3');
 
       expect(response.statusCode).toBe(204);
     });
 
     it('should return 409 conflict when trying to delete default routing rule', async () => {
-      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-routing-rules/6');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-routing-rules/7');
 
       expect(response.statusCode).toBe(409);
       expect(response.json()).toMatchObject({ code: 'SND_RTR_004' });
@@ -477,11 +477,11 @@ describe('Sender Routing Rule', () => {
     });
 
     it('should allow re-creation of deleted routing rule combination', async () => {
-      const deleteResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-routing-rules/1');
+      const deleteResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-routing-rules/2');
       expect(deleteResponse.statusCode).toBe(204);
 
       const body = {
-        senderProfileId: '1',
+        senderProfileId: '2',
         service: 'auth',
         region: 'US',
         messageType: 'TRANSACTIONAL',

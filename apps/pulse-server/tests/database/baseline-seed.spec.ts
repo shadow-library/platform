@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { and, eq, inArray } from 'drizzle-orm';
+import { Config } from '@shadow-library/common';
 
 import { type PrimaryDatabase, schema } from '@server/database';
 import { seedBaseline } from '@server/database/seed';
@@ -82,5 +83,51 @@ describe('Baseline Seed', () => {
       .from(schema.templates)
       .where(and(inArray(schema.templates.templateKey, IDENTITY_TEMPLATE_KEYS)));
     expect(identity.map(row => row.templateKey).sort()).toStrictEqual([...IDENTITY_TEMPLATE_KEYS].sort());
+  });
+
+  /**
+   * XA-1 follow-up: the catch-all `DEV` sender profile must never seed on a production deployment — its endpoints
+   * only write to `notification_messages` and never actually send, so on a fresh prod box the catch-all routing
+   * rule would turn every unrouted OTP or security alert into a silently swallowed `SENT` instead of a loud,
+   * alertable `SND_RTR_001`/`PERMANENTLY_FAILED`.
+   */
+  describe('sender configuration gate', () => {
+    const originalStage = Config['cache'].get('app.stage');
+    const originalEnv = Config['cache'].get('app.env');
+
+    afterEach(() => {
+      Config['cache'].set('app.stage', originalStage);
+      Config['cache'].set('app.env', originalEnv);
+    });
+
+    it('should not create a catch-all sender profile on a production deployment', async () => {
+      const db = testEnv.getPostgresClient();
+      await db.delete(schema.senderRoutingRules);
+      await db.delete(schema.senderEndpoints);
+      await db.delete(schema.senderProfiles);
+      expect(await db.$count(schema.senderProfiles)).toBe(0);
+
+      Config['cache'].set('app.stage', 'prod');
+      Config['cache'].set('app.env', 'production');
+
+      await seedBaseline(db);
+
+      expect(await db.$count(schema.senderProfiles)).toBe(0);
+      expect(await db.$count(schema.senderEndpoints)).toBe(0);
+      expect(await db.$count(schema.senderRoutingRules)).toBe(0);
+    });
+
+    it('should create the catch-all sender profile off a production deployment', async () => {
+      const db = testEnv.getPostgresClient();
+
+      Config['cache'].set('app.stage', 'dev');
+      Config['cache'].set('app.env', 'development');
+
+      await seedBaseline(db);
+
+      expect(await db.$count(schema.senderProfiles)).toBeGreaterThanOrEqual(1);
+      expect(await db.$count(schema.senderEndpoints)).toBeGreaterThanOrEqual(1);
+      expect(await db.$count(schema.senderRoutingRules)).toBeGreaterThanOrEqual(1);
+    });
   });
 });

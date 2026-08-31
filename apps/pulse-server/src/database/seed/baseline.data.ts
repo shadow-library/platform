@@ -1,4 +1,16 @@
-import { type Notification, type Template } from '@server/database';
+import { type Configuration, type Notification, type Template } from '@server/database';
+
+export interface SenderEndpointFixture {
+  channel: Notification.Channel;
+  provider: Configuration.ServiceProvider;
+  identifier: string;
+}
+
+export interface SenderProfileFixture {
+  key: string;
+  displayName: string;
+  endpoints: SenderEndpointFixture[];
+}
 
 export interface PartialFixture {
   partialKey: string;
@@ -144,6 +156,21 @@ export const BASELINE_PARTIALS: PartialFixture[] = [
   { partialKey: 'otp-code', name: 'One-time code block', description: 'The centred, monospaced code panel for OTP emails.', body: '<div class="email-code">{{ code }}</div>' },
   { partialKey: 'button', name: 'Primary button', description: 'A branded call-to-action button.', body: '<a class="email-btn" href="{{ href }}">{{ label }}</a>' },
 ];
+
+/**
+ * The catch-all sender profile: a `DEV` endpoint per channel, so a fresh deployment can deliver every baseline
+ * template (`notificationChannel` covers EMAIL, SMS, and PUSH) without an operator wiring a real provider first.
+ * `DEV` just logs the rendered message to `notification_messages` — see `DevNotificationProvider`.
+ */
+export const BASELINE_SENDER_PROFILE: SenderProfileFixture = {
+  key: 'default',
+  displayName: 'Default (dev)',
+  endpoints: [
+    { channel: 'EMAIL', provider: 'DEV', identifier: 'Shadow Library <noreply@dev.shadow-library.local>' },
+    { channel: 'SMS', provider: 'DEV', identifier: '+10000000000' },
+    { channel: 'PUSH', provider: 'DEV', identifier: 'dev-push-sender' },
+  ],
+};
 
 export const BASELINE_TEMPLATES: TemplateFixture[] = [
   {

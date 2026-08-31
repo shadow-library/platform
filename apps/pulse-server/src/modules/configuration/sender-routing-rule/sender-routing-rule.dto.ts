@@ -57,7 +57,7 @@ export class SenderRoutingRuleDetailResponse extends SenderRoutingRuleResponse {
 export class UpdateSenderRoutingRuleBody extends PickType(CreateRoutingRuleBody, ['senderProfileId']) {}
 
 @Schema()
-export class ListSenderRoutingRulesQuery extends PaginationQuery(SortByTime) {
+export class ListSenderRoutingRulesQuery extends PaginationQuery(SortByTime, { sortBy: 'updatedAt', sortOrder: 'desc' }) {
   @Field(() => MessageType, { optional: true })
   messageType?: Template.MessageType;
 
