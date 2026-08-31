@@ -73,7 +73,8 @@ function RegisterPage(): React.JSX.Element {
       </AuthScreen>
     );
 
-  if (!flow)
+  if (!flow) {
+    const submitEmail = (): void => (email.trim() ? void run(() => authApi.registerInit(email.trim(), deviceId)) : setError('Enter your email address.'));
     return (
       <AuthScreen footer={footer}>
         <AuthCard>
@@ -96,20 +97,24 @@ function RegisterPage(): React.JSX.Element {
             </Alert>
           )}
           <FormField label="Email address">
-            <Input type="email" placeholder="you@company.com" autoComplete="email" value={email} onValueChange={setEmail} autoFocus />
+            <Input
+              type="email"
+              placeholder="you@company.com"
+              autoComplete="email"
+              value={email}
+              onValueChange={setEmail}
+              onKeyDown={event => event.key === 'Enter' && submitEmail()}
+              autoFocus
+            />
           </FormField>
-          <Button
-            variant="primary"
-            fullWidth
-            loading={busy}
-            onClick={() => (email.trim() ? void run(() => authApi.registerInit(email.trim(), deviceId)) : setError('Enter your email address.'))}
-          >
+          <Button variant="primary" fullWidth loading={busy} onClick={submitEmail}>
             Continue
           </Button>
           <p className={parts.otpNote}>By continuing you agree to the Terms and Privacy Policy.</p>
         </AuthCard>
       </AuthScreen>
     );
+  }
 
   const status = flow.status;
   const stepIndex = status === 'AWAITING_EMAIL_OTP' ? 2 : status === 'AWAITING_DEMOGRAPHICS' || status === 'AWAITING_PROFILE' ? 3 : 4;
@@ -165,34 +170,43 @@ function RegisterPage(): React.JSX.Element {
               {error}
             </Alert>
           )}
-          <div className={parts.nameRow}>
-            <FormField label="First name" required>
-              <Input value={firstName} onValueChange={setFirstName} autoFocus />
+          <form
+            className={parts.stepForm}
+            onSubmit={event => {
+              event.preventDefault();
+              submitProfile();
+            }}
+          >
+            <div className={parts.nameRow}>
+              <FormField label="First name" required>
+                <Input value={firstName} onValueChange={setFirstName} autoFocus />
+              </FormField>
+              <FormField label="Last name" required>
+                <Input value={lastName} onValueChange={setLastName} />
+              </FormField>
+            </div>
+            <FormField label="Date of birth" optional>
+              <Input type="date" value={dateOfBirth} onValueChange={setDateOfBirth} />
             </FormField>
-            <FormField label="Last name" required>
-              <Input value={lastName} onValueChange={setLastName} />
+            <FormField label="Gender" optional>
+              <Select placeholder="Prefer not to say" value={gender} onValueChange={setGender}>
+                {GENDERS.map(option => (
+                  <Select.Item key={option.value} value={option.value}>
+                    {option.label}
+                  </Select.Item>
+                ))}
+              </Select>
             </FormField>
-          </div>
-          <FormField label="Date of birth" optional>
-            <Input type="date" value={dateOfBirth} onValueChange={setDateOfBirth} />
-          </FormField>
-          <FormField label="Gender" optional>
-            <Select placeholder="Prefer not to say" value={gender} onValueChange={setGender}>
-              {GENDERS.map(option => (
-                <Select.Item key={option.value} value={option.value}>
-                  {option.label}
-                </Select.Item>
-              ))}
-            </Select>
-          </FormField>
-          <Button variant="primary" fullWidth loading={busy} onClick={submitProfile}>
-            Continue
-          </Button>
+            <Button type="submit" variant="primary" fullWidth loading={busy}>
+              Continue
+            </Button>
+          </form>
         </AuthCard>
       </AuthScreen>
     );
   }
 
+  const submitPassword = (): void => (password ? void run(() => authApi.registerPassword(flow.flowId, password)) : setError('Choose a password.'));
   return (
     <AuthScreen footer={footer}>
       <AuthCard>
@@ -204,7 +218,15 @@ function RegisterPage(): React.JSX.Element {
           </Alert>
         )}
         <FormField label="Password">
-          <Input type="password" revealable autoComplete="new-password" value={password} onValueChange={setPassword} autoFocus />
+          <Input
+            type="password"
+            revealable
+            autoComplete="new-password"
+            value={password}
+            onValueChange={setPassword}
+            onKeyDown={event => event.key === 'Enter' && submitPassword()}
+            autoFocus
+          />
         </FormField>
         <div className={parts.pwRules}>
           {PASSWORD_RULES.map(rule => {
@@ -217,12 +239,7 @@ function RegisterPage(): React.JSX.Element {
             );
           })}
         </div>
-        <Button
-          variant="primary"
-          fullWidth
-          loading={busy}
-          onClick={() => (password ? void run(() => authApi.registerPassword(flow.flowId, password)) : setError('Choose a password.'))}
-        >
+        <Button variant="primary" fullWidth loading={busy} onClick={submitPassword}>
           Create account
         </Button>
       </AuthCard>

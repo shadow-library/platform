@@ -254,6 +254,10 @@
   color: var(--sh-text-tertiary);
 }
 
+.stepForm {
+  display: contents;
+}
+
 .nameRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
