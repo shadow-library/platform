@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
@@ -90,6 +90,13 @@ export class DirectoryService {
               lastName: schema.userProfiles.lastName,
             })
             .from(schema.users)
+            /**
+             * Scoped to users holding an active consent for the calling client — the relationship every
+             * user of a first-party app has (`FIRST_PARTY_POLICY`). Ids are sequential, so an id the
+             * caller has no relationship with must resolve to nothing, not a name, or the endpoint is a
+             * walk-the-counter directory harvest (MEDIUM-003).
+             */
+            .innerJoin(schema.consents, and(eq(schema.consents.userId, schema.users.id), eq(schema.consents.clientId, callerClientId), isNull(schema.consents.revokedAt)))
             /** Left-joined: an account with no profile row still resolves, just without a name to show. */
             .leftJoin(schema.userProfiles, eq(schema.userProfiles.userId, schema.users.id))
             .where(and(inArray(schema.users.id, shapely.map(BigInt)), inArray(schema.users.status, [...RESOLVABLE_STATUSES])));
