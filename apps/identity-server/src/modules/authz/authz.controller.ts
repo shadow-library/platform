@@ -19,7 +19,8 @@ export class AuthzController {
   @Post('/check')
   @RespondFor(200, CheckResponse)
   checkAccess(@Body() body: CheckRequestBody): Promise<CheckResponse> {
-    return this.pdp.check({ principal: { type: body.principalType, id: body.principalId }, organisationId: body.organisationId, action: body.action });
+    const request = { principal: { type: body.principalType, id: body.principalId }, organisationId: body.organisationId, action: body.action };
+    return this.pdp.checkForClient(request, serviceClientId(Context.getServiceToken()));
   }
 
   @Put('/catalog')

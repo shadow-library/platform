@@ -3,6 +3,7 @@ import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 
+import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, Permission, PrimaryDatabase, RoleAssignment, schema } from '@server/modules/infrastructure/datastore';
 
@@ -112,6 +113,17 @@ export class PolicyDecisionService {
       authzVersion,
     });
     return decision;
+  }
+
+  async checkForClient(request: CheckRequest, clientId: string): Promise<Decision> {
+    const applicationId = await this.resolveApplicationId(clientId);
+    return this.checkForApplication(request, applicationId);
+  }
+
+  private async resolveApplicationId(clientId: string): Promise<number> {
+    const client = await this.db.query.oauthClients.findFirst({ where: eq(schema.oauthClients.id, clientId), columns: { applicationId: true } });
+    if (!client) throw AppErrorCode.AUTHZ_002.create();
+    return client.applicationId;
   }
 
   private async resolvePermissions(principal: Principal, organisationId: string, applicationId?: number): Promise<Set<string>> {
