@@ -56,8 +56,36 @@ export class BillingRepository {
     const [row] = await this.db()
       .select({ accountId: schema.entitlements.accountId })
       .from(schema.entitlements)
-      .where(and(eq(schema.entitlements.provider, provider), eq(schema.entitlements.providerRef, providerRef)));
+      .where(and(eq(schema.entitlements.provider, provider), eq(schema.entitlements.providerRef, providerRef)))
+      .orderBy(schema.entitlements.accountId)
+      .limit(1);
     return row?.accountId ?? null;
+  }
+
+  /**
+   * Records a verified event whose `(provider, provider_ref)` already binds a different account: the
+   * append-only audit row is retained for the reconciliation runbook exactly as an unmatched one is
+   * (`quarantined`), but no projection is moved — binding the ref here would steal it from its current
+   * owner, which the partial unique index refuses at the storage layer anyway.
+   */
+  async recordConflict(event: NormalizedBillingEvent, provider: string, accountId: bigint): Promise<WebhookApplyResult> {
+    const [inserted] = await this.db()
+      .insert(schema.billingEvents)
+      .values({
+        provider,
+        providerEventId: event.providerEventId,
+        accountId,
+        type: event.type,
+        payload: event.payload,
+        processed: false,
+        quarantined: true,
+        occurredAt: event.occurredAt,
+      })
+      .onConflictDoNothing({ target: schema.billingEvents.providerEventId })
+      .returning({ id: schema.billingEvents.id });
+
+    if (!inserted) return { duplicate: true, quarantined: false, applied: false };
+    return { duplicate: false, quarantined: true, applied: false };
   }
 
   /**

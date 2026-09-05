@@ -1,5 +1,7 @@
 import { Config } from '@shadow-library/common';
 
+import { DEV_PSEUDO_ID_SECRET } from './constants';
+
 declare module '@shadow-library/common' {
   export interface ConfigRecords {
     'server.port': number;
@@ -219,8 +221,8 @@ Config.load('identity.close-service', { defaultValue: 'shadow-identity' });
 Config.load('identity.close-path', { defaultValue: '' });
 Config.load('identity.close-scope', { defaultValue: 'users:close' });
 
-/** HMAC key for the analytics pseudo-id (§23) — an account id must never be recoverable from it. Ops-provisioned per env; the default is dev/test-only. */
-Config.load('telemetry.pseudo-id-secret', { defaultValue: 'dev-only-telemetry-pseudo-id-secret' });
+/** HMAC key for the analytics pseudo-id (§23) — an account id must never be recoverable from it. Ops-provisioned per env; a production deployment refuses to boot on the dev/test-only default (`TelemetryService.onModuleInit`). */
+Config.load('telemetry.pseudo-id-secret', { defaultValue: DEV_PSEUDO_ID_SECRET });
 
 /** ARCHITECTURE §20 abuse guard: `RequestExport` is refused once this many jobs were requested for the account in the trailing 24h. Tunable. */
 Config.load('export.max-per-day', { defaultValue: '1', validateType: 'number', reloadable: true });

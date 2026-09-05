@@ -1,5 +1,5 @@
 import { type InferEnum, type InferSelectModel, sql } from 'drizzle-orm';
-import { bigint, bigserial, boolean, index, pgEnum, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, boolean, index, pgEnum, pgTable, timestamp, unique, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 import { accounts } from './accounts';
 import { jsonb } from './jsonb';
@@ -24,25 +24,35 @@ export const entitlementState = pgEnum('entitlement_state', ['free', 'trial', 'a
  * `updated_at` vs event time, but `updated_at` also moves on writes that carry no provider event
  * (the lapse sweep), which would let a genuinely newer event be mistaken for a stale one.
  */
-export const entitlements = pgTable('entitlements', {
-  accountId: bigint('account_id', { mode: 'bigint' })
-    .primaryKey()
-    .references(() => accounts.id, { onDelete: 'cascade' }),
-  tier: entitlementTier('tier').notNull().default('free'),
-  state: entitlementState('state').notNull().default('free'),
-  /** End of the paid or trial period the provider last reported; access is evaluated against server time, never a client clock. */
-  expiresAt: timestamp('expires_at', { withTimezone: true }),
-  /** When a dunning grace window closes and the account lapses; null outside grace. */
-  graceEndsAt: timestamp('grace_ends_at', { withTimezone: true }),
-  provider: varchar('provider', { length: 32 }),
-  providerRef: varchar('provider_ref', { length: 200 }),
-  trialUsed: boolean('trial_used').notNull().default(false),
-  appliedEventAt: timestamp('applied_event_at', { withTimezone: true }),
-  syncSeq: bigint('sync_seq', { mode: 'bigint' })
-    .notNull()
-    .default(sql`nextval('sync_seq')`),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const entitlements = pgTable(
+  'entitlements',
+  {
+    accountId: bigint('account_id', { mode: 'bigint' })
+      .primaryKey()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    tier: entitlementTier('tier').notNull().default('free'),
+    state: entitlementState('state').notNull().default('free'),
+    /** End of the paid or trial period the provider last reported; access is evaluated against server time, never a client clock. */
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    /** When a dunning grace window closes and the account lapses; null outside grace. */
+    graceEndsAt: timestamp('grace_ends_at', { withTimezone: true }),
+    provider: varchar('provider', { length: 32 }),
+    providerRef: varchar('provider_ref', { length: 200 }),
+    trialUsed: boolean('trial_used').notNull().default(false),
+    appliedEventAt: timestamp('applied_event_at', { withTimezone: true }),
+    syncSeq: bigint('sync_seq', { mode: 'bigint' })
+      .notNull()
+      .default(sql`nextval('sync_seq')`),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  // Partial so a provider binding lands on at most one account (§16.2): the many free/unbilled accounts keep
+  // both columns NULL and are excluded from the index entirely rather than relying on NULL-distinctness to keep them apart.
+  t => [
+    uniqueIndex('entitlements_provider_provider_ref_unique')
+      .on(t.provider, t.providerRef)
+      .where(sql`${t.provider} IS NOT NULL AND ${t.providerRef} IS NOT NULL`),
+  ],
+);
 
 /**
  * Append-only webhook audit (ARCHITECTURE §10.3, §10.4). `provider_event_id` is unique on its own —

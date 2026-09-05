@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { Injectable, type OnModuleInit } from '@shadow-library/app';
+import { Config, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -10,6 +10,7 @@ import { Logger } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 
 import { type TelemetryEvent } from './events';
+import { assertTelemetryPseudoIdSecret } from './pseudo-id';
 
 /**
  * Defining types
@@ -25,8 +26,12 @@ import { type TelemetryEvent } from './events';
  * own — it only has to log what it was handed, structurally.
  */
 @Injectable()
-export class TelemetryService {
+export class TelemetryService implements OnModuleInit {
   private readonly logger = Logger.getLogger(APP_NAME, TelemetryService.name);
+
+  onModuleInit(): void {
+    assertTelemetryPseudoIdSecret(Config.get('telemetry.pseudo-id-secret'));
+  }
 
   emit(event: TelemetryEvent): void {
     const { name, ...payload } = event;

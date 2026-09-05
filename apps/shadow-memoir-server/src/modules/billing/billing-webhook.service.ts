@@ -50,6 +50,20 @@ export class BillingWebhookService {
 
     const event = this.adapter.verify(request);
     const accountId = await this.match(event);
+
+    if (accountId !== null && (await this.isProviderRefConflict(event, accountId))) {
+      await this.repository.recordConflict(event, this.adapter.provider, accountId);
+      logMetric(
+        this.logger,
+        'Billing webhook provider_ref already binds another account; refused the projection move',
+        'billing.provider_ref_conflict',
+        1,
+        { provider, type: event.type },
+        'warn',
+      );
+      return { received: true };
+    }
+
     const result = await this.repository.recordAndApply(event, this.adapter.provider, accountId, Config.get('billing.grace-days'));
 
     if (result.quarantined) {
@@ -69,5 +83,12 @@ export class BillingWebhookService {
     }
     if (event.providerRef) return this.repository.findAccountIdByProviderRef(this.adapter.provider, event.providerRef);
     return null;
+  }
+
+  /** A conflict is a `provider_ref` already bound to some OTHER account than the one this event matched; the ref on the matched account, or on none, is the ordinary bind/rebind path (§16.2). */
+  private async isProviderRefConflict(event: NormalizedBillingEvent, accountId: bigint): Promise<boolean> {
+    if (!event.providerRef) return false;
+    const owner = await this.repository.findAccountIdByProviderRef(this.adapter.provider, event.providerRef);
+    return owner !== null && owner !== accountId;
   }
 }
