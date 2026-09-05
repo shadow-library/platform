@@ -122,6 +122,42 @@ const httpMethods = Object.values(HttpMethod).filter(m => m !== HttpMethod.ALL) 
 const DEFAULT_ARTIFACTS: RouteArtifacts = { masks: {}, transformers: {} };
 const isClassSchema = (schema: object): schema is SchemaClass => typeof schema === 'function' || (Array.isArray(schema) && typeof schema[0] === 'function');
 
+// No first-party DTO uses `@Sensitive`, so the compiled masks never fire; this default pass is the only thing keeping
+// credentials out of request logs. Long unambiguous stems match anywhere in the normalized key so compound names like
+// `accessToken`, `passwordHash` and `sessionId` are caught; short ambiguous stems match the whole key only, so
+// `postcode`/`zipcode`/`barcode` are left alone. `_`/`-` are stripped first, folding `client_secret`, `api_key`, etc.
+const SENSITIVE_KEY_STEMS = ['password', 'secret', 'token', 'authorization', 'credential', 'assertion', 'apikey', 'privatekey', 'cookie', 'session'];
+const SENSITIVE_EXACT_KEYS = new Set(['code', 'codeverifier', 'otp', 'pin']);
+const LOG_REDACTION_PLACEHOLDER = '****';
+const MAX_LOG_REDACTION_DEPTH = 8;
+const normalizeLogKey = (key: string): string => key.toLowerCase().replace(/[_-]/g, '');
+const isSensitiveLogKey = (key: string): boolean => {
+  const normalized = normalizeLogKey(key);
+  return SENSITIVE_EXACT_KEYS.has(normalized) || SENSITIVE_KEY_STEMS.some(stem => normalized.includes(stem));
+};
+
+/** Deep-copies `value` for logging, replacing sensitive-keyed properties with a placeholder; never mutates the source. */
+function redactSensitiveLogData(value: unknown, depth = 0, seen = new WeakSet<object>()): any {
+  if (Array.isArray(value)) {
+    if (depth > MAX_LOG_REDACTION_DEPTH || seen.has(value)) return LOG_REDACTION_PLACEHOLDER;
+    seen.add(value);
+    const result = value.map(item => redactSensitiveLogData(item, depth + 1, seen));
+    seen.delete(value);
+    return result;
+  }
+  if (value !== null && typeof value === 'object') {
+    if (depth > MAX_LOG_REDACTION_DEPTH || seen.has(value)) return LOG_REDACTION_PLACEHOLDER;
+    seen.add(value);
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) {
+      result[key] = isSensitiveLogKey(key) ? LOG_REDACTION_PLACEHOLDER : redactSensitiveLogData(val, depth + 1, seen);
+    }
+    seen.delete(value);
+    return result;
+  }
+  return value;
+}
+
 @Injectable()
 export class FastifyRouter extends Dispatcher {
   static override readonly name = 'FastifyRouter';
@@ -234,9 +270,9 @@ export class FastifyRouter extends Dispatcher {
 
         const resTime = process.hrtime(startTime);
         metadata.timeTaken = (resTime[0] * 1e3 + resTime[1] * 1e-6).toFixed(3); // Converting time to milliseconds
-        if (req.body) metadata.body = masks.body ? masks.body(structuredClone(req.body), mask) : req.body;
-        if (req.query) metadata.query = masks.query ? masks.query(structuredClone(req.query), mask) : req.query;
-        if (req.params) metadata.params = masks.params ? masks.params(structuredClone(req.params), mask) : req.params;
+        if (req.body) metadata.body = redactSensitiveLogData(masks.body ? masks.body(structuredClone(req.body), mask) : req.body);
+        if (req.query) metadata.query = redactSensitiveLogData(masks.query ? masks.query(structuredClone(req.query), mask) : req.query);
+        if (req.params) metadata.params = redactSensitiveLogData(masks.params ? masks.params(structuredClone(req.params), mask) : req.params);
         this.logger.http(`${req.method} ${metadata.url} -> ${res.statusCode} (${metadata.timeTaken}ms)`, metadata);
       });
 
