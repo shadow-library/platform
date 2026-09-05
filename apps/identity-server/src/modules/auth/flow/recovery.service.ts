@@ -89,12 +89,15 @@ export class RecoveryService {
     const flow = await this.requireFlow(flowId, AWAITING_TOTP);
     const userId = BigInt(flow.userId ?? '0');
 
+    const user = await this.userService.getUser(userId);
+    if (user && (this.userService.isFullyLocked(user) || this.userService.isOtpLocked(user))) throw AppErrorCode.AUTH_012.create();
+
     const valid = proof.code
       ? await this.mfaService.verifyTotp(userId, proof.code)
       : proof.recoveryCode
         ? await this.recoveryCodeService.consume(userId, proof.recoveryCode)
         : false;
-    if (!valid) return this.handleFailure(flow);
+    if (!valid) return this.handleFailure(flow, userId);
 
     const next = await this.authFlowService.update(flow, { status: AWAITING_NEW_PASSWORD });
     return { outcome: 'CONTINUE', flowId, status: next.status };
@@ -140,7 +143,18 @@ export class RecoveryService {
     return { outcome: 'COMPLETED', flowId, cookies };
   }
 
-  private async handleFailure(flow: AuthFlowContext): Promise<FlowStepResult> {
+  private async handleFailure(flow: AuthFlowContext, userId?: bigint): Promise<FlowStepResult> {
+    if (userId) {
+      await this.signInEventService.record({
+        flowId: flow.flowId,
+        userId,
+        identifier: flow.identifier,
+        status: 'MFA_FAILED',
+        authMode: 'OTP',
+        device: { ipAddress: flow.device.ipAddress, ipCountry: flow.device.ipCountry, userAgent: flow.device.userAgent },
+      });
+      await this.signInEventService.evaluateLock(userId);
+    }
     const failureCount = flow.failureCount + 1;
     if (failureCount >= MAX_FLOW_FAILURES) {
       await this.authFlowService.delete(flow.flowId);

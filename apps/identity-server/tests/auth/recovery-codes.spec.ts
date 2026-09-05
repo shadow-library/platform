@@ -40,6 +40,7 @@ describe('Recovery codes', () => {
     userId = user.id;
     sessionSecret = (await env.getService(SessionService).create({ userId })).secret;
 
+    await request('post', '/api/v1/me/mfa/step-up').body({ password: 'Password@123' });
     const enroll = await request('post', '/api/v1/me/mfa/totp/enroll');
     totpSecret = (enroll.json() as { secret: string }).secret;
     const activate = await request('post', '/api/v1/me/mfa/totp/activate').body({ code: codeAt(totpSecret, currentStep()) });

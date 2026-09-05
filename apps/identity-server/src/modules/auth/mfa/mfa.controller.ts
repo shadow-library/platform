@@ -39,7 +39,7 @@ export class MfaController {
   @HttpStatus(200)
   @RespondFor(200, TotpActivateResponse)
   activateTotp(@Body() body: TotpCodeBody): ReturnType<MfaService['completeTotpActivation']> {
-    return this.mfaService.completeTotpActivation(Context.getSession(), body.code);
+    return this.mfaService.completeTotpActivation(Context.getSession(), Context.getAuth().elevated ?? false, body.code);
   }
 
   @Post('/recovery-codes')

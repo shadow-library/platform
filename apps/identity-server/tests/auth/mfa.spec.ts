@@ -34,7 +34,13 @@ describe('MFA', () => {
     return chain.headers({ 'x-csrf-token': csrf.header }).cookies({ [SESSION_COOKIE_NAME]: cookie, 'csrf-token': csrf.cookie });
   };
 
+  const elevate = async (cookie = sessionSecret): Promise<void> => {
+    const response = await request('post', '/api/v1/me/mfa/step-up', cookie).body({ password: 'Password@123' });
+    expect(response.statusCode).toBe(200);
+  };
+
   const setupTotp = async (): Promise<string> => {
+    await elevate();
     const enroll = await request('post', '/api/v1/me/mfa/totp/enroll');
     expect(enroll.statusCode).toBe(200);
     const { secret } = enroll.json() as { secret: string };
@@ -74,9 +80,32 @@ describe('MFA', () => {
     });
 
     it('should reject activation with a wrong code', async () => {
+      await elevate();
       await request('post', '/api/v1/me/mfa/totp/enroll');
       const activate = await request('post', '/api/v1/me/mfa/totp/activate').body({ code: '000000' });
       expect(activate.statusCode).toBe(401);
+    });
+
+    it('should reject first totp enrolment from a non-elevated session and accept it after step-up', async () => {
+      const aal1 = (await env.getService(SessionService).create({ userId })).secret;
+      const denied = await request('post', '/api/v1/me/mfa/totp/enroll', aal1);
+      expect(denied.statusCode).toBe(403);
+      expect(denied.json()).toMatchObject({ code: 'AUTH_006' });
+
+      await elevate(aal1);
+      const enroll = await request('post', '/api/v1/me/mfa/totp/enroll', aal1);
+      expect(enroll.statusCode).toBe(200);
+    });
+
+    it('should reject totp activation from a non-elevated session even with a pending enrolment', async () => {
+      await elevate();
+      const enroll = await request('post', '/api/v1/me/mfa/totp/enroll');
+      const { secret } = enroll.json() as { secret: string };
+
+      const aal1 = (await env.getService(SessionService).create({ userId })).secret;
+      const activate = await request('post', '/api/v1/me/mfa/totp/activate', aal1).body({ code: codeAt(secret, currentStep()) });
+      expect(activate.statusCode).toBe(403);
+      expect(activate.json()).toMatchObject({ code: 'AUTH_006' });
     });
 
     it('should require authentication for mfa management', async () => {
@@ -146,6 +175,40 @@ describe('MFA', () => {
       const { flowId } = (await login('mfa@example.com')).json() as { flowId: string };
       const done = await verify(flowId, { password: 'Password@123' });
       expect(done.json()).toMatchObject({ status: 'COMPLETED' });
+    });
+  });
+
+  describe('mfa verification under account lock', () => {
+    const lockOtpOnly = () =>
+      env
+        .getPostgresClient()
+        .update(schema.users)
+        .set({ lockMode: 'OTP_ONLY', lockedUntil: new Date(Date.now() + 60_000) })
+        .where(eq(schema.users.id, userId));
+
+    it('should refuse a banked totp guess once the account locks mid-flow', async () => {
+      const secret = await setupTotp();
+      const { flowId } = (await login('mfa@example.com')).json() as { flowId: string };
+      expect((await verify(flowId, { password: 'Password@123' })).json()).toMatchObject({ status: 'AWAITING_TOTP' });
+
+      await lockOtpOnly();
+
+      const totp = await verify(flowId, { code: codeAt(secret, currentStep() + 1) });
+      expect(totp.statusCode).toBe(403);
+      expect(totp.json()).toMatchObject({ code: 'AUTH_012' });
+    });
+
+    it('should trip the per-account lock after repeated mfa failures across flows', async () => {
+      await setupTotp();
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const { flowId } = (await login('mfa@example.com')).json() as { flowId: string };
+        await verify(flowId, { password: 'Password@123' });
+        await verify(flowId, { code: '000000' });
+      }
+
+      const [user] = await env.getPostgresClient().select().from(schema.users).where(eq(schema.users.id, userId));
+      expect(user?.lockMode).toBe('OTP_ONLY');
+      expect(user?.lockedUntil).not.toBeNull();
     });
   });
 

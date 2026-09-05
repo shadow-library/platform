@@ -225,6 +225,14 @@ export class UserService {
     throw AppErrorCode.AUTH_011.create();
   }
 
+  isOtpLocked(user: User): boolean {
+    return user.lockMode === 'OTP_ONLY' && user.lockedUntil !== null && user.lockedUntil.getTime() > Date.now();
+  }
+
+  isFullyLocked(user: User): boolean {
+    return user.lockMode === 'FULL' && (user.lockedUntil === null || user.lockedUntil.getTime() > Date.now());
+  }
+
   async setStatusHold(userId: bigint, status: User.Status, hold: StatusHold = {}): Promise<void> {
     const restored = status === 'ACTIVE';
     await this.db

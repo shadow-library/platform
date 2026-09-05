@@ -107,7 +107,7 @@ export class LoginService {
     const user = await this.userService.getUser(input.identifier);
     if (!user) throw AppErrorCode.AUTH_008.create();
     this.userService.assertLoginAllowed(await this.userService.resolveEffectiveStatus(user));
-    if (this.isFullyLocked(user)) throw AppErrorCode.AUTH_012.create();
+    if (this.userService.isFullyLocked(user)) throw AppErrorCode.AUTH_012.create();
     const provider = input.identifier.includes('@') ? await this.identityProviderService.routeForEmail(input.identifier.toLowerCase()) : null;
 
     let federated: FederatedFlowState | undefined;
@@ -172,7 +172,7 @@ export class LoginService {
 
     const user = await this.userService.getUser(userId);
     if (!user || user.status !== 'ACTIVE') return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
-    if (this.isOtpLocked(user)) return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
+    if (this.userService.isOtpLocked(user)) return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
     if (user.passwordResetRequired) {
       const next = await this.authFlowService.update(flow, { status: AWAITING_PASSWORD_RESET });
       return { outcome: 'CONTINUE', flowId: flow.flowId, status: next.status };
@@ -322,12 +322,9 @@ export class LoginService {
     if (provider?.organisationId) await this.organisationService.ensureMember(provider.organisationId, userId, 'MEMBER');
   }
 
-  private isOtpLocked(user: User): boolean {
-    return user.lockMode === 'OTP_ONLY' && user.lockedUntil !== null && user.lockedUntil.getTime() > Date.now();
-  }
-
-  private isFullyLocked(user: User): boolean {
-    return user.lockMode === 'FULL' && (user.lockedUntil === null || user.lockedUntil.getTime() > Date.now());
+  private async assertNotLocked(userId: bigint): Promise<void> {
+    const user = await this.userService.getUser(userId);
+    if (user && (this.userService.isFullyLocked(user) || this.userService.isOtpLocked(user))) throw AppErrorCode.AUTH_012.create();
   }
 
   async verifyMfa(flowId: string, proof: MfaProof): Promise<FlowStepResult> {
@@ -337,6 +334,7 @@ export class LoginService {
 
     const userId = flow.userId ? BigInt(flow.userId) : null;
     if (!userId) return this.handleFailure(flow, null, 'MFA_FAILED');
+    await this.assertNotLocked(userId);
 
     const valid = await this.verifyProof(userId, proof);
     if (!valid) return this.handleFailure(flow, userId, 'MFA_FAILED');
@@ -403,7 +401,7 @@ export class LoginService {
 
   private async complete(flow: AuthFlowContext, userId: bigint, options: CompletionOptions): Promise<FlowStepResult> {
     const user = await this.userService.getUser(userId);
-    if (user && this.isFullyLocked(user)) throw AppErrorCode.AUTH_012.create();
+    if (user && this.userService.isFullyLocked(user)) throw AppErrorCode.AUTH_012.create();
     await this.suspiciousLoginService.assessLogin(userId, flow.device);
     await this.signInEventService.record({
       flowId: flow.flowId,

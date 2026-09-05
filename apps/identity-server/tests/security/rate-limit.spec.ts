@@ -92,6 +92,15 @@ describe('Rate limiting', () => {
         expect(response.statusCode).toBe(200);
       }
     });
+
+    it('should carry a per-route budget on challenge verification', async () => {
+      await env.getRedisClient().set('rl:challenge-verify:10.3.0.1', '1000000', 'EX', 3600);
+      const rejected = await env
+        .getRouter()
+        .mockRequest({ method: 'POST', url: '/api/v1/auth/challenge/verify', remoteAddress: '10.3.0.1', payload: { flowId: 'flow_auth_probe' } });
+      expect(rejected.statusCode).toBe(429);
+      expect(Number(rejected.headers['retry-after'])).toBeGreaterThan(0);
+    });
   });
 
   describe('per-client M2M budgets', () => {

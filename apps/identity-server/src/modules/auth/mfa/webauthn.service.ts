@@ -21,7 +21,6 @@ import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, PrimaryDatabase, schema, WebauthnCredential } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
 
-import { MfaService } from './mfa.service';
 import { RecoveryCodeService } from './recovery-code.service';
 import { WebauthnAssertion } from './webauthn.dto';
 
@@ -69,7 +68,6 @@ export class WebauthnService {
     private readonly userEmailService: UserEmailService,
     private readonly auditService: AuditService,
     private readonly notificationService: NotificationService,
-    private readonly mfaService: MfaService,
     private readonly sessionService: SessionService,
     private readonly recoveryCodeService: RecoveryCodeService,
     private readonly clientService: OAuthClientService,
@@ -78,17 +76,17 @@ export class WebauthnService {
     this.redis = databaseService.getRedisClient();
   }
 
-  private async authorizeFactorChange(userId: bigint, elevated: boolean): Promise<void> {
-    if ((await this.mfaService.hasMfa(userId)) && !elevated) throw AppErrorCode.AUTH_006.create();
+  private authorizeFactorChange(elevated: boolean): void {
+    if (!elevated) throw AppErrorCode.AUTH_006.create();
   }
 
   async beginRegistration(userId: bigint, elevated: boolean): Promise<WebauthnRegistrationOptions> {
-    await this.authorizeFactorChange(userId, elevated);
+    this.authorizeFactorChange(elevated);
     return this.toRegistrationOptions(await this.startRegistration(userId));
   }
 
   async completeRegistration(session: ValidatedSession, elevated: boolean, input: WebauthnRegisterInput): Promise<{ success: true; recoveryCodes?: string[] }> {
-    await this.authorizeFactorChange(session.userId, elevated);
+    this.authorizeFactorChange(elevated);
     const response: RegistrationResponseJSON = {
       id: input.id,
       rawId: input.rawId,

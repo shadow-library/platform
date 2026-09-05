@@ -119,6 +119,7 @@ export class AuthController {
 
   @Post('/challenge/verify')
   @Auth({ public: true })
+  @RateLimit({ name: 'challenge-verify', limit: 60, windowSeconds: 3600 })
   @HttpStatus(200)
   @RespondFor(200, ChallengeVerifyResponse)
   @RespondFor(401, ChallengeVerifyResponse)

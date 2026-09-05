@@ -29,7 +29,13 @@ describe('WebAuthn passkeys', () => {
     return chain.headers({ 'x-csrf-token': csrf.header }).cookies({ [SESSION_COOKIE_NAME]: cookie, 'csrf-token': csrf.cookie });
   };
 
+  const elevate = async (cookie = sessionSecret): Promise<void> => {
+    const response = await request('post', '/api/v1/me/mfa/step-up', cookie).body({ password: 'Password@123' });
+    expect(response.statusCode).toBe(200);
+  };
+
   const registerPasskey = async (cookie = sessionSecret, authenticator = emulator): Promise<Record<string, unknown>> => {
+    await elevate(cookie);
     const options = await request('post', '/api/v1/me/webauthn/register/options', cookie);
     expect(options.statusCode).toBe(200);
     const { challenge } = options.json() as { challenge: string };
@@ -69,10 +75,30 @@ describe('WebAuthn passkeys', () => {
     });
 
     it('should reject a registration response with a tampered challenge', async () => {
+      await elevate();
       await request('post', '/api/v1/me/webauthn/register/options');
       const attestation = await emulator.register({ challenge: 'forged-challenge' });
       const verify = await request('post', '/api/v1/me/webauthn/register/verify').body({ ...attestation });
       expect(verify.statusCode).toBe(401);
+    });
+
+    it('should reject first passkey enrolment options from a non-elevated session', async () => {
+      const aal1 = (await env.getService(SessionService).create({ userId })).secret;
+      const options = await request('post', '/api/v1/me/webauthn/register/options', aal1);
+      expect(options.statusCode).toBe(403);
+      expect(options.json()).toMatchObject({ code: 'AUTH_006' });
+    });
+
+    it('should reject passkey registration verify from a non-elevated session even after options', async () => {
+      await elevate();
+      const options = await request('post', '/api/v1/me/webauthn/register/options');
+      const { challenge } = options.json() as { challenge: string };
+      const attestation = await emulator.register({ challenge });
+
+      const aal1 = (await env.getService(SessionService).create({ userId })).secret;
+      const verify = await request('post', '/api/v1/me/webauthn/register/verify', aal1).body({ ...attestation });
+      expect(verify.statusCode).toBe(403);
+      expect(verify.json()).toMatchObject({ code: 'AUTH_006' });
     });
   });
 

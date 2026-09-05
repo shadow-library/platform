@@ -180,12 +180,17 @@ export class MfaService {
     return { enrollments, recoveryCodesRemaining };
   }
 
+  private authorizeFactorChange(elevated: boolean): void {
+    if (!elevated) throw AppErrorCode.AUTH_006.create();
+  }
+
   async beginTotpEnrollment(userId: bigint, elevated: boolean): Promise<TotpProvisioning> {
-    if ((await this.hasMfa(userId)) && !elevated) throw AppErrorCode.AUTH_006.create();
+    this.authorizeFactorChange(elevated);
     return this.enrollTotp(userId);
   }
 
-  async completeTotpActivation(session: ValidatedSession, code: string): Promise<{ success: true; recoveryCodes?: string[] }> {
+  async completeTotpActivation(session: ValidatedSession, elevated: boolean, code: string): Promise<{ success: true; recoveryCodes?: string[] }> {
+    this.authorizeFactorChange(elevated);
     await this.activateTotp(session.userId, code);
     await this.sessionService.elevate(session.id);
     const hasCodes = (await this.recoveryCodeService.countRemaining(session.userId)) > 0;
