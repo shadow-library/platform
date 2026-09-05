@@ -68,7 +68,11 @@ export class PublishAuditTrailer {
   }
 
   private toOutcome(error: Error): PublishAuditEntry['outcome'] {
-    const isAuthFailure = AppError.is(error, AuthGuardErrorCode.IAM_001) || AppError.is(error, AuthGuardErrorCode.IAM_002) || AppError.is(error, AppErrorCode.WBN_010);
+    const isAuthFailure =
+      AppError.is(error, AuthGuardErrorCode.IAM_001) ||
+      AppError.is(error, AuthGuardErrorCode.IAM_002) ||
+      AppError.is(error, AppErrorCode.WBN_010) ||
+      AppError.is(error, AppErrorCode.WBN_012);
     return isAuthFailure ? 'unauthorized' : 'error';
   }
 

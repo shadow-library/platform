@@ -6,12 +6,13 @@ import { DatabaseService } from '@shadow-library/modules';
 import { normalizeContentRating } from '@shadow-library/sdk';
 import { chapterContentHash } from '@shadow-library/sdk/publishing';
 
-import { AppErrorCode } from '@server/classes';
+import { AppErrorCode, isImageRef } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
 
 import { PublishAuditService } from './publish-audit.service';
 import { assertNovelOwnership, loadOwnedNovel, loadReadableNovel, publishCaller, type PublishCaller } from './publish-ownership';
+import { nextPublishToken } from './publish-token';
 import { type ChapterUpsertBody, type ManifestItem, type NovelAccessBody, type NovelAccessResponse, type NovelUpsertBody } from './publish.dto';
 import { type PublishAuditEntry } from './publish.types';
 
@@ -83,15 +84,18 @@ export class PublishService {
   }
 
   private runNovelUpsert(slug: string, body: NovelUpsertBody, caller: PublishCaller): Promise<UpsertResult | StaleMarker> {
+    const coverPath = isImageRef(body.coverPath) ? body.coverPath : null;
+    if (body.coverPath && !coverPath) this.logger.warn('dropped a malformed cover ref before publish', { slug });
     return this.db.transaction(async tx => {
       const stored = await this.lockNovel(tx, slug, body, caller);
+      const publishToken = this.resolvePublishToken(stored, body);
       const base: Omit<PublishAuditEntry, 'outcome'> = { action: 'novel.upsert', novelSlug: slug, incomingRevision: body.revision, storedRevision: stored?.revision, ...caller };
 
       if (stored && body.revision < stored.revision) {
         await this.auditService.record({ ...base, outcome: 'stale_rejected' }, tx);
         return { outcome: 'stale', stored: stored.revision } satisfies StaleMarker;
       }
-      if (stored && body.revision === stored.revision && this.isNovelUnchanged(stored, body, slug)) {
+      if (stored && body.revision === stored.revision && this.isNovelUnchanged(stored, body, slug, coverPath)) {
         await this.auditService.record({ ...base, outcome: 'noop' }, tx);
         return { outcome: 'noop', novelId: stored.id, revision: stored.revision } satisfies UpsertResult;
       }
@@ -99,10 +103,11 @@ export class PublishService {
       const values = {
         slug,
         sourceRef: body.sourceRef,
+        publishToken,
         title: body.title,
         originalAuthor: body.originalAuthor || null,
         blurb: body.blurb ?? null,
-        coverPath: body.coverPath ?? null,
+        coverPath,
         genres: body.genres ?? [],
         tags: body.tags ?? [],
         sexualContent: body.sexualContent ?? null,
@@ -314,13 +319,24 @@ export class PublishService {
     return and(eq(schema.publishedChapters.novelId, novelId), eq(schema.publishedChapters.ordinal, ordinal)) as SQL;
   }
 
-  private isNovelUnchanged(stored: Novel, body: NovelUpsertBody, slug: string): boolean {
+  /**
+   * The `publishToken` is deliberately not part of this equality: binding it is not itself a reader-visible
+   * metadata change, so a legacy novel adopts one on its next content/revision change rather than on an
+   * otherwise-identical push (which stays a no-op). New novels always bind on their creating insert.
+   */
+  private resolvePublishToken(stored: Novel | undefined, body: NovelUpsertBody): string | null {
+    const verdict = nextPublishToken(stored?.publishToken ?? null, body.publishToken);
+    if (verdict.mismatch) throw AppErrorCode.WBN_012.create();
+    return verdict.token;
+  }
+
+  private isNovelUnchanged(stored: Novel, body: NovelUpsertBody, slug: string, coverPath: string | null): boolean {
     return (
       stored.slug === slug &&
       stored.title === body.title &&
       stored.originalAuthor === (body.originalAuthor || null) &&
       stored.blurb === (body.blurb ?? null) &&
-      stored.coverPath === (body.coverPath ?? null) &&
+      stored.coverPath === coverPath &&
       stored.status === (body.status ?? 'live') &&
       stored.visibility === body.visibility &&
       stored.sexualContent === (body.sexualContent ?? null) &&

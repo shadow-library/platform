@@ -7,6 +7,10 @@ import { FORGE_CLIENT_ID, userToken } from '../test-idp';
 
 const env = new TestEnvironment('wiki').init();
 
+const ALICE_IMG = `${'a1'.repeat(32)}.webp`;
+const ALICE_PORTRAIT = `${'b2'.repeat(32)}.webp`;
+const ALICE_REVEAL = `${'c3'.repeat(32)}.webp`;
+
 async function seedNovel(slug = 'moonfall', visibility: 'PUBLIC' | 'RESTRICTED' = 'PUBLIC'): Promise<bigint> {
   const db = env.getPostgresClient();
   const [novel] = await db
@@ -17,7 +21,7 @@ async function seedNovel(slug = 'moonfall', visibility: 'PUBLIC' | 'RESTRICTED' 
 
   const [alice] = await db
     .insert(schema.wikiEntries)
-    .values({ novelId, entryKey: 'alice', type: 'character', name: 'Alice', imageRef: 'alice.webp', firstVisibleOrdinal: 0, contentHash: 'a1', revision: 1 })
+    .values({ novelId, entryKey: 'alice', type: 'character', name: 'Alice', imageRef: ALICE_IMG, firstVisibleOrdinal: 0, contentHash: 'a1', revision: 1 })
     .returning();
   const aliceId = (alice as { id: bigint }).id;
   await db.insert(schema.wikiEntries).values([
@@ -29,8 +33,8 @@ async function seedNovel(slug = 'moonfall', visibility: 'PUBLIC' | 'RESTRICTED' 
     { entryId: aliceId, facetKey: 'secret', content: 'She caused the fall.', sortOrder: 1, visibleFromOrdinal: 5 },
   ]);
   await db.insert(schema.wikiEntryImages).values([
-    { entryId: aliceId, imageRef: 'alice-portrait.webp', caption: 'Portrait', sortOrder: 0, visibleFromOrdinal: 0 },
-    { entryId: aliceId, imageRef: 'alice-reveal.webp', caption: 'The truth', sortOrder: 1, visibleFromOrdinal: 8 },
+    { entryId: aliceId, imageRef: ALICE_PORTRAIT, caption: 'Portrait', sortOrder: 0, visibleFromOrdinal: 0 },
+    { entryId: aliceId, imageRef: ALICE_REVEAL, caption: 'The truth', sortOrder: 1, visibleFromOrdinal: 8 },
   ]);
   return novelId;
 }
@@ -55,7 +59,7 @@ describe('Public wiki API', () => {
       const body = response.json() as { items: { entryKey: string; imageUrl?: string }[]; lockedCount: number };
       expect(body.items.map(item => item.entryKey)).toEqual(['alice']);
       expect(body.lockedCount).toBe(2);
-      expect(body.items[0]?.imageUrl).toMatch(/\/alice\.webp$/);
+      expect(body.items[0]?.imageUrl).toContain(ALICE_IMG);
     });
 
     it('should widen the visible set and shrink the locked count as the gate advances', async () => {
@@ -95,7 +99,7 @@ describe('Public wiki API', () => {
       expect(body.facets.map(facet => facet.facetKey)).toEqual(['bio']);
       expect(body.hiddenFacetCount).toBe(1);
       expect(body.images).toHaveLength(1);
-      expect(body.images[0]?.imageUrl).toMatch(/\/alice-portrait\.webp$/);
+      expect(body.images[0]?.imageUrl).toContain(ALICE_PORTRAIT);
     });
 
     it('should unlock the gated facet and image once the reader has reached them', async () => {

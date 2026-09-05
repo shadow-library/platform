@@ -72,6 +72,13 @@ export const publications = pgTable('publications', {
   /** Separate from `revision` so changing the share list never rewrites the metadata row, and vice versa. */
   accessRevision: integer('access_revision').notNull().default(1),
   revision: integer('revision').notNull().default(1),
+  /**
+   * A high-entropy token the reader binds to this publication trust-on-first-use and then requires on every
+   * later metadata push. Minted lazily and nullable, so publications created before it existed adopt one on
+   * their next converge. Hardens the guessable `sourceRef` (the project id) against reader-side targeting; it
+   * is defense-in-depth, not a standalone control against a forge-side ownership-guard gap.
+   */
+  publishToken: varchar('publish_token', { length: 64 }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

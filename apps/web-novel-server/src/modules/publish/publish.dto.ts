@@ -38,6 +38,15 @@ export class NovelUpsertBody {
   })
   sourceRef: string;
 
+  @Field(() => String, {
+    optional: true,
+    pattern: '^[0-9a-f]{64}$',
+    maxLength: 64,
+    description:
+      'Per-project publish token, bound trust-on-first-use. Optional for wire compatibility; once a novel is bound, a push carrying a different token is refused. Defense-in-depth that hardens the guessable sourceRef — not a full guarantee against a publisher-side authorization gap.',
+  })
+  publishToken?: string;
+
   @Field({ maxLength: 256 })
   title: string;
 

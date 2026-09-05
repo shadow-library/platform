@@ -190,6 +190,13 @@
       "when": 1788005928419,
       "tag": "0026_nice_electro",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1788625213679,
+      "tag": "0027_famous_maelstrom",
+      "breakpoints": true
     }
   ]
 }

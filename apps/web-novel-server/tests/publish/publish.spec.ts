@@ -193,6 +193,49 @@ describe('Internal publish API', () => {
     });
   });
 
+  describe('publish token binding', () => {
+    const TOKEN_A = 'a'.repeat(64);
+    const TOKEN_B = 'b'.repeat(64);
+
+    it('should bind the token on first sight and accept a matching resend', async () => {
+      const created = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { publishToken: TOKEN_A }) });
+      expect(created.statusCode).toBe(200);
+      expect((await novelRows())[0]?.publishToken).toBe(TOKEN_A);
+
+      const resent = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(2, { publishToken: TOKEN_A, title: 'Moonrise' }) });
+      expect(resent.statusCode).toBe(200);
+      expect((await novelRows())[0]).toMatchObject({ title: 'Moonrise', publishToken: TOKEN_A });
+    });
+
+    it('should reject a mismatched token with WBN_012 and leave the bound row intact', async () => {
+      await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { publishToken: TOKEN_A }) });
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(2, { publishToken: TOKEN_B, title: 'Hijacked' }) });
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'WBN_012' });
+
+      const [novel] = await novelRows();
+      expect(novel).toMatchObject({ title: 'Moonfall', revision: 1, publishToken: TOKEN_A });
+      expect((await auditRows()).at(-1)).toMatchObject({ action: 'novel.upsert', outcome: 'unauthorized' });
+    });
+
+    it('should trust-on-first-use bind a legacy tokenless novel on its next push', async () => {
+      await env
+        .getPostgresClient()
+        .insert(schema.novels)
+        .values({ slug: SLUG, sourceClientId: FORGE_CLIENT_ID, sourceRef: REF, title: 'Moonfall', visibility: 'PUBLIC', revision: 1 });
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(2, { publishToken: TOKEN_A, title: 'Rebound' }) });
+      expect(response.statusCode).toBe(200);
+      expect((await novelRows())[0]).toMatchObject({ title: 'Rebound', publishToken: TOKEN_A });
+    });
+
+    it('should still apply a tokenless push against a bound novel during rollout', async () => {
+      await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1, { publishToken: TOKEN_A }) });
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(2, { title: 'No Token' }) });
+      expect(response.statusCode).toBe(200);
+      expect((await novelRows())[0]).toMatchObject({ title: 'No Token', publishToken: TOKEN_A });
+    });
+  });
+
   describe('novel vocabulary and content ratings', () => {
     it('should persist the pushed genres, tags and rating dimensions', async () => {
       const body = novelBody(1, {

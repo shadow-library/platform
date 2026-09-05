@@ -104,7 +104,10 @@ export class WikiService {
       name: entry.name,
       imageUrl: this.catalogService.imageUrl(entry.imageRef),
       facets: facets.map(facet => ({ facetKey: facet.facetKey, content: facet.content, sortOrder: facet.sortOrder })),
-      images: images.map(image => ({ imageUrl: this.catalogService.imageUrl(image.imageRef) as string, caption: image.caption ?? undefined, sortOrder: image.sortOrder })),
+      images: images.flatMap(image => {
+        const imageUrl = this.catalogService.imageUrl(image.imageRef);
+        return imageUrl ? [{ imageUrl, caption: image.caption ?? undefined, sortOrder: image.sortOrder }] : [];
+      }),
       hiddenFacetCount: hidden?.value ?? 0,
     };
     return { body, etag: this.etag(novel.accessRevision, entry.revision, gate), visibility: novel.visibility, personalized: this.isPersonalized(principal) };

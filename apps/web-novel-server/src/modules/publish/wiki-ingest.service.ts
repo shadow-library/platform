@@ -4,7 +4,7 @@ import { Logger } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { AppErrorCode } from '@server/classes';
+import { AppErrorCode, isImageRef } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/modules/datastore';
 
@@ -66,7 +66,7 @@ export class WikiIngestService {
       const values = {
         type: body.type,
         name: body.name,
-        imageRef: body.imageRef ?? null,
+        imageRef: isImageRef(body.imageRef) ? body.imageRef : null,
         firstVisibleOrdinal: body.firstVisibleOrdinal,
         contentHash: body.contentHash,
         revision: body.revision,
@@ -93,9 +93,12 @@ export class WikiIngestService {
             body.facets.map(facet => ({ entryId, facetKey: facet.facetKey, content: facet.content, sortOrder: facet.sortOrder, visibleFromOrdinal: facet.visibleFromOrdinal })),
           );
       }
-      if (body.images.length > 0) {
+      const images = body.images.filter(image => isImageRef(image.imageRef));
+      if (images.length !== body.images.length)
+        this.logger.warn('dropped malformed wiki image refs before storage', { slug, entryKey, dropped: body.images.length - images.length });
+      if (images.length > 0) {
         await tx.insert(schema.wikiEntryImages).values(
-          body.images.map(image => ({
+          images.map(image => ({
             entryId,
             imageRef: image.imageRef,
             caption: image.caption ?? null,

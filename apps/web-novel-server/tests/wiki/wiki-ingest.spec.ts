@@ -25,7 +25,7 @@ const entryBody = (revision: number, contentHash: string, overrides: object = {}
     { facetKey: 'bio', content: 'A cartographer of falling skies.', sortOrder: 0, visibleFromOrdinal: 0 },
     { facetKey: 'secret', content: 'She caused the fall.', sortOrder: 1, visibleFromOrdinal: 12 },
   ],
-  images: [{ imageRef: 'alice.webp', caption: 'Alice', sortOrder: 0, visibleFromOrdinal: 0 }],
+  images: [{ imageRef: `${'a1'.repeat(32)}.webp`, caption: 'Alice', sortOrder: 0, visibleFromOrdinal: 0 }],
   ...overrides,
 });
 

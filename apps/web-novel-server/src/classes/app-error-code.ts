@@ -49,6 +49,13 @@ export class AppErrorCode extends ServerErrorCode {
    * consistent revision) and WBN_010 (a well-formed push against a slug this caller doesn't own).
    */
   static readonly WBN_011 = AppErrorCode.badRequest('WBN_011', 'The supplied contentHash does not match the pushed chapter payload');
+  /**
+   * The metadata push carried a `publishToken` that does not match the one this `(sourceClientId, sourceRef)`
+   * was bound to on first sight. Shares the 409 family with WBN_010 and, like it, is an authorization refusal:
+   * a per-project defense-in-depth check that hardens the guessable `sourceRef`, not a standalone control
+   * against a forge-side ownership-guard gap that already acts on the target project.
+   */
+  static readonly WBN_012 = AppErrorCode.conflict('WBN_012', 'The publish token does not match the token bound to this novel');
 
   /*!
    * Session Error Codes

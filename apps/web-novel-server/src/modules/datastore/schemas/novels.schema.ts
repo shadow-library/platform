@@ -52,6 +52,14 @@ export const novels = pgTable(
      * mistake this column exists to remove.
      */
     sourceRef: varchar('source_ref', { length: 64 }).notNull(),
+    /**
+     * The per-project publish token, bound trust-on-first-use: the first metadata push carrying one sets it,
+     * and every later push under this `(source_client_id, source_ref)` must present the same token. Nullable so
+     * novels published before it existed keep resolving and bind on their next changing push. It hardens the
+     * guessable `source_ref` against targeting; it is defense-in-depth, not a standalone control against a
+     * publisher-side authorization gap that already acts on the target project.
+     */
+    publishToken: varchar('publish_token', { length: 64 }),
     title: varchar('title', { length: 256 }).notNull(),
     /** The work's own author as the reader should see them, which is not the publishing client and is unknown for many pushes. */
     originalAuthor: varchar('original_author', { length: 256 }),

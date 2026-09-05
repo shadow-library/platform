@@ -13,11 +13,13 @@ const env = new TestEnvironment('reader').init();
  */
 let sessionCookie = '';
 
+const MOONFALL_COVER = `${'cd'.repeat(32)}.jpg`;
+
 const seedNovel = async (slug = 'moonfall') => {
   const db = env.getPostgresClient();
   const [novel] = await db
     .insert(schema.novels)
-    .values({ slug, sourceClientId: FORGE_CLIENT_ID, sourceRef: slug, title: 'Moonfall', coverPath: 'moonfall-cover.jpg', genres: ['Fantasy'], revision: 1 })
+    .values({ slug, sourceClientId: FORGE_CLIENT_ID, sourceRef: slug, title: 'Moonfall', coverPath: MOONFALL_COVER, genres: ['Fantasy'], revision: 1 })
     .returning();
   return novel as { id: bigint };
 };
@@ -120,7 +122,7 @@ describe('Reader progress and library', () => {
       expect(items[0]).toMatchObject({
         slug: 'moonfall',
         title: 'Moonfall',
-        coverUrl: 'http://localhost:9000/wiki-assets/moonfall-cover.jpg',
+        coverUrl: `http://localhost:9000/wiki-assets/${MOONFALL_COVER}`,
         genres: ['Fantasy'],
         status: 'live',
       });

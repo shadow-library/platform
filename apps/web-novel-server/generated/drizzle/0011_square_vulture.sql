@@ -1,0 +1,1 @@
+ALTER TABLE "novels" ADD COLUMN "publish_token" varchar(64);

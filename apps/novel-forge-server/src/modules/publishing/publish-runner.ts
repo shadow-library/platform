@@ -188,12 +188,14 @@ export class PublishRunner {
     const refused = new Set<string>();
     const entrySlug = publication.novelSlug;
     let current = publication;
+    const publishToken = await this.publishingService.ensurePublishToken(publication);
 
     for (let attempt = 1; attempt <= SLUG_ATTEMPT_LIMIT; attempt++) {
       try {
         /** Decimal `projectId`: never reassigned for the project's life, and 19 digits at most against the reader's `varchar(64)`. */
         const novelResult = await this.pushClient.upsertNovel(current.novelSlug, {
           sourceRef: current.projectId.toString(),
+          publishToken,
           title: current.title,
           originalAuthor: current.originalAuthor ?? undefined,
           blurb: current.blurb ?? undefined,

@@ -78,6 +78,13 @@
       "when": 1788001579811,
       "tag": "0010_rainy_hannibal_king",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788625208698,
+      "tag": "0011_square_vulture",
+      "breakpoints": true
     }
   ]
 }

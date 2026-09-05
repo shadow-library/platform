@@ -6,7 +6,7 @@ import { AppError, Config, Logger, LRUCache } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 import { CONTENT_RATING_LEVELS, type ContentRatingDimension, type ContentRatingLevel, ratingRank } from '@shadow-library/sdk';
 
-import { AppErrorCode } from '@server/classes';
+import { AppErrorCode, isImageRef } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
 
@@ -199,7 +199,7 @@ export class CatalogService {
   }
 
   imageUrl(ref: string | null | undefined): string | undefined {
-    if (!ref) return undefined;
+    if (!isImageRef(ref)) return undefined;
     return `${this.publicOrigin}/${ref}`;
   }
 

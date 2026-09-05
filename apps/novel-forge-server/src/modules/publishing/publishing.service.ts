@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { AppError, Logger } from '@shadow-library/common';
@@ -7,7 +7,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { type ContentRating, normalizeContentRating } from '@shadow-library/sdk';
 
 import { AppErrorCode } from '@server/classes';
-import { assertActiveProject } from '@server/common';
+import { assertActiveProject, generatePublishToken } from '@server/common';
 import { APP_NAME, CURATE_PERMISSION } from '@server/constants';
 import { type ImportedNovelMetaData, type PrimaryDatabase, type Publishing, schema } from '@server/database';
 
@@ -313,6 +313,29 @@ export class PublishingService {
   async getPublication(projectId: bigint): Promise<Publishing.Publication> {
     const publication = await this.db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId) });
     return publication ?? AppErrorCode.PUB_001.throw();
+  }
+
+  /**
+   * Returns the publication's reader publish token, minting and persisting one the first time. The write is
+   * conditional on the column still being null so two concurrent converges converge on a single token rather
+   * than each binding a different one on the reader (the reader would then refuse the second).
+   */
+  async ensurePublishToken(publication: Publishing.Publication): Promise<string> {
+    if (publication.publishToken) return publication.publishToken;
+    const candidate = generatePublishToken();
+    const [bound] = await this.databaseService.run(() =>
+      this.db
+        .update(schema.publications)
+        .set({ publishToken: candidate, updatedAt: new Date() })
+        .where(and(eq(schema.publications.id, publication.id), isNull(schema.publications.publishToken)))
+        .returning({ publishToken: schema.publications.publishToken }),
+    );
+    if (bound?.publishToken) {
+      this.logger.info('publication bound a reader publish token', { projectId: publication.projectId });
+      return bound.publishToken;
+    }
+    const current = await this.db.query.publications.findFirst({ where: eq(schema.publications.id, publication.id), columns: { publishToken: true } });
+    return current?.publishToken ?? candidate;
   }
 
   loadLedger(projectId: bigint): Promise<Publishing.ChapterPublication[]> {

@@ -2,6 +2,7 @@ export * from './internal-service.middleware';
 export * from './publish-audit.middleware';
 export * from './publish-audit.service';
 export * from './publish-ownership';
+export * from './publish-token';
 export * from './publish.controller';
 export * from './publish.decorators';
 export * from './publish.dto';

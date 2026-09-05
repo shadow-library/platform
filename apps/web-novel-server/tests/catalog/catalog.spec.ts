@@ -9,6 +9,8 @@ import { FORGE_CLIENT_ID, forgeToken } from '../test-idp';
 
 const env = new TestEnvironment('catalog').init();
 
+const AURORA_COVER = `${'ab'.repeat(32)}.jpg`;
+
 const seedCatalog = async () => {
   const db = env.getPostgresClient();
   const [aurora] = await db
@@ -20,7 +22,7 @@ const seedCatalog = async () => {
         sourceRef: 'forge-aurora-blade',
         title: 'Aurora Blade',
         blurb: 'Steel under polar light',
-        coverPath: 'aurora-blade-cover.jpg',
+        coverPath: AURORA_COVER,
         genres: ['Fantasy', 'Action'],
         tags: ['Slow Romance'],
         sexualContent: 'moderate',
@@ -87,7 +89,7 @@ describe('Public catalog API', () => {
         genres: ['Fantasy', 'Action'],
         status: 'live',
         chapterCount: 2,
-        coverUrl: 'http://localhost:9000/wiki-assets/aurora-blade-cover.jpg',
+        coverUrl: `http://localhost:9000/wiki-assets/${AURORA_COVER}`,
       });
     });
 
@@ -220,7 +222,7 @@ describe('Public catalog API', () => {
         blurb: 'Steel under polar light',
         chapterCount: 2,
         status: 'live',
-        coverUrl: 'http://localhost:9000/wiki-assets/aurora-blade-cover.jpg',
+        coverUrl: `http://localhost:9000/wiki-assets/${AURORA_COVER}`,
       });
     });
 

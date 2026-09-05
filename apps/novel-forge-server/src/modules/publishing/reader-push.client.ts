@@ -8,6 +8,8 @@ import { APP_NAME } from '@server/constants';
 export interface NovelPushBody {
   /** Our own identity for the novel, not the reader's: it, not the slug, decides which row a push lands on, so a new slug renames rather than duplicates. */
   sourceRef: string;
+  /** The publication's per-project token the reader binds trust-on-first-use; optional so a reader that predates it simply drops it. Hardens the guessable `sourceRef`, not a guard-gap control on its own. */
+  publishToken?: string;
   title: string;
   /** The work's own author for a curated import; omitted rather than empty — the reader's schema rejects a blank one. */
   originalAuthor?: string;
