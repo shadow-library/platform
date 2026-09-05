@@ -2,6 +2,7 @@
   "extends": "../tsconfig.web.json",
   /** `paths` stays leaf-local — see tsconfig.web.json's comment (Bun runtime ${configDir} limitation). */
   "compilerOptions": {
-    "paths": { "@/*": ["./src/*"] }
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["vite/client", "node", "bun"]
   }
 }

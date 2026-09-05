@@ -5,8 +5,9 @@ import { Alert, Button, FormField, Input, Spinner } from '@shadow-library/ui';
 import { ExternalLinkIcon, GlobeIcon, KeyIcon } from '@/components/icons';
 import { assertPasskey, AuthCard, AuthMedallion, AuthScreen, IdentifierChip, MfaLockedCard, MfaStep, OtpEntry, StepHeader, useFlow } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
-import { authApi, type FlowState, type SocialProvider, useAuthMethodsQuery } from '@/lib/apis';
+import { authApi, type FlowState, type SocialProvider, useAuthMethodsQuery, useRootDomain } from '@/lib/apis';
 import { useDeviceId } from '@/lib/hooks';
+import { safeReturnTo } from '@/lib/safe-return-to';
 
 interface LoginSearch {
   returnTo?: string;
@@ -43,6 +44,7 @@ function LoginPage(): React.JSX.Element {
   const search = Route.useSearch();
   const navigate = useNavigate();
   const deviceId = useDeviceId();
+  const rootDomain = useRootDomain();
   const { flow, busy, error, dead, deadReason, run, reset, setError } = useFlow();
   const methods = useAuthMethodsQuery();
 
@@ -91,7 +93,8 @@ function LoginPage(): React.JSX.Element {
 
   const complete = (next: FlowState): void => {
     if (next.resumeUrl) return window.location.assign(next.resumeUrl);
-    if (search.returnTo && search.returnTo.startsWith('/')) return window.location.assign(search.returnTo);
+    const target = safeReturnTo(search.returnTo, rootDomain);
+    if (target) return window.location.assign(target);
     navigate({ to: '/account' });
   };
 

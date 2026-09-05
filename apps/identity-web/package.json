@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "license": "UNLICENSED",
+  "shadow": {
+    "verifyTest": true
+  },
   "scripts": {
     "dev": "vite dev --port 3000",
     "start": "bun main.ts",

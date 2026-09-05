@@ -6,6 +6,7 @@ import { AuthCard, AuthMedallion, AuthScreen, StepHeader } from '@/features/auth
 import parts from '@/features/auth/auth-parts.module.css';
 import { StepUpFields } from '@/features/portal';
 import { stepUpIntentQueryOptions, useRootDomain, useStepUpIntentQuery, useStepUpMethodsQuery } from '@/lib/apis';
+import { safeReturnTo } from '@/lib/safe-return-to';
 import { requireSession } from '@/lib/session';
 
 /** Kept snake_case to round-trip the SDK's OAuth-style URL — a renamed shape makes the router rewrite the address with duplicate params. */
@@ -36,28 +37,6 @@ export const Route = createFileRoute('/_auth/step-up')({
   },
   component: StepUpPage,
 });
-
-/**
- * The elevation is bound to the SDK's `client_id`; a browser folds backslashes into slashes, so the
- * candidate is normalised before the protocol-relative (`//host`) check. A relative same-origin path
- * is always safe; an absolute URL is allowed only for the issuer's own origin or a first-party app
- * under the ecosystem root domain — mirroring how the issuer scopes its redirects.
- */
-function safeReturnTo(candidate: string | undefined, rootDomain: string): string | null {
-  if (!candidate) return null;
-  const normalised = candidate.replace(/\\/g, '/');
-  if (normalised.startsWith('/') && !normalised.startsWith('//')) return normalised;
-  let url: URL;
-  try {
-    url = new URL(candidate);
-  } catch {
-    return null;
-  }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
-  if (url.origin === window.location.origin) return url.toString();
-  if (url.hostname === rootDomain || url.hostname.endsWith(`.${rootDomain}`)) return url.toString();
-  return null;
-}
 
 function StepUpPage(): React.JSX.Element {
   const { client_id: clientId, resource, return_to: returnTo } = Route.useSearch();
