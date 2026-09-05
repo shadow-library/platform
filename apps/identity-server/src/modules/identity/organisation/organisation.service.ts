@@ -5,7 +5,7 @@ import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, isNumericId } from '@server/constants';
 import { type ValidatedSession } from '@server/modules/auth/session';
 import { RefreshTokenService } from '@server/modules/auth/token';
 import { PolicyDecisionService } from '@server/modules/authz';
@@ -154,10 +154,17 @@ export class OrganisationService {
   }
 
   async assertActiveTeam(organisationId: string): Promise<Organisation> {
-    if (!/^\d+$/.test(organisationId)) throw AppErrorCode.ORG_002.create();
+    if (!isNumericId(organisationId)) throw AppErrorCode.ORG_002.create();
     const organisation = await this.getById(BigInt(organisationId));
     if (!organisation || organisation.status !== 'ACTIVE') throw AppErrorCode.ORG_002.create();
     if (organisation.type !== 'TEAM') throw AppErrorCode.ORG_003.create();
+    return organisation;
+  }
+
+  async assertActiveOrganisation(organisationId: string): Promise<Organisation> {
+    if (!isNumericId(organisationId)) throw AppErrorCode.ORG_002.create();
+    const organisation = await this.getById(BigInt(organisationId));
+    if (!organisation || organisation.status !== 'ACTIVE') throw AppErrorCode.ORG_002.create();
     return organisation;
   }
 

@@ -178,6 +178,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ORG_010 = AppErrorCode.notFound('ORG_010', 'Domain not found');
   /** The application cannot be assigned because the organisation's members could never reach it (inactive, INTERNAL, or an unreleased RESTRICTED app) */
   static readonly ORG_011 = AppErrorCode.validation('ORG_011', 'The application cannot be assigned to this organisation', 400);
+  /** Revoke-path companion to ORG_011: same machine code and status so no new failure oracle appears, wording that fits removal rather than assignment */
+  static readonly ORG_011_REVOKE = AppErrorCode.validation('ORG_011', 'The application is not entitled in this organisation', 400);
 
   /*!
    * Organisation Policy Error Codes

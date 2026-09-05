@@ -18,6 +18,8 @@ export const REGEX = {
   SUBDOMAIN: /^[a-z0-9][a-z0-9-]{0,62}$/,
 } as const satisfies Record<string, RegExp>;
 
+export const isNumericId = (value: string): boolean => REGEX.ID.test(value);
+
 const unanchored = (regex: RegExp): string => regex.source.slice(1, -1);
 
 const shapedAs = (regex: RegExp, message: string): FieldPattern => ({ pattern: regex.source, errorMessage: { pattern: message } });

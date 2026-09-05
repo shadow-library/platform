@@ -9,9 +9,12 @@ import { OrganisationService } from '@server/modules/identity/organisation';
 
 import { ADMIN_PERMISSIONS, AdminPermission, PLATFORM_ORG_NAME } from './admin.constants';
 
+export type AdminScope = 'platform' | 'application';
+
 export interface AdminActor {
   session: ValidatedSession;
   organisationId: string;
+  scope: AdminScope;
 }
 
 @Injectable()
@@ -48,7 +51,7 @@ export class AdminAccessService {
       throw AppErrorCode.ADM_001.create();
     }
     this.logger.debug('admin access granted', { userId, permission, aal: session.aal });
-    return { session, organisationId };
+    return { session, organisationId, scope: 'platform' };
   }
 
   async listGrantedPermissions(session: ValidatedSession): Promise<AdminPermission[]> {
@@ -66,13 +69,13 @@ export class AdminAccessService {
     const platform = await this.policyDecisionService.check({ principal, organisationId, action: ADMIN_PERMISSIONS.rolesManage });
     if (platform.decision === 'PERMIT') {
       this.logger.debug('role admin access granted platform-wide', { userId, applicationId });
-      return { session, organisationId };
+      return { session, organisationId, scope: 'platform' };
     }
 
     const scoped = await this.policyDecisionService.checkForApplication({ principal, organisationId, action: ADMIN_PERMISSIONS.appRolesManage }, applicationId);
     if (scoped.decision === 'PERMIT') {
       this.logger.debug('role admin access granted for application', { userId, applicationId });
-      return { session, organisationId };
+      return { session, organisationId, scope: 'application' };
     }
     this.logger.warn('role admin access denied', { securityEvent: 'admin.access_denied', userId, applicationId, aal: session.aal });
     throw AppErrorCode.ADM_001.create();

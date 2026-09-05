@@ -1,14 +1,15 @@
 import { Body, Get, HttpController, HttpStatus, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 import { AppErrorCode } from '@server/classes';
+import { isNumericId } from '@server/constants';
 import { Auth, Context } from '@server/modules/access';
 import { PolicyDecisionService, type Principal } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { Application } from '@server/modules/infrastructure/datastore';
-import { ApplicationRoleService } from '@server/modules/system/application';
+import { ApplicationAccessService, ApplicationRoleService } from '@server/modules/system/application';
 
-import { AdminAccessService, AdminActor } from './admin-access.service';
+import { AdminAccessService, AdminActor, AdminScope } from './admin-access.service';
 import { ApplicationIdQuery, AssignmentListQuery, AssignmentListResponse, PermissionListResponse, RoleAssignmentBody } from './admin-role.dto';
 import { AdminActionResponse } from './admin-user.dto';
 import { ADMIN_PERMISSIONS } from './admin.constants';
@@ -19,6 +20,7 @@ export class AdminRoleController {
     private readonly access: AdminAccessService,
     private readonly policyDecisionService: PolicyDecisionService,
     private readonly applicationRoleService: ApplicationRoleService,
+    private readonly applicationAccess: ApplicationAccessService,
     private readonly organisationService: OrganisationService,
     private readonly auditService: AuditService,
   ) {}
@@ -29,11 +31,49 @@ export class AdminRoleController {
     return role;
   }
 
-  /** Organisation-grant scope is derived from the principal, never trusted from the request; revocation skips liveness so suspended-org grants remain removable. */
-  private async resolveAssignment(body: RoleAssignmentBody, validate: boolean): Promise<{ principal: Principal; organisationId: string }> {
-    if (body.principalType !== 'ORGANISATION') return { principal: { type: body.principalType, id: body.principalId }, organisationId: body.organisationId };
-    if (validate) await this.organisationService.assertActiveTeam(body.principalId);
-    return { principal: { type: 'ORGANISATION', id: body.principalId }, organisationId: body.principalId };
+  /** An organisation grant's scope is derived from the principal; a user/service grant's is caller-supplied and validated at write time, never trusted. */
+  private resolveAssignment(body: RoleAssignmentBody): { principal: Principal; organisationId: string } {
+    if (body.principalType === 'ORGANISATION') return { principal: { type: 'ORGANISATION', id: body.principalId }, organisationId: body.principalId };
+    return { principal: { type: body.principalType, id: body.principalId }, organisationId: body.organisationId };
+  }
+
+  /**
+   * The base rule — an org-wide grant targets an active team organisation — holds for every caller. The stronger tenant
+   * checks (the role's application entitled in the target, and for a user their membership of it) close HIGH-001 for the
+   * lower-trust app-scoped tier: without them an app admin could plant its application's role onto any principal in any
+   * organisation. A platform `iam:roles:manage` admin is already trusted across every tenant, so it keeps unrestricted reach.
+   */
+  private async assertAssignable(role: Application.Role, principal: Principal, organisationId: string, scope: AdminScope): Promise<void> {
+    if (principal.type === 'ORGANISATION') {
+      const organisation = await this.organisationService.assertActiveTeam(organisationId);
+      if (scope === 'application') await this.assertApplicationEntitled(role.applicationId, organisation.id);
+      return;
+    }
+    if (scope !== 'application') return;
+    const organisation = await this.organisationService.assertActiveOrganisation(organisationId);
+    await this.assertApplicationEntitled(role.applicationId, organisation.id);
+    if (principal.type === 'USER') await this.organisationService.assertMember(this.parseUserId(principal.id), organisation.id);
+  }
+
+  /** Revocation deliberately skips organisation liveness so a suspended-org grant stays removable; the app-scoped tier still may not touch a tenant its application is not entitled in, so a cross-tenant app admin cannot tamper (HIGH-001). The platform tier is unrestricted, mirroring assignment. */
+  private async assertRevocable(role: Application.Role, organisationId: string, scope: AdminScope): Promise<void> {
+    if (scope !== 'application') return;
+    await this.assertApplicationEntitled(role.applicationId, this.parseOrganisationId(organisationId), AppErrorCode.ORG_011_REVOKE);
+  }
+
+  private async assertApplicationEntitled(applicationId: number, organisationId: bigint, error: AppErrorCode = AppErrorCode.ORG_011): Promise<void> {
+    const entitled = await this.applicationAccess.listOrganisationApplicationIds(organisationId);
+    if (!entitled.has(applicationId)) throw error.create();
+  }
+
+  private parseOrganisationId(organisationId: string): bigint {
+    if (!isNumericId(organisationId)) throw AppErrorCode.ORG_002.create();
+    return BigInt(organisationId);
+  }
+
+  private parseUserId(userId: string): bigint {
+    if (!isNumericId(userId)) throw AppErrorCode.ORG_001.create();
+    return BigInt(userId);
   }
 
   private async record(actor: AdminActor, action: string, targetType: string, targetId: string, detail?: Record<string, unknown>): Promise<void> {
@@ -55,7 +95,8 @@ export class AdminRoleController {
   async assignRole(@Body() body: RoleAssignmentBody): Promise<AdminActionResponse> {
     const role = await this.findRoleOrThrow(body.roleId);
     const actor = await this.access.requireRoleAdmin(Context.getSession(), role.applicationId);
-    const { principal, organisationId } = await this.resolveAssignment(body, true);
+    const { principal, organisationId } = this.resolveAssignment(body);
+    await this.assertAssignable(role, principal, organisationId, actor.scope);
     await this.policyDecisionService.assignRole(principal, role.id, organisationId, actor.session.userId.toString());
     await this.record(actor, 'admin.role.assigned', 'role_assignment', `${principal.type}:${principal.id}`, { roleId: role.id, organisationId });
     return { success: true };
@@ -68,7 +109,8 @@ export class AdminRoleController {
   async revokeRoleAssignment(@Body() body: RoleAssignmentBody): Promise<AdminActionResponse> {
     const role = await this.findRoleOrThrow(body.roleId);
     const actor = await this.access.requireRoleAdmin(Context.getSession(), role.applicationId);
-    const { principal, organisationId } = await this.resolveAssignment(body, false);
+    const { principal, organisationId } = this.resolveAssignment(body);
+    await this.assertRevocable(role, organisationId, actor.scope);
     await this.policyDecisionService.revokeRole(principal, role.id, organisationId);
     await this.record(actor, 'admin.role.revoked', 'role_assignment', `${principal.type}:${principal.id}`, { roleId: role.id, organisationId });
     return { success: true };
