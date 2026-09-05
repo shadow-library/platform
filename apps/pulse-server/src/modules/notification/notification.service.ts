@@ -64,14 +64,16 @@ export interface ListMessagesQuery extends Partial<OffsetPagination> {
   recipient?: string;
 }
 
-export type NotificationMessage = Notification.Message & {
+export interface NotificationMessage {
+  id: bigint;
   channel: Notification.Channel;
+  /** Masked at the source: the dev log exposes delivery metadata only, never the raw recipient or the rendered body/subject/payload (OTP codes, reset links). */
   recipient: string;
   locale: string;
-  payload?: unknown;
   templateKey: string;
   messageType: Template.MessageType;
-};
+  createdAt: Date;
+}
 
 const MAX_ATTEMPTS = 5;
 const BASE_DELAY_SECONDS: Record<Template.MessageType, number> = { OTP: 2, TRANSACTIONAL: 30, PROMOTIONAL: 5 * 60 };
@@ -276,7 +278,15 @@ export class NotificationService {
     const where = whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
     const baseQuery = this.db
-      .select()
+      .select({
+        id: schema.notificationMessages.id,
+        createdAt: schema.notificationMessages.createdAt,
+        recipient: schema.notificationJobs.recipient,
+        channel: schema.notificationJobs.channel,
+        locale: schema.notificationJobs.locale,
+        templateKey: schema.templates.templateKey,
+        messageType: schema.templates.messageType,
+      })
       .from(schema.notificationMessages)
       .innerJoin(schema.notificationJobs, eq(schema.notificationMessages.notificationJobId, schema.notificationJobs.id))
       .innerJoin(schema.templates, eq(schema.notificationJobs.templateId, schema.templates.id))
@@ -292,11 +302,7 @@ export class NotificationService {
     ]);
 
     const total = Number(countResult[0]?.count ?? 0);
-    const items = rows.map(row => ({
-      ...row.notification_messages,
-      ...utils.object.pickKeys(row.notification_jobs, ['channel', 'recipient', 'locale', 'payload']),
-      ...utils.object.pickKeys(row.templates, ['templateKey', 'messageType']),
-    }));
+    const items = rows.map<NotificationMessage>(row => ({ ...row, recipient: utils.string.mask(row.recipient) }));
     return utils.pagination.createResult(query, items, total);
   }
 }

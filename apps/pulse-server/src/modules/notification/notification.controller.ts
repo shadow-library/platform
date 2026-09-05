@@ -21,7 +21,7 @@ export class NotificationController {
 
   @Get('/messages')
   @EnableIf(() => Config.get('app.stage') === 'dev')
-  @RequirePermission(PULSE_PERMISSIONS.logsRead)
+  @RequirePermission(PULSE_PERMISSIONS.messagesRead)
   @RespondFor(200, ListNotificationMessagesResponse)
   listMessages(@Query() query: ListNotificationMessagesQuery): Promise<ListNotificationMessagesResponse> {
     return this.notificationService.listMessages(query);

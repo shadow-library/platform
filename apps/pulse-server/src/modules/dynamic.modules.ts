@@ -17,10 +17,6 @@ import { CUSTOM_DATA_TRANSFORMERS } from '@server/common';
  * express.
  */
 export const AppHttpCoreModule = HttpCoreModule.forRoot({
-  csrf: {
-    disabled: true,
-  },
-
   openapi: {
     normalizeSchemaIds: true,
   },

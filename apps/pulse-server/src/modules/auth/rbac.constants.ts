@@ -20,6 +20,8 @@ export const PULSE_PERMISSIONS = {
   sendersWrite: 'pulse:senders:write',
   metricsRead: 'pulse:metrics:read',
   logsRead: 'pulse:logs:read',
+  /** High-trust: the dev message log exposes recipient PII and rendered bodies (OTP codes, reset links), so it is admin-only, unlike the viewer-held logsRead */
+  messagesRead: 'pulse:messages:read',
 } as const;
 
 export const PULSE_SCOPES = {

@@ -1,4 +1,4 @@
-import { type ReactElement, useState } from 'react';
+import { type ReactElement } from 'react';
 import { Badge, Card, EmptyState, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
 import { useSearchParams } from '@shadow-library/web/router';
 
@@ -15,8 +15,6 @@ import {
   useDebouncedParam,
   useTablePagination,
   useTableSort,
-  type ViewerData,
-  ViewerDrawer,
 } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type NotificationMessageResponse, useListNotificationMessagesQuery } from '@/lib';
@@ -29,7 +27,7 @@ export default function MessageLog(): ReactElement {
           Message Log <Badge variant="outline">dev-only</Badge>
         </>
       }
-      subtitle="Inspect previously rendered / sent messages. Available only when the server runs in the dev environment stage."
+      subtitle="Inspect delivery metadata for previously sent messages. Available only when the server runs in the dev environment stage."
     />
   );
 
@@ -40,7 +38,7 @@ export default function MessageLog(): ReactElement {
         <Card padding="sm">
           <EmptyState
             title="Message Log is unavailable"
-            description="This inspection endpoint is only exposed while the server runs in the dev environment stage. Run the server in dev to view rendered messages."
+            description="This inspection endpoint is only exposed while the server runs in the dev environment stage. Run the server in dev to view message delivery metadata."
           />
         </Card>
       </>
@@ -61,19 +59,6 @@ function MessageLogTable(): ReactElement {
   const [recipientValue, setRecipientValue] = useDebouncedParam('recipient');
   const pagination = useTablePagination(data?.total);
   const { sort, onSortChange } = useTableSort({ id: 'createdAt', direction: 'desc' });
-
-  const [viewer, setViewer] = useState<ViewerData | null>(null);
-  const openView = (row: NotificationMessageResponse): void =>
-    setViewer({
-      channel: row.channel,
-      title: `${row.channel} · ${row.recipient}`,
-      meta: `${row.templateKey} · ${formatDateTime(row.createdAt)}`,
-      recipient: row.recipient,
-      subject: row.renderedSubject,
-      body: row.renderedBody,
-      rawBody: row.renderedBody,
-      payload: row.payload ?? null,
-    });
 
   const columns: TableColumn<NotificationMessageResponse>[] = [
     { id: 'channel', header: 'Channel', cell: row => <OutlineBadge>{row.channel}</OutlineBadge> },
@@ -107,7 +92,6 @@ function MessageLogTable(): ReactElement {
         rowKey="id"
         aria-label="Message log"
         loading={isLoading}
-        onRowClick={openView}
         sort={sort}
         onSortChange={onSortChange}
         emptyState="No messages match your filters."
@@ -123,7 +107,6 @@ function MessageLogTable(): ReactElement {
           summary
         />
       </div>
-      <ViewerDrawer open={!!viewer} data={viewer} onOpenChange={open => !open && setViewer(null)} />
     </>
   );
 }

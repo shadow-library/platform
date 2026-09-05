@@ -89,7 +89,7 @@ const USERS_RESOLVE = { resource: PLATFORM_RESOURCE, scope: 'users:resolve' } as
  */
 const PULSE_VIEWER_PERMISSIONS = ['pulse:templates:read', 'pulse:senders:read', 'pulse:metrics:read', 'pulse:logs:read'] as const;
 const PULSE_OPERATOR_PERMISSIONS = [...PULSE_VIEWER_PERMISSIONS, 'pulse:templates:write', 'pulse:templates:publish', 'pulse:layouts:write'] as const;
-const PULSE_ADMIN_PERMISSIONS = [...PULSE_OPERATOR_PERMISSIONS, 'pulse:senders:write'] as const;
+const PULSE_ADMIN_PERMISSIONS = [...PULSE_OPERATOR_PERMISSIONS, 'pulse:senders:write', 'pulse:messages:read'] as const;
 
 /**
  * The first-party ecosystem reconciled on boot. Each application gets one client whose id equals
@@ -120,6 +120,7 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
         { name: 'pulse:senders:write', description: 'Manage sender profiles, endpoints and routing rules' },
         { name: 'pulse:metrics:read', description: 'Read delivery metrics and dashboards' },
         { name: 'pulse:logs:read', description: 'Read notification delivery logs' },
+        { name: 'pulse:messages:read', description: 'Read the dev message log, including recipient PII and rendered message bodies' },
       ],
       roles: [
         { name: 'PulseViewer', description: 'Read-only access to pulse templates, senders, metrics and logs', permissions: PULSE_VIEWER_PERMISSIONS },

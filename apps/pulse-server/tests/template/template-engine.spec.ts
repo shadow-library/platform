@@ -39,6 +39,86 @@ describe('TemplateEngineService', () => {
     expect(out.body).toContain('&lt;script&gt;');
   });
 
+  it('should neutralize author `| raw` in an EMAIL body so markup cannot bypass escaping', async () => {
+    const out = await engine.render({
+      channel: 'EMAIL',
+      subject: null,
+      body: '<p>{{ payload | raw }}</p>',
+      layout: null,
+      data: { payload: '<script>alert(1)</script>' },
+    });
+    expect(out.body).not.toContain('<script>');
+    expect(out.body).toContain('&lt;script&gt;');
+  });
+
+  it('should neutralize author `| raw` inside a partial', async () => {
+    const out = await engine.render({
+      channel: 'EMAIL',
+      subject: null,
+      body: `{% render 'evil', payload: payload %}`,
+      layout: null,
+      partials: { evil: '{{ payload | raw }}' },
+      data: { payload: '<img src=x onerror=alert(1)>' },
+    });
+    expect(out.body).not.toContain('<img');
+    expect(out.body).toContain('&lt;img');
+  });
+
+  it('should inject the layout content slot unescaped while escaping author `| raw` in the same render', async () => {
+    const out = await engine.render({
+      channel: 'EMAIL',
+      subject: null,
+      body: '<h1>{{ heading }}</h1><p>{{ danger | raw }}</p>',
+      layout: '<main>{{ content | raw }}</main><footer>{{ danger | raw }}</footer>',
+      data: { heading: 'Sign in', danger: '<script>alert(1)</script>' },
+    });
+    expect(out.body).toContain('<main><h1>Sign in</h1>');
+    expect(out.body).not.toContain('<script>');
+    expect(out.body).toContain('&lt;script&gt;');
+  });
+
+  it('should neutralize an author `{% echo %}` tag in an EMAIL body so markup cannot bypass escaping', async () => {
+    const out = await engine.render({
+      channel: 'EMAIL',
+      subject: null,
+      body: '<p>{% echo payload %}</p>',
+      layout: null,
+      data: { payload: '<script>alert(1)</script>' },
+    });
+    expect(out.body).not.toContain('<script>');
+    expect(out.body).toContain('&lt;script&gt;');
+  });
+
+  it('should neutralize an author `{% liquid echo %}` in an EMAIL body so markup cannot bypass escaping', async () => {
+    const out = await engine.render({
+      channel: 'EMAIL',
+      subject: null,
+      body: '{% liquid echo payload %}',
+      layout: null,
+      data: { payload: '<script>alert(1)</script>' },
+    });
+    expect(out.body).not.toContain('<script>');
+    expect(out.body).toContain('&lt;script&gt;');
+  });
+
+  it('should keep `{% liquid %}` assign/if control flow working when no author value is echoed', async () => {
+    const out = await engine.render({
+      channel: 'EMAIL',
+      subject: null,
+      body: `{% liquid
+        assign role = 'admin'
+        if role == 'admin'
+          assign label = 'Administrator'
+        else
+          assign label = 'Member'
+        endif
+      %}<span>{{ label }}</span>`,
+      layout: null,
+      data: {},
+    });
+    expect(out.body).toContain('<span>Administrator</span>');
+  });
+
   it('should render SMS as plain text without HTML-escaping', async () => {
     const out = await engine.render({ channel: 'SMS', subject: null, body: '{{ code }} is your code — expires soon', data: { code: '482913' } });
     expect(out.subject).toBeNull();

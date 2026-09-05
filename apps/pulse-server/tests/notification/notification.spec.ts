@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
+import { utils } from '@shadow-library/common';
+
+import { PULSE_PERMISSIONS } from '@modules/auth';
 import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
 
 const testEnv = new TestEnvironment('notification_test');
@@ -87,7 +90,21 @@ describe('Notification', () => {
   });
 
   describe('GET /v1/notifications/messages', () => {
-    it('should return all seeded notification messages', async () => {
+    it('should require the admin-only pulse:messages:read, denying a viewer that only holds pulse:logs:read', async () => {
+      const headers = await testEnv.userHeaders({ sub: 'pulse-viewer', permissions: [PULSE_PERMISSIONS.logsRead] });
+      const response = await testEnv.getRouter().mockRequest().headers(headers).get('/api/v1/notifications/messages');
+
+      expect(response.statusCode).toBe(403);
+    });
+
+    it('should allow a caller granted pulse:messages:read', async () => {
+      const headers = await testEnv.userHeaders({ sub: 'pulse-messages-reader', permissions: [PULSE_PERMISSIONS.messagesRead] });
+      const response = await testEnv.getRouter().mockRequest().headers(headers).get('/api/v1/notifications/messages');
+
+      expect(response.statusCode).toBe(200);
+    });
+
+    it('should return delivery metadata only, never the rendered body/subject or payload', async () => {
       const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/notifications/messages');
 
       expect(response.statusCode).toBe(200);
@@ -99,16 +116,20 @@ describe('Notification', () => {
             id: expect.stringMatching(TEST_REGEX.id),
             channel: expect.stringMatching(/(EMAIL|SMS|PUSH)/),
             recipient: expect.any(String),
-            renderedBody: expect.any(String),
             templateKey: expect.any(String),
             messageType: expect.stringMatching(/(TRANSACTIONAL|PROMOTIONAL|OTP)/),
             createdAt: expect.stringMatching(TEST_REGEX.dateISO),
           }),
         ]),
       );
+      for (const item of json.items) {
+        expect(item).not.toHaveProperty('renderedBody');
+        expect(item).not.toHaveProperty('renderedSubject');
+        expect(item).not.toHaveProperty('payload');
+      }
     });
 
-    it('should filter notification messages by channel', async () => {
+    it('should filter notification messages by channel, masking the recipient', async () => {
       const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/notifications/messages?channel=SMS');
 
       expect(response.statusCode).toBe(200);
@@ -116,14 +137,14 @@ describe('Notification', () => {
       expect(json.total).toBe(1);
       expect(json.items[0]).toMatchObject({
         channel: 'SMS',
-        recipient: '+15551230001',
+        recipient: utils.string.mask('+15551230001'),
         templateKey: 'sign-up',
         messageType: 'TRANSACTIONAL',
-        renderedBody: 'Welcome Alice, your account is ready.',
       });
+      expect(json.items[0].recipient).not.toBe('+15551230001');
     });
 
-    it('should filter notification messages by recipient', async () => {
+    it('should filter notification messages by the raw recipient while returning it masked', async () => {
       const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/notifications/messages?recipient=alice@example.com');
 
       expect(response.statusCode).toBe(200);
@@ -131,13 +152,11 @@ describe('Notification', () => {
       expect(json.total).toBe(1);
       expect(json.items[0]).toMatchObject({
         channel: 'EMAIL',
-        recipient: 'alice@example.com',
-        renderedSubject: 'Welcome to Shadow',
-        renderedBody: 'Hi Alice, welcome aboard!',
+        recipient: utils.string.mask('alice@example.com'),
         templateKey: 'sign-up',
         messageType: 'TRANSACTIONAL',
-        payload: { name: 'Alice' },
       });
+      expect(json.items[0].recipient).not.toBe('alice@example.com');
     });
   });
 });

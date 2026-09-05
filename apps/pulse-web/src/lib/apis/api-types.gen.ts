@@ -785,13 +785,9 @@ export interface components {
     NotificationMessageResponse: {
       id: string;
       channel: components['schemas']['NotificationChannel'];
+      /** @description Recipient, masked — the log carries delivery metadata only, never the raw recipient or rendered body/payload (OTP codes, reset links) */
       recipient: string;
       locale: string;
-      renderedSubject?: string;
-      renderedBody: string;
-      payload?: {
-        [key: string]: unknown;
-      };
       templateKey: string;
       messageType: components['schemas']['MessageType'];
       /** Format: date-time */

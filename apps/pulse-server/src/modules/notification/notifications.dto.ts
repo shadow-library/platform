@@ -81,20 +81,11 @@ export class NotificationMessageResponse {
   @Field(() => NotificationChannel)
   channel: Notification.Channel;
 
-  @Field()
+  @Field({ description: 'Recipient, masked — the log carries delivery metadata only, never the raw recipient or rendered body/payload (OTP codes, reset links)' })
   recipient: string;
 
   @Field()
   locale: string;
-
-  @Field({ optional: true })
-  renderedSubject?: string | null;
-
-  @Field()
-  renderedBody: string;
-
-  @Field(() => Object, { optional: true, additionalProperties: true })
-  payload?: unknown;
 
   @Field()
   templateKey: string;
