@@ -6,7 +6,14 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { DatabaseService } from '@server/modules/infrastructure/datastore';
 
-import { M2M_CLIENT_BUCKET, M2M_CLIENT_LIMIT, M2M_CLIENT_WINDOW_SECONDS } from './security.constants';
+import {
+  M2M_CLIENT_BUCKET,
+  M2M_CLIENT_LIMIT,
+  M2M_CLIENT_WINDOW_SECONDS,
+  OAUTH_PUBLIC_CLIENT_BUCKET,
+  OAUTH_PUBLIC_CLIENT_LIMIT,
+  OAUTH_PUBLIC_CLIENT_WINDOW_SECONDS,
+} from './security.constants';
 
 export interface RateDecision {
   allowed: boolean;
@@ -69,6 +76,13 @@ export class RateLimiterService {
     const decision = await this.consume(M2M_CLIENT_BUCKET, clientId, M2M_CLIENT_LIMIT, M2M_CLIENT_WINDOW_SECONDS);
     if (decision.allowed) return;
     this.logger.warn('M2M client exceeded its request budget', { securityEvent: 'security.client_rate_limited', clientId });
+    throw AppErrorCode.SEC_001.create();
+  }
+
+  async consumePublicClientBudget(clientId: string, ip: string): Promise<void> {
+    const decision = await this.consume(OAUTH_PUBLIC_CLIENT_BUCKET, `${clientId}:${ip}`, OAUTH_PUBLIC_CLIENT_LIMIT, OAUTH_PUBLIC_CLIENT_WINDOW_SECONDS);
+    if (decision.allowed) return;
+    this.logger.warn('public OAuth client request budget exceeded for source', { securityEvent: 'security.public_client_rate_limited', clientId, ip });
     throw AppErrorCode.SEC_001.create();
   }
 

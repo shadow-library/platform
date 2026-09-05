@@ -3,6 +3,7 @@ import { AppError, Config, Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, OIDC_PROTOCOL_SCOPES } from '@server/constants';
+import { Context } from '@server/modules/access';
 import { KeyService } from '@server/modules/auth/keys';
 import { SessionService } from '@server/modules/auth/session';
 import { RefreshTokenClientMismatchError, RefreshTokenReuseError, RefreshTokenService } from '@server/modules/auth/token';
@@ -618,7 +619,8 @@ export class OAuthService {
 
   private async authenticateGrantClient(credential: ClientCredential): Promise<OAuthClient> {
     const client = await this.authenticateClient(credential);
-    await this.rateLimiterService.consumeClientBudget(client.id);
+    if (client.tokenEndpointAuthMethod === 'none') await this.rateLimiterService.consumePublicClientBudget(client.id, Context.getClientInfo().ip);
+    else await this.rateLimiterService.consumeClientBudget(client.id);
     return client;
   }
 

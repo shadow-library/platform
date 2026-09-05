@@ -1,7 +1,15 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { OAuthClientService } from '@server/modules/auth/oauth';
-import { GENERAL_LIMIT, IP_GENERAL_BUCKET, M2M_CLIENT_BUCKET, M2M_CLIENT_LIMIT, M2M_CLIENT_WINDOW_SECONDS, RateLimiterService } from '@server/modules/infrastructure/security';
+import {
+  GENERAL_LIMIT,
+  IP_GENERAL_BUCKET,
+  M2M_CLIENT_BUCKET,
+  M2M_CLIENT_LIMIT,
+  M2M_CLIENT_WINDOW_SECONDS,
+  OAUTH_PUBLIC_CLIENT_BUCKET,
+  RateLimiterService,
+} from '@server/modules/infrastructure/security';
 import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
@@ -150,6 +158,65 @@ describe('Rate limiting', () => {
       await env.getRedisClient().set(`rl:${IP_GENERAL_BUCKET}:${EGRESS_IP}`, String(GENERAL_LIMIT), 'EX', 60);
       expect((await token(alpha)).statusCode).toBe(429);
       expect((await token(alpha, '10.2.0.2')).statusCode).toBe(200);
+    });
+  });
+
+  describe('public client budgets at the token endpoint', () => {
+    const EGRESS_IP = '10.2.2.1';
+    const OTHER_IP = '10.2.2.2';
+    let publicClient: { clientId: string };
+
+    const publicBucketKey = (clientId: string, ip: string) => `rl:${OAUTH_PUBLIC_CLIENT_BUCKET}:${clientId}:${ip}`;
+    const clientBucketKey = (clientId: string) => `rl:${M2M_CLIENT_BUCKET}:${clientId}`;
+
+    const junkRefresh = (clientId: string, ip: string) =>
+      env.getRouter().mockRequest({
+        method: 'POST',
+        url: '/oauth2/token',
+        remoteAddress: ip,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: `grant_type=refresh_token&refresh_token=not-a-real-token&client_id=${clientId}`,
+      });
+
+    beforeEach(async () => {
+      const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+      publicClient = await env
+        .getService(OAuthClientService)
+        .register({ applicationId, name: 'Shadow SPA', kind: 'SPA_PUBLIC', grantTypes: ['authorization_code', 'refresh_token'] });
+    });
+
+    it('should charge a grant that never authenticates to its source, not the shared client budget', async () => {
+      const rejected = await junkRefresh(publicClient.clientId, EGRESS_IP);
+      expect(rejected.statusCode).toBe(400);
+      expect(Number(await env.getRedisClient().get(publicBucketKey(publicClient.clientId, EGRESS_IP)))).toBe(1);
+      expect(await env.getRedisClient().get(clientBucketKey(publicClient.clientId))).toBeNull();
+    });
+
+    it('should confine a flood to its source and leave a different source free to reach grant validation', async () => {
+      /** Seed the attacker's own bucket past its limit rather than sending dozens of junk requests to get there. */
+      await env.getRedisClient().set(publicBucketKey(publicClient.clientId, EGRESS_IP), '999999', 'EX', 60);
+
+      expect((await junkRefresh(publicClient.clientId, EGRESS_IP)).statusCode).toBe(429);
+      expect((await junkRefresh(publicClient.clientId, OTHER_IP)).statusCode).toBe(400);
+      expect(await env.getRedisClient().get(clientBucketKey(publicClient.clientId))).toBeNull();
+    });
+
+    it('should keep a confidential client on the shared per-client budget, unaffected by this change', async () => {
+      const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+      const confidential = await env.getService(OAuthClientService).register({ applicationId, name: 'Confidential Fleet', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+      await env.getRedisClient().set(clientBucketKey(confidential.clientId), String(M2M_CLIENT_LIMIT), 'EX', M2M_CLIENT_WINDOW_SECONDS);
+
+      const response = await env.getRouter().mockRequest({
+        method: 'POST',
+        url: '/oauth2/token',
+        remoteAddress: EGRESS_IP,
+        headers: {
+          authorization: `Basic ${Buffer.from(`${confidential.clientId}:${confidential.secret}`).toString('base64')}`,
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        payload: 'grant_type=client_credentials',
+      });
+      expect(response.statusCode).toBe(429);
     });
   });
 });
