@@ -1,7 +1,7 @@
 import { SQL } from 'bun';
 import { describe, expect, it } from 'bun:test';
 
-import { TestEnvironment } from '@tests/test-environment';
+import { csrfPair, TestEnvironment } from '@tests/test-environment';
 import { AUTH_AUDIENCE, CALLBACK_URI, issueTestToken, TEST_USER, testIdP } from '@tests/test-idp';
 
 interface ResponseWithCookies {
@@ -205,16 +205,28 @@ describe.if(pgAvailable)('authentication', () => {
   });
 
   describe('POST /api/auth/logout', () => {
-    it('should clear the session cookie', async () => {
+    it('should clear the session cookie once the CSRF double-submit is satisfied', async () => {
+      const { session } = await establishSession();
+      const csrf = csrfPair();
+      const response = await testEnv
+        .getRouter({ authenticated: false })
+        .mockRequest()
+        .post('/api/auth/logout')
+        .headers({ 'x-csrf-token': csrf.header })
+        .cookies({ [SESSION_COOKIE]: session, 'csrf-token': csrf.cookie });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ success: true });
+      expect(cookieValue(response, SESSION_COOKIE)).toBe('');
+    });
+
+    it('should reject a cookie-bearing mutation that omits the CSRF token', async () => {
       const { session } = await establishSession();
       const response = await testEnv
         .getRouter({ authenticated: false })
         .mockRequest()
         .post('/api/auth/logout')
         .cookies({ [SESSION_COOKIE]: session });
-      expect(response.statusCode).toBe(200);
-      expect(response.json()).toEqual({ success: true });
-      expect(cookieValue(response, SESSION_COOKIE)).toBe('');
+      expect(response.statusCode).toBe(403);
     });
   });
 });

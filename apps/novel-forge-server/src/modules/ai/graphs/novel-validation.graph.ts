@@ -153,7 +153,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
         const tools = toolRegistry.forNode('validateWindow', toolCtx);
         const rawTools = toolRegistry.getRaw('validateWindow');
         const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-        const model = modelRouter.chatFor('validation', projectRow as ProjectConfig | undefined);
+        const model = await modelRouter.chatFor('validation', projectRow as ProjectConfig | undefined, projectId);
 
         const systemMsg = new SystemMessage(PROMPT_REGISTRY.validation.system);
         const humanMsg = new HumanMessage(

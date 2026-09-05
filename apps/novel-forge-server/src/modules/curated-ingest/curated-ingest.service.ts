@@ -11,6 +11,7 @@ import { type ImportedNovelMetaData, type PrimaryDatabase, type Project, schema 
 
 import { landFinalChapters } from '../novel-import/land-chapters';
 import { ProjectService } from '../project';
+import { assertUnderProjectCap } from '../project/project/project-limits';
 import { type IngestChapterBody, type IngestManifestResponse, type IngestNovelBody, type IngestNovelResponse } from './curated-ingest.dto';
 import { type IngestAction, IngestAuditService, type IngestOutcome } from './ingest-audit.service';
 
@@ -44,6 +45,10 @@ export class CuratedIngestService {
       await this.record('novel.upsert', sourceRef, 'exists', existing.id);
       return { projectId: existing.id, created: false };
     }
+
+    // Only a genuinely new source reaches here — an existing one returned above — so the cap bounds the
+    // per-owner novel count without ever blocking an idempotent re-push of an already-ingested source.
+    await assertUnderProjectCap(this.db, this.owner());
 
     const created = await this.db.transaction(async rawTx => {
       const tx = rawTx as unknown as PrimaryDatabase;

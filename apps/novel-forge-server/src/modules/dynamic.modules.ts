@@ -42,7 +42,6 @@ import { CUSTOM_DATA_TRANSFORMERS } from '@server/common';
  */
 
 export const AppHttpCoreModule = HttpCoreModule.forRoot({
-  csrf: { disabled: true },
   openapi: { normalizeSchemaIds: true },
 });
 

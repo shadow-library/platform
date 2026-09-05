@@ -24,6 +24,11 @@ function stubDatabaseService(): never {
   return { getPostgresClient: () => db } as never;
 }
 
+// The quota guard is exercised in its own suite; here it is a no-op so routing/dispatch tests stay pure.
+function stubQuotaService(): never {
+  return { enforce: async () => undefined } as never;
+}
+
 // The router reads provider credentials and base URLs straight off the Config cache, which no test
 // bootstrap populates — seed it directly so a client can be constructed without a real environment.
 function setConfig(key: string, value: unknown): void {
@@ -33,7 +38,7 @@ function setConfig(key: string, value: unknown): void {
 describe('ModelRouterService.resolveModel', () => {
   // Create a minimal stub — we only need resolveModel which has no DB dependency
   const stubTelemetry = {} as never;
-  const router = new ModelRouterService(stubTelemetry, stubDatabaseService());
+  const router = new ModelRouterService(stubTelemetry, stubDatabaseService(), stubQuotaService());
 
   it('routes Unrestricted roles through the Unrestricted group map, not a single pin', () => {
     expect(router.resolveModel('generation', { contentMode: 'unrestricted' }).model).toBe(UNRESTRICTED_GROUP_DEFAULTS.writing.model);
@@ -107,7 +112,7 @@ describe('ModelRouterService.resolveModel', () => {
 });
 
 describe('ModelRouterService.buildClient', () => {
-  const router = new ModelRouterService({} as never, stubDatabaseService());
+  const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService());
 
   setConfig('ai.openrouter.api.key', 'test-openrouter-key');
   setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
@@ -202,7 +207,7 @@ describe('resolveReasoningEffort', () => {
 });
 
 describe('ModelRouterService.buildClient reasoning', () => {
-  const router = new ModelRouterService({} as never, stubDatabaseService());
+  const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService());
 
   setConfig('ai.openrouter.api.key', 'test-openrouter-key');
   setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
@@ -306,7 +311,7 @@ describe('PRODUCTION_DEFAULTS vs LOCAL_TEST_DEFAULTS', () => {
 describe('ModelRouterService.structured (repair ladder)', () => {
   function makeRouter(fakeChain: { invoke: ReturnType<typeof mock> }): ModelRouterService {
     const stubTelemetry = {} as never;
-    const router = new ModelRouterService(stubTelemetry, stubDatabaseService());
+    const router = new ModelRouterService(stubTelemetry, stubDatabaseService(), stubQuotaService());
     // Patch buildClient so no real provider is instantiated (no API keys needed in tests) — the router
     // invokes the returned client directly with the formatted messages.
     (router as unknown as Record<string, unknown>)['buildClient'] = () => fakeChain;

@@ -6,6 +6,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
+import { assertUnderProjectCap } from '../project/project/project-limits';
 import { type ImportNovelBody, type ImportNovelResponse } from './novel-import.dto';
 import { validateNovelBundle } from './novel-import.validator';
 
@@ -45,6 +46,7 @@ export class NovelImportService {
     }
 
     const ownerId = BigInt(this.context.getAuthPrincipal().sub);
+    await assertUnderProjectCap(this.db, ownerId);
     const kind: Project.Kind = bundle.mode === 'final' ? 'new_novel' : 'source';
     const cover = bundle.novel.cover ? (bundle.assets ?? []).find(a => a.name === bundle.novel.cover) : undefined;
 

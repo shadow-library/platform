@@ -24,6 +24,7 @@ import {
   ROLE_GROUP,
   UNRESTRICTED_DEFAULTS,
 } from './defaults';
+import { AiQuotaService } from './ai-quota.service';
 import { UNRESTRICTED_AUTHORING_ADDENDUM } from './prompts/authoring-preamble';
 import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
@@ -154,6 +155,7 @@ export class ModelRouterService {
   constructor(
     private readonly telemetry: TelemetryHandler,
     private readonly databaseService: DatabaseService,
+    private readonly quota: AiQuotaService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -168,9 +170,13 @@ export class ModelRouterService {
     }
     // The settings UI writes one selection across every role in a group, so group members resolve identically.
     const models = project?.config?.models as Record<string, ResolvedModel> | undefined;
-    const projectModel = models?.[role];
-    if (projectModel) return projectModel;
-    if (role === 'chat' && models?.['plan']) return models['plan'];
+    const projectModel = models?.[role] ?? (role === 'chat' ? models?.['plan'] : undefined);
+    if (projectModel) {
+      // Fail closed at the sink: a persisted override whose model id is not in the registry — including
+      // one written before write-time validation existed — must never reach the platform credential.
+      if (!MODEL_MAP[projectModel.model]) throw AppErrorCode.AI_002.create();
+      return projectModel;
+    }
     return getProfileDefaults()[role] ?? getGroupDefaults().writing;
   }
 
@@ -178,6 +184,10 @@ export class ModelRouterService {
   // covers them all; `ai.openrouter.api.url` redirects the leg at an in-cluster gateway speaking the
   // same wire protocol. Ollama stays local and keeps its own client.
   buildClient(resolved: ResolvedModel, opts?: { format?: string | Record<string, unknown>; role?: AiRole }): BaseChatModel {
+    // Fail-closed backstop: the sink never dispatches a model absent from the registry. An id that is
+    // present but explicitly paired with a different provider is left alone — that precedence is by
+    // design (see resolveProvider) and routes to that provider, never the platform's OpenRouter key.
+    if (!MODEL_MAP[resolved.model]) throw AppErrorCode.AI_002.create();
     switch (resolveProvider(resolved)) {
       case 'openrouter': {
         // OpenRouter takes reasoning control as a top-level `reasoning: { effort }` body field, which is
@@ -216,13 +226,17 @@ export class ModelRouterService {
     }
   }
 
-  chatFor(role: AiRole, project?: ProjectConfig): BaseChatModel {
+  // `projectId` is optional only so the smoke/local harnesses can build a raw client without a project;
+  // every product caller passes it, which is what gates the judge/validation raw-client paths on quota.
+  async chatFor(role: AiRole, project?: ProjectConfig, projectId?: bigint): Promise<BaseChatModel> {
+    if (projectId !== undefined) await this.quota.enforce(projectId);
     const resolved = this.resolveModel(role, project);
     this.logger.debug(`Routing role=${role} to provider=${resolved.provider} model=${resolved.model}`);
     return this.buildClient(resolved, { role });
   }
 
   async structured<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, ctx: TelemetryContext, project?: ProjectConfig): Promise<T> {
+    await this.quota.enforce(ctx.projectId);
     const role = promptModule.role ?? (promptModule.key as AiRole);
     const resolved = this.resolveModel(role, project);
     const llm = this.buildClient(resolved, { format: toJsonSchemaFormat(promptModule.schema), role });
@@ -307,6 +321,7 @@ export class ModelRouterService {
    * plain text-to-image rather than failing.
    */
   async images(request: ImageRequest, ctx: TelemetryContext, project?: ProjectConfig): Promise<GeneratedImage[]> {
+    await this.quota.enforce(ctx.projectId);
     const resolved = this.resolveModel('image', project);
     const apiKey = Config.get('ai.openrouter.api.key');
     if (!apiKey) throw AppErrorCode.AI_004.create();

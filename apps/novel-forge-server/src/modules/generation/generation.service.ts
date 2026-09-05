@@ -690,7 +690,7 @@ export class GenerationService {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
     const pack = await this.contextAssembler.forChapter(projectId, chapter);
-    const model = this.modelRouter.chatFor('judge', project as never);
+    const model = await this.modelRouter.chatFor('judge', project as never, projectId);
 
     const runId = `judge-${projectId}-${chapter}-${Date.now()}`;
     const tools = this.toolRegistry.forNode('judge', { chapter, db: this.db, node: 'judge', projectId, retrieval: this.retrievalService, runId });

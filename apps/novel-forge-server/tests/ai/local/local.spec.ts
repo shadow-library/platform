@@ -43,7 +43,7 @@ describe('Rung-3 Ollama integration', () => {
           insert: () => ({ values: () => ({ onConflictDoNothing: () => Promise.resolve() }) }),
         }),
       };
-      router = new ModelRouterService(new NoopCallbackHandler() as unknown as TelemetryHandler, stubDbService as never);
+      router = new ModelRouterService(new NoopCallbackHandler() as unknown as TelemetryHandler, stubDbService as never, { enforce: async () => undefined } as never);
     });
 
     afterAll(() => {
@@ -62,7 +62,7 @@ describe('Rung-3 Ollama integration', () => {
   });
 
   it('generate chapter: chatFor(generation) returns non-empty content', async () => {
-    const llm = router.chatFor('generation');
+    const llm = await router.chatFor('generation');
     const response = await llm.invoke([new HumanMessage('Write a single short paragraph opening a fantasy chapter. Output only the prose, nothing else.')]);
     const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
     expect(content.length).toBeGreaterThan(20);

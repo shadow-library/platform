@@ -9,12 +9,15 @@ import { assertActiveProject } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Bible, type Chapter, type Knowledge, type Plan, type PrimaryDatabase, type Project, schema } from '@server/database';
 
+import { isRegisteredModel } from '../../ai/defaults';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
+import { assertUnderProjectCap } from './project-limits';
 import {
   type CloneProjectBody,
   type CostResponse,
   type CreateProjectBody,
   type ListProjectsQuery,
+  type ProjectConfig,
   type ProjectStatusResponse,
   type ResetResponse,
   type UpdateProjectBody,
@@ -44,6 +47,16 @@ export class ProjectService {
     return BigInt(this.context.getAuthPrincipal().sub);
   }
 
+  // Every persisted model override must name a registry model with the matching provider, regardless of
+  // contentMode — the raw pick is otherwise dispatched to the platform's OpenRouter credential verbatim.
+  private assertConfigModelsAllowed(config?: ProjectConfig): void {
+    const models = config?.models;
+    if (!models) return;
+    for (const ref of Object.values(models)) {
+      if (ref && !isRegisteredModel(ref)) throw AppErrorCode.AI_002.create();
+    }
+  }
+
   // The `ProjectResponse.config` schema is a non-nullable object; a fresh project stores `config = null`,
   // so map that to `undefined` (an omitted field) before it reaches the serialiser. `instructions` is
   // surfaced as its effective value (stored override or the default) so the settings form always shows
@@ -60,6 +73,7 @@ export class ProjectService {
   async create(body: CreateProjectBody, options?: CreateProjectOptions): Promise<Project.Presented> {
     const status = options?.status ?? 'active';
     this.logger.debug('create project', { name: body.name, kind: body.kind, contentMode: body.contentMode, status });
+    await assertUnderProjectCap(this.db, this.ownerId());
 
     const [project] = await this.db
       .insert(schema.projects)
@@ -154,6 +168,7 @@ export class ProjectService {
   }
 
   async update(id: bigint, update: UpdateProjectBody): Promise<Project.Presented> {
+    this.assertConfigModelsAllowed(update.config);
     const set: Record<string, unknown> = { ...update, updatedAt: new Date() };
     // Normalise the writing instructions: blank — or the default itself — collapses back to null so the
     // column keeps meaning "use the default" and follows future changes to DEFAULT_WRITING_INSTRUCTIONS.
@@ -174,6 +189,8 @@ export class ProjectService {
   }
 
   async clone(id: bigint, body: CloneProjectBody): Promise<Project.Presented> {
+    this.assertConfigModelsAllowed(body.config);
+    await assertUnderProjectCap(this.db, this.ownerId());
     return this.db.transaction(async tx => {
       const source = await tx.query.projects.findFirst({ where: eq(schema.projects.id, id) });
       if (!source) throw AppErrorCode.PRJ_001.create();

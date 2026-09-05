@@ -84,7 +84,7 @@ function buildHarness(db: PrimaryDatabase): Harness {
   };
 
   const dbStub = { getPostgresClient: () => db } as never;
-  const router = new ModelRouterService({} as never, dbStub);
+  const router = new ModelRouterService({} as never, dbStub, { enforce: async () => undefined } as never);
   const assembler = new ContextAssembler(dbStub, new CatalogService(dbStub));
   const workflowRuns = new WorkflowRunService(dbStub, assembler, router, {} as never, {} as never, {} as never);
   harness.service = new IllustrationService(

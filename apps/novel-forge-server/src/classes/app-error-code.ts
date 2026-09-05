@@ -25,6 +25,7 @@ export class AppErrorCode extends ServerErrorCode {
    */
   static readonly PRJ_001 = AppErrorCode.notFound('PRJ_001', 'Project not found');
   static readonly PRJ_003 = AppErrorCode.badRequest('PRJ_003', 'Operation not valid for this project kind');
+  static readonly PRJ_004 = AppErrorCode.conflict('PRJ_004', 'Project limit reached for this account — delete an existing project before creating another');
 
   /*!
    * Source Errors
@@ -92,6 +93,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AI_005 = new AppErrorCode('AI_005', 'Image generation failed — see the model call log', 500);
   static readonly AI_006 = new AppErrorCode('AI_006', 'AI is not configured — set AI_OPENROUTER_API_KEY', 500);
   static readonly AI_007 = new AppErrorCode('AI_007', 'AI model call failed — see the model call log', 502);
+  static readonly AI_008 = AppErrorCode.badRequest('AI_008', 'AI request rate limit reached — too many model calls in the current window, try again shortly', 429);
+  static readonly AI_009 = AppErrorCode.badRequest('AI_009', 'AI spend limit reached for this account in the current window — try again later', 429);
 
   /*!
    * Illustration Errors

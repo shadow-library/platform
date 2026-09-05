@@ -13,7 +13,7 @@ import { type PrimaryDatabase, type Refinement, schema } from '@server/database'
 
 import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
-import { type AiRole, isUnrestrictedAllowed, type ResolvedModel } from '../ai/defaults';
+import { type AiRole, isRegisteredModel, isUnrestrictedAllowed, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { buildChatRefinePrompt, renderScopeInstructions, scopeAllowedOps } from '../ai/prompts';
@@ -227,6 +227,11 @@ export class ChatService {
 
   async updateSessionModel(projectId: bigint, sessionId: string, provider: string | null, model: string | null): Promise<Refinement.ChatSession> {
     const session = await this.mutableSession(projectId, sessionId);
+    // Clearing (both null) restores the project/profile default; a pin must name a registry model with
+    // the matching provider, regardless of contentMode, so a raw pick never reaches the platform key.
+    if (provider !== null || model !== null) {
+      if (!provider || !model || !isRegisteredModel({ provider, model })) throw AppErrorCode.AI_002.create();
+    }
     const [updated] = await this.db
       .update(schema.chatSessions)
       .set({ modelProvider: provider, modelId: model, updatedAt: new Date() })

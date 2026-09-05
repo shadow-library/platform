@@ -327,7 +327,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
 
     const tools = toolRegistry.forNode('judge', toolCtx);
     const rawTools = toolRegistry.getRaw('judge');
-    const model = modelRouter.chatFor('judge', projectRow as ProjectConfig | undefined);
+    const model = await modelRouter.chatFor('judge', projectRow as ProjectConfig | undefined, projectId);
 
     const renderedContract = renderEndingContract(brief?.endingContract);
     const contractBlock = renderedContract

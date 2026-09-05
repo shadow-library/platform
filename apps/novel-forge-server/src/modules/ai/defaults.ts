@@ -113,6 +113,12 @@ export function isUnrestrictedAllowed(role: AiRole, resolved: ResolvedModel): bo
   return (UNRESTRICTED_LLM_ALLOWLIST as readonly string[]).includes(resolved.model);
 }
 
+// Write-time allowlist gate: a pick is accepted only when the model id is in the registry AND the
+// stated provider matches the registry's — a real model id paired with the wrong provider is rejected.
+export function isRegisteredModel(resolved: ResolvedModel): boolean {
+  return MODEL_MAP[resolved.model]?.provider === resolved.provider;
+}
+
 // Local-test profile: routes everything to Ollama (used in smoke tests / dev without API keys).
 const LOCAL_TEST_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'ollama', model: 'qwen3:14b' },

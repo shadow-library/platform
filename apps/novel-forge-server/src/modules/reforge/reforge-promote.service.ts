@@ -10,6 +10,7 @@ import { type PrimaryDatabase, type ReforgeTransform, schema } from '@server/dat
 // A direct file import of the landing helper, never the novel-import barrel — the barrel's services
 // would drag their module in, exactly as chapter-reforge.graph.ts imports residue-scan directly.
 import { landFinalChapters } from '../novel-import/land-chapters';
+import { assertUnderProjectCap } from '../project/project/project-limits';
 import { ReforgePlanService } from './reforge-plan.service';
 
 export interface PromoteOptions {
@@ -70,6 +71,7 @@ export class ReforgePromoteService {
     });
 
     const title = options.title?.trim() || source.title || source.name;
+    if (source.ownerId != null) await assertUnderProjectCap(this.db, source.ownerId);
     const promoted = await this.db.transaction(async rawTx => {
       const tx = rawTx as unknown as PrimaryDatabase;
       const [project] = await tx

@@ -58,7 +58,7 @@ describe.if(pgAvailable)('RefineService', () => {
     const noop = {} as never;
 
     // Real router (repair ladder + llm_cache) with only the provider client mocked out.
-    const modelRouter = new ModelRouterService(noop, databaseService);
+    const modelRouter = new ModelRouterService(noop, databaseService, { enforce: async () => undefined } as never);
     (modelRouter as unknown as Record<string, unknown>)['buildClient'] = () => ({ invoke: llmInvoke, pipe: () => ({ invoke: llmInvoke }) });
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));

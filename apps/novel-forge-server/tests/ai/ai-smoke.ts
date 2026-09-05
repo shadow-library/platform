@@ -37,7 +37,7 @@ class SmokeNoop extends BaseCallbackHandler {
 const stubDbService = {
   getPostgresClient: () => ({ query: { llmCache: { findFirst: async () => undefined } }, insert: () => ({ values: () => ({ onConflictDoNothing: () => Promise.resolve() }) }) }),
 };
-const router = new ModelRouterService(new SmokeNoop() as never, stubDbService as never);
+const router = new ModelRouterService(new SmokeNoop() as never, stubDbService as never, { enforce: async () => undefined } as never);
 
 logger.info('AI smoke test starting', { ollamaHost, profile: 'local-test' });
 
@@ -87,7 +87,7 @@ try {
 
 try {
   const { HumanMessage } = await import('@langchain/core/messages');
-  const llm = router.chatFor('generation');
+  const llm = await router.chatFor('generation');
   const response = await llm.invoke([new HumanMessage('Write one sentence of fantasy prose.')]);
   const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
   record('generation chat', content.length > 5, `content length=${content.length}`);

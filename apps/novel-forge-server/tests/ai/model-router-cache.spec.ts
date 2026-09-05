@@ -41,7 +41,7 @@ describe.if(pgAvailable)('ModelRouterService cache + resilience', () => {
   });
 
   function makeRouter(chain: { invoke: (...args: unknown[]) => Promise<{ content: string }> }): ModelRouterService {
-    const router = new ModelRouterService({} as never, { getPostgresClient: () => db } as never);
+    const router = new ModelRouterService({} as never, { getPostgresClient: () => db } as never, { enforce: async () => undefined } as never);
     (router as unknown as Record<string, unknown>)['buildClient'] = () => chain;
     return router;
   }

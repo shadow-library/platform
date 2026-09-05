@@ -6,6 +6,7 @@
 import './test-idp';
 
 import { afterAll, beforeAll, beforeEach } from 'bun:test';
+import { randomBytes } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -33,6 +34,15 @@ export const TEST_REGEX = {
   uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
   dateISO: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/,
 } satisfies Record<string, RegExp>;
+
+// A valid double-submit CSRF pair for cookie-authenticated mutations: the http-core middleware requires
+// the `csrf-token` cookie (`<expiry base36>:<token>`) to match the `x-csrf-token` header on any request
+// that carries cookies.
+export function csrfPair(): { cookie: string; header: string } {
+  const token = randomBytes(16).toString('hex');
+  const expiry = (Date.now() + 60_000).toString(36);
+  return { cookie: `${expiry}:${token}`, header: token };
+}
 
 export class TestEnvironment {
   private static readonly logger = Logger.getLogger(APP_NAME, TestEnvironment.name);
