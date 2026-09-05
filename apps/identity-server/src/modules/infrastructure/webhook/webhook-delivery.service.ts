@@ -108,8 +108,10 @@ export class WebhookDeliveryService {
 
     const timestamp = Math.floor(Date.now() / 1000);
     const secrets = this.webhookService.signingSecretsOf(subscription);
+    // redirect:'manual' stops a guard-validated endpoint bouncing delivery inward; a rebind window persists (guard-resolve -> fetch) as Bun's fetch exposes no hook to pin the resolved IP.
     const response = await fetch(subscription.targetUrl, {
       method: 'POST',
+      redirect: 'manual',
       headers: {
         'content-type': 'application/json',
         [WEBHOOK_ID_HEADER]: delivery.id.toString(),
@@ -119,6 +121,8 @@ export class WebhookDeliveryService {
       body: delivery.payload,
       signal: AbortSignal.timeout(10_000),
     });
+    if (response.status >= 300 && response.status < 400)
+      throw AppError.internal(`webhook endpoint returned a redirect (${response.status}); refusing to follow it into an unvalidated target`);
     if (!response.ok) throw AppError.internal(`webhook endpoint answered ${response.status}`);
     return response.status;
   }

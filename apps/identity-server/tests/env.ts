@@ -4,6 +4,9 @@ process.env.RATE_LIMIT_ENABLED ??= 'false';
 process.env.AUTH_WORKLOAD_ISSUER ??= 'http://127.0.0.1:45123';
 process.env.AUTH_WORKLOAD_JWKS_URI ??= 'http://127.0.0.1:45123/jwks';
 
+/** Mock webhook receivers and upstream IdPs live on loopback/non-resolving hosts, so the SSRF guard runs in dev mode by default; the strict-path specs re-enable it per test. */
+process.env.WEBHOOKS_ALLOW_INSECURE_TARGETS ??= 'true';
+
 /** CI exercises audit-chain serialization with one connection; a wider pool changes that concurrency profile. */
 process.env.DATABASE_POSTGRES_MAX_CONNECTIONS ??= '1';
 

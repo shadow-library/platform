@@ -105,11 +105,11 @@ export class IdentityProviderService {
   }
 
   private async discover(issuer: string): Promise<DiscoveredEndpoints> {
-    this.targetGuard.assertAcceptableUrl(issuer);
     const url = oidcDiscoveryUrl(issuer);
     let document: DiscoveryDocument;
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS) });
+      await this.targetGuard.assertDeliverable(url);
+      const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS) });
       if (!response.ok) throw AppError.internal(`discovery answered ${response.status}`);
       document = (await response.json()) as DiscoveryDocument;
     } catch (error) {

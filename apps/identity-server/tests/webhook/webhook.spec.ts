@@ -135,6 +135,34 @@ describe('Webhooks', () => {
     expect(isPrivateAddress('2600::1')).toBe(false);
   });
 
+  it('should refuse to follow a delivery redirect into an internal address', async () => {
+    const internalHits: string[] = [];
+    const internal = Bun.serve({
+      port: 0,
+      fetch: httpRequest => {
+        internalHits.push(new URL(httpRequest.url).pathname);
+        return new Response('{}', { status: 200 });
+      },
+    });
+    const redirector = Bun.serve({ port: 0, fetch: () => new Response(null, { status: 302, headers: { location: `http://127.0.0.1:${internal.port}/metadata` } }) });
+    try {
+      const { id } = await createSubscription(['org.*'], `http://127.0.0.1:${redirector.port}/hook`);
+      await emitAudit('org.created');
+
+      const sent = await env.getService(WebhookDeliveryService).dispatchPending();
+
+      expect(sent).toBe(0);
+      expect(internalHits).toHaveLength(0);
+      const failed = await request('get', `/api/v1/admin/webhooks/${id}/deliveries?status=FAILED`);
+      const items = (failed.json() as { items: { lastError: string }[] }).items;
+      expect(items).toHaveLength(1);
+      expect(items[0]?.lastError).toContain('redirect');
+    } finally {
+      internal.stop(true);
+      redirector.stop(true);
+    }
+  });
+
   it('should fan out matching audit events and deliver signed payloads', async () => {
     const { secret } = await createSubscription(['org.*']);
     const event = await emitAudit('org.created');

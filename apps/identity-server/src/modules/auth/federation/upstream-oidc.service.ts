@@ -5,6 +5,7 @@ import { Config, Logger, LRUCache } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
 import { IdentityProvider } from '@server/modules/infrastructure/datastore';
+import { WebhookTargetGuard } from '@server/modules/infrastructure/webhook';
 
 import { IdentityProviderService } from './identity-provider.service';
 
@@ -72,7 +73,10 @@ export class UpstreamOidcService {
   private readonly issuer = Config.get('oauth.issuer');
   private readonly jwksCache = new LRUCache(JWKS_CACHE_CAPACITY, { ttl: JWKS_CACHE_TTL_MS });
 
-  constructor(private readonly identityProviderService: IdentityProviderService) {}
+  constructor(
+    private readonly identityProviderService: IdentityProviderService,
+    private readonly targetGuard: WebhookTargetGuard,
+  ) {}
 
   get callbackUrl(): string {
     return `${this.issuer}/api/v1/auth/federated/callback`;
@@ -107,8 +111,10 @@ export class UpstreamOidcService {
 
     let idToken: string;
     try {
+      await this.targetGuard.assertDeliverable(provider.tokenEndpoint);
       const response = await fetch(provider.tokenEndpoint, {
         method: 'POST',
+        redirect: 'manual',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: body.toString(),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -215,7 +221,8 @@ export class UpstreamOidcService {
     let keys = forceRefresh ? null : (this.jwksCache.get<UpstreamJwk[]>(provider.jwksUri) ?? null);
     if (!keys) {
       try {
-        const response = await fetch(provider.jwksUri, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+        await this.targetGuard.assertDeliverable(provider.jwksUri);
+        const response = await fetch(provider.jwksUri, { redirect: 'manual', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
         if (!response.ok) return null;
         const document = (await response.json()) as { keys?: UpstreamJwk[] };
         keys = Array.isArray(document.keys) ? document.keys : [];
