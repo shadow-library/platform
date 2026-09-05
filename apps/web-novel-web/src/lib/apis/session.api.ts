@@ -1,9 +1,10 @@
 import { type QueryClient, queryOptions } from '@tanstack/react-query';
 import { type UserInfo, userInfoQueryOptions } from '@shadow-library/web';
 import { type AuthPrincipal, createAuthApi } from '@shadow-library/web/auth';
+import { purgeOfflineData } from '@shadow-library/web/offline';
 import { requireAuth } from '@shadow-library/web/router';
 
-import { queryPersister } from '@/lib/offline';
+import { OFFLINE_DB_NAME, offlineStore, PURGE_CACHE_PREFIXES, queryPersister } from '@/lib/offline';
 
 import { clearLibraryMirror } from './library.api';
 import { clearNotificationsMirror } from './notifications.api';
@@ -103,13 +104,17 @@ export async function signOut(): Promise<string | undefined> {
 
 /**
  * Wipe every on-device trace of the session on sign-out: the in-memory query cache, the IndexedDB query
- * persister, and this user's namespaced library/progress/updates mirrors. Without this, the next person on
- * the device would inherit the previous account's cached shelf and reading history.
+ * persister, this user's namespaced library/progress/updates mirrors, the downloaded-content database, and
+ * the runtime Cache Storage that holds cache-first chapter responses. Without the last two the next person on
+ * the device would inherit the previous account's cached shelf, reading history, and any gated chapter it
+ * unlocked. The offline store is closed first so its database can be deleted rather than block on an open handle.
  */
 export async function purgeOnLogout(queryClient: QueryClient, userId?: string): Promise<void> {
   clearLibraryMirror(userId);
   clearProgressMirror(userId);
   clearNotificationsMirror(userId);
   queryClient.clear();
+  offlineStore.close();
   await queryPersister.removeClient();
+  await purgeOfflineData({ databases: [OFFLINE_DB_NAME], cachePrefixes: [...PURGE_CACHE_PREFIXES] });
 }

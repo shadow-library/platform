@@ -1,8 +1,10 @@
+import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo } from 'react';
 import { Spinner } from '@shadow-library/ui';
 
 import { AppShell } from '@/features/shell';
+import { sessionQueryOptions } from '@/lib/apis';
 import { MemoirDataProvider, useOnboardingStatus } from '@/lib/data';
 import { requireSession, useSessionGuard } from '@/lib/session';
 import { createSyncedMemoirData, SyncEngineProvider } from '@/lib/sync';
@@ -20,6 +22,8 @@ export const Route = createFileRoute('/_app')({
 function AuthenticatedShell(): ReactElement {
   const status = useSessionGuard();
   const data = useMemo(() => createSyncedMemoirData(), []);
+  // `beforeLoad` already ensured the session, so this reads it from cache; `sub` keys the account-change purge.
+  const accountId = useQuery(sessionQueryOptions()).data?.sub ?? null;
 
   if (status === 'redirecting')
     return (
@@ -30,7 +34,7 @@ function AuthenticatedShell(): ReactElement {
 
   return (
     <MemoirDataProvider value={data}>
-      <SyncEngineProvider data={data}>
+      <SyncEngineProvider data={data} accountId={accountId}>
         <OnboardingGate>
           <AppShell>
             <Outlet />

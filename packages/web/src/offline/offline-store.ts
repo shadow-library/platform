@@ -93,6 +93,13 @@ export class OfflineStore {
     await idbClear(db, META_STORE);
   }
 
+  /** Close the open connection so the database can be deleted without an open-handle block; it reopens lazily on next use. */
+  close(): void {
+    const opening = this.database;
+    this.database = null;
+    void opening?.then(db => db.close()).catch(() => undefined);
+  }
+
   async totalSize(): Promise<number> {
     return (await this.list()).reduce((sum, entry) => sum + entry.size, 0);
   }

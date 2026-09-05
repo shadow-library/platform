@@ -1,9 +1,10 @@
 import { createContext, type ReactElement, type ReactNode, useContext, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { Alert, Button, toISODate } from '@shadow-library/ui';
+import { purgeIfAccountChanged } from '@shadow-library/web/offline';
 
 import { type MemoirData, memoirKeys, memoirQueryClient, setFinanceProvider, setQuickLogProvider } from '@/lib/data';
 
-import { MemoirStore } from './memoir-store';
+import { MEMOIR_DB_NAME, MemoirStore } from './memoir-store';
 import { SyncEngine } from './sync-engine';
 import { SyncedAccountProvider } from './synced-account-provider';
 import { SyncedDataProvider } from './synced-provider';
@@ -14,6 +15,9 @@ import { SyncedReflectProvider } from './synced-reflect-provider';
 import { type SyncSnapshot } from './sync.types';
 
 const OFFLINE_SNAPSHOT: SyncSnapshot = { state: 'offline', queuedCount: 0, lastSyncedAt: null, notices: [], initError: null };
+
+/** localStorage marker for the account whose mirror this device currently holds — see {@link purgeIfAccountChanged}. */
+const LAST_ACCOUNT_KEY = 'shadow-memoir:last-account';
 
 const SyncEngineContext = createContext<SyncEngine | null>(null);
 
@@ -72,6 +76,11 @@ export function createSyncedMemoirData(options: { today?: string; store?: Memoir
 
 export interface SyncProviderProps {
   data: SyncedMemoirData;
+  /**
+   * The signed-in identity subject, driving the account-change purge that must run before hydrate. Omit only
+   * in fixtures/tests that render without a session; production passes the session's `sub`.
+   */
+  accountId?: string | null;
   children: ReactNode;
 }
 
@@ -79,20 +88,31 @@ export interface SyncProviderProps {
  * Starts the engine on mount and flushes again whenever the browser reports it is back online. Both are
  * idempotent: `sync()` serializes overlapping passes, so a regain event during a running pass is a no-op
  * rather than a second batch on the wire.
+ *
+ * Before the first hydrate it purges the local mirror if the signed-in account differs from the one this
+ * device last held — so a handed-on device never renders the previous owner's finance/journal/health data.
+ * The engine is constructed side-effect-free (the database opens lazily in `start()`), so deleting it here
+ * lands before any row is read.
  */
-export function SyncEngineProvider({ data, children }: SyncProviderProps): ReactElement {
+export function SyncEngineProvider({ data, accountId, children }: SyncProviderProps): ReactElement {
   const { engine, queryClient } = data;
 
   useEffect(() => {
-    void engine.start();
+    let cancelled = false;
+    const boot = async (): Promise<void> => {
+      await purgeIfAccountChanged({ storageKey: LAST_ACCOUNT_KEY, accountId: accountId ?? null, databases: [MEMOIR_DB_NAME] });
+      if (!cancelled) await engine.start();
+    };
+    void boot();
     const unsubscribe = engine.subscribeWorld(() => void queryClient.invalidateQueries({ queryKey: memoirKeys.all }));
     const onOnline = (): void => void engine.sync();
     window.addEventListener('online', onOnline);
     return () => {
+      cancelled = true;
       unsubscribe();
       window.removeEventListener('online', onOnline);
     };
-  }, [engine, queryClient]);
+  }, [engine, queryClient, accountId]);
 
   const value = useMemo(() => engine, [engine]);
   return (

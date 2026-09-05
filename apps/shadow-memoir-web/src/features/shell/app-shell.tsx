@@ -4,9 +4,11 @@ import { type ReactElement, type ReactNode, useState } from 'react';
 import { BottomNavigation, Fab, IconButton, Kbd, matchPath, Tooltip, useMediaQuery, useTheme } from '@shadow-library/ui';
 import { AppShell as Chrome } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
+import { purgeOfflineData } from '@shadow-library/web/offline';
 
 import { BellIcon, LogIcon, MemoirMark, MoonIcon, SearchIcon, SunIcon } from '@/components/icons';
 import { logout, meQuery } from '@/lib/apis';
+import { MEMOIR_DB_NAME, useSyncEngine } from '@/lib/sync';
 
 import styles from './app-shell.module.css';
 import { DESKTOP_NAV, PHONE_NAV } from './nav';
@@ -39,20 +41,26 @@ function ShellChrome({ children }: AppShellProps): ReactElement {
   const [captureOpen, setCaptureOpen] = useState(false);
   const me = useQuery(meQuery);
   const overlays = useSystemOverlays();
+  const engine = useSyncEngine();
 
   /**
-   * Ends the app session server-side, then hands the browser on. Where the deployment configures
-   * RP-initiated logout the reply carries identity's end-session URL, which must replace the local bounce —
-   * routing to the landing screen would leave the central session live and sign the owner straight back in.
-   * The session cookie is cleared regardless of the outcome, so a failed call still signs out locally.
+   * Ends the app session server-side, purges this device's local mirror, then hands the browser on. The purge
+   * runs on every outcome — a signed-out device that keeps the owner's finance/journal/health data in
+   * IndexedDB is the leak this closes. Where the deployment configures RP-initiated logout the reply carries
+   * identity's end-session URL, which must replace the local bounce — routing to the landing screen would
+   * leave the central session live and sign the owner straight back in. The store is closed first so the
+   * database can be deleted rather than block on the engine's open connection.
    */
   const handleSignOut = async (): Promise<void> => {
+    let redirectTo: string | undefined;
     try {
-      const { redirectTo } = await logout();
-      if (redirectTo) return window.location.assign(redirectTo);
+      redirectTo = (await logout()).redirectTo;
     } catch {
-      /* the cookie is gone either way, so fall through to the local bounce */
+      /* the cookie is gone either way, so fall through to the local purge and bounce */
     }
+    engine?.store.close();
+    await purgeOfflineData({ databases: [MEMOIR_DB_NAME] });
+    if (redirectTo) return window.location.assign(redirectTo);
     await navigate({ to: '/welcome', search: { returnTo: '/' } });
   };
 

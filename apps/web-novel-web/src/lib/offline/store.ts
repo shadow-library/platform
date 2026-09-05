@@ -14,12 +14,23 @@ export interface DownloadedNovel {
   downloadedAt: string;
 }
 
+/** IndexedDB database holding explicitly-downloaded content — the account-scoped store purged on sign-out and account change. */
+export const OFFLINE_DB_NAME = 'webnovel-offline';
+
+/**
+ * Cache Storage caches that hold per-account content and must be dropped on sign-out or an account change:
+ * the runtime cache (chapters are served cache-first, so a gated chapter one reader unlocked must never be
+ * served to the next), and the SW offline cache. The precache (app shell) is deliberately excluded —
+ * clearing it would strip offline navigation until the worker reinstalls.
+ */
+export const PURGE_CACHE_PREFIXES = ['webnovel-runtime', 'webnovel-offline'] as const;
+
 /**
  * One IndexedDB database for all explicitly-downloaded content (SW-independent, so downloads work even
  * where service workers don't). Chapters are stored one key per chapter so partial downloads and per-range
  * updates stay cheap; the `novel:` record indexes them for the offline-library screen.
  */
-export const offlineStore = new OfflineStore({ dbName: 'webnovel-offline' });
+export const offlineStore = new OfflineStore({ dbName: OFFLINE_DB_NAME });
 export const offlineManager = new OfflineContentManager(offlineStore);
 
 export const NOVEL_KEY_PREFIX = 'novel:';

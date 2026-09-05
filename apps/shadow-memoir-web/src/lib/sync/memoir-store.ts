@@ -12,9 +12,11 @@ export interface KeyValueBacking {
   put(key: string, value: unknown): Promise<void>;
   delete(key: string): Promise<void>;
   keys(): Promise<string[]>;
+  /** Release the underlying handle so the database can be deleted on sign-out without an open-connection block. */
+  close?(): void;
 }
 
-const DB_NAME = 'shadow-memoir';
+export const MEMOIR_DB_NAME = 'shadow-memoir';
 
 const DOMAIN_PREFIX = 'domain:';
 const META_PREFIX = 'meta:';
@@ -54,12 +56,13 @@ const DOMAIN_KEYS: Record<SyncDomain, (row: DeltaRow) => string> = {
 
 /** `OfflineStore` opens the database lazily, so a browser-created instance is inert until first use. */
 function offlineBacking(): KeyValueBacking {
-  const store = new OfflineStore({ dbName: DB_NAME });
+  const store = new OfflineStore({ dbName: MEMOIR_DB_NAME });
   return {
     get: key => store.get(key),
     put: (key, value) => store.put(key, value).then(() => undefined),
     delete: key => store.delete(key),
     keys: () => store.list().then(entries => entries.map(entry => entry.key)),
+    close: () => store.close(),
   };
 }
 
@@ -127,6 +130,11 @@ export class MemoirStore {
   async clearMirror(): Promise<void> {
     for (const key of await this.keysWithPrefix(DOMAIN_PREFIX)) await this.backing.delete(key);
     await this.writeMeta(SYNC_META_KEYS.cursor, '0');
+  }
+
+  /** Release the IndexedDB handle so a sign-out purge can delete the database instead of blocking on an open connection. */
+  close(): void {
+    this.backing.close?.();
   }
 
   async appendOutbox(entry: OutboxEntry): Promise<void> {
