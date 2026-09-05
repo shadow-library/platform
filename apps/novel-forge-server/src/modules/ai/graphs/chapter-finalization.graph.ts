@@ -2,6 +2,7 @@ import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@l
 import { and, eq, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
+import { sanitizeMarkdown } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Project } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -77,6 +78,8 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
 
   async function commitProse(state: FinalizationState) {
     const projectId = BigInt(state.projectId);
+    const content = sanitizeMarkdown(state.prose);
+    const title = sanitizeMarkdown(state.title) || null;
     logger.debug('finalization commitProse', { runId: state.runId, chapter: state.chapter, proseLength: state.prose.length });
 
     // Commit the canonical chapter row and mark the draft final atomically: a crash must not leave a
@@ -89,13 +92,13 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
         .values({
           projectId,
           number: state.chapter,
-          title: state.title || null,
-          content: state.prose,
+          title,
+          content,
           summary: state.summary || null,
           status: 'done',
           generator: (state.generator as Project.ContentGenerator) || 'standard',
           isolated: state.isolated,
-          wordCount: state.prose.split(/\s+/).length,
+          wordCount: content.split(/\s+/).length,
           locked: true,
         })
         .onConflictDoUpdate({

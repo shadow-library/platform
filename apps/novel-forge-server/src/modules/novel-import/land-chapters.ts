@@ -1,3 +1,4 @@
+import { sanitizeMarkdown } from '@server/common';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 export interface LandedChapter {
@@ -44,9 +45,9 @@ export async function landFinalChapters(db: PrimaryDatabase, projectId: bigint, 
         number: startNumber + i + offset,
         sourceOrdinal: chapter.sourceOrdinal ?? null,
         contentHash: chapter.contentHash ?? null,
-        title: chapter.title ?? null,
-        content: chapter.content,
-        note: chapter.note ?? null,
+        title: sanitizeMarkdown(chapter.title ?? null),
+        content: sanitizeMarkdown(chapter.content),
+        note: sanitizeMarkdown(chapter.note ?? null),
         wordCount: countWords(chapter.content),
         status: 'done' as const,
         generator: isFinal ? ('human' as const) : ('standard' as const),

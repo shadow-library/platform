@@ -4,6 +4,7 @@ import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
+import { sanitizeMarkdown } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Chapter, type PrimaryDatabase, schema } from '@server/database';
 
@@ -44,7 +45,11 @@ export class ChapterService {
   async update(projectId: bigint, number: number, update: UpdateChapterBody): Promise<Chapter.Row> {
     const [result] = await this.db
       .update(schema.chapters)
-      .set({ ...update, updatedAt: new Date() })
+      .set({
+        ...(update.title !== undefined && { title: sanitizeMarkdown(update.title) }),
+        ...(update.content !== undefined && { content: sanitizeMarkdown(update.content) }),
+        updatedAt: new Date(),
+      })
       .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, number)))
       .returning()
       .catch(err => this.databaseService.translateError(err));

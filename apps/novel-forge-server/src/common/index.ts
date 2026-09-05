@@ -9,3 +9,4 @@ export * from './draft-staleness';
 export * from './enum.dto';
 export * from './finalize-gate';
 export * from './project-status';
+export * from './sanitize-content';

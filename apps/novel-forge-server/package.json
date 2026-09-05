@@ -61,6 +61,7 @@
     "js-tiktoken": "^1.0.12",
     "langchain": "^0.3.29",
     "llamaindex": "^0.9.4",
+    "marked": "^18.0.6",
     "ollama": "^0.6.3",
     "reflect-metadata": "catalog:",
     "zod": "^3.25.76"

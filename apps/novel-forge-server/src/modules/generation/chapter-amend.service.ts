@@ -4,7 +4,7 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertActiveProject, decideAmendRepublish, declaredDraftFields } from '@server/common';
+import { assertActiveProject, decideAmendRepublish, declaredDraftFields, sanitizeMarkdown } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Chapter, type DbExecutor, type PrimaryDatabase, schema } from '@server/database';
 
@@ -51,13 +51,14 @@ export class ChapterAmendService {
       // No `setWhere: ne(locked, true)` here, unlike the finalization graph's `commitProse`: that guard
       // stops a re-run from clobbering canon it did not write, and clobbering canon on the author's
       // explicit instruction is this endpoint's entire purpose. `locked` stays true — amend never unlocks.
+      const content = sanitizeMarkdown(body.content);
       const [amended] = await tx
         .update(schema.chapters)
         .set({
-          content: body.content,
-          wordCount: countWords(body.content),
-          ...(body.title !== undefined && { title: body.title }),
-          ...(body.note !== undefined && { note: body.note }),
+          content,
+          wordCount: countWords(content),
+          ...(body.title !== undefined && { title: sanitizeMarkdown(body.title) }),
+          ...(body.note !== undefined && { note: sanitizeMarkdown(body.note) }),
           ...declared,
           locked: true,
           updatedAt: new Date(),
