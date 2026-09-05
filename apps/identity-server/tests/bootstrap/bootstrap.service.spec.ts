@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import { PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { OAuthClientService } from '@server/modules/auth/oauth';
@@ -376,5 +376,27 @@ describe('BootstrapService', () => {
     await env.getService(EcosystemSeedService).seed(await seedOperator());
 
     expect(await clientService.getGrantedScopeNames('memoir')).toContain('web-novel:publish');
+  });
+
+  it('should never generate a client_secret_basic credential for a workload-bound ecosystem application client (MEDIUM-001)', async () => {
+    const clients = await env
+      .getPostgresClient()
+      .select()
+      .from(schema.oauthClients)
+      .where(inArray(schema.oauthClients.id, ['pulse', 'novel-forge', 'web-novel', 'memoir']));
+    expect(clients).toHaveLength(4);
+    expect(clients.every(client => client.tokenEndpointAuthMethod === 'private_key_jwt')).toBe(true);
+
+    const secrets = await env
+      .getPostgresClient()
+      .select()
+      .from(schema.oauthClientSecrets)
+      .where(inArray(schema.oauthClientSecrets.clientId, ['pulse', 'novel-forge', 'web-novel', 'memoir']));
+    expect(secrets).toHaveLength(0);
+  });
+
+  it("should still register identity-server's own outbound service client with a secret, since its NotificationTokenService never presents one (MEDIUM-001)", async () => {
+    const secrets = await env.getPostgresClient().select().from(schema.oauthClientSecrets).where(eq(schema.oauthClientSecrets.clientId, 'identity-server'));
+    expect(secrets).toHaveLength(1);
   });
 });

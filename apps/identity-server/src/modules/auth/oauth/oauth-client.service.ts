@@ -211,7 +211,13 @@ export class OAuthClientService {
     return application.displayName ?? application.name;
   }
 
-  async provisionApplicationIdentity(input: { applicationId: number; name: string; publicUrls?: string[]; isFirstParty?: boolean }): Promise<ProvisionedApplication> {
+  async provisionApplicationIdentity(input: {
+    applicationId: number;
+    name: string;
+    publicUrls?: string[];
+    isFirstParty?: boolean;
+    workloadSubjects?: string[];
+  }): Promise<ProvisionedApplication> {
     const audience = applicationAudience(input.name);
     await this.ensureResource(input.applicationId, audience, `${input.name} API`);
 
@@ -226,6 +232,7 @@ export class OAuthClientService {
       isFirstParty: input.isFirstParty ?? true,
       grantTypes: ['authorization_code', 'client_credentials', TOKEN_EXCHANGE_GRANT],
       redirectUris: (input.publicUrls ?? []).map(origin => `${origin}${OAUTH_CALLBACK_PATH}`),
+      workloadSubjects: input.workloadSubjects,
     });
     return { clientId: registered.clientId, secret: registered.secret, audience, created: true };
   }

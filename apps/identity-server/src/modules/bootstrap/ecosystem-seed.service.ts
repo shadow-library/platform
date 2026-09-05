@@ -6,6 +6,7 @@ import { applicationAudience, OAUTH_CALLBACK_PATH, OAuthClientService } from '@s
 import { PolicyDecisionService, ServiceAccessService } from '@server/modules/authz';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
 
+import { announceSecretOnce } from './bootstrap-secrets.util';
 import { ECOSYSTEM_SEED, type SeedApplication, type SeedScopeGrant, type SeedServiceClient } from './ecosystem-seed.constants';
 
 export interface EcosystemOperator {
@@ -120,14 +121,30 @@ export class EcosystemSeedService {
     }
   }
 
+  /**
+   * In a production deployment the client is bound to its workload subject at creation with no
+   * `client_secret_basic` credential generated at all (§8.4) — workload identity is the credential
+   * that is actually presented, and there is no legitimate reader for a generated one there.
+   * Outside production (no projected service-account token to present) a fallback secret is still
+   * generated for local wiring, disclosed once via `announceSecretOnce`, never logged.
+   */
   private async createClient(applicationId: number, app: string, origins: string[]): Promise<void> {
+    const isProductionDeployment = Config.isProductionDeployment();
+    const subjects = [workloadSubject(app)];
+    if (isProductionDeployment) {
+      await this.oauthClientService.provisionApplicationIdentity({ applicationId, name: app, publicUrls: origins, isFirstParty: true, workloadSubjects: subjects });
+      return;
+    }
+
     const provisioned = await this.oauthClientService.provisionApplicationIdentity({ applicationId, name: app, publicUrls: origins, isFirstParty: true });
     if (provisioned.created && provisioned.secret) {
-      this.logger.warn(`Seeded ${app} client '${provisioned.clientId}' — store this secret now, it is shown only once: ${provisioned.secret}`, { clientId: provisioned.clientId });
+      this.logger.info(`Seeded ${app} client '${provisioned.clientId}' with a generated fallback secret`, { clientId: provisioned.clientId });
+      announceSecretOnce(`Seeded ${app} client '${provisioned.clientId}' secret`, provisioned.secret, isProductionDeployment);
     }
-    await this.oauthClientService.updateClient(provisioned.clientId, { workloadSubjects: [workloadSubject(app)] });
+    await this.oauthClientService.updateClient(provisioned.clientId, { workloadSubjects: subjects });
   }
 
+  /** identity-server mints its own outbound service tokens locally (NotificationTokenService) rather than calling its own token endpoint, so this credential is never actually presented and is never worth disclosing. */
   private async createServiceClient(seed: SeedServiceClient): Promise<void> {
     const application = this.applicationService.getApplicationOrThrow(seed.application);
     const { clientId, secret } = await this.oauthClientService.register({
@@ -138,8 +155,7 @@ export class EcosystemSeedService {
       isFirstParty: true,
       grantTypes: ['client_credentials'],
     });
-    if (secret) this.logger.warn(`Seeded ${seed.label} client '${clientId}' — store this secret now, it is shown only once: ${secret}`, { clientId });
-    else this.logger.info(`Seeded ${seed.label} client '${clientId}'`, { clientId });
+    this.logger.info(`Seeded ${seed.label} client '${clientId}'`, { clientId, hasSecret: Boolean(secret) });
   }
 
   private async bindApplication(seed: SeedApplication, scopes: Map<string, string>): Promise<void> {

@@ -12,6 +12,7 @@ import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
 
+import { announceSecretOnce, resolveBootstrapAdminPassword } from './bootstrap-secrets.util';
 import { EcosystemSeedService } from './ecosystem-seed.service';
 
 const PLATFORM_RESOURCE = 'shadow-identity';
@@ -95,7 +96,8 @@ export class BootstrapService implements OnModuleInit {
 
     if (!admin) {
       const configuredPassword = Config.get('auth.bootstrap.admin-password');
-      const password = configuredPassword || this.generatePassword();
+      const isProductionDeployment = Config.isProductionDeployment();
+      const { password, generated } = resolveBootstrapAdminPassword(configuredPassword, isProductionDeployment, () => this.generatePassword());
       admin = await this.userService.createUserWithPassword({
         email,
         password,
@@ -105,7 +107,7 @@ export class BootstrapService implements OnModuleInit {
         status: 'ACTIVE',
         passwordResetRequired: true,
       });
-      if (!configuredPassword) this.logger.warn(`Generated bootstrap admin password (used once to start the forced password reset): ${password}`, { email });
+      if (generated) announceSecretOnce(`Generated bootstrap admin password for '${email}' (used once to start the forced password reset)`, password, isProductionDeployment);
       this.logger.info('Bootstrapped platform administrator — first sign-in requires a password reset', { userId: admin.id, email });
     }
 

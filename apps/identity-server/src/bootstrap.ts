@@ -42,7 +42,8 @@ Config.load('server.host', { defaultValue: '0.0.0.0' });
 
 Config.load('auth.flow.ttl', { defaultValue: '900', validateType: 'number' });
 Config.load('auth.bootstrap.admin-email', { defaultValue: 'admin@shadow-apps.com' });
-Config.load('auth.bootstrap.admin-password', { defaultValue: 'Password@123' });
+/** Left empty by default so BootstrapService can tell "operator configured" apart from "generate one" (required in production; see BootstrapService). */
+Config.load('auth.bootstrap.admin-password', { defaultValue: '' });
 Config.load('auth.password.breach-check-enabled', { defaultValue: 'false', validateType: 'boolean' });
 Config.load('auth.webauthn.rp-id', { defaultValue: 'localhost' });
 Config.load('auth.webauthn.origin', { defaultValue: 'http://localhost:8080' });
