@@ -32,6 +32,15 @@ describe('Team organisations', () => {
 
   const session = async (userId: bigint, aal: 'AAL1' | 'AAL2' = 'AAL1') => (await env.getService(SessionService).create({ userId, aal })).secret;
 
+  const appScopedOwnerSecret = async (): Promise<string> => {
+    const sessions = env.getService(SessionService);
+    const secret = await session(ownerId, 'AAL1');
+    const validated = await sessions.validate(secret);
+    if (!validated) throw new Error('session did not validate');
+    await sessions.elevate(validated.id, { clientId: 'app_client_scoped', resource: 'https://api.example.com' });
+    return secret;
+  };
+
   beforeEach(async () => {
     const users = env.getService(UserService);
     ownerId = (await users.createUserWithPassword({ email: 'owner@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true })).id;
@@ -143,6 +152,27 @@ describe('Team organisations', () => {
     const members = await request('get', `/api/v1/organisations/${orgId}/members`, ownerSecret);
     const roles = (members.json() as { members: { userId: string; role: string }[] }).members;
     expect(roles.find(member => member.userId === adminId.toString())?.role).toBe('OWNER');
+  });
+
+  it('should reject an owner promotion made with an app-scoped step-up', async () => {
+    const secret = await appScopedOwnerSecret();
+    const promote = await request('patch', `/api/v1/organisations/${orgId}/members/${adminId}`, secret, { role: 'OWNER' });
+    expect(promote.statusCode).toBe(403);
+    expect((promote.json() as { code: string }).code).toBe('AUTH_006');
+  });
+
+  it('should reject demoting or removing an owner with an app-scoped step-up', async () => {
+    const promoted = await request('patch', `/api/v1/organisations/${orgId}/members/${adminId}`, ownerSecret, { role: 'OWNER' });
+    expect(promoted.statusCode).toBe(200);
+
+    const secret = await appScopedOwnerSecret();
+    const demote = await request('patch', `/api/v1/organisations/${orgId}/members/${adminId}`, secret, { role: 'MEMBER' });
+    expect(demote.statusCode).toBe(403);
+    expect((demote.json() as { code: string }).code).toBe('AUTH_006');
+
+    const removed = await request('delete', `/api/v1/organisations/${orgId}/members/${adminId}`, secret);
+    expect(removed.statusCode).toBe(403);
+    expect((removed.json() as { code: string }).code).toBe('AUTH_006');
   });
 
   it('should protect the last owner from demotion and removal', async () => {

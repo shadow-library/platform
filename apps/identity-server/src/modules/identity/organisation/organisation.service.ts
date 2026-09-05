@@ -6,7 +6,7 @@ import { AppError, Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, isNumericId } from '@server/constants';
-import { type ValidatedSession } from '@server/modules/auth/session';
+import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
 import { RefreshTokenService } from '@server/modules/auth/token';
 import { PolicyDecisionService } from '@server/modules/authz';
 import { AuditService } from '@server/modules/infrastructure/audit';
@@ -82,12 +82,9 @@ export class OrganisationService {
     private readonly auditService: AuditService,
     private readonly notificationService: NotificationService,
     private readonly refreshTokenService: RefreshTokenService,
+    private readonly sessionService: SessionService,
   ) {
     this.db = databaseService.getPostgresClient();
-  }
-
-  private isElevated(session: ValidatedSession): boolean {
-    return session.elevatedUntil !== null && session.elevatedUntil > Date.now();
   }
 
   private async audit(caller: CallerContext, organisationId: bigint, action: string, targetType?: string, targetId?: string): Promise<void> {
@@ -260,13 +257,13 @@ export class OrganisationService {
 
   async changeMemberRole(caller: CallerContext, callerMembership: Organisation.Member, organisationId: bigint, targetUserId: bigint, role: Organisation.MemberRole): Promise<void> {
     if (role === 'OWNER') {
-      if (!this.isElevated(caller.session)) throw AppErrorCode.AUTH_006.create();
+      if (!this.sessionService.isSelfServiceElevated(caller.session)) throw AppErrorCode.AUTH_006.create();
       if (callerMembership.role !== 'OWNER') throw AppErrorCode.ORG_007.create();
     }
     const target = await this.getMembership(targetUserId, organisationId);
     if (!target) throw AppErrorCode.USR_001.create();
     if (target.role === 'OWNER' && callerMembership.role !== 'OWNER') throw AppErrorCode.ORG_007.create();
-    if (target.role === 'OWNER' && caller.session.aal !== 'AAL2') throw AppErrorCode.AUTH_006.create();
+    if (target.role === 'OWNER' && !this.sessionService.isSelfServiceElevated(caller.session)) throw AppErrorCode.AUTH_006.create();
     if (callerMembership.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[callerMembership.role]) throw AppErrorCode.ORG_007.create();
 
     await this.updateMemberRole(organisationId, targetUserId, role);
@@ -292,7 +289,7 @@ export class OrganisationService {
     const target = await this.getMembership(targetUserId, organisationId);
     if (!target) throw AppErrorCode.USR_001.create();
     if (target.userId === caller.session.userId) throw AppErrorCode.ORG_007.create();
-    if (target.role === 'OWNER' && (callerMembership.role !== 'OWNER' || caller.session.aal !== 'AAL2'))
+    if (target.role === 'OWNER' && (callerMembership.role !== 'OWNER' || !this.sessionService.isSelfServiceElevated(caller.session)))
       throw (callerMembership.role !== 'OWNER' ? AppErrorCode.ORG_007 : AppErrorCode.AUTH_006).create();
     if (callerMembership.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[callerMembership.role]) throw AppErrorCode.ORG_007.create();
     if (status !== 'ACTIVE' && target.role === 'OWNER') await this.assertNotLastOwner(organisationId, targetUserId);
@@ -321,7 +318,7 @@ export class OrganisationService {
     const target = await this.getMembership(targetUserId, organisationId);
     if (!target) throw AppErrorCode.USR_001.create();
     if (target.userId === caller.session.userId) throw AppErrorCode.ORG_007.create();
-    if (target.role === 'OWNER' && (callerMembership.role !== 'OWNER' || caller.session.aal !== 'AAL2'))
+    if (target.role === 'OWNER' && (callerMembership.role !== 'OWNER' || !this.sessionService.isSelfServiceElevated(caller.session)))
       throw (callerMembership.role !== 'OWNER' ? AppErrorCode.ORG_007 : AppErrorCode.AUTH_006).create();
     if (callerMembership.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[callerMembership.role]) throw AppErrorCode.ORG_007.create();
 

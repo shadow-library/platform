@@ -44,9 +44,21 @@ describe('AccessGuard', () => {
     return { userId: user.id, secret };
   };
 
+  const stepUp = async (secret: string, intent?: { clientId: string; resource: string }): Promise<void> => {
+    const validated = await sessions.validate(secret);
+    if (!validated) throw new Error('session did not validate');
+    await sessions.elevate(validated.id, intent);
+  };
+
   beforeEach(() => {
     sessions = env.getService(SessionService);
-    guard = new AccessGuard(env.getService(SessionAuthService), env.getService(AdminAccessService), env.getService(OrganisationService), env.getService(KeyService));
+    guard = new AccessGuard(
+      env.getService(SessionAuthService),
+      env.getService(SessionService),
+      env.getService(AdminAccessService),
+      env.getService(OrganisationService),
+      env.getService(KeyService),
+    );
   });
 
   it('should not guard a route with no access declaration', () => {
@@ -78,6 +90,27 @@ describe('AccessGuard', () => {
     const strong = await sessionFor('guard-strong@example.com', 'AAL2');
     const context = (await resolve({ elevated: true }, requestWith(strong.secret))) as AuthContext;
     expect(context.elevated).toBe(true);
+  });
+
+  it('should accept a self-service step-up on an identity elevated route', async () => {
+    const { secret } = await sessionFor('guard-selfservice@example.com', 'AAL1');
+    await stepUp(secret);
+    const context = (await resolve({ elevated: true }, requestWith(secret))) as AuthContext;
+    expect(context.elevated).toBe(true);
+  });
+
+  it('should reject an app-scoped step-up on an identity elevated route', async () => {
+    const { secret } = await sessionFor('guard-appscoped@example.com', 'AAL1');
+    await stepUp(secret, { clientId: 'app_client_scoped', resource: 'https://api.example.com' });
+    const denied = (await resolve({ elevated: true }, requestWith(secret))) as Error;
+    expect((denied as { code?: string }).code).toBe('AUTH_006');
+  });
+
+  it('should not mark an app-scoped step-up as elevated for factor enrollment', async () => {
+    const { secret } = await sessionFor('guard-appscoped-enroll@example.com', 'AAL1');
+    await stepUp(secret, { clientId: 'app_client_scoped', resource: 'https://api.example.com' });
+    const context = (await resolve({ session: true }, requestWith(secret))) as AuthContext;
+    expect(context.elevated).toBe(false);
   });
 
   it('should attach the admin actor when the permission is held and deny otherwise', async () => {

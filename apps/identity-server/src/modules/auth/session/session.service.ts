@@ -173,6 +173,10 @@ export class SessionService {
     return intent !== null && intent.clientId === clientId && intent.resource === resource;
   }
 
+  isSelfServiceElevated(session: ValidatedSession): boolean {
+    return this.isElevated(session) && session.elevationIntent === null;
+  }
+
   async consumeElevation(sessionId: bigint): Promise<void> {
     const [session] = await this.db
       .update(schema.userSessions)

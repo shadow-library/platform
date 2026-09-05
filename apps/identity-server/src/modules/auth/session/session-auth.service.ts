@@ -31,8 +31,8 @@ export class SessionAuthService {
 
   async authenticateElevated(request: FastifyRequest): Promise<ValidatedSession> {
     const session = await this.authenticate(request);
-    if (!this.sessionService.isElevated(session)) {
-      this.logger.debug('elevated authentication rejected: session lacks a recent step-up', { userId: session.userId.toString(), aal: session.aal });
+    if (!this.sessionService.isSelfServiceElevated(session)) {
+      this.logger.debug('elevated authentication rejected: session lacks a self-service step-up', { userId: session.userId.toString(), aal: session.aal });
       throw AppErrorCode.AUTH_006.create();
     }
     return session;

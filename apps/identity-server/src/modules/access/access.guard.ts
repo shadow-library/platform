@@ -6,7 +6,7 @@ import { AsyncRouteHandler, Middleware, MiddlewareGenerator } from '@shadow-libr
 import { AppErrorCode } from '@server/classes';
 import { AdminAccessService } from '@server/modules/admin';
 import { type JwtClaims, KeyService } from '@server/modules/auth/keys';
-import { SessionAuthService } from '@server/modules/auth/session';
+import { SessionAuthService, SessionService } from '@server/modules/auth/session';
 import { OrganisationService } from '@server/modules/identity/organisation';
 
 import { ACCESS_METADATA } from './access.decorator';
@@ -21,6 +21,7 @@ export class AccessGuard implements MiddlewareGenerator {
 
   constructor(
     private readonly sessionAuthService: SessionAuthService,
+    private readonly sessionService: SessionService,
     private readonly adminAccessService: AdminAccessService,
     private readonly organisationService: OrganisationService,
     private readonly keyService: KeyService,
@@ -45,7 +46,7 @@ export class AccessGuard implements MiddlewareGenerator {
 
       const session = options.elevated ? await this.sessionAuthService.authenticateElevated(request) : await this.sessionAuthService.authenticate(request);
       context.session = session;
-      context.elevated = session.elevatedUntil !== null && session.elevatedUntil > Date.now();
+      context.elevated = this.sessionService.isSelfServiceElevated(session);
 
       if (options.permission) context.actor = await this.adminAccessService.authorize(session, options.permission);
 
