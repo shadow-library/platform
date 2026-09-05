@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { inArray, sql, type SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -21,6 +21,12 @@ export interface RetrievalHit {
 const DEFAULT_PROSE_K = 5;
 const DEFAULT_LORE_K = 6;
 
+// `kinds` is model-chosen, so bind every value as a parameter: `inArray` renders `lc.kind in ($1, $2, …)`, never interpolated SQL a jailbroken model could shape.
+export function buildKindFilter(kinds?: string[]): SQL {
+  if (!kinds || kinds.length === 0) return sql``;
+  return sql`AND ${inArray(sql`lc.kind`, kinds)}`;
+}
+
 @Injectable()
 export class RetrievalService {
   private readonly logger = Logger.getLogger(APP_NAME, RetrievalService.name);
@@ -39,6 +45,7 @@ export class RetrievalService {
       const embedding = await this.embeddingService.embed(query);
       if (!embedding) return [];
 
+      // Raw-interpolated, not bound: numeric and non-attacker-controlled; pgvector needs a text '[...]'::vector literal and a bound $n needs a text-to-vector cast it lacks.
       const vecLiteral = `[${embedding.join(',')}]`;
 
       const rows = await this.db.execute<{ chapter: number; text: string; score: number }>(sql`
@@ -71,9 +78,9 @@ export class RetrievalService {
       const embedding = await this.embeddingService.embed(query);
       if (!embedding) return [];
 
+      // Raw-interpolated, not bound: numeric and non-attacker-controlled; pgvector needs a text '[...]'::vector literal and a bound $n needs a text-to-vector cast it lacks.
       const vecLiteral = `[${embedding.join(',')}]`;
-      const kinds = opts?.kinds;
-      const kindFilter = kinds && kinds.length > 0 ? sql`AND lc.kind = ANY(ARRAY[${sql.raw(kinds.map(k => `'${k}'`).join(','))}]::varchar[])` : sql``;
+      const kindFilter = buildKindFilter(opts?.kinds);
 
       const loreRows = await this.db.execute<{ kind: string; refKey: string; text: string; score: number }>(sql`
         SELECT lc.kind, lc.ref_key AS "refKey", lc.text,

@@ -2,8 +2,10 @@ import { z } from 'zod';
 
 import { type RegisteredTool } from '../types';
 
+// Defence in depth: `kinds` is model-chosen and reaches a SQL filter, so constrain it to an identifier
+// shape here as well — the values are also bound as parameters in RetrievalService.searchLore.
 const inputSchema = z.object({
-  kinds: z.array(z.string()).optional(),
+  kinds: z.array(z.string().regex(/^[a-z0-9_]{1,64}$/i)).optional(),
   query: z.string(),
 });
 
