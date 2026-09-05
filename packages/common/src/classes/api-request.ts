@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import qs from 'node:querystring';
-import { Dispatcher, request } from 'undici';
+import { Dispatcher, getGlobalDispatcher, interceptors, request } from 'undici';
 import deepmerge from 'deepmerge';
 import { JsonObject, JsonValue } from 'type-fest';
 
@@ -28,7 +28,7 @@ export interface APIRequestOptions extends Partial<Dispatcher.DispatchOptions> {
   data?: JsonObject;
   /** How `data` is encoded on the wire — set by `body()` (json) and `form()` (form). Defaults to json. */
   bodyFormat?: BodyFormat;
-  /** Lives on undici's `RequestOptions` rather than `DispatchOptions`, so it is declared here to reach `request()` */
+  /** Applied through undici's redirect interceptor — `request()` no longer accepts it as an option. */
   maxRedirections?: number;
 }
 
@@ -51,10 +51,9 @@ export class APIRequest {
   private static readonly logger = Logger.getLogger(NAMESPACE, 'APIRequest');
 
   /**
-   * undici's `request` does not follow redirects — its `maxRedirections` defaults to 0, unlike
-   * `fetch`, whose behaviour callers reasonably expect. Left at that default a 3xx arrives as a
-   * response with no body rather than the resource, which reads as an empty answer instead of a
-   * move. The cap is what stops a redirect loop becoming an infinite one.
+   * undici's `request` does not follow redirects, unlike `fetch`, whose behaviour callers reasonably
+   * expect — a 3xx would otherwise arrive as a bodyless response rather than the resource. The redirect
+   * interceptor restores that, and the cap stops a redirect loop becoming an infinite one.
    */
   private static readonly DEFAULT_MAX_REDIRECTIONS = 5;
 
@@ -194,6 +193,7 @@ export class APIRequest {
       requestOptions.body = body;
     }
     const redirections = maxRedirections ?? APIRequest.DEFAULT_MAX_REDIRECTIONS;
+    const dispatcher = redirections > 0 ? getGlobalDispatcher().compose(interceptors.redirect({ maxRedirections: redirections })) : undefined;
 
     /** Log the request. Read the level per request so a runtime level change is honoured. */
     const isDebug = Logger.isDebugEnabled();
@@ -205,7 +205,7 @@ export class APIRequest {
     const signal = timeout === undefined ? undefined : AbortSignal.timeout(timeout);
     const startTime = process.hrtime();
     const perform = async (): Promise<{ response: Dispatcher.ResponseData; resData: unknown }> => {
-      const response = await request(url, { ...requestOptions, maxRedirections: redirections, ...(signal ? { signal } : {}) });
+      const response = await request(url, { ...requestOptions, ...(dispatcher ? { dispatcher } : {}), ...(signal ? { signal } : {}) });
       const resData = response.headers['content-type']?.includes('application/json') ? await response.body.json() : null;
       return { response, resData };
     };

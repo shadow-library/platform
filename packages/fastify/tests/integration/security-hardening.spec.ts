@@ -33,11 +33,11 @@ class SecurityController {
 }
 
 describe('trust proxy request.ip resolution', () => {
-  describe('with a hop-count trust proxy', () => {
+  describe('with a trusted-CIDR trust proxy', () => {
     let app: ShadowApplication;
     let router: FastifyRouter;
 
-    @Module({ imports: [FastifyModule.forRoot({ controllers: [SecurityController], trustProxy: 1 })] })
+    @Module({ imports: [FastifyModule.forRoot({ controllers: [SecurityController], trustProxy: ['127.0.0.0/8'] })] })
     class TrustedProxyModule {}
 
     beforeAll(async () => {

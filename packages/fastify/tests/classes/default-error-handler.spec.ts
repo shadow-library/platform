@@ -64,7 +64,7 @@ describe('DefaultErrorHandler', () => {
     expect(response.status).toHaveBeenCalledWith(415);
     expect(response.send).toHaveBeenCalledWith({
       code: 'S006',
-      message: 'Unsupported Media Type: application/unknown',
+      message: error.message,
     });
   });
 

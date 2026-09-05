@@ -17,9 +17,9 @@ import { parseTrustProxy } from '@lib/config';
  */
 
 describe('parseTrustProxy', () => {
-  it('should parse a hop count into a number', () => {
-    expect(parseTrustProxy('1')).toBe(1);
-    expect(parseTrustProxy('3')).toBe(3);
+  it('should fail closed on a numeric hop count, which fastify no longer supports (CVE-2026-16732)', () => {
+    expect(parseTrustProxy('1')).toBe(false);
+    expect(parseTrustProxy('3')).toBe(false);
   });
 
   it('should parse a comma-separated CIDR list into a trimmed string array', () => {

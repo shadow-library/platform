@@ -13,7 +13,7 @@ import { NAMESPACE } from './constants';
  * Defining types
  */
 
-export type TrustProxy = boolean | number | string[];
+export type TrustProxy = boolean | string[];
 
 declare module '@shadow-library/common' {
   export interface ConfigRecords {
@@ -33,10 +33,15 @@ const isDevValue = String(Config.isDev());
 const logger = Logger.getLogger(NAMESPACE, 'Config');
 
 // Fastify's `trustProxy: true` derives `request.ip` from the client-supplied, left-most x-forwarded-for entry, which is spoofable.
-// A hop count or trusted-CIDR list instead trusts only addresses the ingress attached; identity-server keys rate limits and IP blocks on request.ip.
+// A numeric hop count is likewise spoofable — a direct client can supply enough hops (CVE-2026-16732) — so fastify removed it (>= 5.12.1)
+// and treats it as trust-nothing; a numeric value is mapped to `false` here to match. A trusted-CIDR list trusts only addresses the ingress
+// attached and is the safe form; identity-server keys rate limits and IP blocks on request.ip.
 export function parseTrustProxy(value: string): TrustProxy {
   if (value === 'true' || value === 'false') return value === 'true';
-  if (/^\d+$/.test(value)) return Number(value);
+  if (/^\d+$/.test(value)) {
+    logger.warn('APP_TRUST_PROXY numeric hop-count is no longer supported (CVE-2026-16732) — trusting no proxy; use a trusted CIDR list to resolve request.ip behind an ingress');
+    return false;
+  }
   return value
     .split(',')
     .map(entry => entry.trim())
