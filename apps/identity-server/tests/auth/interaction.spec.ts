@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
 
-import { OAuthClientService } from '@server/modules/auth/oauth';
+import { ConsentService, OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { ApplicationService } from '@server/modules/system/application';
@@ -142,6 +142,74 @@ describe('UI interaction surface', () => {
         .cookies({ 'csrf-token': csrf.cookie })
         .body({ clientId, scopeNames: ['openid'], decision: 'APPROVE' });
       expect(response.statusCode).toBe(401);
+    });
+  });
+
+  describe('consent scope integrity', () => {
+    const authorizeWith = (scope: string, cookie = sessionSecret) => {
+      const { challenge } = pkce();
+      const url = `/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scope)}&code_challenge=${challenge}&code_challenge_method=S256`;
+      return env
+        .getRouter()
+        .mockRequest()
+        .get(url)
+        .cookies({ [SESSION_COOKIE_NAME]: cookie });
+    };
+
+    it('should re-prompt when a re-authorization requests scopes beyond the recorded consent', async () => {
+      const approve = await request('post', '/api/v1/auth/consent').body({ clientId, scopeNames: ['openid'], decision: 'APPROVE' });
+      expect(approve.statusCode).toBe(200);
+
+      const narrow = await authorizeWith('openid');
+      expect(narrow.headers.location).toStartWith(`${REDIRECT_URI}?code=`);
+
+      const widened = await authorizeWith('openid profile email');
+      expect(widened.statusCode).toBe(302);
+      expect(widened.headers.location).toContain('/login');
+    });
+
+    it('should issue a code once the widened consent is approved', async () => {
+      await request('post', '/api/v1/auth/consent').body({ clientId, scopeNames: ['openid'], decision: 'APPROVE' });
+      await request('post', '/api/v1/auth/consent').body({ clientId, scopeNames: ['openid', 'profile', 'email'], decision: 'APPROVE' });
+
+      const widened = await authorizeWith('openid profile email');
+      expect(widened.headers.location).toStartWith(`${REDIRECT_URI}?code=`);
+    });
+
+    it('should store the intersection of requested and entitled scopes, ignoring an inflated decision body', async () => {
+      const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+      const scopeId = await env.getService(OAuthClientService).ensureScope(applicationId, 'api://reports', 'reports:read', 'USER');
+      await env.getService(OAuthClientService).grantScope(clientId, scopeId);
+
+      const approve = await request('post', '/api/v1/auth/consent').body({ clientId, scopeNames: ['openid', 'profile', 'reports:read', 'ghost:write'], decision: 'APPROVE' });
+      expect(approve.statusCode).toBe(200);
+
+      const consent = await env.getService(ConsentService).getActive(userId, clientId);
+      expect(consent?.scopeNames.slice().sort()).toEqual(['openid', 'profile', 'reports:read']);
+    });
+
+    it('should let first-party clients skip the consent prompt without a prior grant', async () => {
+      const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+      const firstParty = await env.getService(OAuthClientService).register({
+        applicationId,
+        name: 'First Party App',
+        kind: 'WEB_CONFIDENTIAL',
+        isFirstParty: true,
+        grantTypes: ['authorization_code'],
+        redirectUris: [REDIRECT_URI],
+      });
+
+      const { challenge } = pkce();
+      const url = `/oauth2/authorize?client_id=${firstParty.clientId}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent('openid profile')}&code_challenge=${challenge}&code_challenge_method=S256`;
+      const response = await env
+        .getRouter()
+        .mockRequest()
+        .get(url)
+        .cookies({ [SESSION_COOKIE_NAME]: sessionSecret });
+      expect(response.headers.location).toStartWith(`${REDIRECT_URI}?code=`);
+
+      const consent = await env.getService(ConsentService).getActive(userId, firstParty.clientId);
+      expect(consent?.source).toBe('FIRST_PARTY_POLICY');
     });
   });
 });

@@ -3,11 +3,11 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, OIDC_PROTOCOL_SCOPES } from '@server/constants';
 import { type ValidatedSession } from '@server/modules/auth/session';
 import { RefreshTokenService } from '@server/modules/auth/token';
 import { AuditService } from '@server/modules/infrastructure/audit';
-import { Consent, DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { Consent, DatabaseService, OAuthClient, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationMemberService, ApplicationService } from '@server/modules/system/application';
 
 import { OAuthClientService } from './oauth-client.service';
@@ -97,7 +97,7 @@ export class ConsentService {
     const target = { actorType: 'USER' as const, actorId: caller.session.userId.toString(), targetType: 'oauth_client', targetId: client.id, ipAddress: caller.ip };
 
     if (input.decision === 'APPROVE') {
-      await this.record(caller.session.userId, client.id, input.scopeNames, 'USER');
+      await this.record(caller.session.userId, client.id, await this.entitledScopes(client, input.scopeNames), 'USER');
       await this.auditService.record({ action: 'oauth.consent.granted', outcome: 'SUCCESS', ...target });
       return { decision: 'APPROVE' };
     }
@@ -111,6 +111,12 @@ export class ConsentService {
     }
     await this.auditService.record({ action: 'oauth.consent.denied', outcome: 'SUCCESS', ...target });
     return { decision: 'DENY', redirectTo };
+  }
+
+  private async entitledScopes(client: OAuthClient, requestedNames: string[]): Promise<string[]> {
+    const requested = await this.clientService.filterScopesForPrincipal(requestedNames, 'user');
+    const entitled = await this.clientService.getEntitledScopeNames(client);
+    return requested.filter(name => entitled.has(name) || OIDC_PROTOCOL_SCOPES.has(name));
   }
 
   async listConsentRecords(userId: bigint): Promise<ConsentRecordData[]> {

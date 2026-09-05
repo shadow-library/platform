@@ -206,8 +206,9 @@ export class OAuthService {
     const scope = grant.scopes.join(' ');
     if (client.isFirstParty) {
       await this.consentService.record(session.userId, client.id, grant.scopes, 'FIRST_PARTY_POLICY');
-    } else if (!(await this.consentService.getActive(session.userId, client.id))) {
-      return { kind: 'login' };
+    } else {
+      const consent = await this.consentService.getActive(session.userId, client.id);
+      if (!consent || grant.scopes.some(name => !consent.scopeNames.includes(name))) return { kind: 'login' };
     }
 
     const code = await this.codeService.issue({

@@ -306,6 +306,15 @@ export class OAuthClientService {
     return new Map([...granted, ...owned].map(scope => [scope.name, scope]));
   }
 
+  /** Every user-consentable scope name the client can reach across audiences: explicit cross-resource grants plus its own audience's declared scopes. */
+  async getEntitledScopeNames(client: OAuthClient): Promise<Set<string>> {
+    const granted = await this.getGrantedScopes(client.id);
+    const names = new Set(granted.map(scope => scope.name));
+    const application = await this.db.query.applications.findFirst({ where: eq(schema.applications.id, client.applicationId), columns: { name: true } });
+    if (application) for (const scope of await this.listResourceScopes(applicationAudience(application.name))) names.add(scope.name);
+    return names;
+  }
+
   private async listResourceScopes(identifier: string): Promise<GrantedScope[]> {
     return this.db
       .select({ name: schema.scopes.name, resourceIdentifier: schema.apiResources.identifier, isSensitive: schema.scopes.isSensitive })
