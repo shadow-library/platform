@@ -1,5 +1,6 @@
 export * from './cells';
 export * from './ConfirmProvider';
+export * from './EmailPreviewFrame';
 export * from './format';
 export * from './FormDrawer';
 export * from './icons';

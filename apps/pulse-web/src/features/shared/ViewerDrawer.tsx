@@ -4,6 +4,7 @@ import { Drawer, SegmentedControl } from '@shadow-library/ui';
 import { type NotificationChannel } from '@/lib';
 
 import { OutlineBadge } from './cells';
+import { EmailPreviewFrame } from './EmailPreviewFrame';
 import { PulseSquare } from './icons';
 import styles from './ViewerDrawer.module.css';
 
@@ -119,9 +120,8 @@ function EmailPreview({ subject, body, recipient }: { subject: string; body: str
           </div>
         </div>
       </div>
-      {/* Template/message body is admin-authored content rendered into an isolated preview surface. */}
       <div className={styles.emailBodyWrap}>
-        <div className={styles.emailBody} dangerouslySetInnerHTML={{ __html: body }} />
+        <EmailPreviewFrame body={body} className={styles.emailFrame} />
       </div>
     </div>
   );

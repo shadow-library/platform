@@ -141,14 +141,12 @@
   padding: 4px 0;
 }
 
-.emailBody {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 24px 32px;
-  font-family: var(--sh-font-sans);
-  color: #1a1a1a;
-  font-size: 15px;
-  line-height: 1.6;
+.emailFrame {
+  display: block;
+  width: 100%;
+  height: 520px;
+  border: 0;
+  background: var(--sh-neutral-white);
 }
 
 .smsWrap {

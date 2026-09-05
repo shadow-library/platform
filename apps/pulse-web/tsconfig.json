@@ -3,6 +3,6 @@
   "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "generated/**/*.ts"],
   "compilerOptions": {
     "paths": { "@/*": ["./src/*"] },
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node", "bun"]
   }
 }

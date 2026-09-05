@@ -7,6 +7,9 @@
     "dev": "vite dev",
     "start": "bun run serve.ts"
   },
+  "shadow": {
+    "verifyTest": true
+  },
   "dependencies": {
     "@shadow-library/ui": "workspace:*",
     "@shadow-library/web": "workspace:*",
