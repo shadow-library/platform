@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
 import { ChevronDownIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
@@ -230,9 +230,6 @@ interface EntityDialogProps {
 
 function EntityDialog({ open, onOpenChange, mode, initial, onSubmit, pending }: EntityDialogProps): React.JSX.Element {
   const [form, setForm] = useState(initial);
-  useEffect(() => {
-    if (open) setForm(initial);
-  }, [open, initial]);
   const set = <K extends keyof EntityFormState>(key: K, value: EntityFormState[K]): void => setForm(prev => ({ ...prev, [key]: value }));
   const invalid = !form.name.trim() || (mode === 'create' && !form.entityKey.trim());
 

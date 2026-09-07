@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button, Checkbox, Drawer, FormField, Input, SegmentedControl, Spinner, Textarea, toast } from '@shadow-library/ui';
 
 import { type ChipIntent, PageHeader, QueryState, StatusChip } from '@/components/nf';
@@ -62,13 +62,12 @@ function ConfigCard({ novelId, status }: ConfigCardProps): React.JSX.Element {
   const [audit, setAudit] = useState(true);
   const [hydrated, setHydrated] = useState(false);
 
-  useEffect(() => {
-    if (hydrated || !status) return;
+  if (!hydrated && status) {
+    setHydrated(true);
     setDirectives(status.rebrand.directives ?? '');
     setBanned((status.rebrand.settings?.bannedExtra ?? []).join(', '));
     setAudit(status.rebrand.settings?.auditEnabled !== false);
-    setHydrated(true);
-  }, [status, hydrated]);
+  }
 
   const save = (): void => {
     const bannedExtra = banned

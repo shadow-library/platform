@@ -970,14 +970,15 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
 
   const draft = draftQuery.data;
 
-  // Seed the Markdown buffer whenever the chapter changes. A chapter with no prose yet (a fresh "write
-  // it yourself" draft) opens straight in the Write tab; one that already has prose opens as a read.
-  useEffect(() => {
+  // A chapter with no prose yet (a fresh "write it yourself" draft) opens straight in the Write tab;
+  // one that already has prose opens as a read.
+  const [seeded, setSeeded] = useState<{ draftId?: string }>({});
+  if (seeded.draftId !== draft?.id) {
+    setSeeded({ draftId: draft?.id });
     setText(draft?.body ?? '');
     setTab('write');
     setEditing(draft ? !(draft.body ?? '').trim() : false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft?.id]);
+  }
 
   useEffect(() => {
     if (editing && tab === 'write') editorRef.current?.focus();

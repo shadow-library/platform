@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Button, Dialog, FormField, IconButton, Kbd, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
 import { WarningIcon } from '@/components/icons';
@@ -43,9 +43,11 @@ interface FeedbackDialogProps {
 
 function FeedbackDialog({ open, onOpenChange, disposition, pending, onSubmit }: FeedbackDialogProps): React.JSX.Element {
   const [note, setNote] = useState('');
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (open) setNote('');
-  }, [open]);
+  }
   const title = disposition === 'rejected' ? 'Reject draft' : 'Request revision';
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -183,17 +185,10 @@ function ReviewDetail({ novelId, draft }: ReviewDetailProps): React.JSX.Element 
 function ReviewScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const queueQuery = useReviewQueueQuery(novelId);
-  // Memoized so identity is stable across renders where the query data hasn't changed — otherwise the
-  // `?? []` fallback mints a new array every render and re-triggers the effect below on every render.
-  const drafts = useMemo(() => queueQuery.data?.drafts ?? [], [queueQuery.data]);
+  const drafts = queueQuery.data?.drafts ?? [];
   const [selectedChapter, setSelectedChapter] = useState<number | undefined>();
 
-  useEffect(() => {
-    const first = drafts[0];
-    if (selectedChapter == null && first) setSelectedChapter(first.chapter);
-  }, [drafts, selectedChapter]);
-
-  const selected = drafts.find(d => d.chapter === selectedChapter);
+  const selected = selectedChapter == null ? drafts[0] : drafts.find(d => d.chapter === selectedChapter);
 
   return (
     <div className="nf-splitpane">
@@ -209,7 +204,7 @@ function ReviewScreen(): React.JSX.Element {
           {drafts.map(draft => {
             const intent = REVIEW_INTENT[draft.reviewStatus] ?? 'neutral';
             return (
-              <button key={draft.id} className="nf-selrow nf-selrow-stack" data-active={draft.chapter === selectedChapter} onClick={() => setSelectedChapter(draft.chapter)}>
+              <button key={draft.id} className="nf-selrow nf-selrow-stack" data-active={draft.chapter === selected?.chapter} onClick={() => setSelectedChapter(draft.chapter)}>
                 <div className={styles.rowTopRow}>
                   <div className={styles.spacer} />
                   <StatusChip intent={intent}>{draft.reviewStatus}</StatusChip>

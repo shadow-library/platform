@@ -11,7 +11,7 @@ import {
 } from '@shadow-library/sdk';
 import { Alert, Button, Dialog, FormField, Input, MultiSelect, type MultiSelectOption, SegmentedControl, Textarea, toast, Tooltip } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { type ChipIntent, PageContainer, PageHeader, QueryState, RatingField, SectionCard, StatusChip, UNRATED } from '@/components/nf';
 import {
@@ -90,8 +90,8 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
   const [status, setStatus] = useState<PublicationStatus>('live');
   const [hydrated, setHydrated] = useState(false);
 
-  useEffect(() => {
-    if (hydrated || !ready) return;
+  if (!hydrated && ready) {
+    setHydrated(true);
     setSlug(publication?.novelSlug ?? '');
     setTitle(publication?.title ?? defaultTitle);
     setBlurb(publication?.blurb ?? '');
@@ -102,8 +102,7 @@ function NovelCard({ novelId, publication, ready, defaultTitle }: NovelCardProps
     setViolence(publication?.violence ?? UNRATED);
     setDarkContent(publication?.darkContent ?? UNRATED);
     setStatus(publication?.status ?? 'live');
-    setHydrated(true);
-  }, [publication, ready, hydrated, defaultTitle]);
+  }
 
   const save = (): void => {
     const body: PublishNovelBody = {
@@ -284,12 +283,11 @@ function AccessCard({ novelId, published }: AccessCardProps): React.JSX.Element 
   const [draft, setDraft] = useState('');
   const [hydrated, setHydrated] = useState(false);
 
-  useEffect(() => {
-    if (hydrated || !access.data) return;
+  if (!hydrated && access.data) {
+    setHydrated(true);
     setVisibility(access.data.visibility);
     setEmails(access.data.grants.map(grant => grant.email));
-    setHydrated(true);
-  }, [access.data, hydrated]);
+  }
 
   const addDraft = (): void => {
     const added = draft

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Alert, Button, Checkbox, Drawer, FormField, Input, Select, Spinner, Tabs, Textarea, toast } from '@shadow-library/ui';
 
 import { type ChipIntent, Markdown, PageHeader, QueryState, StatusChip } from '@/components/nf';
@@ -249,11 +249,10 @@ function PlanTab({ novelId, status }: TabProps): React.JSX.Element {
   const plan = planQuery.data?.plan;
   const sourceChapterCount = plan?.sourceChapterCount ?? status?.sourceChapters ?? 0;
 
-  useEffect(() => {
-    if (!planQuery.data || planQuery.data.plan.revision === loadedRevision) return;
-    setSpans(planQuery.data.spans.map(({ spanKey: _key, firstOutputChapter: _first, lastOutputChapter: _last, ...rest }) => rest));
+  if (planQuery.data && planQuery.data.plan.revision !== loadedRevision) {
     setLoadedRevision(planQuery.data.plan.revision);
-  }, [planQuery.data, loadedRevision]);
+    setSpans(planQuery.data.spans.map(({ spanKey: _key, firstOutputChapter: _first, lastOutputChapter: _last, ...rest }) => rest));
+  }
 
   const issues = validateSpans(spans, sourceChapterCount);
   const approved = plan?.status === 'approved';
@@ -378,7 +377,12 @@ function OutputReader({ novelId, outputChapter, onClose }: { novelId: string; ou
   const [sourceChapter, setSourceChapter] = useState<number | null>(null);
   const sourceQuery = useChapterQuery(novelId, sourceChapter ?? 0, sourceChapter !== null);
 
-  useEffect(() => setSourceChapter(output?.fromChapter ?? null), [output?.fromChapter]);
+  const fromChapter = output?.fromChapter ?? null;
+  const [syncedFrom, setSyncedFrom] = useState<number | null>(null);
+  if (syncedFrom !== fromChapter) {
+    setSyncedFrom(fromChapter);
+    setSourceChapter(fromChapter);
+  }
 
   return (
     <Drawer open={outputChapter !== null} onOpenChange={open => !open && onClose()} placement="right" size="lg">

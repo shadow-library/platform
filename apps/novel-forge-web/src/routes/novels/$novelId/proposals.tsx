@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Button, Checkbox, SegmentedControl, toast } from '@shadow-library/ui';
 
 import { type ChipIntent, Markdown, PaneError, PaneLoader, StatusChip } from '@/components/nf';
@@ -255,14 +255,10 @@ function ProposalsScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const [filter, setFilter] = useState<Filter>('pending');
   const proposalsQuery = useListProposalsQuery(novelId, { limit: 100, ...(filter === 'pending' ? { status: 'pending' } : {}) });
-  const proposals = useMemo(() => proposalsQuery.data?.items ?? [], [proposalsQuery.data]);
+  const proposals = proposalsQuery.data?.items ?? [];
   const [selectedId, setSelectedId] = useState<string | undefined>();
 
-  useEffect(() => {
-    if (!proposals.some(p => p.id === selectedId)) setSelectedId(proposals[0]?.id);
-  }, [proposals, selectedId]);
-
-  const selected = proposals.find(p => p.id === selectedId);
+  const selected = proposals.find(p => p.id === selectedId) ?? proposals[0];
   const pendingCount = proposals.filter(p => p.status === 'pending').length;
 
   return (
@@ -286,7 +282,7 @@ function ProposalsScreen(): React.JSX.Element {
             <button
               key={proposal.id}
               className="nf-selrow nf-selrow-stack"
-              data-active={proposal.id === selectedId}
+              data-active={proposal.id === selected?.id}
               onClick={() => setSelectedId(proposal.id)}
               style={proposal.status === 'conflicted' ? ({ '--nf-bar': 'var(--sh-danger-solid)' } as React.CSSProperties) : undefined}
             >

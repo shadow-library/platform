@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Button, Dialog, FormField, Input, SegmentedControl, Select, Spinner, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
 import { ImageIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
@@ -89,12 +89,15 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
   const [subjectKey, setSubjectKey] = useState(initial.subjectKey);
   const [instruction, setInstruction] = useState('');
 
-  useEffect(() => {
-    if (!open) return;
-    setSubjectType(initial.subjectType);
-    setSubjectKey(initial.subjectKey);
-    setInstruction('');
-  }, [open, initial]);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (open) {
+      setSubjectType(initial.subjectType);
+      setSubjectKey(initial.subjectKey);
+      setInstruction('');
+    }
+  }
 
   const resolvedKey = subjectType === 'entity' && !subjectKey ? (entities[0]?.entityKey ?? '') : subjectKey;
   const invalid = subjectType === 'cover' ? false : subjectType === 'chapter' ? !/^\d+$/.test(resolvedKey.trim()) : !resolvedKey;
@@ -216,10 +219,12 @@ function InstructionList({ instructions, pending, onReplace, onRemove, onAdd }: 
   const [drafts, setDrafts] = useState(instructions);
   const [addition, setAddition] = useState('');
 
-  useEffect(() => {
+  const [seeded, setSeeded] = useState(instructions);
+  if (seeded !== instructions) {
+    setSeeded(instructions);
     setDrafts(instructions);
     setAddition('');
-  }, [instructions]);
+  }
 
   return (
     <div className={styles.instructions}>

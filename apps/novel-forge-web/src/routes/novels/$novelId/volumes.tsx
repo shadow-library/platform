@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button, Dialog, FormField, Input, Textarea, toast } from '@shadow-library/ui';
 
 import { ChevronRightIcon, SparkIcon } from '@/components/icons';
@@ -433,9 +433,11 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
   const [draft, setDraft] = useState('');
 
   const brief = briefQuery.data;
-  useEffect(() => {
-    if (brief) setDraft(brief.body);
-  }, [brief]);
+  const [seededBrief, setSeededBrief] = useState<typeof brief>(undefined);
+  if (brief && seededBrief !== brief) {
+    setSeededBrief(brief);
+    setDraft(brief.body);
+  }
 
   const save = (): void => {
     updateBrief.mutate(

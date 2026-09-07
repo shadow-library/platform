@@ -20,41 +20,40 @@ export interface ForgeScope {
 export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; scope: ForgeScope; placeholder?: string }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
-  const [sessionId, setSessionId] = useState<string | undefined>();
+  const [createdSessionId, setCreatedSessionId] = useState<string | undefined>();
   const [last, setLast] = useState<ChatTurnResponse | undefined>();
-  const creatingRef = useRef(false);
+  const creatingRef = useRef<string | null>(null);
   const inputWrapRef = useRef<HTMLDivElement>(null);
 
   const sessionsQuery = useListChatSessionsQuery(novelId, { scopeType: scope.type, status: 'active', limit: 50 }, open);
   const createSession = useCreateChatSessionMutation(novelId);
   const turn = useForgeTurnMutation(novelId);
 
-  useEffect(() => {
-    setSessionId(undefined);
+  const scopeKey = JSON.stringify([scope.type, scope.ref, scope.title]);
+  const [syncedScope, setSyncedScope] = useState(scopeKey);
+  if (syncedScope !== scopeKey) {
+    setSyncedScope(scopeKey);
+    setCreatedSessionId(undefined);
     setLast(undefined);
-    creatingRef.current = false;
-  }, [scope.type, scope.ref, scope.title]);
+  }
+
+  const match = sessionsQuery.data?.items.find(s => (s.scopeRef ?? '') === (scope.ref ?? '') && (s.title ?? '') === scope.title);
+  const sessionId = createdSessionId ?? match?.id;
 
   useEffect(() => {
-    if (!open || sessionId || !sessionsQuery.isSuccess) return;
-    const match = sessionsQuery.data.items.find(s => (s.scopeRef ?? '') === (scope.ref ?? '') && (s.title ?? '') === scope.title);
-    if (match) {
-      setSessionId(match.id);
-      return;
-    }
-    if (creatingRef.current) return;
-    creatingRef.current = true;
+    if (!open || sessionId || !sessionsQuery.isSuccess || creatingRef.current === scopeKey) return;
+    creatingRef.current = scopeKey;
     createSession.mutate(
       { scopeType: scope.type, scopeRef: scope.ref, title: scope.title },
       {
-        onSuccess: s => setSessionId(s.id),
+        onSuccess: s => setCreatedSessionId(s.id),
         onError: e => {
-          creatingRef.current = false;
+          creatingRef.current = null;
           toast.danger(e.message);
         },
       },
     );
-  }, [open, sessionId, sessionsQuery.isSuccess, sessionsQuery.data, scope, createSession]);
+  }, [open, sessionId, scopeKey, sessionsQuery.isSuccess, scope, createSession]);
 
   useEffect(() => {
     if (open) inputWrapRef.current?.querySelector('textarea')?.focus();

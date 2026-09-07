@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button, Checkbox, Drawer, FormField, Input, SegmentedControl, Spinner, Textarea, toast } from '@shadow-library/ui';
 
 import { type ChipIntent, PageHeader, QueryState, StatusChip } from '@/components/nf';
@@ -69,14 +69,13 @@ function ConfigCard({ novelId, status }: ConfigCardProps): React.JSX.Element {
   const [targetWords, setTargetWords] = useState('');
   const [hydrated, setHydrated] = useState(false);
 
-  useEffect(() => {
-    if (hydrated || !status) return;
+  if (!hydrated && status) {
+    setHydrated(true);
     setInstructions(status.reforge.instructions ?? '');
     setFidelity(status.reforge.fidelity ?? 'preserve');
     setJudge(status.reforge.settings?.judgeEnabled !== false);
     setTargetWords(status.reforge.settings?.targetWords ? String(status.reforge.settings.targetWords) : '');
-    setHydrated(true);
-  }, [status, hydrated]);
+  }
 
   const save = (): void => {
     const parsedWords = Number.parseInt(targetWords, 10);

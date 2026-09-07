@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Button, Dialog, Spinner } from '@shadow-library/ui';
 
 import { type ChipIntent, PaneError, PaneLoader, StatusChip } from '@/components/nf';
@@ -388,15 +388,9 @@ function RunDetail({ novelId, runId }: RunDetailProps): React.JSX.Element {
 function RunsScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const runsQuery = useListRunsQuery(novelId, true, { refetchInterval: 4000 });
-  // Memoized so identity is stable across renders where the query data hasn't changed — otherwise the
-  // `?? []` fallback mints a new array every render and re-triggers the effect below on every render.
-  const runs = useMemo(() => runsQuery.data?.items ?? [], [runsQuery.data]);
+  const runs = runsQuery.data?.items ?? [];
   const [selectedId, setSelectedId] = useState<string | undefined>();
-
-  useEffect(() => {
-    const first = runs[0];
-    if (!selectedId && first) setSelectedId(first.id);
-  }, [runs, selectedId]);
+  const activeId = selectedId ?? runs[0]?.id;
 
   return (
     <div className="nf-splitpane">
@@ -411,11 +405,11 @@ function RunsScreen(): React.JSX.Element {
           {runsQuery.error && <PaneError error={runsQuery.error} />}
           {!runsQuery.isLoading && runs.length === 0 && <div className="nf-emptynote">No runs yet.</div>}
           {runs.map(run => (
-            <RunListItem key={run.id} run={run} selected={run.id === selectedId} onSelect={() => setSelectedId(run.id)} />
+            <RunListItem key={run.id} run={run} selected={run.id === activeId} onSelect={() => setSelectedId(run.id)} />
           ))}
         </div>
       </div>
-      <div className="nf-detail">{selectedId ? <RunDetail novelId={novelId} runId={selectedId} /> : <div className="nf-pane-empty">Select a run to see its detail.</div>}</div>
+      <div className="nf-detail">{activeId ? <RunDetail novelId={novelId} runId={activeId} /> : <div className="nf-pane-empty">Select a run to see its detail.</div>}</div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button, Dialog, FormField, Input, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
 import { EyeIcon, EyeOffIcon, PlusIcon, TrashIcon } from '@/components/icons';
@@ -88,9 +88,6 @@ interface FactDialogProps {
 
 function FactDialog({ open, onOpenChange, mode, initial, onSubmit, pending }: FactDialogProps): React.JSX.Element {
   const [form, setForm] = useState(initial);
-  useEffect(() => {
-    if (open) setForm(initial);
-  }, [open, initial]);
   const set = <K extends keyof FactFormState>(key: K, value: FactFormState[K]): void => setForm(prev => ({ ...prev, [key]: value }));
   const chapterValid = form.revealChapter.trim() === '' || (/^\d+$/.test(form.revealChapter.trim()) && Number(form.revealChapter) >= 1);
   const invalid = !form.text.trim() || (mode === 'create' && !form.factKey.trim()) || !chapterValid;
@@ -155,23 +152,26 @@ function RevealDialog({ novelId, factKey, entities, open, onOpenChange }: Reveal
   const [chapter, setChapter] = useState('');
   const [note, setNote] = useState('');
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (open) {
-      setEntityKey(entities[0]?.entityKey ?? '');
+      setEntityKey('');
       setChapter('');
       setNote('');
     }
-  }, [open, entities]);
+  }
 
+  const resolvedEntityKey = entityKey || (entities[0]?.entityKey ?? '');
   const chapterNum = Number(chapter);
-  const invalid = !entityKey || !Number.isInteger(chapterNum) || chapterNum < 1;
+  const invalid = !resolvedEntityKey || !Number.isInteger(chapterNum) || chapterNum < 1;
 
   const submit = (): void => {
     reveal.mutate(
-      { entityKey, chapter: chapterNum, note: note.trim() || undefined },
+      { entityKey: resolvedEntityKey, chapter: chapterNum, note: note.trim() || undefined },
       {
         onSuccess: () => {
-          toast.success(`Revealed to ${entityKey} at chapter ${chapterNum}`);
+          toast.success(`Revealed to ${resolvedEntityKey} at chapter ${chapterNum}`);
           onOpenChange(false);
         },
         onError: err => toast.danger(err.message),
@@ -186,7 +186,7 @@ function RevealDialog({ novelId, factKey, entities, open, onOpenChange }: Reveal
         <Dialog.Body>
           <div className={styles.dialogForm}>
             <FormField label="Character" required>
-              <Select value={entityKey} onValueChange={setEntityKey}>
+              <Select value={resolvedEntityKey} onValueChange={setEntityKey}>
                 {entities.map(e => (
                   <Select.Item key={e.entityKey} value={e.entityKey}>
                     {e.name}
@@ -227,8 +227,6 @@ function FactDetail({ novelId, factKey, onEdit }: FactDetailProps): React.JSX.El
   const retract = useRetractKnowledgeMutation(novelId, factKey);
   const [spoilerShown, setSpoilerShown] = useState(false);
   const [revealOpen, setRevealOpen] = useState(false);
-
-  useEffect(() => setSpoilerShown(false), [factKey]);
 
   if (factQuery.isLoading) return <PaneLoader />;
   if (factQuery.error) return <PaneError error={factQuery.error} />;
@@ -442,7 +440,7 @@ function CanonFactsScreen(): React.JSX.Element {
 
       <div className="nf-detail">
         {selectedKey ? (
-          <FactDetail novelId={novelId} factKey={selectedKey} onEdit={fact => setDialog({ mode: 'edit', initial: formFromFact(fact) })} />
+          <FactDetail key={selectedKey} novelId={novelId} factKey={selectedKey} onEdit={fact => setDialog({ mode: 'edit', initial: formFromFact(fact) })} />
         ) : (
           <div className="nf-pane-empty">Select a fact to see its detail, or create one.</div>
         )}

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Button, Dialog, FormField, Input, SegmentedControl, Select, Tabs, Textarea, toast } from '@shadow-library/ui';
 
 import { PageContainer, PageHeader, QueryState, SectionCard } from '@/components/nf';
@@ -129,15 +129,17 @@ function SettingsScreen(): React.JSX.Element {
   const [models, setModels] = useState<Partial<Record<ModelGroup, string>>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  useEffect(() => {
-    if (!project) return;
+  const unrestrictedAllowlist = modelsQuery.data?.unrestrictedAllowlist;
+  const [synced, setSynced] = useState<{ project: typeof project; allowlist: typeof unrestrictedAllowlist }>({ project: undefined, allowlist: undefined });
+  if (project && (synced.project !== project || synced.allowlist !== unrestrictedAllowlist)) {
+    setSynced({ project, allowlist: unrestrictedAllowlist });
     setTitle(projectTitle(project));
     setBrief(project.brief ?? '');
     setInstructions(project.instructions ?? '');
     setContentMode(project.contentMode);
     const overrides = project.config?.models ?? {};
     const next: Partial<Record<ModelGroup, string>> = {};
-    const allowed = new Set(modelsQuery.data?.unrestrictedAllowlist ?? []);
+    const allowed = new Set(unrestrictedAllowlist ?? []);
     const unrestrictedMode = project.contentMode === 'unrestricted';
     for (const group of ALL_ROLES) {
       const entry = GROUP_ROLES[group.key].map(role => overrides[role]).find(Boolean);
@@ -145,7 +147,7 @@ function SettingsScreen(): React.JSX.Element {
       next[group.key] = honour && entry ? encodeModelRef(entry.provider, entry.model) : INHERIT;
     }
     setModels(next);
-  }, [project, modelsQuery.data?.unrestrictedAllowlist]);
+  }
 
   const setModel = (key: ModelGroup, value: string): void => setModels(prev => ({ ...prev, [key]: value }));
 
