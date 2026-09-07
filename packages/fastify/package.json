@@ -29,7 +29,6 @@
   },
   "homepage": "https://github.com/shadow-library/fastify#readme",
   "dependencies": {
-    "@fastify/middie": "^9.0.3",
     "@shadow-library/app": "workspace:*",
     "@shadow-library/class-schema": "workspace:*",
     "@shadow-library/common": "workspace:*",
@@ -43,14 +42,12 @@
   },
   "devDependencies": {
     "@fastify/cookie": "^11.1.2",
-    "@fastify/view": "^10.0.2",
     "@types/bun": "catalog:",
     "reflect-metadata": "catalog:",
     "typescript": "^5.9.2"
   },
   "peerDependencies": {
     "@fastify/cookie": "^11.0.0",
-    "@fastify/view": "^10.0.0",
     "@shadow-library/app": "workspace:*",
     "@shadow-library/class-schema": "workspace:*",
     "@shadow-library/common": "workspace:*",
@@ -58,9 +55,6 @@
   },
   "peerDependenciesMeta": {
     "@fastify/cookie": {
-      "optional": true
-    },
-    "@fastify/view": {
       "optional": true
     }
   }

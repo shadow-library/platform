@@ -30,7 +30,6 @@
   "devDependencies": {
     "@types/bun": "catalog:",
     "drizzle-kit": "catalog:",
-    "fastify": "catalog:",
     "type-fest": "catalog:",
     "typescript": "catalog:"
   },
@@ -41,7 +40,6 @@
     "@shadow-library/common": "workspace:*",
     "@shadow-library/fastify": "workspace:*",
     "@shadow-library/modules": "workspace:*",
-    "ajv": "catalog:",
     "drizzle-orm": "catalog:",
     "reflect-metadata": "catalog:"
   }

@@ -72,8 +72,14 @@ const config: KnipConfig = {
     '.': {
       entry: ['scripts/*.ts', 'scripts/utils/*.ts', '*.config.ts'],
       project: ['scripts/**/*.ts', '*.config.ts'],
-      /** `scripts/build.ts` loads the whole bundler toolchain through `import(name)` over a string array, which knip cannot follow. */
+      /**
+       * `scripts/build.ts` loads the whole bundler toolchain through `import(name)` over a string array, and
+       * `scripts/code-health.ts` resolves its analyzers as binaries — neither is an import knip can follow.
+       */
       ignoreDependencies: [
+        'jscpd',
+        'knip',
+        'madge',
         '@rollup/plugin-alias',
         '@rollup/plugin-node-resolve',
         'cssnano',
@@ -104,6 +110,8 @@ const config: KnipConfig = {
   ignore: ['**/*.gen.ts', '**/dist/**', '**/generated/**', '**/*.stories.tsx'],
   ignoreDependencies: ['@types/*'],
   ignoreBinaries: ['docker', 'psql'],
+  /** Spawned by path from another workspace's directory, never imported: `scripts/*.ts` and the e2e seed entry. */
+  ignoreUnresolved: [/^scripts\//, 'seed/seed.ts'],
 };
 
 export default config;

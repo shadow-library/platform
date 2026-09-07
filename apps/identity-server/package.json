@@ -49,15 +49,11 @@
     "@shadow-library/fastify": "workspace:*",
     "@shadow-library/modules": "workspace:*",
     "@simplewebauthn/server": "^13.3.2",
-    "ajv": "catalog:",
-    "ajv-formats": "^3.0.1",
     "drizzle-orm": "catalog:",
-    "drizzle-seed": "^0.3.1",
     "fast-xml-parser": "^5.10.0",
     "ioredis": "^5.8.2",
     "luxon": "^3.7.2",
     "reflect-metadata": "catalog:",
-    "ua-parser-js": "^2.0.6",
     "validator": "^13.15.23",
     "xml-crypto": "^6.1.2"
   }

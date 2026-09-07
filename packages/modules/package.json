@@ -45,7 +45,6 @@
     "@types/luxon": "^3.7.1",
     "@types/memcached": "^2.2.10",
     "drizzle-orm": "catalog:",
-    "fastify": "catalog:",
     "ioredis": "^5.8.2",
     "light-my-request": "catalog:",
     "memcached": "^2.2.2",
