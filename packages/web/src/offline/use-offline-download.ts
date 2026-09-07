@@ -46,20 +46,20 @@ export function useOfflineDownload(manager?: OfflineContentManager): UseOfflineD
   }, [contentManager]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void contentManager.list().then(setEntries);
+  }, [contentManager]);
 
   const download = useCallback(
     async <T>(options: DownloadOptions<T>): Promise<void> => {
       setIsDownloading(true);
       setProgress({ phase: 'data', completed: 0, total: 1 });
-      try {
-        await contentManager.download({ ...options, onProgress: value => setProgress(value) });
-        await refresh();
-      } finally {
-        setIsDownloading(false);
-        setProgress(null);
-      }
+      await contentManager
+        .download({ ...options, onProgress: value => setProgress(value) })
+        .then(refresh)
+        .finally(() => {
+          setIsDownloading(false);
+          setProgress(null);
+        });
     },
     [contentManager, refresh],
   );

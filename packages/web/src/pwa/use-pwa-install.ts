@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 /**
  * Importing user defined packages
@@ -29,32 +29,50 @@ export interface PwaInstall {
 /**
  * Declaring the constants
  */
-function isStandalone(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
+const STANDALONE_QUERY = '(display-mode: standalone)';
+
+/** `appinstalled` fires in the tab that triggered the install, which itself keeps running in the browser display mode. */
+let appInstalled = false;
+
+function getIsInstalled(): boolean {
+  return appInstalled || window.matchMedia(STANDALONE_QUERY).matches || (navigator as { standalone?: boolean }).standalone === true;
+}
+
+function getServerIsInstalled(): boolean {
+  return false;
+}
+
+function subscribeToIsInstalled(onStoreChange: () => void): () => void {
+  const media = window.matchMedia(STANDALONE_QUERY);
+  const onInstalled = (): void => {
+    appInstalled = true;
+    onStoreChange();
+  };
+  media.addEventListener('change', onStoreChange);
+  window.addEventListener('appinstalled', onInstalled);
+  return () => {
+    media.removeEventListener('change', onStoreChange);
+    window.removeEventListener('appinstalled', onInstalled);
+  };
 }
 
 /**
  * Drive a custom "Install app" affordance. The browser fires `beforeinstallprompt` (which we stash instead of
  * letting the mini-infobar show), and `promptInstall()` replays it on a user gesture. `canInstall` reflects
- * whether a prompt is pending, and `isInstalled` flips once the app runs standalone. SSR-safe — all listeners
- * and DOM reads happen in the mount effect.
+ * whether a prompt is pending, and `isInstalled` flips once the app runs standalone. SSR-safe — the install
+ * state is an external store whose server snapshot is `false`, and the prompt listener runs in a mount effect.
  */
 export function usePwaInstall(): PwaInstall {
   const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const isInstalled = useSyncExternalStore(subscribeToIsInstalled, getIsInstalled, getServerIsInstalled);
 
   useEffect(() => {
     const onBeforeInstall = (event: Event): void => {
       event.preventDefault();
       setPromptEvent(event as BeforeInstallPromptEvent);
     };
-    const onInstalled = (): void => {
-      setIsInstalled(true);
-      setPromptEvent(null);
-    };
+    const onInstalled = (): void => setPromptEvent(null);
 
-    setIsInstalled(isStandalone());
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
     window.addEventListener('appinstalled', onInstalled);
     return () => {
