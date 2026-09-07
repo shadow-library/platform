@@ -17,11 +17,7 @@ import { APIRequest, AppError, ErrorCode } from '@shadow-library/common';
  * Declaring the constants
  */
 
-mock.module('undici', () => ({
-  request: mock(() => Promise.resolve({ statusCode: 200, headers: {} })),
-  getGlobalDispatcher: () => ({ compose: (interceptor: unknown) => interceptor }),
-  interceptors: { redirect: (opts: unknown) => opts },
-}));
+mock.module('undici', () => ({ request: mock(() => Promise.resolve({ statusCode: 200, headers: {} })) }));
 
 describe('APIRequest', () => {
   const mockRequest = request as Mock<any>;
@@ -44,7 +40,6 @@ describe('APIRequest', () => {
       headers: { 'x-test': '1', 'content-type': 'application/json' },
       query: { sort: 'asc' },
       body: JSON.stringify({ username: 'john-doe', name: { first: 'John', last: 'Doe' } }),
-      dispatcher: { maxRedirections: 5 },
     });
   });
 
@@ -99,20 +94,15 @@ describe('APIRequest', () => {
   describe('redirects', () => {
     beforeEach(() => mockRequest.mockResolvedValue({ statusCode: 200, headers: {} }));
 
-    /** undici's own default is 0, which would return the 3xx with no body rather than the resource. */
-    it('should follow redirects by default', async () => {
+    /** Redirects are followed by hand, so the cap must never reach undici as an option — see api-request-redirect.spec.ts for the behaviour. */
+    it('should not forward the redirect cap to undici', async () => {
       await APIRequest.get('/resource');
-      expect(mockRequest).toHaveBeenCalledWith('/resource', expect.objectContaining({ dispatcher: { maxRedirections: 5 } }));
+      expect(mockRequest).toHaveBeenCalledWith('/resource', { method: 'GET' });
     });
 
     it('should not follow redirects when told not to', async () => {
       await APIRequest.get('/authorize').followRedirects(false);
       expect(mockRequest).toHaveBeenCalledWith('/authorize', { method: 'GET' });
-    });
-
-    it('should follow redirects when explicitly enabled', async () => {
-      await APIRequest.get('/resource').followRedirects(true);
-      expect(mockRequest).toHaveBeenCalledWith('/resource', expect.objectContaining({ dispatcher: { maxRedirections: 5 } }));
     });
   });
 
@@ -161,13 +151,13 @@ describe('APIRequest', () => {
     it('should pass an abort signal to undici when a timeout is set', async () => {
       mockRequest.mockResolvedValue({ statusCode: 200, headers: {} });
       await APIRequest.get('/test').timeout(1000);
-      expect(mockRequest).toHaveBeenCalledWith('/test', { method: 'GET', dispatcher: { maxRedirections: 5 }, signal: expect.any(AbortSignal) });
+      expect(mockRequest).toHaveBeenCalledWith('/test', { method: 'GET', signal: expect.any(AbortSignal) });
     });
 
     it('should not pass an abort signal when no timeout is set', async () => {
       mockRequest.mockResolvedValue({ statusCode: 200, headers: {} });
       await APIRequest.get('/test');
-      expect(mockRequest).toHaveBeenCalledWith('/test', { method: 'GET', dispatcher: { maxRedirections: 5 } });
+      expect(mockRequest).toHaveBeenCalledWith('/test', { method: 'GET' });
     });
 
     it('should throw API_REQUEST_TIMEOUT when the request exceeds the timeout', async () => {

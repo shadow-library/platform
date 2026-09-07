@@ -1,8 +1,9 @@
 /**
  * Importing npm packages
  */
+import { type IncomingHttpHeaders } from 'node:http';
 import qs from 'node:querystring';
-import { Dispatcher, getGlobalDispatcher, interceptors, request } from 'undici';
+import { Dispatcher, request } from 'undici';
 import deepmerge from 'deepmerge';
 import { JsonObject, JsonValue } from 'type-fest';
 
@@ -20,6 +21,8 @@ import { utils } from '@lib/utils';
 
 export type BodyFormat = 'json' | 'form';
 
+type HopOptions = Partial<Dispatcher.RequestOptions>;
+
 export interface APIRequestOptions extends Partial<Dispatcher.DispatchOptions> {
   baseURL?: string;
   throwErrorOnFailure?: boolean;
@@ -28,7 +31,7 @@ export interface APIRequestOptions extends Partial<Dispatcher.DispatchOptions> {
   data?: JsonObject;
   /** How `data` is encoded on the wire — set by `body()` (json) and `form()` (form). Defaults to json. */
   bodyFormat?: BodyFormat;
-  /** Applied through undici's redirect interceptor — `request()` no longer accepts it as an option. */
+  /** Maximum number of 3xx hops to follow; `0` returns the redirect itself. Defaults to 5. */
   maxRedirections?: number;
 }
 
@@ -52,10 +55,13 @@ export class APIRequest {
 
   /**
    * undici's `request` does not follow redirects, unlike `fetch`, whose behaviour callers reasonably
-   * expect — a 3xx would otherwise arrive as a bodyless response rather than the resource. The redirect
-   * interceptor restores that, and the cap stops a redirect loop becoming an infinite one.
+   * expect — a 3xx would otherwise arrive as a bodyless response rather than the resource. Redirects are
+   * followed by hand rather than through `getGlobalDispatcher().compose(interceptors.redirect(...))`,
+   * because Bun's built-in `undici` shadows the npm package and its `Dispatcher` has no `compose`.
    */
   private static readonly DEFAULT_MAX_REDIRECTIONS = 5;
+
+  private static readonly REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
 
   private constructor(private readonly options: APIRequestOptions = {}) {
     if (typeof options.throwErrorOnFailure === 'undefined') options.throwErrorOnFailure = true;
@@ -177,6 +183,37 @@ export class APIRequest {
     return params.toString();
   }
 
+  private static isHeaderRecord(headers: unknown): headers is IncomingHttpHeaders {
+    return typeof headers === 'object' && headers !== null && !Array.isArray(headers) && !(Symbol.iterator in headers);
+  }
+
+  /** Mirrors the fetch spec's redirect rewrite: 303 — and 301/302 after a body-carrying method — become GET, and credentials never cross an origin. */
+  private static rewriteForRedirect(options: HopOptions, statusCode: number, from: URL, to: URL): HopOptions {
+    const next: HopOptions = { ...options };
+    delete next.query;
+
+    const headers = APIRequest.isHeaderRecord(options.headers) ? { ...options.headers } : undefined;
+    if (headers && from.origin !== to.origin) {
+      delete headers['authorization'];
+      delete headers['cookie'];
+      delete headers['host'];
+    }
+
+    const method = options.method?.toUpperCase() ?? 'GET';
+    const rewritesToGet = method !== 'GET' && method !== 'HEAD' && (statusCode === 303 || statusCode === 301 || statusCode === 302);
+    if (rewritesToGet) {
+      next.method = 'GET';
+      delete next.body;
+      if (headers) {
+        delete headers['content-type'];
+        delete headers['content-length'];
+      }
+    }
+
+    if (headers) next.headers = headers;
+    return next;
+  }
+
   async execute<T = any>(): Promise<APIResponse<T>> {
     const { baseURL = '', throwErrorOnFailure, data, bodyFormat, path, timeout, maxRedirections, ...requestOptions } = this.options;
 
@@ -193,7 +230,6 @@ export class APIRequest {
       requestOptions.body = body;
     }
     const redirections = maxRedirections ?? APIRequest.DEFAULT_MAX_REDIRECTIONS;
-    const dispatcher = redirections > 0 ? getGlobalDispatcher().compose(interceptors.redirect({ maxRedirections: redirections })) : undefined;
 
     /** Log the request. Read the level per request so a runtime level change is honoured. */
     const isDebug = Logger.isDebugEnabled();
@@ -205,9 +241,26 @@ export class APIRequest {
     const signal = timeout === undefined ? undefined : AbortSignal.timeout(timeout);
     const startTime = process.hrtime();
     const perform = async (): Promise<{ response: Dispatcher.ResponseData; resData: unknown }> => {
-      const response = await request(url, { ...requestOptions, ...(dispatcher ? { dispatcher } : {}), ...(signal ? { signal } : {}) });
-      const resData = response.headers['content-type']?.includes('application/json') ? await response.body.json() : null;
-      return { response, resData };
+      let target = url;
+      let hopOptions: HopOptions = { ...requestOptions, ...(signal ? { signal } : {}) };
+      for (let hop = 0; ; hop++) {
+        const response = await request(target, hopOptions);
+        const location = response.headers['location'];
+        const isRedirect = redirections > 0 && APIRequest.REDIRECT_STATUS_CODES.has(response.statusCode) && typeof location === 'string';
+        if (!isRedirect) {
+          const resData = response.headers['content-type']?.includes('application/json') ? await response.body.json() : null;
+          return { response, resData };
+        }
+
+        /** Bun's undici builtin has no `body.dump()`; draining the text releases the connection on both runtimes. */
+        await response.body.text();
+        if (hop >= redirections) throw AppError.internal(`API request exceeded ${redirections} redirects`);
+        const current = URL.parse(target);
+        const next = current && URL.parse(location, current.href);
+        if (!next) throw AppError.internal(`API request received an unresolvable redirect location '${location}'`);
+        hopOptions = APIRequest.rewriteForRedirect(hopOptions, response.statusCode, current, next);
+        target = next.href;
+      }
     };
     const { response, resData } = await perform().catch((error: unknown) => {
       if (signal?.aborted) {
