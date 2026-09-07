@@ -35,7 +35,11 @@
     "prepare": "husky",
     "verify": "bun scripts/verify.ts --all",
     "build": "bun scripts/build.ts --all",
-    "db": "bun scripts/db.ts"
+    "db": "bun scripts/db.ts",
+    "knip": "bun scripts/code-health.ts knip",
+    "duplicates": "bun scripts/code-health.ts duplicates",
+    "deps:check": "bun scripts/code-health.ts cycles",
+    "code-health": "bun scripts/code-health.ts"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.0",
@@ -55,6 +59,9 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.7.0",
     "husky": "^9.1.7",
+    "jscpd": "^5.1.2",
+    "knip": "^6.34.0",
+    "madge": "^8.0.0",
     "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.19",
     "postcss-import": "^16.1.1",
