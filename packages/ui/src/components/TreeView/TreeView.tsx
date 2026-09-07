@@ -21,6 +21,16 @@ interface FlatNode {
   hasChildren: boolean;
 }
 
+function flatten(list: TreeNode[], expandedSet: Set<string>, level: number, parentId: string | null): FlatNode[] {
+  const rows: FlatNode[] = [];
+  for (const node of list) {
+    const hasChildren = Boolean(node.children && node.children.length > 0);
+    rows.push({ node, level, parentId, hasChildren });
+    if (hasChildren && expandedSet.has(node.id)) rows.push(...flatten(node.children ?? [], expandedSet, level + 1, node.id));
+  }
+  return rows;
+}
+
 function leafIds(node: TreeNode): string[] {
   if (!node.children || node.children.length === 0) return [node.id];
   return node.children.flatMap(leafIds);
@@ -69,18 +79,7 @@ export function TreeView({
   const [internalSelected, setInternalSelected] = useState<string[]>(defaultSelected);
   const selectedSet = useMemo(() => new Set(selectedControlled ? selected : internalSelected), [selectedControlled, selected, internalSelected]);
 
-  const flat = useMemo(() => {
-    const rows: FlatNode[] = [];
-    const walk = (list: TreeNode[], level: number, parentId: string | null): void => {
-      for (const node of list) {
-        const hasChildren = Boolean(node.children && node.children.length > 0);
-        rows.push({ node, level, parentId, hasChildren });
-        if (hasChildren && expandedSet.has(node.id)) walk(node.children ?? [], level + 1, node.id);
-      }
-    };
-    walk(nodes, 1, null);
-    return rows;
-  }, [nodes, expandedSet]);
+  const flat = useMemo(() => flatten(nodes, expandedSet, 1, null), [nodes, expandedSet]);
 
   const [focusedId, setFocusedId] = useState<string | undefined>(() => nodes[0]?.id);
   const rowRefs = useRef(new Map<string, HTMLLIElement>());

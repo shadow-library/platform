@@ -64,13 +64,14 @@ export function Combobox({
 }: ComboboxProps): ReactElement {
   const [selectedValue, setSelectedValue] = useControllableState<string | null>({ value, defaultValue, onChange: onValueChange });
 
+  const resolvedLabel = options.find(option => option.value === selectedValue)?.label;
+
   const [open, setOpen] = useState(false);
-  const [inputValue, setInputValue] = useState('');
-  const [committedLabel, setCommittedLabel] = useState('');
+  const [inputValue, setInputValue] = useState(resolvedLabel ?? '');
+  const [committedLabel, setCommittedLabel] = useState(resolvedLabel ?? '');
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
-  const [asyncOptions, setAsyncOptions] = useState<ComboboxOption[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [asyncResult, setAsyncResult] = useState<{ query: string; options: ComboboxOption[] } | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const fieldRef = useRef<HTMLDivElement>(null);
@@ -83,40 +84,43 @@ export function Combobox({
   const isInsideField = (target: EventTarget | null): boolean => target instanceof Node && (fieldRef.current?.contains(target) ?? false);
 
   // Keep the field's committed label in sync with a value we can resolve from static options.
-  useEffect(() => {
-    if (open) return;
-    const option = options.find(candidate => candidate.value === selectedValue);
-    if (option) {
-      setCommittedLabel(option.label);
-      setInputValue(option.label);
+  const [syncedLabel, setSyncedLabel] = useState({ value: selectedValue, label: resolvedLabel });
+  if (!open && (syncedLabel.value !== selectedValue || syncedLabel.label !== resolvedLabel)) {
+    setSyncedLabel({ value: selectedValue, label: resolvedLabel });
+    if (resolvedLabel != null) {
+      setCommittedLabel(resolvedLabel);
+      setInputValue(resolvedLabel);
     } else if (selectedValue == null) {
       setCommittedLabel('');
       setInputValue('');
     }
-  }, [selectedValue, open, options]);
+  }
 
   // Debounced async search.
   useEffect(() => {
     if (!isAsync || !open) return;
-    setSearching(true);
+    let cancelled = false;
     const handle = setTimeout(async () => {
       const results = await onSearch(query);
-      setAsyncOptions(results);
-      setSearching(false);
+      if (cancelled) return;
+      setAsyncResult({ query, options: results });
       setActiveIndex(0);
     }, 300);
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [query, open, isAsync, onSearch]);
 
   const filtered = useMemo(() => {
-    if (isAsync) return asyncOptions;
+    if (isAsync) return asyncResult?.options ?? [];
     const q = fold(query.trim());
     return q ? options.filter(option => fold(option.label).includes(q)) : options;
-  }, [isAsync, asyncOptions, options, query]);
+  }, [isAsync, asyncResult, options, query]);
 
   const showCreate = creatable && query.trim().length > 0 && !filtered.some(option => fold(option.label) === fold(query.trim()));
   const rowCount = filtered.length + (showCreate ? 1 : 0);
-  const busy = loading || searching;
+  const busy = loading || (isAsync && open && asyncResult?.query !== query);
 
   function commit(option: ComboboxOption): void {
     if (option.disabled) return;

@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Children, isValidElement, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react';
+import { Children, isValidElement, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -62,45 +62,42 @@ function SplitPaneRoot({ direction = 'horizontal', autoSaveId, onResize, childre
   const [collapsed, setCollapsed] = useState(false);
   const [dragging, setDragging] = useState(false);
   const lastSize = useRef(0);
+  const sized = useRef(false);
   const storageKey = autoSaveId ? `sh-splitpane:${autoSaveId}` : null;
 
-  // Measure the container along the split axis.
+  function bounds(len: number = containerLen): { min: number; max: number } {
+    const min = resolveSize(first?.minSize, len, 120);
+    const secondMin = resolveSize(second?.minSize, len, 120);
+    const max = Math.min(resolveSize(first?.maxSize, len, len - secondMin), len - secondMin);
+    return { min, max };
+  }
+
+  function clamp(value: number, len: number = containerLen): number {
+    const { min, max } = bounds(len);
+    return Math.max(min, Math.min(max, value));
+  }
+
+  // Measure the container along the split axis, and size the first pane on the first non-zero
+  // measurement — same layout pass, so the pane never paints at a placeholder size.
   useIsomorphicLayoutEffect(() => {
     const node = containerRef.current;
     if (!node) return;
-    const measure = () => setContainerLen(direction === 'horizontal' ? node.clientWidth : node.clientHeight);
+    const measure = (): void => {
+      const len = direction === 'horizontal' ? node.clientWidth : node.clientHeight;
+      setContainerLen(len);
+      if (sized.current || len === 0) return;
+      sized.current = true;
+      const saved = storageKey ? globalThis.localStorage?.getItem(storageKey) : null;
+      const fraction = saved ? Number.parseFloat(saved) : Number.NaN;
+      const initial = Number.isFinite(fraction) ? fraction * len : resolveSize(first?.defaultSize, len, len * 0.3);
+      setSize(clamp(initial, len));
+    };
     measure();
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => observer.disconnect();
   }, [direction]);
-
-  // Initialize (from storage or defaultSize) once the container is measured.
-  // one-time init guarded by `size === null`; only the container measurement should retrigger it
-  useEffect(() => {
-    if (containerLen === 0 || size !== null) return;
-    let fraction: number | null = null;
-    if (storageKey) {
-      const saved = globalThis.localStorage?.getItem(storageKey);
-      if (saved) fraction = Number.parseFloat(saved);
-    }
-    const initial = fraction != null && Number.isFinite(fraction) ? fraction * containerLen : resolveSize(first?.defaultSize, containerLen, containerLen * 0.3);
-    setSize(clamp(initial));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time init guarded by `size === null`; only the container measurement should retrigger it
-  }, [containerLen]);
-
-  function bounds(): { min: number; max: number } {
-    const min = resolveSize(first?.minSize, containerLen, 120);
-    const secondMin = resolveSize(second?.minSize, containerLen, 120);
-    const max = Math.min(resolveSize(first?.maxSize, containerLen, containerLen - secondMin), containerLen - secondMin);
-    return { min, max };
-  }
-
-  function clamp(value: number): number {
-    const { min, max } = bounds();
-    return Math.max(min, Math.min(max, value));
-  }
 
   function commit(next: number): void {
     setSize(next);
@@ -145,6 +142,16 @@ function SplitPaneRoot({ direction = 'horizontal', autoSaveId, onResize, childre
     commit(clamp(resolveSize(first?.defaultSize, containerLen, containerLen * 0.3)));
   }
 
+  function toggleCollapse(): void {
+    if (collapsed) {
+      setCollapsed(false);
+      commit(clamp(lastSize.current || resolveSize(first?.defaultSize, containerLen, containerLen * 0.3)));
+    } else {
+      lastSize.current = size ?? 0;
+      setCollapsed(true);
+    }
+  }
+
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     const decrease = direction === 'horizontal' ? 'ArrowLeft' : 'ArrowUp';
     const increase = direction === 'horizontal' ? 'ArrowRight' : 'ArrowDown';
@@ -163,16 +170,6 @@ function SplitPaneRoot({ direction = 'horizontal', autoSaveId, onResize, childre
     } else if (event.key === 'Enter' && first?.collapsible) {
       event.preventDefault();
       toggleCollapse();
-    }
-  }
-
-  function toggleCollapse(): void {
-    if (collapsed) {
-      setCollapsed(false);
-      commit(clamp(lastSize.current || resolveSize(first?.defaultSize, containerLen, containerLen * 0.3)));
-    } else {
-      lastSize.current = size ?? 0;
-      setCollapsed(true);
     }
   }
 

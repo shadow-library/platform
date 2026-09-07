@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { forwardRef, useContext, useEffect, useMemo, useState } from 'react';
+import { forwardRef, useContext, useMemo, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -55,9 +55,7 @@ export const Shell = forwardRef<HTMLDivElement, ShellProps>(function Shell(
   const hasSidebar = sidebar != null;
 
   // Growing back to desktop dismisses the drawer — the persistent sidebar has returned.
-  useEffect(() => {
-    if (isDesktop && navOpen) setNavOpen(false);
-  }, [isDesktop, navOpen]);
+  if (isDesktop && navOpen) setNavOpen(false);
 
   const mobileNav = useMemo(() => ({ hasSidebar, open: navOpen, setOpen: setNavOpen }), [hasSidebar, navOpen]);
   const drawerArea = useMemo(() => ({ close: () => setNavOpen(false) }), []);

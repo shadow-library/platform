@@ -6,7 +6,7 @@ import { type KeyboardEvent, type ReactElement, useEffect, useMemo, useRef, useS
 /**
  * Importing user defined packages
  */
-import { useControllableState } from '@/hooks';
+import { useControllableState, useHydrated } from '@/hooks';
 import { addDays, addMonths, buildMonthMatrix, cn, DEFAULT_LOCALE, formatLongDate, isSameDay, parseISODate, startOfMonth, toISODate } from '@/lib';
 
 import styles from './Calendar.module.css';
@@ -85,21 +85,18 @@ export function Calendar({
   // "today", so the tab stop is identical on the server and the first client render.
   const [focusedDate, setFocusedDate] = useState(() => firstSelected ?? today ?? startOfMonth(new Date()));
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
-  // "Today" reads the wall clock, which differs between the server and the client. Resolve it after
-  // mount (null until then) so the current-day marker is absent on the server and the first client
-  // render alike, then appears once hydrated. A caller-supplied `today` pins it deterministically.
-  const [resolvedToday, setResolvedToday] = useState<Date | null>(today ?? null);
+  // "Today" reads the wall clock, which differs between the server and the client. Withhold it until
+  // hydration so the current-day marker is absent on the server and the first client render alike,
+  // then appears once hydrated. A caller-supplied `today` pins it deterministically.
+  const [clockToday] = useState(() => new Date());
+  const hydrated = useHydrated();
+  const resolvedToday = today ?? (hydrated ? clockToday : null);
   const dayRefs = useRef(new Map<string, HTMLButtonElement>());
   const shouldFocus = useRef(false);
 
   const minDate = min ? parseISODate(min) : null;
   const maxDate = max ? parseISODate(max) : null;
   const blackout = useMemo(() => new Set(disabledDates ?? []), [disabledDates]);
-
-  useEffect(() => {
-    if (today) return;
-    setResolvedToday(new Date());
-  }, [today]);
 
   useEffect(() => {
     if (!shouldFocus.current) return;

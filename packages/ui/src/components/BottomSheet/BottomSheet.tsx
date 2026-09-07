@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactElement, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactElement, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -57,13 +57,14 @@ export function BottomSheet({
   const surfaceRef = useRef<HTMLDivElement>(null);
   const drag = useRef<DragState>({ active: false, pointerId: -1, startY: 0, startHeight: 0, lastY: 0, lastT: 0, velocity: 0 });
 
-  // Reset to the initial snap each time the sheet opens.
-  useEffect(() => {
+  const [synced, setSynced] = useState({ open, startIndex });
+  if (synced.open !== open || synced.startIndex !== startIndex) {
+    setSynced({ open, startIndex });
     if (open) {
       setSnapIndex(startIndex);
       setOffset(0);
     }
-  }, [open, startIndex]);
+  }
 
   const snap = snapPoints[snapIndex] ?? 'content';
   const showGrabber = dismissable || snapPoints.length > 1;

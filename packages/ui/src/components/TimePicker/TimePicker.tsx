@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as Popover from '@radix-ui/react-popover';
-import { type KeyboardEvent, type ReactElement, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, type ReactElement, useId, useMemo, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -34,6 +34,11 @@ function formatMinutes(minutes: number, hour12: boolean): string {
   const period = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return `${h12}:${pad2(m)} ${period}`;
+}
+
+function displayText(value: string | null, hour12: boolean): string {
+  const minutes = value ? toMinutes(value) : null;
+  return minutes != null ? formatMinutes(minutes, hour12) : '';
 }
 
 /** Loosely parse "9:30", "930", "9.30pm", "21:30" to minutes of day, or null. */
@@ -97,7 +102,7 @@ export function TimePicker({
   const [currentValue, setCurrentValue] = useControllableState<string | null>({ value, defaultValue, onChange: onValueChange });
 
   const [open, setOpen] = useState(false);
-  const [text, setText] = useState('');
+  const [text, setText] = useState(() => displayText(currentValue, hour12));
   const [invalidTyped, setInvalidTyped] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -114,11 +119,11 @@ export function TimePicker({
     return list;
   }, [minMinutes, maxMinutes, step]);
 
-  // Reflect committed value into the field text.
-  useEffect(() => {
-    const minutes = currentValue ? toMinutes(currentValue) : null;
-    setText(minutes != null ? formatMinutes(minutes, hour12) : '');
-  }, [currentValue, hour12]);
+  const [synced, setSynced] = useState({ value: currentValue, hour12 });
+  if (synced.value !== currentValue || synced.hour12 !== hour12) {
+    setSynced({ value: currentValue, hour12 });
+    setText(displayText(currentValue, hour12));
+  }
 
   function commit(next: string | null): void {
     setCurrentValue(next);
@@ -132,8 +137,7 @@ export function TimePicker({
   }
 
   function revertText(): void {
-    const fallback = currentValue ? toMinutes(currentValue) : null;
-    setText(fallback != null ? formatMinutes(fallback, hour12) : '');
+    setText(displayText(currentValue, hour12));
   }
 
   function handleBlur(): void {

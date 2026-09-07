@@ -82,11 +82,11 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
   const [invalidTyped, setInvalidTyped] = useState(false);
   const holdRef = useRef<{ timeout?: ReturnType<typeof setTimeout>; interval?: ReturnType<typeof setInterval> }>({});
 
-  // sync the field text from the external value only
-  useEffect(() => {
+  const [syncedValue, setSyncedValue] = useState(current);
+  if (syncedValue !== current) {
+    setSyncedValue(current);
     setText(current != null ? format(current) : '');
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync the field text from the external value only; `format` is stable
-  }, [current]);
+  }
 
   function clampRound(input: number): number {
     let next = input;

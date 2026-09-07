@@ -1,11 +1,12 @@
 /**
  * Importing npm packages
  */
-import { forwardRef, type KeyboardEvent, type MouseEvent, useEffect, useState } from 'react';
+import { forwardRef, type KeyboardEvent, type MouseEvent, useState } from 'react';
 
 /**
  * Importing user defined packages
  */
+import { useHydrated } from '@/hooks';
 import { addDays, cn, DEFAULT_LOCALE, formatLongDate, isSameDay } from '@/lib';
 
 import { Avatar } from '../Avatar';
@@ -89,13 +90,11 @@ export const NotificationList = forwardRef<HTMLDivElement, NotificationListProps
   },
   ref,
 ) {
-  // Resolve "now" after mount (null until then) unless the caller pins it, so relative day headers never
-  // differ between the server and the first client render.
-  const [now, setNow] = useState<Date | null>(nowProp ?? null);
-  useEffect(() => {
-    if (nowProp) return;
-    setNow(new Date());
-  }, [nowProp]);
+  // Withhold "now" until hydration unless the caller pins it, so relative day headers never differ
+  // between the server and the first client render.
+  const [clockNow] = useState(() => new Date());
+  const hydrated = useHydrated();
+  const now = nowProp ?? (hydrated ? clockNow : null);
 
   if (items.length === 0)
     return (

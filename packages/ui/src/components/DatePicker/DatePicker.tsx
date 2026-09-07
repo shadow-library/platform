@@ -88,15 +88,15 @@ export function DatePicker({
   const maxDate = max ? parseISODate(max) : null;
   const blackout = useMemo(() => new Set(disabledDates ?? []), [disabledDates]);
 
-  // Reflect external value changes into the field and view.
-  useEffect(() => {
+  const [syncedValue, setSyncedValue] = useState(currentValue);
+  if (syncedValue !== currentValue) {
+    setSyncedValue(currentValue);
     setText(currentValue ?? '');
-    const parsed = currentValue ? parseISODate(currentValue) : null;
-    if (parsed) {
-      setViewDate(startOfMonth(parsed));
-      setFocusedDate(parsed);
+    if (selectedDate) {
+      setViewDate(startOfMonth(selectedDate));
+      setFocusedDate(selectedDate);
     }
-  }, [currentValue]);
+  }
 
   // Move DOM focus to the roving day while the calendar is open.
   useEffect(() => {
