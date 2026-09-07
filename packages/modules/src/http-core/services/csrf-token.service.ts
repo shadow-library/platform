@@ -3,8 +3,7 @@
  */
 import crypto from 'node:crypto';
 
-import { CookieSerializeOptions } from '@fastify/cookie';
-import { DateTime, DurationLike } from 'luxon';
+import { DateTime } from 'luxon';
 import { Inject, Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { HttpRequest } from '@shadow-library/fastify';
@@ -14,29 +13,11 @@ import { HttpRequest } from '@shadow-library/fastify';
  */
 import { HTTP_CORE_CONFIGS, LOGGER_NAMESPACE } from '../http-core.constants';
 import { type HttpCoreModuleOptions } from '../http-core.types';
+import { type CSRFCookie, type CSRFOptions } from './csrf-token.types';
 
 /**
  * Defining types
  */
-
-export interface CSRFOptions {
-  disabled?: boolean;
-
-  cookieName: string;
-  headerName: string;
-  expiresIn: DurationLike;
-  refreshLeeway: DurationLike;
-  tokenRadix: number;
-  tokenLength: number;
-}
-
-export interface CSRFCookie {
-  name: string;
-  value: string;
-  options: CookieSerializeOptions;
-}
-
-export type CSRFTokenType = 'token' | 'cookie';
 
 interface CSRFTokenValidationResult {
   isValid: boolean;

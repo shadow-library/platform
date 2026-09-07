@@ -10,21 +10,13 @@ import { Logger, LRUCache, LRUCacheOptions, Nullable } from '@shadow-library/com
  * Importing user defined packages
  */
 import { CACHE_MODULE_OPTIONS, LOGGER_NAMESPACE } from './cache.constants';
-import { type CacheModuleOptions } from './cache.module';
+import { type CacheModuleOptions, type ICacheStore } from './cache.types';
 import { MemcacheService } from './memcache.service';
 import { RedisCacheService } from './redis-cache.service';
 
 /**
  * Defining types
  */
-
-export interface ICacheStore {
-  get<T = any>(key: string): Promise<T | null>;
-  set<T = any>(key: string, value: T, ttlSeconds?: number): Promise<void>;
-  del(key: string): Promise<void>;
-  incr(key: string, amount?: number): Promise<number>;
-  decr(key: string, amount?: number): Promise<number>;
-}
 
 /**
  * Declaring the constants

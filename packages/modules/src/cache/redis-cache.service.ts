@@ -10,7 +10,7 @@ import { Logger } from '@shadow-library/common';
  */
 import { DatabaseService } from '../database/database.service';
 import { LOGGER_NAMESPACE } from './cache.constants';
-import { type ICacheStore } from './cache.service';
+import { type ICacheStore } from './cache.types';
 
 /**
  * Defining types

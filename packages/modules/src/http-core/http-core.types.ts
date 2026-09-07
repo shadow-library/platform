@@ -8,7 +8,7 @@ import { OpenAPIV3 } from 'openapi-types';
 /**
  * Importing user defined packages
  */
-import { CSRFOptions } from './services';
+import { type CSRFOptions } from './services/csrf-token.types';
 
 /**
  * Defining types
