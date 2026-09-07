@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import { createContext, type ReactElement, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, type ReactElement, type ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 import { Alert, Button } from '@shadow-library/ui';
 import { useServiceWorker } from '@shadow-library/web/pwa';
 
@@ -38,9 +38,11 @@ export function SystemOverlayProvider({ children }: { children: ReactNode }): Re
   const install = useInstallOffer();
   const controls = useMemo<SystemOverlayControls>(() => ({ open: setKind, close: () => setKind(null) }), []);
 
-  useEffect(() => {
+  const [offered, setOffered] = useState(false);
+  if (offered !== install.shouldOffer) {
+    setOffered(install.shouldOffer);
     if (install.shouldOffer) setKind('install');
-  }, [install.shouldOffer]);
+  }
 
   return (
     <SystemOverlayContext.Provider value={controls}>

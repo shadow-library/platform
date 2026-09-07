@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import { type InstallOutcome, usePwaInstall } from '@shadow-library/web/pwa';
 
 const VALUE_DELIVERED_KEY = 'shadow-memoir:value-delivered';
@@ -13,6 +13,16 @@ export interface InstallOffer {
   dismiss: () => void;
 }
 
+const listeners = new Set<() => void>();
+
+/** `getSnapshot` runs on every render, and the value behind it is two `localStorage` reads. */
+let cached: boolean | null = null;
+
+function notify(): void {
+  cached = null;
+  for (const listener of listeners) listener();
+}
+
 /**
  * Marks that the app has delivered something worth keeping — the first completed quest, the first saved log.
  * Installation is offered only after this, never as a gate on arrival (PRODUCT.md §6.6), so the moment is
@@ -21,11 +31,27 @@ export interface InstallOffer {
 export function markValueDelivered(): void {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(VALUE_DELIVERED_KEY, '1');
+  notify();
 }
 
 function read(key: string): boolean {
   if (typeof window === 'undefined') return false;
   return window.localStorage.getItem(key) === '1';
+}
+
+function subscribeToOffer(onStoreChange: () => void): () => void {
+  cached = null;
+  listeners.add(onStoreChange);
+  return () => void listeners.delete(onStoreChange);
+}
+
+function getEligible(): boolean {
+  cached ??= read(VALUE_DELIVERED_KEY) && !read(OFFER_SETTLED_KEY);
+  return cached;
+}
+
+function getServerEligible(): boolean {
+  return false;
 }
 
 /**
@@ -35,14 +61,13 @@ function read(key: string): boolean {
  */
 export function useInstallOffer(): InstallOffer {
   const { canInstall, promptInstall } = usePwaInstall();
-  const [eligible, setEligible] = useState(false);
-
-  // localStorage is read after mount so the server render and the first client render agree.
-  useEffect(() => setEligible(read(VALUE_DELIVERED_KEY) && !read(OFFER_SETTLED_KEY)), []);
+  // localStorage is an external store whose server snapshot is `false`, so the server render and the
+  // hydration render agree and the persisted answer lands after mount.
+  const eligible = useSyncExternalStore(subscribeToOffer, getEligible, getServerEligible);
 
   const settle = useCallback(() => {
     window.localStorage.setItem(OFFER_SETTLED_KEY, '1');
-    setEligible(false);
+    notify();
   }, []);
 
   const offer = useCallback(async (): Promise<InstallOutcome> => {

@@ -1,5 +1,5 @@
 import { getRouteApi, Link } from '@tanstack/react-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import { Button, Card, ConfirmDialog, SegmentedControl, Select, Switch, type ThemeMode, toast, useTheme } from '@shadow-library/ui';
 
 import { BookIcon, ChevronRightIcon, SettingsSlidersIcon } from '@/components/icons';
@@ -71,6 +71,29 @@ const CONTENT_TOGGLES: ToggleMeta[] = [
   { key: 'markReadOnScroll', label: 'Mark chapters read on scroll', description: 'Mark a chapter finished once you reach the end.' },
 ];
 
+const listeners = new Set<() => void>();
+
+let settingsSnapshot: WebnovelSettings | null = null;
+
+function publish(next: WebnovelSettings): void {
+  settingsSnapshot = next;
+  for (const listener of listeners) listener();
+}
+
+function subscribeToSettings(onStoreChange: () => void): () => void {
+  listeners.add(onStoreChange);
+  return () => void listeners.delete(onStoreChange);
+}
+
+function getSettings(): WebnovelSettings {
+  settingsSnapshot ??= loadSettings();
+  return settingsSnapshot;
+}
+
+function getServerSettings(): WebnovelSettings {
+  return DEFAULT_SETTINGS;
+}
+
 const route = getRouteApi('/_shell/settings');
 
 function ToggleList({ toggles, settings, onToggle }: { toggles: ToggleMeta[]; settings: WebnovelSettings; onToggle: (key: ToggleKey, value: boolean) => void }): React.JSX.Element {
@@ -95,26 +118,22 @@ export function SettingsScreen(): React.JSX.Element {
   const navigate = route.useNavigate();
   const { mode: themeMode, setMode: setThemeMode } = useTheme();
 
-  // Deterministic defaults render on the server and through the hydration pass; the persisted preferences load
-  // in an effect afterwards, so the first client render always matches the server HTML.
-  const [settings, setSettings] = useState<WebnovelSettings>(DEFAULT_SETTINGS);
+  // Deterministic defaults render on the server and through the hydration pass; the persisted preferences
+  // arrive with the store's client snapshot, so the first client render always matches the server HTML.
+  const settings = useSyncExternalStore(subscribeToSettings, getSettings, getServerSettings);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  useEffect(() => setSettings(loadSettings()), []);
-
   const patch = useCallback(<K extends keyof WebnovelSettings>(key: K, value: WebnovelSettings[K]): void => {
-    setSettings(current => {
-      const next: WebnovelSettings = { ...current, [key]: value };
-      saveSettings(next);
-      return next;
-    });
+    const next: WebnovelSettings = { ...getSettings(), [key]: value };
+    saveSettings(next);
+    publish(next);
   }, []);
 
   const onToggle = useCallback((key: ToggleKey, value: boolean): void => patch(key, value), [patch]);
 
   const onClearData = (): void => {
     clearAllLocalData();
-    setSettings(DEFAULT_SETTINGS);
+    publish(DEFAULT_SETTINGS);
     setThemeMode('system');
     setConfirmOpen(false);
     toast.success('Cleared all local data from this device');

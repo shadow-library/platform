@@ -26,6 +26,11 @@ interface DownloadRow {
   bytes: number;
 }
 
+interface OfflineSnapshot {
+  rows: DownloadRow[];
+  usage: { used: number; quota: number };
+}
+
 type EntryStatus = 'downloading' | 'paused' | 'failed' | 'complete' | 'update';
 
 const STATUS: Record<EntryStatus, { label: string; intent: 'neutral' | 'info' | 'success' | 'danger' }> = {
@@ -46,25 +51,29 @@ function percent(task: DownloadTask): number {
   return task.total > 0 ? Math.round((task.completed / task.total) * 100) : 0;
 }
 
+async function loadOfflineSnapshot(): Promise<OfflineSnapshot> {
+  const records = await listDownloadedNovels();
+  const sizes = await Promise.all(records.map(record => downloadedSize(record.slug)));
+  const rows = records.map((record, index) => ({ record, bytes: sizes[index] ?? 0 })).sort((a, b) => Date.parse(b.record.downloadedAt) - Date.parse(a.record.downloadedAt));
+  const estimate = await offlineStore.estimate();
+  const used = await offlineStore.totalSize();
+  return { rows, usage: { used, quota: estimate?.quota ?? 0 } };
+}
+
 export function DownloadsScreen(): React.JSX.Element {
-  const [rows, setRows] = useState<DownloadRow[]>([]);
-  const [usage, setUsage] = useState<{ used: number; quota: number } | null>(null);
+  const [snapshot, setSnapshot] = useState<OfflineSnapshot | null>(null);
   const navigate = useNavigate();
   const session = useQuery(sessionQueryOptions());
   const tasks = useSyncExternalStore(downloadQueue.subscribe, downloadQueue.getSnapshot, downloadQueue.getServerSnapshot);
 
-  const refresh = useCallback(async (): Promise<void> => {
-    const records = await listDownloadedNovels();
-    const sizes = await Promise.all(records.map(record => downloadedSize(record.slug)));
-    setRows(records.map((record, index) => ({ record, bytes: sizes[index] ?? 0 })).sort((a, b) => Date.parse(b.record.downloadedAt) - Date.parse(a.record.downloadedAt)));
-    const estimate = await offlineStore.estimate();
-    const used = await offlineStore.totalSize();
-    setUsage({ used, quota: estimate?.quota ?? 0 });
-  }, []);
+  const rows = snapshot?.rows ?? [];
+  const usage = snapshot?.usage ?? null;
+
+  const refresh = useCallback((): Promise<void> => loadOfflineSnapshot().then(setSnapshot), []);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void loadOfflineSnapshot().then(setSnapshot);
+  }, []);
 
   const onRemove = async (record: DownloadedNovel): Promise<void> => {
     await removeDownloadedNovel(record.slug);

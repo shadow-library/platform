@@ -10,7 +10,7 @@ import {
 import { Alert, Button, cn, Combobox, type ComboboxOption, Drawer, EmptyState, Pagination, SegmentedControl, Select, Skeleton, Slider, Switch, Tag } from '@shadow-library/ui';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { SearchIcon, SettingsSlidersIcon } from '@/components/icons';
 import { Cover, NovelCard, RatingRow, StatusBadge } from '@/components/novel';
@@ -352,8 +352,12 @@ function FilterDrawer(props: FilterDrawerProps): React.JSX.Element {
   const chapterValue = parseChapterRange(search.chapters) ?? [CHAPTER_MIN, CHAPTER_MAX];
   const [chapterDraft, setChapterDraft] = useState<[number, number]>(chapterValue);
 
-  // Keep the slider in step with the URL so an external Reset snaps the handles back to full range.
-  useEffect(() => setChapterDraft(parseChapterRange(search.chapters) ?? [CHAPTER_MIN, CHAPTER_MAX]), [search.chapters]);
+  // The handles are a local draft while dragging, so an external Reset has to snap them back explicitly.
+  const [syncedChapters, setSyncedChapters] = useState(search.chapters);
+  if (syncedChapters !== search.chapters) {
+    setSyncedChapters(search.chapters);
+    setChapterDraft(chapterValue);
+  }
 
   const commitChapters = (value: number | number[]): void => {
     const values = value as number[];

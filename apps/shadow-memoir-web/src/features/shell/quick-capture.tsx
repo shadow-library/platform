@@ -52,9 +52,14 @@ export function QuickCapture({ open, onOpenChange }: QuickCaptureProps): ReactEl
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onOpenChange]);
 
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (!open) setText('');
+  }
+
   useEffect(() => {
-    if (!open) return setText('');
-    field.current?.focus();
+    if (open) field.current?.focus();
   }, [open]);
 
   const parse = useMemo(() => parseCapture(text, { date: today, currency, occurrences: occurrences.data ?? [] }), [text, today, currency, occurrences.data]);

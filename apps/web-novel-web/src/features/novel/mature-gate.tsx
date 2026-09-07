@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import { Button } from '@shadow-library/ui';
 
 import { AlertIcon } from '@/components/icons';
@@ -18,24 +18,40 @@ interface MatureGateState {
   reveal: () => void;
 }
 
+const listeners = new Set<() => void>();
+
+/** `getSnapshot` runs on every render, and both reads behind it parse JSON out of `localStorage`. */
+let cached: boolean | null = null;
+
+function subscribeToMatureAccess(onStoreChange: () => void): () => void {
+  cached = null;
+  listeners.add(onStoreChange);
+  return () => void listeners.delete(onStoreChange);
+}
+
+function getMatureAllowed(): boolean {
+  cached ??= loadSettings().showMatureContent || hasMatureConsent();
+  return cached;
+}
+
+function getServerMatureAllowed(): boolean {
+  return false;
+}
+
 /**
  * Resolve whether a mature title must stay gated for this device. The decision depends on `localStorage`
  * (consent + the "show mature content" preference), which is unreadable during SSR and the first client
- * render — so a mature title starts gated on both, and an effect reveals it only once consent is known. That
+ * render — so a mature title starts gated on both, and the store's real answer lands only once mounted. That
  * keeps server and client markup identical and guarantees mature text is never present in the pre-consent
  * HTML. `reveal` records consent so the choice survives reloads and future visits.
  */
 export function useMatureGate(mature: boolean): MatureGateState {
-  const [allowed, setAllowed] = useState(false);
-
-  useEffect(() => {
-    if (!mature) return;
-    setAllowed(loadSettings().showMatureContent || hasMatureConsent());
-  }, [mature]);
+  const allowed = useSyncExternalStore(subscribeToMatureAccess, getMatureAllowed, getServerMatureAllowed);
 
   const reveal = useCallback((): void => {
     grantMatureConsent();
-    setAllowed(true);
+    cached = null;
+    for (const listener of listeners) listener();
   }, []);
 
   return { gateVisible: mature && !allowed, reveal };

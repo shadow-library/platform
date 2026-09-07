@@ -1,5 +1,5 @@
 import { CONTENT_RATING_LEVEL_LABELS, type ContentRating, type ContentRatingDimension } from '@shadow-library/sdk';
-import { Avatar, Button, cn, Input, Pagination, Tabs, Textarea, toast, Tooltip } from '@shadow-library/ui';
+import { Avatar, Button, cn, Input, Pagination, Tabs, Textarea, toast, Tooltip, useHydrated } from '@shadow-library/ui';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useRouter } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -429,15 +429,15 @@ function ChaptersPanel({ novel, currentOrdinal }: { novel: NovelDetail; currentO
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [downloadedOrdinals, setDownloadedOrdinals] = useState<Set<number>>(new Set());
-  const [now, setNow] = useState<number | null>(null);
+  const [mountedAt] = useState(() => Date.now());
   const chapters = useQuery(chapterListQueryOptions(novel.slug, page, CHAPTER_PAGE_SIZE));
   const router = useRouter();
+  const hydrated = useHydrated();
+  const now = hydrated ? mountedAt : null;
 
   useEffect(() => {
     void getDownloadedNovel(novel.slug).then(record => setDownloadedOrdinals(new Set(record?.ordinals ?? [])));
   }, [novel.slug]);
-
-  useEffect(() => setNow(Date.now()), []);
 
   const term = filter.trim().toLowerCase();
   const filtered = (chapters.data?.items ?? []).filter(chapter => !term || chapter.title.toLowerCase().includes(term) || String(chapter.ordinal).includes(term));

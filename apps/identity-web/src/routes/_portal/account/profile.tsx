@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Avatar, Button, DescriptionList, FormField, Input, toast } from '@shadow-library/ui';
 
 import { PageHeader, QueryState } from '@/components/si';
@@ -21,12 +21,11 @@ function ProfilePage(): React.JSX.Element {
   const [lastName, setLastName] = useState('');
   const [seeded, setSeeded] = useState(false);
 
-  useEffect(() => {
-    if (!user || seeded) return;
+  if (user && !seeded) {
+    setSeeded(true);
     setFirstName(user.firstName ?? '');
     setLastName(user.lastName ?? '');
-    setSeeded(true);
-  }, [user, seeded]);
+  }
 
   const dirty = Boolean(user) && (firstName !== (user?.firstName ?? '') || lastName !== (user?.lastName ?? ''));
 

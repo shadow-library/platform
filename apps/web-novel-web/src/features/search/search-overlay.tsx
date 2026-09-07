@@ -55,11 +55,18 @@ export function SearchOverlay({ open, onOpenChange }: SearchOverlayProps): React
     return () => window.clearTimeout(id);
   }, [query]);
 
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (open) {
+      setQuery('');
+      setDebounced('');
+      setRecents(readRecents());
+    }
+  }
+
   useEffect(() => {
     if (!open) return;
-    setQuery('');
-    setDebounced('');
-    setRecents(readRecents());
     const id = window.requestAnimationFrame(() => inputRef.current?.focus());
     return () => window.cancelAnimationFrame(id);
   }, [open]);
