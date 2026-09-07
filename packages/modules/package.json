@@ -11,6 +11,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./bootstrap": {
+      "types": "./dist/bootstrap/index.d.ts",
+      "default": "./dist/bootstrap/index.js"
+    },
     "./http-core": {
       "types": "./dist/http-core/index.d.ts",
       "default": "./dist/http-core/index.js"

@@ -27,7 +27,7 @@ const PACKAGE_ENTRIES: Record<string, string[]> = {
     'src/services/reflector.service.ts',
   ],
   'packages/fastify': ['src/index.ts'],
-  'packages/modules': ['src/index.ts', 'src/http-core/index.ts', 'src/database/index.ts', 'src/cache/index.ts', 'src/storage/index.ts'],
+  'packages/modules': ['src/index.ts', 'src/bootstrap/index.ts', 'src/http-core/index.ts', 'src/database/index.ts', 'src/cache/index.ts', 'src/storage/index.ts'],
   'packages/sdk': ['src/index.ts', 'src/publishing/index.ts'],
   'packages/ui': ['src/index.ts', 'src/router.ts', 'src/router.tsx'],
   'packages/web': [
