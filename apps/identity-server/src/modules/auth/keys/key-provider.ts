@@ -18,6 +18,9 @@ export abstract class KeyProvider {
 
 const CURRENT_KEK_VERSION = 1;
 
+/** Pinned so `setAuthTag` cannot accept a truncated tag: node otherwise allows any GCM-permitted length, and a 4-byte tag is forgeable. */
+const GCM_TAG_LENGTH = 16;
+
 @Injectable()
 export class EnvKeyProvider extends KeyProvider {
   readonly kekVersion = CURRENT_KEK_VERSION;
@@ -31,14 +34,14 @@ export class EnvKeyProvider extends KeyProvider {
 
   encrypt(plaintext: Buffer): EncryptedSecret {
     const iv = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', this.kek, iv);
+    const cipher = createCipheriv('aes-256-gcm', this.kek, iv, { authTagLength: GCM_TAG_LENGTH });
     const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
     const authTag = cipher.getAuthTag();
     return { ciphertext: ciphertext.toString('base64'), iv: iv.toString('base64'), authTag: authTag.toString('base64'), kekVersion: this.kekVersion };
   }
 
   decrypt(secret: EncryptedSecret): Buffer {
-    const decipher = createDecipheriv('aes-256-gcm', this.kek, Buffer.from(secret.iv, 'base64'));
+    const decipher = createDecipheriv('aes-256-gcm', this.kek, Buffer.from(secret.iv, 'base64'), { authTagLength: GCM_TAG_LENGTH });
     decipher.setAuthTag(Buffer.from(secret.authTag, 'base64'));
     return Buffer.concat([decipher.update(Buffer.from(secret.ciphertext, 'base64')), decipher.final()]);
   }
