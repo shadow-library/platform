@@ -13,7 +13,7 @@ export interface ChapterLike {
   words: number;
 }
 
-export interface RecombineGroup {
+interface RecombineGroup {
   members: ChapterLike[];
   /** Display title for the merged chapter — the first member's stripped base. */
   title: string | null;
@@ -54,7 +54,7 @@ const TRAILING_DASH = /\s+[-–—]\s*(\d{1,2})\s*$/;
 const CHAPTER_PREFIX = /^\s*(?:chapter|ch\.?|c)\s*#?(\d{1,5})(?:\s*[.\-–—]\s*(\d{1,2}))?\b\s*[:.\-–—]?\s*/i;
 const BARE_NUMBER_PREFIX = /^\s*(\d{1,5})\s*[:.\-–—]\s*/;
 
-export function normalizeBase(base: string): string {
+function normalizeBase(base: string): string {
   return base
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')

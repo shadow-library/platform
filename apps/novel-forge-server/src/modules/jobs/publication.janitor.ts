@@ -17,7 +17,7 @@ function retryableFailure(error: PgColumn): SQL | undefined {
 }
 
 /** Sweep cadence — also the precision of `scheduledAt` releases and the base retry interval for failed pushes */
-export const PUBLISH_SWEEP_INTERVAL_MS = 60_000;
+const PUBLISH_SWEEP_INTERVAL_MS = 60_000;
 
 /**
  * The ledger-as-outbox sweeper (checkpoint-janitor pattern, reader-publish design §5): on boot and

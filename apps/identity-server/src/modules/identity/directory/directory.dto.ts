@@ -2,7 +2,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 import { PATTERN } from '@server/constants';
 
-export const MAX_RESOLVE_EMAILS = 50;
+const MAX_RESOLVE_EMAILS = 50;
 
 @Schema()
 export class ResolveUsersBody {
@@ -25,7 +25,7 @@ export class ResolveUsersResponse {
   users: ResolvedUserItem[];
 }
 
-export const MAX_LOOKUP_USERS = 50;
+const MAX_LOOKUP_USERS = 50;
 
 @Schema()
 export class LookupUsersBody {

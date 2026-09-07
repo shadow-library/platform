@@ -31,11 +31,6 @@ export interface ResolvedModel {
   model: string;
 }
 
-export interface AiProfile {
-  roleOverrides?: Partial<Record<AiRole, ResolvedModel>>;
-  forceProvider?: string;
-}
-
 export type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image' | 'embedding';
 
 // Every fine-grained role maps to exactly one user-facing model group. Roles stay fine-grained

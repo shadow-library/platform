@@ -23,7 +23,7 @@ export interface GraduateInput {
   title: string;
 }
 
-export interface GraduatedProject {
+interface GraduatedProject {
   id: bigint;
   name: string;
   title: string | null;

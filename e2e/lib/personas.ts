@@ -60,10 +60,10 @@ export interface SeedManifest {
  */
 
 /** Shared password for the four seeded `.test` personas — meets identity's ≥12-char upper/lower/number policy. */
-export const E2E_PERSONA_PASSWORD = 'E2eSeed#Passw0rd!';
+const E2E_PERSONA_PASSWORD = 'E2eSeed#Passw0rd!';
 
 /** Password the seed forces onto the bootstrap admin (id 1) so the suite has a working admin despite the unknown boot secret. */
-export const E2E_ADMIN_PASSWORD = 'E2eAdmin#Passw0rd!';
+const E2E_ADMIN_PASSWORD = 'E2eAdmin#Passw0rd!';
 
 /** The bootstrap admin's well-known email (identity's default `AUTH_BOOTSTRAP_ADMIN_EMAIL`); it already holds IAMAdmin + PulseAdmin. */
 export const ADMIN_EMAIL = 'admin@shadow-apps.com';

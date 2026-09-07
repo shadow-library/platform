@@ -25,7 +25,7 @@ export interface SeedSpan extends PlanSpanLike {
 }
 
 // The ledger and the discovered cuts share this ceiling; past it the writer stops reading the list.
-export const CUT_SLICE_TOKENS = 1_500;
+const CUT_SLICE_TOKENS = 1_500;
 
 export function slugifyCutKey(label: string): string {
   return (
@@ -102,7 +102,7 @@ export function buildSeedCuts(spans: SeedSpan[]): CutEntryLike[] {
  * chapter opens — is already authored in the plan the human approved, and a model call here would only
  * paraphrase it with a chance of contradicting it.
  */
-export function renderBridgeDirective(dropped: SeedSpan, following: SeedSpan): string {
+function renderBridgeDirective(dropped: SeedSpan, following: SeedSpan): string {
   const lines = [
     `The source chapters ${dropped.fromChapter}-${dropped.toChapter}${dropped.arcLabel ? ` (${dropped.arcLabel})` : ''} are cut. The reader never saw them and never will.`,
   ];

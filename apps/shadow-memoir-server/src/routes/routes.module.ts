@@ -13,7 +13,7 @@ import { OcrModule } from '@server/modules/ocr';
 import { ReceiptsModule } from '@server/modules/receipts';
 import { SyncModule } from '@server/modules/sync';
 
-export const AppHttpCoreModule = HttpCoreModule.forRoot({
+const AppHttpCoreModule = HttpCoreModule.forRoot({
   openapi: { normalizeSchemaIds: true },
 });
 

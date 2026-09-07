@@ -1,7 +1,7 @@
 import { type Application } from '@server/modules/infrastructure/datastore';
 
 /** A scope exposed by an application's own API resource. */
-export interface SeedScope {
+interface SeedScope {
   name: string;
   description: string;
   /** Surfaced separately from the plain scope list and gated at consent/elevation. */
@@ -11,12 +11,12 @@ export interface SeedScope {
 }
 
 /** An entry in an application's RBAC catalogue, granted to roles by name. */
-export interface SeedPermission {
+interface SeedPermission {
   name: string;
   description: string;
 }
 
-export interface SeedRole {
+interface SeedRole {
   name: string;
   description: string;
   /** Permission names from the same application's catalogue. */
@@ -33,7 +33,7 @@ export interface SeedScopeGrant {
 }
 
 /** A caller allow-listed onto an application's otherwise deny-by-default routes. */
-export interface SeedServiceAccessRule {
+interface SeedServiceAccessRule {
   callerClientId: string;
   method: string;
   pathPattern: string;

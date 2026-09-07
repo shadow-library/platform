@@ -1,4 +1,4 @@
-export const IMAGE_REF_PATTERN = /^[0-9a-f]{64}\.[a-z0-9]+$/;
+const IMAGE_REF_PATTERN = /^[0-9a-f]{64}\.[a-z0-9]+$/;
 
 const REJECTED_EXTENSIONS = new Set(['svg']);
 

@@ -5,7 +5,7 @@ import { APP_NAME } from '@server/constants';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
 /** A brief's epistemic contract (character-knowledge design §3): who bounds the chapter, who learns what. */
-export interface KnowledgeReveal {
+interface KnowledgeReveal {
   entityKey: string;
   factKey: string;
 }

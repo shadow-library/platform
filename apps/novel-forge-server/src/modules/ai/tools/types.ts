@@ -5,7 +5,7 @@ import { type PrimaryDatabase } from '@server/database';
 import { type RetrievalService } from '../retrieval';
 
 // ReadonlyDb enforces at compile time that tool handlers cannot call db.insert/update/delete.
-export type ReadonlyDb = Pick<PrimaryDatabase, 'query' | 'select'>;
+type ReadonlyDb = Pick<PrimaryDatabase, 'query' | 'select'>;
 
 export interface ToolContext {
   chapter: number | null;

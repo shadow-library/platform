@@ -16,7 +16,7 @@ import { type Quest, schema } from '@server/database';
 
 export type LinkableModule = Extract<Quest.ModuleLink, 'journal' | 'meal' | 'weight'>;
 
-export type LinkageStatus = 'offered' | 'already-completed';
+type LinkageStatus = 'offered' | 'already-completed';
 
 export interface LinkageMatch {
   status: LinkageStatus;

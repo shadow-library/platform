@@ -18,7 +18,7 @@ export interface RecombineOptions {
   useAi?: boolean;
 }
 
-export interface MergedChapterSummary {
+interface MergedChapterSummary {
   number: number;
   title: string | null;
   parts: number;

@@ -24,7 +24,7 @@ export interface ApplicationOrganisationRow {
   assignedBy: string | null;
 }
 
-export interface OrganisationApplicationRow {
+interface OrganisationApplicationRow {
   id: number;
   name: string;
   displayName: string | null;

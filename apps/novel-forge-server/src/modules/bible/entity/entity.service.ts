@@ -16,7 +16,7 @@ export type EntityWithImages = Knowledge.Entity & { images: Knowledge.EntityImag
 // The refs stay on these types for internal callers; only the URLs are declared on the response DTOs, so
 // the serialiser is what keeps the refs off the wire.
 export type PresentedEntity = Knowledge.Entity & { imageUrl?: string };
-export type PresentedEntityImage = Knowledge.EntityImage & { imageUrl: string };
+type PresentedEntityImage = Knowledge.EntityImage & { imageUrl: string };
 export type PresentedEntityWithImages = PresentedEntity & { images: PresentedEntityImage[] };
 
 type UploadMime = 'image/png' | 'image/jpeg' | 'image/webp';

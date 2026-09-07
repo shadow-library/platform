@@ -28,7 +28,7 @@ export interface RegisterClient {
   authMethod?: ClientAuthMethod;
 }
 
-export type ClientAuthMethod = 'client_secret' | 'workload_identity';
+type ClientAuthMethod = 'client_secret' | 'workload_identity';
 
 export interface ProvisionedApplication {
   clientId: string;

@@ -9,7 +9,7 @@ import { PublishModule } from '@server/modules/publish';
 import { ReaderModule } from '@server/modules/reader';
 import { WikiModule } from '@server/modules/wiki';
 
-export const AppHttpCoreModule = HttpCoreModule.forRoot({
+const AppHttpCoreModule = HttpCoreModule.forRoot({
   openapi: { normalizeSchemaIds: true },
 });
 

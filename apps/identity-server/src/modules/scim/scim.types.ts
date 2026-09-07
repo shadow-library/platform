@@ -3,7 +3,7 @@ export interface ScimName {
   familyName?: string;
 }
 
-export interface ScimEmail {
+interface ScimEmail {
   value: string;
   primary?: boolean;
   type?: string;
@@ -14,7 +14,7 @@ export interface ScimMemberRef {
   display?: string;
 }
 
-export interface ScimMeta {
+interface ScimMeta {
   resourceType: 'User' | 'Group';
   created: string;
   lastModified: string;
@@ -96,8 +96,8 @@ export const SCIM_CONTENT_TYPE = 'application/scim+json; charset=utf-8';
 export const USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 export const GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Group';
 export const LIST_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:ListResponse';
-export const PATCH_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
-export const ERROR_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:Error';
+const PATCH_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
+const ERROR_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:Error';
 
 export class ScimError extends Error {
   constructor(

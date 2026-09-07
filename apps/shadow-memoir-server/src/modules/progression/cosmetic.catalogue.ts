@@ -4,7 +4,7 @@ import { type AchievementId } from '@modules/rules';
  * Defining types
  */
 
-export type CosmeticKind = 'badge' | 'hero_accent' | 'theme_accent';
+type CosmeticKind = 'badge' | 'hero_accent' | 'theme_accent';
 
 export interface CosmeticDefinition {
   readonly id: string;
@@ -25,7 +25,7 @@ export interface CosmeticDefinition {
  * `rules`, because `rules` is pure and already carries its own purity test; the coin price is a product
  * lever the way rewards are, but the catalogue itself has no rule-evaluation shape to speak of.
  */
-export const COSMETIC_CATALOGUE: readonly CosmeticDefinition[] = [
+const COSMETIC_CATALOGUE: readonly CosmeticDefinition[] = [
   { id: 'badge_bronze', name: 'Bronze Badge', kind: 'badge', priceCoins: 50 },
   { id: 'badge_silver', name: 'Silver Badge', kind: 'badge', priceCoins: 150 },
   { id: 'badge_gold_streak', name: 'Gold Streak Badge', kind: 'badge', priceCoins: null, unlockedByAchievementId: 'first_gold_streak' },

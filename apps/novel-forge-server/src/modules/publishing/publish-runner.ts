@@ -20,17 +20,17 @@ export interface ConvergeOptions {
   reconcile?: boolean;
 }
 
-export interface ConvergeFailure {
+interface ConvergeFailure {
   ordinal: number;
   error: string;
 }
 
-export interface WikiConvergeFailure {
+interface WikiConvergeFailure {
   entryKey: string;
   error: string;
 }
 
-export interface WikiConvergeResult {
+interface WikiConvergeResult {
   pushed: string[];
   deleted: string[];
   skipped: string[];
@@ -68,7 +68,7 @@ export const UNKNOWN_CONFLICT_ERROR_PREFIX = 'unattributed conflict:';
 export const UNSWEEPABLE_ERROR_PREFIXES = [STALE_ERROR_PREFIX, HASH_MISMATCH_ERROR_PREFIX, SLUG_EXHAUSTED_ERROR_PREFIX, UNKNOWN_CONFLICT_ERROR_PREFIX];
 
 /** The terminal outcome of the slug ladder: ledgered under an unsweepable prefix so the janitor stops re-running a converge that cannot converge */
-export class SlugExhaustedError extends Error {
+class SlugExhaustedError extends Error {
   constructor(readonly slug: string) {
     super(`${SLUG_EXHAUSTED_ERROR_PREFIX} the reader refuses '${slug}' and no re-assignment is available — republish this project with an explicit novelSlug`);
     this.name = 'SlugExhaustedError';

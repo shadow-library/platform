@@ -26,7 +26,7 @@ import { SecurityModule } from '@server/modules/infrastructure/security';
 import { ScimModule } from '@server/modules/scim';
 import { PolicyModule } from '@server/modules/system/policy';
 
-export const AppHttpCoreModule = HttpCoreModule.forRoot({
+const AppHttpCoreModule = HttpCoreModule.forRoot({
   helmet: {
     contentSecurityPolicy: {
       directives: {

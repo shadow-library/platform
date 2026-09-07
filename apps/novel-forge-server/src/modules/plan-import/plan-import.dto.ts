@@ -8,7 +8,7 @@ import { EndingContractSchema, KnowledgeContractSchema } from '../ai/schemas';
 
 // `story_state` and `ai` are app-managed sections; an authored bundle may only carry canon sections.
 export const PLAN_BUNDLE_SECTIONS = ['project', 'world', 'power', 'plot', 'lore'] as const;
-export const PlanBundleSection = EnumType.create('PlanBundleSection', [...PLAN_BUNDLE_SECTIONS]);
+const PlanBundleSection = EnumType.create('PlanBundleSection', [...PLAN_BUNDLE_SECTIONS]);
 export type PlanBundleSectionValue = (typeof PLAN_BUNDLE_SECTIONS)[number];
 
 const KEY_PATTERN = '^[a-z0-9_]+$';

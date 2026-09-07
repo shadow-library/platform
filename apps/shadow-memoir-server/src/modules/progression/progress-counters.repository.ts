@@ -15,9 +15,9 @@ import { type DatabaseTransaction, type PrimaryDatabase, schema } from '@server/
  * which is a rolling window computed live off `reschedule_events` rather than an incremental total
  * (ARCHITECTURE §26, T-21 module report).
  */
-export type IncrementalCounters = Omit<ProgressCounters, 'totalXp' | 'level' | 'stats' | 'reschedulesWithReasonIn90Days'>;
+type IncrementalCounters = Omit<ProgressCounters, 'totalXp' | 'level' | 'stats' | 'reschedulesWithReasonIn90Days'>;
 
-export const EMPTY_INCREMENTAL_COUNTERS: IncrementalCounters = {
+const EMPTY_INCREMENTAL_COUNTERS: IncrementalCounters = {
   questsCompleted: EMPTY_PROGRESS_COUNTERS.questsCompleted,
   completionsByStrictness: EMPTY_PROGRESS_COUNTERS.completionsByStrictness,
   longestStreakDays: EMPTY_PROGRESS_COUNTERS.longestStreakDays,

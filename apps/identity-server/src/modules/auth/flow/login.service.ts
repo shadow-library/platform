@@ -32,7 +32,7 @@ export interface LoginInitInput {
   returnTo?: string;
 }
 
-export interface FederatedLoginOption {
+interface FederatedLoginOption {
   authorizationUrl: string;
   enforced: boolean;
 }

@@ -22,7 +22,7 @@ export interface RebrandGraphServices {
   checkpointer: BaseCheckpointSaver;
 }
 
-export interface RebrandAuditIssueRecord {
+interface RebrandAuditIssueRecord {
   source: 'audit';
   type: string;
   detail: string;

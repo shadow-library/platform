@@ -30,7 +30,7 @@ export class ListChaptersQuery extends PaginationQuery(SortByTime, {}, { maximum
 }
 
 @Schema()
-export class ChapterListResponse {
+class ChapterListResponse {
   @Field(() => String)
   id: bigint;
 

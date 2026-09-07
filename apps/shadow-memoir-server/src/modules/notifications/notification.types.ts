@@ -4,7 +4,7 @@ import { type NotificationOutbox } from '@server/database';
  * Defining types
  */
 
-export interface AiResultReadyVariables {
+interface AiResultReadyVariables {
   resultId: string;
   suggestionCount: number;
 }
@@ -19,7 +19,7 @@ export interface WeeklyDigestVariables {
   reasonTagCode?: string;
 }
 
-export interface BillingReminderVariables {
+interface BillingReminderVariables {
   state: string;
   expiresAtDate: string;
   amount?: number;

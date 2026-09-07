@@ -1,4 +1,4 @@
-export interface RenderBrand {
+interface RenderBrand {
   /** Product wordmark shown in the header and footer. */
   name: string;
   /** Small uppercase label rendered beside the wordmark. */
@@ -10,7 +10,7 @@ export interface RenderBrand {
 }
 
 /** The default first-party brand; mirrors the `@shadow-library/ui` indigo palette. A send may override any field via payload. */
-export const DEFAULT_BRAND: RenderBrand = { name: 'Shadow', tagline: 'Security', accent: '#4f46e5', accentDark: '#818cf8' };
+const DEFAULT_BRAND: RenderBrand = { name: 'Shadow', tagline: 'Security', accent: '#4f46e5', accentDark: '#818cf8' };
 
 /**
  * The ambient variables every layout, template, and partial may reference without declaring them in a template's

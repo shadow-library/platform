@@ -23,26 +23,26 @@ export const DUPLICATE_PARAGRAPH_MIN_WORDS = 20;
 
 // Share of this chapter's 5–8-grams that also appear in the prior window. Ordinary prose reuses names,
 // places and stock connectives, so a few percent is normal; 5% means whole clauses are being recycled.
-export const CROSS_CHAPTER_NGRAM_RATE_MAX = 0.05;
+const CROSS_CHAPTER_NGRAM_RATE_MAX = 0.05;
 
 // The stock-phrase list is ~20 of the most overused reactions; more than five hits in one chapter means
 // the draft is leaning on them as its default beat.
-export const STOCK_PHRASE_MAX = 5;
+const STOCK_PHRASE_MAX = 5;
 
 // A dialogue-heavy chapter runs ~15 tags per 1,000 words; past 25 the tags are crowding the prose.
-export const DIALOGUE_TAGS_PER_1000_MAX = 25;
+const DIALOGUE_TAGS_PER_1000_MAX = 25;
 
 // Rate is only meaningful once there are enough tags to rate; below this the denominator is noise.
-export const DIALOGUE_TAG_RATE_MIN_SAMPLE = 10;
+const DIALOGUE_TAG_RATE_MIN_SAMPLE = 10;
 
 // "Said" should carry most attributions; a majority of exotic alternatives is the classic said-bookism tell.
-export const SAID_ALTERNATIVE_RATE_MAX = 0.5;
+const SAID_ALTERNATIVE_RATE_MAX = 0.5;
 
 // How much of the opening/closing to compare for a boundary echo, and how long a shared run has to be
 // before it's unambiguously the same sentence rather than incidental phrase reuse (e.g. a character's
 // name and a stock verb landing in both windows by chance).
-export const BOUNDARY_ECHO_WINDOW_WORDS = 60;
-export const BOUNDARY_ECHO_NGRAM_SIZE = 6;
+const BOUNDARY_ECHO_WINDOW_WORDS = 60;
+const BOUNDARY_ECHO_NGRAM_SIZE = 6;
 
 /**
  * Detects a chapter opening by repeating the previous chapter's closing verbatim (or near-verbatim) —

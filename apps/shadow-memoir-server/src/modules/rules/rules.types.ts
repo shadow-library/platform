@@ -6,9 +6,9 @@ export type StatAffinity = 'discipline' | 'body' | 'wealth' | 'mind';
 
 export type IntensityMode = 'standard' | 'low_intensity' | 'high_intensity';
 
-export type SchedulingModel = 'strict_time' | 'time_window' | 'day_level';
+type SchedulingModel = 'strict_time' | 'time_window' | 'day_level';
 
-export type StreakEligibility = 'always' | 'opt_in' | 'never';
+type StreakEligibility = 'always' | 'opt_in' | 'never';
 
 export type TimingBand = 'on_time' | 'late_0_2h' | 'late_2h_plus' | 'day_1' | 'day_2' | 'day_3' | 'day_4';
 
@@ -25,7 +25,7 @@ export type CrownCadence = 'daily' | 'weekly';
 
 export type MomentumBucket = 'cold' | 'steady' | 'warm';
 
-export type QuickLogSource = 'journal' | 'meal' | 'weight' | 'side_quest';
+type QuickLogSource = 'journal' | 'meal' | 'weight' | 'side_quest';
 
 export type ReasonTag =
   | 'forgot'
@@ -42,7 +42,7 @@ export type ReasonTag =
   | 'poorly_planned'
   | 'other';
 
-export interface StrictnessRules {
+interface StrictnessRules {
   readonly schedulingModel: SchedulingModel;
   /** Share of the period's Crown endowment this quest's scheduled occurrence carries. */
   readonly crownWeight: number;
@@ -54,13 +54,13 @@ export interface StrictnessRules {
   readonly consumesOneShot: boolean;
 }
 
-export interface TimingRules {
+interface TimingRules {
   /** Extends an Anchor's on-time window past its start minute; the window is half-open. */
   readonly anchorGraceMinutes: number;
   readonly lateStepMinutes: number;
 }
 
-export interface RewardRules {
+interface RewardRules {
   readonly baseXp: Readonly<Record<Strictness, Readonly<Record<TimingBand, number>>>>;
   readonly baseCoins: Readonly<Record<Strictness, number>>;
   readonly partialXpFactor: number;
@@ -72,7 +72,7 @@ export interface RewardRules {
   readonly timing: TimingRules;
 }
 
-export interface LevelCurve {
+interface LevelCurve {
   readonly curveCoefficient: number;
   readonly curveExponent: number;
   readonly maxLevel: number;
@@ -84,19 +84,19 @@ export interface StreakTier {
   readonly xpModifier: number;
 }
 
-export interface StreakRules {
+interface StreakRules {
   /** Ascending by `minDays`; the first entry is the floor tier and always matches. */
   readonly tiers: readonly [StreakTier, ...StreakTier[]];
   readonly breakAnnounceMinDays: number;
 }
 
-export interface ShieldRules {
+interface ShieldRules {
   readonly capPerQuest: number;
   readonly expires: boolean;
   readonly returnerGrant: number;
 }
 
-export interface HpCostRules {
+interface HpCostRules {
   readonly perBreak: number;
   /** Applied instead of `perBreak` when the break ends an unshielded Silver-or-better streak. */
   readonly perBreakEndingHighStreak: number;
@@ -106,7 +106,7 @@ export type ComebackTrigger =
   | { readonly kind: 'anchor_miss_yesterday' }
   | { readonly kind: 'miss_within_days'; readonly days: number; readonly strictness: readonly Strictness[]; readonly requiresColdMomentum: boolean };
 
-export interface IntensityModeRules {
+interface IntensityModeRules {
   readonly hpMax: number;
   readonly overnightHpRegen: number;
   readonly crownCadence: CrownCadence;
@@ -116,7 +116,7 @@ export interface IntensityModeRules {
   readonly comebackTriggers: readonly ComebackTrigger[];
 }
 
-export interface CrownRules {
+interface CrownRules {
   readonly xpPerWeight: number;
   readonly coinsWeightDivisor: number;
   readonly maxCoins: number;
@@ -124,23 +124,23 @@ export interface CrownRules {
   readonly weeklyAnchorWeekday: number;
 }
 
-export interface RecoveryRules {
+interface RecoveryRules {
   readonly maxPerDay: number;
   readonly triggeredByStrictness: readonly Strictness[];
 }
 
-export interface ComebackRules {
+interface ComebackRules {
   readonly maxFiresPerDay: number;
   readonly maxFiresPerDayViaRecovery: number;
 }
 
-export interface ReturnerRules {
+interface ReturnerRules {
   readonly defaultThresholdDays: number;
   readonly shieldGrant: number;
   readonly suppressesComeback: boolean;
 }
 
-export interface MomentumRules {
+interface MomentumRules {
   /** Indexed by days before today; weights the recent completion count. */
   readonly recentDayWeights: readonly [number, number, number];
   readonly medianWindowDays: number;
@@ -148,7 +148,7 @@ export interface MomentumRules {
   readonly warmAboveRatio: number;
 }
 
-export interface CapacityRules {
+interface CapacityRules {
   readonly newUserBaselineCap: number;
   readonly ratchetFactor: number;
   readonly medianWindowDays: number;
@@ -160,7 +160,7 @@ export interface CapacityRules {
   readonly anchorWarnAboveCount: number;
 }
 
-export interface QuickLogReward {
+interface QuickLogReward {
   readonly xp: number;
   readonly coins: number;
   readonly statTick: number;

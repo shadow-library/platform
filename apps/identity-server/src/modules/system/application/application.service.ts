@@ -14,16 +14,6 @@ export interface ApplicationDetails extends Application {
   roles: Application.Role[];
 }
 
-export interface CreateApplication {
-  name: string;
-  description?: string;
-  displayName?: string;
-
-  homePageUrl?: string;
-  isActive?: boolean;
-  logoUrl?: string;
-}
-
 @Injectable()
 export class ApplicationService implements OnModuleInit {
   private readonly logger = Logger.getLogger(APP_NAME, ApplicationService.name);

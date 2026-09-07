@@ -1,11 +1,11 @@
 import { type NovelBundle } from './novel-import.dto';
 
-export interface BundleIssue {
+interface BundleIssue {
   field: string;
   msg: string;
 }
 
-export interface FlattenedChapter {
+interface FlattenedChapter {
   /** 1-based, derived by flattening volumes in ordinal order — never carried in the bundle itself. */
   number: number;
   title: string;

@@ -1,6 +1,6 @@
 import { type Publishing } from '@server/database';
 
-export type AmendRepublishSkipReason = 'never-published' | 'unpublished' | 'unchanged';
+type AmendRepublishSkipReason = 'never-published' | 'unpublished' | 'unchanged';
 
 export type AmendRepublishDecision = { republish: true; revision: number } | { republish: false; reason: AmendRepublishSkipReason };
 

@@ -26,7 +26,7 @@ export class UserSearchQuery extends PaginationQuery(USER_SORT_FIELDS) {
 }
 
 @Schema()
-export class UserSummaryItem {
+class UserSummaryItem {
   @Field()
   id: string;
 

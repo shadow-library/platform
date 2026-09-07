@@ -1,4 +1,4 @@
-export interface BaseConfig {
+interface BaseConfig {
   notificationId: string;
   payload?: Record<string, any>;
 }

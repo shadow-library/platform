@@ -125,7 +125,7 @@ function parseMonthlyPattern(field: string, value: unknown): MonthlyPattern {
 }
 
 /** Accepts the `rules` module's own `RecurrenceRule` shape (ARCHITECTURE §10.3's closed rule object) rather than a flattened one, so it feeds `expandRecurrence`/`occursOn` unchanged. */
-export function parseRecurrence(value: unknown): RecurrenceRule {
+function parseRecurrence(value: unknown): RecurrenceRule {
   const body = record('recurrence', value);
   const frequency = oneOf('recurrence.frequency', body['frequency'], ['daily', 'weekly', 'monthly', 'yearly'] as const);
   const interval = body['interval'] === undefined ? 1 : int('recurrence.interval', body['interval']);

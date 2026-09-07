@@ -16,7 +16,7 @@ import { currentThresholdOffers, type ThresholdOffer } from './threshold-offer';
  * Defining types
  */
 
-export interface BuiltinMetric {
+interface BuiltinMetric {
   name: string;
   unit: string | null;
   valueType: Metric.ValueType;
@@ -42,7 +42,7 @@ export type MetricEdit = Partial<Pick<MetricCreate, 'name' | 'unit' | 'valueType
  */
 
 /** The built-in health set (ARCHITECTURE §18, PRODUCT.md §6.1) — steps, calories burned, sleep, water — all `is_health: true`, none deletable through `metric.delete` (§9). */
-export const BUILTIN_METRICS: readonly BuiltinMetric[] = [
+const BUILTIN_METRICS: readonly BuiltinMetric[] = [
   { name: 'Steps', unit: 'steps', valueType: 'count', direction: 'higher', defaultValue: null, isHealth: true },
   { name: 'Calories burned', unit: 'kcal', valueType: 'number', direction: 'higher', defaultValue: null, isHealth: true },
   { name: 'Sleep duration', unit: 'hr', valueType: 'duration', direction: 'higher', defaultValue: null, isHealth: true },

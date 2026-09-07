@@ -1,11 +1,11 @@
 import { type PlanBundle, type PlanBundleArc } from './plan-import.dto';
 
-export interface BundleIssue {
+interface BundleIssue {
   field: string;
   msg: string;
 }
 
-export interface VolumeRange {
+interface VolumeRange {
   start: number;
   end: number;
 }

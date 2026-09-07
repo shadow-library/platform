@@ -18,7 +18,7 @@ export interface DeltaRecord {
   row: DeltaRow;
 }
 
-export interface DeltaFetchContext {
+interface DeltaFetchContext {
   since: bigint;
   /** The page size the assembler wants; a source returning exactly this many is treated as truncated. */
   limit: number;

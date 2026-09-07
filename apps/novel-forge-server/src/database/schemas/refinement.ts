@@ -10,7 +10,6 @@ export namespace Refinement {
   export type Proposal = InferSelectModel<typeof refinementProposals>;
   export type ChatScope = InferEnum<typeof chatScope>;
   export type ChatSessionStatus = InferEnum<typeof chatSessionStatus>;
-  export type ChatMessageRole = InferEnum<typeof chatMessageRole>;
   export type ChatMode = InferEnum<typeof chatMode>;
   export type Kind = InferEnum<typeof refinementKind>;
   export type ProposalStatus = InferEnum<typeof refinementProposalStatus>;

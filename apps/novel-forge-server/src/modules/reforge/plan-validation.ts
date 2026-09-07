@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export type SpanAction = 'keep' | 'condense' | 'merge' | 'drop';
+type SpanAction = 'keep' | 'condense' | 'merge' | 'drop';
 
 /** The span shape the validator works on — DB rows, model output, and edit payloads all satisfy it. */
 export interface PlanSpanLike {

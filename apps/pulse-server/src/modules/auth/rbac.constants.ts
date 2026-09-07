@@ -1,7 +1,3 @@
-export type PulsePermission = (typeof PULSE_PERMISSIONS)[keyof typeof PULSE_PERMISSIONS];
-export type PulseScope = (typeof PULSE_SCOPES)[keyof typeof PULSE_SCOPES];
-export type PulseRole = (typeof PULSE_ROLES)[keyof typeof PULSE_ROLES];
-
 /**
  * The authoritative pulse RBAC catalog. Route decorators reference these strings and the identity
  * BootstrapService seeds the matching application permissions and roles — the two must stay in sync.
@@ -26,10 +22,4 @@ export const PULSE_PERMISSIONS = {
 
 export const PULSE_SCOPES = {
   notificationsSend: 'notifications:send',
-} as const;
-
-export const PULSE_ROLES = {
-  admin: 'PulseAdmin',
-  operator: 'PulseOperator',
-  viewer: 'PulseViewer',
 } as const;

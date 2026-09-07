@@ -1,1 +1,1 @@
-export { AppHttpCoreModule, HttpRouteModule } from './routes.module';
+export { HttpRouteModule } from './routes.module';

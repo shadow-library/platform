@@ -46,7 +46,7 @@ function collectText(rows: Rows, ...fields: string[]): string[] {
   return values;
 }
 
-export function trailingWindowStart(now: Date, months: number): string {
+function trailingWindowStart(now: Date, months: number): string {
   const start = new Date(now);
   start.setUTCMonth(start.getUTCMonth() - months);
   return start.toISOString().slice(0, 10);

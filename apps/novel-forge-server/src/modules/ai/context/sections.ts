@@ -35,7 +35,7 @@ export interface ContextSection {
   required?: boolean;
 }
 
-export interface OmittedSection {
+interface OmittedSection {
   key: string;
   reason: 'budget' | 'unresolved';
 }
@@ -55,7 +55,7 @@ export interface AssembledPack {
 }
 
 // Section labels are part of the prompt contract — never change their text.
-export const SECTION_LABELS: Record<string, string> = {
+const SECTION_LABELS: Record<string, string> = {
   prev_ending: '## PREVIOUS CHAPTER ENDING',
   continuation_state: '## CONTINUATION STATE',
   brief: '## CHAPTER BRIEF',
@@ -108,7 +108,7 @@ export const SECTION_LABELS: Record<string, string> = {
   cast_appearance: '## CAST APPEARANCE',
 };
 
-export function sectionLabel(key: string): string {
+function sectionLabel(key: string): string {
   return SECTION_LABELS[key] ?? '## ' + key.toUpperCase().replace(/_/g, ' ');
 }
 

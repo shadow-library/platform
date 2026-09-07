@@ -81,11 +81,6 @@ export function webNovelDb(): Sql {
   return db('webNovel');
 }
 
-/** The shadow-memoir database — accounts, quests, quest logs, finance, quick logs, sync/command log. */
-export function memoirDb(): Sql {
-  return db('memoir');
-}
-
 /** The novel-forge database — projects and their cascade of authoring state. */
 export function novelForgeDb(): Sql {
   return db('novelForge');

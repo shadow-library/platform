@@ -1,6 +1,6 @@
 import { type Ruleset } from './rules.types';
 
-export type ReturnerPlacement = 'granted' | 'held_pending' | 'held_targetless';
+type ReturnerPlacement = 'granted' | 'held_pending' | 'held_targetless';
 
 export interface ReturnerCandidate {
   readonly questId: string;

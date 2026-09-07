@@ -155,7 +155,7 @@ export class GlossaryListResponse {
 }
 
 @Schema({ additionalProperties: true, description: 'Model-reported audit entry whose fields vary by source.' })
-export class ConversionDetailItem {
+class ConversionDetailItem {
   @Field({ optional: true })
   detail?: string;
 }

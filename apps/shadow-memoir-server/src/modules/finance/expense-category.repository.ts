@@ -23,7 +23,7 @@ interface BuiltinCategory {
  */
 
 /** The 9 fixed categories (PRD §2.5); user-scoped rows rather than a code constant so a later product change to custom categories needs no migration (ARCHITECTURE §10.3 O-5). */
-export const BUILTIN_CATEGORIES: readonly BuiltinCategory[] = [
+const BUILTIN_CATEGORIES: readonly BuiltinCategory[] = [
   { key: 'food', label: 'Food' },
   { key: 'groceries', label: 'Groceries' },
   { key: 'transport', label: 'Transport' },

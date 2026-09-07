@@ -6,7 +6,7 @@
  * one, so a stricter policy always wins no matter which organisation set it. `AND` is its analogue
  * for a switch — any applicable organisation turning a capability off turns it off for the meeting.
  */
-export type PolicyResolution = 'MIN' | 'MAX' | 'AND' | 'OR' | 'OVERRIDE';
+type PolicyResolution = 'MIN' | 'MAX' | 'AND' | 'OR' | 'OVERRIDE';
 
 export interface PolicyDefinition {
   label: string;

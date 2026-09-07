@@ -10,5 +10,4 @@ export const WEBHOOK_ID_HEADER = 'x-shadow-webhook-id';
 export const WEBHOOK_EVENT_HEADER = 'x-shadow-webhook-event';
 
 export const WEBHOOK_SECRET_PREFIX = 'whsec_';
-export const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
 export const WEBHOOK_ROTATION_OVERLAP_HOURS = 24;

@@ -9,7 +9,7 @@ import { AUTH_MODE_REGISTRY, AuthMode, AuthModeService, SOCIAL_AUTH_MODES } from
 
 import { AuthFlowService, DeviceContext, sanitizeReturnTo } from './auth-flow.service';
 
-export interface SocialProviderOption {
+interface SocialProviderOption {
   provider: SocialProviderKind;
   label: string;
 }

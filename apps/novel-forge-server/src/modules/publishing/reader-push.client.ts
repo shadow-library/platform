@@ -82,13 +82,13 @@ export interface WikiManifestItem {
 }
 
 /** Identity service name of the reader — resolves via `SERVICE_URL_WEB_NOVEL_SERVER` or in-cluster svc DNS */
-export const READER_SERVICE = 'web-novel-server';
+const READER_SERVICE = 'web-novel-server';
 
 /** RFC 8707 resource the M2M token is addressed to; the reader accepts exactly this `aud`, not the service name */
-export const READER_RESOURCE = 'api://web-novel';
+const READER_RESOURCE = 'api://web-novel';
 
 /** The M2M scope the reader's `/internal/*` guard requires; end-user tokens never carry it */
-export const READER_PUBLISH_SCOPE = 'web-novel:publish';
+const READER_PUBLISH_SCOPE = 'web-novel:publish';
 
 /** Any reader push failure that is not a revision conflict — transport errors, 5xx, unmintable token */
 export class ReaderPushError extends Error {

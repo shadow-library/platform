@@ -33,7 +33,7 @@ interface WindowSpec {
   to: number;
 }
 
-export interface NovelValidationReport extends ValidationOutput {
+interface NovelValidationReport extends ValidationOutput {
   windowsRequested: number;
   windowsSucceeded: number;
   failedRanges: WindowSpec[];

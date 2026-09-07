@@ -42,7 +42,7 @@ const decodeSegment = <T>(segment: string): T | null => {
   }
 };
 
-export class WorkloadAssertionError extends Error {}
+class WorkloadAssertionError extends Error {}
 
 @Injectable()
 export class WorkloadIdentityService {

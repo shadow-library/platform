@@ -7,12 +7,12 @@ import { jsonb } from './jsonb';
 // Per-role model overrides persisted in `projects.config` (jsonb). Mirrors the wire `ProjectConfig`/
 // `ProjectModelOverrides` in project.dto (enumerated, not an index signature, so it round-trips in both
 // directions: read → response, and write ← create/clone input) — keep the two structurally in sync.
-export interface ProjectModelRefData {
+interface ProjectModelRefData {
   provider: string;
   model: string;
 }
 
-export interface ProjectModelOverridesData {
+interface ProjectModelOverridesData {
   extraction?: ProjectModelRefData;
   generation?: ProjectModelRefData;
   judge?: ProjectModelRefData;

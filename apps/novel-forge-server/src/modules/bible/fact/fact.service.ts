@@ -10,7 +10,7 @@ import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
 import { type RevealFactBody, type UpsertFactBody } from './fact.dto';
 
-export interface KnowledgeEntry {
+interface KnowledgeEntry {
   entityKey: string;
   entityName: string;
   learnedInChapter: number;

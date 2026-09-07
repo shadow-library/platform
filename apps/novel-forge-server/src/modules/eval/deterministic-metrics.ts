@@ -29,10 +29,10 @@
 export const WORD_TARGET_MIN = 1800;
 export const WORD_TARGET_MAX = 2600;
 
-export const SENTENCE_BAND_MIN = 6;
-export const SENTENCE_BAND_MAX = 22;
+const SENTENCE_BAND_MIN = 6;
+const SENTENCE_BAND_MAX = 22;
 
-export const NGRAM_SIZES = [5, 6, 7, 8] as const;
+const NGRAM_SIZES = [5, 6, 7, 8] as const;
 
 export interface StockPhrase {
   label: string;
@@ -41,7 +41,7 @@ export interface StockPhrase {
 
 // ~20-item starting list — see the module doc comment above. Patterns are case-insensitive and tolerant
 // of "his"/"her"/"their" where the report's examples imply a possessive.
-export const STOCK_PHRASES: StockPhrase[] = [
+const STOCK_PHRASES: StockPhrase[] = [
   { label: 'narrowed eyes', pattern: /\b(?:eyes narrowed|narrowed (?:his|her|their) eyes)\b/gi },
   { label: 'tightened jaw', pattern: /\b(?:jaw tightened|tightened (?:his|her|their) jaw)\b/gi },
   { label: 'breath hitched', pattern: /\bbreath hitched\b/gi },
@@ -65,9 +65,9 @@ export const STOCK_PHRASES: StockPhrase[] = [
   { label: 'released a breath', pattern: /\breleased (?:a|the) breath (?:she|he|they) (?:didn't|did not) (?:know|realize) (?:she|he|they) (?:was|were) holding\b/gi },
 ];
 
-export const SAID_ASKED_VERBS = ['said', 'asked'];
+const SAID_ASKED_VERBS = ['said', 'asked'];
 
-export const SAID_ALTERNATIVE_VERBS = [
+const SAID_ALTERNATIVE_VERBS = [
   'exclaimed',
   'growled',
   'whispered',
@@ -97,7 +97,7 @@ const DIALOGUE_TAG_VERBS = [...SAID_ASKED_VERBS, ...SAID_ALTERNATIVE_VERBS];
 
 // Contracted -> expanded. Matching is whole-word, case-insensitive; the count for a pair is however many
 // times either form appears inside quoted dialogue.
-export const CONTRACTION_PAIRS: [contracted: string, expanded: string][] = [
+const CONTRACTION_PAIRS: [contracted: string, expanded: string][] = [
   ["don't", 'do not'],
   ["doesn't", 'does not'],
   ["didn't", 'did not'],
@@ -141,7 +141,7 @@ export function countWords(text: string): number {
   return trimmed.split(/\s+/).length;
 }
 
-export interface WordCountReport {
+interface WordCountReport {
   chapter: number;
   words: number;
   inTarget: boolean;
@@ -241,7 +241,7 @@ export function ngrams(tokens: string[], n: number): string[] {
   return result;
 }
 
-export interface NgramSizeStat {
+interface NgramSizeStat {
   n: number;
   totalOccurrences: number;
   repeatedOccurrences: number;
@@ -289,7 +289,7 @@ export function computeCrossChapterRepeatedNgrams(body: string, priorBodies: str
   return { sizes: sizeStats, overallRepeatedRate: totalOcc === 0 ? 0 : totalRep / totalOcc };
 }
 
-export interface StockPhraseHit {
+interface StockPhraseHit {
   label: string;
   count: number;
 }

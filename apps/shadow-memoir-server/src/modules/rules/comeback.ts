@@ -1,7 +1,7 @@
 import { computeReward, type RewardInput } from './reward';
 import { type ComebackTrigger, type IntensityMode, type MomentumBucket, type Ruleset, type Strictness } from './rules.types';
 
-export type ComebackFireKind = 'fired' | 're_fired';
+type ComebackFireKind = 'fired' | 're_fired';
 
 export interface RecentMiss {
   /** Whole local days before today; yesterday is 1. Today's misses are not yet knowable at arming time. */

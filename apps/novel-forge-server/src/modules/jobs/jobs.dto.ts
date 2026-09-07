@@ -1,5 +1,4 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
-import { Transform } from '@shadow-library/fastify';
 
 import { JobKind, JobStatus } from '@server/common';
 
@@ -7,13 +6,6 @@ import { JobKind, JobStatus } from '@server/common';
 export class JobIdParams {
   @Field()
   jobId: string;
-}
-
-@Schema()
-export class ProjectJobsParams {
-  @Field(() => String, { pattern: '^[0-9]+$' })
-  @Transform('bigint:parse')
-  projectId: bigint;
 }
 
 @Schema()
@@ -63,10 +55,4 @@ export class JobResponse {
 
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;
-}
-
-@Schema()
-export class ListJobResponse {
-  @Field(() => [JobResponse])
-  items: JobResponse[];
 }

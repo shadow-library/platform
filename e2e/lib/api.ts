@@ -108,12 +108,3 @@ export async function pollJob<T = Record<string, unknown>>(ctx: APIRequestContex
     return { status: body.status, body };
   }, options);
 }
-
-/** Polls `GET /api/v1/projects/:projectId/runs/:runId` until the run reaches a terminal status, returning its final body. */
-export async function pollRun<T = Record<string, unknown>>(ctx: APIRequestContext, projectId: string, runId: string, options: PollOptions = {}): Promise<T> {
-  return pollUntil<T>(async () => {
-    const response = await ctx.get(`/api/v1/projects/${projectId}/runs/${runId}`);
-    const body = (await response.json()) as T & { status: string };
-    return { status: body.status, body };
-  }, options);
-}

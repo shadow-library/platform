@@ -21,8 +21,6 @@ export interface ListSenderRoutingRulesQuery extends Partial<OffsetPagination> {
 
 export type CreateRoutingRule = Omit<InferInsertModel<typeof schema.senderRoutingRules>, 'createdAt' | 'updatedAt'>;
 
-export type UpdateRoutingRule = Partial<Pick<CreateRoutingRule, 'senderProfileId'>>;
-
 @Injectable()
 export class SenderRoutingRuleService {
   private readonly logger = Logger.getLogger(APP_NAME, SenderRoutingRuleService.name);

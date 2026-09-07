@@ -12,7 +12,7 @@
 
 export type LoggableModule = 'journal' | 'meals' | 'weight' | 'sidequests';
 
-export type EntryCapLevel = 'clear' | 'approaching' | 'reached';
+type EntryCapLevel = 'clear' | 'approaching' | 'reached';
 
 export interface EntryCapAdvisory {
   module: LoggableModule;
@@ -29,9 +29,9 @@ export interface EntryCapAdvisory {
  * Declaring the constants
  */
 
-export const MONTHLY_ENTRY_CAP = 100;
+const MONTHLY_ENTRY_CAP = 100;
 
-export const CAP_ADVISORY_THRESHOLD = 0.8;
+const CAP_ADVISORY_THRESHOLD = 0.8;
 
 const MODULE_NOUNS: Record<LoggableModule, string> = {
   journal: 'journal entries',

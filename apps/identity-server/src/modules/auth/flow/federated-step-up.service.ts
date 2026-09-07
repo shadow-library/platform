@@ -21,14 +21,14 @@ export interface FederatedStepUpElevation {
   elevatedUntil: Date;
 }
 
-export const AWAITING_FEDERATED_STEP_UP = 'AWAITING_FEDERATED_STEP_UP';
+const AWAITING_FEDERATED_STEP_UP = 'AWAITING_FEDERATED_STEP_UP';
 
 /**
  * Bounds how long a step-up re-auth has to complete before the browser must restart it, playing the
  * same role for the federated factor that a TOTP code's own validity window plays for that factor —
  * short enough that a completion is provably a fresh act, not a redirect resumed hours later.
  */
-export const FEDERATED_STEP_UP_FLOW_TTL_SECONDS = 300;
+const FEDERATED_STEP_UP_FLOW_TTL_SECONDS = 300;
 
 @Injectable()
 export class FederatedStepUpService {

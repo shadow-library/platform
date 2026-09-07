@@ -1,6 +1,6 @@
 import { type Ideation } from '@server/database';
 
-export interface ProvenanceFieldSummary {
+interface ProvenanceFieldSummary {
   field: string;
   /** Absent when the sheet carries a value the studio never recorded a source for. */
   source?: Ideation.FieldSource;

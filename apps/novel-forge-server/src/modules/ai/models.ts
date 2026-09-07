@@ -1,8 +1,8 @@
-export type ModelKind = 'llm' | 'embedding' | 'image';
-export type ModelProvider = 'openrouter' | 'ollama';
+type ModelKind = 'llm' | 'embedding' | 'image';
+type ModelProvider = 'openrouter' | 'ollama';
 export type ReasoningEffort = 'max' | 'xhigh' | 'high' | 'medium' | 'low' | 'none';
 
-export interface ReasoningSpec {
+interface ReasoningSpec {
   /** `mandatory` models always reason and can only be clamped; `optional` models reason unless the request omits the field. */
   mode: 'none' | 'optional' | 'mandatory';
   /** Efforts OpenRouter accepts for this model, ordered highest to lowest — the clamp reads the last entry as the floor. */

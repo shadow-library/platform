@@ -16,7 +16,7 @@ export interface OrgOAuthAppActor {
   ip?: string;
 }
 
-export type OrgOAuthAppKind = Exclude<OAuthClient.Kind, 'SERVICE'>;
+type OrgOAuthAppKind = Exclude<OAuthClient.Kind, 'SERVICE'>;
 
 export interface RegisterOrgOAuthApp {
   displayName: string;

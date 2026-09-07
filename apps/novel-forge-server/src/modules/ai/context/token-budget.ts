@@ -76,7 +76,7 @@ export function truncateAtParagraphTail(text: string, maxTokens: number): { text
   return { text: accumulated, truncated: false };
 }
 
-export interface BudgetOmission {
+interface BudgetOmission {
   key: string;
   reason: 'budget' | 'unresolved';
 }

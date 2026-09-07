@@ -19,7 +19,7 @@ export interface UserSearchFilter {
   sortOrder?: 'asc' | 'desc';
 }
 
-export interface UserSummary {
+interface UserSummary {
   id: bigint;
   username: string | null;
   status: User.Status;
@@ -33,7 +33,7 @@ export interface UserSearchResult {
   total: number;
 }
 
-export interface UserMfaStatus {
+interface UserMfaStatus {
   totp: boolean;
   webauthn: boolean;
   passkeyCount: number;

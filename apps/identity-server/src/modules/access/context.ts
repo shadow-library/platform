@@ -19,7 +19,7 @@ const authOf = (context: ContextService): AuthContext => {
   return request.auth;
 };
 
-export const AUTH_CONTEXT_EXTENSION = {
+const AUTH_CONTEXT_EXTENSION = {
   getAuth(this: ContextService): AuthContext {
     return authOf(this);
   },

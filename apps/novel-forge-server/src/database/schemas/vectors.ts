@@ -1,11 +1,7 @@
-import { InferSelectModel, relations } from 'drizzle-orm';
+import { relations } from 'drizzle-orm';
 import { bigint, bigserial, customType, index, integer, pgTable, text } from 'drizzle-orm/pg-core';
 
 import { projects } from './projects';
-
-export namespace Vector {
-  export type ChapterChunk = InferSelectModel<typeof chapterChunks>;
-}
 
 const EMBEDDING_DIM = 1024;
 

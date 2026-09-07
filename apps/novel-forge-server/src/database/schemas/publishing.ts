@@ -10,9 +10,6 @@ export namespace Publishing {
   export type ChapterPublication = InferSelectModel<typeof chapterPublications>;
   export type WikiPublication = InferSelectModel<typeof wikiPublications>;
   export type Grant = InferSelectModel<typeof publicationGrants>;
-  export type Status = InferEnum<typeof publicationStatus>;
-  export type ChapterStatus = InferEnum<typeof chapterPublicationStatus>;
-  export type WikiState = InferEnum<typeof wikiPublicationState>;
   export type Visibility = InferEnum<typeof publicationVisibility>;
   export type GrantState = InferEnum<typeof publicationGrantState>;
 }

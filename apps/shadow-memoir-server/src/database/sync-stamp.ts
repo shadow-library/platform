@@ -25,7 +25,7 @@ export function nextSyncSeq(): SQL {
   return sql`nextval('sync_seq')`;
 }
 
-export function isSyncSeqTable(table: object): table is SyncSeqTable {
+function isSyncSeqTable(table: object): table is SyncSeqTable {
   return 'syncSeq' in table;
 }
 

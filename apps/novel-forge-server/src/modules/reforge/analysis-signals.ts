@@ -9,7 +9,7 @@ export interface SignalChapter {
   wordCount?: number | null;
 }
 
-export type SignalCandidateType = 'filler' | 'repetition' | 'pacing_stall' | 'dropped_thread' | 'arc_boundary' | 'quality_outlier';
+type SignalCandidateType = 'filler' | 'repetition' | 'pacing_stall' | 'dropped_thread' | 'arc_boundary' | 'quality_outlier';
 
 /**
  * A candidate with evidence, never a verdict (transform design §3.1). The model confirms, rates, and
@@ -29,7 +29,7 @@ export interface SignalCandidate {
 }
 
 /** Deterministic half of the analysis metrics; the model-derived `stallRatio` is folded in by the analysis stage. */
-export interface SignalMetrics {
+interface SignalMetrics {
   chapterCount: number;
   medianWords: number;
   madWords: number;

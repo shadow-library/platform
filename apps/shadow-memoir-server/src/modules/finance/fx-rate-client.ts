@@ -28,7 +28,7 @@ export interface FetchedRate extends CurrencyPair {
  * `date` is the ISO calendar date to price the pair at; omitted means "latest" — the sweep uses that
  * form to warm today's cache, and the dated form to resolve a null rate at its own `occurred_on`.
  */
-export interface FxRateClient {
+interface FxRateClient {
   fetchRates(pairs: readonly CurrencyPair[], date?: string): Promise<FetchedRate[]>;
 }
 

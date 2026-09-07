@@ -20,7 +20,7 @@ export interface LandChaptersOptions {
   onBatch?: (done: number, total: number) => Promise<void>;
 }
 
-export const CHAPTER_LANDING_BATCH_SIZE = 25;
+const CHAPTER_LANDING_BATCH_SIZE = 25;
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;

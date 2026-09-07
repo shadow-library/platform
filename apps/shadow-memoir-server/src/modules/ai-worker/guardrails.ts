@@ -156,7 +156,7 @@ export function findVerbatimQuote(output: string, sensitiveSources: string[]): s
   return null;
 }
 
-export function indicatesCrisis(text: string): boolean {
+function indicatesCrisis(text: string): boolean {
   return CRISIS_PATTERNS.some(pattern => pattern.test(text));
 }
 

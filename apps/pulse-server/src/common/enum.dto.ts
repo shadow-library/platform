@@ -3,7 +3,6 @@ import { EnumType } from '@shadow-library/class-schema';
 import { schema } from '@server/database';
 
 export const NotificationChannel = EnumType.create('NotificationChannel', schema.notificationChannel.enumValues);
-export const NotificationStatus = EnumType.create('NotificationStatus', schema.notificationStatus.enumValues);
 export const Priority = EnumType.create('Priority', schema.priority.enumValues);
 export const NotificationServiceProvider = EnumType.create('NotificationServiceProvider', schema.notificationServiceProviders.enumValues);
 export const MessageType = EnumType.create('MessageType', schema.messageTypes.enumValues);

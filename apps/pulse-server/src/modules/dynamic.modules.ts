@@ -16,7 +16,7 @@ import { CUSTOM_DATA_TRANSFORMERS } from '@server/common';
  * `/api/auth/*` contract pulse-web is coded against, which a module-wide version prefix cannot
  * express.
  */
-export const AppHttpCoreModule = HttpCoreModule.forRoot({
+const AppHttpCoreModule = HttpCoreModule.forRoot({
   openapi: {
     normalizeSchemaIds: true,
   },

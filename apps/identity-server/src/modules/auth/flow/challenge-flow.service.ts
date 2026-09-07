@@ -11,7 +11,7 @@ import { ChallengeService } from './challenge.service';
 
 export type ChallengeMethodName = 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP';
 
-export interface ChallengeMetadata {
+interface ChallengeMetadata {
   maskedEmail?: string;
   maskedPhone?: string;
 }

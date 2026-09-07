@@ -1,7 +1,7 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 
 @Schema({ additionalProperties: true })
-export class ChatLookupItem {
+class ChatLookupItem {
   @Field({ description: 'the lookup tool name, exactly as listed in the playbook' })
   tool: string;
 

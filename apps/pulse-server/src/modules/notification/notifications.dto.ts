@@ -74,7 +74,7 @@ export class ListNotificationMessagesQuery extends PaginationQuery(SortByCreated
 }
 
 @Schema()
-export class NotificationMessageResponse {
+class NotificationMessageResponse {
   @Field(() => String)
   id: bigint;
 

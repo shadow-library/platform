@@ -30,7 +30,7 @@ export function assertNovelOwnership(novel: Novel, caller: PublishCaller): void 
  * an oracle over another publisher's slugs — and an unknown novel must keep reading as an empty shelf
  * for ledger recovery.
  */
-export function assertNovelReadable(novel: Novel, caller: PublishCaller): void {
+function assertNovelReadable(novel: Novel, caller: PublishCaller): void {
   if (!isOwnedBy(novel, caller)) throw AppErrorCode.WBN_001.create();
 }
 

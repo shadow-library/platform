@@ -23,7 +23,7 @@ export interface ConstraintPlaybook {
   conceptFilter?: (card: ConceptCandidate) => boolean;
 }
 
-export interface PlaybookMatch {
+interface PlaybookMatch {
   playbook: ConstraintPlaybook;
   constraint: Ideation.SeedConstraint;
 }

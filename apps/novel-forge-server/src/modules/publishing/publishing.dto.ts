@@ -255,7 +255,7 @@ export class ReconcileResponse {
 }
 
 /** A share list is a handful of people; an author who needs more than this wants organisation visibility. */
-export const MAX_GRANT_EMAILS = 200;
+const MAX_GRANT_EMAILS = 200;
 
 @Schema()
 export class AccessGrantInput {

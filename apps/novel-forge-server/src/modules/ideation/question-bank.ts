@@ -54,7 +54,7 @@ export const SEED_FIELD_KEYS = Object.keys(SEED_FIELD_MEMBERS) as Ideation.Field
  * nothing about where the story happens. This is the emission contract the extraction prompt writes
  * against — a room answer that lands under any other key is invisible to the router.
  */
-export const ROOM_CONSTRAINT_KEYS = ['room', 'setting', 'world', 'place', 'location', 'locale'];
+const ROOM_CONSTRAINT_KEYS = ['room', 'setting', 'world', 'place', 'location', 'locale'];
 
 const filled = (value: string | string[] | undefined): boolean => (Array.isArray(value) ? value.length > 0 : typeof value === 'string' && value.trim() !== '');
 

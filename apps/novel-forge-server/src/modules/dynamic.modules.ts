@@ -41,7 +41,7 @@ import { CUSTOM_DATA_TRANSFORMERS } from '@server/common';
  * Declaring the constants
  */
 
-export const AppHttpCoreModule = HttpCoreModule.forRoot({
+const AppHttpCoreModule = HttpCoreModule.forRoot({
   openapi: { normalizeSchemaIds: true },
 });
 

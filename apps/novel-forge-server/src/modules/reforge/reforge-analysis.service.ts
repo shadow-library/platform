@@ -17,7 +17,7 @@ import { renderAnalysisReport } from './analysis-report';
 import { type AnalysisSignals, computeAnalysisSignals, renderSignalDigest, type SignalChapter } from './analysis-signals';
 import { ReforgeService } from './reforge.service';
 
-export interface AnalyzeProgress {
+interface AnalyzeProgress {
   phase: 'signals' | 'analyzing' | 'synthesizing';
   done: number;
   total: number;

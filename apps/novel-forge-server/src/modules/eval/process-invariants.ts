@@ -43,7 +43,7 @@ export interface ApprovalRow {
   chapter: number;
 }
 
-export interface FailOpenViolation {
+interface FailOpenViolation {
   chapter: number;
   reviewStatus: string;
   status: string;
@@ -105,7 +105,7 @@ export interface RunTargetRow {
 
 const REPAIR_NODES = new Set(['repairPatch', 'repairRewrite']);
 
-export interface ChapterRepairStat {
+interface ChapterRepairStat {
   chapter: number | null;
   runId: string;
   repairPatchCount: number;

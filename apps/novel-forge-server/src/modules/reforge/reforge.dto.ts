@@ -195,7 +195,7 @@ export class ReforgeStatusResponse {
 }
 
 @Schema({ additionalProperties: true, description: 'Model-reported audit issue whose fields vary by source.' })
-export class ReforgeDetailItem {
+class ReforgeDetailItem {
   @Field({ optional: true })
   detail?: string;
 }

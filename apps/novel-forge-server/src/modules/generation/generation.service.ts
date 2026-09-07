@@ -52,7 +52,7 @@ import {
   type UpdateDraftBody,
 } from './generation.dto';
 
-export interface RunContextSectionSummary {
+interface RunContextSectionSummary {
   key: string;
   tier: string;
   segment: string;
@@ -78,7 +78,7 @@ export interface ReviewQueueResult {
   proposals: Generation.ContinuityProposal[];
 }
 
-export interface RoleUsageResult {
+interface RoleUsageResult {
   role: string;
   calls: number;
   inputTokens: number;

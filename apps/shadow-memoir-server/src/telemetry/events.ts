@@ -17,7 +17,7 @@ interface TelemetryEventBase {
  * `hero_events.type` (ARCHITECTURE §11.1). `note`/free-text fields never appear here; only the mechanical
  * deltas the ledger itself computed.
  */
-export interface HeroEventRecordedEvent extends TelemetryEventBase {
+interface HeroEventRecordedEvent extends TelemetryEventBase {
   name: 'hero_event_recorded';
   eventType: HeroEvent.Type;
   xpDelta: number;
@@ -29,7 +29,7 @@ export interface HeroEventRecordedEvent extends TelemetryEventBase {
 }
 
 /** An expense command was applied. `merchant`/`note`/`categoryId` never appear — ids/enums/numbers only. */
-export interface ExpenseRecordedEvent extends TelemetryEventBase {
+interface ExpenseRecordedEvent extends TelemetryEventBase {
   name: 'expense_recorded';
   source: Expense.Source;
   hasReceipt: boolean;
@@ -37,7 +37,7 @@ export interface ExpenseRecordedEvent extends TelemetryEventBase {
 }
 
 /** A subscription billing cycle was confirmed (a coin grant, distinct from the underlying `hero_event_recorded`). */
-export interface SubscriptionCycleConfirmedEvent extends TelemetryEventBase {
+interface SubscriptionCycleConfirmedEvent extends TelemetryEventBase {
   name: 'subscription_cycle_confirmed';
   frequency: Subscription.Frequency;
 }
@@ -47,14 +47,14 @@ export interface SubscriptionCycleConfirmedEvent extends TelemetryEventBase {
  * entries never reach this event at all — the caller checks `isHealth` before emitting, so there is no
  * conditional field here for a leak to hide behind.
  */
-export interface MetricEntryRecordedEvent extends TelemetryEventBase {
+interface MetricEntryRecordedEvent extends TelemetryEventBase {
   name: 'metric_entry_recorded';
   valueType: Metric.ValueType;
   source: MetricEntry.Source;
 }
 
 /** A sync command batch was submitted, with its outcome shape only — never a command's payload. */
-export interface QuickLogRecordedEvent extends TelemetryEventBase {
+interface QuickLogRecordedEvent extends TelemetryEventBase {
   name: 'quick_log_recorded';
   module: 'journal' | 'meal' | 'weight' | 'side_quest';
   rewarded: boolean;
@@ -62,7 +62,7 @@ export interface QuickLogRecordedEvent extends TelemetryEventBase {
   linked: boolean;
 }
 
-export interface SyncBatchSubmittedEvent extends TelemetryEventBase {
+interface SyncBatchSubmittedEvent extends TelemetryEventBase {
   name: 'sync_batch_submitted';
   commandCount: number;
   appliedCount: number;

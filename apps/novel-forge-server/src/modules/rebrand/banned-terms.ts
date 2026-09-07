@@ -4,7 +4,7 @@
 // dynasty names ("Han", "Tang", "Ming") are left out because they collide with ordinary names and
 // words — their dynastic uses ride along with other signals or a per-project `settings.bannedExtra`
 // entry.
-export const BANNED_TERM_PACKS: Record<string, string[]> = {
+const BANNED_TERM_PACKS: Record<string, string[]> = {
   'east-asian': [
     'China',
     'Chinese',

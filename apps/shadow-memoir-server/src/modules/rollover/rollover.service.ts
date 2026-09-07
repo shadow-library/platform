@@ -76,7 +76,7 @@ interface CrownDayOutcome {
  * Declaring the constants
  */
 
-export const ROLLOVER_ENGINE_VERSION = '1';
+const ROLLOVER_ENGINE_VERSION = '1';
 
 const HOLD_STATES: readonly QuestLog.State[] = ['completed', 'partial', 'late', 'recovery'];
 const BREAK_STATES: readonly QuestLog.State[] = ['missed', 'skipped', 'postponed'];

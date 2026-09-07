@@ -51,7 +51,7 @@ export class UpdateProposalBody {
 }
 
 @Schema({ additionalProperties: true, description: 'Change-set operation whose remaining fields depend on its server-validated op value.' })
-export class ChangeOpItem {
+class ChangeOpItem {
   @Field()
   op: string;
 }
@@ -186,7 +186,7 @@ export class RevertProposalResponse {
 }
 
 @Schema()
-export class ChangeItemResponse {
+class ChangeItemResponse {
   @Field(() => String)
   id: bigint;
 

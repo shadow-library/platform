@@ -2,7 +2,7 @@ import { type Bible, type Ideation } from '@server/database';
 
 import { HOOK_TYPES, type HookTypeValue } from '../ai/schemas/enums';
 
-export interface EndingContract {
+interface EndingContract {
   hookType: HookTypeValue;
   emotionalBeat: string;
   openQuestion: string;
@@ -71,12 +71,12 @@ export interface ArcRemoveOp {
   arcKey: string;
 }
 
-export interface KnowledgeReveal {
+interface KnowledgeReveal {
   entityKey: string;
   factKey: string;
 }
 
-export interface KnowledgeContract {
+interface KnowledgeContract {
   pov: string[];
   learns?: KnowledgeReveal[];
 }
@@ -155,7 +155,7 @@ export interface FactRemoveOp {
  * collection columns replace wholesale.
  */
 /** `turnOrdinal` is the apply engine's to fill in — the model names the source, the server knows the turn. */
-export interface SeedProvenanceInput {
+interface SeedProvenanceInput {
   source: Ideation.FieldSource;
   turnOrdinal?: number | null;
 }
@@ -179,74 +179,74 @@ export interface SeedUpdateOp {
 // Action ops drive the pipeline through existing service code (chat-hub design §4.2). They carry no
 // artifact refs, no baseline, and no inverse — they execute post-commit and their outcome lands in
 // the proposal's opResults, never in domain tables directly.
-export interface GenerateChaptersAction {
+interface GenerateChaptersAction {
   op: 'action.generate_chapters';
   count: number;
 }
 
-export interface PlanVolumesAction {
+interface PlanVolumesAction {
   op: 'action.plan_volumes';
   volumeCount: number;
   chaptersPerVolume: number;
 }
 
-export interface PlanArcsAction {
+interface PlanArcsAction {
   op: 'action.plan_arcs';
   volumeKey: string;
   arcCount?: number;
 }
 
-export interface OutlineArcAction {
+interface OutlineArcAction {
   op: 'action.outline_arc';
   arcKey: string;
 }
 
-export interface AuditBibleAction {
+interface AuditBibleAction {
   op: 'action.audit_bible';
 }
 
-export interface EnhancePremiseAction {
+interface EnhancePremiseAction {
   op: 'action.enhance_premise';
   overview?: string;
 }
 
-export interface JudgeDraftAction {
+interface JudgeDraftAction {
   op: 'action.judge_draft';
   chapter: number;
 }
 
-export interface ReviseDraftAction {
+interface ReviseDraftAction {
   op: 'action.revise_draft';
   chapter: number;
   note: string;
 }
 
-export interface ApproveDraftAction {
+interface ApproveDraftAction {
   op: 'action.approve_draft';
   chapter: number;
 }
 
-export interface ApproveVolumePlanAction {
+interface ApproveVolumePlanAction {
   op: 'action.approve_volume_plan';
 }
 
-export interface ApproveArcsAction {
+interface ApproveArcsAction {
   op: 'action.approve_arcs';
   volumeKey: string;
 }
 
-export interface ValidateAction {
+interface ValidateAction {
   op: 'action.validate';
   scope: 'novel' | 'chapter';
   chapter?: number;
 }
 
-export interface FinalizeAction {
+interface FinalizeAction {
   op: 'action.finalize';
   upTo?: number;
 }
 
-export interface GraduateSeedAction {
+interface GraduateSeedAction {
   op: 'action.graduate_seed';
   title: string;
 }
@@ -287,7 +287,6 @@ export type ActionOp =
 
 export type ChangeOp = ContentOp | ActionOp;
 export type OpType = ChangeOp['op'];
-export type ContentOpType = ContentOp['op'];
 export type ActionType = ActionOp['op'];
 
 type FieldKind = 'string' | 'number' | 'string[]' | 'object' | 'object[]' | 'object|null';
@@ -374,12 +373,12 @@ const OP_SPECS: Record<OpType, OpSpec> = {
   'action.graduate_seed': { required: { title: 'string' }, optional: {} },
 };
 
-export const OP_TYPES = Object.keys(OP_SPECS) as OpType[];
+const OP_TYPES = Object.keys(OP_SPECS) as OpType[];
 export const ACTION_TYPES = OP_TYPES.filter(op => op.startsWith('action.')) as ActionType[];
 // Graduation belongs to the studio alone: a hub project has already graduated, so offering it there is
 // an action the model can only fail with (IDE_001).
 export const HUB_ACTION_TYPES = ACTION_TYPES.filter(action => action !== 'action.graduate_seed');
-export const VALIDATION_SCOPES = ['novel', 'chapter'];
+const VALIDATION_SCOPES = ['novel', 'chapter'];
 
 // What each action does, rendered into the hub playbook so the model picks actions by meaning, not by
 // guessing from the name (chat-hub design §4.2/§4.3).

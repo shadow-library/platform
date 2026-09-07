@@ -23,7 +23,7 @@ export interface SpanTransformServices {
   checkpointer: BaseCheckpointSaver;
 }
 
-export interface TransformContractIssue {
+interface TransformContractIssue {
   source: 'contract';
   type: string;
   detail: string;

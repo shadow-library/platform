@@ -17,7 +17,7 @@ interface ConsentCaller {
   ip: string;
 }
 
-export interface ConsentScopeData {
+interface ConsentScopeData {
   name: string;
   description?: string;
   isSensitive: boolean;

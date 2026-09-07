@@ -46,7 +46,7 @@ export function escapeXml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
-export function nameIdFormatUri(format: string): string {
+function nameIdFormatUri(format: string): string {
   return NAME_ID_FORMATS[format] ?? (NAME_ID_FORMATS.EMAIL as string);
 }
 
@@ -82,7 +82,7 @@ export function parseAuthnRequest(xml: string): ParsedAuthnRequest | null {
   return { id, issuer, acsUrl: typeof acsUrl === 'string' ? acsUrl : undefined };
 }
 
-export function certificateToBase64(pem: string): string {
+function certificateToBase64(pem: string): string {
   return pem.replace(/-----(BEGIN|END) CERTIFICATE-----/g, '').replace(/\s+/g, '');
 }
 

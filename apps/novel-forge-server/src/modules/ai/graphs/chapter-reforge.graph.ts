@@ -22,7 +22,7 @@ export interface ReforgeGraphServices {
   checkpointer: BaseCheckpointSaver;
 }
 
-export interface ReforgeFidelityIssueRecord {
+interface ReforgeFidelityIssueRecord {
   source: 'fidelity';
   type: string;
   detail: string;

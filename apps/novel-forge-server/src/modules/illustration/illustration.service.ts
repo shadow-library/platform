@@ -22,7 +22,7 @@ export interface StartIllustrationInput {
   instruction?: string;
 }
 
-export interface PresentedCandidate {
+interface PresentedCandidate {
   ref: string;
   imageUrl: string;
   createdAt: string;

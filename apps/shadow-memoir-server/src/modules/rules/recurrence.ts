@@ -12,8 +12,6 @@ import {
   type Weekday,
 } from './time';
 
-export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
-
 export type MonthlyPattern =
   { readonly kind: 'day_of_month'; readonly dayOfMonth: number } | { readonly kind: 'nth_weekday'; readonly weekday: Weekday; readonly ordinal: NthWeekdayOrdinal };
 
@@ -29,21 +27,21 @@ interface RecurrenceSpec {
   readonly exceptions?: readonly LocalDate[];
 }
 
-export interface DailyRecurrence extends RecurrenceSpec {
+interface DailyRecurrence extends RecurrenceSpec {
   readonly frequency: 'daily';
 }
 
-export interface WeeklyRecurrence extends RecurrenceSpec {
+interface WeeklyRecurrence extends RecurrenceSpec {
   readonly frequency: 'weekly';
   readonly daysOfWeek: readonly [Weekday, ...Weekday[]];
 }
 
-export interface MonthlyRecurrence extends RecurrenceSpec {
+interface MonthlyRecurrence extends RecurrenceSpec {
   readonly frequency: 'monthly';
   readonly pattern: MonthlyPattern;
 }
 
-export interface YearlyRecurrence extends RecurrenceSpec {
+interface YearlyRecurrence extends RecurrenceSpec {
   readonly frequency: 'yearly';
 }
 

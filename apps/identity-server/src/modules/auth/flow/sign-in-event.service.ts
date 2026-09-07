@@ -5,7 +5,7 @@ import { Logger } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, PrimaryDatabase, schema, User, UserSession } from '@server/modules/infrastructure/datastore';
 
-export interface SignInDevice {
+interface SignInDevice {
   deviceId?: string;
   ipAddress?: string;
   ipCountry?: string;

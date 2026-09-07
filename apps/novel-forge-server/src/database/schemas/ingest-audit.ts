@@ -1,9 +1,4 @@
-import { InferSelectModel } from 'drizzle-orm';
 import { bigint, bigserial, index, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
-
-export namespace IngestAuditLog {
-  export type Row = InferSelectModel<typeof ingestAuditLog>;
-}
 
 /**
  * Append-only trail of the curated-ingest surface: one row per mutation attempt, rejections included, so a

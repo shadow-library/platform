@@ -4,8 +4,8 @@ import { type Story } from '@server/database';
 // it — long enough that ordinary pacing (a thread resting a chapter or two) never trips it.
 export const DORMANT_THREAD_THRESHOLD_CHAPTERS = 6;
 
-export type DormantThreadKind = 'thread' | 'mystery';
-export type DormantThreadReason = 'dormant' | 'overdue';
+type DormantThreadKind = 'thread' | 'mystery';
+type DormantThreadReason = 'dormant' | 'overdue';
 
 export interface DormantThreadEntry {
   kind: DormantThreadKind;

@@ -2,17 +2,17 @@ import { computeContentHash } from '@server/common';
 import { type Knowledge } from '@server/database';
 
 /** The reader wiki-entry types, matching web-novel-server's ingest contract (a superset-equal of forge's `entity_type`). */
-export type WikiEntryType = Knowledge.EntityType;
+type WikiEntryType = Knowledge.EntityType;
 
 /** One spoiler-gated fragment of a wiki entry — shown by the reader only once the reader has passed `visibleFromOrdinal`. */
-export interface WikiFacet {
+interface WikiFacet {
   facetKey: string;
   content: string;
   sortOrder: number;
   visibleFromOrdinal: number;
 }
 
-export interface WikiImage {
+interface WikiImage {
   imageRef: string;
   caption?: string;
   sortOrder: number;
@@ -20,7 +20,7 @@ export interface WikiImage {
 }
 
 /** The reader-clean wiki payload — nothing forge-internal, nothing unrevealed, may ever appear here (hard rule 7). */
-export interface WikiEntryPayload {
+interface WikiEntryPayload {
   type: WikiEntryType;
   name: string;
   imageRef?: string;
@@ -36,14 +36,14 @@ export interface WikiEntryProjection {
 }
 
 /** A gallery image reference (content-addressed) plus its caption/order — the portrait rides `WikiEntityInput.imageRef`. */
-export interface WikiEntityImageInput {
+interface WikiEntityImageInput {
   imageRef: string;
   caption?: string | null;
   sortOrder: number;
 }
 
 /** A single chapter-stamped relationship observation toward a target entity. */
-export interface WikiRelationshipInput {
+interface WikiRelationshipInput {
   targetKey: string;
   kind: string;
   note?: string | null;

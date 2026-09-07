@@ -13,7 +13,7 @@ export const NOVEL_VISIBILITIES = ['PUBLIC', 'ORGANISATION', 'RESTRICTED'] as co
  * A share list is a handful of people, not an audience. The cap is a guard against a malformed push
  * rather than a product limit — an author who needs more than this wants `ORGANISATION`.
  */
-export const MAX_GRANT_SUBJECTS = 500;
+const MAX_GRANT_SUBJECTS = 500;
 
 const RATING_DESCRIPTION = 'Omit when unrated. An absent dimension is stored as unrated and is never inferred to be "none".';
 
@@ -139,7 +139,7 @@ export class NovelAccessResponse {
 
 /** The per-chapter rating, three independent optional dimensions. Omitting one leaves it unrated; there is no way to say "no content" other than the explicit `'none'`. */
 @Schema()
-export class ChapterContentRating {
+class ChapterContentRating {
   @Field(() => SexualContentRating, { optional: true, description: RATING_DESCRIPTION })
   sexualContent?: SexualContentLevel;
 
