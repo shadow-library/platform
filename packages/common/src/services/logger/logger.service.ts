@@ -13,6 +13,7 @@ import { MaybeUndefined } from '@lib/interfaces';
 
 import { Config } from '../config.service';
 import { format as formats } from './formats';
+import { type LoggerInstance } from './logger.types';
 import { ConsoleTransport, FileTransport } from './transports';
 
 /**
@@ -32,14 +33,8 @@ interface ContextProviderConfig {
   provider: ContextProvider;
 }
 
-export interface Logger {
-  verbose(message: string, ...meta: any[]): void;
-  debug(message: string, ...meta: any[]): void;
-  info(message: string, ...meta: any[]): void;
-  http(message: string, ...meta: any[]): void;
-  warn(message: string, ...meta: any[]): void;
-  error(message: string, ...meta: any[]): void;
-}
+/** Declared in `logger.types` so `ConfigService` can name it without importing this module, which needs `Config` at construction */
+export type Logger = LoggerInstance;
 
 /**
  * Declaring the constants

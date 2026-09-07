@@ -8,8 +8,8 @@ import { AppError, MaybeNull } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { ClassSchema, ParsedSchema } from './class-schema';
-import { JSONSchema, JSONSchemaType } from './interfaces';
+import { ClassSchema } from './class-schema';
+import { JSONSchema, JSONSchemaType, ParsedSchema } from './interfaces';
 
 /**
  * Defining types

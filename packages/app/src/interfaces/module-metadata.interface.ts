@@ -7,7 +7,6 @@ import { Class } from 'type-fest';
  * Importing user defined packages
  */
 import { ForwardReference } from '../utils';
-import { DynamicModule } from './dynamic-module.interface';
 import { Provider, ProviderToken } from './provider.interface';
 
 /**
@@ -42,4 +41,11 @@ export interface ModuleMetadata {
    * in other modules which import this module.
    */
   exports?: ProviderToken[];
+}
+
+export interface DynamicModule extends ModuleMetadata {
+  /**
+   * A module reference
+   */
+  module: Class<unknown>;
 }

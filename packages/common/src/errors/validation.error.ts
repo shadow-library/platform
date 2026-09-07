@@ -8,8 +8,7 @@ import { JsonObject } from 'type-fest';
  */
 import { utils } from '@lib/utils';
 
-import { AppError, AppErrorObject, SerializedAppError } from './app.error';
-import { ErrorCode } from './error-code.error';
+import { AppError, AppErrorObject, ErrorCode, SerializedAppError } from './app.error';
 
 /**
  * Defining types

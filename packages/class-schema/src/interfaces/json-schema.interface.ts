@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { SetRequired } from 'type-fest';
 
 /**
  * Importing user defined packages
@@ -72,3 +73,5 @@ export interface JSONSchema {
   /** Other possible fields */
   [key: string]: any;
 }
+
+export type ParsedSchema = SetRequired<JSONSchema, '$id' | 'type'> & { definitions?: Record<string, ParsedSchema> };

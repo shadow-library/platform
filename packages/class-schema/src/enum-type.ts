@@ -6,9 +6,9 @@ import { AppError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { type ParsedSchema } from './class-schema';
 import { getCounterId } from './constants';
 import { EnumFieldSchema } from './interfaces';
+import { type ParsedSchema } from './interfaces/json-schema.interface';
 
 /**
  * Defining types

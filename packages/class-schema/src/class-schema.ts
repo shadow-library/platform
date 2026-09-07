@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import merge from 'deepmerge';
-import { Class, SetRequired } from 'type-fest';
+import { Class } from 'type-fest';
 
 /**
  * Importing user defined packages
@@ -10,14 +10,12 @@ import { Class, SetRequired } from 'type-fest';
 import { BRAND, Integer, METADATA_KEYS } from './constants';
 import { SchemaOptions } from './decorators';
 import { EnumType } from './enum-type';
-import { AnyFieldSchema, JSONSchema, JSONSchemaType } from './interfaces';
+import { AnyFieldSchema, JSONSchema, JSONSchemaType, ParsedSchema } from './interfaces';
 import { SchemaComposerMetadata } from './internal.types';
 
 /**
  * Defining types
  */
-
-export type ParsedSchema = SetRequired<JSONSchema, '$id' | 'type'> & { definitions?: Record<string, ParsedSchema> };
 
 export type SchemaClass = EnumType | Class<unknown> | [Class<unknown>];
 

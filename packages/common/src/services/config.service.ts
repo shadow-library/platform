@@ -14,7 +14,7 @@ import { Utils } from '@lib/internal.utils';
 import { tryCatch } from '@lib/shorthands';
 import { utils } from '@lib/utils';
 
-import { type Logger } from './logger';
+import { type LoggerInstance } from './logger/logger.types';
 
 /**
  * Defining types
@@ -74,7 +74,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
   private readonly envFilePaths: string[] = [];
   private readonly subscribers = new Map<string, Set<ConfigChangeCallback<Configs>>>();
 
-  private logger: Logger;
+  private logger: LoggerInstance;
   private envVars: Record<string, string | undefined> = {};
   private fsWatcher: FSWatcher | null = null;
 
@@ -113,7 +113,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
   }
 
   /** Wires the config's own logger once the logger singleton is ready; until then config logs to the console. */
-  setLogger(logger: Logger): this {
+  setLogger(logger: LoggerInstance): this {
     this.logger = logger;
     return this;
   }
