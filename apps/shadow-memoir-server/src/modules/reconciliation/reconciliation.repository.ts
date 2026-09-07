@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { and, eq, exists, lt, sql } from 'drizzle-orm';
+import { and, eq, exists, lt, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
@@ -172,9 +172,8 @@ export class ReconciliationRepository {
       .limit(batchSize);
     if (doomed.length === 0) return 0;
 
-    for (const row of doomed) {
-      await this.db.delete(schema.commandLog).where(and(eq(schema.commandLog.accountId, row.accountId), eq(schema.commandLog.commandId, row.commandId)));
-    }
+    const pairs = doomed.map(row => and(eq(schema.commandLog.accountId, row.accountId), eq(schema.commandLog.commandId, row.commandId)));
+    await this.db.delete(schema.commandLog).where(or(...pairs));
     return doomed.length;
   }
 }

@@ -84,10 +84,11 @@ export class WikiPublishingService {
     const projectedKeys = new Set(projections.map(projection => projection.entryKey));
     const now = new Date();
 
+    const added: (typeof schema.wikiPublications.$inferInsert)[] = [];
     for (const projection of projections) {
       const row = byKey.get(projection.entryKey);
       if (!row) {
-        await this.db.insert(schema.wikiPublications).values({ projectId, entryKey: projection.entryKey, revision: 1, contentHash: projection.contentHash, state: 'pending' });
+        added.push({ projectId, entryKey: projection.entryKey, revision: 1, contentHash: projection.contentHash, state: 'pending' });
         continue;
       }
       const resurrected = row.state === 'deleted';
@@ -97,6 +98,7 @@ export class WikiPublishingService {
         .set({ contentHash: projection.contentHash, revision: row.revision + 1, state: 'pending', error: null, attempts: 0, updatedAt: now })
         .where(eq(schema.wikiPublications.id, row.id));
     }
+    if (added.length > 0) await this.db.insert(schema.wikiPublications).values(added);
 
     for (const row of existing) {
       if (projectedKeys.has(row.entryKey) || row.state === 'deleted') continue;

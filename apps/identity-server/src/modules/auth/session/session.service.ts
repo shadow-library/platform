@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
+import { type PgPreparedQuery, type PreparedQueryConfig } from 'drizzle-orm/pg-core';
 import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
@@ -63,10 +64,15 @@ export class SessionService {
   private readonly logger = Logger.getLogger(APP_NAME, SessionService.name);
   private readonly db: PrimaryDatabase;
   private readonly redis: Redis;
+  /** Prepared because it is the cookie lookup on the authenticated request path; the driver builds no server-side statement, the saving is Drizzle's per-call SQL generation. */
+  private readonly sessionByHashQuery: PgPreparedQuery<PreparedQueryConfig & { execute: UserSession | undefined }>;
 
   constructor(databaseService: DatabaseService) {
     this.db = databaseService.getPostgresClient();
     this.redis = databaseService.getRedisClient();
+    this.sessionByHashQuery = this.db.query.userSessions
+      .findFirst({ where: eq(schema.userSessions.sessionHash, sql.placeholder('sessionHash')) })
+      .prepare('identity_session_by_hash');
   }
 
   private hashSecret(secret: string): string {
@@ -116,7 +122,7 @@ export class SessionService {
     const cached = await this.redis.get(this.cacheKey(hash));
     if (cached) return this.reviveCached(cached);
 
-    const session = await this.db.query.userSessions.findFirst({ where: eq(schema.userSessions.sessionHash, hash) });
+    const session = await this.sessionByHashQuery.execute({ sessionHash: hash });
     if (!session || session.status !== 'ACTIVE') return null;
 
     const now = Date.now();

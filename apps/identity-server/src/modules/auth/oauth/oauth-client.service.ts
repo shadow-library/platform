@@ -177,7 +177,12 @@ export class OAuthClientService {
 
   async ensureRedirectUris(clientId: string, uris: string[]): Promise<void> {
     this.assertValidRedirectUris(uris);
-    for (const uri of uris) await this.db.insert(schema.oauthClientRedirectUris).values({ clientId, uri }).onConflictDoNothing();
+    const unique = [...new Set(uris)];
+    if (unique.length === 0) return;
+    await this.db
+      .insert(schema.oauthClientRedirectUris)
+      .values(unique.map(uri => ({ clientId, uri })))
+      .onConflictDoNothing();
   }
 
   async removeRedirectUri(clientId: string, uri: string): Promise<void> {

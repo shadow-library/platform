@@ -33,10 +33,8 @@ export class BackChannelLogoutService {
       .innerJoin(schema.oauthClients, eq(schema.refreshTokenFamilies.clientId, schema.oauthClients.id))
       .where(and(eq(schema.refreshTokenFamilies.sessionId, sessionId), isNotNull(schema.oauthClients.backchannelLogoutUri), eq(schema.oauthClients.isActive, true)));
 
-    for (const target of targets) {
-      if (!target.uri) continue;
-      await this.db.insert(schema.oidcLogoutDeliveries).values({ clientId: target.clientId, logoutUri: target.uri, subject: userId.toString(), sid: sessionId.toString() });
-    }
+    const deliveries = targets.flatMap(target => (target.uri ? [{ clientId: target.clientId, logoutUri: target.uri, subject: userId.toString(), sid: sessionId.toString() }] : []));
+    if (deliveries.length > 0) await this.db.insert(schema.oidcLogoutDeliveries).values(deliveries);
     if (targets.length > 0) this.logger.debug('Queued back-channel logout deliveries', { sessionId, count: targets.length });
     return targets.length;
   }

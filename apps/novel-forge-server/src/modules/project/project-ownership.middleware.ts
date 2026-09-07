@@ -1,4 +1,5 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+import { type PgPreparedQuery, type PreparedQueryConfig } from 'drizzle-orm/pg-core';
 import { type HandlerMetadata } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { ContextService, type HttpRequest, Middleware, type RouteHandler } from '@shadow-library/fastify';
@@ -23,12 +24,17 @@ import { type PrimaryDatabase, schema } from '@server/database';
 export class ProjectOwnershipGuard {
   private readonly logger = Logger.getLogger(APP_NAME, ProjectOwnershipGuard.name);
   private readonly db: PrimaryDatabase;
+  /** Prepared because this guard runs on every project-scoped request; the driver builds no server-side statement, the saving is Drizzle's per-call SQL generation. */
+  private readonly projectOwnerQuery: PgPreparedQuery<PreparedQueryConfig & { execute: { ownerId: bigint | null } | undefined }>;
 
   constructor(
     private readonly context: ContextService,
     databaseService: DatabaseService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
+    this.projectOwnerQuery = this.db.query.projects
+      .findFirst({ where: eq(schema.projects.id, sql.placeholder('projectId')), columns: { ownerId: true } })
+      .prepare('novel_forge_project_owner');
   }
 
   cacheKey(metadata: HandlerMetadata): string {
@@ -61,7 +67,7 @@ export class ProjectOwnershipGuard {
     const ownerId = this.toBigInt(sub);
     if (projectId === null || ownerId === null) throw AppErrorCode.PRJ_001.create();
 
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { ownerId: true } });
+    const project = await this.projectOwnerQuery.execute({ projectId });
     if (!project || project.ownerId === null || project.ownerId !== ownerId) {
       this.logger.warn('rejected cross-owner project access', { projectId: projectId.toString(), caller: ownerId.toString() });
       throw AppErrorCode.PRJ_001.create();
