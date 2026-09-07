@@ -73,6 +73,20 @@ function resolveGlobals(env: GlobalsEnv | undefined): Record<string, boolean> {
 }
 
 /**
+ * `eslint-plugin-react-hooks` v7 also ships the React Compiler's own analysis as lint rules — `set-state-in-effect`,
+ * `refs`, `purity`, `immutability` and the rest. They catch a class of defect the two classic hook rules cannot:
+ * state derived through an effect instead of during render, refs read during render, side effects in a reducer.
+ *
+ * `todo` is excluded because it reports where the compiler could not lower a construct (a `try` with `finally`, an
+ * `UpdateExpression` on a global), which says nothing about whether the code is correct.
+ */
+const COMPILER_RULES: Linter.RulesRecord = Object.fromEntries(
+  Object.keys(reactHooks.rules)
+    .filter(name => name !== 'todo' && name !== 'rules-of-hooks' && name !== 'exhaustive-deps')
+    .map(name => [`react-hooks/${name}`, 'error']),
+);
+
+/**
  * The React/JSX layer. Bundles `eslint-plugin-react` (with the new JSX runtime, so `react-in-jsx-scope` is off,
  * and `prop-types` off since TypeScript types supersede it), `eslint-plugin-jsx-a11y`, and
  * `eslint-plugin-react-hooks`. React/a11y rules are scoped to JSX files; hook rules cover all `.ts`/`.tsx` so
@@ -91,7 +105,7 @@ export function reactLayer(version: string = DEFAULT_REACT_VERSION, scope = '**'
     {
       files: sourceFiles,
       plugins: { 'react-hooks': reactHooks },
-      rules: { 'react-hooks/rules-of-hooks': 'error', 'react-hooks/exhaustive-deps': 'warn' },
+      rules: { ...COMPILER_RULES, 'react-hooks/rules-of-hooks': 'error', 'react-hooks/exhaustive-deps': 'warn' },
     },
   ] as Linter.Config[];
 }
