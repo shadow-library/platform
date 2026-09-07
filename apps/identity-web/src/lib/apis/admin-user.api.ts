@@ -2,20 +2,11 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 
 import { type JsonValue } from '@/types';
 
-import {
-  type UserAuditEventItem,
-  type UserAuditEventsResponse,
-  type UserContactItem,
-  type UserDetailResponse,
-  type UserMfaSummary,
-  type UserSearchResponse,
-  type UserSummaryItem,
-} from './api-types.gen';
+import { type UserAuditEventsResponse, type UserDetailResponse, type UserSearchResponse, type UserSummaryItem } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
-export type { UserAuditEventItem, UserAuditEventsResponse, UserContactItem, UserDetailResponse, UserMfaSummary, UserSearchResponse, UserSummaryItem };
+export type { UserAuditEventsResponse, UserDetailResponse, UserSearchResponse, UserSummaryItem };
 export type UserStatus = UserSummaryItem['status'];
-export type LockMode = UserSummaryItem['lockMode'];
 
 /** Query params for the admin user search (`GET /admin/users`) — offset-based pagination. */
 export interface UserSearchParams {
@@ -43,14 +34,14 @@ export interface BlockUserInput {
   reason?: string;
 }
 
-export const adminUserKeys = {
+const adminUserKeys = {
   all: ['admin', 'users'] as const,
   list: (params?: UserSearchParams) => [...adminUserKeys.all, 'list', params] as const,
   detail: (userId: string) => [...adminUserKeys.all, userId] as const,
   audit: (userId: string) => [...adminUserKeys.all, userId, 'audit'] as const,
 };
 
-export const adminUsersQueryOptions = (params?: UserSearchParams) =>
+const adminUsersQueryOptions = (params?: UserSearchParams) =>
   queryOptions<UserSearchResponse, ApiError>({
     queryKey: adminUserKeys.list(params),
     queryFn: ({ signal }) => APIRequest.get('/admin/users').query(params).signal(signal).execute<UserSearchResponse>(),

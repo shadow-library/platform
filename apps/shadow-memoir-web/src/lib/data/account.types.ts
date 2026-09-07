@@ -21,7 +21,7 @@ export interface BehaviourPreferences {
 }
 
 /** The three email categories the account row carries. Push is not per-category — it is one opt-in per registered device. */
-export type NotificationPrefKey = 'weeklyDigest' | 'aiReadiness' | 'billingReminders';
+type NotificationPrefKey = 'weeklyDigest' | 'aiReadiness' | 'billingReminders';
 
 export interface NotificationPreference {
   id: NotificationPrefKey;
@@ -46,7 +46,7 @@ export interface AccountDevice {
 
 export type PlanId = 'free' | 'coach';
 
-export type BillingPeriod = 'monthly' | 'yearly';
+type BillingPeriod = 'monthly' | 'yearly';
 
 export interface BillingPlan {
   id: PlanId;
@@ -86,14 +86,14 @@ export interface ExportView {
  * Deletion never reaches `scheduled` from inside the app: the elevated re-authentication happens on the
  * Shadow account, and only its confirmation can start anything (PRD §2.10).
  */
-export type DeletionStage = 'idle' | 'awaiting-reauth' | 'scheduled';
+type DeletionStage = 'idle' | 'awaiting-reauth' | 'scheduled';
 
-export interface DeletionAcknowledgement {
+interface DeletionAcknowledgement {
   id: string;
   text: string;
 }
 
-export interface ReauthHandoff {
+interface ReauthHandoff {
   title: string;
   body: string;
   continueLabel: string;
@@ -112,9 +112,9 @@ export interface DeletionView {
   gracePeriodNote: string;
 }
 
-export type SyncStatus = 'online' | 'offline' | 'syncing' | 'failed';
+type SyncStatus = 'online' | 'offline' | 'syncing' | 'failed';
 
-export type QueueEntryState = 'queued' | 'sent' | 'retrying' | 'conflict';
+type QueueEntryState = 'queued' | 'sent' | 'retrying' | 'conflict';
 
 export interface QueueEntry {
   id: string;
@@ -124,7 +124,7 @@ export interface QueueEntry {
   retryable: boolean;
 }
 
-export interface InstallRow {
+interface InstallRow {
   id: string;
   label: string;
   help: string;
@@ -151,7 +151,7 @@ export interface OnboardingStatus {
   completed: boolean;
 }
 
-export interface OnboardingSubmission {
+interface OnboardingSubmission {
   currency: string;
   timezone: string;
   wakeTime: string;

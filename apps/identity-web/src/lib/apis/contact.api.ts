@@ -13,7 +13,7 @@ export interface VerifyContactInput {
   code: string;
 }
 
-export const contactKeys = {
+const contactKeys = {
   emails: ['contacts', 'emails'] as const,
   phones: ['contacts', 'phones'] as const,
 };

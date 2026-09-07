@@ -38,7 +38,7 @@ export const HISTORY_KIND_LABELS: Record<HistoryKind, string> = {
 
 export const HISTORY_KINDS: HistoryFilter[] = ['all', 'quest', 'hero', 'expense', 'journal', 'meal', 'weight', 'health', 'side-quest', 'recovery'];
 
-export const HISTORY_PAGE_SIZE = 20;
+const HISTORY_PAGE_SIZE = 20;
 
 export interface ReflectQuestLog {
   id: string;
@@ -67,7 +67,7 @@ export interface ReflectGrant {
   earnedAt: string;
 }
 
-export interface ReflectHero {
+interface ReflectHero {
   level: number;
   xp: number;
   coins: number;
@@ -100,7 +100,7 @@ export interface ReviewLocalState {
   complete: boolean;
 }
 
-export const REVIEW_PROMPTS: { id: string; question: string; placeholder: string }[] = [
+const REVIEW_PROMPTS: { id: string; question: string; placeholder: string }[] = [
   { id: 'better', question: 'What went better than you expected?', placeholder: 'One sentence is enough' },
   { id: 'change', question: 'What will you change about next week?', placeholder: 'One sentence is enough' },
   { id: 'carry', question: 'Anything you want to stop carrying?', placeholder: 'Optional' },
@@ -201,7 +201,7 @@ function rank<T>(counts: Map<string, T & { value: number }>): (T & { value: numb
   return [...counts.values()].sort((left, right) => right.value - left.value);
 }
 
-export interface HistoryRecord extends HistoryRow {
+interface HistoryRecord extends HistoryRow {
   date: string;
   title: string;
   section: string;
@@ -388,7 +388,7 @@ function grantRecord(grant: ReflectGrant): HistoryRecord {
   };
 }
 
-export function deriveHistoryRecords(source: ReflectSource): HistoryRecord[] {
+function deriveHistoryRecords(source: ReflectSource): HistoryRecord[] {
   const queued = new Set(source.queuedIds);
   return [
     ...source.logs.map(log => questRecord(log, queued)),

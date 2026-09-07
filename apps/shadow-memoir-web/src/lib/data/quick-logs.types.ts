@@ -38,7 +38,7 @@ export interface JournalDraft {
   tags?: string[];
 }
 
-export interface JournalPrompt {
+interface JournalPrompt {
   id: string;
   question: string;
 }
@@ -68,7 +68,7 @@ export const MEAL_TYPE_LABELS: Record<MealType, string> = {
   ate_out: 'Ate out',
 };
 
-export interface Macros {
+interface Macros {
   proteinG: number;
   carbsG: number;
   fatG: number;
@@ -97,7 +97,7 @@ export interface Meal extends Macros {
   sourceLabel: string;
 }
 
-export interface MealDraft {
+interface MealDraft {
   /** Client-minted UUIDv7, as on {@link JournalDraft}. */
   id?: string;
   date: string;
@@ -107,7 +107,7 @@ export interface MealDraft {
   note?: string;
 }
 
-export interface MealDayHistory {
+interface MealDayHistory {
   date: string;
   summary: string;
   calories: number | null;
@@ -232,7 +232,7 @@ export interface HealthMetricState {
   offer: ThresholdOffer | null;
 }
 
-export interface HealthMetricHistoryRow {
+interface HealthMetricHistoryRow {
   date: string;
   text: string;
   badge: string | null;

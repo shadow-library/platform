@@ -4,7 +4,7 @@ import { type SettledCommandResult } from './command.types';
 import { useMemoirData } from './data-context';
 import { type HeroCommand, type HeroDeck, type RecoveryView } from './hero.types';
 
-export const heroKeys = {
+const heroKeys = {
   all: ['memoir', 'hero'] as const,
   deck: ['memoir', 'hero', 'deck'] as const,
   recovery: ['memoir', 'hero', 'recovery'] as const,

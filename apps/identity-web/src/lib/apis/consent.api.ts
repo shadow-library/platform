@@ -5,10 +5,9 @@ import { type ApiError, APIRequest } from './transport';
 
 /** A standing OAuth consent grant the user can review and revoke — distinct from the sign-in consent prompt in `auth.api.ts`. */
 export type ConsentRecord = ConsentRecordDto;
-export type ConsentSource = ConsentRecordDto['source'];
 export type { ConsentRecordsResponse };
 
-export const consentKeys = {
+const consentKeys = {
   all: ['me', 'consents'] as const,
 };
 

@@ -105,14 +105,6 @@ export function QueryState({ isLoading, error, isEmpty, emptyTitle = 'Nothing he
   return children;
 }
 
-export function PaneLoader(): ReactElement {
-  return (
-    <div className={styles.paneLoader}>
-      <Spinner size="lg" label="Loading" />
-    </div>
-  );
-}
-
 /**
  * The light/dark switch every shell carries in its top bar. `ThemeProvider` renders the default theme on
  * the server and on the first client pass, adopting the stored choice only in a mount effect — so the icon

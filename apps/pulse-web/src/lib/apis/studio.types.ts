@@ -31,7 +31,7 @@ import {
  */
 export type TemplateVariableType = 'string' | 'number' | 'boolean';
 
-export interface TemplateVariable {
+interface TemplateVariable {
   type: TemplateVariableType;
   required: boolean;
   description?: string;
@@ -56,7 +56,7 @@ export type UpdateTemplateBody = Omit<GeneratedUpdateTemplateBody, 'variableSche
  * `RollbackVersionBody`'s `{ version }` companion). None of these collide with a star-exported name from
  * `api-types.gen.ts`, so there's nothing to disambiguate for them in `index.ts`.
  */
-export interface UpdateChannelSettingBody {
+interface UpdateChannelSettingBody {
   isEnabled: boolean;
 }
 

@@ -265,14 +265,3 @@ export function toWireCommand(command: SyncCommand): WireCommand {
       return { type: command.type, payload: { ...command, type: undefined } };
   }
 }
-
-/**
- * The `entity_ref` → server id mapping a create command's outcome carries (ARCHITECTURE §12.4), so the
- * local row minted optimistically can adopt the id the server assigned.
- */
-export function readEntityRef(result: Record<string, unknown>): { entityRef: string; id: string } | null {
-  const entityRef = result['entityRef'];
-  const id = result['id'];
-  if (typeof entityRef !== 'string' || (typeof id !== 'string' && typeof id !== 'number')) return null;
-  return { entityRef, id: String(id) };
-}

@@ -14,7 +14,7 @@ export type { AuthModeItem, AuthModeListResponse, CreateGlobalIdentityProviderBo
 export type AuthMode = AuthModeItem['method'];
 export type SocialProviderKind = GlobalIdentityProviderItem['kind'];
 
-export const adminAuthModeKeys = {
+const adminAuthModeKeys = {
   all: ['admin', 'auth-modes'] as const,
 };
 

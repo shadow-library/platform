@@ -2,7 +2,7 @@ import { toast } from '@shadow-library/ui';
 
 export type UploadMime = 'image/png' | 'image/jpeg' | 'image/webp';
 
-export const ACCEPTED_MIMES: UploadMime[] = ['image/png', 'image/jpeg', 'image/webp'];
+const ACCEPTED_MIMES: UploadMime[] = ['image/png', 'image/jpeg', 'image/webp'];
 export const ACCEPT_ATTR = 'image/png,image/jpeg,image/webp';
 // Keep the base64 body under the server's 12MB limit and give oversized files a clear message.
 const MAX_BYTES = 8 * 1024 * 1024;

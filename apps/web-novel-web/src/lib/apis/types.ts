@@ -67,9 +67,9 @@ export interface NovelReview {
 }
 
 /** Counts of 5★→1★ ratings, index 0 = 5★. */
-export type RatingDistribution = [number, number, number, number, number];
+type RatingDistribution = [number, number, number, number, number];
 
-export type CommentState = 'normal' | 'deleted' | 'moderated';
+type CommentState = 'normal' | 'deleted' | 'moderated';
 
 /** A reply carries no further nesting — one level deep only. */
 export interface NovelCommentReply {
@@ -201,7 +201,7 @@ export interface WikiFacet {
   sortOrder: number;
 }
 
-export interface WikiImage {
+interface WikiImage {
   imageUrl: string;
   caption?: string;
   sortOrder: number;

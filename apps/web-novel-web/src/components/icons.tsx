@@ -99,14 +99,6 @@ export const WifiOffIcon = icon(
     <line x1="12" y1="20" x2="12.01" y2="20" />
   </>,
 );
-export const RefreshIcon = icon(
-  <>
-    <path d="M21 2v6h-6" />
-    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-    <path d="M3 22v-6h6" />
-    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-  </>,
-);
 export const LockIcon = icon(
   <>
     <rect x="3" y="11" width="18" height="11" rx="2" />
@@ -137,11 +129,5 @@ export const ExternalIcon = icon(
   <>
     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
     <path d="M15 3h6v6M10 14 21 3" />
-  </>,
-);
-export const LogOutIcon = icon(
-  <>
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <path d="M16 17l5-5-5-5M21 12H9" />
   </>,
 );

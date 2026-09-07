@@ -37,7 +37,7 @@ export type ServerNovelStatus = ServerNovelSummary['status'];
  * The canonical webnovel-server read surface. Every query forwards TanStack Query's abort `signal` into
  * `APIRequest.signal(...)` so navigation cancels in-flight requests.
  */
-export const novelKeys = {
+const novelKeys = {
   catalog: (query: CatalogQuery) => ['novels', 'catalog', query] as const,
   detail: (slug: string) => ['novels', 'detail', slug] as const,
   chapters: (slug: string, page: number, limit: number) => ['novels', 'chapters', slug, page, limit] as const,
@@ -96,7 +96,7 @@ export function toSummary(item: ServerNovelSummary): NovelSummary {
   };
 }
 
-export function toDetail(item: NovelDetailResponse): NovelDetail {
+function toDetail(item: NovelDetailResponse): NovelDetail {
   return { ...toSummary(item), alternativeTitles: [], language: 'English', mature: false };
 }
 

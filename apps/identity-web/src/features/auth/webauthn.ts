@@ -13,7 +13,7 @@ type PublicKeyOptions = JsonObject;
 
 export type CeremonyResult = { outcome: 'COMPLETED'; response: JsonObject } | { outcome: 'CANCELLED' } | { outcome: 'UNSUPPORTED' };
 
-export function isWebauthnSupported(): boolean {
+function isWebauthnSupported(): boolean {
   return typeof window !== 'undefined' && typeof window.PublicKeyCredential === 'function';
 }
 

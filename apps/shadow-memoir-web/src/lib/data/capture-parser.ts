@@ -3,7 +3,7 @@ import { type CaptureTarget } from './view.types';
 
 export type CaptureKind = 'expense' | 'metric' | 'weight' | 'journal' | 'side-quest' | 'quest-action';
 
-export interface CaptureField {
+interface CaptureField {
   label: string;
   value: string;
   /** Filled in from a default rather than typed, so the preview can say so in words. */

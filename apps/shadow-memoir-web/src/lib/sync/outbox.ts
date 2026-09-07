@@ -3,7 +3,7 @@ import { type MemoirStore } from './memoir-store';
 import { type OutboxEntry, type SyncCommand, type SyncNotice, type WireCommandOutcome } from './sync.types';
 import { uuidv7 } from './uuid';
 
-export const MAX_BATCH_SIZE = 100;
+const MAX_BATCH_SIZE = 100;
 
 export interface OutboxOptions {
   deviceId?: string;

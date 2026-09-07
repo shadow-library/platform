@@ -5,7 +5,6 @@ import {
   type CreateRoutingRuleBody,
   type ListSenderRoutingRuleResponse,
   type ListSenderRoutingRulesQueryParams,
-  type SenderRoutingRuleDetailResponse,
   type SenderRoutingRuleResponse,
   type UpdateSenderRoutingRuleBody,
 } from './api-types.gen';
@@ -21,13 +20,6 @@ export function useListSenderRoutingRulesQuery(params: ListSenderRoutingRulesQue
   return useQuery<ListSenderRoutingRuleResponse, ApiError>({
     queryKey: senderRoutingRuleKeys.list(params),
     queryFn: () => APIRequest.get('/sender-routing-rules').query(params).execute(),
-  });
-}
-
-export function useSenderRoutingRuleQuery(routingRuleId: string): UseQueryResult<SenderRoutingRuleDetailResponse, ApiError> {
-  return useQuery<SenderRoutingRuleDetailResponse, ApiError>({
-    queryKey: senderRoutingRuleKeys.detail(routingRuleId),
-    queryFn: () => APIRequest.get(`/sender-routing-rules/${routingRuleId}`).execute(),
   });
 }
 

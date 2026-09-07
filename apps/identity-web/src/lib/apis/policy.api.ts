@@ -5,7 +5,7 @@ import { type ApiError, APIRequest } from './transport';
 
 export type { PolicyItem, PolicyListResponse, SetPolicyBody };
 
-export const policyKeys = {
+const policyKeys = {
   all: ['organisations'] as const,
   list: (orgId: string) => [...policyKeys.all, orgId, 'policies'] as const,
 };

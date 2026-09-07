@@ -22,27 +22,11 @@ export function relativeTime(iso?: string | null): string {
   return new Date(iso).toLocaleDateString(DATE_LOCALE, { month: 'short', day: 'numeric' });
 }
 
-export function formatDateTime(iso?: string | null): string {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString(DATE_LOCALE, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-
 export function formatDate(iso?: string | null): string {
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString(DATE_LOCALE, { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-export function initials(name?: string | null): string {
-  if (!name) return '?';
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  const first = parts[0]?.[0] ?? '';
-  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
-  return (first + last).toUpperCase();
 }
 
 export function displayName(user: { firstName?: string | null; lastName?: string | null; email?: string | null }): string {
@@ -85,8 +69,4 @@ export function countryFlag(code?: string | null): string {
     .map(ch => base + (ch.charCodeAt(0) - 65));
   if (chars.some(cp => cp < base || cp > base + 25)) return '';
   return String.fromCodePoint(...chars);
-}
-
-export function countLabel(count: number, singular: string, plural = `${singular}s`): string {
-  return `${count} ${count === 1 ? singular : plural}`;
 }

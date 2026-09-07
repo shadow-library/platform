@@ -1,11 +1,11 @@
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-import { type CreateScopeBody, type ResourceItem, type ResourceListResponse, type ScopeItem } from './api-types.gen';
+import { type CreateScopeBody, type ResourceItem, type ResourceListResponse } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
-export type { CreateScopeBody, ResourceItem, ResourceListResponse, ScopeItem };
+export type { CreateScopeBody, ResourceItem, ResourceListResponse };
 
-export const adminResourceKeys = {
+const adminResourceKeys = {
   all: ['admin', 'resources'] as const,
 };
 

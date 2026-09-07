@@ -17,9 +17,7 @@ export type Command =
   | { type: 'journal.record'; text: string }
   | { type: 'sideQuest.record'; text: string; statAffinity: StatAffinity };
 
-export type CommandType = Command['type'];
-
-export interface CommandOutcome {
+interface CommandOutcome {
   status: 'applied' | 'queued';
   message: string;
   xpAwarded: number;
@@ -40,7 +38,7 @@ export interface CommandConfirmation {
   command: Command;
 }
 
-export interface CommandRejection {
+interface CommandRejection {
   status: 'rejected';
   message: string;
 }

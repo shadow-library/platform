@@ -55,7 +55,7 @@ interface DeriveInput {
  */
 const READ_STORAGE_KEY = 'webnovel:notifications-read';
 
-export const notificationsKeys = {
+const notificationsKeys = {
   read: (userId?: string) => ['notifications', 'read', userId ?? 'guest'] as const,
   downloads: ['notifications', 'downloads'] as const,
   settings: ['notifications', 'settings'] as const,

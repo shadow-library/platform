@@ -22,7 +22,7 @@ import { type LibraryEntry, type NovelSummary } from './types';
  */
 const LIBRARY_STORAGE_KEY = 'webnovel:library';
 
-export const libraryKeys = {
+const libraryKeys = {
   // Keyed by user (namespaced like the storage mirror) rather than a static tuple: the loader fires before
   // `session.data` resolves, so a static key would cache the guest-empty result under the same key a signed-in
   // fetch reuses and never refetch once the session lands. Mirrors `notificationsKeys.read`.

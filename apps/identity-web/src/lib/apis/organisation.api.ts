@@ -7,7 +7,6 @@ import {
   type DomainsResponse,
   type IdentityProviderListResponse,
   type IdentityProviderResponse,
-  type InvitationItem,
   type InvitationsResponse,
   type InviteMemberBody,
   type MemberItem,
@@ -25,7 +24,6 @@ export type {
   DomainItem,
   DomainsResponse,
   IdentityProviderListResponse,
-  InvitationItem,
   InvitationsResponse,
   InviteMemberBody,
   MemberItem,
@@ -36,8 +34,6 @@ export type {
 };
 export type MyOrganisation = MyOrganisationItem;
 export type IdentityProvider = IdentityProviderResponse;
-export type OrgType = OrganisationResponse['type'];
-export type OrgStatus = OrganisationResponse['status'];
 export type MemberRole = MemberItem['role'];
 export type MemberStatus = MemberItem['status'];
 
@@ -95,10 +91,6 @@ export const organisationQueryOptions = (orgId: string, enabled = true) =>
     queryFn: ({ signal }) => APIRequest.get(`/organisations/${orgId}`).signal(signal).execute<OrganisationResponse>(),
     enabled: enabled && Boolean(orgId),
   });
-
-export function useOrganisationQuery(orgId: string, enabled = true): UseQueryResult<OrganisationResponse, ApiError> {
-  return useQuery(organisationQueryOptions(orgId, enabled));
-}
 
 export function useCreateOrganisationMutation(): UseMutationResult<OrganisationResponse, ApiError, CreateOrganisationBody> {
   const queryClient = useQueryClient();

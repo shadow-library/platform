@@ -30,7 +30,7 @@ export function isCurrencyCode(value: string): value is CurrencyCode {
   return value in CURRENCIES;
 }
 
-export function currencyExponent(currency: CurrencyCode): number {
+function currencyExponent(currency: CurrencyCode): number {
   return CURRENCIES[currency].exponent;
 }
 
@@ -69,10 +69,6 @@ export function formatMinor(amountMinor: number, currency: CurrencyCode, locale:
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(minorToMajor(amountMinor, currency));
 }
 
-export function formatAmountText(amountText: string, currency: CurrencyCode): string {
-  return `${CURRENCIES[currency].symbol} ${amountText} ${currency}`;
-}
-
 /**
  * Applies the rate captured when the expense was entered. A null rate is a real state — the entry saved
  * without one and reconciles later — so it converts to null rather than to zero.
@@ -105,7 +101,7 @@ export function daysBetween(fromISODate: string, toISODate: string): number {
   return Math.round((to - from) / 86_400_000);
 }
 
-export function upcomingWindowDays(subscription: Pick<Subscription, 'reminderEnabled' | 'reminderLead'>): number {
+function upcomingWindowDays(subscription: Pick<Subscription, 'reminderEnabled' | 'reminderLead'>): number {
   return subscription.reminderEnabled ? REMINDER_LEAD_DAYS[subscription.reminderLead] : DEFAULT_UPCOMING_WINDOW_DAYS;
 }
 

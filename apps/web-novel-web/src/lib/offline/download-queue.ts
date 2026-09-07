@@ -1,5 +1,5 @@
 /** Lifecycle of an in-flight download. `complete` is not modelled here — finished downloads live in the OfflineStore. */
-export type DownloadTaskState = 'downloading' | 'paused' | 'failed';
+type DownloadTaskState = 'downloading' | 'paused' | 'failed';
 
 export interface DownloadTask {
   slug: string;
@@ -10,7 +10,7 @@ export interface DownloadTask {
   error?: string;
 }
 
-export interface StartDownloadInput {
+interface StartDownloadInput {
   slug: string;
   title: string;
   /** Ordinals to fetch, in order. Progress is measured against this length. */
@@ -43,7 +43,7 @@ const EMPTY_TASKS: DownloadTask[] = [];
 
 const wait = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
-export class DownloadQueue {
+class DownloadQueue {
   private readonly tasks = new Map<string, InternalTask>();
   private readonly listeners = new Set<() => void>();
   private snapshot: DownloadTask[] = EMPTY_TASKS;

@@ -10,7 +10,6 @@ export type PublicationStatus = 'live' | 'retired';
 export type ChapterPublicationStatus = 'scheduled' | 'published' | 'failed' | 'unpublished';
 /** Local aliases retain the generated access contract while improving its call-site names. */
 export type PublicationAccess = PublicationAccessResponse;
-export type AccessGrant = AccessGrantItem;
 export type GrantState = AccessGrantItem['state'];
 
 export interface Publication {
@@ -78,7 +77,7 @@ export interface PublishChapterVariables {
   scheduledAt?: string;
 }
 
-export interface ReconcileFailure {
+interface ReconcileFailure {
   ordinal: number;
   error: string;
 }

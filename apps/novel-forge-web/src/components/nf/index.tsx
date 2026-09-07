@@ -1,5 +1,5 @@
 import { type ApiError } from '@/lib/apis';
-import { type CSSProperties, type ReactElement, type ReactNode } from 'react';
+import { type ReactElement, type ReactNode } from 'react';
 
 import { Alert, EmptyState, Spinner } from '@shadow-library/ui';
 import { SparkIcon } from '../icons';
@@ -125,30 +125,6 @@ export function QueryState({ isLoading, error, isEmpty, emptyTitle = 'Nothing he
     );
   if (isEmpty) return <EmptyState size="inline" title={emptyTitle} description={emptyDescription} action={emptyAction} />;
   return children;
-}
-
-interface AssetBoxProps {
-  height?: number;
-  width?: number | string;
-  radius?: number;
-  color?: string;
-}
-
-export function AssetBox({ height = 80, width, radius = 8, color }: AssetBoxProps): ReactElement {
-  return (
-    <div
-      className={styles.assetBox}
-      data-solid={color ? 'true' : undefined}
-      style={
-        {
-          '--nf-asset-h': `${height}px`,
-          '--nf-asset-w': typeof width === 'number' ? `${width}px` : (width ?? '100%'),
-          '--nf-asset-r': `${radius}px`,
-          ...(color ? { '--nf-asset-bg': color } : {}),
-        } as CSSProperties
-      }
-    />
-  );
 }
 
 export function PaneLoader(): ReactElement {

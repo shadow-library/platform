@@ -1,4 +1,4 @@
-import { type CommandEnvelopeDto, type SyncCommandOutcomeDto, type SyncDeltaResponseDto, type SyncTombstoneDto } from '@/lib/apis/api-types.gen';
+import { type CommandEnvelopeDto, type SyncCommandOutcomeDto, type SyncDeltaResponseDto } from '@/lib/apis/api-types.gen';
 import { type Command, type FinanceCommand, type HeroCommand, type QuickLogCommand } from '@/lib/data';
 
 /** The delta domains shadow-memoir-server registers today. Each flips from fixture-backed to live independently. */
@@ -76,8 +76,6 @@ export type SyncCommand = Command | FinanceCommand | QuickLogCommand | HeroComma
 
 export type DeltaRow = Record<string, unknown>;
 
-export type DeltaTombstone = SyncTombstoneDto;
-
 /** The generated contract, with `domains` narrowed from the schema's free-form object to the rows it actually carries. */
 export type DeltaPage = Omit<SyncDeltaResponseDto, 'domains'> & { domains: Record<string, DeltaRow[]> };
 
@@ -88,7 +86,7 @@ export interface DeltaResponse {
 
 export type CommandEnvelope = CommandEnvelopeDto;
 
-export type CommandOutcomeStatus = 'applied' | 'rejected' | 'superseded' | 'failed';
+type CommandOutcomeStatus = 'applied' | 'rejected' | 'superseded' | 'failed';
 
 /** `status` is `string` in the schema because the server assembles it from two sources; the client only ever sees these four. */
 export type WireCommandOutcome = Omit<SyncCommandOutcomeDto, 'status'> & { status: CommandOutcomeStatus };

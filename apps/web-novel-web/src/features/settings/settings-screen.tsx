@@ -30,7 +30,7 @@ interface ThemeOption {
  * picker: theme is a platform-wide preference shared with the other Shadow apps, so it reads and writes the
  * design-system `useTheme` directly rather than keeping a second copy here that could disagree with it.
  */
-export const SETTINGS_SECTIONS: { id: SettingsSection; label: string }[] = [
+const SETTINGS_SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'reader', label: 'Reader defaults' },
   { id: 'downloads', label: 'Downloads' },

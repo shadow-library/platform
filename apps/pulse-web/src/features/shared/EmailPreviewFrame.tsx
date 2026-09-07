@@ -1,7 +1,7 @@
 import { type ReactElement } from 'react';
 
 /** Neither `allow-scripts` nor `allow-same-origin`: write-privileged author HTML renders as an opaque-origin, script-inert frame so a read-only reviewer's pulse-web session is untouchable. */
-export const EMAIL_PREVIEW_SANDBOX = '';
+const EMAIL_PREVIEW_SANDBOX = '';
 
 export interface EmailPreviewFrameProps {
   body: string;

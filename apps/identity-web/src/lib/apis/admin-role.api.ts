@@ -1,9 +1,9 @@
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-import { type AssignmentListResponse, type PermissionItem, type PermissionListResponse, type RoleAssignmentBody, type RoleAssignmentItem } from './api-types.gen';
+import { type AssignmentListResponse, type PermissionListResponse, type RoleAssignmentBody, type RoleAssignmentItem } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
-export type { AssignmentListResponse, PermissionItem, PermissionListResponse, RoleAssignmentBody, RoleAssignmentItem };
+export type { AssignmentListResponse, PermissionListResponse, RoleAssignmentBody, RoleAssignmentItem };
 export type PrincipalType = RoleAssignmentItem['principalType'];
 
 export interface AssignmentListParams {
@@ -18,12 +18,12 @@ export interface AssignmentListParams {
  * SDK's catalog sync (`PUT /api/v1/authz/catalog`); the console can only read them. What it still drives
  * is *assignment* — granting a defined role to a principal.
  */
-export const adminRoleKeys = {
+const adminRoleKeys = {
   permissions: (applicationId: number) => ['admin', 'permissions', applicationId] as const,
   assignments: (params?: AssignmentListParams) => ['admin', 'role-assignments', params] as const,
 };
 
-export const permissionsQueryOptions = (applicationId: number, enabled = true) =>
+const permissionsQueryOptions = (applicationId: number, enabled = true) =>
   queryOptions<PermissionListResponse, ApiError>({
     queryKey: adminRoleKeys.permissions(applicationId),
     queryFn: ({ signal }) => APIRequest.get('/admin/permissions').query({ applicationId }).signal(signal).execute<PermissionListResponse>(),
@@ -34,7 +34,7 @@ export function usePermissionsQuery(applicationId: number, enabled = true): UseQ
   return useQuery(permissionsQueryOptions(applicationId, enabled));
 }
 
-export const roleAssignmentsQueryOptions = (params?: AssignmentListParams) =>
+const roleAssignmentsQueryOptions = (params?: AssignmentListParams) =>
   queryOptions<AssignmentListResponse, ApiError>({
     queryKey: adminRoleKeys.assignments(params),
     queryFn: ({ signal }) => APIRequest.get('/admin/role-assignments').query(params).signal(signal).execute<AssignmentListResponse>(),

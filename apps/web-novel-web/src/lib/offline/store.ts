@@ -33,7 +33,7 @@ export const PURGE_CACHE_PREFIXES = ['webnovel-runtime', 'webnovel-offline'] as 
 export const offlineStore = new OfflineStore({ dbName: OFFLINE_DB_NAME });
 export const offlineManager = new OfflineContentManager(offlineStore);
 
-export const NOVEL_KEY_PREFIX = 'novel:';
+const NOVEL_KEY_PREFIX = 'novel:';
 
 export function novelKey(slug: string): string {
   return `${NOVEL_KEY_PREFIX}${slug}`;

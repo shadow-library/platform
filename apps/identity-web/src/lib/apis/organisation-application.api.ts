@@ -14,7 +14,7 @@ export type AppAccessMode = OrganisationApplicationsResponse['appAccessMode'];
  * assigning/unassigning apps needs ADMIN + step-up, and flipping the access mode is OWNER + step-up —
  * so callers gate the affordances the same way and the server remains the authority.
  */
-export const orgApplicationKeys = {
+const orgApplicationKeys = {
   list: (orgId: string) => [...orgKeys.detail(orgId), 'applications'] as const,
 };
 

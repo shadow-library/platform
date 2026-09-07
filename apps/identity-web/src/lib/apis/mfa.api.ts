@@ -2,19 +2,10 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 
 import { type JsonObject } from '@/types';
 
-import {
-  type MfaEnrollmentItem,
-  type MfaEnrollmentsResponse,
-  type StepUpIntentResponse,
-  type StepUpResponse,
-  type TotpActivateResponse,
-  type TotpEnrollResponse,
-} from './api-types.gen';
+import { type MfaEnrollmentsResponse, type StepUpIntentResponse, type StepUpResponse, type TotpActivateResponse, type TotpEnrollResponse } from './api-types.gen';
 import { meKeys } from './me.api';
 import { type ApiError, APIRequest } from './transport';
 
-export type MfaFactorType = MfaEnrollmentItem['type'];
-export type MfaEnrollment = MfaEnrollmentItem;
 export type TotpEnrollment = TotpEnrollResponse;
 export type TotpActivation = TotpActivateResponse;
 export type StepUpState = StepUpResponse;
@@ -54,7 +45,7 @@ export interface WebauthnRegisterInput {
   label?: string;
 }
 
-export const mfaKeys = {
+const mfaKeys = {
   all: ['mfa'] as const,
 };
 

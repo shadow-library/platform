@@ -1,6 +1,6 @@
 import { useMutation, type UseMutationResult, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { type UserInfo, userInfoQueryOptions } from '@shadow-library/web';
-import { type AuthLogoutResult, type AuthPrincipal, createAuthApi } from '@shadow-library/web/auth';
+import { type AuthLogoutResult, createAuthApi } from '@shadow-library/web/auth';
 
 import { apiClient, type ApiError } from './transport';
 
@@ -13,7 +13,7 @@ import { apiClient, type ApiError } from './transport';
  * `SessionResponse` is the SDK's principal: `sub` is the stable user id, and the cookie carries an opaque
  * handle rather than a token, so the browser is told only what the guard exposes.
  */
-export type { AuthLogoutResult as LogoutResponse, AuthPrincipal as SessionResponse } from '@shadow-library/web/auth';
+export type { AuthPrincipal as SessionResponse } from '@shadow-library/web/auth';
 
 const authApi = createAuthApi(apiClient.auth, { staleTime: 60_000 });
 
@@ -23,10 +23,6 @@ const authApi = createAuthApi(apiClient.auth, { staleTime: 60_000 });
  * 401). `beforeLoad` gates ensure it; components read the warm cache.
  */
 export const sessionQuery = authApi.sessionQueryOptions();
-
-export function useSessionQuery(): UseQueryResult<AuthPrincipal, ApiError> {
-  return useQuery(sessionQuery);
-}
 
 export const meQuery = userInfoQueryOptions(() => apiClient.auth.get('/userinfo').execute<UserInfo>());
 

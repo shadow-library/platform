@@ -1,13 +1,11 @@
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-import { type ClientDetailResponse, type ClientListResponse, type ClientSummaryItem, type RotateSecretResponse, type UpdateClientBody } from './api-types.gen';
+import { type ClientDetailResponse, type ClientListResponse, type RotateSecretResponse, type UpdateClientBody } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
-export type { ClientDetailResponse, ClientListResponse, ClientSummaryItem, RotateSecretResponse, UpdateClientBody };
-export type ClientKind = ClientSummaryItem['kind'];
-export type GrantType = 'authorization_code' | 'refresh_token' | 'client_credentials';
+export type { ClientDetailResponse, ClientListResponse, RotateSecretResponse, UpdateClientBody };
 
-export const adminClientKeys = {
+const adminClientKeys = {
   all: ['admin', 'clients'] as const,
   list: () => [...adminClientKeys.all, 'list'] as const,
   detail: (clientId: string) => [...adminClientKeys.all, clientId] as const,
@@ -23,7 +21,7 @@ export function useClientsQuery(): UseQueryResult<ClientListResponse, ApiError> 
   return useQuery(adminClientsQueryOptions());
 }
 
-export const adminClientQueryOptions = (clientId: string, enabled = true) =>
+const adminClientQueryOptions = (clientId: string, enabled = true) =>
   queryOptions<ClientDetailResponse, ApiError>({
     queryKey: adminClientKeys.detail(clientId),
     queryFn: ({ signal }) => APIRequest.get(`/admin/clients/${clientId}`).signal(signal).execute<ClientDetailResponse>(),

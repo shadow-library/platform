@@ -13,7 +13,7 @@ import { ApiError, APIRequest } from './transport';
 export type ReforgeFidelity = 'preserve' | 'close' | 'loose';
 export type ReforgeMode = 'chapter' | 'transform';
 
-export interface ReforgeSettings {
+interface ReforgeSettings {
   judgeEnabled?: boolean;
   targetWords?: number;
   analysisWindow?: number;
@@ -35,7 +35,7 @@ export interface ReforgeStartBody {
   limit?: number;
 }
 
-export type ReforgePhase = 'pending' | 'glossary' | 'reforging' | 'done' | 'failed';
+type ReforgePhase = 'pending' | 'glossary' | 'reforging' | 'done' | 'failed';
 export type ReforgeChapterStatus = 'reforged' | 'attention' | 'failed';
 
 export interface Reforge {
@@ -49,13 +49,13 @@ export interface Reforge {
   updatedAt: string;
 }
 
-export interface ReforgeCounts {
+interface ReforgeCounts {
   reforged: number;
   attention: number;
   failed: number;
 }
 
-export interface ReforgeTransformStatus {
+interface ReforgeTransformStatus {
   plan?: {
     id: string;
     revision: number;
@@ -89,21 +89,21 @@ export interface ReforgeSummary {
   updatedAt: string;
 }
 
-export interface ReforgeIssue {
+interface ReforgeIssue {
   source: 'residue' | 'fidelity' | 'run';
   type: string;
   detail: string;
   excerpt?: string;
 }
 
-export interface ReforgeChanges {
+interface ReforgeChanges {
   renames?: string[];
   removals?: string[];
   addedScenes?: string[];
   proseNotes?: string;
 }
 
-export interface ReforgeFidelityVerdict {
+interface ReforgeFidelityVerdict {
   verdict?: 'clean' | 'issues';
   coveredBeats?: number;
   totalBeats?: number;

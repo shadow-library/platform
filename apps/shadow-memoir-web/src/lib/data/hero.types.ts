@@ -24,7 +24,7 @@ export interface HeroTitle {
 export type CosmeticKind = 'badge' | 'hero_accent' | 'theme_accent';
 
 /** `achievement` cosmetics are never purchasable — coins and achievements are the only two acquisition paths (PRD §2.9). */
-export type CosmeticState = 'equipped' | 'owned' | 'affordable' | 'short' | 'achievement';
+type CosmeticState = 'equipped' | 'owned' | 'affordable' | 'short' | 'achievement';
 
 export interface Cosmetic {
   id: string;
@@ -37,7 +37,7 @@ export interface Cosmetic {
   note: string;
 }
 
-export interface ProgressionEvent {
+interface ProgressionEvent {
   id: string;
   when: string;
   title: string;
@@ -46,7 +46,7 @@ export interface ProgressionEvent {
   rewarded: boolean;
 }
 
-export interface LifetimeStat {
+interface LifetimeStat {
   stat: StatAffinity;
   label: string;
   value: number;
@@ -54,7 +54,7 @@ export interface LifetimeStat {
   note: string;
 }
 
-export interface CrownRecord {
+interface CrownRecord {
   label: string;
   banked: boolean;
 }
@@ -77,7 +77,7 @@ export interface HeroDeck {
   cosmetics: Cosmetic[];
 }
 
-export interface RecoveryChoice {
+interface RecoveryChoice {
   id: string;
   title: string;
   body: string;
@@ -86,13 +86,13 @@ export interface RecoveryChoice {
   to: string;
 }
 
-export interface IntensityOption {
+interface IntensityOption {
   mode: HeroIntensityMode;
   name: string;
   description: string;
 }
 
-export interface MissedWhileAway {
+interface MissedWhileAway {
   id: string;
   title: string;
   meta: string;

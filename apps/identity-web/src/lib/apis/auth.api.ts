@@ -24,11 +24,10 @@ import { type ApiError, APIRequest } from './transport';
  * envelopes, so those statuses are `modeled` on the request and resolve to a `FlowState`, not a throw.
  */
 
-export type { AuthMethodsResponse, ChallengeMethod, ChallengeMethodMetadata, ConsentDecisionBody, SocialLoginStartResponse };
-export type SocialProviderOption = SocialProviderOptionDto;
+export type { AuthMethodsResponse, ChallengeMethod, ConsentDecisionBody, SocialLoginStartResponse };
 export type SocialProvider = SocialProviderOptionDto['provider'];
 export type ChallengeMethodName = ChallengeMethod['name'];
-export type FederatedLoginOption = FederatedLoginOptionDto;
+type FederatedLoginOption = FederatedLoginOptionDto;
 export type ResendResult = ChallengeResendResponse;
 export type ConsentScope = ConsentScopeDto;
 export type ConsentPrompt = ConsentPromptResponse;

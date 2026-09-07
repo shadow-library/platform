@@ -65,7 +65,7 @@ interface ResolvedDefault {
   group: string;
 }
 
-export function modelLabel(models: AiModelOption[], provider?: string | null, modelId?: string | null): string {
+function modelLabel(models: AiModelOption[], provider?: string | null, modelId?: string | null): string {
   if (!provider || !modelId) return 'default';
   const match = models.find(m => m.provider === provider && m.id === modelId);
   return match?.label ?? modelId;

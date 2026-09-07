@@ -1,6 +1,6 @@
 export type LoggableModule = 'expenses' | 'journal' | 'meals' | 'weight' | 'sidequests';
 
-export type EntryCapLevel = 'clear' | 'approaching' | 'reached';
+type EntryCapLevel = 'clear' | 'approaching' | 'reached';
 
 export interface EntryCapAdvisory {
   module: LoggableModule;

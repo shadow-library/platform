@@ -1,4 +1,4 @@
-import { type MessageType, type NotificationChannel, type NotificationServiceProvider, type Priority, type VersionStatus } from '@/lib';
+import { type MessageType, type NotificationChannel, type NotificationServiceProvider, type Priority } from '@/lib';
 
 export interface Option {
   value: string;
@@ -27,12 +27,6 @@ export const VARIABLE_TYPE_OPTIONS: Option[] = [
   { value: 'string', label: 'String' },
   { value: 'number', label: 'Number' },
   { value: 'boolean', label: 'Boolean' },
-];
-
-export const VERSION_STATUS_OPTIONS: { value: VersionStatus; label: string }[] = [
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'PUBLISHED', label: 'Published' },
-  { value: 'ARCHIVED', label: 'Archived' },
 ];
 
 export const PROVIDER_OPTIONS: { value: NotificationServiceProvider; label: string }[] = [

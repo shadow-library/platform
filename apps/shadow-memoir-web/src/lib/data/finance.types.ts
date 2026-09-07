@@ -65,17 +65,17 @@ export const BUILT_IN_CATEGORIES: ExpenseCategory[] = [
   UNCATEGORISED,
 ];
 
-export type ExpenseSource = 'manual' | 'ocr';
+type ExpenseSource = 'manual' | 'ocr';
 
-export type SyncState = 'synced' | 'queued';
+type SyncState = 'synced' | 'queued';
 
-export interface ReceiptLine {
+interface ReceiptLine {
   label: string;
   value: string;
   lowConfidence: boolean;
 }
 
-export interface ExpenseReceipt {
+interface ExpenseReceipt {
   fileName: string;
   sizeBytes: number;
   lines: ReceiptLine[];
@@ -103,7 +103,7 @@ export interface Expense {
   receipt?: ExpenseReceipt;
 }
 
-export interface ExpenseAuditEntry {
+interface ExpenseAuditEntry {
   text: string;
   when: string;
 }
@@ -184,7 +184,7 @@ export interface CategorySlice {
   percentOfLargest: number;
 }
 
-export interface FxRateSnapshot {
+interface FxRateSnapshot {
   from: CurrencyCode;
   to: CurrencyCode;
   rate: number;

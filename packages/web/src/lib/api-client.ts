@@ -70,6 +70,17 @@ export interface ApiSurface {
 
 export type ApiClient<TSurfaces extends Record<string, string>> = { [K in keyof TSurfaces]: ApiSurface };
 
+/**
+ * Options for query hooks that poll — e.g. following a job or workflow run to completion. A static
+ * interval polls forever; the function form reads the query's own last-fetched data (the same shape
+ * React Query's own `refetchInterval` callback receives) to decide whether there is still anything
+ * worth polling for and stop (`false`) once there isn't — a screen that lists background jobs so it
+ * can watch one in flight shouldn't keep polling after that job (or every job) has settled.
+ */
+export interface PollingOptions<TData = unknown> {
+  refetchInterval?: number | ((query: { state: { data?: TData } }) => number | false);
+}
+
 interface SurfaceContext {
   basePath: string;
   ssr?: SsrTransportLoader;

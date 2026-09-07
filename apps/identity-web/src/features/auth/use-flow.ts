@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from 'react';
 import { type FlowState, isApiError } from '@/lib/apis';
 
 /** Why a flow became unrecoverable: `expired` (timed out / not found) vs `locked` (terminated after too many failures). */
-export type DeadReason = 'expired' | 'locked';
+type DeadReason = 'expired' | 'locked';
 
 export interface FlowUiState {
   flow: FlowState | null;

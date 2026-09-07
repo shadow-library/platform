@@ -8,10 +8,8 @@ import {
   type ApplicationOrganisationItem,
   type ApplicationOrganisationListResponse,
   type ApplicationRoleItem,
-  type ApplicationSummaryItem,
   type CreateApplicationBody,
   type CreateApplicationResponse,
-  type ReleaseApplicationBody,
   type UpdateApplicationBody,
 } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
@@ -24,17 +22,15 @@ export type {
   ApplicationOrganisationItem,
   ApplicationOrganisationListResponse,
   ApplicationRoleItem,
-  ApplicationSummaryItem,
   CreateApplicationBody,
   CreateApplicationResponse,
-  ReleaseApplicationBody,
   UpdateApplicationBody,
 };
 
 /** An application's platform visibility: who could ever be granted it (D-A1). */
 export type ApplicationVisibility = ApplicationDetailResponse['visibility'];
 
-export const adminApplicationKeys = {
+const adminApplicationKeys = {
   all: ['admin', 'applications'] as const,
   list: () => [...adminApplicationKeys.all, 'list'] as const,
   detail: (id: string) => [...adminApplicationKeys.all, id] as const,
@@ -109,7 +105,7 @@ export function useRemoveApplicationMemberMutation(): UseMutationResult<undefine
   });
 }
 
-export const adminApplicationOrganisationsQueryOptions = (appId: string, enabled = true) =>
+const adminApplicationOrganisationsQueryOptions = (appId: string, enabled = true) =>
   queryOptions<ApplicationOrganisationListResponse, ApiError>({
     queryKey: adminApplicationKeys.organisations(appId),
     queryFn: ({ signal }) => APIRequest.get(`/admin/applications/${appId}/organisations`).signal(signal).execute<ApplicationOrganisationListResponse>(),

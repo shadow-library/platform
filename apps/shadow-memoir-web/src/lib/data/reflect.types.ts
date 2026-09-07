@@ -118,10 +118,7 @@ export interface ReviewView {
   carried: string;
 }
 
-/** The two data classes the server gates behind consent. Quests, planning and money need none — they are the coach's baseline read. */
-export type AiDataClass = 'journal_reflection_reason' | 'health';
-
-export interface AiConsentGrants {
+interface AiConsentGrants {
   /** Reflection text and the reasons attached to a miss (PRD §6.7). */
   journal: boolean;
   /** Weight, sleep, steps, water and meals — a separate decision, revocable on its own (PRD §3.10). */
@@ -133,7 +130,7 @@ export interface AiConsent extends AiConsentGrants {
   decided: boolean;
 }
 
-export interface AiQuota {
+interface AiQuota {
   used: number;
   /** Null on a paid plan: the allowance is a daily soft cap the server holds, not a monthly count the client can render. */
   limit: number | null;
@@ -169,7 +166,7 @@ export interface AiResult {
   limitationNote: string | null;
 }
 
-export interface AiHistoryEntry {
+interface AiHistoryEntry {
   id: string;
   state: AiRequestState;
   title: string;

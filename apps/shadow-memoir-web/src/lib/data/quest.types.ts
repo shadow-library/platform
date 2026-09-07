@@ -26,7 +26,7 @@ export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
 export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
-export type RecurrenceEnd = { kind: 'never' } | { kind: 'count'; count: number } | { kind: 'until'; date: string };
+type RecurrenceEnd = { kind: 'never' } | { kind: 'count'; count: number } | { kind: 'until'; date: string };
 
 export interface Recurrence {
   frequency: RecurrenceFrequency;
@@ -40,9 +40,9 @@ export interface Recurrence {
   exceptions: string[];
 }
 
-export type PartialMode = 'scaled' | 'actual' | 'none';
+type PartialMode = 'scaled' | 'actual' | 'none';
 
-export interface QuestConsequence {
+interface QuestConsequence {
   metric: string;
   fullValue: number;
   unit: string | null;
@@ -51,13 +51,13 @@ export interface QuestConsequence {
 
 export type ModuleLink = 'journal' | 'meal' | 'weight';
 
-export interface HealthThreshold {
+interface HealthThreshold {
   metric: string;
   target: number;
   unit: string;
 }
 
-export interface QuestNotification {
+interface QuestNotification {
   enabled: boolean;
   leadMinutes: number;
 }
@@ -107,14 +107,14 @@ export interface QuestSummary {
   scheduleSummary: string;
 }
 
-export interface ThresholdReading {
+interface ThresholdReading {
   metric: string;
   unit: string;
   target: number;
   current: number;
 }
 
-export interface PartialProgress {
+interface PartialProgress {
   value: number;
   target: number;
   unit: string;

@@ -14,7 +14,6 @@ export * from './interstitial.api';
 export * from './bible.api';
 export * from './fact.api';
 export * from './insight.api';
-export * from './proposal.api';
 export * from './refinement.api';
 export * from './ideation.api';
 export * from './run.api';

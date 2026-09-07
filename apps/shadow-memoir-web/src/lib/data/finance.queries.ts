@@ -13,7 +13,7 @@ import {
   type SubscriptionsView,
 } from './finance.types';
 
-export const financeKeys = {
+const financeKeys = {
   all: ['memoir', 'finance'] as const,
   summary: (range: FinanceRange) => ['memoir', 'finance', 'summary', range] as const,
   expenses: (query: ExpenseQuery) => ['memoir', 'finance', 'expenses', query] as const,

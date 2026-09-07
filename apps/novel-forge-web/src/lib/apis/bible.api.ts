@@ -1,6 +1,6 @@
-import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-import { type BibleDocResponse, type BibleSection, type ListBibleDocResponse, type UpsertBibleDocBody } from './api-types.gen';
+import { type BibleSection, type ListBibleDocResponse } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
 /**
@@ -17,22 +17,5 @@ export function useListBibleDocsQuery(projectId: string, enabled = true): UseQue
     queryKey: bibleKeys.list(projectId),
     queryFn: () => APIRequest.get(`/projects/${projectId}/bible`).execute(),
     enabled: enabled && Boolean(projectId),
-  });
-}
-
-export function useBibleDocQuery(projectId: string, section: BibleSection, slug: string, enabled = true): UseQueryResult<BibleDocResponse, ApiError> {
-  return useQuery<BibleDocResponse, ApiError>({
-    queryKey: bibleKeys.doc(projectId, section, slug),
-    queryFn: () => APIRequest.get(`/projects/${projectId}/bible/${section}/${slug}`).execute(),
-    enabled: enabled && Boolean(projectId) && Boolean(slug),
-    retry: false,
-  });
-}
-
-export function useUpsertBibleDocMutation(projectId: string, section: BibleSection, slug: string): UseMutationResult<BibleDocResponse, ApiError, UpsertBibleDocBody> {
-  const queryClient = useQueryClient();
-  return useMutation<BibleDocResponse, ApiError, UpsertBibleDocBody>({
-    mutationFn: data => APIRequest.put(`/projects/${projectId}/bible/${section}/${slug}`).body(data).execute(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: bibleKeys.doc(projectId, section, slug) }),
   });
 }

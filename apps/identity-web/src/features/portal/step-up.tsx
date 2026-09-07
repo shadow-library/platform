@@ -142,7 +142,7 @@ export function StepUpFields({ methods, loading, intent, onElevated }: StepUpFie
  * The AAL2 step-up prompt, shown when a sensitive action needs a fresh factor proof. The identity
  * server decides which factors this account may elevate with; the fields adapt to that set.
  */
-export function StepUpDialog({ open, onOpenChange, title = 'Confirm it’s you', methods, methodsLoading, onElevated }: StepUpDialogProps): ReactElement {
+function StepUpDialog({ open, onOpenChange, title = 'Confirm it’s you', methods, methodsLoading, onElevated }: StepUpDialogProps): ReactElement {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <Dialog.Content size="sm">

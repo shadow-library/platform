@@ -9,12 +9,12 @@ import { ApiError, APIRequest } from './transport';
  * Types are hand-authored until the OpenAPI spec regenerates.
  */
 
-export interface RebrandSettings {
+interface RebrandSettings {
   bannedExtra?: string[];
   auditEnabled?: boolean;
 }
 
-export type RebrandPhase = 'pending' | 'glossary' | 'converting' | 'done' | 'failed';
+type RebrandPhase = 'pending' | 'glossary' | 'converting' | 'done' | 'failed';
 export type ConversionStatus = 'converted' | 'attention' | 'failed';
 
 export interface Rebrand {
@@ -27,7 +27,7 @@ export interface Rebrand {
   updatedAt: string;
 }
 
-export interface ConversionCounts {
+interface ConversionCounts {
   converted: number;
   attention: number;
   failed: number;
@@ -41,15 +41,6 @@ export interface RebrandOverview {
   job?: JobResponse | null;
 }
 
-export interface GlossaryEntry {
-  sourceName: string;
-  variants?: string[] | null;
-  replacement: string;
-  category: 'character' | 'place' | 'country' | 'culture' | 'faction' | 'technique' | 'item' | 'term';
-  notes?: string | null;
-  createdChapter?: number | null;
-}
-
 export interface ConversionSummary {
   chapter: number;
   title?: string | null;
@@ -59,7 +50,7 @@ export interface ConversionSummary {
   updatedAt: string;
 }
 
-export interface ConversionIssue {
+interface ConversionIssue {
   source: 'residue' | 'audit' | 'run';
   type: string;
   detail: string;
@@ -118,14 +109,6 @@ export function useRebrandChapterQuery(projectId: string, chapter: number | null
     queryKey: rebrandKeys.conversion(projectId, chapter ?? 0),
     queryFn: () => APIRequest.get(`/projects/${projectId}/rebrand/chapters/${chapter}`).execute(),
     enabled: Boolean(projectId) && chapter !== null,
-  });
-}
-
-export function useRebrandGlossaryQuery(projectId: string, enabled = true): UseQueryResult<{ items: GlossaryEntry[] }, ApiError> {
-  return useQuery<{ items: GlossaryEntry[] }, ApiError>({
-    queryKey: rebrandKeys.glossary(projectId),
-    queryFn: () => APIRequest.get(`/projects/${projectId}/rebrand/glossary`).query({ limit: 500 }).execute(),
-    enabled: enabled && Boolean(projectId),
   });
 }
 

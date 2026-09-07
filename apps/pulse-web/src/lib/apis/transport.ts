@@ -1,10 +1,5 @@
 import { createApiClient } from '@shadow-library/web';
 
-/** Query hooks that poll — a static interval polls forever; the function form reads the query's own last-fetched data to decide whether to keep polling. */
-export interface PollingOptions<TData = unknown> {
-  refetchInterval?: number | ((query: { state: { data?: TData } }) => number | false);
-}
-
 /**
  * The whole of pulse-web's transport configuration. `@shadow-library/web` owns the request builder, the
  * browser/SSR split, the CSRF double-submit and the error contract, so what is left here is the two base
@@ -29,7 +24,7 @@ export interface PollingOptions<TData = unknown> {
  * would still bundle its target for the client build and drag `node:stream` in with it.
  */
 export { ApiError, isApiError } from '@shadow-library/web';
-export type { ApiFailure, ApiResult, ErrorField, ErrorResponse, QueryParams, QueryValue } from '@shadow-library/web';
+export type { ApiFailure, ApiResult, ErrorField, ErrorResponse, PollingOptions, QueryParams, QueryValue } from '@shadow-library/web';
 
 export const apiClient = createApiClient({
   surfaces: { v1: '/api/v1', auth: '/api/auth' },

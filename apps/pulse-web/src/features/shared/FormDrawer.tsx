@@ -4,11 +4,11 @@ import { Combobox, Drawer, FormField, Input, Select, Switch, Textarea } from '@s
 import styles from './FormDrawer.module.css';
 import { type Option } from './options';
 
-export type FormFieldType = 'text' | 'number' | 'textarea' | 'select' | 'combobox' | 'switch';
+type FormFieldType = 'text' | 'number' | 'textarea' | 'select' | 'combobox' | 'switch';
 export type FormValue = string | number | boolean | undefined;
 export type FormValues = Record<string, FormValue>;
 
-export interface FormFieldConfig {
+interface FormFieldConfig {
   key: string;
   label: string;
   type: FormFieldType;

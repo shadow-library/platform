@@ -1,7 +1,7 @@
 import { createContext, type PropsWithChildren, type ReactElement, type ReactNode, useCallback, useContext, useRef, useState } from 'react';
 import { ConfirmDialog } from '@shadow-library/ui';
 
-export interface ConfirmOptions {
+interface ConfirmOptions {
   title: ReactNode;
   description?: ReactNode;
   confirmLabel?: string;

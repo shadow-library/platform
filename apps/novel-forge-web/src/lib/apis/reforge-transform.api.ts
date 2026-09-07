@@ -10,11 +10,11 @@ import { ApiError, APIRequest } from './transport';
  */
 
 export type SpanAction = 'keep' | 'condense' | 'merge' | 'drop';
-export type TransformPlanStatus = 'draft' | 'pending' | 'approved' | 'superseded';
+type TransformPlanStatus = 'draft' | 'pending' | 'approved' | 'superseded';
 export type OutputStatus = 'written' | 'attention' | 'failed';
 export type FindingType = 'filler' | 'repetition' | 'pacing_stall' | 'dead_subplot' | 'dropped_thread' | 'arc_boundary' | 'quality_outlier' | 'window_failed';
 
-export interface AnalysisMetrics {
+interface AnalysisMetrics {
   repetitionRatio: number;
   stallRatio: number;
   medianWords: number;
@@ -22,7 +22,7 @@ export interface AnalysisMetrics {
   deadThreadCount: number;
 }
 
-export interface ReforgeAnalysis {
+interface ReforgeAnalysis {
   id: string;
   status: 'pending' | 'signals' | 'analyzing' | 'synthesizing' | 'done' | 'failed';
   windowSize: number;
@@ -68,7 +68,7 @@ export interface PlanSpan {
   lastOutputChapter?: number | null;
 }
 
-export interface ReforgePlan {
+interface ReforgePlan {
   id: string;
   revision: number;
   status: TransformPlanStatus;
@@ -100,7 +100,7 @@ export interface ReforgeOutputSummary {
   updatedAt: string;
 }
 
-export interface ReforgeOutputIssue {
+interface ReforgeOutputIssue {
   source?: string;
   type: string;
   detail: string;

@@ -144,7 +144,7 @@ function seedHistory(state: MemoirWorldState): void {
   if (run && isScheduled(run, state.today)) state.logs.set(occurrenceKey(run.id, state.today), recordFor(run, 'completed'));
 }
 
-export function seedWorldState(options: FixtureProviderOptions = {}): MemoirWorldState {
+function seedWorldState(options: FixtureProviderOptions = {}): MemoirWorldState {
   const today = options.today ?? toISODate(new Date());
   const persona = options.persona ?? 'active';
   const seeded = seed(today, persona);

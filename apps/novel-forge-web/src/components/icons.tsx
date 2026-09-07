@@ -31,19 +31,6 @@ export const OverviewIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
-export const LogoutIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <path d="M16 17l5-5-5-5M21 12H9" />
-  </SvgIcon>
-);
-
-export const MenuIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M3 6h18M3 12h18M3 18h18" />
-  </SvgIcon>
-);
-
 export const SourceIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <path d="M4 4h11l5 5v11H4z" />
@@ -114,13 +101,6 @@ export const GridIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
-export const ClockIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <circle cx="12" cy="12" r="9" />
-    <path d="M12 7v5l3 2" />
-  </SvgIcon>
-);
-
 export const SearchIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <circle cx="11" cy="11" r="7" />
@@ -152,12 +132,6 @@ export const GlobeIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <circle cx="12" cy="12" r="9" />
     <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
-  </SvgIcon>
-);
-
-export const ChevronsUpDownIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M8 9l4-4 4 4M16 15l-4 4-4-4" />
   </SvgIcon>
 );
 
@@ -242,40 +216,10 @@ export const ScissorsIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
-export const MoreIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon fill="currentColor" stroke="none" {...p}>
-    <circle cx="5" cy="12" r="1.6" />
-    <circle cx="12" cy="12" r="1.6" />
-    <circle cx="19" cy="12" r="1.6" />
-  </SvgIcon>
-);
-
 export const WarningIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
     <path d="M12 9v4M12 17h.01" />
-  </SvgIcon>
-);
-
-export const UsersIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-    <circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-  </SvgIcon>
-);
-
-export const MapPinIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-    <circle cx="12" cy="10" r="3" />
-  </SvgIcon>
-);
-
-export const FlagIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-    <path d="M4 22v-7" />
   </SvgIcon>
 );
 

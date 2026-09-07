@@ -17,7 +17,7 @@ import { createApiClient } from '@shadow-library/web';
 export { ApiError, isApiError } from '@shadow-library/web';
 export type { ApiFailure, ApiResult, ErrorField, ErrorResponse, QueryParams, QueryValue } from '@shadow-library/web';
 
-export const apiClient = createApiClient({
+const apiClient = createApiClient({
   surfaces: { v1: '/api/v1' },
   // Vite replaces `import.meta.env.SSR` with `false` in the client build, so this whole branch — and the
   // server module graph behind it — is eliminated there. A bare `() => import(...)` would not do: the thunk

@@ -26,7 +26,7 @@ export const HEALTH_METRICS: HealthMetricDefinition[] = [
 
 export const SIDE_QUEST_DAILY_REWARD_LIMIT = 3;
 
-export const QUICK_LOG_REWARDS = {
+const QUICK_LOG_REWARDS = {
   journal: { xp: 5, coins: 0, statTicked: false },
   meal: { xp: 3, coins: 0, statTicked: false },
   weight: { xp: 3, coins: 0, statTicked: false },
@@ -43,7 +43,7 @@ export function journalWordCount(text: string): number {
 }
 
 /** Markdown-lite is the whole vocabulary: bold, italic, headings, bullets and quotes. Nothing else is read. */
-export function markdownLitePlainText(text: string): string {
+function markdownLitePlainText(text: string): string {
   return text
     .replace(/^\s{0,3}>\s?/gm, '')
     .replace(/^\s{0,3}#{1,3}\s+/gm, '')

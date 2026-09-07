@@ -7,9 +7,6 @@ import {
   type JobEnqueueResponse,
   type JudgeResponse,
   type ListDraftResponse,
-  type ListDraftRevisionResponse,
-  type OutlineBody,
-  type OutlineResponse,
   type PlanBody,
   type PlanResponse,
   type ProposalResponse,
@@ -43,14 +40,6 @@ export function useDraftQuery(projectId: string, n: number | undefined, enabled 
   return useQuery<DraftResponse, ApiError>({
     queryKey: draftKeys.detail(projectId, n ?? -1),
     queryFn: () => APIRequest.get(`/projects/${projectId}/drafts/${n}`).execute(),
-    enabled: enabled && Boolean(projectId) && n !== undefined,
-  });
-}
-
-export function useDraftRevisionsQuery(projectId: string, n: number | undefined, enabled = true): UseQueryResult<ListDraftRevisionResponse, ApiError> {
-  return useQuery<ListDraftRevisionResponse, ApiError>({
-    queryKey: draftKeys.revisions(projectId, n ?? -1),
-    queryFn: () => APIRequest.get(`/projects/${projectId}/drafts/${n}/revisions`).execute(),
     enabled: enabled && Boolean(projectId) && n !== undefined,
   });
 }
@@ -160,21 +149,6 @@ export function usePlanMutation(projectId: string): UseMutationResult<PlanRespon
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'volumes'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'status'] });
-    },
-  });
-}
-
-export function useOutlineMutation(projectId: string): UseMutationResult<OutlineResponse, ApiError, OutlineBody | undefined> {
-  const queryClient = useQueryClient();
-  return useMutation<OutlineResponse, ApiError, OutlineBody | undefined>({
-    mutationFn: data =>
-      APIRequest.post(`/projects/${projectId}/outline`)
-        .body(data ?? {})
-        .execute(),
-    onSuccess: () => {
-      invalidateDraft(queryClient, projectId);
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'volumes'] });
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'briefs'] });
     },
   });
 }

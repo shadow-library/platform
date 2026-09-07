@@ -12,14 +12,11 @@ export type { AuthPrincipal as SessionResponse } from '@shadow-library/web/auth'
 
 const authApi = createAuthApi(apiClient.auth);
 
-export const sessionKeys = authApi.keys;
-
 /**
- * Two session reads, deliberately. `sessionQueryOptions` throws on 401 — that is what the route gate reads
- * to bounce an unauthenticated visitor. `optionalSessionQueryOptions` folds the 401 into `null`, which is
- * what the landing screen and the shell need: signed out is a state Shadow Memoir renders, not a failure.
+ * `sessionQueryOptions` throws on 401 — that is what the route gate reads to bounce an unauthenticated
+ * visitor.
  */
-export const { loginUrl, logout, optionalSessionQueryOptions, sessionQueryOptions } = authApi;
+export const { loginUrl, logout, sessionQueryOptions } = authApi;
 
 /**
  * The owner's own profile, from the SDK's userinfo route. Deliberately separate from the session query:

@@ -1,17 +1,6 @@
 import { createApiClient } from '@shadow-library/web';
 
 /**
- * Options for query hooks that poll — e.g. following a job or workflow run to completion. A static
- * interval polls forever; the function form reads the query's own last-fetched data (the same shape
- * React Query's own `refetchInterval` callback receives) to decide whether there is still anything
- * worth polling for and stop (`false`) once there isn't — a screen that lists background jobs so it
- * can watch one in flight shouldn't keep polling after that job (or every job) has settled.
- */
-export interface PollingOptions<TData = unknown> {
-  refetchInterval?: number | ((query: { state: { data?: TData } }) => number | false);
-}
-
-/**
  * The browser never needs the backend's origin: the ingress routes `/api/*` on this origin to
  * novel-forge-server, so a browser call is same-origin and carries its own cookies. SSR has no browser to
  * do that, so it reaches novel-forge-server directly — in-cluster, skipping the ingress — through
@@ -27,7 +16,7 @@ export interface PollingOptions<TData = unknown> {
  * would still bundle its target for the client build and drag `node:stream` in with it.
  */
 export { ApiError, isApiError } from '@shadow-library/web';
-export type { ApiFailure, ApiResult, ErrorField, ErrorResponse, QueryParams, QueryValue } from '@shadow-library/web';
+export type { ApiFailure, ApiResult, ErrorField, ErrorResponse, PollingOptions, QueryParams, QueryValue } from '@shadow-library/web';
 
 export const apiClient = createApiClient({
   surfaces: { v1: '/api/v1', auth: '/api/auth' },

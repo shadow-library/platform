@@ -3,7 +3,7 @@ import { readLocal, writeLocal } from '@/lib/local-store';
 export type ReaderTheme = 'light' | 'sepia' | 'dark';
 export type ReaderFont = 'serif' | 'sans';
 export type ReaderWidth = 'narrow' | 'normal' | 'wide';
-export type ReaderAlign = 'left' | 'justify';
+type ReaderAlign = 'left' | 'justify';
 
 export interface ReaderSettings {
   theme: ReaderTheme;
@@ -28,7 +28,7 @@ export interface ReaderPalette {
  */
 const STORAGE_KEY = 'webnovel:reader-settings';
 
-export const READER_DEFAULTS: ReaderSettings = { theme: 'sepia', font: 'serif', fontSize: 19, lineHeight: 1.75, width: 'normal', align: 'left' };
+const READER_DEFAULTS: ReaderSettings = { theme: 'sepia', font: 'serif', fontSize: 19, lineHeight: 1.75, width: 'normal', align: 'left' };
 
 export const READER_PALETTES: Record<ReaderTheme, ReaderPalette> = {
   light: { bg: '#fdfdfc', fg: '#1c1c20', hairline: 'rgba(28,28,32,.12)', muted: 'rgba(28,28,32,.55)' },

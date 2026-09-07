@@ -6,7 +6,7 @@ import { type ApiError, APIRequest } from './transport';
 export type { CreateServiceProviderBody, ServiceProviderItem, ServiceProviderListResponse, UpdateServiceProviderBody };
 export type SamlNameIdFormat = ServiceProviderItem['nameIdFormat'];
 
-export const adminSamlKeys = {
+const adminSamlKeys = {
   all: ['admin', 'saml'] as const,
   detail: (id: string) => [...adminSamlKeys.all, id] as const,
 };
@@ -19,17 +19,6 @@ export const serviceProvidersQueryOptions = () =>
 
 export function useServiceProvidersQuery(): UseQueryResult<ServiceProviderListResponse, ApiError> {
   return useQuery(serviceProvidersQueryOptions());
-}
-
-export const serviceProviderQueryOptions = (id: string, enabled = true) =>
-  queryOptions<ServiceProviderItem, ApiError>({
-    queryKey: adminSamlKeys.detail(id),
-    queryFn: ({ signal }) => APIRequest.get(`/admin/saml/service-providers/${id}`).signal(signal).execute<ServiceProviderItem>(),
-    enabled: enabled && Boolean(id),
-  });
-
-export function useServiceProviderQuery(id: string, enabled = true): UseQueryResult<ServiceProviderItem, ApiError> {
-  return useQuery(serviceProviderQueryOptions(id, enabled));
 }
 
 export function useCreateServiceProviderMutation(): UseMutationResult<ServiceProviderItem, ApiError, CreateServiceProviderBody> {

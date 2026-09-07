@@ -13,12 +13,6 @@ export function formatDateTime(iso?: string | null): string {
   return `${MONTHS[d.getMonth()] ?? ''} ${pad(d.getDate())}, ${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function formatDate(iso?: string | null): string {
-  const d = iso ? toInstant(iso) : null;
-  if (!d) return '—';
-  return `${MONTHS[d.getMonth()] ?? ''} ${pad(d.getDate())}, ${d.getFullYear()}`;
-}
-
 /**
  * "Jul 11" — short axis/label form for an ISO calendar date (`YYYY-MM-DD`), em dash when unparseable.
  *

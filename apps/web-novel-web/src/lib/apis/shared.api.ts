@@ -21,7 +21,7 @@ export interface SharedEntry extends LibraryEntry {
  * after the author took it back. It is fetched fresh, never persisted, and is empty for a guest.
  */
 
-export const sharedKeys = {
+const sharedKeys = {
   all: ['shared'] as const,
 };
 

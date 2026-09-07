@@ -13,7 +13,7 @@ import {
   type ReviewView,
 } from './reflect.types';
 
-export const reflectKeys = {
+const reflectKeys = {
   all: ['memoir', 'reflect'] as const,
   history: (filter: HistoryFilter, query: string, page: number) => ['memoir', 'reflect', 'history', filter, query, page] as const,
   record: (recordId: string) => ['memoir', 'reflect', 'record', recordId] as const,

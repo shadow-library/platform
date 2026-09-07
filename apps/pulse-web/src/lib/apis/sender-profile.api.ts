@@ -85,13 +85,6 @@ export function useListSenderEndpointsQuery(profileId: string, params: ListSende
   });
 }
 
-export function useSenderEndpointQuery(profileId: string, endpointId: string): UseQueryResult<SenderEndpointResponse, ApiError> {
-  return useQuery<SenderEndpointResponse, ApiError>({
-    queryKey: senderProfileKeys.endpoint(profileId, endpointId),
-    queryFn: () => APIRequest.get(`/sender-profiles/${profileId}/endpoints/${endpointId}`).execute(),
-  });
-}
-
 export function useCreateSenderEndpointMutation(profileId: string): UseMutationResult<SenderEndpointResponse, ApiError, CreateSenderEndpointBody> {
   const queryClient = useQueryClient();
   return useMutation<SenderEndpointResponse, ApiError, CreateSenderEndpointBody>({

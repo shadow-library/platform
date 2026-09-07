@@ -5,7 +5,7 @@ import { type ApiError, APIRequest } from './transport';
 
 export type { AdminContextResponse };
 
-export const adminContextKeys = {
+const adminContextKeys = {
   all: ['admin', 'context'] as const,
 };
 
@@ -14,7 +14,7 @@ export const adminContextKeys = {
  * empty list — so first-party surfaces can reveal the operator console to staff only, without the
  * client making authorization decisions: the identity server still enforces every privileged endpoint.
  */
-export const adminContextQueryOptions = (enabled = true) =>
+const adminContextQueryOptions = (enabled = true) =>
   queryOptions<AdminContextResponse, ApiError>({
     queryKey: adminContextKeys.all,
     queryFn: ({ signal }) => APIRequest.get('/admin/context').signal(signal).execute<AdminContextResponse>(),

@@ -209,15 +209,6 @@ export function projectWorldState(rows: Partial<DomainRows>, today: string): Mem
   };
 }
 
-/**
- * The world an owner sees before the first delta has landed. Deliberately the empty projection rather than
- * the fixtures: the quest domain is authoritative the moment the server answers, and seeding invented
- * quests into a real account would show the owner a plan that is not theirs.
- */
-export function emptyWorldState(today: string): MemoirWorldState {
-  return projectWorldState({}, today);
-}
-
 export interface FinanceRows {
   expenses: ExpenseDetail[];
   subscriptions: Subscription[];

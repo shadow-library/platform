@@ -76,7 +76,7 @@ function memoryBacking(): KeyValueBacking {
   };
 }
 
-export function createBacking(): KeyValueBacking {
+function createBacking(): KeyValueBacking {
   return isIndexedDbAvailable() ? offlineBacking() : memoryBacking();
 }
 

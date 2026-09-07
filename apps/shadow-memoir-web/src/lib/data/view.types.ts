@@ -24,7 +24,7 @@ export interface HeroState {
   crown: CrownPeriod;
 }
 
-export interface RecoveryNotice {
+interface RecoveryNotice {
   title: string;
   body: string;
 }
@@ -58,7 +58,7 @@ export interface ActivityEntry {
   rewarded: boolean;
 }
 
-export interface DaySummary {
+interface DaySummary {
   headline: string;
   detail: string;
 }
@@ -104,7 +104,7 @@ export interface PlanMonthCell {
   outcomes: OccurrenceState[];
 }
 
-export interface PlanCarryOver {
+interface PlanCarryOver {
   title: string;
   body: string;
 }
@@ -121,7 +121,7 @@ export interface PlanView {
   glance: string[];
 }
 
-export interface LoadPreviewDay {
+interface LoadPreviewDay {
   label: string;
   minutes: number;
   percentOfCapacity: number;

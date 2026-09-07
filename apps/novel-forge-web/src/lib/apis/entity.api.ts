@@ -13,7 +13,7 @@ import { ApiError, APIRequest } from './transport';
 
 // The gallery of additional reference images an entity carries, alongside its single `imageUrl`
 // portrait. Hand-authored until the generated OpenAPI types pick up the new fields on redeploy.
-export interface EntityImage {
+interface EntityImage {
   id: string;
   imageUrl: string;
   caption?: string | null;

@@ -1,20 +1,12 @@
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
-import {
-  type CreatedWebhookResponse,
-  type CreateWebhookBody,
-  type UpdateWebhookBody,
-  type WebhookDeliveriesResponse,
-  type WebhookDeliveryItem,
-  type WebhookItem,
-  type WebhookListResponse,
-} from './api-types.gen';
+import { type CreatedWebhookResponse, type CreateWebhookBody, type WebhookDeliveriesResponse, type WebhookDeliveryItem, type WebhookListResponse } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
-export type { CreateWebhookBody, CreatedWebhookResponse, UpdateWebhookBody, WebhookDeliveriesResponse, WebhookDeliveryItem, WebhookItem, WebhookListResponse };
+export type { CreateWebhookBody, CreatedWebhookResponse, WebhookDeliveriesResponse, WebhookDeliveryItem, WebhookListResponse };
 export type DeliveryStatus = WebhookDeliveryItem['status'];
 
-export const adminWebhookKeys = {
+const adminWebhookKeys = {
   all: ['admin', 'webhooks'] as const,
   detail: (id: string) => [...adminWebhookKeys.all, id] as const,
   deliveries: (id: string, status?: DeliveryStatus) => [...adminWebhookKeys.all, id, 'deliveries', status] as const,
@@ -30,18 +22,7 @@ export function useWebhooksQuery(): UseQueryResult<WebhookListResponse, ApiError
   return useQuery(webhooksQueryOptions());
 }
 
-export const webhookQueryOptions = (id: string, enabled = true) =>
-  queryOptions<WebhookItem, ApiError>({
-    queryKey: adminWebhookKeys.detail(id),
-    queryFn: ({ signal }) => APIRequest.get(`/admin/webhooks/${id}`).signal(signal).execute<WebhookItem>(),
-    enabled: enabled && Boolean(id),
-  });
-
-export function useWebhookQuery(id: string, enabled = true): UseQueryResult<WebhookItem, ApiError> {
-  return useQuery(webhookQueryOptions(id, enabled));
-}
-
-export const webhookDeliveriesQueryOptions = (id: string, status?: DeliveryStatus, enabled = true) =>
+const webhookDeliveriesQueryOptions = (id: string, status?: DeliveryStatus, enabled = true) =>
   queryOptions<WebhookDeliveriesResponse, ApiError>({
     queryKey: adminWebhookKeys.deliveries(id, status),
     queryFn: ({ signal }) => APIRequest.get(`/admin/webhooks/${id}/deliveries`).query({ status }).signal(signal).execute<WebhookDeliveriesResponse>(),
@@ -57,17 +38,6 @@ export function useCreateWebhookMutation(): UseMutationResult<CreatedWebhookResp
   return useMutation<CreatedWebhookResponse, ApiError, CreateWebhookBody>({
     mutationFn: body => APIRequest.post('/admin/webhooks').body(body).execute<CreatedWebhookResponse>(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: adminWebhookKeys.all }),
-  });
-}
-
-export function useUpdateWebhookMutation(): UseMutationResult<WebhookItem, ApiError, { id: string; body: UpdateWebhookBody }> {
-  const queryClient = useQueryClient();
-  return useMutation<WebhookItem, ApiError, { id: string; body: UpdateWebhookBody }>({
-    mutationFn: input => APIRequest.patch(`/admin/webhooks/${input.id}`).body(input.body).execute<WebhookItem>(),
-    onSuccess: (_data, { id }) => {
-      queryClient.invalidateQueries({ queryKey: adminWebhookKeys.all });
-      queryClient.invalidateQueries({ queryKey: adminWebhookKeys.detail(id) });
-    },
   });
 }
 

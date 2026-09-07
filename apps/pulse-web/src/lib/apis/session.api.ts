@@ -9,7 +9,7 @@ import { apiClient } from './transport';
  * that contract, so this module binds it to pulse's auth surface and re-exports it under the names the app
  * already uses, rather than restating endpoints and response shapes a backend change could invalidate.
  */
-export type { AuthOrganisation as OrganisationResponse, AuthPrincipal as SessionResponse } from '@shadow-library/web/auth';
+export type { AuthPrincipal as SessionResponse } from '@shadow-library/web/auth';
 
 /**
  * The session mirrors live auth state, so `createAuthApi`'s default `staleTime: 0` is kept: the route gate
@@ -17,8 +17,6 @@ export type { AuthOrganisation as OrganisationResponse, AuthPrincipal as Session
  * snapshot, so the shell is shown only while the session is currently valid.
  */
 const authApi = createAuthApi(apiClient.auth);
-
-export const sessionKeys = authApi.keys;
 
 /**
  * Pulse is INTERNAL, so `organisationsQueryOptions` is in practice the platform organisation alone — the

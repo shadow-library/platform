@@ -13,7 +13,7 @@ export function Muted({ children }: { children: ReactNode }): ReactElement {
   return <span className={styles.muted}>{children}</span>;
 }
 
-export function EmptyDash(): ReactElement {
+function EmptyDash(): ReactElement {
   return <span className={styles.muted}>—</span>;
 }
 

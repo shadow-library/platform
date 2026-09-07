@@ -6,7 +6,7 @@ import { type ApiError, APIRequest } from './transport';
 export type MyApplication = MyApplicationItem;
 export type { MyApplicationsResponse };
 
-export const myApplicationKeys = {
+const myApplicationKeys = {
   all: ['me', 'applications'] as const,
 };
 

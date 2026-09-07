@@ -3,7 +3,7 @@ import { useMutation, type UseMutationResult, useQuery, type UseQueryResult } fr
 import { useMemoirData } from './data-context';
 import { type HealthView, type JournalView, type MealsView, type QuickLogCommand, type QuickLogCommandResult, type SideQuestsView, type WeightView } from './quick-logs.types';
 
-export const quickLogKeys = {
+const quickLogKeys = {
   all: ['memoir', 'quick-logs'] as const,
   journal: () => ['memoir', 'quick-logs', 'journal'] as const,
   meals: (date: string) => ['memoir', 'quick-logs', 'meals', date] as const,

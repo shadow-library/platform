@@ -23,17 +23,6 @@ function notify(): void {
   for (const listener of listeners) listener();
 }
 
-/**
- * Marks that the app has delivered something worth keeping — the first completed quest, the first saved log.
- * Installation is offered only after this, never as a gate on arrival (PRODUCT.md §6.6), so the moment is
- * recorded by the screen that produced the value rather than inferred by a timer.
- */
-export function markValueDelivered(): void {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(VALUE_DELIVERED_KEY, '1');
-  notify();
-}
-
 function read(key: string): boolean {
   if (typeof window === 'undefined') return false;
   return window.localStorage.getItem(key) === '1';

@@ -5,7 +5,7 @@ import { ImageIcon, TrashIcon } from '@/components/icons';
 import { ACCEPT_ATTR, readImageFile, type UploadMime } from './image-file';
 import styles from './ImageGallery.module.css';
 
-export interface GalleryImage {
+interface GalleryImage {
   id: string;
   url?: string;
   caption?: string | null;
