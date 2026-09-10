@@ -82,9 +82,8 @@ const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
 };
 
-// Unrestricted is a content policy, not a vendor pin. Writing goes to Grok 4.6 because it will put adult
-// material on the page; planning/chat stay on GLM-5.2 (same structured stack as Standard); review/helper
-// move off Claude/Luna onto DeepSeek V4 Pro so the judge and illustration-prompt compose do not refuse.
+// Unrestricted is an alternate model map, not a vendor pin. Writing goes to Grok 4.6; planning/chat stay on
+// GLM-5.2 (same structured stack as Standard); review/helper move off Claude/Luna onto DeepSeek V4 Pro.
 export const UNRESTRICTED_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
   planning: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
@@ -97,8 +96,8 @@ export const UNRESTRICTED_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
 
 export const UNRESTRICTED_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(UNRESTRICTED_GROUP_DEFAULTS);
 
-// Overrides on an Unrestricted project are honoured only when the model will actually generate the content.
-// grok-4.3 is excluded: it avoids sexual content and collapses into summary-like prose.
+// Overrides on an Unrestricted project are honoured only when the model is on the unrestricted allowlist.
+// grok-4.3 is excluded: it refuses the unrestricted writing brief and collapses into summary-like prose.
 export const UNRESTRICTED_LLM_ALLOWLIST = ['x-ai/grok-4.6', 'deepseek/deepseek-v4-pro', 'z-ai/glm-5.2', 'moonshotai/kimi-k3'] as const;
 export const UNRESTRICTED_IMAGE_ALLOWLIST = ['x-ai/grok-imagine-image-2.0'] as const;
 

@@ -4334,7 +4334,7 @@ export interface components {
     CreateSeedBody: {
       /** @description The idea as the author first typed it; kept verbatim as the opening turn of the studio conversation. */
       spark?: string;
-      /** @description Content policy for the seed. Unrestricted routes studio chat through models that will write adult material. */
+      /** @description Content mode for the seed. Unrestricted routes studio chat through the unrestricted model map. */
       contentMode?: components['schemas']['ContentMode'];
     };
     ListSeedsResponse: {

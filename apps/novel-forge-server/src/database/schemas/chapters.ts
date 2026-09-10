@@ -41,7 +41,7 @@ export const chapters = pgTable(
     generator: contentGenerator('generator').notNull().default('standard'),
     // Independent of `generator`: that records who wrote the chapter, this records whether its prose is
     // firewalled from the vector index, continuity extraction, and the verbatim-prose adjacency rule — a
-    // `novel-import` final-mode chapter is `human` and not isolated; pasted explicit prose is `human` and isolated.
+    // `novel-import` final-mode chapter is `human` and not isolated; pasted firewalled prose is `human` and isolated.
     isolated: boolean('isolated').notNull().default(false),
     /** Null is *unrated*, never `'none'` — the reader stores and filters the two differently, so an unset dimension must never be defaulted. */
     contentRating: jsonb('content_rating').$type<ContentRating>(),

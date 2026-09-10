@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { type BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { AIMessage, type BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 import { eq } from 'drizzle-orm';
@@ -25,7 +25,6 @@ import {
   UNRESTRICTED_DEFAULTS,
 } from './defaults';
 import { AiQuotaService } from './ai-quota.service';
-import { UNRESTRICTED_AUTHORING_ADDENDUM } from './prompts/authoring-preamble';
 import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
@@ -61,23 +60,6 @@ interface OpenRouterImageResponse {
 // results are safe to cache. Creative roles (generation, revision, plan, outline, chat…) are never
 // cached — caching them would make a re-request return byte-identical prose.
 const CACHEABLE_ROLES = new Set<AiRole>(['judge', 'validation', 'continuity', 'extraction', 'review', 'audit', 'compact']);
-const UNRESTRICTED_PREAMBLE_ROLES = new Set<AiRole>([
-  'generation',
-  'revision',
-  'fix',
-  'rebrand',
-  'reforge',
-  'premise',
-  'plan',
-  'arc',
-  'outline',
-  'skeleton',
-  'bible',
-  'chat',
-  'title',
-  'epitome',
-  'illustration',
-]);
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
 // An explicitly resolved provider always wins: Unrestricted allowlist, the AI_PROFILE defaults and a per-project
@@ -240,7 +222,7 @@ export class ModelRouterService {
     const role = promptModule.role ?? (promptModule.key as AiRole);
     const resolved = this.resolveModel(role, project);
     const llm = this.buildClient(resolved, { format: toJsonSchemaFormat(promptModule.schema), role });
-    const messages = await this.buildMessages(promptModule, input, resolved, role, project);
+    const messages = await this.buildMessages(promptModule, input, resolved);
     // Input carries the rendered context pack and user prose — sensitive/large, so it rides on debug
     // (dev-only) as a full snapshot to reproduce the exact model call locally.
     this.logger.debug('structured: invoking model', {
@@ -411,16 +393,9 @@ export class ModelRouterService {
   // Ollama gets the required JSON schema appended in-band — grammar-constrained decoding only exists
   // on Ollama, so API models must be told the exact output shape or the creative roles (whose prompts
   // never mention JSON) answer with plain prose.
-  private async buildMessages<T>(
-    promptModule: PromptModule<T>,
-    input: Record<string, unknown>,
-    resolved: ResolvedModel,
-    role: AiRole,
-    project?: ProjectConfig,
-  ): Promise<BaseMessage[]> {
+  private async buildMessages<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, resolved: ResolvedModel): Promise<BaseMessage[]> {
     const provider = resolveProvider(resolved);
     let messages = await promptModule.template.formatMessages(input);
-    if (project?.contentMode === 'unrestricted' && UNRESTRICTED_PREAMBLE_ROLES.has(role)) messages = [new SystemMessage(UNRESTRICTED_AUTHORING_ADDENDUM), ...messages];
     if (promptModule.cacheStrategy && supportsPromptCaching(resolved)) messages = applyAnthropicCacheControl(messages);
     if (provider !== 'ollama') {
       messages = [

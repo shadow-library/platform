@@ -1,7 +1,7 @@
 # Interstitial Chapter Design — inserting, isolating, and amending unrestricted chapters
 
-The chapter pipeline plans a brief, then writes it with the primary model. That model refuses dark, violent,
-or sexual material an author may need on the page — today's only escape hatch is `generate-grok`, which is
+The chapter pipeline plans a brief, then writes it with the primary model. That model sometimes refuses
+material an author may need on the page — today's only escape hatch is `generate-grok`, which is
 vendor-named, can only fill a slot the plan already allocated, and cannot correct a chapter once it is
 finalized canon. This document specifies **insertion** (adding a chapter the plan never allocated, at any
 point ahead of the write frontier), **containment** (a real firewall around that chapter's content, independent
@@ -24,7 +24,7 @@ exact material containment exists to firewall:
 - `importDraft` (paste-your-own-prose) always writes `generator: 'human'`.
 - `novel-import`'s `final` mode lands every chapter as `generator: 'human'`, `locked: true` (`novel-import-format.md`).
 
-So a pasted explicit chapter is indexed into pgvector, retrieved by `search_prose`, fed to continuity
+So a pasted firewalled chapter is indexed into pgvector, retrieved by `search_prose`, fed to continuity
 extraction, and tagged with no warning in the outliner's catalog — exactly the leakage Appendix A rule 8
 exists to prevent. Containment must key on **what the content is**, not on **who or what produced it**.
 
@@ -53,9 +53,9 @@ exists to prevent. Containment must key on **what the content is**, not on **who
     author is offered the existing `extract-to-bible` endpoint as a manual follow-up.
 12. **The unrestricted writing default stays `x-ai/grok-4.6`.** `UNRESTRICTED_GROUP_DEFAULTS`
     (`src/modules/ai/defaults.ts`) is unchanged — `creative-writing-model-evaluation.md` rates the Grok family
-    poorly as a prose writer, and this default is a deliberate content-policy exception, kept because the model
-    will put adult material on the page where the alternatives on `UNRESTRICTED_LLM_ALLOWLIST` are more
-    reluctant. The literal model id strings in `src/modules/ai/models.ts` (`x-ai/grok-4.6`, `x-ai/grok-4.3`,
+    poorly as a prose writer, and this default is a deliberate exception on the unrestricted map, kept because
+    the model will write material the alternatives on `UNRESTRICTED_LLM_ALLOWLIST` refuse. The literal model id
+    strings in `src/modules/ai/models.ts` (`x-ai/grok-4.6`, `x-ai/grok-4.3`,
     `x-ai/grok-imagine-image-2.0`) are real vendor identifiers, not our naming choice, and are untouched by the
     rename in decision 9.
 
@@ -184,9 +184,9 @@ Every one of the following switches its condition from `generator === 'unrestric
 
 The catalog tag is the one site that is informational rather than exclusionary — it tells the outliner (which
 sees titles only, per rule 7) that a chapter's content is firewalled. Keying it on `isolated` rather than
-`generator` matters here too: a `novel-import` `final`-mode chapter that happens to carry adult content and is
-marked `isolated` at import time (§8's `drafts/:n/import` extension) should show the same tag a
-`generate-unrestricted` chapter does, even though its `generator` reads `'human'`.
+`generator` matters here too: a `novel-import` `final`-mode chapter that is marked `isolated` at import time
+(§8's `drafts/:n/import` extension) should show the same tag a `generate-unrestricted` chapter does, even
+though its `generator` reads `'human'`.
 
 `chapter-finalization.graph.ts`'s `commitProse` node (line ~95) currently writes
 `generator: (state.generator as 'standard' | 'grok') || 'standard'` onto the chapter row — after the rename
@@ -359,9 +359,9 @@ override, falling back to `UNRESTRICTED_GROUP_DEFAULTS` (still `x-ai/grok-4.6` f
 @Field({ optional: true }) isolated?: boolean;
 ```
 
-`isolated` defaults to `false` for ordinary hand-edits of standard chapters, but the author pasting explicit
-content through this same endpoint (the paste-prose writer path from decision 2) sets it `true` — this is what
-finally gives the paste path a real firewall (§1.1). `state` lets a pasted chapter carry continuation state the
+`isolated` defaults to `false` for ordinary hand-edits of standard chapters, but the author pasting prose they
+want firewalled through this same endpoint (the paste-prose writer path from decision 2) sets it `true` — this
+is what finally gives the paste path a real firewall (§1.1). `state` lets a pasted chapter carry continuation state the
 finalize gate (§9) requires without inventing a second import endpoint. Also fixes the defect in §6 item 1.
 
 **`GenerationService.generate`'s batch loop must stop, not skip, at an unfilled external slot.** Today's
@@ -530,7 +530,7 @@ non-atomic-contract rule as §11.
 - No new `AiRole`. Insertion's planner-origin brief reuses the existing brief-drafting prompt; summarize
   registers under the existing `role: 'continuity'` (`ROLE_GROUP.continuity === 'review'`), so on an
   Unrestricted project it runs on `deepseek-v4-pro`, not the writing group's `grok-4.6` — deliberately: the
-  job is to _read_ explicit prose without refusing, which is a review concern (same reasoning that keeps the
+  job is to _read_ firewalled prose without refusing, which is a review concern (same reasoning that keeps the
   judge on the review group), not an authoring one. Amend needs no model call of its own beyond an optional
   future re-summarize, which is out of scope here.
 - The bible schema and the extraction/judge pipeline are untouched (decision 11) — amendment is a prose

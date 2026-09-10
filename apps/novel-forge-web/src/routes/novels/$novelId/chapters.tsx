@@ -381,7 +381,7 @@ function FillSlotDialog({ novelId, chapter, onOpenChange, onFilled }: FillSlotDi
                   checked={isolated}
                   onCheckedChange={checked => setIsolated(checked === true)}
                   label="Firewall this chapter"
-                  description="Keeps the prose out of the index, retrieval, and continuity extraction. Leave it on for explicit content."
+                  description="Keeps the prose out of the index, retrieval, and continuity extraction."
                 />
               </>
             )}

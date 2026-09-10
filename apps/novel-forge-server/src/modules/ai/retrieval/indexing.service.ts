@@ -23,7 +23,7 @@ export class IndexingService {
   }
 
   // Add (or re-add) prose chunks for a chapter. Deletes existing chunks first (idempotent).
-  // Containment keys on `isolated`, never on provenance: hand-pasted explicit prose is `generator: 'human'`.
+  // Containment keys on `isolated`, never on provenance: hand-pasted firewalled prose is `generator: 'human'`.
   async addProse(projectId: bigint, chapter: number, content: string, isolated: boolean): Promise<void> {
     if (isolated) {
       this.logger.debug('addProse: skipping isolated chapter (not indexed)', { projectId, chapter });

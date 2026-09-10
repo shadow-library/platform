@@ -34,7 +34,7 @@ function makeIndexing(chapters: ChapterRow[] = []): { indexing: IndexingService;
 describe('IndexingService.addProse — containment keys on isolated, not provenance', () => {
   it('should skip a human-written chapter that is isolated', async () => {
     const { indexing, insertedChapters } = makeIndexing();
-    await indexing.addProse(1n, 7, 'explicit prose', true);
+    await indexing.addProse(1n, 7, 'firewalled prose', true);
     expect(insertedChapters).toEqual([]);
   });
 
@@ -55,7 +55,7 @@ describe('IndexingService.backfill', () => {
   it('should index non-isolated chapters of every provenance and skip isolated ones', async () => {
     const { indexing, insertedChapters } = makeIndexing([
       { number: 1, content: 'novel-import final mode', generator: 'human', isolated: false },
-      { number: 2, content: 'pasted explicit prose', generator: 'human', isolated: true },
+      { number: 2, content: 'pasted firewalled prose', generator: 'human', isolated: true },
       { number: 3, content: 'model prose', generator: 'unrestricted', isolated: false },
       { number: 4, content: 'contained prose', generator: 'unrestricted', isolated: true },
     ]);

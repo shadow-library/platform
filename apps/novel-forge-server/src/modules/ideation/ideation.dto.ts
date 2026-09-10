@@ -17,7 +17,7 @@ export class CreateSeedBody {
   @Field({ optional: true, description: 'The idea as the author first typed it; kept verbatim as the opening turn of the studio conversation.' })
   spark?: string;
 
-  @Field(() => ContentMode, { optional: true, description: 'Content policy for the seed. Unrestricted routes studio chat through models that will write adult material.' })
+  @Field(() => ContentMode, { optional: true, description: 'Content mode for the seed. Unrestricted routes studio chat through the unrestricted model map.' })
   contentMode?: Project.ContentMode;
 }
 

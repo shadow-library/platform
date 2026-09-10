@@ -103,10 +103,7 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
             </SegmentedControl>
             {door === 'idea' ? (
               <>
-                <FormField
-                  label="Content mode"
-                  helper="Unrestricted uses models that will write adult and otherwise blocked material. Standard uses the default quality stack, which refuses or sanitises this."
-                >
+                <FormField label="Content mode" helper="Unrestricted uses the alternate model map. Standard uses the default quality stack.">
                   <SegmentedControl value={contentMode} onValueChange={v => setContentMode(v as Mode)} fullWidth>
                     <SegmentedControl.Item value="standard">Standard</SegmentedControl.Item>
                     <SegmentedControl.Item value="unrestricted">Unrestricted</SegmentedControl.Item>
@@ -137,10 +134,7 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
                 <FormField label="Working title" required error={titleError}>
                   <Input placeholder="e.g. The Ashfall Chronicles" value={title} onValueChange={setTitle} invalid={Boolean(titleError)} autoFocus />
                 </FormField>
-                <FormField
-                  label="Content mode"
-                  helper="Unrestricted uses models that will write adult and otherwise blocked material. Standard uses the default quality stack, which refuses or sanitises this."
-                >
+                <FormField label="Content mode" helper="Unrestricted uses the alternate model map. Standard uses the default quality stack.">
                   <SegmentedControl value={contentMode} onValueChange={v => setContentMode(v as Mode)} fullWidth>
                     <SegmentedControl.Item value="standard">Standard</SegmentedControl.Item>
                     <SegmentedControl.Item value="unrestricted">Unrestricted</SegmentedControl.Item>

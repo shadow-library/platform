@@ -219,10 +219,7 @@ function SettingsScreen(): React.JSX.Element {
                   >
                     <Textarea value={instructions} onValueChange={setInstructions} minRows={6} autoGrow />
                   </FormField>
-                  <FormField
-                    label="Content mode"
-                    helper="Unrestricted uses models that will write adult and otherwise blocked material. Standard uses the default quality stack, which refuses or sanitises this."
-                  >
+                  <FormField label="Content mode" helper="Unrestricted uses the alternate model map. Standard uses the default quality stack.">
                     <SegmentedControl value={contentMode} onValueChange={v => setContentMode(v as ContentMode)}>
                       <SegmentedControl.Item value="standard">Standard</SegmentedControl.Item>
                       <SegmentedControl.Item value="unrestricted">Unrestricted</SegmentedControl.Item>
@@ -242,9 +239,7 @@ function SettingsScreen(): React.JSX.Element {
                 <Alert intent="info" title="Model changes apply to new runs only">
                   Each operation picks a provider and model together; the provider follows the model you choose. Operations set to “Inherit default” use the
                   <strong>{profile ? ` ${profile}` : ''}</strong> server profile{unrestricted ? ' Unrestricted map' : ''}. In-flight jobs keep the model they started with.
-                  {unrestricted
-                    ? ' Unrestricted only lists models that will write adult and otherwise blocked material; Standard providers that refuse this content are hidden.'
-                    : ''}
+                  {unrestricted ? ' Unrestricted only lists models on the unrestricted allowlist; other providers are hidden.' : ''}
                 </Alert>
               </div>
 
