@@ -406,135 +406,162 @@ export class ProposalApplyService {
    * over existing rows invert to upserts of the prior refinable fields; creations invert to removes;
    * removes invert to upserts of the deleted content.
    */
-  private async captureInverse(ctx: ApplyContext, op: ContentOp): Promise<ContentOp | null> {
+  private captureInverse(ctx: ApplyContext, op: ContentOp): Promise<ContentOp | null> {
     switch (op.op) {
-      case 'premise.update': {
-        const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
-        if (!project) return null;
-        const inverse: PremiseUpdateOp = { op: 'premise.update' };
-        if (op.premise !== undefined) inverse.premise = project.premise ?? '';
-        if (op.brief !== undefined) inverse.brief = project.brief ?? '';
-        if (op.themes !== undefined) inverse.themes = (project.themes as string[] | null) ?? [];
-        if (op.instructions !== undefined) inverse.instructions = project.instructions ?? '';
-        return inverse;
-      }
+      case 'premise.update':
+        return this.inversePremiseUpdate(ctx, op);
       case 'bible_document.upsert':
-      case 'bible_document.remove': {
-        const doc = await ctx.tx.query.bibleDocuments.findFirst({
-          where: and(eq(schema.bibleDocuments.projectId, ctx.projectId), eq(schema.bibleDocuments.section, op.section), eq(schema.bibleDocuments.slug, op.slug)),
-        });
-        if (!doc) return op.op === 'bible_document.upsert' ? { op: 'bible_document.remove', section: op.section, slug: op.slug } : null;
-        return {
-          op: 'bible_document.upsert',
-          section: op.section,
-          slug: op.slug,
-          frontmatter: (doc.frontmatter as Record<string, unknown> | null) ?? undefined,
-          body: doc.body ?? undefined,
-        };
-      }
+      case 'bible_document.remove':
+        return this.inverseBibleDoc(ctx, op);
       case 'volume.upsert':
-      case 'volume.remove': {
-        const volume = await ctx.tx.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, ctx.projectId), eq(schema.volumes.volumeKey, op.volumeKey)) });
-        if (!volume) return op.op === 'volume.upsert' ? { op: 'volume.remove', volumeKey: op.volumeKey } : null;
-        return {
-          op: 'volume.upsert',
-          volumeKey: op.volumeKey,
-          ordinal: volume.ordinal,
-          title: volume.title ?? undefined,
-          objective: volume.objective ?? undefined,
-          conflict: volume.conflict ?? undefined,
-          payoff: volume.payoff ?? undefined,
-          targetChapterCount: volume.targetChapterCount ?? undefined,
-          cast: (volume.cast as string[] | null) ?? undefined,
-          body: volume.body ?? undefined,
-        };
-      }
+      case 'volume.remove':
+        return this.inverseVolume(ctx, op);
       case 'arc.upsert':
-      case 'arc.remove': {
-        const arc = await ctx.tx.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, ctx.projectId), eq(schema.arcs.arcKey, op.arcKey)) });
-        if (!arc) return op.op === 'arc.upsert' ? { op: 'arc.remove', arcKey: op.arcKey } : null;
-        return {
-          op: 'arc.upsert',
-          arcKey: op.arcKey,
-          volumeKey: arc.volumeKey,
-          ordinal: arc.ordinal,
-          title: arc.title ?? undefined,
-          objective: arc.objective ?? undefined,
-          escalation: arc.escalation ?? undefined,
-          payoff: arc.payoff ?? undefined,
-          hook: arc.hook ?? undefined,
-          chapterStart: arc.chapterStart ?? undefined,
-          chapterEnd: arc.chapterEnd ?? undefined,
-          cast: (arc.cast as string[] | null) ?? undefined,
-          body: arc.body ?? undefined,
-        };
-      }
+      case 'arc.remove':
+        return this.inverseArc(ctx, op);
       case 'brief.update':
-      case 'brief.remove': {
-        const brief = await ctx.tx.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, ctx.projectId), eq(schema.briefs.chapter, op.chapter)) });
-        if (!brief) return op.op === 'brief.update' ? { op: 'brief.remove', chapter: op.chapter } : null;
-        return {
-          op: 'brief.update',
-          chapter: op.chapter,
-          title: brief.title ?? undefined,
-          body: brief.body,
-          volumeKey: brief.volumeKey ?? undefined,
-          arcKey: brief.arcKey ?? undefined,
-          contextRefs: (brief.contextRefs as string[] | null) ?? undefined,
-          endingContract: (brief.endingContract as BriefUpdateOp['endingContract'] | null) ?? undefined,
-          // Always explicit: an omitted contract would merge as "keep", leaving a reverted reveal in place.
-          knowledgeContract: (brief.knowledgeContract as BriefUpdateOp['knowledgeContract']) ?? null,
-        };
-      }
+      case 'brief.remove':
+        return this.inverseBrief(ctx, op);
       case 'draft.update':
-      case 'draft.remove': {
-        const draft = await ctx.tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, ctx.projectId), eq(schema.drafts.chapter, op.chapter)) });
-        if (!draft) return op.op === 'draft.update' ? { op: 'draft.remove', chapter: op.chapter } : null;
-        return { op: 'draft.update', chapter: op.chapter, title: draft.title ?? undefined, body: draft.body, summary: draft.summary ?? undefined };
-      }
+      case 'draft.remove':
+        return this.inverseDraft(ctx, op);
       case 'entity.upsert':
-      case 'entity.remove': {
-        const entity = await ctx.tx.query.entities.findFirst({ where: and(eq(schema.entities.projectId, ctx.projectId), eq(schema.entities.entityKey, op.entityKey)) });
-        if (!entity) return op.op === 'entity.upsert' ? { op: 'entity.remove', entityKey: op.entityKey } : null;
-        return {
-          op: 'entity.upsert',
-          entityKey: op.entityKey,
-          type: entity.type as EntityUpsertOp['type'],
-          name: entity.name,
-          status: entity.status ?? undefined,
-          motivation: entity.motivation ?? undefined,
-          notes: entity.notes ?? undefined,
-          body: entity.body ?? undefined,
-        };
-      }
+      case 'entity.remove':
+        return this.inverseEntity(ctx, op);
       case 'fact.upsert':
-      case 'fact.remove': {
-        const fact = await ctx.tx.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, ctx.projectId), eq(schema.canonFacts.factKey, op.factKey)) });
-        if (!fact) return op.op === 'fact.upsert' ? { op: 'fact.remove', factKey: op.factKey } : null;
-        return {
-          op: 'fact.upsert',
-          factKey: op.factKey,
-          body: fact.text,
-          subjects: (fact.subjects as string[] | null) ?? undefined,
-          constraintNote: fact.constraintNote ?? undefined,
-          terms: (fact.terms as string[] | null) ?? undefined,
-          revealChapter: fact.revealChapter ?? undefined,
-        };
-      }
-      case 'seed.update': {
-        const seed = await ctx.tx.query.storySeeds.findFirst({ where: eq(schema.storySeeds.projectId, ctx.projectId) });
-        if (!seed) return null;
-        const inverse: SeedUpdateOp = { op: 'seed.update' };
-        // Per-key inverses, not the whole prior object: a key the op introduced has no prior value, and
-        // only an explicit null in the inverse removes it again under the applier's merge.
-        if (op.fields !== undefined) inverse.fields = priorKeys(op.fields, seed.fields) as SeedUpdateOp['fields'];
-        if (op.provenance !== undefined) inverse.provenance = priorKeys(op.provenance, seed.provenance) as SeedUpdateOp['provenance'];
-        if (op.constraints !== undefined) inverse.constraints = seed.constraints ?? [];
-        if (op.concepts !== undefined) inverse.concepts = seed.concepts ?? [];
-        if (op.tasteAnchors !== undefined) inverse.tasteAnchors = seed.tasteAnchors ?? { comps: [], preferences: [] };
-        return inverse;
-      }
+      case 'fact.remove':
+        return this.inverseFact(ctx, op);
+      case 'seed.update':
+        return this.inverseSeedUpdate(ctx, op);
     }
+  }
+
+  private async inversePremiseUpdate(ctx: ApplyContext, op: PremiseUpdateOp): Promise<ContentOp | null> {
+    const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
+    if (!project) return null;
+    const inverse: PremiseUpdateOp = { op: 'premise.update' };
+    if (op.premise !== undefined) inverse.premise = project.premise ?? '';
+    if (op.brief !== undefined) inverse.brief = project.brief ?? '';
+    if (op.themes !== undefined) inverse.themes = (project.themes as string[] | null) ?? [];
+    if (op.instructions !== undefined) inverse.instructions = project.instructions ?? '';
+    return inverse;
+  }
+
+  private async inverseBibleDoc(ctx: ApplyContext, op: BibleDocumentUpsertOp | BibleDocumentRemoveOp): Promise<ContentOp | null> {
+    const doc = await ctx.tx.query.bibleDocuments.findFirst({
+      where: and(eq(schema.bibleDocuments.projectId, ctx.projectId), eq(schema.bibleDocuments.section, op.section), eq(schema.bibleDocuments.slug, op.slug)),
+    });
+    if (!doc) return op.op === 'bible_document.upsert' ? { op: 'bible_document.remove', section: op.section, slug: op.slug } : null;
+    return {
+      op: 'bible_document.upsert',
+      section: op.section,
+      slug: op.slug,
+      frontmatter: (doc.frontmatter as Record<string, unknown> | null) ?? undefined,
+      body: doc.body ?? undefined,
+    };
+  }
+
+  private async inverseVolume(ctx: ApplyContext, op: VolumeUpsertOp | VolumeRemoveOp): Promise<ContentOp | null> {
+    const volume = await ctx.tx.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, ctx.projectId), eq(schema.volumes.volumeKey, op.volumeKey)) });
+    if (!volume) return op.op === 'volume.upsert' ? { op: 'volume.remove', volumeKey: op.volumeKey } : null;
+    return {
+      op: 'volume.upsert',
+      volumeKey: op.volumeKey,
+      ordinal: volume.ordinal,
+      title: volume.title ?? undefined,
+      objective: volume.objective ?? undefined,
+      conflict: volume.conflict ?? undefined,
+      payoff: volume.payoff ?? undefined,
+      targetChapterCount: volume.targetChapterCount ?? undefined,
+      cast: (volume.cast as string[] | null) ?? undefined,
+      body: volume.body ?? undefined,
+    };
+  }
+
+  private async inverseArc(ctx: ApplyContext, op: ArcUpsertOp | ArcRemoveOp): Promise<ContentOp | null> {
+    const arc = await ctx.tx.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, ctx.projectId), eq(schema.arcs.arcKey, op.arcKey)) });
+    if (!arc) return op.op === 'arc.upsert' ? { op: 'arc.remove', arcKey: op.arcKey } : null;
+    return {
+      op: 'arc.upsert',
+      arcKey: op.arcKey,
+      volumeKey: arc.volumeKey,
+      ordinal: arc.ordinal,
+      title: arc.title ?? undefined,
+      objective: arc.objective ?? undefined,
+      escalation: arc.escalation ?? undefined,
+      payoff: arc.payoff ?? undefined,
+      hook: arc.hook ?? undefined,
+      chapterStart: arc.chapterStart ?? undefined,
+      chapterEnd: arc.chapterEnd ?? undefined,
+      cast: (arc.cast as string[] | null) ?? undefined,
+      body: arc.body ?? undefined,
+    };
+  }
+
+  private async inverseBrief(ctx: ApplyContext, op: BriefUpdateOp | BriefRemoveOp): Promise<ContentOp | null> {
+    const brief = await ctx.tx.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, ctx.projectId), eq(schema.briefs.chapter, op.chapter)) });
+    if (!brief) return op.op === 'brief.update' ? { op: 'brief.remove', chapter: op.chapter } : null;
+    return {
+      op: 'brief.update',
+      chapter: op.chapter,
+      title: brief.title ?? undefined,
+      body: brief.body,
+      volumeKey: brief.volumeKey ?? undefined,
+      arcKey: brief.arcKey ?? undefined,
+      contextRefs: (brief.contextRefs as string[] | null) ?? undefined,
+      endingContract: (brief.endingContract as BriefUpdateOp['endingContract'] | null) ?? undefined,
+      // Always explicit: an omitted contract would merge as "keep", leaving a reverted reveal in place.
+      knowledgeContract: (brief.knowledgeContract as BriefUpdateOp['knowledgeContract']) ?? null,
+    };
+  }
+
+  private async inverseDraft(ctx: ApplyContext, op: DraftUpdateOp | DraftRemoveOp): Promise<ContentOp | null> {
+    const draft = await ctx.tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, ctx.projectId), eq(schema.drafts.chapter, op.chapter)) });
+    if (!draft) return op.op === 'draft.update' ? { op: 'draft.remove', chapter: op.chapter } : null;
+    return { op: 'draft.update', chapter: op.chapter, title: draft.title ?? undefined, body: draft.body, summary: draft.summary ?? undefined };
+  }
+
+  private async inverseEntity(ctx: ApplyContext, op: EntityUpsertOp | EntityRemoveOp): Promise<ContentOp | null> {
+    const entity = await ctx.tx.query.entities.findFirst({ where: and(eq(schema.entities.projectId, ctx.projectId), eq(schema.entities.entityKey, op.entityKey)) });
+    if (!entity) return op.op === 'entity.upsert' ? { op: 'entity.remove', entityKey: op.entityKey } : null;
+    return {
+      op: 'entity.upsert',
+      entityKey: op.entityKey,
+      type: entity.type as EntityUpsertOp['type'],
+      name: entity.name,
+      status: entity.status ?? undefined,
+      motivation: entity.motivation ?? undefined,
+      notes: entity.notes ?? undefined,
+      body: entity.body ?? undefined,
+    };
+  }
+
+  private async inverseFact(ctx: ApplyContext, op: FactUpsertOp | FactRemoveOp): Promise<ContentOp | null> {
+    const fact = await ctx.tx.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, ctx.projectId), eq(schema.canonFacts.factKey, op.factKey)) });
+    if (!fact) return op.op === 'fact.upsert' ? { op: 'fact.remove', factKey: op.factKey } : null;
+    return {
+      op: 'fact.upsert',
+      factKey: op.factKey,
+      body: fact.text,
+      subjects: (fact.subjects as string[] | null) ?? undefined,
+      constraintNote: fact.constraintNote ?? undefined,
+      terms: (fact.terms as string[] | null) ?? undefined,
+      revealChapter: fact.revealChapter ?? undefined,
+    };
+  }
+
+  private async inverseSeedUpdate(ctx: ApplyContext, op: SeedUpdateOp): Promise<ContentOp | null> {
+    const seed = await ctx.tx.query.storySeeds.findFirst({ where: eq(schema.storySeeds.projectId, ctx.projectId) });
+    if (!seed) return null;
+    const inverse: SeedUpdateOp = { op: 'seed.update' };
+    // Per-key inverses, not the whole prior object: a key the op introduced has no prior value, and
+    // only an explicit null in the inverse removes it again under the applier's merge.
+    if (op.fields !== undefined) inverse.fields = priorKeys(op.fields, seed.fields) as SeedUpdateOp['fields'];
+    if (op.provenance !== undefined) inverse.provenance = priorKeys(op.provenance, seed.provenance) as SeedUpdateOp['provenance'];
+    if (op.constraints !== undefined) inverse.constraints = seed.constraints ?? [];
+    if (op.concepts !== undefined) inverse.concepts = seed.concepts ?? [];
+    if (op.tasteAnchors !== undefined) inverse.tasteAnchors = seed.tasteAnchors ?? { comps: [], preferences: [] };
+    return inverse;
   }
 
   private applyOp(ctx: ApplyContext, op: ChangeOp): Promise<void> {
