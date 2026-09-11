@@ -17,6 +17,9 @@ const pgAvailable = await (async () => {
   }
 })();
 
+// This is the one spec file that owns the global `plugins.dir`, and it sets and clears it at module scope on
+// purpose: bun skips an afterAll registered inside a `describe.if(false)`, which would leave the key set for
+// whichever spec file the runner walks to next.
 Config['cache'].set('plugins.dir', join(import.meta.dir, 'fixtures'));
 afterAll(() => Config['cache'].set('plugins.dir', ''));
 
@@ -25,11 +28,18 @@ const testEnv = new TestEnvironment('plugin_fixture');
 describe.if(pgAvailable)('GET /api/v1/plugins with plugins.dir set to a real directory', () => {
   testEnv.init();
 
+  it('should list every fixture directory under plugins.dir', async () => {
+    const response = await testEnv.getRouter().mockRequest().get('/api/v1/plugins');
+
+    expect(response.statusCode).toBe(200);
+    expect((response.json() as { id: string }[]).map(entry => entry.id)).toEqual(['route-claim', 'twin-track']);
+  });
+
   it('should list the twin-track fixture loaded from the fixtures directory', async () => {
     const response = await testEnv.getRouter().mockRequest().get('/api/v1/plugins');
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual([
+    expect(response.json()).toContainEqual(
       expect.objectContaining({
         id: 'twin-track',
         decisionPoints: ['canon.augment', 'brief.policy', 'call.route', 'context.contribute', 'prompt.contribute'],
@@ -44,6 +54,6 @@ describe.if(pgAvailable)('GET /api/v1/plugins with plugins.dir set to a real dir
           },
         },
       }),
-    ]);
+    );
   });
 });

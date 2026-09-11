@@ -122,6 +122,14 @@ describe('validateManifest', () => {
     expect(() => validateManifest(badWidget, 'alpha')).toThrow(/forms\.settings\.fields\[0\]\.widget must be one of/);
   });
 
+  it('should reject an enum on a field that is not a string', () => {
+    const numberEnum = manifestFor('alpha', { forms: { settings: { fields: [{ name: 'a', type: 'number', title: 'A', enum: ['1', '2'] }] } } });
+    const booleanEnum = manifestFor('alpha', { forms: { settings: { fields: [{ name: 'a', type: 'boolean', title: 'A', enum: ['true'] }] } } });
+
+    expect(() => validateManifest(numberEnum, 'alpha')).toThrow(/forms\.settings\.fields\[0\]\.enum is only valid on a string field/);
+    expect(() => validateManifest(booleanEnum, 'alpha')).toThrow(/forms\.settings\.fields\[0\]\.enum is only valid on a string field/);
+  });
+
   it('should reject a required entry naming an undeclared field', () => {
     const raw = manifestFor('alpha', { forms: { settings: { fields: [{ name: 'a', type: 'string', title: 'A' }], required: ['b'] } } });
 

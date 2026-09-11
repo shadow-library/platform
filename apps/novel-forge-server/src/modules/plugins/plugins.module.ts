@@ -1,11 +1,14 @@
 import { Module } from '@shadow-library/app';
+import { DatabaseModule } from '@shadow-library/modules';
 
-import { PluginController } from './plugin.controller';
-import { PluginHost } from './plugin-host.service';
+import { PluginController, ProjectPluginController } from './plugin.controller';
+import { PluginHost, ScopedPluginHostFactory } from './plugin-host.service';
+import { PluginService } from './plugin.service';
 
 @Module({
-  controllers: [PluginController],
-  providers: [PluginHost],
-  exports: [PluginHost],
+  imports: [DatabaseModule],
+  controllers: [PluginController, ProjectPluginController],
+  providers: [PluginHost, ScopedPluginHostFactory, PluginService],
+  exports: [PluginHost, ScopedPluginHostFactory, PluginService],
 })
 export class PluginsModule {}

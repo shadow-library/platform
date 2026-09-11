@@ -271,4 +271,14 @@ export class AppErrorCode extends ServerErrorCode {
   // The forge owns the prose once it has landed, so a changed push is refused rather than applied — the
   // curator amends the finalized chapter in the forge, which keeps the amendment trail intact.
   static readonly ING_003 = AppErrorCode.conflict('ING_003', 'A different chapter has already been ingested at this source ordinal');
+
+  /*!
+   * Plugin Errors
+   */
+  static readonly PLG_001 = AppErrorCode.notFound('PLG_001', 'Plugin is not loaded on this deployment');
+  // Deliberately the same 404 as PLG_001, so a probe cannot tell "no such plugin on this deploy" from
+  // "installed but not enabled on this novel" by the response status.
+  static readonly PLG_002 = AppErrorCode.notFound('PLG_002', 'Plugin is not enabled on this novel');
+  static readonly PLG_003 = AppErrorCode.badRequest('PLG_003', 'Plugin configuration was rejected — {reason}');
+  static readonly PLG_004 = AppErrorCode.conflict('PLG_004', 'Another enabled plugin already claims an exclusive decision point this plugin claims: {decisionPoint}');
 }

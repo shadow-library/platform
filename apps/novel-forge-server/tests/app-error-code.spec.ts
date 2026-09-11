@@ -66,6 +66,16 @@ describe('AppErrorCode', () => {
     expect(AppErrorCode.ING_003.status).toBe(409);
   });
 
+  it('should answer a plugin that is not on this deploy and one that is not enabled with the same status', () => {
+    expect(AppErrorCode.PLG_001.status).toBe(404);
+    expect(AppErrorCode.PLG_002.status).toBe(404);
+  });
+
+  it('should define plugin error codes', () => {
+    expect(AppErrorCode.PLG_003.status).toBe(400);
+    expect(AppErrorCode.PLG_004.status).toBe(409);
+  });
+
   it('should define transform reforge error codes', () => {
     expect(AppErrorCode.REF_004.status).toBe(404);
     expect(AppErrorCode.REF_005.status).toBe(400);

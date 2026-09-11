@@ -862,7 +862,7 @@ against it.
 - [x] **PG1** — `plugin.types.ts`, loader, `plugins.dir`, `GET /api/v1/plugins`, `registerForTest`. Unset or
       empty dir ⇒ `[]`. Boot skips a failing plugin. Verify: loader unit tests; HTTP list with dir unset.
 - [x] **PG2** — Fixture `tests/plugins/fixtures/twin-track/`. Verify: it loads and lists.
-- [ ] **PG3** — `project_plugins` + `plugin_kv` + `PLG_001`–`PLG_004` + enable/disable + config validation +
+- [x] **PG3** — `project_plugins` + `plugin_kv` + `PLG_001`–`PLG_004` + enable/disable + config validation +
       exclusivity + scoped host + `host.kv` + `host.read`. Verify: migration applies; enable on A invisible to
       B; disable idempotent; `PLG_003` / `PLG_004`; `installed: false` and `needsReview` paths.
 - [ ] **PG4** — `PluginPolicyService` + `ForgeCallPolicy` + `call.route` + writer-class resolution + the

@@ -63,6 +63,7 @@ function validateFormField(raw: unknown, at: string): PluginFormField {
   if (raw.description !== undefined) field.description = requireString(raw, 'description', at);
   if (raw.widget !== undefined) field.widget = requireMember(raw, 'widget', FORM_WIDGETS, at);
   if (raw.enum !== undefined) {
+    if (field.type !== 'string') fail(`${at}.enum is only valid on a string field`);
     if (!isStringArray(raw.enum)) fail(`${at}.enum must be an array of strings`);
     field.enum = [...raw.enum];
   }

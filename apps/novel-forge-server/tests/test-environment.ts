@@ -55,9 +55,7 @@ export class TestEnvironment {
     const databaseName = `${baseConnectionString.split('/').pop()}_${this.databaseSuffix}`;
     TestEnvironment.logger.info(`Setting up test environment with database: '${databaseName}'`);
     Config['cache'].set('database.postgres.url', `${baseConnectionString}_${this.databaseSuffix}`);
-    // DatabaseService never closes its Postgres pool on app stop, so every booted TestEnvironment
-    // leaks one for the rest of the run. Tests are sequential anyway; a small pool per app keeps the
-    // whole suite far below Postgres's max_connections no matter how many suites boot an app.
+    // Many suites each boot an app, so a small pool per app keeps the whole run clear of Postgres's max_connections.
     Config['cache'].set('database.postgres.max-connections', '3');
 
     // The shared StorageModule defaults to the S3 driver, which the suite has no cluster to reach; pin it
