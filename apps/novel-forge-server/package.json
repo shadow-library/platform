@@ -6,6 +6,7 @@
   "description": "Backend service for the AI-powered novel generation platform. Provides workflow orchestration, lore management, chapter generation, AI integrations, user review pipelines, and continuity validation.",
   "scripts": {
     "dev": "bun run --watch src/main.ts",
+    "test": "bun test --coverage --timeout 20000",
     "ai:smoke": "bun run tests/ai/ai-smoke.ts",
     "ai:pull-models": "bun run tests/ai/ai-pull-models.ts",
     "eval:metrics": "bun run tests/eval/deterministic-metrics.ts",
