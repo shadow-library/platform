@@ -9,6 +9,7 @@ import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import { type KnowledgeLeakIssue, loadKnowledgeView, parseKnowledgeContract, renderForbiddenFacts, scanKnowledgeLeaks } from '../../bible/fact/knowledge-view';
+import { type ForgeCallPolicy, type PluginPolicyService, type PolicyCall, raisedContainment, type ScopedPolicyResolver } from '../../plugins/plugin-policy.service';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ContextSection, splitSegments } from '../context/sections';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
@@ -29,6 +30,7 @@ export interface GraphServices {
   telemetry: TelemetryHandler;
   toolRegistry: ToolRegistryService;
   indexingService: IndexingService;
+  pluginPolicy: PluginPolicyService;
   checkpointer: BaseCheckpointSaver;
 }
 
@@ -58,6 +60,9 @@ const ChapterGenAnnotation = Annotation.Root({
   attempt: Annotation<number>({ reducer: (_, n) => n, default: () => 0 }),
   repairMode: Annotation<'patch' | 'rewrite'>({ reducer: (_, n) => n, default: () => 'patch' }),
   patchApplied: Annotation<boolean>({ reducer: (_, n) => n, default: () => false }),
+  // Sticky, not last-write-wins: any call a plugin routed permissively during the run shapes the prose
+  // that lands, so once raised the run stays contained however many later nodes resolve an unraised policy.
+  writerClassRaised: Annotation<boolean>({ reducer: (a, n) => a || n, default: () => false }),
   // outcome
   draftId: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
@@ -167,13 +172,22 @@ function tryParseJson(raw: string): unknown {
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function createChapterGenerationGraph(services: GraphServices) {
-  const { db, contextAssembler, modelRouter, toolRegistry, checkpointer } = services;
+  const { db, contextAssembler, modelRouter, toolRegistry, checkpointer, pluginPolicy } = services;
+
+  // The graph is built per run, so this closure is the run's scope: one `project_plugins` read feeds every
+  // node's policy instead of one read per model call.
+  let resolver: Promise<ScopedPolicyResolver> | undefined;
+  async function policyFor(projectId: bigint, call: PolicyCall): Promise<ForgeCallPolicy> {
+    resolver ??= pluginPolicy.scoped(projectId);
+    return (await resolver).for(call);
+  }
 
   async function assembleContext(state: ChapterGenState) {
-    const pack = await contextAssembler.forChapter(BigInt(state.projectId), state.chapter);
+    const policy = await policyFor(BigInt(state.projectId), { role: 'generation', chapter: state.chapter });
+    const pack = await contextAssembler.forChapter(BigInt(state.projectId), state.chapter, { policy });
     // Link the pack to the run row so the run detail can show the prompt anatomy behind the tokens.
     if (pack.id !== null) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
-    return { contextPackId: pack.id ? String(pack.id) : null, nodeTrace: ['assembleContext'] };
+    return { contextPackId: pack.id ? String(pack.id) : null, writerClassRaised: policy.raised, nodeTrace: ['assembleContext'] };
   }
 
   async function draftChapter(state: ChapterGenState) {
@@ -199,17 +213,22 @@ export function createChapterGenerationGraph(services: GraphServices) {
       role: 'generation',
     };
 
+    const policy = await policyFor(projectId, { role: 'generation', chapter: state.chapter });
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
       { stableContext, volatileContext, chapterBrief: renderChapterBrief(brief), endingContract: renderEndingContract(brief?.endingContract), guidance: state.guidance },
       ctx,
       projectRow as ProjectConfig | undefined,
+      policy,
     )) as { title: string; body: string; summary: string; state?: Record<string, string> };
 
     let title = result.title ?? '';
+    let raised = policy.raised;
     if (!title) {
       const titleCtx: TelemetryContext = { ...ctx, promptKey: 'title', node: 'draftChapter:title' };
-      const titleResult = (await modelRouter.structured(PROMPT_REGISTRY.title, { prose: result.body.slice(0, 500) }, titleCtx)) as { title: string };
+      const titlePolicy = await policyFor(projectId, { role: 'title', chapter: state.chapter });
+      raised ||= titlePolicy.raised;
+      const titleResult = (await modelRouter.structured(PROMPT_REGISTRY.title, { prose: result.body.slice(0, 500) }, titleCtx, undefined, titlePolicy)) as { title: string };
       title = titleResult.title ?? '';
     }
 
@@ -219,6 +238,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       title,
       summary: result.summary,
       continuationState: (result.state ?? {}) as Record<string, string>,
+      writerClassRaised: raised,
       nodeTrace: ['draftChapter'],
     };
   }
@@ -226,6 +246,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
   async function persistDraft(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
     const source = state.attempt === 0 ? 'generated' : state.repairMode === 'patch' ? 'patched' : 'rewritten';
+    const containment = raisedContainment({ raised: state.writerClassRaised });
 
     // Upsert the draft and record its revision in one transaction: the revision log must never
     // diverge from the draft it describes. `onConflictDoNothing` on the revision keeps the whole
@@ -244,6 +265,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
           revision: 0,
           reviewStatus: 'generating',
           staleReason: null,
+          ...containment,
         })
         .onConflictDoUpdate({
           target: [schema.drafts.projectId, schema.drafts.chapter],
@@ -254,6 +276,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
             state: sql`EXCLUDED.state`,
             revision: sql`drafts.revision + 1`,
             staleReason: null,
+            ...containment,
             updatedAt: new Date(),
           },
         })
@@ -327,7 +350,8 @@ export function createChapterGenerationGraph(services: GraphServices) {
 
     const tools = toolRegistry.forNode('judge', toolCtx);
     const rawTools = toolRegistry.getRaw('judge');
-    const model = await modelRouter.chatFor('judge', projectRow as ProjectConfig | undefined, projectId);
+    const judgePolicy = await policyFor(projectId, { role: 'judge', chapter: state.chapter });
+    const model = await modelRouter.chatFor('judge', projectRow as ProjectConfig | undefined, projectId, judgePolicy);
 
     const renderedContract = renderEndingContract(brief?.endingContract);
     const contractBlock = renderedContract
@@ -413,7 +437,15 @@ export function createChapterGenerationGraph(services: GraphServices) {
         .where(eq(schema.drafts.id, BigInt(state.draftId)));
     }
 
-    return { verdict, findings, endingCompliant, knowledgeCompliant: knowledge.knowledgeCompliant, briefCompliant, nodeTrace: ['judge'] };
+    return {
+      verdict,
+      findings,
+      endingCompliant,
+      knowledgeCompliant: knowledge.knowledgeCompliant,
+      briefCompliant,
+      writerClassRaised: judgePolicy.raised,
+      nodeTrace: ['judge'],
+    };
   }
 
   async function repairPatch(state: ChapterGenState) {
@@ -429,17 +461,19 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const findingsStr = state.findings.map(f => `[${f.severity}] ${f.text}`).join('\n');
     const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'repairPatch', promptKey: 'fix', promptVersion: '1.0.0', role: 'fix' };
 
+    const policy = await policyFor(projectId, { role: 'fix', chapter: state.chapter });
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.fix,
       { contextPack: renderedPack, prose: state.prose, findings: findingsStr },
       ctx,
       projectRow as ProjectConfig | undefined,
+      policy,
     )) as FixOutput;
 
     logger.debug('generation repairPatch', { runId: state.runId, chapter: state.chapter, attempt: state.attempt, action: result.action, patches: result.patches?.length ?? 0 });
 
     if (result.action === 'rewrite' && result.body) {
-      return { prose: result.body, repairMode: 'rewrite' as const, patchApplied: false, nodeTrace: ['repairPatch'] };
+      return { prose: result.body, repairMode: 'rewrite' as const, patchApplied: false, writerClassRaised: policy.raised, nodeTrace: ['repairPatch'] };
     }
 
     if (result.action === 'patch' && result.patches && result.patches.length > 0) {
@@ -456,13 +490,20 @@ export function createChapterGenerationGraph(services: GraphServices) {
       }
 
       if (allApplied) {
-        return { prose: patched, repairMode: 'patch' as const, patchApplied: true, attempt: state.attempt + 1, previousFindings: state.findings, nodeTrace: ['repairPatch'] };
+        return {
+          prose: patched,
+          repairMode: 'patch' as const,
+          patchApplied: true,
+          attempt: state.attempt + 1,
+          previousFindings: state.findings,
+          writerClassRaised: policy.raised,
+          nodeTrace: ['repairPatch'],
+        };
       }
       logger.debug('generation repairPatch: a patch anchor was not uniquely found — falling back to rewrite', { runId: state.runId, chapter: state.chapter });
     }
 
-    // Patch failed — fall through to rewrite.
-    return { repairMode: 'rewrite' as const, patchApplied: false, nodeTrace: ['repairPatch'] };
+    return { repairMode: 'rewrite' as const, patchApplied: false, writerClassRaised: policy.raised, nodeTrace: ['repairPatch'] };
   }
 
   async function repairRewrite(state: ChapterGenState) {
@@ -491,11 +532,13 @@ export function createChapterGenerationGraph(services: GraphServices) {
       role: 'generation',
     };
 
+    const policy = await policyFor(projectId, { role: 'generation', chapter: state.chapter });
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
       { stableContext, volatileContext, chapterBrief: renderChapterBrief(brief), endingContract: renderEndingContract(brief?.endingContract), guidance },
       ctx,
       projectRow as ProjectConfig | undefined,
+      policy,
     )) as { title: string; body: string; summary: string; state?: Record<string, string> };
 
     return {
@@ -506,6 +549,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       attempt: state.attempt + 1,
       previousFindings: state.findings,
       repairMode: 'patch' as const,
+      writerClassRaised: policy.raised,
       nodeTrace: ['repairRewrite'],
     };
   }

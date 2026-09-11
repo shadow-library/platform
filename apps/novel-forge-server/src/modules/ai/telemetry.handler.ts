@@ -8,6 +8,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
+import { type PluginStamp } from '../plugins/plugin-policy.service';
 import { countTokens } from './context/token-budget';
 
 export interface TelemetryContext {
@@ -26,6 +27,8 @@ interface PendingCall {
   model: string;
   attempt: number;
   promptTokensEstimate: number;
+  plugins?: PluginStamp[];
+  policyDigest?: string;
 }
 
 export interface TokenUsage {
@@ -116,9 +119,10 @@ export class TelemetryHandler extends BaseCallbackHandler {
     // fallback estimate when the provider stays silent.
     const promptTokensEstimate = countTokens(prompts.map(p => (typeof p === 'string' ? p : JSON.stringify(p))).join('\n'));
 
-    const nf = metadata?.['nfTelemetry'] as (TelemetryContext & { projectId: string; provider: string; model: string; attempt: number }) | undefined;
+    const nf = metadata?.['nfTelemetry'] as
+      (TelemetryContext & { projectId: string; provider: string; model: string; attempt: number; plugins?: PluginStamp[]; policyDigest?: string }) | undefined;
     if (nf) {
-      const { provider, model, attempt, projectId, ...ctx } = nf;
+      const { provider, model, attempt, projectId, plugins, policyDigest, ...ctx } = nf;
       this.logger.debug('LLM call started', {
         runId,
         provider,
@@ -130,7 +134,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
         workflowRunId: ctx.runId,
         promptTokensEstimate,
       });
-      this.pending.set(runId, { startedAt: Date.now(), ctx: { ...ctx, projectId: BigInt(projectId) }, provider, model, attempt, promptTokensEstimate });
+      this.pending.set(runId, { startedAt: Date.now(), ctx: { ...ctx, projectId: BigInt(projectId) }, provider, model, attempt, promptTokensEstimate, plugins, policyDigest });
       return;
     }
 
@@ -169,6 +173,8 @@ export class TelemetryHandler extends BaseCallbackHandler {
         promptKey: call.ctx.promptKey,
         promptVersion: call.ctx.promptVersion,
         status: 'ok',
+        plugins: call.plugins ?? null,
+        policyDigest: call.policyDigest ?? null,
         inputTokens,
         cachedInputTokens,
         outputTokens,
@@ -199,6 +205,8 @@ export class TelemetryHandler extends BaseCallbackHandler {
         promptKey: call.ctx.promptKey,
         promptVersion: call.ctx.promptVersion,
         status: 'transport_error',
+        plugins: call.plugins ?? null,
+        policyDigest: call.policyDigest ?? null,
         latencyMs: Date.now() - call.startedAt,
         attempt: call.attempt,
         rawOutput: '',

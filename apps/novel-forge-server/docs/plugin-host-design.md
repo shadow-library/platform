@@ -215,7 +215,15 @@ that is the author's setting, not a plugin's.
 
 **Raising the class and isolating the output are one act.** A generation whose class was raised by a plugin
 writes its draft with `generator: 'unrestricted'` and `isolated: true`, exactly as `generateUnrestricted`
-does. There is no path that produces permissive prose outside the containment firewall.
+does. There is no path that produces permissive prose outside the containment firewall. Containment keys on
+`policy.raised`, never on the resulting class: an unrestricted-mode novel already starts permissive, and its
+own generations stay uncontained exactly as they are today.
+
+The raise is **sticky for the whole run**, not per node. A run resolves a policy per role — `generation`,
+`title`, `judge`, `fix` — and any one of them may be the raised one, so a raise anywhere in the run isolates
+the draft that run persists. `chapter-generation.graph.ts` carries this as the `writerClassRaised` reducer:
+it ORs rather than replaces, so a later unraised node cannot un-contain prose an earlier raised call shaped.
+Over-containment is the safe direction, matching §4 decision 12.
 
 ### 5.3.1 The sanitization rule — what may go in a core artifact
 
@@ -312,6 +320,8 @@ interface PluginStamp {
 
 interface ForgeCallPolicy {
   writerClass: WriterClass;
+  /** True only when a plugin lifted this call above the project's own class. */
+  raised: boolean;
   plugins: PluginStamp[];
   systemMessages: Array<{ role: 'system'; content: string }>;
   contextSections: PluginContextSection[];
@@ -343,7 +353,8 @@ promptVersion, input }`, and `llm_cache.requestHash` is globally unique — not 
 `chapter-generation.graph.ts:330` (judge), `novel-validation.graph.ts:156`, and
 `generation.service.ts:693` (`judgeDraft`).
 
-`call.route` **is** honoured on those paths, because it lives in `resolveModel`. `prompt.contribute` is not.
+`call.route` **is** honoured on those paths, because it lives in `resolveModel` and all three thread the
+resolved policy into `chatFor`. `prompt.contribute` is not.
 The loader logs a warning when a manifest declares `prompt.contribute` for a role that never routes through
 `structured()`.
 
@@ -797,6 +808,10 @@ content policy, a genre, or an imprint.
   - `contributeContextSections` — one section with `minWriterClass: 'permissive'` carrying `noteText`.
   - `contributeSystemMessages` — one message for roles `generation`, `revision`, `fix`; empty otherwise.
 
+Two single-purpose fixtures sit beside it, equally abstract: `route-claim/` claims `call.route` exclusively
+and refuses a config no form can express, and `role-route/` raises the class for one configured call role
+only — the shape that proves the raise is sticky across the repair ladder rather than keyed on `generation`.
+
 `tests/plugins/plugin-host.spec.ts` and an HTTP e2e beside the other controller specs:
 
 1. `plugins.dir` unset ⇒ `GET /plugins` is `[]`; a generate-path policy is empty; `buildMessages` output is
@@ -832,6 +847,12 @@ from a real directory.
 - `src/modules/dynamic.modules.ts` — import `PluginsModule`
 - `src/modules/ai/model-router.service.ts` — `resolveModel` takes the policy; `buildMessages` appends
   contributions; **`hashRequest` folds in `policy.digest`**; `model_calls` records plugin stamps
+- `src/database/schemas/ai.ts` — `model_calls` gains nullable `plugins` (jsonb) and `policy_digest`, the
+  columns the amended rule 10 requires; both stay null on a plugin-free call
+- `src/modules/ai/graphs/chapter-generation.graph.ts` — resolve the policy once per run and thread it to
+  every node's call; apply the isolated-draft invariant where the draft is persisted
+- `src/modules/ai/graphs/novel-validation.graph.ts` — thread the policy into its raw `chatFor()` client, so
+  §6.1's coverage claim holds without an asterisk
 - `src/modules/ai/context/context-assembler.service.ts` — accept the policy, merge plugin sections, enforce
   `minWriterClass`
 - `src/modules/ai/telemetry.handler.ts` — carry plugin stamps onto the `model_calls` row
@@ -865,7 +886,7 @@ against it.
 - [x] **PG3** — `project_plugins` + `plugin_kv` + `PLG_001`–`PLG_004` + enable/disable + config validation +
       exclusivity + scoped host + `host.kv` + `host.read`. Verify: migration applies; enable on A invisible to
       B; disable idempotent; `PLG_003` / `PLG_004`; `installed: false` and `needsReview` paths.
-- [ ] **PG4** — `PluginPolicyService` + `ForgeCallPolicy` + `call.route` + writer-class resolution + the
+- [x] **PG4** — `PluginPolicyService` + `ForgeCallPolicy` + `call.route` + writer-class resolution + the
       isolated-draft invariant + **`hashRequest` digest** + `model_calls` stamps. Verify: fixture test 5, 7,
       12; one `project_plugins` read per run.
 - [ ] **PG5** — `context.contribute` + `minWriterClass` guard + `prompt.contribute`. Verify: fixture tests 1,

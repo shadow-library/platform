@@ -68,7 +68,7 @@ describe.if(pgAvailable)('outline invariant enforcement', () => {
       }),
     } as never;
     const noop = {} as never;
-    return new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop);
+    return new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, noop);
   }
 
   function buildSpanService(): { service: GenerationService; structured: ReturnType<typeof mock> } {
@@ -79,7 +79,7 @@ describe.if(pgAvailable)('outline invariant enforcement', () => {
     const modelRouter = { structured } as never;
     const contextAssembler = { catalog: async () => 'CATALOG', resolveRefs: async (_projectId: bigint, refs: string[]) => ({ resolved: [], unresolved: refs }) } as never;
     const noop = {} as never;
-    const service = new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop);
+    const service = new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, noop);
     return { service, structured };
   }
 

@@ -6,6 +6,7 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { createChapterGenerationGraph } from '@modules/ai/graphs/chapter-generation.graph';
+import { emptyPolicy } from '@modules/plugins';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { FULL_LENGTH_DRAFT_BODY } from '@tests/fixtures/draft-body';
@@ -52,7 +53,16 @@ function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, calls: 
   const contextAssembler = { forChapter: async () => ({ id: null }) };
   const toolRegistry = { forNode: () => [], getRaw: () => [] };
 
-  return { db, contextAssembler, modelRouter, telemetry: {}, toolRegistry, indexingService: {}, checkpointer } as never;
+  return {
+    db,
+    contextAssembler,
+    modelRouter,
+    telemetry: {},
+    toolRegistry,
+    indexingService: {},
+    pluginPolicy: { scoped: async () => ({ for: () => emptyPolicy() }) },
+    checkpointer,
+  } as never;
 }
 
 describe.if(pgAvailable)('LangGraph checkpoint resume', () => {

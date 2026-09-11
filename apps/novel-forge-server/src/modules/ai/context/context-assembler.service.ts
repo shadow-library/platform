@@ -12,12 +12,20 @@ import { loadKnowledgeView, parseKnowledgeContract, renderChapterReveals, render
 import { matchPlaybooks } from '../../ideation/constraint-playbooks';
 import { SEED_FIELD_KEYS } from '../../ideation/question-bank';
 import { type RouterResult, toRouterSeedState } from '../../ideation/question-router';
+import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../prompts/authoring-preamble';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 import { CatalogService } from './catalog.service';
 import { computeDormantThreads, renderDormantThreads } from './dormant-threads';
 import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextSegment, type ContextTier, joinSections, renderSection, splitSegments } from './sections';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
+
+export interface ChapterPackOptions {
+  budgetTokens?: number;
+  dryRun?: boolean;
+  /** The call's resolved policy, threaded ahead of assembly so the writer class is already fixed when sections are chosen. */
+  policy?: ForgeCallPolicy;
+}
 
 export interface IdeationPackOptions {
   budgetTokens?: number;
@@ -435,7 +443,7 @@ export class ContextAssembler {
     return { resolved, unresolved };
   }
 
-  async forChapter(projectId: bigint, chapter: number, opts?: { budgetTokens?: number; dryRun?: boolean }): Promise<AssembledPack & { id: bigint | null }> {
+  async forChapter(projectId: bigint, chapter: number, opts?: ChapterPackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? DEFAULT_BUDGET;
 
     const [project, brief, prevChapter, currentVolume, recentChapters, prevDraft] = await Promise.all([

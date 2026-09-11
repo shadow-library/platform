@@ -156,7 +156,7 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
     const noop = {} as never;
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
-    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop);
+    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop);
     const modelRouter = { structured: structuredMock, resolveModel: () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }) } as never;
     proposals = new ProposalService(databaseService);
     applier = new ProposalApplyService(databaseService, new ActionExecutorRegistry());

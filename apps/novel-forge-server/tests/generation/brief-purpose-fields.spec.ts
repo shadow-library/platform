@@ -64,7 +64,7 @@ describe.if(pgAvailable)('brief chapterPurpose/readerValue/repetitionRisks (harn
     const modelRouter = { structured: mock(async () => structuredOutput) } as never;
     const contextAssembler = { catalog: async () => 'CATALOG', resolveRefs: async (_projectId: bigint, refs: string[]) => ({ resolved: [], unresolved: refs }) } as never;
     const noop = {} as never;
-    return new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop);
+    return new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, noop);
   }
 
   it('persists chapterPurpose, readerValue, and repetitionRisks from outline()', async () => {

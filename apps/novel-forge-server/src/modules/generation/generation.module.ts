@@ -3,6 +3,7 @@ import { DatabaseModule, StorageModule } from '@shadow-library/modules';
 
 import { AiModule } from '../ai/ai.module';
 import { JobsModule } from '../jobs/jobs.module';
+import { PluginsModule } from '../plugins/plugins.module';
 import { RefinementModule } from '../refinement/refinement.module';
 import { ChapterAmendController } from './chapter-amend.controller';
 import { ChapterAmendService } from './chapter-amend.service';
@@ -14,7 +15,7 @@ import { GenerationController } from './generation.controller';
 import { GenerationService } from './generation.service';
 
 @Module({
-  imports: [DatabaseModule, AiModule, JobsModule, RefinementModule, StorageModule],
+  imports: [DatabaseModule, AiModule, JobsModule, PluginsModule, RefinementModule, StorageModule],
   controllers: [GenerationController, ChapterImageController, ChapterInsertController, ChapterAmendController],
   providers: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService],
   exports: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService],

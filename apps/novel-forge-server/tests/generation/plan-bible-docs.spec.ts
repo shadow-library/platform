@@ -55,7 +55,7 @@ describe.if(pgAvailable)('plan() reads bible documents', () => {
     const databaseService = { getPostgresClient: () => db } as never;
     const modelRouter = { structured } as never;
     const noop = {} as never;
-    return new GenerationService(databaseService, noop, modelRouter, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    return new GenerationService(databaseService, noop, modelRouter, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
   }
 
   it('passes rendered bible-document content to the model call when bible docs exist', async () => {

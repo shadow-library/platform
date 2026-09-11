@@ -685,9 +685,13 @@ _Result:_ `bun test` green; nightly green-or-skipped; docs current.
 8. Draft and isolated content never enter an index, never retrieve, and never feed continuity extraction. Containment is
    driven by `chapters.isolated` / `drafts.isolated`, never by `generator` — provenance and containment are independent
    axes. Unrestricted projects retrieve like Standard; a project's `contentMode` never implies a chapter is isolated, and
-   a chapter being isolated never implies its project is `unrestricted`. (Amended by `interstitial-chapter-design.md` §2.)
+   a chapter being isolated never implies its project is `unrestricted`. A call whose writer class a plugin raised to
+   `permissive` writes `generator: 'unrestricted'` and `isolated: true` — raising the class and isolating the output are
+   one act. (Amended by `interstitial-chapter-design.md` §2 and `plugin-host-design.md` §3.)
 9. Review state lives in `drafts.reviewStatus`, not in paused graphs; feedback starts a new run.
-10. Prompt text lives in versioned code modules; every call logs `promptKey@promptVersion`.
+10. Prompt text lives in versioned code modules; every call logs `promptKey@promptVersion`. When plugins contribute to a
+    call, `model_calls` also records the resolved policy's plugin stamps and its digest, so the exact message list stays
+    reconstructable. _(Amended by `docs/plugin-host-design.md` §3.)_
 11. `runId` correlates everything; a failed generation is debuggable from the database alone.
 12. Chat is turn-based stateless chains: every turn is a fresh `workflow_runs` row; conversation state lives in `chat_sessions`/`chat_messages`, never in checkpoints. _(Added by `docs/interactive-refinement-design.md` §2.2.)_
 13. Chat, audit, premise, and arc-plan output never writes domain tables directly — only through a `refinement_proposals` apply. _(Added by `docs/interactive-refinement-design.md` §2.2.)_

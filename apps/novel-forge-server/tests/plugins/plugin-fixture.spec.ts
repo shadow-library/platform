@@ -32,7 +32,7 @@ describe.if(pgAvailable)('GET /api/v1/plugins with plugins.dir set to a real dir
     const response = await testEnv.getRouter().mockRequest().get('/api/v1/plugins');
 
     expect(response.statusCode).toBe(200);
-    expect((response.json() as { id: string }[]).map(entry => entry.id)).toEqual(['route-claim', 'twin-track']);
+    expect((response.json() as { id: string }[]).map(entry => entry.id)).toEqual(['role-route', 'route-claim', 'twin-track']);
   });
 
   it('should list the twin-track fixture loaded from the fixtures directory', async () => {

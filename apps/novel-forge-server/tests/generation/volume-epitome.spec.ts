@@ -49,6 +49,7 @@ describe.if(pgAvailable)('volume epitome on finalization', () => {
       noop,
       noop,
       noop,
+      noop,
     );
     return { service, structured, finalization };
   }

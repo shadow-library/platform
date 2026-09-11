@@ -6,6 +6,7 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { createNovelValidationGraph } from '@modules/ai/graphs/novel-validation.graph';
+import { emptyPolicy } from '@modules/plugins';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -54,6 +55,7 @@ function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, verdict
     telemetry: {},
     toolRegistry: { forNode: () => [], getRaw: () => [] },
     indexingService: {},
+    pluginPolicy: { resolve: async () => emptyPolicy() },
     checkpointer,
   } as never;
 }
@@ -79,7 +81,16 @@ describe.if(pgAvailable)('novel-validation persistReport', () => {
     if (!project) throw new Error('failed to seed project');
 
     // With no finalized chapters, planWindows yields no windows, so validateWindows never calls a model.
-    const services = { db, contextAssembler: {}, modelRouter: {}, telemetry: {}, toolRegistry: {}, indexingService: {}, checkpointer } as never;
+    const services = {
+      db,
+      contextAssembler: {},
+      modelRouter: {},
+      telemetry: {},
+      toolRegistry: {},
+      indexingService: {},
+      pluginPolicy: { resolve: async () => emptyPolicy() },
+      checkpointer,
+    } as never;
     const graph = createNovelValidationGraph(services);
 
     await graph.invoke({ projectId: String(project.id), runId: 'val-run-1' }, { configurable: { thread_id: 'val-run-1' } });

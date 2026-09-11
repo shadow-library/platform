@@ -10,6 +10,7 @@ import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { createChapterGenerationGraph } from '@modules/ai/graphs/chapter-generation.graph';
 import { GenerationService } from '@modules/generation/generation.service';
+import { emptyPolicy } from '@modules/plugins';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -99,6 +100,7 @@ describe.if(pgAvailable)('generation path prompt-cache vars', () => {
       modelRouter,
       telemetry: {},
       toolRegistry: { forNode: () => [], getRaw: () => [] },
+      pluginPolicy: { scoped: async () => ({ for: () => emptyPolicy() }) },
       checkpointer: new MemorySaver(),
     } as never;
 
@@ -118,7 +120,8 @@ describe.if(pgAvailable)('generation path prompt-cache vars', () => {
     const structured = mock(async () => draftOutput);
     const databaseService = { getPostgresClient: () => db } as never;
     const noop = {} as never;
-    const service = new GenerationService(databaseService, noop, { structured } as never, assembler(), noop, noop, noop, noop, noop, noop, noop, noop);
+    const pluginPolicy = { resolve: async () => emptyPolicy('permissive') } as never;
+    const service = new GenerationService(databaseService, noop, { structured } as never, assembler(), noop, noop, noop, noop, noop, noop, noop, noop, pluginPolicy);
 
     await service.generateUnrestricted(projectId, 2, { guidance: 'GUIDANCE_MARKER' } as never);
 

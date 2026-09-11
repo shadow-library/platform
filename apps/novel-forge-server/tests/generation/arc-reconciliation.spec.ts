@@ -82,6 +82,7 @@ describe.if(pgAvailable)('arc reconciliation on finalization', () => {
       noop,
       noop,
       noop,
+      noop,
     );
     return { service, structured, forOutline, finalization };
   }

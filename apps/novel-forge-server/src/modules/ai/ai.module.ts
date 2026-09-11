@@ -1,6 +1,7 @@
 import { Module } from '@shadow-library/app';
 import { DatabaseModule } from '@shadow-library/modules';
 
+import { PluginsModule } from '../plugins/plugins.module';
 import { AiController } from './ai.controller';
 import { AiQuotaService } from './ai-quota.service';
 import { CatalogService } from './context/catalog.service';
@@ -14,7 +15,7 @@ import { TelemetryHandler } from './telemetry.handler';
 import { ToolRegistryService } from './tools/tool-registry.service';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, PluginsModule],
   controllers: [AiController],
   providers: [
     TelemetryHandler,

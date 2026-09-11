@@ -73,7 +73,7 @@ describe.if(pgAvailable)('outliner-authored knowledge contracts', () => {
     const databaseService = { getPostgresClient: () => db } as never;
     const contextAssembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
     const noop = {} as never;
-    return new GenerationService(databaseService, noop, { structured: mock(async () => briefs) } as never, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop);
+    return new GenerationService(databaseService, noop, { structured: mock(async () => briefs) } as never, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, noop);
   }
 
   interface ProjectFixture {

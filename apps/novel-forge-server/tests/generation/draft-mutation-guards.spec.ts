@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { AppError } from '@shadow-library/common';
 
 import { GenerationService } from '@modules/generation/generation.service';
+import { emptyPolicy } from '@modules/plugins';
 import { type Generation, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -42,7 +43,8 @@ describe.if(pgAvailable)('GenerationService draft mutation guards', () => {
     const noop = {} as never;
     const modelRouter = { structured: async () => ({ title: 'revised title', body: 'revised body', summary: 'revised summary', state: {} }) } as never;
     const contextAssembler = { forChapter: async () => ({ rendered: '', renderedStable: '', renderedVolatile: '' }) } as never;
-    return new GenerationService({ getPostgresClient: () => client } as never, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop);
+    const pluginPolicy = { resolve: async () => emptyPolicy() } as never;
+    return new GenerationService({ getPostgresClient: () => client } as never, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, pluginPolicy);
   }
 
   beforeAll(async () => {
@@ -396,7 +398,8 @@ describe('GenerationService.generateUnrestricted model routing', () => {
     const modelRouter = { structured } as never;
     const contextAssembler = { forChapter: async () => ({ rendered: '', renderedStable: '', renderedVolatile: '' }) } as never;
     const db = stubDb(project);
-    return new GenerationService({ getPostgresClient: () => db } as never, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop);
+    const pluginPolicy = { resolve: async () => emptyPolicy('permissive') } as never;
+    return new GenerationService({ getPostgresClient: () => db } as never, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, pluginPolicy);
   }
 
   it('passes the real project row into modelRouter.structured, with contentMode forced to unrestricted', async () => {

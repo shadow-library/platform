@@ -152,6 +152,58 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/plugins': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Plugins */
+    get: operations['get_api_v1_plugins'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/plugins': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Project Plugins */
+    get: operations['get_api_v1_projects_projectId_plugins'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/plugins/{pluginId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Enable Plugin */
+    put: operations['put_api_v1_projects_projectId_plugins_pluginId'];
+    post?: never;
+    /** Disable Plugin */
+    delete: operations['delete_api_v1_projects_projectId_plugins_pluginId'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/api-keys': {
     parameters: {
       query?: never;
@@ -2607,58 +2659,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/plugins': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Plugins */
-    get: operations['get_api_v1_plugins'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/plugins': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Project Plugins */
-    get: operations['get_api_v1_projects_projectId_plugins'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/plugins/{pluginId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    /** Enable Plugin */
-    put: operations['put_api_v1_projects_projectId_plugins_pluginId'];
-    post?: never;
-    /** Disable Plugin */
-    delete: operations['delete_api_v1_projects_projectId_plugins_pluginId'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2739,6 +2739,68 @@ export interface components {
       role: string;
       provider: string;
       model: string;
+    };
+    PluginManifestResponse: components['schemas']['PluginManifestResponse1'][];
+    /** @description Manifest of one plugin loaded on this deploy. */
+    PluginManifestResponse1: {
+      /** @description Stable plugin identifier, equal to its directory name under the deployment plugin directory. */
+      id: string;
+      /** @description Manifest version the stored per-novel config is validated against. */
+      version: string;
+      title: string;
+      description: string;
+      /** @description Pipeline decision points this plugin answers. */
+      decisionPoints: components['schemas']['DecisionPoint'][];
+      /** @description Decision points claimed exclusively — a second plugin claiming one of these cannot be enabled on the same novel. */
+      exclusive?: components['schemas']['DecisionPoint'][];
+      /** @description Declared forms keyed by name; `settings` is the per-novel configuration form rendered from its field list. */
+      forms: {
+        [key: string]: unknown;
+      };
+      actions?: components['schemas']['PluginActionResponse'][];
+    };
+    /** @enum {string} */
+    DecisionPoint: 'canon.augment' | 'brief.policy' | 'call.route' | 'context.contribute' | 'prompt.contribute';
+    /** @description An author-triggered action the plugin surfaces in the UI. Invoking one is not yet supported. */
+    PluginActionResponse: {
+      id: string;
+      /** @description Operation name passed back to the plugin when the action runs. */
+      op: string;
+      label: string;
+      /** @description Where the action is offered. */
+      surface: components['schemas']['PluginActionSurface'];
+      /** @description Name of the manifest form collecting arguments for this action. */
+      form?: string;
+    };
+    /** @enum {string} */
+    PluginActionSurface: 'settings' | 'chapter' | 'volume' | 'novel';
+    ProjectPluginResponse: components['schemas']['ProjectPluginResponse1'][];
+    /** @description One plugin enabled on a novel, with the settings it was last saved with. */
+    ProjectPluginResponse1: {
+      pluginId: string;
+      /** @description Manifest version the stored config was validated against. */
+      pluginVersion: string;
+      config: {
+        [key: string]: unknown;
+      };
+      ordinal: number;
+      /** @description False when the plugin is no longer on disk. The enablement is kept, but it contributes to no decision point. */
+      installed: boolean;
+      /** @description True when the plugin on disk reports a different version and the stored config no longer validates. It contributes nothing until the settings are saved again. */
+      needsReview: boolean;
+      /** Format: date-time */
+      enabledAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @description Enable the plugin on this novel, or replace the settings it is already enabled with. */
+    EnablePluginBody: {
+      /** @description Values for the fields the manifest declares under `forms.settings`. Any other key is rejected; omitting it stores an empty config. */
+      config?: {
+        [key: string]: unknown;
+      };
+      /** @description Order this plugin contributes in relative to the other plugins enabled on the novel. Lower runs first. This request replaces the stored row, so omitting it resets the order to 0. */
+      ordinal?: number;
     };
     CreateApiKeyBody: {
       /** @description Human-readable label; it is the only way to tell two keys apart once the secret is gone. */
@@ -5340,68 +5402,6 @@ export interface components {
       volumesApproved: number;
       arcsApproved: number;
     };
-    PluginManifestResponse: components['schemas']['PluginManifestResponse1'][];
-    /** @description Manifest of one plugin loaded on this deploy. */
-    PluginManifestResponse1: {
-      /** @description Stable plugin identifier, equal to its directory name under the deployment plugin directory. */
-      id: string;
-      /** @description Manifest version the stored per-novel config is validated against. */
-      version: string;
-      title: string;
-      description: string;
-      /** @description Pipeline decision points this plugin answers. */
-      decisionPoints: components['schemas']['DecisionPoint'][];
-      /** @description Decision points claimed exclusively — a second plugin claiming one of these cannot be enabled on the same novel. */
-      exclusive?: components['schemas']['DecisionPoint'][];
-      /** @description Declared forms keyed by name; `settings` is the per-novel configuration form rendered from its field list. */
-      forms: {
-        [key: string]: unknown;
-      };
-      actions?: components['schemas']['PluginActionResponse'][];
-    };
-    /** @enum {string} */
-    DecisionPoint: 'canon.augment' | 'brief.policy' | 'call.route' | 'context.contribute' | 'prompt.contribute';
-    /** @description An author-triggered action the plugin surfaces in the UI. Invoking one is not yet supported. */
-    PluginActionResponse: {
-      id: string;
-      /** @description Operation name passed back to the plugin when the action runs. */
-      op: string;
-      label: string;
-      /** @description Where the action is offered. */
-      surface: components['schemas']['PluginActionSurface'];
-      /** @description Name of the manifest form collecting arguments for this action. */
-      form?: string;
-    };
-    /** @enum {string} */
-    PluginActionSurface: 'settings' | 'chapter' | 'volume' | 'novel';
-    ProjectPluginResponse: components['schemas']['ProjectPluginResponse1'][];
-    /** @description One plugin enabled on a novel, with the settings it was last saved with. */
-    ProjectPluginResponse1: {
-      pluginId: string;
-      /** @description Manifest version the stored config was validated against. */
-      pluginVersion: string;
-      config: {
-        [key: string]: unknown;
-      };
-      ordinal: number;
-      /** @description False when the plugin is no longer on disk. The enablement is kept, but it contributes to no decision point. */
-      installed: boolean;
-      /** @description True when the plugin on disk reports a different version and the stored config no longer validates. It contributes nothing until the settings are saved again. */
-      needsReview: boolean;
-      /** Format: date-time */
-      enabledAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    /** @description Enable the plugin on this novel, or replace the settings it is already enabled with. */
-    EnablePluginBody: {
-      /** @description Values for the fields the manifest declares under `forms.settings`. Any other key is rejected; omitting it stores an empty config. */
-      config?: {
-        [key: string]: unknown;
-      };
-      /** @description Order this plugin contributes in relative to the other plugins enabled on the novel. Lower runs first. This request replaces the stored row, so omitting it resets the order to 0. */
-      ordinal?: number;
-    };
   };
   responses: never;
   parameters: never;
@@ -5721,6 +5721,161 @@ export interface operations {
           'application/json': components['schemas']['AiModelsResponse'];
         };
       };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_plugins: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginManifestResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_plugins: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectPluginResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_plugins_pluginId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        pluginId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EnablePluginBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectPluginResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_plugins_pluginId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        pluginId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
       /** @description Default Response */
       '4XX': {
         headers: {
@@ -13297,161 +13452,6 @@ export interface operations {
       };
     };
   };
-  get_api_v1_plugins: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['PluginManifestResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_plugins: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectPluginResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  put_api_v1_projects_projectId_plugins_pluginId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        pluginId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['EnablePluginBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectPluginResponse1'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_projects_projectId_plugins_pluginId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        pluginId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
 }
 export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
 export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
@@ -13465,6 +13465,14 @@ export type SwitchOrganisationResponse = components['schemas']['SwitchOrganisati
 export type AiModelsResponse = components['schemas']['AiModelsResponse'];
 export type AiModelOption = components['schemas']['AiModelOption'];
 export type AiRoleDefault = components['schemas']['AiRoleDefault'];
+export type PluginManifestResponse = components['schemas']['PluginManifestResponse'];
+export type PluginManifestResponse1 = components['schemas']['PluginManifestResponse1'];
+export type DecisionPoint = components['schemas']['DecisionPoint'];
+export type PluginActionResponse = components['schemas']['PluginActionResponse'];
+export type PluginActionSurface = components['schemas']['PluginActionSurface'];
+export type ProjectPluginResponse = components['schemas']['ProjectPluginResponse'];
+export type ProjectPluginResponse1 = components['schemas']['ProjectPluginResponse1'];
+export type EnablePluginBody = components['schemas']['EnablePluginBody'];
 export type CreateApiKeyBody = components['schemas']['CreateApiKeyBody'];
 export type CreateApiKeyResponse = components['schemas']['CreateApiKeyResponse'];
 export type ListApiKeysResponse = components['schemas']['ListApiKeysResponse'];
@@ -13790,17 +13798,10 @@ export type ImportPlanResponse = components['schemas']['ImportPlanResponse'];
 export type ImportResults = components['schemas']['ImportResults'];
 export type CollectionResult = components['schemas']['CollectionResult'];
 export type ApprovalResult = components['schemas']['ApprovalResult'];
-export type PluginManifestResponse = components['schemas']['PluginManifestResponse'];
-export type PluginManifestResponse1 = components['schemas']['PluginManifestResponse1'];
-export type DecisionPoint = components['schemas']['DecisionPoint'];
-export type PluginActionResponse = components['schemas']['PluginActionResponse'];
-export type PluginActionSurface = components['schemas']['PluginActionSurface'];
-export type ProjectPluginResponse = components['schemas']['ProjectPluginResponse'];
-export type ProjectPluginResponse1 = components['schemas']['ProjectPluginResponse1'];
-export type EnablePluginBody = components['schemas']['EnablePluginBody'];
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
+export type ListProjectPluginsPathParams = Exclude<paths['/api/v1/projects/{projectId}/plugins']['get']['parameters']['path'], undefined>;
 export type GetManifestPathParams = Exclude<paths['/api/v1/ingest/novels/{sourceRef}/manifest']['get']['parameters']['path'], undefined>;
 export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
 export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
@@ -13879,4 +13880,3 @@ export type ListCutsPathParams = Exclude<paths['/api/v1/projects/{projectId}/ref
 export type GetReforgeManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/manuscript']['get']['parameters']['path'], undefined>;
 export type GetAccessPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications/access']['get']['parameters']['path'], undefined>;
 export type ListPublicationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications']['get']['parameters']['path'], undefined>;
-export type ListProjectPluginsPathParams = Exclude<paths['/api/v1/projects/{projectId}/plugins']['get']['parameters']['path'], undefined>;

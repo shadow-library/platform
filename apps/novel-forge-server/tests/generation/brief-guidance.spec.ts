@@ -5,6 +5,7 @@ import { MemorySaver } from '@langchain/langgraph';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { createChapterGenerationGraph } from '@modules/ai/graphs/chapter-generation.graph';
+import { emptyPolicy } from '@modules/plugins';
 import { renderChapterBrief } from '@server/common';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -114,6 +115,7 @@ describe.if(pgAvailable)('chapter generation graph brief guidance', () => {
       telemetry: {},
       toolRegistry: { forNode: () => [], getRaw: () => [] },
       indexingService: {},
+      pluginPolicy: { scoped: async () => ({ for: () => emptyPolicy() }) },
       checkpointer: new MemorySaver(),
     } as never;
   }

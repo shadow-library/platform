@@ -62,7 +62,7 @@ describe.if(pgAvailable)('RefineService', () => {
     (modelRouter as unknown as Record<string, unknown>)['buildClient'] = () => ({ invoke: llmInvoke, pipe: () => ({ invoke: llmInvoke }) });
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
-    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop);
+    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop);
     refine = new RefineService(databaseService, assembler, modelRouter, workflowRuns, new ProposalService(databaseService));
 
     const [project] = await db

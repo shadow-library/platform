@@ -8,6 +8,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
+import { PluginPolicyService } from '../../plugins/plugin-policy.service';
 import { ContextAssembler } from '../context/context-assembler.service';
 import { ModelRouterService } from '../model-router.service';
 import { IndexingService } from '../retrieval/indexing.service';
@@ -113,6 +114,7 @@ export class WorkflowRunService {
     private readonly telemetry: TelemetryHandler,
     private readonly toolRegistry: ToolRegistryService,
     private readonly indexingService: IndexingService,
+    private readonly pluginPolicy: PluginPolicyService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
     this.checkpointer = PostgresSaver.fromConnString(DB_URL);
@@ -131,6 +133,7 @@ export class WorkflowRunService {
       telemetry: this.telemetry,
       toolRegistry: this.toolRegistry,
       indexingService: this.indexingService,
+      pluginPolicy: this.pluginPolicy,
       checkpointer: this.checkpointer,
     };
   }

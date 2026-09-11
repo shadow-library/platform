@@ -55,7 +55,7 @@ describe.if(pgAvailable)('GenerationService.deleteDraft', () => {
       delete: async (ref: string) => void deleted.push(ref),
     };
     chapterImages = new ChapterImageService({ getPostgresClient: () => db } as never, imageStorage as never);
-    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, chapterImages);
+    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, chapterImages, noop);
   });
 
   async function seedChapters(bodies: string[]): Promise<bigint> {

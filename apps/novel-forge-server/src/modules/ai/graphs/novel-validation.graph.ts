@@ -7,6 +7,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
+import { type PluginPolicyService } from '../../plugins/plugin-policy.service';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
@@ -25,6 +26,7 @@ export interface ValidationServices {
   telemetry: TelemetryHandler;
   toolRegistry: ToolRegistryService;
   indexingService: IndexingService;
+  pluginPolicy: PluginPolicyService;
   checkpointer: BaseCheckpointSaver;
 }
 
@@ -94,7 +96,7 @@ function tryParseValidation(raw: string): ValidationOutput | null {
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function createNovelValidationGraph(services: ValidationServices) {
-  const { db, contextAssembler, modelRouter, toolRegistry, checkpointer } = services;
+  const { db, contextAssembler, modelRouter, toolRegistry, pluginPolicy, checkpointer } = services;
 
   async function planWindows(state: ValidationState) {
     const projectId = BigInt(state.projectId);
@@ -136,6 +138,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
     const allFindings: ValidationOutput[] = [];
     const succeededWindows: WindowSpec[] = [];
     const failedWindows: WindowSpec[] = [];
+    const policy = await pluginPolicy.resolve(projectId, { role: 'validation' });
 
     for (const window of state.windows) {
       try {
@@ -153,7 +156,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
         const tools = toolRegistry.forNode('validateWindow', toolCtx);
         const rawTools = toolRegistry.getRaw('validateWindow');
         const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-        const model = await modelRouter.chatFor('validation', projectRow as ProjectConfig | undefined, projectId);
+        const model = await modelRouter.chatFor('validation', projectRow as ProjectConfig | undefined, projectId, policy);
 
         const systemMsg = new SystemMessage(PROMPT_REGISTRY.validation.system);
         const humanMsg = new HumanMessage(

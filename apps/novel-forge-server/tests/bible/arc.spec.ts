@@ -51,7 +51,7 @@ describe.if(pgAvailable)('arc module & gates', () => {
     const noop = {} as never;
     const jobService = { enqueue: async () => 'job-1' } as never;
     const jobExecutor = { dispatch: async () => undefined } as never;
-    generationService = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, jobService, jobExecutor, noop, noop);
+    generationService = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, jobService, jobExecutor, noop, noop, noop);
   });
 
   // Leaving the pool open starves later spec files of connections and silently skips their suites.
@@ -156,6 +156,7 @@ describe.if(pgAvailable)('arc module & gates', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     // Gate 2: all arcs of the volume must be approved first.
@@ -196,6 +197,7 @@ describe.if(pgAvailable)('arc module & gates', () => {
       {} as never,
       { structured } as never,
       contextAssembler,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,

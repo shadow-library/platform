@@ -7,6 +7,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Plugins, type PrimaryDatabase, schema } from '@server/database';
 
+import { type LoadedPlugin } from './plugin-loader';
 import { PluginHost, ScopedPluginHostFactory } from './plugin-host.service';
 import { type EnablePluginBody } from './plugin.dto';
 import { type DecisionPoint, type ForgePlugin, type PluginForm } from './plugin.types';
@@ -44,6 +45,12 @@ export function validateConfig(form: PluginForm | undefined, config: Record<stri
   }
 
   return undefined;
+}
+
+/** A row whose plugin moved on keeps its claim but contributes nothing until the author re-saves a config the new manifest accepts. */
+export function needsReview(loaded: LoadedPlugin, row: { pluginVersion: string; config: Record<string, unknown> }): boolean {
+  if (loaded.manifest.version === row.pluginVersion) return false;
+  return validateConfig(loaded.manifest.forms[SETTINGS_FORM], row.config) !== undefined;
 }
 
 @Injectable()
@@ -155,7 +162,7 @@ export class PluginService {
       updatedAt: row.updatedAt,
     };
 
-    if (!loaded || loaded.manifest.version === row.pluginVersion) return view;
-    return { ...view, needsReview: validateConfig(loaded.manifest.forms[SETTINGS_FORM], row.config) !== undefined };
+    if (!loaded) return view;
+    return { ...view, needsReview: needsReview(loaded, row) };
   }
 }

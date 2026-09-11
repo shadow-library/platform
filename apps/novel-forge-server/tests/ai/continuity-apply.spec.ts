@@ -55,7 +55,7 @@ describe.if(pgAvailable)('continuity delta application', () => {
     checkpointer = PostgresSaver.fromConnString(url);
     await checkpointer.setup();
     const noop = {} as never;
-    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
   });
 
   async function seedProject(name: string): Promise<bigint> {

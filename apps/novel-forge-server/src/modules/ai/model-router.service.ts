@@ -14,6 +14,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
+import { type ForgeCallPolicy } from '../plugins/plugin-policy.service';
 import {
   type AiRole,
   getGroupDefaults,
@@ -142,10 +143,12 @@ export class ModelRouterService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  resolveModel(role: AiRole, project?: ProjectConfig): ResolvedModel {
-    if (project?.contentMode === 'unrestricted') {
+  // `call.route`: a plugin may raise this call to the permissive class, and no policy can lower a project
+  // whose own contentMode is already unrestricted — the raise-only rule is structural at the routing sink.
+  resolveModel(role: AiRole, project?: ProjectConfig, policy?: ForgeCallPolicy): ResolvedModel {
+    if (project?.contentMode === 'unrestricted' || policy?.writerClass === 'permissive') {
       const unrestrictedDefault = UNRESTRICTED_DEFAULTS[role] ?? UNRESTRICTED_DEFAULTS.generation;
-      const models = project.config?.models as Record<string, ResolvedModel> | undefined;
+      const models = project?.config?.models as Record<string, ResolvedModel> | undefined;
       const projectModel = models?.[role] ?? (role === 'chat' && models?.['plan'] ? models['plan'] : undefined);
       if (projectModel && isUnrestrictedAllowed(role, projectModel)) return projectModel;
       return unrestrictedDefault;
@@ -210,17 +213,17 @@ export class ModelRouterService {
 
   // `projectId` is optional only so the smoke/local harnesses can build a raw client without a project;
   // every product caller passes it, which is what gates the judge/validation raw-client paths on quota.
-  async chatFor(role: AiRole, project?: ProjectConfig, projectId?: bigint): Promise<BaseChatModel> {
+  async chatFor(role: AiRole, project?: ProjectConfig, projectId?: bigint, policy?: ForgeCallPolicy): Promise<BaseChatModel> {
     if (projectId !== undefined) await this.quota.enforce(projectId);
-    const resolved = this.resolveModel(role, project);
+    const resolved = this.resolveModel(role, project, policy);
     this.logger.debug(`Routing role=${role} to provider=${resolved.provider} model=${resolved.model}`);
     return this.buildClient(resolved, { role });
   }
 
-  async structured<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, ctx: TelemetryContext, project?: ProjectConfig): Promise<T> {
+  async structured<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, ctx: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<T> {
     await this.quota.enforce(ctx.projectId);
     const role = promptModule.role ?? (promptModule.key as AiRole);
-    const resolved = this.resolveModel(role, project);
+    const resolved = this.resolveModel(role, project, policy);
     const llm = this.buildClient(resolved, { format: toJsonSchemaFormat(promptModule.schema), role });
     const messages = await this.buildMessages(promptModule, input, resolved);
     // Input carries the rendered context pack and user prose — sensitive/large, so it rides on debug
@@ -237,7 +240,7 @@ export class ModelRouterService {
       input,
     });
 
-    const requestHash = CACHEABLE_ROLES.has(role) ? this.hashRequest(resolved, promptModule, input) : null;
+    const requestHash = CACHEABLE_ROLES.has(role) ? this.hashRequest(resolved, promptModule, input, policy) : null;
     if (requestHash) {
       const cached = await this.db.query.llmCache.findFirst({ where: eq(schema.llmCache.requestHash, requestHash) });
       if (cached) {
@@ -250,7 +253,7 @@ export class ModelRouterService {
       }
     }
 
-    const rawOutput1 = await this.invokeResilient(llm, messages, this.invokeConfig(ctx, resolved, 0), role);
+    const rawOutput1 = await this.invokeResilient(llm, messages, this.invokeConfig(ctx, resolved, 0, policy), role);
     const parsed1 = this.parseOutput(promptModule, tryParseJson(rawOutput1));
     if (parsed1.success) {
       this.logger.debug('structured: parsed on first attempt', { role, runId: ctx.runId, outputLength: rawOutput1.length });
@@ -269,7 +272,7 @@ export class ModelRouterService {
       ),
     ];
 
-    const rawOutput2 = await this.invokeResilient(llm, repairMessages, this.invokeConfig(ctx, resolved, 1), role);
+    const rawOutput2 = await this.invokeResilient(llm, repairMessages, this.invokeConfig(ctx, resolved, 1, policy), role);
     const parsed2 = this.parseOutput(promptModule, tryParseJson(rawOutput2));
     if (parsed2.success) {
       this.logger.debug('structured: parsed after repair', { role, runId: ctx.runId, outputLength: rawOutput2.length });
@@ -409,10 +412,16 @@ export class ModelRouterService {
   }
 
   // Invoke config: telemetry callback + attribution metadata (read by TelemetryHandler.handleLLMStart).
-  private invokeConfig(ctx: TelemetryContext, resolved: ResolvedModel, attempt: number): { callbacks: TelemetryHandler[]; metadata: Record<string, unknown> } {
+  private invokeConfig(
+    ctx: TelemetryContext,
+    resolved: ResolvedModel,
+    attempt: number,
+    policy?: ForgeCallPolicy,
+  ): { callbacks: TelemetryHandler[]; metadata: Record<string, unknown> } {
+    const stamps = policy?.plugins.length ? { plugins: policy.plugins, policyDigest: policy.digest } : {};
     return {
       callbacks: [this.telemetry],
-      metadata: { nfTelemetry: { ...ctx, projectId: String(ctx.projectId), provider: resolved.provider, model: resolved.model, attempt } },
+      metadata: { nfTelemetry: { ...ctx, projectId: String(ctx.projectId), provider: resolved.provider, model: resolved.model, attempt, ...stamps } },
     };
   }
 
@@ -445,8 +454,11 @@ export class ModelRouterService {
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
   }
 
-  private hashRequest(resolved: ResolvedModel, promptModule: { key: string; version: string }, input: Record<string, unknown>): string {
-    const payload = JSON.stringify({ provider: resolved.provider, model: resolved.model, promptKey: promptModule.key, promptVersion: promptModule.version, input });
+  // `llm_cache.requestHash` is global, not project-scoped, so without the digest a plugin-shaped result is
+  // served verbatim to another novel; a plugin-free policy contributes no key and keeps its existing entries.
+  private hashRequest(resolved: ResolvedModel, promptModule: { key: string; version: string }, input: Record<string, unknown>, policy?: ForgeCallPolicy): string {
+    const policyKey = policy?.digest ? { policy: policy.digest } : {};
+    const payload = JSON.stringify({ provider: resolved.provider, model: resolved.model, promptKey: promptModule.key, promptVersion: promptModule.version, input, ...policyKey });
     return createHash('sha256').update(payload).digest('hex');
   }
 

@@ -32,6 +32,7 @@ import { approveVolumePlan } from '../bible/volume/volume.approve';
 import { redactJobForResponse } from '../jobs/job-response';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
+import { PluginPolicyService, raisedContainment } from '../plugins/plugin-policy.service';
 import { type ChangeOp } from '../refinement/change-set';
 import { ProposalService } from '../refinement/proposal.service';
 import { ChapterImageService } from './chapter-image.service';
@@ -134,6 +135,7 @@ export class GenerationService {
     private readonly jobExecutor: JobExecutor,
     private readonly proposalService: ProposalService,
     private readonly chapterImages: ChapterImageService,
+    private readonly pluginPolicy: PluginPolicyService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -636,9 +638,10 @@ export class GenerationService {
       .values({ projectId, artifactType: 'draft', artifactRef: String(chapter), disposition: 'revision_requested', note: body.note })
       .returning();
 
-    const pack = await this.contextAssembler.forChapter(projectId, chapter);
     const brief = await this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'revision', chapter }, project);
+    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
 
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.revision.key, promptVersion: PROMPT_REGISTRY.revision.version, role: PROMPT_REGISTRY.revision.key };
     const revised = (await this.modelRouter.structured(
@@ -646,6 +649,7 @@ export class GenerationService {
       { contextPack: pack.rendered, chapterBrief: renderChapterBrief(brief), draftBody: draft.body, feedback: body.note },
       ctx,
       project as never,
+      policy,
     )) as { title: string; body: string; summary: string; state?: Record<string, string> };
 
     const newRevision = draft.revision + 1;
@@ -659,6 +663,7 @@ export class GenerationService {
         revision: newRevision,
         reviewStatus: 'needs_review',
         staleReason: null,
+        ...raisedContainment(policy),
         updatedAt: new Date(),
       })
       .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)))
@@ -689,8 +694,9 @@ export class GenerationService {
     const draft = await this.getDraft(projectId, chapter);
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
-    const pack = await this.contextAssembler.forChapter(projectId, chapter);
-    const model = await this.modelRouter.chatFor('judge', project as never, projectId);
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'judge', chapter }, project);
+    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
+    const model = await this.modelRouter.chatFor('judge', project as never, projectId, policy);
 
     const runId = `judge-${projectId}-${chapter}-${Date.now()}`;
     const tools = this.toolRegistry.forNode('judge', { chapter, db: this.db, node: 'judge', projectId, retrieval: this.retrievalService, runId });
@@ -1046,7 +1052,8 @@ export class GenerationService {
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
 
-    const pack = await this.contextAssembler.forChapter(projectId, chapter);
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'generation', chapter }, { contentMode: 'unrestricted' });
+    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.generation.key, promptVersion: PROMPT_REGISTRY.generation.version, role: PROMPT_REGISTRY.generation.key };
 
     const result = (await this.modelRouter.structured(
@@ -1060,6 +1067,7 @@ export class GenerationService {
       },
       ctx,
       { ...project, contentMode: 'unrestricted' } as never,
+      policy,
     )) as {
       title: string;
       body: string;

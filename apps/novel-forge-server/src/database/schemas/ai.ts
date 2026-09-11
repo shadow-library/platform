@@ -97,6 +97,9 @@ export const modelCalls = pgTable(
     attempt: smallint('attempt').notNull().default(0),
     rawOutput: text('raw_output'),
     error: jsonb('error').$type<Record<string, unknown>>(),
+    // Null on every plugin-free call, which is what keeps the pre-host rows and the pre-host generate path identical.
+    plugins: jsonb('plugins').$type<{ id: string; version: string; configHash: string }[]>(),
+    policyDigest: varchar('policy_digest'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   t => [
