@@ -2607,6 +2607,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/plugins': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Plugins */
+    get: operations['get_api_v1_plugins'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5288,6 +5305,40 @@ export interface components {
       volumesApproved: number;
       arcsApproved: number;
     };
+    PluginManifestResponse: components['schemas']['PluginManifestResponse1'][];
+    /** @description Manifest of one plugin loaded on this deploy. */
+    PluginManifestResponse1: {
+      /** @description Stable plugin identifier, equal to its directory name under the deployment plugin directory. */
+      id: string;
+      /** @description Manifest version the stored per-novel config is validated against. */
+      version: string;
+      title: string;
+      description: string;
+      /** @description Pipeline decision points this plugin answers. */
+      decisionPoints: components['schemas']['DecisionPoint'][];
+      /** @description Decision points claimed exclusively — a second plugin claiming one of these cannot be enabled on the same novel. */
+      exclusive?: components['schemas']['DecisionPoint'][];
+      /** @description Declared forms keyed by name; `settings` is the per-novel configuration form rendered from its field list. */
+      forms: {
+        [key: string]: unknown;
+      };
+      actions?: components['schemas']['PluginActionResponse'][];
+    };
+    /** @enum {string} */
+    DecisionPoint: 'canon.augment' | 'brief.policy' | 'call.route' | 'context.contribute' | 'prompt.contribute';
+    /** @description An author-triggered action the plugin surfaces in the UI. Invoking one is not yet supported. */
+    PluginActionResponse: {
+      id: string;
+      /** @description Operation name passed back to the plugin when the action runs. */
+      op: string;
+      label: string;
+      /** @description Where the action is offered. */
+      surface: components['schemas']['PluginActionSurface'];
+      /** @description Name of the manifest form collecting arguments for this action. */
+      form?: string;
+    };
+    /** @enum {string} */
+    PluginActionSurface: 'settings' | 'chapter' | 'volume' | 'novel';
   };
   responses: never;
   parameters: never;
@@ -13183,6 +13234,44 @@ export interface operations {
       };
     };
   };
+  get_api_v1_plugins: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginManifestResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
 }
 export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
 export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
@@ -13521,6 +13610,11 @@ export type ImportPlanResponse = components['schemas']['ImportPlanResponse'];
 export type ImportResults = components['schemas']['ImportResults'];
 export type CollectionResult = components['schemas']['CollectionResult'];
 export type ApprovalResult = components['schemas']['ApprovalResult'];
+export type PluginManifestResponse = components['schemas']['PluginManifestResponse'];
+export type PluginManifestResponse1 = components['schemas']['PluginManifestResponse1'];
+export type DecisionPoint = components['schemas']['DecisionPoint'];
+export type PluginActionResponse = components['schemas']['PluginActionResponse'];
+export type PluginActionSurface = components['schemas']['PluginActionSurface'];
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;

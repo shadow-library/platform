@@ -375,6 +375,10 @@ Empty or unset ⇒ no plugins, `GET /plugins` returns `[]`, every pipeline stage
 A load failure (missing entry, thrown factory, id mismatch, manifest that fails validation) logs and **skips
 that plugin**. Boot never crashes. The skipped id is absent from `GET /plugins`.
 
+`manifest.json` is canonical and is validated before the entry is imported; the loader then validates what
+`manifest()` returns and skips the plugin when the two disagree in any field, so one manifest steers both the
+recorded contract and the plugin's own behaviour.
+
 Plugins resolve npm imports against their own directory, not the server's `node_modules`, and the backend
 ships as a single-file `Bun.build` bundle. **Plugins must be dependency-free or pre-bundled.** The build emits
 `dist/plugin.types.d.ts` so a plugin can be authored against the real contract.
@@ -481,6 +485,11 @@ export type PluginChangeOp =
   | { op: 'brief.update'; chapter: number; title?: string; body?: string; writeMode?: 'standard' | 'external' }
   | { op: 'arc.upsert'; arcKey: string; volumeKey: string; title?: string; objective?: string; escalation?: string; payoff?: string; hook?: string; body?: string };
 
+export interface PluginEvent {
+  type: string;
+  payload: unknown;
+}
+
 export interface ForgePlugin {
   id: string;
   manifest(): PluginManifest;
@@ -524,6 +533,13 @@ export interface ScopedPluginHost {
     facts(): Promise<unknown[]>;
   };
 }
+
+/** What `createPlugin` receives at load time — not project-scoped, because no project is in scope during boot. */
+export interface PluginHostApi {
+  log: ScopedPluginHost['log'];
+}
+
+export type PluginFactory = (host: PluginHostApi) => ForgePlugin;
 ```
 
 `ScopedPluginHost` is bound to one project. **`projectId` appears nowhere in the plugin-facing API**, so a
@@ -843,7 +859,7 @@ Ordered so that every task's verification is runnable when the task lands. The f
 is the harness for everything after it, and the type regeneration precedes the web work that type-checks
 against it.
 
-- [ ] **PG1** — `plugin.types.ts`, loader, `plugins.dir`, `GET /api/v1/plugins`, `registerForTest`. Unset or
+- [x] **PG1** — `plugin.types.ts`, loader, `plugins.dir`, `GET /api/v1/plugins`, `registerForTest`. Unset or
       empty dir ⇒ `[]`. Boot skips a failing plugin. Verify: loader unit tests; HTTP list with dir unset.
 - [ ] **PG2** — Fixture `tests/plugins/fixtures/twin-track/`. Verify: it loads and lists.
 - [ ] **PG3** — `project_plugins` + `plugin_kv` + `PLG_001`–`PLG_004` + enable/disable + config validation +
