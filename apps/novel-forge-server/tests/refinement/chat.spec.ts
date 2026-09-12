@@ -159,6 +159,31 @@ describe.if(pgAvailable)('ChatService', () => {
     expect(await chat.failedTurn(projectId, session.id)).toMatchObject({ graph: 'chat-turn', code: 'AI_007' });
   });
 
+  it('should still report a failed turn whose message the database stamped later than the app stamped the failure', async () => {
+    const session = await chat.createSession(projectId, { scopeType: 'novel' });
+    const failedAt = new Date();
+    const [run] = await db
+      .insert(schema.workflowRuns)
+      .values({ projectId, graph: 'chat-turn', target: `session:${session.id}`, status: 'failed', input: {}, nodeTrace: [], startedAt: failedAt, endedAt: failedAt })
+      .returning();
+    await db
+      .insert(schema.chatMessages)
+      .values({ sessionId: session.id, projectId, ordinal: 1, role: 'user', content: 'hello?', runId: run?.id, createdAt: new Date(failedAt.getTime() + 1) });
+
+    expect(await chat.failedTurn(projectId, session.id)).toMatchObject({ runId: run?.id });
+  });
+
+  it('should not report a failed turn once the author has sent a newer message', async () => {
+    const session = await chat.createSession(projectId, { scopeType: 'novel' });
+    structuredMock.mockImplementationOnce(async () => {
+      throw AppErrorCode.AI_007.create();
+    });
+    await codeOf(chat.turn(projectId, session.id, 'first try'));
+    await db.insert(schema.chatMessages).values({ sessionId: session.id, projectId, ordinal: 2, role: 'user', content: 'never sent to a run' });
+
+    expect(await chat.failedTurn(projectId, session.id)).toBeNull();
+  });
+
   it('returns no proposal for discussion-only turns and rejects archived sessions', async () => {
     const session = await chat.createSession(projectId, { scopeType: 'novel' });
     structuredMock.mockImplementationOnce(async () => ({ reply: 'Just thoughts, no changes yet.' }));

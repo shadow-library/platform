@@ -298,13 +298,14 @@ export class ChatService {
 
     const last = await this.db.query.chatMessages.findFirst({
       where: eq(schema.chatMessages.sessionId, sessionId),
-      columns: { role: true, createdAt: true },
+      columns: { role: true, runId: true },
       orderBy: desc(schema.chatMessages.ordinal),
     });
-    if (!last || last.role !== 'user') return null;
+    // Matched by run, not by time: the message is stamped by the database clock and the failure by the app's, so a
+    // turn that fails within the millisecond its message was stored would otherwise read as already moved past.
+    if (!last || last.role !== 'user' || last.runId !== run.id) return null;
 
     const failedAt = run.endedAt ?? run.startedAt;
-    if (last.createdAt > failedAt) return null;
 
     const error = run.error as { code?: unknown; message?: unknown } | null;
     return {
