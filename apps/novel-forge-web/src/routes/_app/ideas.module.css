@@ -58,6 +58,21 @@
   font-size: var(--sh-text-body-sm);
   color: var(--sh-text-tertiary);
   line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.naming {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.namingCaption {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
 }
 
 .newCard {

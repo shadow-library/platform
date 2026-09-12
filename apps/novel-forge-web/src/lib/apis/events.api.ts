@@ -19,6 +19,8 @@ export type ProjectEvent =
 
 const PROJECT_EVENT_TYPES = ['run', 'job', 'chat'] as const;
 const SESSION_TARGET_PREFIX = 'session:';
+const SEED_TARGET_PREFIX = 'seed:';
+const IDEATION_GRAPH_PREFIX = 'ideation-';
 // The stream ends itself every 15 minutes and reconnects within its 3-second retry; only an outage longer than this
 // hands changes back to polling at full speed.
 const OUTAGE_AFTER_MS = 5_000;
@@ -40,11 +42,12 @@ export function applyProjectEvent(queryClient: QueryClient, projectId: string, e
   if (event.type === 'chat') return invalidateChatSession(queryClient, projectId, event.sessionId);
 
   invalidateRuns(queryClient, projectId);
+  if (event.target.startsWith(SEED_TARGET_PREFIX) && event.graph.startsWith(IDEATION_GRAPH_PREFIX)) return invalidateSeed(queryClient, projectId);
   if (!event.target.startsWith(SESSION_TARGET_PREFIX)) return;
   const sessionId = event.target.slice(SESSION_TARGET_PREFIX.length);
   if (event.status === 'running') return invalidateChatSession(queryClient, projectId, sessionId);
   invalidateChat(queryClient, projectId, sessionId);
-  if (event.graph.startsWith('ideation-')) invalidateSeed(queryClient, projectId);
+  if (event.graph.startsWith(IDEATION_GRAPH_PREFIX)) invalidateSeed(queryClient, projectId);
 }
 
 /** Whatever a disconnected tab may have missed: everything the stream would otherwise have told it to refetch. */

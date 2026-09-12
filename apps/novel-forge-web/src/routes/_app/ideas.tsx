@@ -1,16 +1,19 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Button, Dialog, toast } from '@shadow-library/ui';
+import { Button, Dialog, Skeleton, toast } from '@shadow-library/ui';
 
-import { PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
-import { PageHeader, QueryState, RowAction, StatusChip } from '@/components/nf';
+import { EditIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
+import { IdeaRename, PageHeader, QueryState, RowAction, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
-import { listSeedsQueryOptions, type SeedSummaryResponse, useDeleteSeedMutation, useListSeedsQuery } from '@/lib/apis';
+import { applySeedName, invalidateSeed, listSeedsQueryOptions, type SeedSummaryResponse, useDeleteSeedMutation, useListSeedsQuery, useUpdateProjectMutation } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
+import { anySeedBeingNamed, firstTitle, isBeingNamed } from '@/lib/idea-title';
 
 import styles from './ideas.module.css';
 
 const SEED_LIMIT = 50;
+const NAMING_POLL_MS = 3_000;
 
 // The shelf's only data is the seed list, so the loader prefetches it and the grid paints on the server.
 // The params object is the query key, so the prefetch has to name the same first page the component asks for.
@@ -21,16 +24,22 @@ export const Route = createFileRoute('/_app/ideas')({
 });
 
 function seedLabel(seed: SeedSummaryResponse): string {
-  return seed.workingTitle?.trim() || seed.sparkExcerpt?.trim() || 'Untitled idea';
+  return firstTitle([seed.name, seed.workingTitle, seed.sparkExcerpt], 'Untitled idea');
 }
 
 function IdeasShelf(): React.JSX.Element {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [offset, setOffset] = useState(0);
-  const seedsQuery = useListSeedsQuery({ limit: SEED_LIMIT, offset });
+  const seedsQuery = useListSeedsQuery(
+    { limit: SEED_LIMIT, offset },
+    { refetchInterval: query => (anySeedBeingNamed(query.state.data?.items ?? [], new Date(query.state.dataUpdatedAt)) ? NAMING_POLL_MS : false) },
+  );
   const deleteSeed = useDeleteSeedMutation();
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SeedSummaryResponse | undefined>();
+  const [renamingId, setRenamingId] = useState<string | undefined>();
+  const renameSeed = useUpdateProjectMutation(renamingId ?? '');
 
   const seeds = seedsQuery.data?.items ?? [];
   const total = seedsQuery.data?.total ?? 0;
@@ -45,6 +54,24 @@ function IdeasShelf(): React.JSX.Element {
       },
       onError: err => toast.danger(err.message),
     });
+  };
+
+  const saveRename = (projectId: string, next: string | null): void => {
+    if (next == null) return setRenamingId(id => (id === projectId ? undefined : id));
+    renameSeed.mutate(
+      { title: next },
+      {
+        onSuccess: () => {
+          applySeedName(queryClient, projectId, next);
+          invalidateSeed(queryClient, projectId);
+          setRenamingId(id => (id === projectId ? undefined : id));
+        },
+        onError: err => {
+          toast.danger(err.message);
+          setRenamingId(id => (id === projectId ? undefined : id));
+        },
+      },
+    );
   };
 
   return (
@@ -68,36 +95,53 @@ function IdeasShelf(): React.JSX.Element {
         emptyAction={{ label: 'New idea', onClick: () => setCreateOpen(true) }}
       >
         <div className={styles.grid}>
-          {seeds.map(seed => (
-            <div
-              key={seed.id}
-              className={`nf-cardhover ${styles.card}`}
-              role="button"
-              tabIndex={0}
-              onClick={() => openStudio(seed.projectId)}
-              onKeyDown={e => {
-                if (e.target !== e.currentTarget) return;
-                if (e.key !== 'Enter' && e.key !== ' ') return;
-                e.preventDefault();
-                openStudio(seed.projectId);
-              }}
-            >
-              <div className={styles.cardTop}>
-                <StatusChip intent="accent">
-                  <SparkIcon size={12} /> idea
-                </StatusChip>
-                <div className={styles.spacer} />
-                <span className={styles.cardTime}>{relativeTime(seed.updatedAt)}</span>
-                <div className="nf-rowactions">
-                  <RowAction label="Delete idea" danger onClick={() => setDeleteTarget(seed)}>
-                    <TrashIcon size={13} />
-                  </RowAction>
+          {seeds.map(seed => {
+            const naming = isBeingNamed(seed, new Date(seedsQuery.dataUpdatedAt));
+            const settled = Boolean(seed.name?.trim() || seed.workingTitle?.trim());
+            const renaming = renamingId === seed.projectId;
+            return (
+              <div
+                key={seed.id}
+                className={`nf-cardhover ${styles.card}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => openStudio(seed.projectId)}
+                onKeyDown={e => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  e.preventDefault();
+                  openStudio(seed.projectId);
+                }}
+              >
+                <div className={styles.cardTop}>
+                  <StatusChip intent="accent">
+                    <SparkIcon size={12} /> idea
+                  </StatusChip>
+                  <div className={styles.spacer} />
+                  <span className={styles.cardTime}>{relativeTime(seed.updatedAt)}</span>
+                  <div className="nf-rowactions">
+                    <RowAction label="Rename idea" onClick={() => setRenamingId(seed.projectId)}>
+                      <EditIcon size={13} />
+                    </RowAction>
+                    <RowAction label="Delete idea" danger onClick={() => setDeleteTarget(seed)}>
+                      <TrashIcon size={13} />
+                    </RowAction>
+                  </div>
                 </div>
+                {renaming ? (
+                  <IdeaRename name={seedLabel(seed)} saving={renameSeed.isPending} onCommit={next => saveRename(seed.projectId, next)} />
+                ) : naming ? (
+                  <div className={styles.naming} aria-busy="true">
+                    <Skeleton shape="line" width="72%" height={16} />
+                    <span className={styles.namingCaption}>Naming this idea…</span>
+                  </div>
+                ) : (
+                  <h3 className={styles.cardTitle}>{seedLabel(seed)}</h3>
+                )}
+                {(naming || settled) && seed.sparkExcerpt?.trim() && <p className={styles.cardSpark}>{seed.sparkExcerpt}</p>}
               </div>
-              <h3 className={styles.cardTitle}>{seedLabel(seed)}</h3>
-              {seed.workingTitle && seed.sparkExcerpt && <p className={styles.cardSpark}>{seed.sparkExcerpt}</p>}
-            </div>
-          ))}
+            );
+          })}
           <button onClick={() => setCreateOpen(true)} className={styles.newCard}>
             <span className={styles.newIcon}>
               <PlusIcon size={20} />

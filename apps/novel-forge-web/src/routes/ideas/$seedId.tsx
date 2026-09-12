@@ -32,6 +32,7 @@ import {
   useStressSeedMutation,
 } from '@/lib/apis';
 import { messageTime } from '@/lib/format';
+import { firstTitle } from '@/lib/idea-title';
 import { requireSession } from '@/lib/session';
 import { answeredCount, answerText, composeAnswers, type StudioAnswer, type StudioAnswers } from '@/lib/studio-answers';
 
@@ -49,7 +50,7 @@ export const Route = createFileRoute('/ideas/$seedId')({
       throw err;
     }
   },
-  head: ({ loaderData }) => ({ meta: [{ title: `${loaderData?.fields.workingTitle ?? 'Idea'} · Ideation Studio` }] }),
+  head: ({ loaderData }) => ({ meta: [{ title: `${firstTitle([loaderData?.name, loaderData?.fields.workingTitle], 'Idea')} · Ideation Studio` }] }),
   component: () => (
     <AppShell>
       <StudioScreen />

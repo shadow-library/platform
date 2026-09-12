@@ -73,6 +73,20 @@ describe('applyProjectEvent', () => {
 
     expect(invalidated).toEqual(['projects/7/runs']);
   });
+
+  it('should refetch the seed for a naming run on a seed target', () => {
+    applyProjectEvent(queryClient, '7', { type: 'run', runId: 'r1', graph: 'ideation-name', target: 'seed:7', status: 'completed' });
+    flushInvalidations(queryClient);
+
+    expect(invalidated).toEqual(['projects/7/runs', 'projects/7/seed', 'seeds']);
+  });
+
+  it('should not refetch the seed for a non-ideation run on a seed target', () => {
+    applyProjectEvent(queryClient, '7', { type: 'run', runId: 'r1', graph: 'chapter-generation', target: 'seed:7', status: 'completed' });
+    flushInvalidations(queryClient);
+
+    expect(invalidated).toEqual(['projects/7/runs']);
+  });
 });
 
 describe('livePolling', () => {

@@ -1,13 +1,28 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import { type PropsWithChildren, useMemo, useState } from 'react';
 import { type CommandItem, CommandPalette, IconButton, Kbd, toast, Tooltip, useTheme } from '@shadow-library/ui';
 import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
 
-import { useListProjectsQuery, useListProposalsQuery, useLogoutMutation, useMeQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery, useSeedQuery } from '@/lib/apis';
+import { IdeaRename } from '@/components/nf';
+import {
+  applySeedName,
+  invalidateSeed,
+  useListProjectsQuery,
+  useListProposalsQuery,
+  useLogoutMutation,
+  useMeQuery,
+  useProjectQuery,
+  useProjectStatusQuery,
+  useReviewQueueQuery,
+  useSeedQuery,
+  useUpdateProjectMutation,
+} from '@/lib/apis';
 import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle } from '@/lib/format';
+import { firstTitle } from '@/lib/idea-title';
 
-import { BookIcon, GridIcon, MoonIcon, SearchIcon, SparkIcon, SunIcon } from '../icons';
+import { BookIcon, EditIcon, GridIcon, MoonIcon, SearchIcon, SparkIcon, SunIcon } from '../icons';
 import styles from './AppShell.module.css';
 import { JobsTray } from './JobsTray';
 import { type NovelParams } from './routes';
@@ -28,11 +43,14 @@ function ThemeToggle(): React.JSX.Element {
 export default function AppShell({ children }: PropsWithChildren): React.JSX.Element {
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { novelId, seedId } = useParams({ strict: false }) as NovelParams;
   const inProject = Boolean(novelId);
   const inIdeas = pathname === '/ideas' || pathname.startsWith('/ideas/');
   const onIdeaStudio = inIdeas && Boolean(seedId);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [renamingIdea, setRenamingIdea] = useState(false);
+  const renameIdea = useUpdateProjectMutation(seedId ?? '');
 
   const meQuery = useMeQuery();
   const logout = useLogoutMutation();
@@ -147,8 +165,48 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   };
 
   const leafSegment = pathname.split('/').filter(Boolean).pop();
-  const crumbLeaf = inProject && leafSegment != null ? SCREEN_LABEL.get(leafSegment) : onIdeaStudio ? (seedQuery.data?.fields.workingTitle?.trim() ?? 'Idea') : undefined;
+  const crumbLeaf = inProject && leafSegment != null ? SCREEN_LABEL.get(leafSegment) : undefined;
   const crumbRoot = inProject && project ? projectTitle(project) : inIdeas ? 'Ideas' : 'Projects';
+
+  const saveIdeaName = (next: string): void => {
+    if (!seedId) return;
+    renameIdea.mutate(
+      { title: next },
+      {
+        onSuccess: () => {
+          applySeedName(queryClient, seedId, next);
+          invalidateSeed(queryClient, seedId);
+          setRenamingIdea(false);
+        },
+        onError: err => {
+          toast.danger(err.message);
+          setRenamingIdea(false);
+        },
+      },
+    );
+  };
+
+  const ideaTitle = firstTitle([seedQuery.data?.name, seedQuery.data?.fields.workingTitle], 'Idea');
+  const ideaCrumb = onIdeaStudio ? (
+    renamingIdea ? (
+      <IdeaRename compact name={ideaTitle} saving={renameIdea.isPending} onCommit={next => (next == null ? setRenamingIdea(false) : saveIdeaName(next))} />
+    ) : (
+      <span className={styles.crumbIdea}>
+        <span>{ideaTitle}</span>
+        <IconButton variant="ghost" size="sm" aria-label="Rename idea" icon={<EditIcon size={13} />} onClick={() => setRenamingIdea(true)} />
+      </span>
+    )
+  ) : undefined;
+
+  const breadcrumb = onIdeaStudio ? (
+    <>
+      {crumbRoot} / {ideaCrumb}
+    </>
+  ) : crumbLeaf != null ? (
+    `${crumbRoot} / ${crumbLeaf}`
+  ) : (
+    crumbRoot
+  );
 
   return (
     <Chrome
@@ -159,7 +217,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
         items: [{ id: 'projects', label: 'All projects', icon: <GridIcon />, onSelect: () => void navigate({ to: '/' }) }],
         onSignOut: signOut,
       }}
-      breadcrumb={crumbLeaf != null ? `${crumbRoot} / ${crumbLeaf}` : crumbRoot}
+      breadcrumb={breadcrumb}
       search={
         <>
           <button className={`nf-search ${styles.search}`} onClick={() => setPaletteOpen(true)}>

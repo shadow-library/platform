@@ -18,6 +18,12 @@
   --nf-page-pad-inline: max(var(--sh-shell-gutter-inline), var(--sh-safe-left)) max(var(--sh-shell-gutter-inline), var(--sh-safe-right));
 }
 
+.crumbIdea {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .search {
   display: flex;
   align-items: center;

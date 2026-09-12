@@ -47,8 +47,17 @@ export const seedQueryOptions = (projectId: string): UseQueryOptions<SeedRespons
     queryFn: () => APIRequest.get(`/projects/${projectId}/seed`).execute(),
   });
 
-export function useListSeedsQuery(params?: ListSeedsQueryParams): UseQueryResult<ListSeedsResponse, ApiError> {
-  return useQuery(listSeedsQueryOptions(params));
+/**
+ * `PollingOptions` (from `@shadow-library/web`) only carries `state.data`, but the naming poll needs
+ * `state.dataUpdatedAt` too — the clock that tells it the 2-minute naming window has closed even when
+ * structural sharing keeps returning the same `data` reference. Widened locally rather than upstream.
+ */
+export interface SeedsPollingOptions {
+  refetchInterval?: (query: { state: { data?: ListSeedsResponse; dataUpdatedAt: number } }) => number | false;
+}
+
+export function useListSeedsQuery(params?: ListSeedsQueryParams, opts?: SeedsPollingOptions): UseQueryResult<ListSeedsResponse, ApiError> {
+  return useQuery({ ...listSeedsQueryOptions(params), refetchInterval: opts?.refetchInterval });
 }
 
 export function useSeedQuery(projectId: string, enabled = true): UseQueryResult<SeedResponse, ApiError> {
@@ -107,6 +116,14 @@ export function useDeleteSeedMutation(): UseMutationResult<undefined, ApiError, 
 export function invalidateSeed(queryClient: QueryClient, projectId: string): void {
   invalidateSoon(queryClient, { queryKey: seedKeys.sheet(projectId) });
   invalidateSoon(queryClient, { queryKey: seedKeys.all });
+}
+
+/** Writes a rename into the cached sheet and every cached shelf page immediately, so the old name doesn't flash until the batched invalidation lands. */
+export function applySeedName(queryClient: QueryClient, projectId: string, name: string): void {
+  queryClient.setQueryData<SeedResponse>(seedKeys.sheet(projectId), seed => (seed ? { ...seed, name } : seed));
+  queryClient.setQueriesData<ListSeedsResponse>({ queryKey: seedKeys.all }, data =>
+    data ? { ...data, items: data.items.map(item => (item.projectId === projectId ? { ...item, name } : item)) } : data,
+  );
 }
 
 /**

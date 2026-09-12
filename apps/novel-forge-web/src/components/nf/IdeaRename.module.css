@@ -1,0 +1,22 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.crumb {
+  display: inline-flex;
+}
+
+.crumbWrap {
+  width: min(280px, 60vw);
+}
+
+.cardField {
+  font-weight: 650;
+}
+
+.hint {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}

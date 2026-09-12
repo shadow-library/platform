@@ -6,6 +6,7 @@ import { SparkIcon } from '../icons';
 import styles from './nf.module.css';
 
 export { ContentRatingPicker, RatingField, UNRATED } from './ContentRating';
+export { IdeaRename } from './IdeaRename';
 export { Markdown } from './Markdown';
 export { PageSkeleton } from './PageSkeleton';
 export { RouteNotFound } from './NotFound';
