@@ -5,7 +5,8 @@
   "version": "0.0.0",
   "description": "Backend service for Shadow Memoir: gamified life-tracking (quests, hero progression, finance, AI insights) for the account's owner.",
   "scripts": {
-    "dev": "bun run --watch src/main.ts"
+    "dev": "bun run --watch src/main.ts",
+    "test": "bun test --coverage --timeout 20000"
   },
   "shadow": {
     "entries": [
