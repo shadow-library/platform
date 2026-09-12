@@ -23,6 +23,7 @@ import { AppError, Config, Fn, Logger, MaybeUndefined, utils } from '@shadow-lib
 /**
  * Importing user defined packages
  */
+import { EventStream } from '../classes';
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE, HTTP_CONTROLLER_INPUTS, HTTP_CONTROLLER_TYPE, NAMESPACE } from '../constants';
 import { HttpMethod, MiddlewareMetadata, MiddlewareType, SensitiveDataType, TransformerFn } from '../decorators';
 import { AsyncRouteHandler, CallbackRouteHandler, HttpRequest, HttpResponse, ServerMetadata } from '../interfaces';
@@ -569,6 +570,7 @@ export class FastifyRouter extends Dispatcher {
 
   async stop(): Promise<void> {
     this.logger.debug('stopping server');
+    EventStream.closeAll(this.instance);
     await this.instance.close();
     this.logger.info('server stopped');
   }
