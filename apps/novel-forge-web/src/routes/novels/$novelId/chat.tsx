@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Checkbox, Dialog, FormField, Input, SegmentedControl, Select, Spinner, Textarea, toast } from '@shadow-library/ui';
@@ -9,6 +10,7 @@ import {
   type ChangeItemResponse,
   type ChatScope,
   type ChatSessionResponse,
+  isTurnFailureRecorded,
   turnState,
   useApplyProposalMutation,
   useChatMessagesQuery,
@@ -484,6 +486,7 @@ interface ChatThreadProps {
 
 function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React.JSX.Element {
   const messagesQuery = useChatMessagesQuery(novelId, session.id);
+  const queryClient = useQueryClient();
   const turn = useChatTurnMutation(novelId, session.id);
   const updateSession = useUpdateChatSessionMutation(novelId);
   const [input, setInput] = useState('');
@@ -544,7 +547,10 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
         } else if (result.applyNote) toast.danger(result.applyNote);
         else if (result.proposal) toast.success('Forge drafted changes — review them below the reply.');
       },
-      onError: err => {
+      // A failure the turn recorded shows as its own card, message kept and a retry offered; only one that never
+      // reached the transcript needs the toast and the draft handed back.
+      onError: async (err, _content, context) => {
+        if (await isTurnFailureRecorded(queryClient, novelId, session.id, context?.previous)) return;
         toast.danger(err.message);
         if (draft !== undefined) setInput(current => current || draft);
       },

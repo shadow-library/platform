@@ -140,6 +140,19 @@ export function transcriptBehind(transcript: ListChatMessagesResponse | undefine
   return runIdOf(status.pendingTurn) !== runIdOf(transcript.pendingTurn) || runIdOf(status.failedTurn) !== runIdOf(transcript.failedTurn);
 }
 
+/**
+ * Whether a failed send left its failure in the transcript, where the turn's failure card already says it. A request
+ * refused before its turn ran (an archived session, a bad scope) records nothing there, and still needs telling.
+ * Compared by run against the transcript as it was before sending, so an earlier failure still on screen does not count.
+ */
+export async function isTurnFailureRecorded(queryClient: QueryClient, projectId: string, sessionId: string, before?: ListChatMessagesResponse): Promise<boolean> {
+  const queryKey = refinementKeys.messages(projectId, sessionId);
+  // Joins the refetch the mutation already started once the server answered, rather than sending another.
+  await queryClient.refetchQueries({ queryKey, exact: true }, { cancelRefetch: false });
+  const failed = queryClient.getQueryData<ListChatMessagesResponse>(queryKey)?.failedTurn;
+  return failed != null && failed.runId !== before?.failedTurn?.runId;
+}
+
 export function useChatMessagesQuery(projectId: string, sessionId: string | undefined, enabled = true): UseQueryResult<ListChatMessagesResponse, ApiError> {
   const queryClient = useQueryClient();
   const active = enabled && Boolean(projectId) && Boolean(sessionId);

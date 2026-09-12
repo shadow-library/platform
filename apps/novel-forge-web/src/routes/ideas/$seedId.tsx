@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, notFound, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Dialog, FormField, Input, Textarea, toast } from '@shadow-library/ui';
@@ -10,6 +11,7 @@ import {
   type ConceptCardResponse,
   type FieldProvenanceResponse,
   isApiError,
+  isTurnFailureRecorded,
   type ReadinessEntryResponse,
   type SeedFieldsResponse,
   seedQueryOptions,
@@ -527,6 +529,7 @@ function StudioScreen(): React.JSX.Element {
   const sessionId = seed?.sessionId ?? '';
   useProjectEventStream(seedId);
   const messagesQuery = useChatMessagesQuery(seedId, sessionId || undefined, Boolean(sessionId));
+  const queryClient = useQueryClient();
   const turn = useChatTurnMutation(seedId, sessionId);
   const syncSeed = useSeedSync(seedId);
   const [input, setInput] = useState('');
@@ -562,7 +565,10 @@ function StudioScreen(): React.JSX.Element {
         syncSeed(result.seed);
         if (result.applyNote) toast.warning(result.applyNote);
       },
-      onError: err => {
+      // A failure the turn recorded shows as its own card, message kept and a retry offered; only one that never
+      // reached the transcript needs the toast and the draft handed back.
+      onError: async (err, _content, context) => {
+        if (await isTurnFailureRecorded(queryClient, seedId, sessionId, context?.previous)) return;
         toast.danger(err.message);
         if (clearedDraft !== undefined) setInput(current => current || clearedDraft);
       },
