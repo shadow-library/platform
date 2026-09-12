@@ -173,7 +173,8 @@ export class WorkflowRunService {
   }
 
   private async failRun(runId: string, err: unknown, node?: string): Promise<void> {
-    const error = err instanceof Error ? { class: err.constructor.name, message: err.message, node } : { class: 'UnknownError', message: String(err), node };
+    const code = err instanceof AppError ? err.code : undefined;
+    const error = err instanceof Error ? { class: err.constructor.name, message: err.message, code, node } : { class: 'UnknownError', message: String(err), node };
     this.logger.debug('persisting workflow run failure', { runId, node, error });
     await this.db
       .update(schema.workflowRuns)

@@ -13,6 +13,7 @@ import { ChatCompactionService } from '@modules/refinement/chat-compaction.servi
 import { ChatService } from '@modules/refinement/chat.service';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
+import { AppErrorCode } from '@server/classes';
 import { type PrimaryDatabase, schema } from '@server/database';
 import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -144,6 +145,18 @@ describe.if(pgAvailable)('ChatService', () => {
     const done = await chat.listMessages(projectId, session.id, {});
     expect(done.map(m => m.role)).toEqual(['user', 'assistant']);
     expect(await chat.hasPendingTurn(projectId, session.id)).toBe(false);
+  });
+
+  it('should clear the pending turn and report the failure code when the model call fails', async () => {
+    const session = await chat.createSession(projectId, { scopeType: 'novel' });
+    structuredMock.mockImplementationOnce(async () => {
+      throw AppErrorCode.AI_007.create();
+    });
+
+    expect(await codeOf(chat.turn(projectId, session.id, 'is anyone there?'))).toBe('AI_007');
+
+    expect(await chat.hasPendingTurn(projectId, session.id)).toBe(false);
+    expect(await chat.failedTurn(projectId, session.id)).toMatchObject({ graph: 'chat-turn', code: 'AI_007' });
   });
 
   it('returns no proposal for discussion-only turns and rejects archived sessions', async () => {
