@@ -162,6 +162,30 @@ describe('epistemic ops', () => {
   });
 });
 
+describe('the rationale every op may carry', () => {
+  it('should accept a rationale on content ops, action ops, and scope-restricted ops alike', () => {
+    const ops: ChangeOp[] = [
+      { op: 'premise.update', premise: 'sharper', rationale: 'the pitch buried the hook' },
+      { op: 'brief.update', chapter: 3, body: 'a brief', rationale: 'the chapter had no brief' },
+      { op: 'seed.update', fields: { hook: 'a hook' }, rationale: 'the sheet had no hook' },
+      { op: 'action.generate_chapters', count: 2, rationale: 'the queue had run dry' },
+    ];
+    expect(validateChangeSet(ops)).toEqual([]);
+    expect(validateChangeSet([{ op: 'brief.update', chapter: 3, rationale: 'why' }], ['brief.update'])).toEqual([]);
+  });
+
+  it('should reject a rationale that is not a string', () => {
+    expect(validateChangeSet([{ op: 'fact.remove', factKey: 'f1', rationale: 3 }])[0]).toMatch(/invalid field 'rationale'/);
+  });
+
+  it('should advertise the rationale field once for every op it renders', () => {
+    const rendered = renderOpVocabulary(['fact.upsert', 'brief.update']);
+    expect(rendered.match(/"rationale": <string, optional>/g)).toHaveLength(2);
+    expect(rendered).toContain('never written into the story itself');
+    expect(renderActionVocabulary(['action.audit_bible'])).toContain('"rationale": <string, optional>');
+  });
+});
+
 describe('changeSetRefs', () => {
   it('should derive deduplicated artifact refs', () => {
     const refs = changeSetRefs([...validOps, { op: 'volume.remove', volumeKey: 'vol_1' }]);

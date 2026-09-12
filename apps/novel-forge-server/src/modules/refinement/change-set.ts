@@ -286,7 +286,8 @@ export type ActionOp =
   | FinalizeAction
   | GraduateSeedAction;
 
-export type ChangeOp = ContentOp | ActionOp;
+/** Rationale is metadata about the change, not part of it: it reaches the author beside the op and is stripped before any applier sees it, so `ContentOp` — the shape inverses are captured as — deliberately lacks it. */
+export type ChangeOp = (ContentOp | ActionOp) & { rationale?: string };
 export type OpType = ChangeOp['op'];
 export type ActionType = ActionOp['op'];
 
@@ -311,7 +312,7 @@ const SEED_CONSTRAINT_LOCKED_BY = ['author', 'inferred'];
 // to 'offered' is a verdict the author is allowed to take back.
 const SEED_CONCEPT_FATES = ['offered', 'kept', 'killed', 'crossed'];
 
-const OP_SPECS: Record<OpType, OpSpec> = {
+const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'premise.update': { required: {}, optional: { premise: 'string', brief: 'string', themes: 'string[]', instructions: 'string' } },
   'bible_document.upsert': { required: { section: 'string', slug: 'string' }, optional: { frontmatter: 'object', body: 'string' } },
   'bible_document.remove': { required: { section: 'string', slug: 'string' }, optional: {} },
@@ -384,6 +385,11 @@ const OP_SPECS: Record<OpType, OpSpec> = {
   'action.finalize': { required: {}, optional: { upTo: 'number' } },
   'action.graduate_seed': { required: { title: 'string' }, optional: {} },
 };
+
+// Rationale is metadata about an op rather than a field of the artifact, so it rides on every op and apply drops it — derived, so a newly declared op cannot be the one that refuses it.
+const OP_SPECS = Object.fromEntries(
+  (Object.entries(DECLARED_OP_SPECS) as [OpType, OpSpec][]).map(([op, spec]): [OpType, OpSpec] => [op, { ...spec, optional: { ...spec.optional, rationale: 'string' } }]),
+) as Record<OpType, OpSpec>;
 
 const OP_TYPES = Object.keys(OP_SPECS) as OpType[];
 export const ACTION_TYPES = OP_TYPES.filter(op => op.startsWith('action.')) as ActionType[];
@@ -663,6 +669,9 @@ export function validatePluginChangeSet(value: unknown): string[] {
   return errors;
 }
 
+const RATIONALE_NOTE =
+  'rationale, on any op, is one short sentence saying why that change is being made. It is shown to the author beside the op when they review the proposal and is never written into the story itself.';
+
 /**
  * Renders the exact JSON shape of each allowed op for prompt use — weak local models return
  * malformed change-sets when the vocabulary is named but never shown (design §14 risk).
@@ -683,7 +692,7 @@ export function renderOpVocabulary(ops: readonly OpType[]): string {
   const factRules = ops.includes('fact.upsert')
     ? '\nCanon facts are the spoiler ledger: a truth the reader must not learn yet goes in fact.upsert body and NEVER in bible prose, an entity sheet, or a brief — those are visible to the drafter. constraintNote is the POV-safe behaviour that must hold while the fact is hidden; terms are the give-away names and phrases the leak scan blocks. In a mystery the reveal schedule IS the plot, so place each reveal deliberately: set revealChapter as the intended beat and stage the matching brief.update knowledgeContract.learns that pays it off.'
     : '';
-  return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}${contractShape}${knowledgeShape}${factRules}`;
+  return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}\n${RATIONALE_NOTE}${contractShape}${knowledgeShape}${factRules}`;
 }
 
 /** Action shapes + what each one does — the pipeline half of the hub playbook (chat-hub design §4.3). */

@@ -27,6 +27,7 @@ const fixtures = await loadPlugins(join(import.meta.dir, 'fixtures'), id => ({ l
 // The fixture rewrites a brief's title and body only when the note appears in neither, and `includes('')`
 // is always true — an empty note would silently skip the branch this suite is here to prove.
 const NOTE = 'marker note';
+const MARKED_RATIONALE = 'chapter 3 is one of the marked chapters';
 
 const intruderToken = await issueTestToken({ sub: '4004' });
 
@@ -57,6 +58,22 @@ describe.if(pgAvailable)('plugins that propose changes', () => {
     host.registerForTest(probe('emit-arc-move', [{ op: 'arc.upsert', arcKey: 'v1_a1', volumeKey: 'v2', title: 'Moved' }]));
     host.registerForTest(probe('emit-malformed', [{ op: 'fact.upsert', body: 'no key at all' }]));
     host.registerForTest(probe('emit-nothing', []));
+    host.registerForTest(
+      probe('emit-rationale', [
+        { op: 'fact.upsert', factKey: 'reasoned-fact', body: 'a fact', rationale: 'the ledger had no entry for this' },
+        { op: 'entity.upsert', entityKey: 'reasoned-entity', type: 'character', name: 'Named', rationale: 'the cast list was missing a name' },
+        { op: 'bible_document.upsert', section: 'world', slug: 'reasoned-doc', body: 'doc body', rationale: 'the section had no such document' },
+        { op: 'brief.update', chapter: 3, body: 'brief body', rationale: 'the chapter had no brief' },
+      ]),
+    );
+    host.registerForTest(
+      probe('emit-unreasoned', [
+        { op: 'fact.upsert', factKey: 'reasoned-fact', body: 'a fact' },
+        { op: 'entity.upsert', entityKey: 'reasoned-entity', type: 'character', name: 'Named' },
+        { op: 'bible_document.upsert', section: 'world', slug: 'reasoned-doc', body: 'doc body' },
+        { op: 'brief.update', chapter: 3, body: 'brief body' },
+      ]),
+    );
     host.registerForTest({
       id: 'emit-throw',
       manifest: () => ({ id: 'emit-throw', version: '1.0.0', title: 'emit-throw', description: 'emit-throw', decisionPoints: ['canon.augment'], forms: {} }),
@@ -249,7 +266,7 @@ describe.if(pgAvailable)('plugins that propose changes', () => {
       const proposal = await stage(projectId);
 
       expect(proposal).toMatchObject({ kind: 'plugin', status: 'pending', scopeRef: 'twin-track' });
-      expect(proposal?.changeSet).toEqual([{ op: 'brief.update', chapter: 3, writeMode: 'external', title: NOTE, body: NOTE }]);
+      expect(proposal?.changeSet).toEqual([{ op: 'brief.update', chapter: 3, writeMode: 'external', rationale: MARKED_RATIONALE, title: NOTE, body: NOTE }]);
       expect(await briefRow(projectId, 3)).toMatchObject({ title: 'Planned three', body: 'planned body three', writeMode: 'standard', handEdited: false });
     });
 
@@ -315,6 +332,74 @@ describe.if(pgAvailable)('plugins that propose changes', () => {
 
       expect(await proposalRow(projectId, String(applied?.id))).toMatchObject({ status: 'applied' });
       expect(await proposalRow(projectId, String(next?.id))).toMatchObject({ status: 'pending' });
+    });
+  });
+
+  describe('the rationale an op carries', () => {
+    const VOLATILE_COLUMNS = ['id', 'projectId', 'createdAt', 'updatedAt'];
+    const stable = (row: object | undefined) => Object.fromEntries(Object.entries(row ?? {}).filter(([column]) => !VOLATILE_COLUMNS.includes(column)));
+
+    const proposed = (projectId: string) => ({
+      fact: db().query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, BigInt(projectId)), eq(schema.canonFacts.factKey, 'reasoned-fact')) }),
+      entity: db().query.entities.findFirst({ where: and(eq(schema.entities.projectId, BigInt(projectId)), eq(schema.entities.entityKey, 'reasoned-entity')) }),
+      doc: db().query.bibleDocuments.findFirst({
+        where: and(eq(schema.bibleDocuments.projectId, BigInt(projectId)), eq(schema.bibleDocuments.section, 'world'), eq(schema.bibleDocuments.slug, 'reasoned-doc')),
+      }),
+      brief: briefRow(projectId, 3),
+    });
+
+    const artifacts = async (projectId: string) => {
+      const rows = proposed(projectId);
+      return { fact: stable(await rows.fact), entity: stable(await rows.entity), doc: stable(await rows.doc), brief: stable(await rows.brief) };
+    };
+
+    const stageAndApply = async (name: string, pluginId: string) => {
+      const projectId = await createProject(name);
+      await enable(projectId, pluginId);
+      const staged = await augment(projectId, pluginId);
+      expect(staged.statusCode).toBe(200);
+      const proposalId = staged.json().proposalId as string;
+      const applied = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/proposals/${proposalId}/apply`).body({});
+      expect(applied.statusCode).toBe(200);
+      return { projectId, proposalId };
+    };
+
+    it('should stage ops that carry a rationale rather than refuse the proposal', async () => {
+      const projectId = await createProject('rationale-staged');
+      await enable(projectId, 'emit-rationale');
+
+      const response = await augment(projectId, 'emit-rationale');
+
+      expect(response.statusCode).toBe(200);
+      const proposal = await proposalRow(projectId, response.json().proposalId as string);
+      expect((proposal?.changeSet as { rationale?: string }[]).map(op => op.rationale)).toEqual([
+        'the ledger had no entry for this',
+        'the cast list was missing a name',
+        'the section had no such document',
+        'the chapter had no brief',
+      ]);
+    });
+
+    it('should apply to artifacts identical to the ones the same ops without a rationale produce', async () => {
+      const reasoned = await stageAndApply('rationale-applied', 'emit-rationale');
+      const plain = await stageAndApply('rationale-absent', 'emit-unreasoned');
+
+      const applied = await artifacts(reasoned.projectId);
+      expect(applied).toEqual(await artifacts(plain.projectId));
+      for (const row of Object.values(applied)) expect(Object.keys(row)).not.toContain('rationale');
+    });
+
+    it('should capture inverse ops that carry no rationale and revert cleanly', async () => {
+      const { projectId, proposalId } = await stageAndApply('rationale-reverted', 'emit-rationale');
+
+      const applied = await proposalRow(projectId, proposalId);
+      for (const inverse of applied?.inverseOps as object[]) expect(inverse).not.toHaveProperty('rationale');
+
+      const response = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/proposals/${proposalId}/revert`);
+
+      expect(response.statusCode).toBe(200);
+      const rows = proposed(projectId);
+      expect([await rows.fact, await rows.entity, await rows.doc, await rows.brief]).toEqual([undefined, undefined, undefined, undefined]);
     });
   });
 

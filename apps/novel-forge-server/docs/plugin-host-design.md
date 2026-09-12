@@ -513,7 +513,7 @@ export interface WritingKnobs {
  * rather than imported so a plugin never depends on `@modules/refinement`; the loader validates every
  * emitted op against the real `OP_SPECS` before a proposal is staged.
  */
-export type PluginChangeOp =
+export type PluginChangeOp = (
   | {
       op: 'entity.upsert';
       entityKey: string;
@@ -530,7 +530,11 @@ export type PluginChangeOp =
   | { op: 'bible_document.upsert'; section: string; slug: string; frontmatter?: Record<string, unknown>; body?: string }
   | { op: 'bible_document.remove'; section: string; slug: string }
   | { op: 'brief.update'; chapter: number; title?: string; body?: string; writeMode?: 'standard' | 'external' }
-  | { op: 'arc.upsert'; arcKey: string; volumeKey: string; title?: string; objective?: string; escalation?: string; payoff?: string; hook?: string; body?: string };
+  | { op: 'arc.upsert'; arcKey: string; volumeKey: string; title?: string; objective?: string; escalation?: string; payoff?: string; hook?: string; body?: string }
+) & {
+  /** Why this change is being made, shown to the author beside the op (§5.2). Every op accepts one; apply strips it, so it never reaches the artifact. */
+  rationale?: string;
+};
 
 export interface PluginEvent {
   type: string;

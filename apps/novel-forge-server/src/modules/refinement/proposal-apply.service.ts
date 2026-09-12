@@ -125,6 +125,14 @@ export function declinedOpNote(opResults: OpResult[]): string | undefined {
   return notes.length > 0 ? notes.join(' ') : undefined;
 }
 
+/** The one gate between an op and the artifact it edits: `rationale` explains the change to the author and is never stored beside the content it describes. */
+function withoutRationale<T extends ChangeOp>(op: T): T {
+  if (!('rationale' in op)) return op;
+  const rest = { ...op } as Record<string, unknown>;
+  delete rest['rationale'];
+  return rest as T;
+}
+
 /** Per-key merge for the seed sheet's keyed jsonb columns, where a null value clears the key. */
 function mergeKeys<T extends object>(prior: T | null, patch: Record<string, unknown>): T {
   const merged = { ...(prior ?? ({} as T)) } as Record<string, unknown>;
@@ -571,7 +579,8 @@ export class ProposalApplyService {
     return inverse;
   }
 
-  private applyOp(ctx: ApplyContext, op: ChangeOp): Promise<void> {
+  private applyOp(ctx: ApplyContext, incoming: ChangeOp): Promise<void> {
+    const op = withoutRationale(incoming);
     switch (op.op) {
       case 'premise.update':
         return this.applyPremiseUpdate(ctx, op);

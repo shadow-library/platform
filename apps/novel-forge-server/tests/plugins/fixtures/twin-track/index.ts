@@ -56,7 +56,13 @@ function decideBriefPolicy(ctx: ProjectContext & { briefs: BriefSummary[] }): Pl
   for (const brief of ctx.briefs) {
     if (!chapters.has(brief.chapter)) continue;
     const needsRewrite = !brief.title.includes(config.noteText) && !brief.body.includes(config.noteText);
-    ops.push({ op: 'brief.update', chapter: brief.chapter, writeMode: 'external', ...(needsRewrite ? { title: config.noteText, body: config.noteText } : {}) });
+    ops.push({
+      op: 'brief.update',
+      chapter: brief.chapter,
+      writeMode: 'external',
+      rationale: `chapter ${brief.chapter} is one of the marked chapters`,
+      ...(needsRewrite ? { title: config.noteText, body: config.noteText } : {}),
+    });
   }
   return ops;
 }

@@ -190,4 +190,20 @@ describe.if(pgAvailable)('proposal engine', () => {
     expect(Object.keys(updated.baseline as Record<string, unknown>)).toEqual(['chapter:5']);
     await proposals.discard(projectId, proposal.id);
   });
+
+  it('should apply a chat op that carries a rationale without letting it reach the artifact', async () => {
+    const briefFive = () => db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, 5)) });
+
+    const reasoned = await createProposal([{ op: 'brief.update', chapter: 5, body: 'a brief worth explaining', rationale: 'the beat it hands off was unclear' }]);
+    expect((await applier.apply(projectId, reasoned.id)).proposal.status).toBe('applied');
+    const explained = await briefFive();
+
+    const plain = await createProposal([{ op: 'brief.update', chapter: 5, body: 'a brief worth explaining' }]);
+    await applier.apply(projectId, plain.id);
+
+    expect(explained?.contentHash).toBe((await briefFive())?.contentHash);
+    expect(Object.keys(explained ?? {})).not.toContain('rationale');
+    const applied = await db.query.refinementProposals.findFirst({ where: eq(schema.refinementProposals.id, reasoned.id) });
+    for (const inverse of applied?.inverseOps as object[]) expect(inverse).not.toHaveProperty('rationale');
+  });
 });
