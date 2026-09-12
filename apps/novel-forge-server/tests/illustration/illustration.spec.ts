@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { Config } from '@shadow-library/common';
 
+import { ProjectEventService } from '@modules/events';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { getProfileDefaults } from '@modules/ai/defaults';
@@ -87,7 +88,7 @@ function buildHarness(db: PrimaryDatabase): Harness {
   const dbStub = { getPostgresClient: () => db } as never;
   const router = new ModelRouterService({} as never, dbStub, { enforce: async () => undefined } as never);
   const assembler = new ContextAssembler(dbStub, new CatalogService(dbStub));
-  const workflowRuns = new WorkflowRunService(dbStub, assembler, router, {} as never, {} as never, {} as never, {} as never);
+  const workflowRuns = new WorkflowRunService(dbStub, assembler, router, {} as never, {} as never, {} as never, {} as never, new ProjectEventService());
   harness.service = new IllustrationService(
     dbStub,
     storage as never,

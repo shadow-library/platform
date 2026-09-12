@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AppError } from '@shadow-library/common';
 
+import { ProjectEventService } from '@modules/events';
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
@@ -53,7 +54,7 @@ describe.if(pgAvailable)('ChatService ideation guards', () => {
     const noop = {} as never;
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
-    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop);
+    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop, new ProjectEventService());
     const modelRouter = { structured: noop, resolveModel: () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }) } as never;
     const applier = new ProposalApplyService(databaseService, new ActionExecutorRegistry());
     chat = new ChatService(
@@ -67,6 +68,7 @@ describe.if(pgAvailable)('ChatService ideation guards', () => {
       noop,
       new ChatCompactionService(databaseService, modelRouter, workflowRuns),
       noPluginPolicy(),
+      new ProjectEventService(),
     );
 
     const [project] = await db

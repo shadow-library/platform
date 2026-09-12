@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AppError } from '@shadow-library/common';
 
+import { ProjectEventService } from '@modules/events';
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
@@ -63,7 +64,7 @@ describe.if(pgAvailable)('RefineService', () => {
     (modelRouter as unknown as Record<string, unknown>)['buildClient'] = () => ({ invoke: llmInvoke, pipe: () => ({ invoke: llmInvoke }) });
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
-    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop);
+    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop, new ProjectEventService());
     refine = new RefineService(databaseService, assembler, modelRouter, workflowRuns, new ProposalService(databaseService), noPluginPolicy());
 
     const [project] = await db

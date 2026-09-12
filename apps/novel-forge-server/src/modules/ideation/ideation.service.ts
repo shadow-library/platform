@@ -24,6 +24,7 @@ import { ChatService, SCOPE_CHAT_ROLE } from '../refinement/chat.service';
 import { type ScopedTurnResult } from '../refinement/chat-turn.registry';
 import { declinedOpNote, ProposalApplyService } from '../refinement/proposal-apply.service';
 import { ProposalService } from '../refinement/proposal.service';
+import { ProjectEventService } from '../events/project-event.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { ProjectService } from '../project/project/project.service';
 import { matchPlaybooks } from './constraint-playbooks';
@@ -72,6 +73,7 @@ export class IdeationService {
     private readonly compaction: ChatCompactionService,
     private readonly chatService: ChatService,
     private readonly pluginPolicy: PluginPolicyService,
+    private readonly events: ProjectEventService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -327,7 +329,7 @@ export class IdeationService {
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'ideation-turn', `session:${session.id}`, { content }, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
-      const userMessage = await this.persistUserMessage(this.db, session, content, runId);
+      const userMessage = await this.recordUserMessage(session, content, runId);
       const output = (await this.modelRouter.structured(
         prompt,
         { stableContext: pack.renderedStable, history, volatileContext: pack.renderedVolatile || 'nothing', userMessage: content },
@@ -380,7 +382,7 @@ export class IdeationService {
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'ideation-concepts', `session:${session.id}`, { content }, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
-      const userMessage = await this.persistUserMessage(this.db, session, content, runId);
+      const userMessage = await this.recordUserMessage(session, content, runId);
       const telemetry = { projectId, runId, node: 'ideation-concepts', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat' };
       const generate = async (volatileContext: string): Promise<IdeationConceptsOutput> =>
         (await this.modelRouter.structured(
@@ -454,7 +456,7 @@ export class IdeationService {
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'ideation-stress', target, {}, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
-      const userMessage = chat ? await this.persistUserMessage(this.db, chat.session, chat.content, runId) : undefined;
+      const userMessage = chat ? await this.recordUserMessage(chat.session, chat.content, runId) : undefined;
       const output = (await this.modelRouter.structured(
         prompt,
         { stableContext: pack.renderedStable, precheck },
@@ -652,6 +654,13 @@ export class IdeationService {
    * persists the spark so the thread is never blank while the opening turn spins up, and a turn that
    * died after this point — whose retry would otherwise show the author's words twice.
    */
+  /** Commits on its own — never inside the turn's transaction — so the tab it wakes can already read the message. */
+  private async recordUserMessage(session: Refinement.ChatSession, content: string, runId: string | null): Promise<Refinement.ChatMessage> {
+    const message = await this.persistUserMessage(this.db, session, content, runId);
+    this.events.publish(session.projectId, { type: 'chat', sessionId: session.id });
+    return message;
+  }
+
   private async persistUserMessage(tx: DbExecutor, session: Refinement.ChatSession, content: string, runId: string | null): Promise<Refinement.ChatMessage> {
     const unanswered = await this.unansweredUserMessage(session.id, content);
     if (unanswered) {

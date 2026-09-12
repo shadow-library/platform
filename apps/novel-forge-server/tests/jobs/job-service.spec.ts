@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
+import { ProjectEventService } from '@modules/events';
 import { JobService } from '@modules/jobs/job.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -32,7 +33,7 @@ describe.if(pgAvailable)('JobService dedup/retry semantics', () => {
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
-    service = new JobService({ getPostgresClient: () => db } as never);
+    service = new JobService({ getPostgresClient: () => db } as never, new ProjectEventService());
   });
 
   async function createProject(): Promise<bigint> {

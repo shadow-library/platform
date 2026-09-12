@@ -20,6 +20,7 @@ import { buildChatRefinePrompt, renderScopeInstructions, scopeAllowedOps } from 
 import { RetrievalService } from '../ai/retrieval';
 import { type ChatRefineOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
+import { ProjectEventService } from '../events/project-event.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
@@ -45,6 +46,12 @@ export interface FailedTurn {
   failedAt: Date;
   code: string | null;
   message: string | null;
+}
+
+export interface ChatTurnStatus {
+  pendingTurn: PendingTurn | null;
+  failedTurn: FailedTurn | null;
+  lastOrdinal: number;
 }
 
 export interface ChatTurnResult {
@@ -106,6 +113,7 @@ export class ChatService {
     private readonly retrievalService: RetrievalService,
     private readonly compaction: ChatCompactionService,
     private readonly pluginPolicy: PluginPolicyService,
+    private readonly events: ProjectEventService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -271,6 +279,15 @@ export class ChatService {
       orderBy: desc(schema.workflowRuns.startedAt),
     });
     return row ? { runId: row.id, graph: row.graph, startedAt: row.startedAt } : null;
+  }
+
+  async turnStatus(projectId: bigint, sessionId: string): Promise<ChatTurnStatus> {
+    await this.getSession(projectId, sessionId);
+    const [pendingTurn, lastOrdinal] = await Promise.all([this.pendingTurn(projectId, sessionId), this.latestOrdinal(sessionId)]);
+    // Only looked up once nothing is running: a live turn is the answer, and the previous failure it is
+    // retrying would otherwise be reported alongside it.
+    const failedTurn = pendingTurn ? null : await this.failedTurn(projectId, sessionId);
+    return { pendingTurn, failedTurn, lastOrdinal };
   }
 
   async hasPendingTurn(projectId: bigint, sessionId: string): Promise<boolean> {
@@ -486,6 +503,7 @@ export class ChatService {
       .returning()
       .catch(err => this.databaseService.translateError(err));
     if (!userMessage) throw AppErrorCode.CHT_001.create();
+    this.events.publish(projectId, { type: 'chat', sessionId: session.id });
     return userMessage;
   }
 

@@ -7,6 +7,7 @@ import {
   ChatSessionResponse,
   ChatTurnBody,
   ChatTurnResponse,
+  ChatTurnStatusResponse,
   CreateChatSessionBody,
   ListChatMessagesQuery,
   ListChatMessagesResponse,
@@ -48,14 +49,18 @@ export class ChatController {
   @Get('/:sessionId/messages')
   @RespondFor(200, ListChatMessagesResponse)
   async listMessages(@Params() params: ChatSessionParams, @Query() query: ListChatMessagesQuery): Promise<ListChatMessagesResponse> {
-    const [messages, pendingTurn] = await Promise.all([
+    const [messages, { pendingTurn, failedTurn }] = await Promise.all([
       this.chatService.listMessages(params.projectId, params.sessionId, query),
-      this.chatService.pendingTurn(params.projectId, params.sessionId),
+      this.chatService.turnStatus(params.projectId, params.sessionId),
     ]);
-    // Only looked up once nothing is running: a live turn is the answer, and the previous failure it is
-    // retrying would otherwise be reported alongside it.
-    const failedTurn = pendingTurn ? null : await this.chatService.failedTurn(params.projectId, params.sessionId);
     return { messages: messages.map(serialiseMessage), pendingTurn, failedTurn };
+  }
+
+  /** What a client polls while a turn runs: whether it is still running and how far the transcript has got, without the transcript. */
+  @Get('/:sessionId/turn')
+  @RespondFor(200, ChatTurnStatusResponse)
+  turnStatus(@Params() params: ChatSessionParams): Promise<ChatTurnStatusResponse> {
+    return this.chatService.turnStatus(params.projectId, params.sessionId);
   }
 
   /**

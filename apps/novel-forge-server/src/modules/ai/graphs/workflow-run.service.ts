@@ -8,6 +8,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
+import { ProjectEventService } from '../../events/project-event.service';
 import { PluginPolicyService } from '../../plugins/plugin-policy.service';
 import { ContextAssembler } from '../context/context-assembler.service';
 import { ModelRouterService } from '../model-router.service';
@@ -115,6 +116,7 @@ export class WorkflowRunService {
     private readonly toolRegistry: ToolRegistryService,
     private readonly indexingService: IndexingService,
     private readonly pluginPolicy: PluginPolicyService,
+    private readonly events: ProjectEventService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
     this.checkpointer = PostgresSaver.fromConnString(DB_URL);
@@ -159,6 +161,7 @@ export class WorkflowRunService {
       .returning({ id: schema.workflowRuns.id });
     if (!run) throw AppError.internal(`[WorkflowRunService] Failed to create workflow_run row`);
     this.logger.info('workflow run created', { runId: run.id, projectId, graph, target, jobId });
+    this.events.publish(projectId, { type: 'run', runId: run.id, graph, target, status: 'running' });
     this.logger.debug('workflow run input', { runId: run.id, graph, input });
     return run.id;
   }
@@ -166,20 +169,24 @@ export class WorkflowRunService {
   private async completeRun(runId: string, outcome: string | null, status: 'completed' | 'awaiting_review', nodeTrace: string[]): Promise<void> {
     this.logger.info('workflow run finished', { runId, status, outcome });
     this.logger.debug('workflow run node trace', { runId, nodeTrace });
-    await this.db
+    const [run] = await this.db
       .update(schema.workflowRuns)
       .set({ status, outcome: outcome ?? undefined, endedAt: new Date(), nodeTrace: nodeTrace as never })
-      .where(eq(schema.workflowRuns.id, runId));
+      .where(eq(schema.workflowRuns.id, runId))
+      .returning({ projectId: schema.workflowRuns.projectId, graph: schema.workflowRuns.graph, target: schema.workflowRuns.target });
+    if (run) this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status });
   }
 
   private async failRun(runId: string, err: unknown, node?: string): Promise<void> {
     const code = err instanceof AppError ? err.code : undefined;
     const error = err instanceof Error ? { class: err.constructor.name, message: err.message, code, node } : { class: 'UnknownError', message: String(err), node };
     this.logger.debug('persisting workflow run failure', { runId, node, error });
-    await this.db
+    const [run] = await this.db
       .update(schema.workflowRuns)
       .set({ status: 'failed', error: error as never, endedAt: new Date() })
-      .where(eq(schema.workflowRuns.id, runId));
+      .where(eq(schema.workflowRuns.id, runId))
+      .returning({ projectId: schema.workflowRuns.projectId, graph: schema.workflowRuns.graph, target: schema.workflowRuns.target });
+    if (run) this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status: 'failed' });
   }
 
   /**

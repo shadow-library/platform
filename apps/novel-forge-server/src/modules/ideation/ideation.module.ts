@@ -4,6 +4,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 
 import { AiModule } from '../ai/ai.module';
 import { BibleModule } from '../bible/bible.module';
+import { EventsModule } from '../events/events.module';
 import { PluginsModule } from '../plugins/plugins.module';
 import { ProjectModule } from '../project';
 import { RefinementModule } from '../refinement/refinement.module';
@@ -14,7 +15,7 @@ import { IdeationActionRegistrar } from './ideation-action.registrar';
 import { IdeationTurnRegistrar } from './ideation-turn.registrar';
 
 @Module({
-  imports: [DatabaseModule, FastifyModule, ProjectModule, AiModule, PluginsModule, RefinementModule, BibleModule],
+  imports: [DatabaseModule, FastifyModule, ProjectModule, AiModule, EventsModule, PluginsModule, RefinementModule, BibleModule],
   controllers: [SeedController, IdeationController],
   providers: [IdeationService, GraduationService, IdeationTurnRegistrar, IdeationActionRegistrar],
   exports: [IdeationService, GraduationService],

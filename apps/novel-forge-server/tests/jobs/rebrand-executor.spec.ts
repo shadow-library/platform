@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
+import { ProjectEventService } from '@modules/events';
 import { ConcurrencyController } from '@modules/jobs/concurrency.controller';
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { JobService } from '@modules/jobs/job.service';
@@ -61,7 +62,7 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
   // demand, the seed and recombine collaborators just log.
   function buildExecutor(options: HarnessOptions = {}): Harness {
     const events: (string | number)[] = [];
-    const jobService = new JobService({ getPostgresClient: () => db } as never);
+    const jobService = new JobService({ getPostgresClient: () => db } as never, new ProjectEventService());
     const concurrency = new ConcurrencyController();
 
     const rebrandService = {

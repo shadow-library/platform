@@ -11,6 +11,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { AuthClient } from '@shadow-library/auth';
 import { ContextService } from '@shadow-library/fastify';
 
+import { ProjectEventService } from '@modules/events';
 import { ConcurrencyController } from '@modules/jobs/concurrency.controller';
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { JobService } from '@modules/jobs/job.service';
@@ -249,7 +250,7 @@ describe.if(pgAvailable)('Wiki publish pipeline (mocked reader service)', () => 
     await addEntity(projectId);
     reader.failWikiEntries.add('amara');
 
-    const jobService = new JobService(databaseService);
+    const jobService = new JobService(databaseService, new ProjectEventService());
     const executor = new JobExecutor(
       jobService,
       new ConcurrencyController(),

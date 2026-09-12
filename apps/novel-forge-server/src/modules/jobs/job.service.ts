@@ -6,6 +6,8 @@ import { DatabaseService } from '@shadow-library/modules';
 import { APP_NAME } from '@server/constants';
 import { type Job, type PrimaryDatabase, schema } from '@server/database';
 
+import { ProjectEventService } from '../events/project-event.service';
+
 export interface JobProgress {
   done: number;
   total: number;
@@ -19,7 +21,10 @@ export class JobService {
   private readonly logger = Logger.getLogger(APP_NAME, JobService.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly databaseService: DatabaseService) {
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly events: ProjectEventService,
+  ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
@@ -40,6 +45,7 @@ export class JobService {
 
     if (inserted) {
       this.logger.info('Job enqueued', { jobId: inserted.id, projectId, kind, target });
+      this.announce(inserted.id, { projectId, kind, status: 'pending' });
       return inserted.id;
     }
 
@@ -59,6 +65,7 @@ export class JobService {
       .update(schema.jobs)
       .set({ status: 'pending', attempts: 0, lastError: null, progress: null, payload: payload as never, nextAttemptAt: null, updatedAt: new Date() })
       .where(eq(schema.jobs.id, existing.id));
+    this.announce(existing.id, { projectId, kind, status: 'pending' });
     return existing.id;
   }
 
@@ -69,33 +76,43 @@ export class JobService {
   // Atomically claim a pending job. Returns false if another worker already claimed it, which keeps the
   // boot dispatcher and a fresh enqueue+dispatch from ever running the same job twice.
   async start(jobId: string): Promise<boolean> {
-    const claimed = await this.db
+    const [job] = await this.db
       .update(schema.jobs)
       .set({ status: 'in_progress', attempts: sql`${schema.jobs.attempts} + 1`, updatedAt: new Date() })
       .where(and(eq(schema.jobs.id, jobId), eq(schema.jobs.status, 'pending')))
-      .returning({ id: schema.jobs.id });
-    return claimed.length > 0;
+      .returning({ projectId: schema.jobs.projectId, kind: schema.jobs.kind, status: schema.jobs.status });
+    if (job) this.announce(jobId, job);
+    return job !== undefined;
   }
 
   async progress(jobId: string, progress: JobProgress): Promise<void> {
     this.logger.debug('job progress', { jobId, ...progress });
-    await this.db
+    const [job] = await this.db
       .update(schema.jobs)
       .set({ progress: progress as never, updatedAt: new Date() })
-      .where(eq(schema.jobs.id, jobId));
+      .where(eq(schema.jobs.id, jobId))
+      .returning({ projectId: schema.jobs.projectId, kind: schema.jobs.kind, status: schema.jobs.status });
+    if (job) this.announce(jobId, job);
   }
 
   async succeed(jobId: string): Promise<void> {
     this.logger.debug('marking job done', { jobId });
-    await this.db.update(schema.jobs).set({ status: 'done', updatedAt: new Date() }).where(eq(schema.jobs.id, jobId));
+    const [job] = await this.db
+      .update(schema.jobs)
+      .set({ status: 'done', updatedAt: new Date() })
+      .where(eq(schema.jobs.id, jobId))
+      .returning({ projectId: schema.jobs.projectId, kind: schema.jobs.kind, status: schema.jobs.status });
+    if (job) this.announce(jobId, job);
   }
 
   async fail(jobId: string, error: string): Promise<void> {
     this.logger.warn('marking job failed', { jobId, error: error.slice(0, 2000) });
-    await this.db
+    const [job] = await this.db
       .update(schema.jobs)
       .set({ status: 'failed', lastError: error.slice(0, 2000), updatedAt: new Date() })
-      .where(eq(schema.jobs.id, jobId));
+      .where(eq(schema.jobs.id, jobId))
+      .returning({ projectId: schema.jobs.projectId, kind: schema.jobs.kind, status: schema.jobs.status });
+    if (job) this.announce(jobId, job);
   }
 
   async get(jobId: string): Promise<Job.Row | undefined> {
@@ -117,6 +134,10 @@ export class JobService {
 
   async listByProject(projectId: bigint): Promise<Job.Row[]> {
     return this.db.query.jobs.findMany({ where: eq(schema.jobs.projectId, projectId), orderBy: desc(schema.jobs.createdAt) });
+  }
+
+  private announce(jobId: string, job: { projectId: bigint; kind: Job.Kind; status: Job.Status }): void {
+    this.events.publish(job.projectId, { type: 'job', jobId, kind: job.kind, status: job.status });
   }
 
   async recoverStuck(): Promise<void> {

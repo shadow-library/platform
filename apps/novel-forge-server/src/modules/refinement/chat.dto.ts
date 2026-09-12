@@ -214,6 +214,18 @@ export class ListChatMessagesResponse {
   failedTurn?: FailedTurnResponse | null;
 }
 
+@Schema({ description: 'Whether a session’s turn is still running and how far its transcript has got — cheap enough to poll while a turn runs.' })
+export class ChatTurnStatusResponse {
+  @Field(() => PendingTurnResponse, { optional: true, nullable: true, description: 'Present while a chat turn is running for this session; null otherwise.' })
+  pendingTurn?: PendingTurnResponse | null;
+
+  @Field(() => FailedTurnResponse, { optional: true, nullable: true, description: 'Present when the last turn failed and left the transcript unanswered.' })
+  failedTurn?: FailedTurnResponse | null;
+
+  @Field(() => Integer, { description: 'Ordinal of the newest message in the transcript; 0 when it is empty.' })
+  lastOrdinal: number;
+}
+
 @Schema()
 export class ChatTurnBody {
   @Field({

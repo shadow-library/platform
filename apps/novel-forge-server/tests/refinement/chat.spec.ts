@@ -4,6 +4,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AppError } from '@shadow-library/common';
 
+import { type ProjectEvent, ProjectEventService } from '@modules/events';
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { CHAT_HUB_BUDGET, ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
@@ -46,6 +47,7 @@ describe.if(pgAvailable)('ChatService', () => {
   let chat: ChatService;
   let projectId: bigint;
   const structuredMock = mock<() => Promise<unknown>>(async () => ({ reply: 'stub' }));
+  const events = new ProjectEventService();
 
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
@@ -54,7 +56,7 @@ describe.if(pgAvailable)('ChatService', () => {
     const noop = {} as never;
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
-    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop);
+    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop, events);
     const modelRouter = { structured: structuredMock, resolveModel: () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }) } as never;
     const applier = new ProposalApplyService(databaseService, new ActionExecutorRegistry());
     chat = new ChatService(
@@ -68,6 +70,7 @@ describe.if(pgAvailable)('ChatService', () => {
       noop,
       new ChatCompactionService(databaseService, modelRouter, workflowRuns),
       noPluginPolicy(),
+      events,
     );
 
     const [project] = await db
@@ -153,10 +156,15 @@ describe.if(pgAvailable)('ChatService', () => {
       throw AppErrorCode.AI_007.create();
     });
 
+    const published: ProjectEvent[] = [];
+    const unsubscribe = events.subscribe(projectId, event => published.push(event));
+
     expect(await codeOf(chat.turn(projectId, session.id, 'is anyone there?'))).toBe('AI_007');
+    unsubscribe();
 
     expect(await chat.hasPendingTurn(projectId, session.id)).toBe(false);
     expect(await chat.failedTurn(projectId, session.id)).toMatchObject({ graph: 'chat-turn', code: 'AI_007' });
+    expect(published.map(event => (event.type === 'run' ? `run:${event.status}` : event.type))).toEqual(['run:running', 'chat', 'run:failed']);
   });
 
   it('should still report a failed turn whose message the database stamped later than the app stamped the failure', async () => {
@@ -182,6 +190,18 @@ describe.if(pgAvailable)('ChatService', () => {
     await db.insert(schema.chatMessages).values({ sessionId: session.id, projectId, ordinal: 2, role: 'user', content: 'never sent to a run' });
 
     expect(await chat.failedTurn(projectId, session.id)).toBeNull();
+  });
+
+  it('should report a turn’s status and how far the transcript has got, without the transcript', async () => {
+    const session = await chat.createSession(projectId, { scopeType: 'novel' });
+    expect(await chat.turnStatus(projectId, session.id)).toEqual({ pendingTurn: null, failedTurn: null, lastOrdinal: 0 });
+
+    structuredMock.mockImplementationOnce(async () => {
+      throw AppErrorCode.AI_007.create();
+    });
+    await codeOf(chat.turn(projectId, session.id, 'still there?'));
+
+    expect(await chat.turnStatus(projectId, session.id)).toMatchObject({ pendingTurn: null, failedTurn: { code: 'AI_007' }, lastOrdinal: 1 });
   });
 
   it('returns no proposal for discussion-only turns and rejects archived sessions', async () => {

@@ -4,6 +4,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AppError } from '@shadow-library/common';
 
+import { ProjectEventService } from '@modules/events';
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
@@ -157,13 +158,38 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
     const noop = {} as never;
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
-    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop);
+    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop, new ProjectEventService());
     const modelRouter = { structured: structuredMock, resolveModel: () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }) } as never;
     proposals = new ProposalService(databaseService);
     applier = new ProposalApplyService(databaseService, new ActionExecutorRegistry());
     const compaction = new ChatCompactionService(databaseService, modelRouter, workflowRuns);
-    const chat = new ChatService(databaseService, assembler, modelRouter, workflowRuns, proposals, applier, new ToolRegistryService(), noop, compaction, noPluginPolicy());
-    ideation = new IdeationService(databaseService, noop, noop, assembler, modelRouter, workflowRuns, proposals, applier, compaction, chat, noPluginPolicy());
+    const chat = new ChatService(
+      databaseService,
+      assembler,
+      modelRouter,
+      workflowRuns,
+      proposals,
+      applier,
+      new ToolRegistryService(),
+      noop,
+      compaction,
+      noPluginPolicy(),
+      new ProjectEventService(),
+    );
+    ideation = new IdeationService(
+      databaseService,
+      noop,
+      noop,
+      assembler,
+      modelRouter,
+      workflowRuns,
+      proposals,
+      applier,
+      compaction,
+      chat,
+      noPluginPolicy(),
+      new ProjectEventService(),
+    );
   });
 
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());

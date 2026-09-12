@@ -3,6 +3,7 @@ import { FastifyModule } from '@shadow-library/fastify';
 import { DatabaseModule, StorageModule } from '@shadow-library/modules';
 
 import { AiModule } from '../ai/ai.module';
+import { EventsModule } from '../events/events.module';
 import { PublishingModule } from '../publishing/publishing.module';
 import { RebrandModule } from '../rebrand/rebrand.module';
 import { ReforgeModule } from '../reforge/reforge.module';
@@ -15,7 +16,7 @@ import { JobsController } from './jobs.controller';
 import { PublicationJanitor } from './publication.janitor';
 
 @Module({
-  imports: [DatabaseModule, AiModule, SourceModule, RebrandModule, ReforgeModule, PublishingModule, StorageModule, FastifyModule],
+  imports: [DatabaseModule, AiModule, EventsModule, SourceModule, RebrandModule, ReforgeModule, PublishingModule, StorageModule, FastifyModule],
   controllers: [JobsController],
   providers: [JobService, ConcurrencyController, JobExecutor, CheckpointJanitor, PublicationJanitor],
   exports: [JobService, ConcurrencyController, JobExecutor],

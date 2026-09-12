@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { and, asc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
+import { ProjectEventService } from '@modules/events';
 import { ConcurrencyController } from '@modules/jobs/concurrency.controller';
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { JobService } from '@modules/jobs/job.service';
@@ -58,7 +59,7 @@ describe.if(pgAvailable)('JobExecutor.runImport', () => {
   function buildExecutor(): Harness {
     const recombineCalls: bigint[] = [];
     const coverSaves: { contentType: string; bytes: number }[] = [];
-    const jobService = new JobService({ getPostgresClient: () => db } as never);
+    const jobService = new JobService({ getPostgresClient: () => db } as never, new ProjectEventService());
     const concurrency = new ConcurrencyController();
 
     const recombineService = {
