@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import { describe, expect, it } from 'bun:test';
 
 import { TEST_AUDIENCE, TEST_GRANTED_SCOPES, TestEnvironment } from '@tests/test-environment';
@@ -18,8 +20,21 @@ const testEnv = new TestEnvironment('auth_session_test');
 
 const SESSION_COOKIE = '__Host-shadow-session';
 const STATE_COOKIE = '__Host-shadow-session-login';
+const CSRF_COOKIE = 'csrf-token';
+const CSRF_HEADER = 'x-csrf-token';
 
 const USER = { sub: 'user-1' };
+
+/**
+ * The http-core CSRF middleware guards every cookie-authenticated mutation with a double-submit: the
+ * `x-csrf-token` header must equal the token half of an `<expiry base36>:<token>` cookie. Browsers get
+ * the pair from `@shadow-library/web`, which mints one when no cookie exists yet.
+ */
+function csrfPair(): { cookie: string; header: string } {
+  const token = randomBytes(16).toString('hex');
+  const expiry = (Date.now() + 60_000).toString(36);
+  return { cookie: `${expiry}:${token}`, header: token };
+}
 
 describe('Session', () => {
   testEnv.init();
@@ -121,7 +136,13 @@ describe('Session', () => {
   describe('POST /api/auth/logout', () => {
     it('should end the app session and clear the session cookie', async () => {
       const sessionCookie = await establishSession();
-      const response = await testEnv.getRouter().mockRequest().headers({ cookie: sessionCookie }).post('/api/auth/logout').body({});
+      const csrf = csrfPair();
+      const response = await testEnv
+        .getRouter()
+        .mockRequest()
+        .headers({ cookie: `${sessionCookie}; ${CSRF_COOKIE}=${csrf.cookie}`, [CSRF_HEADER]: csrf.header })
+        .post('/api/auth/logout')
+        .body({});
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({ success: true });
