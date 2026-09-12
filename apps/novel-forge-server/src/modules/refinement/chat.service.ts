@@ -94,7 +94,7 @@ export const SCOPE_CHAT_ROLE: Record<Refinement.ChatScope, AiRole> = {
   arc: 'arc',
   brief: 'outline',
   bible_document: 'bible',
-  ideation: 'chat',
+  ideation: 'ideation',
 };
 
 @Injectable()
@@ -211,9 +211,9 @@ export class ChatService {
   }
 
   /**
-   * The studio owns its own conversation end to end: its mode, title, model, lifetime and archival are
-   * consequences of the seed, not of a chat setting. Every mutating path funnels through here so a new
-   * verb on the controller cannot reopen the hole — reading one stays open, the studio screen uses it.
+   * The studio owns its own conversation end to end: its mode, title, lifetime and archival are
+   * consequences of the seed, not of a chat setting. Every mutating path but the model pin funnels
+   * through here so a new verb on the controller cannot reopen the hole.
    */
   private async mutableSession(projectId: bigint, sessionId: string): Promise<Refinement.ChatSession> {
     const session = await this.getSession(projectId, sessionId);
@@ -236,7 +236,7 @@ export class ChatService {
   }
 
   async updateSessionModel(projectId: bigint, sessionId: string, provider: string | null, model: string | null): Promise<Refinement.ChatSession> {
-    const session = await this.mutableSession(projectId, sessionId);
+    const session = await this.getSession(projectId, sessionId);
     // Clearing (both null) restores the project/profile default; a pin must name a registry model with
     // the matching provider, regardless of contentMode, so a raw pick never reaches the platform key.
     if (provider !== null || model !== null) {

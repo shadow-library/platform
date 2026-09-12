@@ -12,7 +12,7 @@ import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
 import { IdeationTurnRegistrar } from '@modules/ideation/ideation-turn.registrar';
 import { ChatCompactionService } from '@modules/refinement/chat-compaction.service';
 import { ChatTurnRegistry } from '@modules/refinement/chat-turn.registry';
-import { ChatService } from '@modules/refinement/chat.service';
+import { ChatService, SCOPE_CHAT_ROLE } from '@modules/refinement/chat.service';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { type PrimaryDatabase, schema } from '@server/database';
@@ -92,17 +92,35 @@ describe.if(pgAvailable)('ChatService ideation guards', () => {
     expect(await codeOf(chat.turn(projectId, session.id, 'hello'))).toBe('IDE_005');
   });
 
-  it('rejects every mutation of a studio session and still allows reading it', async () => {
+  it('should reject every lifecycle mutation of a studio session and still allow reading it', async () => {
     const [session] = await db.insert(schema.chatSessions).values({ projectId, scopeType: 'ideation', mode: 'auto' }).returning();
     if (!session) throw new Error('failed to seed session');
 
     expect(await codeOf(chat.updateSession(projectId, session.id, { mode: 'manual', title: 'mine now' }))).toBe('IDE_005');
-    expect(await codeOf(chat.updateSessionModel(projectId, session.id, 'openrouter', 'x-ai/grok-4.6'))).toBe('IDE_005');
     expect(await codeOf(chat.setSessionStatus(projectId, session.id, 'archived'))).toBe('IDE_005');
     expect(await codeOf(chat.setSessionStatus(projectId, session.id, 'active'))).toBe('IDE_005');
     expect(await codeOf(chat.deleteSession(projectId, session.id))).toBe('IDE_005');
 
     expect(await chat.getSession(projectId, session.id)).toMatchObject({ id: session.id, mode: 'auto', status: 'active' });
+  });
+
+  it('should pin a model on a studio session despite the studio guard', async () => {
+    const [session] = await db.insert(schema.chatSessions).values({ projectId, scopeType: 'ideation', mode: 'auto' }).returning();
+    if (!session) throw new Error('failed to seed session');
+
+    const updated = await chat.updateSessionModel(projectId, session.id, 'openrouter', 'x-ai/grok-4.6');
+    expect(updated).toMatchObject({ id: session.id, modelProvider: 'openrouter', modelId: 'x-ai/grok-4.6' });
+  });
+
+  it('should reject a model pin naming an unregistered model on a studio session', async () => {
+    const [session] = await db.insert(schema.chatSessions).values({ projectId, scopeType: 'ideation', mode: 'auto' }).returning();
+    if (!session) throw new Error('failed to seed session');
+
+    expect(await codeOf(chat.updateSessionModel(projectId, session.id, 'openrouter', 'not-a-real-model'))).toBe('AI_002');
+  });
+
+  it('should route the ideation scope through its own AI role, not the shared chat role', () => {
+    expect(SCOPE_CHAT_ROLE.ideation).toBe('ideation');
   });
 });
 

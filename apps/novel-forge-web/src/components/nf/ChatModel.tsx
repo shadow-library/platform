@@ -44,7 +44,7 @@ const SCOPE_CHAT_ROLE: Record<ChatScope, keyof ProjectModelOverrides> = {
 // The model group each scope inherits its profile default from ('planning' for every structural scope).
 const SCOPE_GROUP: Record<ChatScope, string> = {
   project: 'chat',
-  ideation: 'chat',
+  ideation: 'ideation',
   novel: 'chat',
   volume_plan: 'planning',
   volume: 'planning',
@@ -114,7 +114,9 @@ export function ChatModelMenu({ novelId, session, scopeType, disabled }: ChatMod
   const value = overridden ? encodeModelRef(session?.modelProvider ?? '', session?.modelId ?? '') : 'default';
   const triggerLabel = overridden ? modelLabel(models, session?.modelProvider, session?.modelId) : modelLabel(models, resolvedDefault?.provider, resolvedDefault?.model);
   const defaultCaption = resolvedDefault
-    ? `${modelLabel(models, resolvedDefault.provider, resolvedDefault.model)} · from ${GROUP_LABEL[resolvedDefault.group] ?? resolvedDefault.group} settings`
+    ? scopeType === 'ideation'
+      ? `${modelLabel(models, resolvedDefault.provider, resolvedDefault.model)} · studio default`
+      : `${modelLabel(models, resolvedDefault.provider, resolvedDefault.model)} · from ${GROUP_LABEL[resolvedDefault.group] ?? resolvedDefault.group} settings`
     : undefined;
 
   const onChange = (next: string): void => {

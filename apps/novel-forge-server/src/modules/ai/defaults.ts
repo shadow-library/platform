@@ -24,14 +24,15 @@ export type AiRole =
   | 'arc'
   | 'embedding'
   | 'illustration'
-  | 'image';
+  | 'image'
+  | 'ideation';
 
 export interface ResolvedModel {
   provider: string;
   model: string;
 }
 
-export type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image' | 'embedding';
+export type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image' | 'embedding' | 'ideation';
 
 // Every fine-grained role maps to exactly one user-facing model group. Roles stay fine-grained
 // internally (prompts + telemetry + routing); the group is only the unit the author selects a model
@@ -62,6 +63,7 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
   illustration: 'helper',
   image: 'image',
   embedding: 'embedding',
+  ideation: 'ideation',
 };
 
 // Group-level defaults are the single source of truth; the per-role maps below derive from them so the
@@ -71,7 +73,9 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
 // longform degradation), planning/chat → z-ai/glm-5.2 (strong structured output + instruction
 // following), review → anthropic/claude-sonnet-5 (best tool-calling reliability for the judge loop),
 // helper → openai/gpt-5.6-luna, image → x-ai/grok-imagine-image-2.0 (IllustrationService resolves it
-// through `resolveModel('image', project)`, so a project-level override is honoured).
+// through `resolveModel('image', project)`, so a project-level override is honoured), ideation →
+// anthropic/claude-opus-5 (the ideation studio has no settings screen, so this is the studio's fixed
+// default rather than a group an author configures).
 const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'openrouter', model: 'moonshotai/kimi-k3' },
   planning: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
@@ -80,10 +84,12 @@ const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   helper: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
+  ideation: { provider: 'openrouter', model: 'anthropic/claude-opus-5' },
 };
 
 // Unrestricted is an alternate model map, not a vendor pin. Writing goes to Grok 4.6; planning/chat stay on
 // GLM-5.2 (same structured stack as Standard); review/helper move off Claude/Luna onto DeepSeek V4 Pro.
+// Opus is not on `UNRESTRICTED_LLM_ALLOWLIST`, so ideation falls back to GLM-5.2 there too.
 export const UNRESTRICTED_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
   planning: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
@@ -92,6 +98,7 @@ export const UNRESTRICTED_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   helper: { provider: 'openrouter', model: 'deepseek/deepseek-v4-pro' },
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
+  ideation: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
 };
 
 export const UNRESTRICTED_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(UNRESTRICTED_GROUP_DEFAULTS);
@@ -124,6 +131,7 @@ const LOCAL_TEST_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   helper: { provider: 'ollama', model: 'qwen3:8b' },
   image: { provider: 'ollama', model: 'qwen3:8b' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
+  ideation: { provider: 'ollama', model: 'qwen3:14b' },
 };
 
 function deriveRoleDefaults(groups: Record<ModelGroup, ResolvedModel>): Record<AiRole, ResolvedModel> {
@@ -160,6 +168,7 @@ export const REASONING_POLICY: Record<ModelGroup, ReasoningEffort> = {
   helper: 'none',
   image: 'none',
   embedding: 'none',
+  ideation: 'low',
 };
 
 // Returns the effort to send, or undefined to omit the reasoning field entirely — which is itself how

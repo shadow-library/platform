@@ -26,7 +26,7 @@ export class AiController {
 
     // The author picks a model per group, not per fine-grained role. `embedding` is locked (its vector
     // dimension is bound to the pgvector schema), so it isn't offered. The response's `role` field
-    // carries the group key (`writing` | `planning` | `review` | `chat` | `helper` | `image`).
+    // carries the group key (`writing` | `planning` | `review` | `chat` | `helper` | `image` | `ideation`).
     const toRoleDefaults = (groups: typeof UNRESTRICTED_GROUP_DEFAULTS) =>
       Object.entries(groups)
         .filter(([group]) => group !== 'embedding')

@@ -109,6 +109,16 @@ describe('ModelRouterService.resolveModel', () => {
   it('maps every fine-grained role to a model group', () => {
     for (const role of Object.keys(PRODUCTION_DEFAULTS)) expect(ROLE_GROUP[role as keyof typeof ROLE_GROUP]).toBeDefined();
   });
+
+  it('should resolve an unpinned ideation role to Claude Opus 5 on a standard project', () => {
+    const resolved = router.resolveModel('ideation', { contentMode: 'standard' });
+    expect(resolved).toEqual({ provider: 'openrouter', model: 'anthropic/claude-opus-5' });
+  });
+
+  it('should resolve an unpinned ideation role to GLM 5.2 on an unrestricted project, since Opus is not on the unrestricted allowlist', () => {
+    const resolved = router.resolveModel('ideation', { contentMode: 'unrestricted' });
+    expect(resolved).toEqual({ provider: 'openrouter', model: 'z-ai/glm-5.2' });
+  });
 });
 
 describe('ModelRouterService.buildClient', () => {
@@ -198,6 +208,10 @@ describe('ModelRouterService.buildClient', () => {
 });
 
 describe('resolveReasoningEffort', () => {
+  it('should give ideation the same reasoning policy as chat', () => {
+    expect(REASONING_POLICY.ideation).toBe(REASONING_POLICY.chat);
+  });
+
   it('should omit reasoning for an optional model under the helper "none" policy it cannot express', () => {
     expect(REASONING_POLICY.helper).toBe('none');
     expect(resolveReasoningEffort('anthropic/claude-sonnet-5', 'helper')).toBeUndefined();
