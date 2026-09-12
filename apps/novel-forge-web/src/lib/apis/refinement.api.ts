@@ -1,4 +1,14 @@
-import { type QueryClient, queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import {
+  type Query,
+  type QueryClient,
+  queryOptions,
+  useMutation,
+  type UseMutationResult,
+  useQuery,
+  useQueryClient,
+  type UseQueryOptions,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import {
@@ -19,6 +29,7 @@ import {
   type RevertProposalResponse,
   type RollbackResponse,
 } from './api-types.gen';
+import { flushInvalidations, invalidateSoon } from './batched-invalidation';
 import { livePolling } from './live-polling';
 import { ApiError, APIRequest } from './transport';
 
@@ -78,12 +89,17 @@ interface ApplyProposalVariables {
   opIndexes?: number[];
 }
 
-/** Everything a finished turn can have moved: its transcript, the session list, proposals and the change history. */
+/** A session list's key ends in its filters; a key ending in a session id belongs to that session's own queries. */
+function isSessionList(query: Query): boolean {
+  return typeof query.queryKey[3] !== 'string';
+}
+
+/** Everything a finished turn can have moved: its transcript, the session lists, proposals and the change history. */
 export function invalidateChat(queryClient: QueryClient, projectId: string, sessionId: string): void {
-  queryClient.invalidateQueries({ queryKey: refinementKeys.session(projectId, sessionId) });
-  queryClient.invalidateQueries({ queryKey: refinementKeys.sessions(projectId) });
-  queryClient.invalidateQueries({ queryKey: refinementKeys.proposals(projectId) });
-  queryClient.invalidateQueries({ queryKey: refinementKeys.changes(projectId) });
+  invalidateSoon(queryClient, { queryKey: refinementKeys.messages(projectId, sessionId), exact: true });
+  invalidateSoon(queryClient, { queryKey: refinementKeys.sessions(projectId), predicate: isSessionList });
+  invalidateSoon(queryClient, { queryKey: refinementKeys.proposals(projectId) });
+  invalidateSoon(queryClient, { queryKey: refinementKeys.changes(projectId) });
 }
 
 export function useListChatSessionsQuery(projectId: string, params?: ListSessionsParams, enabled = true): UseQueryResult<ListChatSessionResponse, ApiError> {
@@ -117,13 +133,13 @@ export function turnState(data: ListChatMessagesResponse | undefined): TurnState
   return strandedFor > TURN_SPINUP_GRACE_MS ? { kind: 'failed', failed: null, retryContent: last.content } : { kind: 'pending', pending: null };
 }
 
-/** A session whose turn has started or whose transcript has grown, short of the turn finishing. */
+/** A transcript that has grown or whose turn has started, short of the turn finishing; its status is left to its own poll. */
 export function invalidateChatSession(queryClient: QueryClient, projectId: string, sessionId: string): void {
-  queryClient.invalidateQueries({ queryKey: refinementKeys.session(projectId, sessionId) });
+  invalidateSoon(queryClient, { queryKey: refinementKeys.messages(projectId, sessionId), exact: true });
 }
 
 export function invalidateChatSessions(queryClient: QueryClient, projectId: string): void {
-  queryClient.invalidateQueries({ queryKey: refinementKeys.sessions(projectId) });
+  invalidateSoon(queryClient, { queryKey: refinementKeys.sessions(projectId) });
 }
 
 function runIdOf(turn: { runId: string } | null | undefined): string | null {
@@ -147,7 +163,8 @@ export function transcriptBehind(transcript: ListChatMessagesResponse | undefine
  */
 export async function isTurnFailureRecorded(queryClient: QueryClient, projectId: string, sessionId: string, before?: ListChatMessagesResponse): Promise<boolean> {
   const queryKey = refinementKeys.messages(projectId, sessionId);
-  // Joins the refetch the mutation already started once the server answered, rather than sending another.
+  // Starts the refetch this send already queued and waits on it, rather than sending a second one.
+  flushInvalidations(queryClient);
   await queryClient.refetchQueries({ queryKey, exact: true }, { cancelRefetch: false });
   const failed = queryClient.getQueryData<ListChatMessagesResponse>(queryKey)?.failedTurn;
   return failed != null && failed.runId !== before?.failedTurn?.runId;
@@ -172,7 +189,7 @@ export function useChatMessagesQuery(projectId: string, sessionId: string | unde
   const behind = status.dataUpdatedAt > transcript.dataUpdatedAt && transcriptBehind(transcript.data, status.data);
 
   useEffect(() => {
-    if (behind) queryClient.invalidateQueries({ queryKey: refinementKeys.messages(projectId, sessionId ?? '') });
+    if (behind) invalidateSoon(queryClient, { queryKey: refinementKeys.messages(projectId, sessionId ?? ''), exact: true });
   }, [behind, projectId, queryClient, sessionId]);
 
   return transcript;

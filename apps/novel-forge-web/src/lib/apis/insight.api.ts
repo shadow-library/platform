@@ -1,6 +1,7 @@
 import { type QueryClient, queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
 import { type AiUsageResponse, type ListGenerationJobResponse } from './api-types.gen';
+import { invalidateSoon } from './batched-invalidation';
 import { livePolling } from './live-polling';
 import { ApiError, APIRequest, type PollingOptions } from './transport';
 
@@ -33,5 +34,5 @@ export function useListJobsQuery(projectId: string, enabled = true, opts?: Polli
 }
 
 export function invalidateJobs(queryClient: QueryClient, projectId: string): void {
-  queryClient.invalidateQueries({ queryKey: insightKeys.jobs(projectId) });
+  invalidateSoon(queryClient, { queryKey: insightKeys.jobs(projectId) });
 }

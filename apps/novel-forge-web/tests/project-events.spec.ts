@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { QueryClient } from '@tanstack/react-query';
 
+import { flushInvalidations } from '../src/lib/apis/batched-invalidation';
 import { applyProjectEvent, parseProjectEvent } from '../src/lib/apis/events.api';
 import { livePolling, setEventStreamLive } from '../src/lib/apis/live-polling';
 
@@ -32,28 +33,32 @@ describe('applyProjectEvent', () => {
 
   it('should refetch only the job list for a job event', () => {
     applyProjectEvent(queryClient, '7', { type: 'job', jobId: 'j1', kind: 'extract', status: 'in_progress' });
+    flushInvalidations(queryClient);
 
     expect(invalidated).toEqual(['projects/7/jobs']);
   });
 
-  it('should refetch the session a message landed in', () => {
+  it('should refetch the transcript a message landed in', () => {
     applyProjectEvent(queryClient, '7', { type: 'chat', sessionId: 's1' });
+    flushInvalidations(queryClient);
 
-    expect(invalidated).toEqual(['projects/7/chat-sessions/s1']);
+    expect(invalidated).toEqual(['projects/7/chat-sessions/s1/messages']);
   });
 
-  it('should refetch the runs and the session whose turn has started', () => {
+  it('should refetch the runs and the transcript whose turn has started', () => {
     applyProjectEvent(queryClient, '7', { type: 'run', runId: 'r1', graph: 'chat-turn', target: 'session:s1', status: 'running' });
+    flushInvalidations(queryClient);
 
-    expect(invalidated).toEqual(['projects/7/runs', 'projects/7/chat-sessions/s1']);
+    expect(invalidated).toEqual(['projects/7/runs', 'projects/7/chat-sessions/s1/messages']);
   });
 
   it('should refetch everything a finished studio turn can have moved, including the seed sheet', () => {
     applyProjectEvent(queryClient, '7', { type: 'run', runId: 'r1', graph: 'ideation-turn', target: 'session:s1', status: 'completed' });
+    flushInvalidations(queryClient);
 
     expect(invalidated).toEqual([
       'projects/7/runs',
-      'projects/7/chat-sessions/s1',
+      'projects/7/chat-sessions/s1/messages',
       'projects/7/chat-sessions',
       'projects/7/refinement-proposals',
       'projects/7/changes',
@@ -64,6 +69,7 @@ describe('applyProjectEvent', () => {
 
   it('should refetch only the runs for a run that is not a chat turn', () => {
     applyProjectEvent(queryClient, '7', { type: 'run', runId: 'r1', graph: 'chapter-generation', target: 'chapter-3', status: 'completed' });
+    flushInvalidations(queryClient);
 
     expect(invalidated).toEqual(['projects/7/runs']);
   });

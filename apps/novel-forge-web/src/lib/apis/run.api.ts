@@ -1,6 +1,7 @@
 import { type QueryClient, queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
 import { type ListWorkflowRunResponse, type RunContextResponse, type RunModelCallDetailResponse, type WorkflowRunDetailResponse } from './api-types.gen';
+import { invalidateSoon } from './batched-invalidation';
 import { livePolling } from './live-polling';
 import { ApiError, APIRequest, type PollingOptions } from './transport';
 
@@ -24,7 +25,7 @@ export function useListRunsQuery(projectId: string, enabled = true, opts?: Polli
 }
 
 export function invalidateRuns(queryClient: QueryClient, projectId: string): void {
-  queryClient.invalidateQueries({ queryKey: runKeys.all(projectId) });
+  invalidateSoon(queryClient, { queryKey: runKeys.all(projectId) });
 }
 
 export function useRunQuery(projectId: string, runId: string | undefined, enabled = true): UseQueryResult<WorkflowRunDetailResponse, ApiError> {

@@ -9,6 +9,7 @@ import {
   type SeedResponse,
   type SeedStressResponse,
 } from './api-types.gen';
+import { invalidateSoon } from './batched-invalidation';
 import { ApiError, APIRequest } from './transport';
 
 /**
@@ -104,8 +105,8 @@ export function useDeleteSeedMutation(): UseMutationResult<undefined, ApiError, 
 
 /** The sheet a turn may have moved, and the shelf label its working title may have renamed. */
 export function invalidateSeed(queryClient: QueryClient, projectId: string): void {
-  queryClient.invalidateQueries({ queryKey: seedKeys.sheet(projectId) });
-  queryClient.invalidateQueries({ queryKey: seedKeys.all });
+  invalidateSoon(queryClient, { queryKey: seedKeys.sheet(projectId) });
+  invalidateSoon(queryClient, { queryKey: seedKeys.all });
 }
 
 /**
