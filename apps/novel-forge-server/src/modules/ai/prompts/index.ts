@@ -15,6 +15,7 @@ import { epitomePrompt } from './epitome.prompt';
 import { extractionPrompt } from './extraction.prompt';
 import { fixPrompt } from './fix.prompt';
 import { generationPrompt } from './generation.prompt';
+import { ideaNamePrompt } from './idea-name.prompt';
 import { ideationConceptsPrompt } from './ideation-concepts.prompt';
 import { ideationStressPrompt } from './ideation-stress.prompt';
 import { ideationTurnPrompt } from './ideation-turn.prompt';
@@ -74,6 +75,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'ideation-concepts': ideationConceptsPrompt as PromptModule<unknown>,
   /** Shape-only — the no-contradiction rule lives in `buildIdeationStressPrompt`; the studio calls the builder. */
   'ideation-stress': ideationStressPrompt as PromptModule<unknown>,
+  'idea-name': ideaNamePrompt as PromptModule<unknown>,
   'arc-plan': arcPlanPrompt as PromptModule<unknown>,
   'chapter-extract': chapterExtractPrompt as PromptModule<unknown>,
   'rebrand-glossary': rebrandGlossaryPrompt as PromptModule<unknown>,

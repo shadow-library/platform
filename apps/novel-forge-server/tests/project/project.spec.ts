@@ -60,6 +60,29 @@ describe.if(pgAvailable)('Projects API', () => {
     });
   });
 
+  describe('PATCH /api/v1/projects/:projectId title', () => {
+    it('should store the working title trimmed', async () => {
+      const id = (await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'titled', kind: 'new_novel' })).json().id;
+
+      const updated = await testEnv.getRouter().mockRequest().patch(`/api/v1/projects/${id}`).body({ title: '  The Wreck Singer ' });
+
+      expect(updated.statusCode).toBe(200);
+      expect(updated.json().title).toBe('The Wreck Singer');
+    });
+
+    it('should clear the working title when given a blank one', async () => {
+      const id = (await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'untitled', kind: 'new_novel' })).json().id;
+      await testEnv.getRouter().mockRequest().patch(`/api/v1/projects/${id}`).body({ title: 'The Wreck Singer' });
+
+      const blank = await testEnv.getRouter().mockRequest().patch(`/api/v1/projects/${id}`).body({ title: ' \t ' });
+
+      expect(blank.statusCode).toBe(200);
+      expect(blank.json().title).toBeNull();
+      const stored = await testEnv.getPostgresClient().query.projects.findFirst({ where: eq(schema.projects.id, BigInt(id)) });
+      expect(stored?.title).toBeNull();
+    });
+  });
+
   describe('chapter writing instructions', () => {
     it('should pre-fill new projects with the default writing instructions', async () => {
       const response = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'wi-default', kind: 'new_novel' });

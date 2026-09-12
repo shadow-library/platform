@@ -9,6 +9,7 @@ import { PluginsModule } from '../plugins/plugins.module';
 import { ProjectModule } from '../project';
 import { RefinementModule } from '../refinement/refinement.module';
 import { GraduationService } from './graduation.service';
+import { IdeaNamingService } from './idea-naming.service';
 import { IdeationController, SeedController } from './ideation.controller';
 import { IdeationService } from './ideation.service';
 import { IdeationActionRegistrar } from './ideation-action.registrar';
@@ -17,7 +18,7 @@ import { IdeationTurnRegistrar } from './ideation-turn.registrar';
 @Module({
   imports: [DatabaseModule, FastifyModule, ProjectModule, AiModule, EventsModule, PluginsModule, RefinementModule, BibleModule],
   controllers: [SeedController, IdeationController],
-  providers: [IdeationService, GraduationService, IdeationTurnRegistrar, IdeationActionRegistrar],
-  exports: [IdeationService, GraduationService],
+  providers: [IdeationService, IdeaNamingService, GraduationService, IdeationTurnRegistrar, IdeationActionRegistrar],
+  exports: [IdeationService, IdeaNamingService, GraduationService],
 })
 export class IdeationModule {}

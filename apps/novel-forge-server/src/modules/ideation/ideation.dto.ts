@@ -190,6 +190,14 @@ export class SeedResponse {
   @Field({ optional: true, nullable: true, description: 'The ideation chat session driving this seed.' })
   sessionId?: string | null;
 
+  @Field({
+    optional: true,
+    nullable: true,
+    description:
+      "The idea's display name — the project's title, written once by the helper model from the spark or first message, or set by the author. Null until the idea is named.",
+  })
+  name?: string | null;
+
   @Field(() => SeedFieldsResponse)
   fields: SeedFieldsResponse;
 
@@ -243,6 +251,14 @@ export class SeedSummaryResponse {
 
   @Field({ optional: true, nullable: true })
   sessionId?: string | null;
+
+  @Field({
+    optional: true,
+    nullable: true,
+    description:
+      "The idea's display name — the project's title, written once by the helper model from the spark or first message, or set by the author. Null until the idea is named.",
+  })
+  name?: string | null;
 
   @Field({ optional: true, nullable: true })
   workingTitle?: string | null;

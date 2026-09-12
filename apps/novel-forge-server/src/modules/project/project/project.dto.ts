@@ -169,7 +169,7 @@ export class UploadImageBody {
 
 @Schema({ minProperties: 1 })
 export class UpdateProjectBody {
-  @Field({ optional: true })
+  @Field({ optional: true, maxLength: 500, description: 'The working title — for a seed, the idea’s name. Trimmed; a blank title clears it.' })
   title?: string;
 
   @Field(() => ProjectConfig, { optional: true })

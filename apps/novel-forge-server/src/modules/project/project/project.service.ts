@@ -170,6 +170,7 @@ export class ProjectService {
   async update(id: bigint, update: UpdateProjectBody): Promise<Project.Presented> {
     this.assertConfigModelsAllowed(update.config);
     const set: Record<string, unknown> = { ...update, updatedAt: new Date() };
+    if (update.title !== undefined) set.title = update.title.trim() || null;
     // Normalise the writing instructions: blank — or the default itself — collapses back to null so the
     // column keeps meaning "use the default" and follows future changes to DEFAULT_WRITING_INSTRUCTIONS.
     if (update.instructions !== undefined) {

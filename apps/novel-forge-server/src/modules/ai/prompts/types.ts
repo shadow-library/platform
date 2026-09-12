@@ -33,6 +33,7 @@ export type PromptKey =
   | 'ideation-turn'
   | 'ideation-concepts'
   | 'ideation-stress'
+  | 'idea-name'
   | 'arc-plan'
   | 'chapter-extract'
   | 'rebrand-glossary'

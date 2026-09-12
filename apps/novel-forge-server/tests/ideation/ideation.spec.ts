@@ -1,10 +1,10 @@
 import { SQL } from 'bun';
-import { beforeEach, describe, expect, it } from 'bun:test';
+import { beforeAll, beforeEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { type AppError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { IdeationService } from '@modules/ideation';
+import { IdeaNamingService, IdeationService } from '@modules/ideation';
 import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
 import { seedContentHash } from '@server/common';
 import { type PrimaryDatabase, schema } from '@server/database';
@@ -28,9 +28,17 @@ describe.if(pgAvailable)('Ideation API', () => {
   testEnv.init();
 
   let db: PrimaryDatabase;
+  let nameInBackground: Mock<IdeaNamingService['nameInBackground']>;
+
+  // Naming is covered against a stubbed model in idea-naming.spec. Left live here it is a second real model call per spark
+  // that outlives its test, and the per-test database drop with FORCE severs the pool connections it is holding.
+  beforeAll(() => {
+    nameInBackground = spyOn(testEnv.getService(IdeaNamingService), 'nameInBackground').mockImplementation(() => undefined);
+  });
 
   beforeEach(() => {
     db = testEnv.getPostgresClient();
+    nameInBackground.mockClear();
   });
 
   function createSeed(spark?: string) {
@@ -50,7 +58,7 @@ describe.if(pgAvailable)('Ideation API', () => {
       expect(body.id).toMatch(TEST_REGEX.id);
       expect(body.projectId).toMatch(TEST_REGEX.id);
       expect(body.sessionId).toMatch(TEST_REGEX.uuid);
-      expect(body).toMatchObject({ fields: {}, provenance: {}, constraints: [], concepts: [], readiness: [], askedQuestions: [], revision: 1 });
+      expect(body).toMatchObject({ name: null, fields: {}, provenance: {}, constraints: [], concepts: [], readiness: [], askedQuestions: [], revision: 1 });
       expect(body.tasteAnchors).toEqual({ comps: [], preferences: [] });
 
       const projectId = BigInt(body.projectId);
@@ -81,6 +89,23 @@ describe.if(pgAvailable)('Ideation API', () => {
       const messages = await db.query.chatMessages.findMany({ where: eq(schema.chatMessages.sessionId, body.sessionId) });
       expect(messages).toHaveLength(1);
       expect(messages[0]).toMatchObject({ ordinal: 1, role: 'user', content: 'a salvager who can hear dead ships' });
+    });
+
+    it('should start naming the idea from its spark', async () => {
+      const body = (await createSeed('  a salvager who can hear dead ships  ')).json();
+
+      expect(nameInBackground).toHaveBeenCalledWith({
+        projectId: BigInt(body.projectId),
+        seedId: BigInt(body.id),
+        sessionId: body.sessionId,
+        fallback: 'a salvager who can hear dead ships',
+      });
+    });
+
+    it('should not start naming a seed created without a spark', async () => {
+      const body = (await createSeed()).json();
+
+      expect(nameInBackground.mock.calls.map(([request]) => request.sessionId)).not.toContain(body.sessionId);
     });
 
     it('should write no message when no spark was typed', async () => {
@@ -155,7 +180,20 @@ describe.if(pgAvailable)('Ideation API', () => {
     it('should report a null title and excerpt for a seed with neither', async () => {
       await createSeed();
 
-      expect((await testEnv.getRouter().mockRequest().get('/api/v1/seeds')).json().items[0]).toMatchObject({ workingTitle: null, sparkExcerpt: null });
+      expect((await testEnv.getRouter().mockRequest().get('/api/v1/seeds')).json().items[0]).toMatchObject({ name: null, workingTitle: null, sparkExcerpt: null });
+    });
+
+    it('should carry each idea’s name from its project title', async () => {
+      const named = (await createSeed()).json();
+      const unnamed = (await createSeed()).json();
+      await db
+        .update(schema.projects)
+        .set({ title: 'The Wreck Singer' })
+        .where(eq(schema.projects.id, BigInt(named.projectId)));
+
+      const items: { projectId: string; name: string | null }[] = (await testEnv.getRouter().mockRequest().get('/api/v1/seeds')).json().items;
+      expect(items.find(item => item.projectId === named.projectId)?.name).toBe('The Wreck Singer');
+      expect(items.find(item => item.projectId === unnamed.projectId)?.name).toBeNull();
     });
 
     it('should exclude seeds owned by somebody else', async () => {
@@ -259,6 +297,16 @@ describe.if(pgAvailable)('Ideation API', () => {
       });
     });
 
+    it('should carry the idea’s name', async () => {
+      const created = (await createSeed()).json();
+      await db
+        .update(schema.projects)
+        .set({ title: 'The Wreck Singer' })
+        .where(eq(schema.projects.id, BigInt(created.projectId)));
+
+      expect((await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${created.projectId}/seed`)).json().name).toBe('The Wreck Singer');
+    });
+
     it('should reject an active project with IDE_001', async () => {
       const project = (await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'a novel', kind: 'new_novel' })).json();
 
@@ -281,6 +329,36 @@ describe.if(pgAvailable)('Ideation API', () => {
       const response = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${theirs?.id}/seed`);
       expect(response.statusCode).toBe(404);
       expect(response.json().code).toBe('PRJ_001');
+    });
+  });
+
+  describe('PATCH /api/v1/projects/:projectId on a seed', () => {
+    it('should rename the idea with a trimmed title and show it on the shelf and the sheet', async () => {
+      const created = (await createSeed()).json();
+
+      const response = await testEnv.getRouter().mockRequest().patch(`/api/v1/projects/${created.projectId}`).body({ title: '  The Wreck Singer  ' });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ title: 'The Wreck Singer', status: 'seed' });
+      expect((await testEnv.getRouter().mockRequest().get('/api/v1/seeds')).json().items[0].name).toBe('The Wreck Singer');
+      expect((await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${created.projectId}/seed`)).json().name).toBe('The Wreck Singer');
+    });
+
+    it('should clear the name for an empty or blank title', async () => {
+      const created = (await createSeed()).json();
+
+      for (const title of ['', '   ']) {
+        await db
+          .update(schema.projects)
+          .set({ title: 'The Wreck Singer' })
+          .where(eq(schema.projects.id, BigInt(created.projectId)));
+
+        const response = await testEnv.getRouter().mockRequest().patch(`/api/v1/projects/${created.projectId}`).body({ title });
+
+        expect(response.statusCode).toBe(200);
+        expect((await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${created.projectId}/seed`)).json().name).toBeNull();
+        expect((await testEnv.getRouter().mockRequest().get('/api/v1/seeds')).json().items[0].name).toBeNull();
+      }
     });
   });
 

@@ -13,7 +13,7 @@ import { type DbExecutor, type Ideation, type PrimaryDatabase, type PrimaryTrans
 
 import { ContextAssembler, IDEATION_HISTORY_BUDGET } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
-import { type ResolvedModel } from '../ai/defaults';
+import { isUnrestrictedAllowed, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { buildIdeationStressPrompt, buildIdeationTurnPrompt, PROMPT_REGISTRY, renderReadinessPrecheck, scopeAllowedOps } from '../ai/prompts';
@@ -28,6 +28,7 @@ import { ProjectEventService } from '../events/project-event.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { ProjectService } from '../project/project/project.service';
 import { matchPlaybooks } from './constraint-playbooks';
+import { IdeaNamingService } from './idea-naming.service';
 import { type CreateSeedBody, type ListSeedsQuery, type ListSeedsResponse, type SeedResponse, type SeedStressResponse, type SeedSummaryResponse } from './ideation.dto';
 import { getQuestion } from './question-bank';
 import { nextQuestions, readinessDimensions, recordOffered, type RouterResult, toRouterSeedState } from './question-router';
@@ -46,7 +47,12 @@ const CIRCLING_LIMIT = 3;
 interface StudioTurnContext {
   session: Refinement.ChatSession;
   seed: Ideation.StorySeed;
-  project: { id: bigint; config: unknown } | undefined;
+  project: { id: bigint; title: string | null; config: unknown } | undefined;
+}
+
+interface NamedSeed {
+  seed: Ideation.StorySeed;
+  name: string | null;
 }
 
 /** A card the generation round produced, paired with the playbook filter it failed. */
@@ -74,6 +80,7 @@ export class IdeationService {
     private readonly chatService: ChatService,
     private readonly pluginPolicy: PluginPolicyService,
     private readonly events: ProjectEventService,
+    private readonly naming: IdeaNamingService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -82,11 +89,12 @@ export class IdeationService {
     return BigInt(this.context.getAuthPrincipal().sub);
   }
 
-  private present(seed: Ideation.StorySeed, sessionId: string | null): SeedResponse {
+  private present({ seed, name }: NamedSeed, sessionId: string | null): SeedResponse {
     return {
       id: seed.id,
       projectId: seed.projectId,
       sessionId,
+      name,
       fields: seed.fields ?? {},
       provenance: seed.provenance ?? {},
       constraints: seed.constraints ?? [],
@@ -144,13 +152,16 @@ export class IdeationService {
         }
 
         this.logger.info('seed created', { projectId: project.id, seedId: seed.id, sessionId: session.id, hasSpark: Boolean(spark) });
-        return { response: this.present(seed, session.id), sessionId: session.id };
+        return { response: this.present({ seed, name: project.title ?? null }, session.id), seedId: seed.id, sessionId: session.id };
       });
 
       // After the commit, never inside it: the turn reads the sheet and the session back off `this.db`,
       // which cannot see this transaction's writes. Detached so the author is not held on a model call
       // for the length of the create — the run row it opens is what `pendingTurn` reports meanwhile.
-      if (spark) void this.openingTurn(project.id, created.sessionId, spark);
+      if (spark) {
+        void this.openingTurn(project.id, created.sessionId, spark);
+        this.naming.nameInBackground({ projectId: project.id, seedId: created.seedId, sessionId: created.sessionId, fallback: spark });
+      }
       return created.response;
     } catch (err) {
       // The project insert already committed outside this transaction (ProjectService.create owns no
@@ -199,7 +210,8 @@ export class IdeationService {
     ]);
     if (seeds.length === 0) return utils.pagination.createResult(query, [], total);
 
-    const sessions = await this.studioSessions(seeds.map(seed => seed.projectId));
+    const projectIds = seeds.map(seed => seed.projectId);
+    const [sessions, names] = await Promise.all([this.studioSessions(projectIds), this.projectTitles(projectIds)]);
     const sparks = await this.sparkExcerpts([...sessions.values()]);
 
     const items: SeedSummaryResponse[] = seeds.map(seed => {
@@ -208,6 +220,7 @@ export class IdeationService {
         id: seed.id,
         projectId: seed.projectId,
         sessionId,
+        name: names.get(seed.projectId) ?? null,
         workingTitle: seed.fields?.workingTitle ?? null,
         sparkExcerpt: (sessionId && sparks.get(sessionId)) ?? null,
         createdAt: seed.createdAt,
@@ -219,15 +232,9 @@ export class IdeationService {
 
   /** The full sheet for one seed. Ownership is enforced a stage earlier by `ProjectOwnershipGuard`. */
   async getSeed(projectId: bigint): Promise<SeedResponse> {
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { status: true } });
-    if (!project) throw AppErrorCode.PRJ_001.create();
-    if (project.status !== 'seed') throw AppErrorCode.IDE_001.create();
-
-    const seed = await this.db.query.storySeeds.findFirst({ where: eq(schema.storySeeds.projectId, projectId) });
-    if (!seed) throw AppErrorCode.IDE_001.create();
-
+    const named = await this.loadNamedSeed(projectId);
     const sessions = await this.studioSessions([projectId]);
-    return this.present(seed, sessions.get(projectId) ?? null);
+    return this.present(named, sessions.get(projectId) ?? null);
   }
 
   /**
@@ -247,6 +254,11 @@ export class IdeationService {
       if (!newest.has(session.projectId)) newest.set(session.projectId, session.id);
     }
     return newest;
+  }
+
+  private async projectTitles(projectIds: bigint[]): Promise<Map<bigint, string | null>> {
+    const projects = await this.db.query.projects.findMany({ where: inArray(schema.projects.id, projectIds), columns: { id: true, title: true } });
+    return new Map(projects.map(project => [project.id, project.title]));
   }
 
   /**
@@ -282,6 +294,7 @@ export class IdeationService {
   async turn(projectId: bigint, sessionId: string, content: string): Promise<ScopedTurnResult> {
     const ctx = await this.loadStudio(projectId, sessionId);
     await this.assertNoTurnInFlight(projectId, sessionId);
+    if (ctx.project?.title === null) this.naming.nameInBackground({ projectId, seedId: ctx.seed.id, sessionId, fallback: content });
     await this.compaction.compactIfNeeded(projectId, ctx.session, IDEATION_HISTORY_BUDGET);
 
     const round = nextQuestions(toRouterSeedState(ctx.seed));
@@ -313,7 +326,7 @@ export class IdeationService {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
     const { runId, readiness } = await this.runStress({ seed, session: session ?? null, project, transcript: null, round: null });
-    return { seed: this.present(await this.loadSeed(projectId), sessionId), runId, readiness };
+    return { seed: await this.presentFresh(projectId, sessionId), runId, readiness };
   }
 
   private async interviewTurn(ctx: StudioTurnContext, round: RouterResult, content: string): Promise<ScopedTurnResult> {
@@ -497,17 +510,21 @@ export class IdeationService {
   }
 
   private async loadSeed(projectId: bigint): Promise<Ideation.StorySeed> {
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { status: true } });
+    return (await this.loadNamedSeed(projectId)).seed;
+  }
+
+  private async loadNamedSeed(projectId: bigint): Promise<NamedSeed> {
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { status: true, title: true } });
     if (!project) throw AppErrorCode.PRJ_001.create();
     if (project.status !== 'seed') throw AppErrorCode.IDE_001.create();
 
     const seed = await this.db.query.storySeeds.findFirst({ where: eq(schema.storySeeds.projectId, projectId) });
     if (!seed) throw AppErrorCode.IDE_001.create();
-    return seed;
+    return { seed, name: project.title };
   }
 
-  private async presentFresh(projectId: bigint, sessionId: string): Promise<SeedResponse> {
-    return this.present(await this.loadSeed(projectId), sessionId);
+  private async presentFresh(projectId: bigint, sessionId: string | null): Promise<SeedResponse> {
+    return this.present(await this.loadNamedSeed(projectId), sessionId);
   }
 
   /**
@@ -636,9 +653,14 @@ export class IdeationService {
     }
   }
 
+  /** A pin the unrestricted allowlist refuses is ignored rather than recorded: the router would route around it, and the message would name a model that never ran. */
   private resolveSessionModel(session: Refinement.ChatSession, project?: ProjectConfig): ResolvedModel {
-    if (session.modelProvider && session.modelId) return { provider: session.modelProvider, model: session.modelId };
-    return this.modelRouter.resolveModel(SCOPE_CHAT_ROLE[session.scopeType], project);
+    const role = SCOPE_CHAT_ROLE[session.scopeType];
+    if (session.modelProvider && session.modelId) {
+      const pinned = { provider: session.modelProvider, model: session.modelId };
+      if (project?.contentMode !== 'unrestricted' || isUnrestrictedAllowed(role, pinned)) return pinned;
+    }
+    return this.modelRouter.resolveModel(role, project);
   }
 
   /** The resolved model reaches the router as the `config.models.chat` override it already reads. */

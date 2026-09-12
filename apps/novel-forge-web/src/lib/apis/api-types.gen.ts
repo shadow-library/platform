@@ -3207,6 +3207,7 @@ export interface components {
       volumesTotal?: number;
     };
     UpdateProjectBody: {
+      /** @description The working title — for a seed, the idea’s name. Trimmed; a blank title clears it. */
       title?: string;
       config?: components['schemas']['ProjectConfig'];
       contentMode?: components['schemas']['ContentMode'];
@@ -4159,6 +4160,8 @@ export interface components {
       projectId: string;
       /** @description The ideation chat session driving this seed. */
       sessionId?: null | string;
+      /** @description The idea's display name — the project's title, written once by the helper model from the spark or first message, or set by the author. Null until the idea is named. */
+      name?: null | string;
       fields: components['schemas']['SeedFieldsResponse'];
       provenance: components['schemas']['SeedProvenanceResponse'];
       constraints: components['schemas']['SeedConstraintResponse'][];
@@ -4589,6 +4592,8 @@ export interface components {
       id: string;
       projectId: string;
       sessionId?: null | string;
+      /** @description The idea's display name — the project's title, written once by the helper model from the spark or first message, or set by the author. Null until the idea is named. */
+      name?: null | string;
       workingTitle?: null | string;
       /** @description Opening of the spark the author typed, for a seed that has not earned a working title yet. */
       sparkExcerpt?: null | string;

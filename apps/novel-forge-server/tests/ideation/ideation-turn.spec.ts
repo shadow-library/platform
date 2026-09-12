@@ -11,7 +11,7 @@ import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
 import { buildIdeationStressPrompt } from '@modules/ai/prompts';
 import { type PromptModule } from '@modules/ai/prompts/types';
 import { ToolRegistryService } from '@modules/ai/tools';
-import { IdeationService } from '@modules/ideation';
+import { type IdeaNamingRequest, IdeationService } from '@modules/ideation';
 import { getQuestion } from '@modules/ideation/question-bank';
 import { nextQuestions, readinessDimensions, toRouterSeedState } from '@modules/ideation/question-router';
 import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
@@ -105,6 +105,8 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
   let applier: ProposalApplyService;
   const structuredMock = mock<(prompt: PromptModule<never>, input: Record<string, string>) => Promise<unknown>>(answering({ reply: 'stub' }));
 
+  const nameInBackground = mock<(request: IdeaNamingRequest) => void>(() => undefined);
+
   const lastInput = (): Record<string, string> => structuredMock.mock.calls.at(-1)?.[1] as Record<string, string>;
 
   async function makeSeed(overrides: Partial<Ideation.StorySeed> = {}, sessionOverrides: Partial<Refinement.ChatSession> = {}) {
@@ -189,6 +191,7 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       chat,
       noPluginPolicy(),
       new ProjectEventService(),
+      { nameInBackground } as never,
     );
   });
 
@@ -389,6 +392,66 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       const theirs = await makeSeed();
 
       expect(await codeOf(ideation.turn(mine.projectId, theirs.sessionId, 'hello'))).toBe('CHT_001');
+    });
+  });
+
+  describe('naming', () => {
+    it('should start naming an untitled idea from the turn without waiting for it', async () => {
+      const { projectId, seedId, sessionId } = await makeSeed();
+      structuredMock.mockImplementationOnce(await answersRound(projectId, { reply: 'Heard.' }));
+      nameInBackground.mockClear();
+
+      await ideation.turn(projectId, sessionId, 'a salvager who hears dead ships');
+
+      expect(nameInBackground).toHaveBeenCalledTimes(1);
+      expect(nameInBackground.mock.calls[0]?.[0]).toEqual({ projectId, seedId, sessionId, fallback: 'a salvager who hears dead ships' });
+    });
+
+    it('should not start naming an idea that already has a name', async () => {
+      const { projectId, sessionId } = await makeSeed();
+      await db.update(schema.projects).set({ title: 'The Wreck Singer' }).where(eq(schema.projects.id, projectId));
+      structuredMock.mockImplementationOnce(await answersRound(projectId, { reply: 'Heard.' }));
+      nameInBackground.mockClear();
+
+      const result = await ideation.turn(projectId, sessionId, 'a salvager who hears dead ships');
+
+      expect(nameInBackground).not.toHaveBeenCalled();
+      expect(result.seed?.name).toBe('The Wreck Singer');
+    });
+
+    it('should not start naming for a turn the guards refuse', async () => {
+      const { projectId, sessionId } = await makeSeed();
+      await db.update(schema.projects).set({ status: 'active' }).where(eq(schema.projects.id, projectId));
+      nameInBackground.mockClear();
+
+      expect(await codeOf(ideation.turn(projectId, sessionId, 'hello'))).toBe('IDE_001');
+      expect(nameInBackground).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the session model', () => {
+    const turnModel = async (contentMode: 'standard' | 'unrestricted', pin: { provider: string; model: string }) => {
+      const { projectId, sessionId } = await makeSeed({}, { modelProvider: pin.provider, modelId: pin.model });
+      await db.update(schema.projects).set({ contentMode }).where(eq(schema.projects.id, projectId));
+      structuredMock.mockImplementationOnce(await answersRound(projectId, { reply: 'Heard.' }));
+
+      const result = await ideation.turn(projectId, sessionId, 'a salvager');
+
+      const routed = (structuredMock.mock.calls.at(-1) as unknown[] | undefined)?.[3] as { config: { models: { chat: unknown } } };
+      expect(routed.config.models.chat).toEqual({ provider: result.assistantMessage.modelProvider, model: result.assistantMessage.modelId });
+      return { provider: result.assistantMessage.modelProvider, model: result.assistantMessage.modelId };
+    };
+
+    it('should run and record the pinned model on a standard project', async () => {
+      expect(await turnModel('standard', { provider: 'openrouter', model: 'anthropic/claude-opus-5' })).toEqual({ provider: 'openrouter', model: 'anthropic/claude-opus-5' });
+    });
+
+    it('should ignore a pin the unrestricted allowlist refuses and record the routed default instead', async () => {
+      expect(await turnModel('unrestricted', { provider: 'openrouter', model: 'anthropic/claude-opus-5' })).toEqual({ provider: 'openrouter', model: 'x-ai/grok-4.6' });
+    });
+
+    it('should honour an allowlisted pin on an unrestricted project', async () => {
+      expect(await turnModel('unrestricted', { provider: 'openrouter', model: 'z-ai/glm-5.2' })).toEqual({ provider: 'openrouter', model: 'z-ai/glm-5.2' });
     });
   });
 
