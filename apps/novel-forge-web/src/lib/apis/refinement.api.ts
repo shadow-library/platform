@@ -110,6 +110,14 @@ export function useListChatSessionsQuery(projectId: string, params?: ListSession
   });
 }
 
+export function useChatSessionQuery(projectId: string, sessionId: string, enabled = true): UseQueryResult<ChatSessionResponse, ApiError> {
+  return useQuery<ChatSessionResponse, ApiError>({
+    queryKey: refinementKeys.session(projectId, sessionId),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/chat/sessions/${sessionId}`).execute(),
+    enabled: enabled && Boolean(projectId) && Boolean(sessionId),
+  });
+}
+
 /**
  * What the transcript is waiting on, derived once so both chat screens agree. `pending` carries the
  * running turn's graph and start time, which is what lets the UI name a phase and count the wait
