@@ -1,4 +1,4 @@
-import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import { type QueryClient, queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
 import {
   type CreateSeedBody,
@@ -100,6 +100,12 @@ export function useDeleteSeedMutation(): UseMutationResult<undefined, ApiError, 
       queryClient.invalidateQueries({ queryKey: seedKeys.all });
     },
   });
+}
+
+/** The sheet a turn may have moved, and the shelf label its working title may have renamed. */
+export function invalidateSeed(queryClient: QueryClient, projectId: string): void {
+  queryClient.invalidateQueries({ queryKey: seedKeys.sheet(projectId) });
+  queryClient.invalidateQueries({ queryKey: seedKeys.all });
 }
 
 /**

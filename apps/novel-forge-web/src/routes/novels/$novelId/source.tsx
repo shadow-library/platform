@@ -7,6 +7,7 @@ import { EditIcon, ResetIcon, SourceIcon } from '@/components/icons';
 import { type ChipIntent, PageHeader, QueryState, StatusChip } from '@/components/nf';
 import {
   type ChapterListResponse,
+  hasActiveJob,
   listChaptersQueryOptions,
   projectStatusQueryOptions,
   useConsolidateMutation,
@@ -119,7 +120,7 @@ function SourceScreen(): React.JSX.Element {
   const queryClient = useQueryClient();
   const statusQuery = useProjectStatusQuery(novelId);
   const chaptersQuery = useListChaptersQuery(novelId, { limit: 200 });
-  const jobsQuery = useListJobsQuery(novelId, true, { refetchInterval: 2500 });
+  const jobsQuery = useListJobsQuery(novelId, true, { refetchInterval: query => (hasActiveJob(query.state.data) ? 2500 : false) });
   const extract = useExtractMutation(novelId);
   const consolidate = useConsolidateMutation(novelId);
   const skeleton = useSkeletonMutation(novelId);

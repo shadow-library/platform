@@ -152,6 +152,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Stream Events */
+    get: operations['get_api_v1_projects_projectId_events'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/plugins': {
     parameters: {
       query?: never;
@@ -1425,6 +1442,23 @@ export interface paths {
     put?: never;
     /** Create Turn */
     post: operations['post_api_v1_projects_projectId_chat_sessions_sessionId_messages'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/turn': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Turn Status */
+    get: operations['get_api_v1_projects_projectId_chat_sessions_sessionId_turn'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -4089,6 +4123,15 @@ export interface components {
       code?: string | null;
       message?: string | null;
     };
+    /** @description Whether a session’s turn is still running and how far its transcript has got — cheap enough to poll while a turn runs. */
+    ChatTurnStatusResponse: {
+      /** @description Present while a chat turn is running for this session; null otherwise. */
+      pendingTurn?: components['schemas']['PendingTurnResponse'] | null;
+      /** @description Present when the last turn failed and left the transcript unanswered. */
+      failedTurn?: components['schemas']['FailedTurnResponse'] | null;
+      /** @description Ordinal of the newest message in the transcript; 0 when it is empty. */
+      lastOrdinal: number;
+    };
     ChatTurnBody: {
       /** @description Chat content; accepts long premises, chapters, and reference documents up to 200,000 characters. */
       content: string;
@@ -5805,6 +5848,37 @@ export interface operations {
           'application/json': components['schemas']['AiModelsResponse'];
         };
       };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_events: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
       /** @description Default Response */
       '4XX': {
         headers: {
@@ -9628,6 +9702,48 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ChatTurnResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_chat_sessions_sessionId_turn: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatTurnStatusResponse'];
         };
       };
       /** @description Default Response */
@@ -13741,6 +13857,7 @@ export type StudioReadinessPayloadResponse = components['schemas']['StudioReadin
 export type ReadinessEntryResponse = components['schemas']['ReadinessEntryResponse'];
 export type PendingTurnResponse = components['schemas']['PendingTurnResponse'];
 export type FailedTurnResponse = components['schemas']['FailedTurnResponse'];
+export type ChatTurnStatusResponse = components['schemas']['ChatTurnStatusResponse'];
 export type ChatTurnBody = components['schemas']['ChatTurnBody'];
 export type ChatTurnResponse = components['schemas']['ChatTurnResponse'];
 export type TurnAppliedResult = components['schemas']['TurnAppliedResult'];
@@ -13933,6 +14050,7 @@ export type ApprovalResult = components['schemas']['ApprovalResult'];
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
+export type StreamEventsPathParams = Exclude<paths['/api/v1/projects/{projectId}/events']['get']['parameters']['path'], undefined>;
 export type ListProjectPluginsPathParams = Exclude<paths['/api/v1/projects/{projectId}/plugins']['get']['parameters']['path'], undefined>;
 export type GetManifestPathParams = Exclude<paths['/api/v1/ingest/novels/{sourceRef}/manifest']['get']['parameters']['path'], undefined>;
 export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
@@ -13973,6 +14091,7 @@ export type ListSessionsPathParams = Exclude<paths['/api/v1/projects/{projectId}
 export type GetSessionPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}']['get']['parameters']['path'], undefined>;
 export type ListMessagesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages']['get']['parameters']['query'], undefined>;
 export type ListMessagesPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages']['get']['parameters']['path'], undefined>;
+export type TurnStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/turn']['get']['parameters']['path'], undefined>;
 export type PreviewContextQueryParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['query'], undefined>;
 export type PreviewContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['path'], undefined>;
 export type ListEntitiesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['query'], undefined>;

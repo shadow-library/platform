@@ -21,6 +21,7 @@ import {
   useChatTurnMutation,
   useGraduateSeedMutation,
   useListChangesQuery,
+  useProjectEventStream,
   useRevertProposalMutation,
   useSeedQuery,
   useSeedSync,
@@ -524,6 +525,7 @@ function StudioScreen(): React.JSX.Element {
   const seedQuery = useSeedQuery(seedId);
   const seed = seedQuery.data;
   const sessionId = seed?.sessionId ?? '';
+  useProjectEventStream(seedId);
   const messagesQuery = useChatMessagesQuery(seedId, sessionId || undefined, Boolean(sessionId));
   const turn = useChatTurnMutation(seedId, sessionId);
   const syncSeed = useSeedSync(seedId);

@@ -4,6 +4,7 @@ import { Button, Dialog, Spinner } from '@shadow-library/ui';
 
 import { type ChipIntent, PaneError, PaneLoader, StatusChip } from '@/components/nf';
 import {
+  hasRunningRun,
   listRunsQueryOptions,
   type RunContextPackResponse,
   type RunModelCallResponse,
@@ -387,7 +388,7 @@ function RunDetail({ novelId, runId }: RunDetailProps): React.JSX.Element {
 
 function RunsScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
-  const runsQuery = useListRunsQuery(novelId, true, { refetchInterval: 4000 });
+  const runsQuery = useListRunsQuery(novelId, true, { refetchInterval: query => (hasRunningRun(query.state.data) ? 4000 : false) });
   const runs = runsQuery.data?.items ?? [];
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const activeId = selectedId ?? runs[0]?.id;

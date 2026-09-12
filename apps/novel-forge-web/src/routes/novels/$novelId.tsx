@@ -1,7 +1,7 @@
 import { createFileRoute, notFound, Outlet } from '@tanstack/react-router';
 
 import { AppShell } from '@/components/Layout';
-import { isApiError, meQuery, projectQueryOptions } from '@/lib/apis';
+import { isApiError, meQuery, projectQueryOptions, useProjectEventStream } from '@/lib/apis';
 import { projectTitle } from '@/lib/format';
 import { requireSession } from '@/lib/session';
 
@@ -23,9 +23,16 @@ export const Route = createFileRoute('/novels/$novelId')({
     }
   },
   head: ({ loaderData }) => ({ meta: [{ title: loaderData ? `${projectTitle(loaderData)} · Novel Forge` : 'Novel Forge' }] }),
-  component: () => (
+  component: NovelWorkspace,
+});
+
+function NovelWorkspace(): React.JSX.Element {
+  const { novelId } = Route.useParams();
+  useProjectEventStream(novelId);
+
+  return (
     <AppShell>
       <Outlet />
     </AppShell>
-  ),
-});
+  );
+}

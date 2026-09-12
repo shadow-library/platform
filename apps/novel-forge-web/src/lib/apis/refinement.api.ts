@@ -1,10 +1,12 @@
-import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import { type QueryClient, queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 import {
   type ApplyProposalResponse,
   type AuditBibleResponse,
   type ChatSessionResponse,
   type ChatTurnResponse,
+  type ChatTurnStatusResponse,
   type CreateChatSessionBody,
   type FailedTurnResponse,
   type ListChangesResponse,
@@ -17,6 +19,7 @@ import {
   type RevertProposalResponse,
   type RollbackResponse,
 } from './api-types.gen';
+import { livePolling } from './live-polling';
 import { ApiError, APIRequest } from './transport';
 
 /**
@@ -28,6 +31,7 @@ const refinementKeys = {
   sessions: (projectId: string) => ['projects', projectId, 'chat-sessions'] as const,
   session: (projectId: string, sessionId: string) => ['projects', projectId, 'chat-sessions', sessionId] as const,
   messages: (projectId: string, sessionId: string) => ['projects', projectId, 'chat-sessions', sessionId, 'messages'] as const,
+  turn: (projectId: string, sessionId: string) => ['projects', projectId, 'chat-sessions', sessionId, 'turn'] as const,
   proposals: (projectId: string) => ['projects', projectId, 'refinement-proposals'] as const,
   proposalList: (projectId: string, params?: ListProposalsQueryParams) => [...refinementKeys.proposals(projectId), 'list', params] as const,
   proposal: (projectId: string, proposalId: string) => [...refinementKeys.proposals(projectId), proposalId] as const,
@@ -74,8 +78,9 @@ interface ApplyProposalVariables {
   opIndexes?: number[];
 }
 
-function invalidateChat(queryClient: ReturnType<typeof useQueryClient>, projectId: string, sessionId: string): void {
-  queryClient.invalidateQueries({ queryKey: refinementKeys.messages(projectId, sessionId) });
+/** Everything a finished turn can have moved: its transcript, the session list, proposals and the change history. */
+export function invalidateChat(queryClient: QueryClient, projectId: string, sessionId: string): void {
+  queryClient.invalidateQueries({ queryKey: refinementKeys.session(projectId, sessionId) });
   queryClient.invalidateQueries({ queryKey: refinementKeys.sessions(projectId) });
   queryClient.invalidateQueries({ queryKey: refinementKeys.proposals(projectId) });
   queryClient.invalidateQueries({ queryKey: refinementKeys.changes(projectId) });
@@ -112,15 +117,52 @@ export function turnState(data: ListChatMessagesResponse | undefined): TurnState
   return strandedFor > TURN_SPINUP_GRACE_MS ? { kind: 'failed', failed: null, retryContent: last.content } : { kind: 'pending', pending: null };
 }
 
+/** A session whose turn has started or whose transcript has grown, short of the turn finishing. */
+export function invalidateChatSession(queryClient: QueryClient, projectId: string, sessionId: string): void {
+  queryClient.invalidateQueries({ queryKey: refinementKeys.session(projectId, sessionId) });
+}
+
+export function invalidateChatSessions(queryClient: QueryClient, projectId: string): void {
+  queryClient.invalidateQueries({ queryKey: refinementKeys.sessions(projectId) });
+}
+
+function runIdOf(turn: { runId: string } | null | undefined): string | null {
+  return turn?.runId ?? null;
+}
+
+/** Whether the server's view of a turn has moved past the transcript this tab holds. */
+export function transcriptBehind(transcript: ListChatMessagesResponse | undefined, status: ChatTurnStatusResponse | undefined): boolean {
+  if (!transcript || !status) return false;
+  const lastOrdinal = transcript.messages.at(-1)?.ordinal ?? 0;
+  // A just-sent message sits ahead of the stored transcript until the server persists it; refetching earlier would drop it.
+  if (status.lastOrdinal < lastOrdinal) return false;
+  if (status.lastOrdinal > lastOrdinal) return true;
+  return runIdOf(status.pendingTurn) !== runIdOf(transcript.pendingTurn) || runIdOf(status.failedTurn) !== runIdOf(transcript.failedTurn);
+}
+
 export function useChatMessagesQuery(projectId: string, sessionId: string | undefined, enabled = true): UseQueryResult<ListChatMessagesResponse, ApiError> {
-  return useQuery<ListChatMessagesResponse, ApiError>({
+  const queryClient = useQueryClient();
+  const active = enabled && Boolean(projectId) && Boolean(sessionId);
+  const transcript = useQuery<ListChatMessagesResponse, ApiError>({
     queryKey: refinementKeys.messages(projectId, sessionId ?? ''),
     queryFn: () => APIRequest.get(`/projects/${projectId}/chat/sessions/${sessionId}/messages`).query({ limit: 200 }).execute(),
-    enabled: enabled && Boolean(projectId) && Boolean(sessionId),
-    // Follow an in-flight turn to completion: the server reports the run while a chat-turn is still
-    // going, so a refresh or a second tab keeps polling until the reply lands, then stops.
-    refetchInterval: query => (turnState(query.state.data).kind === 'pending' ? 1500 : false),
+    enabled: active,
   });
+  // While a turn runs, poll the status rather than the transcript, which can be 200 messages; the transcript is
+  // refetched only once the status shows it moved. A status older than the transcript says nothing about it.
+  const status = useQuery<ChatTurnStatusResponse, ApiError>({
+    queryKey: refinementKeys.turn(projectId, sessionId ?? ''),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/chat/sessions/${sessionId}/turn`).execute(),
+    enabled: active && turnState(transcript.data).kind === 'pending',
+    refetchInterval: livePolling(projectId, 1500),
+  });
+  const behind = status.dataUpdatedAt > transcript.dataUpdatedAt && transcriptBehind(transcript.data, status.data);
+
+  useEffect(() => {
+    if (behind) queryClient.invalidateQueries({ queryKey: refinementKeys.messages(projectId, sessionId ?? '') });
+  }, [behind, projectId, queryClient, sessionId]);
+
+  return transcript;
 }
 
 export function useCreateChatSessionMutation(projectId: string): UseMutationResult<ChatSessionResponse, ApiError, CreateChatSessionBody> {

@@ -1,6 +1,7 @@
-import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import { type QueryClient, queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
 import { type ListWorkflowRunResponse, type RunContextResponse, type RunModelCallDetailResponse, type WorkflowRunDetailResponse } from './api-types.gen';
+import { livePolling } from './live-polling';
 import { ApiError, APIRequest, type PollingOptions } from './transport';
 
 const runKeys = {
@@ -16,8 +17,14 @@ export const listRunsQueryOptions = (projectId: string): UseQueryOptions<ListWor
     queryFn: () => APIRequest.get(`/projects/${projectId}/runs`).execute(),
   });
 
-export function useListRunsQuery(projectId: string, enabled = true, opts?: PollingOptions): UseQueryResult<ListWorkflowRunResponse, ApiError> {
-  return useQuery({ ...listRunsQueryOptions(projectId), enabled: enabled && Boolean(projectId), refetchInterval: opts?.refetchInterval });
+export const hasRunningRun = (data?: ListWorkflowRunResponse): boolean => data?.items.some(run => run.status === 'running') ?? false;
+
+export function useListRunsQuery(projectId: string, enabled = true, opts?: PollingOptions<ListWorkflowRunResponse>): UseQueryResult<ListWorkflowRunResponse, ApiError> {
+  return useQuery({ ...listRunsQueryOptions(projectId), enabled: enabled && Boolean(projectId), refetchInterval: livePolling(projectId, opts?.refetchInterval) });
+}
+
+export function invalidateRuns(queryClient: QueryClient, projectId: string): void {
+  queryClient.invalidateQueries({ queryKey: runKeys.all(projectId) });
 }
 
 export function useRunQuery(projectId: string, runId: string | undefined, enabled = true): UseQueryResult<WorkflowRunDetailResponse, ApiError> {

@@ -17,6 +17,7 @@ export * from './insight.api';
 export * from './refinement.api';
 export * from './ideation.api';
 export * from './run.api';
+export * from './events.api';
 export * from './rebrand.api';
 export * from './reforge.api';
 export * from './reforge-transform.api';

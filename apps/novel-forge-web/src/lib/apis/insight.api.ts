@@ -1,6 +1,7 @@
-import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import { type QueryClient, queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
 import { type AiUsageResponse, type ListGenerationJobResponse } from './api-types.gen';
+import { livePolling } from './live-polling';
 import { ApiError, APIRequest, type PollingOptions } from './transport';
 
 const insightKeys = {
@@ -20,11 +21,17 @@ export function useAiUsageQuery(projectId: string, enabled = true): UseQueryResu
   return useQuery({ ...aiUsageQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 
+export const hasActiveJob = (data?: ListGenerationJobResponse): boolean => data?.items.some(job => job.status === 'pending' || job.status === 'in_progress') ?? false;
+
 export function useListJobsQuery(projectId: string, enabled = true, opts?: PollingOptions<ListGenerationJobResponse>): UseQueryResult<ListGenerationJobResponse, ApiError> {
   return useQuery<ListGenerationJobResponse, ApiError>({
     queryKey: insightKeys.jobs(projectId),
     queryFn: () => APIRequest.get(`/projects/${projectId}/jobs`).execute(),
     enabled: enabled && Boolean(projectId),
-    refetchInterval: opts?.refetchInterval,
+    refetchInterval: livePolling(projectId, opts?.refetchInterval),
   });
+}
+
+export function invalidateJobs(queryClient: QueryClient, projectId: string): void {
+  queryClient.invalidateQueries({ queryKey: insightKeys.jobs(projectId) });
 }

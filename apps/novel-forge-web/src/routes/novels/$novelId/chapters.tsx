@@ -30,6 +30,7 @@ import {
   type BriefWriteMode,
   type DraftResponse,
   externalStopChapter,
+  hasActiveJob,
   type InsertChapterBody,
   isFinalizeBlocked,
   isIsolated,
@@ -136,17 +137,18 @@ interface GenerationProgressProps {
 
 function GenerationProgress({ novelId, jobId, onBack }: GenerationProgressProps): React.JSX.Element {
   const queryClient = useQueryClient();
-  const jobsQuery = useListJobsQuery(novelId, true, { refetchInterval: 2500 });
-  const runsQuery = useListRunsQuery(novelId, true, { refetchInterval: 2500 });
+  const jobsQuery = useListJobsQuery(novelId, true, { refetchInterval: query => (hasActiveJob(query.state.data) ? 2500 : false) });
   const job = jobsQuery.data?.items.find(j => j.id === jobId);
-  const runs = (runsQuery.data?.items ?? []).filter(r => r.jobId === jobId);
   const finished = job?.status === 'done' || job?.status === 'failed';
+  const runsQuery = useListRunsQuery(novelId, true, { refetchInterval: () => (finished ? false : 2500) });
+  const runs = (runsQuery.data?.items ?? []).filter(r => r.jobId === jobId);
   const notifiedRef = useRef(false);
 
   useEffect(() => {
     if (!finished || notifiedRef.current) return;
     notifiedRef.current = true;
     queryClient.invalidateQueries({ queryKey: ['projects', novelId, 'drafts'] });
+    queryClient.invalidateQueries({ queryKey: ['projects', novelId, 'runs'] });
     if (job?.status === 'done') toast.success(`Chapter${job.target.includes(',') ? 's' : ''} ${job?.target} drafted`);
     else toast.danger(job?.lastError ?? 'Generation failed');
   }, [finished, job, novelId, queryClient]);
