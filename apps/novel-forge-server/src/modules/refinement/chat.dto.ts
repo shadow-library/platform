@@ -6,6 +6,7 @@ import { ChatMode, ChatScope, ChatSessionStatus, SortByTime } from '@server/comm
 import { type Refinement } from '@server/database';
 
 import { SeedResponse } from '../ideation/ideation.dto';
+import { type StudioPayload, StudioPayloadResponse } from '../ideation/studio-payload.dto';
 import { AppliedArtifactItem, OpResultItem, ProposalResponse } from './refinement.dto';
 
 @Schema()
@@ -146,13 +147,14 @@ export class ChatMessageResponse {
   @Field()
   content: string;
 
-  @Field(() => Object, {
+  // Not `nullable`: fast-json-stringify cannot compile an `anyOf` wrapping a composed `oneOf`, which is
+  // what `nullable` on a discriminated field generates. `serialiseMessage` drops the column's nulls instead.
+  @Field(() => StudioPayloadResponse, {
     optional: true,
-    nullable: true,
     description:
       'Structured turn payload the studio renders beside the prose. Discriminated by `kind`: "questions" (option chips), "cards" (concept cards), "readiness" (the stress table).',
   })
-  payload?: Record<string, unknown> | null;
+  payload?: StudioPayload;
 
   @Field(() => String, { optional: true, nullable: true })
   proposalId?: bigint | null;

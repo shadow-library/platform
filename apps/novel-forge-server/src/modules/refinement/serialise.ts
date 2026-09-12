@@ -1,5 +1,6 @@
 import { type Refinement } from '@server/database';
 
+import { asStudioPayload, type StudioPayload } from '../ideation/studio-payload.dto';
 import { type ProposalResponse } from './refinement.dto';
 
 /**
@@ -11,8 +12,12 @@ import { type ProposalResponse } from './refinement.dto';
  * contract (`string | null`) intact.
  */
 
-export function serialiseMessage<T extends { proposalId?: bigint | null }>(message: T): T {
-  return { ...message, proposalId: message.proposalId == null ? null : (String(message.proposalId) as unknown as bigint) };
+export function serialiseMessage<T extends { proposalId?: bigint | null; payload?: Record<string, unknown> | null }>(message: T): T & { payload?: StudioPayload } {
+  return {
+    ...message,
+    proposalId: message.proposalId == null ? null : (String(message.proposalId) as unknown as bigint),
+    payload: asStudioPayload(message.payload),
+  };
 }
 
 // The proposal's op/state columns are jsonb (`unknown` on the row); the response exposes them as the

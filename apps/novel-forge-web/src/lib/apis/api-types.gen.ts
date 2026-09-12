@@ -3973,13 +3973,100 @@ export interface components {
       role: string;
       content: string;
       /** @description Structured turn payload the studio renders beside the prose. Discriminated by `kind`: "questions" (option chips), "cards" (concept cards), "readiness" (the stress table). */
-      payload?: null | Record<string, never>;
+      payload?:
+        components['schemas']['StudioQuestionsPayloadResponse'] | components['schemas']['StudioCardsPayloadResponse'] | components['schemas']['StudioReadinessPayloadResponse'];
       proposalId?: null | string;
       runId?: null | string;
       modelProvider?: null | string;
       modelId?: null | string;
       /** Format: date-time */
       createdAt: string;
+    };
+    /** @description An interview turn: what to ask next, plus anything the turn inferred from the author’s own words. */
+    StudioQuestionsPayloadResponse: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'questions';
+      questions: components['schemas']['StudioQuestionResponse'][];
+      /** @description Absent when the turn inferred nothing. */
+      locks?: components['schemas']['StudioLockResponse'][];
+    };
+    /** @description One question the studio is asking this turn. */
+    StudioQuestionResponse: {
+      /** @description The question id the round handed over; the sheet records it as asked under this id. */
+      id: string;
+      /** @description The question as asked, in full — the prose reply never repeats it. */
+      wording: string;
+      /** @description Reviewed prose shown under the question; rendered as-is. */
+      coaching: string;
+      /** @description Concrete answers the author can tap; tapping one sends it as the next turn. */
+      options: string[];
+      /** @description The commit-and-explain escape hatch: the answer the studio would pick, and why. */
+      youDecide: string;
+    };
+    /** @description A decision inferred from material the author supplied, offered back for confirmation before anything is written to the sheet. */
+    StudioLockResponse: {
+      key: string;
+      /** @enum {string} */
+      kind: 'shape' | 'scope' | 'promise';
+      /** @description The decision as one falsifiable rule the plan can be checked against. */
+      text: string;
+    };
+    /** @description A divergence turn: the concepts generated this round, for the author to keep, kill or cross. */
+    StudioCardsPayloadResponse: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'cards';
+      /** @description The round these cards were generated in; each card carries its own too. */
+      round: number;
+      cards: components['schemas']['ConceptCardResponse'][];
+      /** @description Absent when every card cleared the locked playbooks. */
+      filtersFailed?: components['schemas']['StudioFilterRejectionResponse'][];
+    };
+    ConceptCardResponse: {
+      /** @description The card's stable identity, minted when the round was generated; verdicts are attributed by it, never by position. */
+      id: string;
+      round: number;
+      title: string;
+      logline: string;
+      engine: string;
+      ladder: string;
+      posture: string;
+      /** @description The line that would make a browsing reader open chapter one. */
+      hookLine?: string;
+      /**
+       * @description Offered until the author reacts to the card, then their verdict.
+       * @enum {string}
+       */
+      fate: 'offered' | 'kept' | 'killed' | 'crossed';
+      reason?: string;
+    };
+    /** @description A concept card shown despite failing a locked playbook filter — author judgement outranks the filter. */
+    StudioFilterRejectionResponse: {
+      playbookKey: string;
+      /** @description Title of the card that failed the filter. */
+      card: string;
+      mustReplace: string;
+    };
+    /** @description A stress turn: the critic’s readiness verdict, one row per dimension. */
+    StudioReadinessPayloadResponse: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'readiness';
+      readiness: components['schemas']['ReadinessEntryResponse'][];
+    };
+    ReadinessEntryResponse: {
+      dimension: string;
+      /** @enum {string} */
+      verdict: 'strong' | 'thin' | 'empty';
+      note: string;
+      fix?: string;
     };
     /** @description The turn running right now, so a client can name the phase and count the wait instead of showing a bare spinner. */
     PendingTurnResponse: {
@@ -4095,31 +4182,6 @@ export interface components {
       comps: string[];
       /** @description The preferences derived from those comps, in editor terms. */
       preferences: string[];
-    };
-    ConceptCardResponse: {
-      /** @description The card's stable identity, minted when the round was generated; verdicts are attributed by it, never by position. */
-      id: string;
-      round: number;
-      title: string;
-      logline: string;
-      engine: string;
-      ladder: string;
-      posture: string;
-      /** @description The line that would make a browsing reader open chapter one. */
-      hookLine?: string;
-      /**
-       * @description Offered until the author reacts to the card, then their verdict.
-       * @enum {string}
-       */
-      fate: 'offered' | 'kept' | 'killed' | 'crossed';
-      reason?: string;
-    };
-    ReadinessEntryResponse: {
-      dimension: string;
-      /** @enum {string} */
-      verdict: 'strong' | 'thin' | 'empty';
-      note: string;
-      fix?: string;
     };
     UpdateChatSessionBody: {
       mode?: components['schemas']['ChatMode'];
@@ -13669,6 +13731,14 @@ export type ChatSessionStatus = components['schemas']['ChatSessionStatus'];
 export type ListChatSessionResponse = components['schemas']['ListChatSessionResponse'];
 export type ListChatMessagesResponse = components['schemas']['ListChatMessagesResponse'];
 export type ChatMessageResponse = components['schemas']['ChatMessageResponse'];
+export type StudioQuestionsPayloadResponse = components['schemas']['StudioQuestionsPayloadResponse'];
+export type StudioQuestionResponse = components['schemas']['StudioQuestionResponse'];
+export type StudioLockResponse = components['schemas']['StudioLockResponse'];
+export type StudioCardsPayloadResponse = components['schemas']['StudioCardsPayloadResponse'];
+export type ConceptCardResponse = components['schemas']['ConceptCardResponse'];
+export type StudioFilterRejectionResponse = components['schemas']['StudioFilterRejectionResponse'];
+export type StudioReadinessPayloadResponse = components['schemas']['StudioReadinessPayloadResponse'];
+export type ReadinessEntryResponse = components['schemas']['ReadinessEntryResponse'];
 export type PendingTurnResponse = components['schemas']['PendingTurnResponse'];
 export type FailedTurnResponse = components['schemas']['FailedTurnResponse'];
 export type ChatTurnBody = components['schemas']['ChatTurnBody'];
@@ -13680,8 +13750,6 @@ export type SeedProvenanceResponse = components['schemas']['SeedProvenanceRespon
 export type FieldProvenanceResponse = components['schemas']['FieldProvenanceResponse'];
 export type SeedConstraintResponse = components['schemas']['SeedConstraintResponse'];
 export type TasteAnchorsResponse = components['schemas']['TasteAnchorsResponse'];
-export type ConceptCardResponse = components['schemas']['ConceptCardResponse'];
-export type ReadinessEntryResponse = components['schemas']['ReadinessEntryResponse'];
 export type UpdateChatSessionBody = components['schemas']['UpdateChatSessionBody'];
 export type UpdateSessionModelBody = components['schemas']['UpdateSessionModelBody'];
 export type EnhancePremiseBody = components['schemas']['EnhancePremiseBody'];

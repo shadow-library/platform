@@ -7,7 +7,6 @@ import { ProposalsIcon, SendIcon, SparkIcon } from '@/components/icons';
 import { type ChipIntent, Markdown, PaneError, PaneLoader, StatusChip, TurnStatus } from '@/components/nf';
 import { MessageModelTag } from '@/components/nf/ChatModel';
 import {
-  type ChatMessageResponse,
   type ConceptCardResponse,
   type FieldProvenanceResponse,
   isApiError,
@@ -15,6 +14,8 @@ import {
   type SeedFieldsResponse,
   seedQueryOptions,
   type SeedResponse,
+  type StudioCardsPayloadResponse,
+  type StudioQuestionsPayloadResponse,
   turnState,
   useChatMessagesQuery,
   useChatTurnMutation,
@@ -49,41 +50,6 @@ export const Route = createFileRoute('/ideas/$seedId')({
     </AppShell>
   ),
 });
-
-interface StudioQuestion {
-  id: string;
-  wording: string;
-  coaching: string;
-  options: string[];
-  youDecide: string;
-}
-
-interface StudioLock {
-  key: string;
-  kind: 'shape' | 'scope' | 'promise';
-  text: string;
-}
-
-interface FilterRejection {
-  playbookKey: string;
-  card: string;
-  mustReplace: string;
-}
-
-/**
- * The structured half of a studio reply. The generated `payload` type is an opaque object — the server
- * declares it as free-form jsonb — so the discriminator is read first and the narrowing done here, once.
- */
-type StudioPayload =
-  | { kind: 'questions'; questions: StudioQuestion[]; locks?: StudioLock[] }
-  | { kind: 'cards'; round: number; cards: ConceptCardResponse[]; filtersFailed?: FilterRejection[] }
-  | { kind: 'readiness'; readiness: ReadinessEntryResponse[] };
-
-function studioPayload(payload: ChatMessageResponse['payload']): StudioPayload | undefined {
-  const kind = (payload as { kind?: unknown } | null | undefined)?.kind;
-  if (kind !== 'questions' && kind !== 'cards' && kind !== 'readiness') return undefined;
-  return payload as unknown as StudioPayload;
-}
 
 type SheetField = keyof SeedFieldsResponse;
 
@@ -158,7 +124,7 @@ interface SendProps {
   disabled: boolean;
 }
 
-function QuestionsBlock({ payload, onSend, disabled }: { payload: Extract<StudioPayload, { kind: 'questions' }> } & Omit<SendProps, 'onCompose'>): React.JSX.Element {
+function QuestionsBlock({ payload, onSend, disabled }: { payload: StudioQuestionsPayloadResponse } & Omit<SendProps, 'onCompose'>): React.JSX.Element {
   return (
     <div className={styles.payload}>
       {payload.locks && payload.locks.length > 0 && (
@@ -211,7 +177,7 @@ function recordedVerdict(matched: ConceptCardResponse | undefined): CardVerdict 
  * carry none, so those fall back to round + position within the round — the old behaviour, which is wrong
  * the moment the model reorders a re-sent collection and is why the id exists.
  */
-function matchCards(payload: Extract<StudioPayload, { kind: 'cards' }>, seed: SeedResponse): (ConceptCardResponse | undefined)[] {
+function matchCards(payload: StudioCardsPayloadResponse, seed: SeedResponse): (ConceptCardResponse | undefined)[] {
   const byId = new Map(seed.concepts.map(concept => [concept.id, concept]));
   const byRound = new Map<number, ConceptCardResponse[]>();
   for (const concept of seed.concepts) byRound.set(concept.round, [...(byRound.get(concept.round) ?? []), concept]);
@@ -225,12 +191,7 @@ function matchCards(payload: Extract<StudioPayload, { kind: 'cards' }>, seed: Se
   });
 }
 
-function ConceptCardsBlock({
-  payload,
-  seed,
-  onCompose,
-  disabled,
-}: { payload: Extract<StudioPayload, { kind: 'cards' }>; seed: SeedResponse } & Omit<SendProps, 'onSend'>): React.JSX.Element {
+function ConceptCardsBlock({ payload, seed, onCompose, disabled }: { payload: StudioCardsPayloadResponse; seed: SeedResponse } & Omit<SendProps, 'onSend'>): React.JSX.Element {
   const [verdicts, setVerdicts] = useState<Record<string, CardVerdict>>({});
 
   // Pre-id transcripts have no identity to key on, so those still fall back to round + position.
@@ -634,7 +595,7 @@ function StudioScreen(): React.JSX.Element {
                   </div>
                 );
 
-              const payload = studioPayload(message.payload);
+              const payload = message.payload;
               const applied = message.proposalId ? appliedChanges.get(message.proposalId) : undefined;
               return (
                 <div key={message.id} className={styles.assistantRow}>
