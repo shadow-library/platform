@@ -134,6 +134,11 @@ describe.if(pgAvailable)('seed-status guards', () => {
   });
 
   describe('ProjectService.clone', () => {
+    /** Unlike the other guarded calls, `clone` attributes the new project to an owner, so it reads the principal before reaching the guard. */
+    beforeEach(() => {
+      spyOn(testEnv.getService(ContextService), 'getAuthPrincipal').mockReturnValue({ sub: '1' } as never);
+    });
+
     afterAll(() => mock.restore());
 
     it('should reject cloning a seed project', async () => {
@@ -141,7 +146,6 @@ describe.if(pgAvailable)('seed-status guards', () => {
     });
 
     it('should let an active project past the guard and clone normally', async () => {
-      spyOn(testEnv.getService(ContextService), 'getAuthPrincipal').mockReturnValue({ sub: '1' } as never);
       const clone = await testEnv.getService(ProjectService).clone(activeId, { name: 'clone of guarded-active' });
       expect(clone.status).toBe('active');
     });
