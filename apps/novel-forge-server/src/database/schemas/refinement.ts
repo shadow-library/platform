@@ -19,7 +19,7 @@ export const chatScope = pgEnum('chat_scope', ['project', 'novel', 'bible_docume
 export const chatSessionStatus = pgEnum('chat_session_status', ['active', 'archived']);
 export const chatMessageRole = pgEnum('chat_message_role', ['user', 'assistant']);
 export const chatMode = pgEnum('chat_mode', ['manual', 'auto']);
-export const refinementKind = pgEnum('refinement_kind', ['chat', 'hub', 'premise_enhance', 'bible_audit', 'arc_plan', 'chapter_extract', 'ideation']);
+export const refinementKind = pgEnum('refinement_kind', ['chat', 'hub', 'premise_enhance', 'bible_audit', 'arc_plan', 'chapter_extract', 'ideation', 'plugin']);
 export const refinementProposalStatus = pgEnum('refinement_proposal_status', ['pending', 'applied', 'discarded', 'superseded', 'conflicted', 'reverted']);
 
 export const chatSessions = pgTable(

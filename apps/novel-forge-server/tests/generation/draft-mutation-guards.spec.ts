@@ -8,6 +8,7 @@ import { GenerationService } from '@modules/generation/generation.service';
 import { emptyPolicy } from '@modules/plugins';
 import { type Generation, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -44,7 +45,22 @@ describe.if(pgAvailable)('GenerationService draft mutation guards', () => {
     const modelRouter = { structured: async () => ({ title: 'revised title', body: 'revised body', summary: 'revised summary', state: {} }) } as never;
     const contextAssembler = { forChapter: async () => ({ rendered: '', renderedStable: '', renderedVolatile: '' }) } as never;
     const pluginPolicy = { resolve: async () => emptyPolicy() } as never;
-    return new GenerationService({ getPostgresClient: () => client } as never, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, pluginPolicy);
+    return new GenerationService(
+      { getPostgresClient: () => client } as never,
+      noop,
+      modelRouter,
+      contextAssembler,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      pluginPolicy,
+      noPluginProposals(),
+    );
   }
 
   beforeAll(async () => {
@@ -399,7 +415,22 @@ describe('GenerationService.generateUnrestricted model routing', () => {
     const contextAssembler = { forChapter: async () => ({ rendered: '', renderedStable: '', renderedVolatile: '' }) } as never;
     const db = stubDb(project);
     const pluginPolicy = { resolve: async () => emptyPolicy('permissive') } as never;
-    return new GenerationService({ getPostgresClient: () => db } as never, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, pluginPolicy);
+    return new GenerationService(
+      { getPostgresClient: () => db } as never,
+      noop,
+      modelRouter,
+      contextAssembler,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      pluginPolicy,
+      noPluginProposals(),
+    );
   }
 
   it('passes the real project row into modelRouter.structured, with contentMode forced to unrestricted', async () => {

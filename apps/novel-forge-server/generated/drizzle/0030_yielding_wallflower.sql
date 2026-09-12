@@ -1,0 +1,1 @@
+ALTER TYPE "public"."refinement_kind" ADD VALUE 'plugin';

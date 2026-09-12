@@ -13,7 +13,7 @@ import { GenerationService } from '@modules/generation/generation.service';
 import { emptyPolicy } from '@modules/plugins';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
-import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
+import { noPluginPolicy, noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -122,7 +122,22 @@ describe.if(pgAvailable)('generation path prompt-cache vars', () => {
     const databaseService = { getPostgresClient: () => db } as never;
     const noop = {} as never;
     const pluginPolicy = { resolve: async () => emptyPolicy('permissive') } as never;
-    const service = new GenerationService(databaseService, noop, { structured } as never, assembler(), noop, noop, noop, noop, noop, noop, noop, noop, pluginPolicy);
+    const service = new GenerationService(
+      databaseService,
+      noop,
+      { structured } as never,
+      assembler(),
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      pluginPolicy,
+      noPluginProposals(),
+    );
 
     await service.generateUnrestricted(projectId, 2, { guidance: 'GUIDANCE_MARKER' } as never);
 

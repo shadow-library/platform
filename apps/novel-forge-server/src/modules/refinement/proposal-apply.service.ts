@@ -82,6 +82,10 @@ interface BaselineMismatch {
   actual: ArtifactState;
 }
 
+// Captured on the inverse and restored on revert, but deliberately absent from `OP_SPECS`: the flag that
+// shields a brief from reconciliation is the engine's to carry, never a field a model or author change-set can set.
+type BriefRestoreOp = BriefUpdateOp & { handEdited?: boolean };
+
 interface ApplyContext {
   tx: PrimaryDatabase;
   projectId: bigint;
@@ -501,18 +505,21 @@ export class ProposalApplyService {
   private async inverseBrief(ctx: ApplyContext, op: BriefUpdateOp | BriefRemoveOp): Promise<ContentOp | null> {
     const brief = await ctx.tx.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, ctx.projectId), eq(schema.briefs.chapter, op.chapter)) });
     if (!brief) return op.op === 'brief.update' ? { op: 'brief.remove', chapter: op.chapter } : null;
-    return {
+    const inverse: BriefRestoreOp = {
       op: 'brief.update',
       chapter: op.chapter,
       title: brief.title ?? undefined,
       body: brief.body,
       volumeKey: brief.volumeKey ?? undefined,
       arcKey: brief.arcKey ?? undefined,
+      writeMode: brief.writeMode,
+      handEdited: brief.handEdited,
       contextRefs: (brief.contextRefs as string[] | null) ?? undefined,
       endingContract: (brief.endingContract as BriefUpdateOp['endingContract'] | null) ?? undefined,
       // Always explicit: an omitted contract would merge as "keep", leaving a reverted reveal in place.
       knowledgeContract: (brief.knowledgeContract as BriefUpdateOp['knowledgeContract']) ?? null,
     };
+    return inverse;
   }
 
   private async inverseDraft(ctx: ApplyContext, op: DraftUpdateOp | DraftRemoveOp): Promise<ContentOp | null> {
@@ -801,7 +808,7 @@ export class ProposalApplyService {
     ctx.applied.push({ artifactRef: `arc:${op.arcKey}`, newRevision: null });
   }
 
-  private async applyBriefUpdate(ctx: ApplyContext, op: BriefUpdateOp): Promise<void> {
+  private async applyBriefUpdate(ctx: ApplyContext, op: BriefRestoreOp): Promise<void> {
     const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
     if (!project) throw AppErrorCode.PRJ_001.create();
     if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw AppErrorCode.RFN_005.create();
@@ -815,6 +822,7 @@ export class ProposalApplyService {
     const merged = {
       title: op.title ?? existing?.title ?? null,
       body: op.body ?? existing?.body ?? '',
+      writeMode: op.writeMode ?? existing?.writeMode ?? 'standard',
       volumeKey: op.volumeKey ?? existing?.volumeKey ?? null,
       arcKey: op.arcKey ?? existing?.arcKey ?? null,
       contextRefs: op.contextRefs ?? existing?.contextRefs ?? null,
@@ -827,10 +835,10 @@ export class ProposalApplyService {
     if (existing) {
       await ctx.tx
         .update(schema.briefs)
-        .set({ ...merged, revision, contentHash, staleReason: null, handEdited: true, updatedAt: new Date() })
+        .set({ ...merged, revision, contentHash, staleReason: null, handEdited: op.handEdited ?? true, updatedAt: new Date() })
         .where(eq(schema.briefs.id, existing.id));
     } else {
-      await ctx.tx.insert(schema.briefs).values({ projectId: ctx.projectId, chapter: op.chapter, ...merged, revision, contentHash, handEdited: true });
+      await ctx.tx.insert(schema.briefs).values({ projectId: ctx.projectId, chapter: op.chapter, ...merged, revision, contentHash, handEdited: op.handEdited ?? true });
     }
     ctx.applied.push({ artifactRef: `chapter:${op.chapter}`, newRevision: revision });
   }

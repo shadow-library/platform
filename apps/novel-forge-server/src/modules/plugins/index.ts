@@ -5,4 +5,6 @@ export * from './plugin.service';
 export * from './plugin-policy.service';
 export * from './plugin.dto';
 export * from './plugin.controller';
+export * from './plugin-proposal.service';
+export * from './plugin-proposal.module';
 export * from './plugins.module';

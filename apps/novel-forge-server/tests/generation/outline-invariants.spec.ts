@@ -6,6 +6,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { GenerationService, MAX_WHOLE_BOOK_OUTLINE_SPAN } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -68,7 +69,7 @@ describe.if(pgAvailable)('outline invariant enforcement', () => {
       }),
     } as never;
     const noop = {} as never;
-    return new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    return new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, noop, noPluginProposals());
   }
 
   function buildSpanService(): { service: GenerationService; structured: ReturnType<typeof mock> } {
@@ -79,7 +80,7 @@ describe.if(pgAvailable)('outline invariant enforcement', () => {
     const modelRouter = { structured } as never;
     const contextAssembler = { catalog: async () => 'CATALOG', resolveRefs: async (_projectId: bigint, refs: string[]) => ({ resolved: [], unresolved: refs }) } as never;
     const noop = {} as never;
-    const service = new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    const service = new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, noop, noPluginProposals());
     return { service, structured };
   }
 

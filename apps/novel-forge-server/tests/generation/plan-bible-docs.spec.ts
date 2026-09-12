@@ -2,6 +2,7 @@ import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
+import { noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { GenerationService } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -55,7 +56,7 @@ describe.if(pgAvailable)('plan() reads bible documents', () => {
     const databaseService = { getPostgresClient: () => db } as never;
     const modelRouter = { structured } as never;
     const noop = {} as never;
-    return new GenerationService(databaseService, noop, modelRouter, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    return new GenerationService(databaseService, noop, modelRouter, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noPluginProposals());
   }
 
   it('passes rendered bible-document content to the model call when bible docs exist', async () => {

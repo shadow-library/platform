@@ -6,6 +6,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { createChapterFinalizationGraph } from '@modules/ai/graphs/chapter-finalization.graph';
 import { type ContinuityOutput } from '@modules/ai/schemas';
+import { noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { GenerationService } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -55,7 +56,7 @@ describe.if(pgAvailable)('continuity delta application', () => {
     checkpointer = PostgresSaver.fromConnString(url);
     await checkpointer.setup();
     const noop = {} as never;
-    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noPluginProposals());
   });
 
   async function seedProject(name: string): Promise<bigint> {

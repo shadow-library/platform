@@ -34,6 +34,7 @@ import { redactJobForResponse } from '../jobs/job-response';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { PluginPolicyService, raisedContainment } from '../plugins/plugin-policy.service';
+import { PluginProposalService } from '../plugins/plugin-proposal.service';
 import { type ChangeOp } from '../refinement/change-set';
 import { ProposalService } from '../refinement/proposal.service';
 import { ChapterImageService } from './chapter-image.service';
@@ -137,13 +138,16 @@ export class GenerationService {
     private readonly proposalService: ProposalService,
     private readonly chapterImages: ChapterImageService,
     private readonly pluginPolicy: PluginPolicyService,
+    private readonly pluginProposals: PluginProposalService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
   async seedFromBrief(projectId: bigint, body: SeedFromBriefBody): Promise<WorkflowRunResult> {
     await this.assertActive(projectId);
-    return this.workflowRunService.runBibleBuilder({ projectId, brief: body.brief, force: body.force });
+    const result = await this.workflowRunService.runBibleBuilder({ projectId, brief: body.brief, force: body.force });
+    if (result.outcome === 'completed') await this.stagePluginCanon(projectId);
+    return result;
   }
 
   private async assertActive(projectId: bigint): Promise<void> {
@@ -324,7 +328,9 @@ export class GenerationService {
 
     if (protectedChapters.size > 0) this.logger.info('outline: preserved protected briefs', { projectId, chapters: [...protectedChapters] });
     this.logger.info('outline: briefs upserted', { projectId, briefs: upserted.filter(Boolean).length });
-    return { briefs: upserted.filter(Boolean) as Generation.Brief[] };
+    const briefs = upserted.filter(Boolean) as Generation.Brief[];
+    await this.stagePluginBriefPolicy(projectId, briefs);
+    return { briefs };
   }
 
   /**
@@ -433,7 +439,25 @@ export class GenerationService {
     );
 
     if (protectedChapters.size > 0) this.logger.info('outlineArc: preserved protected briefs', { projectId, arcKey, chapters: [...protectedChapters] });
-    return { briefs: upserted.filter(Boolean) as Generation.Brief[] };
+    const briefs = upserted.filter(Boolean) as Generation.Brief[];
+    await this.stagePluginBriefPolicy(projectId, briefs);
+    return { briefs };
+  }
+
+  private async stagePluginBriefPolicy(projectId: bigint, briefs: Generation.Brief[]): Promise<void> {
+    const proposal = await this.pluginProposals.stageBriefPolicy(projectId, briefs).catch(err => {
+      this.logger.warn('brief policy staging failed', { projectId, err });
+      return undefined;
+    });
+    if (proposal) this.logger.info('brief policy staged a proposal', { projectId, proposalId: proposal.id });
+  }
+
+  private async stagePluginCanon(projectId: bigint): Promise<void> {
+    const staged = await this.pluginProposals.augmentEnabled(projectId).catch(err => {
+      this.logger.warn('canon augmentation staging failed', { projectId, err });
+      return [];
+    });
+    if (staged.length > 0) this.logger.info('canon augmentation staged proposals', { projectId, proposalIds: staged.map(proposal => proposal.id) });
   }
 
   /**

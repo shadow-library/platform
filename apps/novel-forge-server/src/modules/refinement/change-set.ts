@@ -1,4 +1,4 @@
-import { type Bible, type Ideation } from '@server/database';
+import { type Bible, type Generation, type Ideation } from '@server/database';
 
 import { HOOK_TYPES, type HookTypeValue } from '../ai/schemas/enums';
 
@@ -86,6 +86,7 @@ export interface BriefUpdateOp {
   chapter: number;
   title?: string;
   body?: string;
+  writeMode?: Generation.BriefWriteMode;
   volumeKey?: string;
   arcKey?: string;
   contextRefs?: string[];
@@ -297,6 +298,7 @@ interface OpSpec {
   description?: string;
 }
 
+const BRIEF_WRITE_MODES = ['standard', 'external'];
 const BIBLE_SECTIONS = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
 const ENTITY_TYPES = ['character', 'faction', 'location', 'power_rule', 'item', 'concept'];
 const SEED_COLUMNS = ['fields', 'provenance', 'constraints', 'concepts', 'tasteAnchors'] as const;
@@ -336,7 +338,17 @@ const OP_SPECS: Record<OpType, OpSpec> = {
   'arc.remove': { required: { arcKey: 'string' }, optional: {} },
   'brief.update': {
     required: { chapter: 'number' },
-    optional: { title: 'string', body: 'string', volumeKey: 'string', arcKey: 'string', contextRefs: 'string[]', endingContract: 'object', knowledgeContract: 'object|null' },
+    optional: {
+      title: 'string',
+      body: 'string',
+      writeMode: 'string',
+      volumeKey: 'string',
+      arcKey: 'string',
+      contextRefs: 'string[]',
+      endingContract: 'object',
+      knowledgeContract: 'object|null',
+    },
+    description: `writeMode (one of: ${BRIEF_WRITE_MODES.join(' | ')}) governs batch selection: "external" halts the primary writer's batch at that chapter until it is finalized.`,
   },
   'brief.remove': { required: { chapter: 'number' }, optional: {} },
   'draft.update': { required: { chapter: 'number' }, optional: { title: 'string', body: 'string', summary: 'string' } },
@@ -595,6 +607,8 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
 
     if (op.startsWith('bible_document') && !BIBLE_SECTIONS.includes(record['section'] as string)) errors.push(`${path}: section must be one of ${BIBLE_SECTIONS.join(', ')}`);
     if (op === 'entity.upsert' && !ENTITY_TYPES.includes(record['type'] as string)) errors.push(`${path}: type must be one of ${ENTITY_TYPES.join(', ')}`);
+    if (op === 'brief.update' && record['writeMode'] !== undefined && !BRIEF_WRITE_MODES.includes(record['writeMode'] as string))
+      errors.push(`${path}: writeMode must be one of ${BRIEF_WRITE_MODES.join(', ')}`);
     if (op === 'brief.update' && record['endingContract'] !== undefined) validateEndingContract(record['endingContract'], path, errors);
     if (op === 'brief.update' && record['knowledgeContract'] != null) validateKnowledgeContract(record['knowledgeContract'], path, errors);
     if (op === 'fact.upsert' && typeof record['revealChapter'] === 'number' && record['revealChapter'] < 1) errors.push(`${path}: revealChapter must be >= 1`);
@@ -608,6 +622,42 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     if (op === 'action.validate' && !VALIDATION_SCOPES.includes(record['scope'] as string)) errors.push(`${path}: scope must be one of ${VALIDATION_SCOPES.join(', ')}`);
     if (op === 'action.generate_chapters' && typeof record['count'] === 'number' && record['count'] < 1) errors.push(`${path}: count must be >= 1`);
     if (op === 'action.graduate_seed' && typeof record['title'] === 'string' && record['title'].trim() === '') errors.push(`${path}: title must be a non-empty string`);
+  });
+
+  return errors;
+}
+
+/**
+ * What a plugin may propose (plugin-host design §12): what the novel contains, never its structure. An arc's
+ * narrative fields place a beat at a chapter; its chapter range, ordinal, and volume — and a brief's arc and
+ * volume — are the book's skeleton, which only an explicit author action rearranges.
+ */
+export const PLUGIN_ALLOWED_OPS: readonly OpType[] = [
+  'entity.upsert',
+  'entity.remove',
+  'fact.upsert',
+  'fact.remove',
+  'bible_document.upsert',
+  'bible_document.remove',
+  'brief.update',
+  'arc.upsert',
+];
+
+const ARC_SKELETON_FIELDS = ['ordinal', 'chapterStart', 'chapterEnd'] as const;
+const BRIEF_PARENT_FIELDS = ['volumeKey', 'arcKey'] as const;
+
+/** The §12 allowlist enforced against the real `OP_SPECS`, because a plugin's emitted ops are untrusted input at runtime. */
+export function validatePluginChangeSet(value: unknown): string[] {
+  const errors = validateChangeSet(value, PLUGIN_ALLOWED_OPS);
+  if (!Array.isArray(value)) return errors;
+
+  value.forEach((item, index) => {
+    if (!isKind(item, 'object')) return;
+    const record = item as Record<string, unknown>;
+    const refused = record['op'] === 'arc.upsert' ? ARC_SKELETON_FIELDS : record['op'] === 'brief.update' ? BRIEF_PARENT_FIELDS : [];
+    for (const field of refused) {
+      if (record[field] !== undefined) errors.push(`changeSet[${index}]: field '${field}' is not allowed for this scope`);
+    }
   });
 
   return errors;

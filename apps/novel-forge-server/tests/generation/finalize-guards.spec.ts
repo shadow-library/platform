@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { AppError, Config } from '@shadow-library/common';
 
+import { noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { GenerationService } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -43,7 +44,7 @@ describe.if(pgAvailable)('GenerationService.finalize consistency guards', () => 
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
     const noop = {} as never;
-    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noPluginProposals());
   });
 
   async function createProject(): Promise<bigint> {
@@ -83,6 +84,7 @@ describe.if(pgAvailable)('GenerationService.finalize consistency guards', () => 
       noop,
       noop,
       noop,
+      noPluginProposals(),
     );
     return { service, finalization, structured };
   }

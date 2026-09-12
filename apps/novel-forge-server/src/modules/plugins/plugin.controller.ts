@@ -1,8 +1,10 @@
+import { type FastifyReply } from 'fastify';
 import { Authenticated } from '@shadow-library/auth/module';
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Put, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Put, RespondFor, Response } from '@shadow-library/fastify';
 
 import { PluginHost } from './plugin-host.service';
-import { EnablePluginBody, PluginIdParams, PluginManifestResponse, PluginProjectParams, ProjectPluginResponse } from './plugin.dto';
+import { PluginProposalService } from './plugin-proposal.service';
+import { EnablePluginBody, PluginAugmentResponse, PluginIdParams, PluginManifestResponse, PluginProjectParams, ProjectPluginResponse } from './plugin.dto';
 import { PluginService } from './plugin.service';
 
 @Authenticated()
@@ -38,5 +40,20 @@ export class ProjectPluginController {
   @HttpStatus(204)
   disablePlugin(@Params() params: PluginIdParams): Promise<void> {
     return this.pluginService.disable(params.projectId, params.pluginId);
+  }
+}
+
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/plugins')
+export class PluginAugmentController {
+  constructor(private readonly pluginProposalService: PluginProposalService) {}
+
+  @Post('/:pluginId/augment')
+  @HttpStatus(200)
+  @RespondFor(200, PluginAugmentResponse)
+  async augment(@Params() params: PluginIdParams, @Response() reply: FastifyReply): Promise<PluginAugmentResponse | undefined> {
+    const proposal = await this.pluginProposalService.augment(params.projectId, params.pluginId);
+    if (!proposal) return void reply.status(204).send();
+    return { proposalId: proposal.id };
   }
 }

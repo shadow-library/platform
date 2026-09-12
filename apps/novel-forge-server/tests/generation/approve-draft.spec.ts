@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
+import { noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { GenerationService } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -34,7 +35,7 @@ describe.if(pgAvailable)('GenerationService.approveDraft', () => {
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
     // approveDraft only touches the db client; the other injected services are unused for this path.
     const noop = {} as never;
-    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noPluginProposals());
   });
 
   async function seedDraft(chapter: number): Promise<bigint> {

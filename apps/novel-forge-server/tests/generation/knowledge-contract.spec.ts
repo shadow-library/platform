@@ -11,7 +11,7 @@ import { parseKnowledgeContract } from '@modules/bible/fact/knowledge-view';
 import { GenerationService } from '@modules/generation/generation.service';
 import { type Generation, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
-import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
+import { noPluginPolicy, noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -88,6 +88,7 @@ describe.if(pgAvailable)('outliner-authored knowledge contracts', () => {
       noop,
       noop,
       noPluginPolicy(),
+      noPluginProposals(),
     );
   }
 

@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
+import { noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { GenerationService } from '@modules/generation/generation.service';
 import { type PrimaryDatabase, schema } from '@server/database';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -34,7 +35,7 @@ describe.if(pgAvailable)('run detail observability', () => {
     const databaseService = { getPostgresClient: () => db } as never;
     const noop = {} as never;
     // getRun/getRunCall/getRunContext are pure DB reads — every AI collaborator can be a stub.
-    service = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    service = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noPluginProposals());
 
     const [project] = await db
       .insert(schema.projects)

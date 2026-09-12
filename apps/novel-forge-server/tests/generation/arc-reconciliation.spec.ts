@@ -9,7 +9,7 @@ import { ActionExecutorRegistry, ProposalApplyService, ProposalService } from '@
 import { type Generation, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { emptyPolicy } from '@modules/plugins';
-import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
+import { noPluginPolicy, noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -85,6 +85,7 @@ describe.if(pgAvailable)('arc reconciliation on finalization', () => {
       noop,
       noop,
       noPluginPolicy(),
+      noPluginProposals(),
     );
     return { service, structured, forOutline, finalization };
   }

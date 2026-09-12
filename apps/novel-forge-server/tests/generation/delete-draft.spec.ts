@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { AppError } from '@shadow-library/common';
 
 import { ChapterImageService } from '@modules/generation/chapter-image.service';
+import { noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { GenerationService } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -55,7 +56,7 @@ describe.if(pgAvailable)('GenerationService.deleteDraft', () => {
       delete: async (ref: string) => void deleted.push(ref),
     };
     chapterImages = new ChapterImageService({ getPostgresClient: () => db } as never, imageStorage as never);
-    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, chapterImages, noop);
+    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, chapterImages, noop, noPluginProposals());
   });
 
   async function seedChapters(bodies: string[]): Promise<bigint> {

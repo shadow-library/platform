@@ -6,6 +6,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { GenerationService } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -50,6 +51,7 @@ describe.if(pgAvailable)('volume epitome on finalization', () => {
       noop,
       noop,
       noop,
+      noPluginProposals(),
     );
     return { service, structured, finalization };
   }

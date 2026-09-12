@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, type SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -8,7 +8,7 @@ import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { loadArtifactStates } from './artifact-state';
-import { type ChangeOp, changeSetRefs, type OpType, validateChangeSet } from './change-set';
+import { type ChangeOp, changeSetRefs, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
 
 export interface ChangeItem {
@@ -39,6 +39,21 @@ export interface CreateProposalInput {
   runId?: string | null;
 }
 
+/**
+ * Who a new proposal supersedes its own stale pending work for (§6.4): a chat session, or — for a plugin, which
+ * has no session and restages the same decision on every run — the plugin's own scope.
+ */
+function supersessionOwner(input: CreateProposalInput): SQL | undefined {
+  if (input.sessionId) return eq(schema.refinementProposals.sessionId, input.sessionId);
+  if (input.kind !== 'plugin' || !input.scopeRef) return undefined;
+  return and(eq(schema.refinementProposals.kind, 'plugin'), eq(schema.refinementProposals.scopeType, input.scopeType), eq(schema.refinementProposals.scopeRef, input.scopeRef));
+}
+
+/** A plugin-kind proposal carries the §12 allowlist by virtue of its kind, so a hand-edit cannot widen it either. */
+function validateOps(kind: Refinement.Kind, changeSet: unknown, allowedOps?: readonly OpType[]): string[] {
+  return kind === 'plugin' ? validatePluginChangeSet(changeSet) : validateChangeSet(changeSet, allowedOps);
+}
+
 @Injectable()
 export class ProposalService {
   private readonly logger = Logger.getLogger(APP_NAME, ProposalService.name);
@@ -54,7 +69,7 @@ export class ProposalService {
    * pending proposals are left alone — the baseline check catches them at apply time.
    */
   async create(projectId: bigint, input: CreateProposalInput, executor: DbExecutor = this.db): Promise<Refinement.Proposal> {
-    const errors = validateChangeSet(input.changeSet, input.allowedOps);
+    const errors = validateOps(input.kind, input.changeSet, input.allowedOps);
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
     const refs = changeSetRefs(input.changeSet);
@@ -78,18 +93,14 @@ export class ProposalService {
       .returning();
     if (!proposal) throw AppErrorCode.RFN_001.create();
 
-    if (input.sessionId) await this.supersedeOverlapping(projectId, input.sessionId, proposal.id, refs, executor);
+    const owner = supersessionOwner(input);
+    if (owner) await this.supersedeOverlapping(projectId, owner, proposal.id, refs, executor);
     return proposal;
   }
 
-  private async supersedeOverlapping(projectId: bigint, sessionId: string, newProposalId: bigint, refs: string[], executor: DbExecutor): Promise<void> {
+  private async supersedeOverlapping(projectId: bigint, owner: SQL, newProposalId: bigint, refs: string[], executor: DbExecutor): Promise<void> {
     const pending = await executor.query.refinementProposals.findMany({
-      where: and(
-        eq(schema.refinementProposals.projectId, projectId),
-        eq(schema.refinementProposals.sessionId, sessionId),
-        eq(schema.refinementProposals.status, 'pending'),
-        ne(schema.refinementProposals.id, newProposalId),
-      ),
+      where: and(eq(schema.refinementProposals.projectId, projectId), owner, eq(schema.refinementProposals.status, 'pending'), ne(schema.refinementProposals.id, newProposalId)),
     });
 
     const overlapping = pending.filter(p => changeSetRefs(p.changeSet as ChangeOp[]).some(ref => refs.includes(ref)));
@@ -170,7 +181,7 @@ export class ProposalService {
     const existing = await this.get(projectId, proposalId);
     if (existing.status !== 'pending') throw AppErrorCode.RFN_002.create();
 
-    const errors = validateChangeSet(changeSet);
+    const errors = validateOps(existing.kind, changeSet);
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
     const ops = changeSet as ChangeOp[];

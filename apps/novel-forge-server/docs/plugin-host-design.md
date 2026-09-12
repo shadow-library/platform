@@ -703,17 +703,25 @@ A generation whose class was raised writes `generator: 'unrestricted'`, `isolate
 `ProposalService.create` is called with an explicit `allowedOps`:
 
 **Allowed:** `entity.upsert`, `entity.remove`, `fact.upsert`, `fact.remove`, `bible_document.upsert`,
-`bible_document.remove`, `brief.update`, and `arc.upsert` **restricted to its narrative fields** — `title`,
-`objective`, `escalation`, `payoff`, `hook`, `body`.
+`bible_document.remove`, `brief.update` **restricted to its own content** — `title`, `body`, `writeMode`,
+`contextRefs`, `endingContract`, `knowledgeContract` — and `arc.upsert` **restricted to its narrative
+fields** — `title`, `objective`, `escalation`, `payoff`, `hook`, `body`.
 
 **Refused (`PLG_005`):** every `action.*` op, `draft.update`, `draft.remove`, `brief.remove`, `arc.remove`,
-`premise.update`, `seed.update`, all volume ops, and `arc.upsert` carrying `chapterStart`, `chapterEnd`, or
-`ordinal`.
+`premise.update`, `seed.update`, all volume ops, `arc.upsert` carrying `chapterStart`, `chapterEnd`, or
+`ordinal`, `brief.update` carrying `arcKey` or `volumeKey`, and an `arc.upsert` that names a different
+`volumeKey` than the arc already sits in.
 
 The arc split is the load-bearing one. An arc's narrative fields are how a beat gets placed at a chapter
 (§5.1), so a plugin needs them. An arc's chapter range and ordinal are the book's skeleton — moving them
 renumbers chapters and invalidates briefs. That is `ChapterInsertService`'s job under an explicit author
 action, never a background policy hook's.
+
+The parenting refusals are the same split one level up: which arc a chapter belongs to, and which volume an
+arc belongs to, are structure, and a plugin proposes what the novel _contains_, never how it is arranged.
+`volumeKey` is required on `arc.upsert` (§8), so it is a _change_ to an existing arc's volume that is
+refused, not its presence — a check the pure validator cannot make, so it runs in `PluginProposalService`
+against the arc rows before the proposal is staged.
 
 The refusals are the point. `action.*` would let a plugin enqueue generation, approve a draft, or finalize a
 chapter — a plugin proposes what a novel _contains_, never what the pipeline _does next_. `draft.*` would let a
@@ -936,7 +944,7 @@ against it.
       12; one `project_plugins` read per run.
 - [x] **PG5** — `context.contribute` + `minWriterClass` guard + `prompt.contribute`. Verify: fixture tests 1,
       3, 4, 6; a hook that throws drops its contribution without failing generation.
-- [ ] **PG6** — `canon.augment` + `brief.policy` + `BriefUpdateOp.writeMode` + `refinement_kind` `'plugin'` +
+- [x] **PG6** — `canon.augment` + `brief.policy` + `BriefUpdateOp.writeMode` + `refinement_kind` `'plugin'` +
       the §12 op allowlist + `POST .../augment`. Verify: fixture tests 8, 9; the proposal applies and reverts
       through the existing flow.
 - [ ] **PG7** — Regen `api-types.gen.ts` from a booted server (dir unset), then the web Plugins tab and

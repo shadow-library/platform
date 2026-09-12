@@ -114,3 +114,9 @@ export class ProjectPluginResponse {
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;
 }
+
+@Schema({ description: "The proposal a plugin's canon augmentation was staged as. No body is returned when the plugin proposed nothing." })
+export class PluginAugmentResponse {
+  @Field(() => String, { description: 'Id of the pending proposal holding the proposed canon changes, for review through the proposal surface.' })
+  proposalId: bigint;
+}

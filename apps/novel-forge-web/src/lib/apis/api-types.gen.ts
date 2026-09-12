@@ -1239,6 +1239,23 @@ export interface paths {
     patch: operations['patch_api_v1_projects_projectId_source_chapters_n'];
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/plugins/{pluginId}/augment': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Augment */
+    post: operations['post_api_v1_projects_projectId_plugins_pluginId_augment'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/proposals': {
     parameters: {
       query?: never;
@@ -3528,7 +3545,7 @@ export interface components {
     /** @enum {string} */
     ChatScope: 'project' | 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief' | 'ideation';
     /** @enum {string} */
-    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'arc_plan' | 'chapter_extract' | 'ideation';
+    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'arc_plan' | 'chapter_extract' | 'ideation' | 'plugin';
     /** @enum {string} */
     RefinementProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted' | 'reverted';
     /** @description Change-set operation whose remaining fields depend on its server-validated op value. */
@@ -3834,6 +3851,11 @@ export interface components {
     UpdateChapterBody: {
       title?: string;
       content?: string;
+    };
+    /** @description The proposal a plugin's canon augmentation was staged as. No body is returned when the plugin proposed nothing. */
+    PluginAugmentResponse: {
+      /** @description Id of the pending proposal holding the proposed canon changes, for review through the proposal surface. */
+      proposalId: string;
     };
     ListProposalResponse: {
       total: number;
@@ -8863,6 +8885,47 @@ export interface operations {
       };
     };
   };
+  post_api_v1_projects_projectId_plugins_pluginId_augment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        pluginId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginAugmentResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects_projectId_proposals: {
     parameters: {
       query?: {
@@ -13587,6 +13650,7 @@ export type ListChapterResponse = components['schemas']['ListChapterResponse'];
 export type ChapterListResponse = components['schemas']['ChapterListResponse'];
 export type ChapterResponse = components['schemas']['ChapterResponse'];
 export type UpdateChapterBody = components['schemas']['UpdateChapterBody'];
+export type PluginAugmentResponse = components['schemas']['PluginAugmentResponse'];
 export type ListProposalResponse = components['schemas']['ListProposalResponse'];
 export type UpdateProposalBody = components['schemas']['UpdateProposalBody'];
 export type ApplyProposalBody = components['schemas']['ApplyProposalBody'];

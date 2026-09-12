@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
+import { noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { GenerationService } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -64,7 +65,7 @@ describe.if(pgAvailable)('brief chapterPurpose/readerValue/repetitionRisks (harn
     const modelRouter = { structured: mock(async () => structuredOutput) } as never;
     const contextAssembler = { catalog: async () => 'CATALOG', resolveRefs: async (_projectId: bigint, refs: string[]) => ({ resolved: [], unresolved: refs }) } as never;
     const noop = {} as never;
-    return new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    return new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, noop, noPluginProposals());
   }
 
   it('persists chapterPurpose, readerValue, and repetitionRisks from outline()', async () => {

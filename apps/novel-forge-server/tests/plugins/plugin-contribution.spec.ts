@@ -16,6 +16,7 @@ import { generationPrompt } from '@modules/ai/prompts/generation.prompt';
 import { createPluginLogger, type ForgeCallPolicy, type ForgePlugin, loadPlugins, PluginHost, PluginPolicyService, ScopedPluginHostFactory } from '@modules/plugins';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -373,6 +374,7 @@ describe.if(pgAvailable)('plugin contributions', () => {
         noop,
         noop,
         policyService,
+        noPluginProposals(),
       );
       await service.outlineArc(projectId, 'a1', {});
       const call = structured.mock.calls[0] as unknown as [unknown, Record<string, unknown>, unknown, unknown, ForgeCallPolicy | undefined];

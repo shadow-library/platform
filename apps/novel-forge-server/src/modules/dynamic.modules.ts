@@ -28,7 +28,7 @@ import { NovelImportModule } from '@modules/novel-import';
 import { PipelineModule } from '@modules/pipeline';
 import { PlanImportModule } from '@modules/plan-import';
 import { PlanningModule } from '@modules/planning';
-import { PluginsModule } from '@modules/plugins';
+import { PluginProposalModule, PluginsModule } from '@modules/plugins';
 import { ProjectModule } from '@modules/project';
 import { RefinementModule } from '@modules/refinement';
 import { SourceModule } from '@modules/source';
@@ -65,6 +65,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     PlanImportModule,
     PlanningModule,
     PluginsModule,
+    PluginProposalModule,
     ProjectModule,
     RefinementModule,
     SourceModule,

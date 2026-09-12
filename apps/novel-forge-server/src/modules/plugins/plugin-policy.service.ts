@@ -61,7 +61,7 @@ export function emptyPolicy(writerClass: WriterClass = 'standard'): ForgeCallPol
   return { writerClass, raised: false, plugins: [], systemMessages: [], contextSections: [], knobs: {}, digest: '' };
 }
 
-interface ActivePlugin {
+export interface ActivePlugin {
   id: string;
   version: string;
   config: Record<string, unknown>;
@@ -132,11 +132,12 @@ export class PluginPolicyService {
   async scoped(projectId: bigint, project?: ProjectBaseline): Promise<ScopedPolicyResolver> {
     const row = project ?? (await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { contentMode: true } }));
     const baseline = baselineClass(row);
-    const active = await this.loadActive(projectId);
+    const active = await this.active(projectId);
     return { for: call => this.build(active, baseline, call, [call.role]), forPack: (call, consumers) => this.build(active, baseline, call, consumers) };
   }
 
-  private async loadActive(projectId: bigint): Promise<ActivePlugin[]> {
+  /** The plugins that actually contribute on this novel: enabled, still on disk, and validating against the manifest on disk. */
+  async active(projectId: bigint): Promise<ActivePlugin[]> {
     const rows = await this.db.query.projectPlugins.findMany({
       where: eq(schema.projectPlugins.projectId, projectId),
       orderBy: [asc(schema.projectPlugins.ordinal), asc(schema.projectPlugins.pluginId)],
