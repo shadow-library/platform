@@ -42,6 +42,14 @@ const PACKAGE_ENTRIES: Record<string, string[]> = {
   ],
 };
 
+/**
+ * `declare module` augments a package without importing it, so knip sees no reference and reports the
+ * dependency as unused. Dropping it breaks the augmentation: TS2664 with every augmented member gone.
+ */
+const PACKAGE_IGNORED_DEPENDENCIES: Record<string, string[]> = {
+  'packages/modules': ['fastify'],
+};
+
 /** `packages/web` and `packages/ui` colocate their unit tests beside the source rather than under `tests/`. */
 const COLOCATED_TESTS = ['src/**/*.{test,spec}.{ts,tsx}'];
 
@@ -102,6 +110,7 @@ const config: KnipConfig = {
         {
           entry: [...entry, ...COLOCATED_TESTS, 'tests/**/*.{ts,tsx}', '*.config.ts', '.storybook/*.{ts,tsx}'],
           project: ['src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}', '*.config.ts'],
+          ignoreDependencies: PACKAGE_IGNORED_DEPENDENCIES[dir] ?? [],
         },
       ]),
     ),
