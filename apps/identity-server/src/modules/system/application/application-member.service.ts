@@ -1,4 +1,4 @@
-import { and, eq, inArray, ne } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
@@ -53,7 +53,8 @@ export class ApplicationMemberService {
     await this.db
       .insert(schema.applicationMembers)
       .values({ applicationId, userId })
-      .onConflictDoUpdate({ target: [schema.applicationMembers.applicationId, schema.applicationMembers.userId], set: { lastUsedAt: new Date() } });
+      /** `now()`, not `new Date()`: the insert stamps both columns from the database clock, so a refresh read off the app's would move `lastUsedAt` backwards whenever the two hosts disagree. */
+      .onConflictDoUpdate({ target: [schema.applicationMembers.applicationId, schema.applicationMembers.userId], set: { lastUsedAt: sql`now()` } });
     this.logger.debug('Application membership ensured', { applicationId, userId });
   }
 
