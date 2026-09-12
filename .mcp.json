@@ -13,6 +13,11 @@
       "type": "stdio",
       "command": "bunx",
       "args": ["@playwright/mcp@latest"]
+    },
+    "shadow-logs": {
+      "type": "stdio",
+      "command": "gitops",
+      "args": ["mcp", "dev"]
     }
   }
 }

@@ -26,7 +26,8 @@
       "Bash(sort:*)",
       "Bash(uniq:*)",
       "Bash(cut:*)",
-      "Bash(jq:*)"
+      "Bash(jq:*)",
+      "mcp__shadow-logs"
     ],
     "deny": ["Bash(sed -i:*)", "Bash(sed --in-place:*)"]
   },
