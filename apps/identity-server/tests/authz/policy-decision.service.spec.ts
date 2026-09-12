@@ -61,9 +61,11 @@ describe('PolicyDecisionService', () => {
     expect(after).toBeGreaterThan(before);
   });
 
+  /** The endpoint scopes its decision to the calling client's application, so the caller must be a seeded client bound to `shadow-identity`. */
   const serviceToken = (scope = 'authz:check') =>
-    env.getService(AccessTokenService).mintAccessToken({ subject: 'pdp-caller', audience: 'shadow-identity', scope, clientId: 'pdp-caller', ttlSeconds: 60, actorType: 'service' })
-      .token;
+    env
+      .getService(AccessTokenService)
+      .mintAccessToken({ subject: 'identity-server', audience: 'shadow-identity', scope, clientId: 'identity-server', ttlSeconds: 60, actorType: 'service' }).token;
 
   it('should serve decisions over the HTTP PDP endpoint to authenticated services', async () => {
     await pdp.assignRole(principal(), roleId, orgId);

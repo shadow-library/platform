@@ -187,8 +187,9 @@ describe('WebAuthn passkeys', () => {
       expect(done.statusCode).toBe(200);
       expect(done.json()).toMatchObject({ aal: 'AAL2' });
 
+      /** `registerPasskey` elevates with a password first, so the table also holds that step-up's own audit row. */
       const audits = await env.getPostgresClient().select().from(schema.auditEvents).where(eq(schema.auditEvents.action, 'auth.mfa.step_up'));
-      expect(audits.length).toBe(1);
+      expect(audits.filter(audit => audit.detail?.['method'] === 'WEBAUTHN')).toHaveLength(1);
     });
 
     it('should refuse a passkey step-up for an account with no passkey', async () => {

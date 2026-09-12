@@ -53,7 +53,15 @@ export class TestEnvironment {
       await createDatabaseFromTemplate(this.databaseName);
       await this.app.init();
     });
-    beforeEach(() => createDatabaseFromTemplate(this.databaseName));
+    /**
+     * Redis is flushed with the database, not just at the end: the template reset restarts every id
+     * sequence, so the next test's organisation reuses the previous one's id and would otherwise be
+     * served that test's cached application grants.
+     */
+    beforeEach(async () => {
+      await createDatabaseFromTemplate(this.databaseName);
+      await this.flushRedis();
+    });
     afterAll(async () => {
       await this.flushRedis();
       await this.app.stop();
