@@ -24,6 +24,7 @@ export * from './source.api';
 export * from './plan-import.api';
 export * from './novel-import.api';
 export * from './publishing.api';
+export * from './plugin.api';
 
 /**
  * `reforge.api.ts` and `publishing.api.ts` predate their features' OpenAPI schemas and hand-author their

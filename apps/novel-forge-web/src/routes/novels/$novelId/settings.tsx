@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Alert, Button, Dialog, FormField, Input, SegmentedControl, Select, Tabs, Textarea, toast } from '@shadow-library/ui';
 
 import { PageContainer, PageHeader, QueryState, SectionCard } from '@/components/nf';
+import { PluginsTab } from '@/features/plugins/PluginsTab';
 import {
   type AiModelOption,
   aiModelsQueryOptions,
@@ -11,6 +12,7 @@ import {
   type ProjectModelOverrides,
   useAiModelsQuery,
   useDeleteProjectMutation,
+  useListPluginsQuery,
   useProjectQuery,
   useUpdateProjectMutation,
 } from '@/lib/apis';
@@ -118,6 +120,7 @@ function SettingsScreen(): React.JSX.Element {
   const navigate = useNavigate();
   const projectQuery = useProjectQuery(novelId);
   const modelsQuery = useAiModelsQuery();
+  const pluginsQuery = useListPluginsQuery();
   const updateProject = useUpdateProjectMutation(novelId);
   const deleteProject = useDeleteProjectMutation();
 
@@ -184,6 +187,8 @@ function SettingsScreen(): React.JSX.Element {
     });
   };
 
+  // A deployment with no plugin directory answers `[]`, and the tab does not exist at all there.
+  const hasPlugins = (pluginsQuery.data?.length ?? 0) > 0;
   const unrestricted = contentMode === 'unrestricted';
   const allowlist = new Set(modelsQuery.data?.unrestrictedAllowlist ?? []);
   const modelOptions = (modelsQuery.data?.models ?? []).filter(m => !unrestricted || allowlist.has(m.id) || m.kind === 'embedding');
@@ -201,6 +206,7 @@ function SettingsScreen(): React.JSX.Element {
             <Tabs.List>
               <Tabs.Tab value="general">General</Tabs.Tab>
               <Tabs.Tab value="models">Models</Tabs.Tab>
+              {hasPlugins && <Tabs.Tab value="plugins">Plugins</Tabs.Tab>}
               <Tabs.Tab value="danger">Danger zone</Tabs.Tab>
             </Tabs.List>
 
@@ -287,6 +293,12 @@ function SettingsScreen(): React.JSX.Element {
                 </>
               )}
             </Tabs.Panel>
+
+            {hasPlugins && (
+              <Tabs.Panel value="plugins" className={styles.tabPanel}>
+                <PluginsTab novelId={novelId} manifests={pluginsQuery.data ?? []} />
+              </Tabs.Panel>
+            )}
 
             <Tabs.Panel value="danger" className={styles.tabPanel}>
               <SectionCard title="Delete project">

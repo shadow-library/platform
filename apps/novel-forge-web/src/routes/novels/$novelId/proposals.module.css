@@ -189,3 +189,10 @@
   color: var(--sh-text-primary);
   text-align: left;
 }
+
+.opRationale {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  border-left: 2px solid var(--sh-border-strong);
+  padding-left: 10px;
+}

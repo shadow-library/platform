@@ -8,6 +8,7 @@ import {
   type ProposalResponse,
   useApplyProposalMutation,
   useDiscardProposalMutation,
+  useListPluginsQuery,
   useListProposalsQuery,
   useRevertProposalMutation,
 } from '@/lib/apis';
@@ -83,12 +84,14 @@ function formatOpValue(value: unknown): string {
  * so a change reads as what it does, not as a raw JSON blob.
  */
 export function ChangeOpBody({ op }: { op: Record<string, unknown> }): React.JSX.Element {
-  const entries = Object.entries(op).filter(([k]) => k !== 'op' && op[k] !== undefined);
+  const rationale = typeof op.rationale === 'string' ? op.rationale.trim() : '';
+  const entries = Object.entries(op).filter(([k]) => k !== 'op' && k !== 'rationale' && op[k] !== undefined);
   const prose = entries.filter(([k, v]) => OP_PROSE_FIELDS.has(k) && typeof v === 'string' && v.trim() !== '');
   const inline = entries.filter(([k, v]) => !prose.some(([pk]) => pk === k) && v !== undefined);
 
   return (
     <div className={styles.opBody}>
+      {rationale !== '' && <div className={styles.opRationale}>{rationale}</div>}
       {inline.length > 0 && (
         <div className={styles.opFields}>
           {inline.map(([k, v]) => (
@@ -107,6 +110,14 @@ export function ChangeOpBody({ op }: { op: Record<string, unknown> }): React.JSX
       ))}
     </div>
   );
+}
+
+/** A plugin proposal's `scopeRef` is the id of the plugin that staged it. */
+export function PluginSourceChip({ proposal }: { proposal: ProposalResponse }): React.JSX.Element | null {
+  const isPlugin = proposal.kind === 'plugin' && Boolean(proposal.scopeRef);
+  const pluginsQuery = useListPluginsQuery(isPlugin);
+  if (!isPlugin) return null;
+  return <StatusChip intent="accent">{pluginsQuery.data?.find(manifest => manifest.id === proposal.scopeRef)?.title ?? proposal.scopeRef}</StatusChip>;
 }
 
 interface ProposalDetailProps {
@@ -175,6 +186,7 @@ function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.E
           <StatusChip intent={statusIntent(proposal.status)}>{proposal.status}</StatusChip>
           <StatusChip intent="neutral">{proposal.kind}</StatusChip>
           <StatusChip intent="neutral">{proposal.scopeType}</StatusChip>
+          <PluginSourceChip proposal={proposal} />
           {proposal.autoApplied && <StatusChip intent="info">auto</StatusChip>}
           <div className={styles.spacer} />
           {proposal.model && <span className={styles.model}>{proposal.model}</span>}
@@ -289,6 +301,7 @@ function ProposalsScreen(): React.JSX.Element {
               <div className={styles.cardRow}>
                 <StatusChip intent={statusIntent(proposal.status)}>{proposal.status}</StatusChip>
                 <StatusChip intent="neutral">{proposal.kind}</StatusChip>
+                <PluginSourceChip proposal={proposal} />
                 {proposal.autoApplied && <StatusChip intent="info">auto</StatusChip>}
                 <div className={styles.spacer} />
                 <span className={styles.cardTime}>{relativeTime(proposal.createdAt)}</span>

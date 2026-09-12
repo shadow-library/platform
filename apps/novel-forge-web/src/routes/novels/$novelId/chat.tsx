@@ -30,7 +30,7 @@ import {
 import { messageTime, relativeTime } from '@/lib/format';
 
 import styles from './chat.module.css';
-import { ChangeOpBody, defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE, opLabel } from './proposals';
+import { ChangeOpBody, defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE, opLabel, PluginSourceChip } from './proposals';
 
 interface ChatSearch {
   session?: string;
@@ -313,6 +313,7 @@ function TurnProposalCard({ novelId, proposalId }: TurnProposalCardProps): React
         <StatusChip intent={proposal.status === 'applied' ? 'success' : proposal.status === 'pending' ? 'warning' : proposal.status === 'conflicted' ? 'danger' : 'neutral'}>
           {proposal.status}
         </StatusChip>
+        <PluginSourceChip proposal={proposal} />
         {proposal.autoApplied && <StatusChip intent="info">auto</StatusChip>}
       </div>
 

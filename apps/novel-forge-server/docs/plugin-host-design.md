@@ -951,7 +951,7 @@ against it.
 - [x] **PG6** — `canon.augment` + `brief.policy` + `BriefUpdateOp.writeMode` + `refinement_kind` `'plugin'` +
       the §12 op allowlist + `POST .../augment`. Verify: fixture tests 8, 9; the proposal applies and reverts
       through the existing flow.
-- [ ] **PG7** — Regen `api-types.gen.ts` from a booted server (dir unset), then the web Plugins tab and
+- [x] **PG7** — Regen `api-types.gen.ts` from a booted server (dir unset), then the web Plugins tab and
       proposal badge. Verify: `bun scripts/gen-api-types.ts apps/novel-forge-web --check`; web verify clean;
       no plugin-specific strings in production `src/`.
 
