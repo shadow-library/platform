@@ -23,6 +23,8 @@ import { type HttpCoreModuleOptions, type OpenAPIOptions } from '../http-core.ty
 /**
  * Declaring the constants
  */
+const COMPONENT_PREFIX = '#/components/schemas/';
+const COMPOSED_SCHEMA_ID = /^class-schema:(oneOf|anyOf)\?/;
 
 @Injectable()
 export class OpenApiService {
@@ -61,6 +63,41 @@ export class OpenApiService {
     return normalized;
   }
 
+  /**
+   * Rewrites every internal class-schema reference below `node` to its `#/components/schemas` name, in place.
+   * A reference to a composition is replaced by the composition itself: its `type`/`additionalProperties` are
+   * dropped on the way in, because "an object with no properties" and "one of these schemas" contradict each
+   * other, and a reader that honours the first rejects every variant.
+   */
+  private resolveRefs(node: JSONSchema | undefined, compositions: Map<string, JSONSchema>): void {
+    if (!node || typeof node !== 'object') return;
+
+    if (node.$ref && !node.$ref.startsWith(COMPONENT_PREFIX)) {
+      const composition = compositions.get(node.$ref);
+      if (composition) {
+        delete node.$ref;
+        Object.assign(node, utils.object.omitKeys(structuredClone(composition), ['$id', 'definitions', 'type', 'additionalProperties']));
+      } else node.$ref = `${COMPONENT_PREFIX}${this.resolveSchemaId(node.$ref)}`;
+    }
+
+    const mapping = node.discriminator?.mapping;
+    for (const key in mapping) {
+      const target = mapping[key] as string;
+      if (!target.startsWith(COMPONENT_PREFIX)) mapping[key] = `${COMPONENT_PREFIX}${this.resolveSchemaId(target)}`;
+    }
+
+    const children = [
+      node.items,
+      node.not,
+      ...Object.values(node.properties ?? {}),
+      ...Object.values(node.patternProperties ?? {}),
+      ...(node.oneOf ?? []),
+      ...(node.anyOf ?? []),
+      ...(node.allOf ?? []),
+    ];
+    for (const child of children) this.resolveRefs(child, compositions);
+  }
+
   private normalizeOpenapiSpec(document: Partial<OpenAPIV3.Document>, schema: JSONSchema, normaliseSchema = true): JSONSchema {
     document.components ??= {};
     document.components.schemas ??= {};
@@ -70,40 +107,22 @@ export class OpenApiService {
     if (document.components.schemas[schemaId]) return { $ref: `#/components/schemas/${schemaId}` };
 
     const definitions = [schema, ...Object.values(schema.definitions ?? {})];
+    // A composition has no name a consumer could use — `SchemaComposer` derives its id from the classes it
+    // unites so identical compositions dedupe — so it is inlined at every reference instead of published as
+    // a component. Its own references are resolved first, because inlining copies the body as it stands.
+    const compositions = new Map<string, JSONSchema>();
+    for (const definition of definitions) {
+      if (definition.$id && COMPOSED_SCHEMA_ID.test(definition.$id)) compositions.set(definition.$id, definition);
+    }
+    for (const composition of compositions.values()) this.resolveRefs(composition, compositions);
+
     for (const definition of definitions) {
       if (definition.required?.length === 0) delete definition.required;
+      this.resolveRefs(definition, compositions);
+      if (definition.$id && compositions.has(definition.$id)) continue;
       if (definition.$id && ((schema === definition && normaliseSchema) || schema !== definition)) {
         const resolvedId = this.resolveSchemaId(definition.$id);
         document.components.schemas[resolvedId] = utils.object.omitKeys(definition, ['definitions', '$id']);
-      }
-
-      // A definition can itself be an array schema (a body/response type declared as `SomeClass[]`),
-      // whose own `items.$ref` needs the same class-schema-id -> #/components/schemas rewrite every
-      // property's `items.$ref` gets below — otherwise it's left pointing at the raw internal id, which
-      // is never a valid OpenAPI $ref and, if that id's target collided with another schema's normalized
-      // name, resolves to nothing at all once schemas are diffed/bundled downstream.
-      if (definition.items?.$ref && !definition.items.$ref.startsWith('#/components/schemas/')) {
-        const resolvedRefId = this.resolveSchemaId(definition.items.$ref);
-        definition.items.$ref = `#/components/schemas/${resolvedRefId}`;
-      }
-
-      const properties = [...Object.values(definition.properties ?? {}), ...Object.values(definition.patternProperties ?? {})];
-      for (const property of properties) {
-        if (property.$ref && !property.$ref.startsWith('#/components/schemas/')) {
-          const resolvedRefId = this.resolveSchemaId(property.$ref);
-          property.$ref = `#/components/schemas/${resolvedRefId}`;
-        }
-
-        if (property.items?.$ref && !property.items.$ref.startsWith('#/components/schemas/')) {
-          const resolvedRefId = this.resolveSchemaId(property.items.$ref);
-          property.items.$ref = `#/components/schemas/${resolvedRefId}`;
-        }
-
-        for (const option of property.anyOf ?? []) {
-          if (!option.$ref || option.$ref.startsWith('#/components/schemas/')) continue;
-          const resolvedRefId = this.resolveSchemaId(option.$ref);
-          option.$ref = `#/components/schemas/${resolvedRefId}`;
-        }
       }
     }
 

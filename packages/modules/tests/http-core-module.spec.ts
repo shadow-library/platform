@@ -5,8 +5,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 
 import { Response } from 'light-my-request';
 import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-library/app';
+import { Field, Schema, SchemaComposer } from '@shadow-library/class-schema';
 import { Config } from '@shadow-library/common';
-import { FastifyModule, FastifyRouter, Get, HttpController, HttpStatus, Post } from '@shadow-library/fastify';
+import { FastifyModule, FastifyRouter, Get, HttpController, HttpStatus, Post, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -397,6 +398,74 @@ describe('HttpCore Module', () => {
         const json = response.json();
         expect(json.openapi).toBeDefined();
         expect(json.info).toBeDefined();
+      });
+    });
+
+    describe('when a response schema is a composition', () => {
+      @Schema()
+      class CircleShape {
+        @Field({ const: 'circle' })
+        kind: 'circle';
+
+        @Field(() => Number)
+        radius: number;
+      }
+
+      @Schema()
+      class SquareShape {
+        @Field({ const: 'square' })
+        kind: 'square';
+
+        @Field(() => Number)
+        side: number;
+      }
+
+      @Schema()
+      class ShapeResponse {
+        @Field(() => SchemaComposer.discriminator('kind', CircleShape, SquareShape))
+        shape: CircleShape | SquareShape;
+      }
+
+      @HttpController('/api')
+      class ShapeController {
+        @Get('/shape')
+        @RespondFor(200, ShapeResponse)
+        getShape(): ShapeResponse {
+          return { shape: { kind: 'circle', radius: 1 } };
+        }
+      }
+
+      const HttpCoreShapes = HttpCoreModule.forRoot({ openapi: { enabled: true, routePrefix: '/docs', normalizeSchemaIds: true } });
+
+      @Module({ imports: [FastifyModule.forRoot({ imports: [HttpCoreShapes], controllers: [ShapeController] })] })
+      class ShapeAppModule {}
+
+      let schemas: Record<string, any>;
+
+      beforeEach(async () => {
+        const shapeApp = await ShadowFactory.create(ShapeAppModule);
+        const shapeRouter = shapeApp.get(Dispatcher) as FastifyRouter;
+        const response = await shapeRouter.mockRequest().get('/docs/openapi.json');
+        schemas = response.json().components.schemas;
+      });
+
+      it('should inline the composition at the referencing property rather than publish it as a component', () => {
+        expect(schemas['ShapeResponse'].properties.shape).toStrictEqual({
+          oneOf: [{ $ref: '#/components/schemas/CircleShape' }, { $ref: '#/components/schemas/SquareShape' }],
+          discriminator: { propertyName: 'kind', mapping: { circle: '#/components/schemas/CircleShape', square: '#/components/schemas/SquareShape' } },
+        });
+        expect(Object.keys(schemas).some(name => name.includes('oneOf'))).toBe(false);
+      });
+
+      it('should publish every variant of the composition as its own component', () => {
+        expect(schemas['CircleShape'].properties.radius).toStrictEqual({ type: 'number' });
+        expect(schemas['SquareShape'].properties.side).toStrictEqual({ type: 'number' });
+      });
+
+      it('should leave no unresolved class-schema reference anywhere in the document', () => {
+        const refs = JSON.stringify(schemas).match(/"\$ref":"[^"]+"/g) ?? [];
+        expect(refs.length).toBeGreaterThan(0);
+        expect(refs.every(ref => ref.includes('#/components/schemas/'))).toBe(true);
       });
     });
 
