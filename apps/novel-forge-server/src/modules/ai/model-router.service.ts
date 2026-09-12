@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { type BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
+import { AIMessage, type BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 import { eq } from 'drizzle-orm';
@@ -74,6 +74,15 @@ export function resolveProvider(resolved: ResolvedModel): string {
 // ignores them elsewhere, so the breakpoints are worth injecting for exactly that vendor prefix.
 export function supportsPromptCaching(resolved: ResolvedModel): boolean {
   return resolveProvider(resolved) === 'openrouter' && resolved.model.startsWith('anthropic/');
+}
+
+// `prompt.contribute` (§5.5): contributions land directly after the module's own leading system messages and
+// before cache control, so the three Anthropic breakpoints still key on the module's static system message.
+function withPluginSystemMessages(messages: BaseMessage[], policy?: ForgeCallPolicy): BaseMessage[] {
+  if (!policy?.systemMessages.length) return messages;
+  let insertAt = 0;
+  while (messages[insertAt]?.getType() === 'system') insertAt++;
+  return [...messages.slice(0, insertAt), ...policy.systemMessages.map(message => new SystemMessage(message.content)), ...messages.slice(insertAt)];
 }
 
 function extractJsonBlock(text: string): unknown {
@@ -225,7 +234,7 @@ export class ModelRouterService {
     const role = promptModule.role ?? (promptModule.key as AiRole);
     const resolved = this.resolveModel(role, project, policy);
     const llm = this.buildClient(resolved, { format: toJsonSchemaFormat(promptModule.schema), role });
-    const messages = await this.buildMessages(promptModule, input, resolved);
+    const messages = await this.buildMessages(promptModule, input, resolved, policy);
     // Input carries the rendered context pack and user prose — sensitive/large, so it rides on debug
     // (dev-only) as a full snapshot to reproduce the exact model call locally.
     this.logger.debug('structured: invoking model', {
@@ -396,9 +405,9 @@ export class ModelRouterService {
   // Ollama gets the required JSON schema appended in-band — grammar-constrained decoding only exists
   // on Ollama, so API models must be told the exact output shape or the creative roles (whose prompts
   // never mention JSON) answer with plain prose.
-  private async buildMessages<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, resolved: ResolvedModel): Promise<BaseMessage[]> {
+  private async buildMessages<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, resolved: ResolvedModel, policy?: ForgeCallPolicy): Promise<BaseMessage[]> {
     const provider = resolveProvider(resolved);
-    let messages = await promptModule.template.formatMessages(input);
+    let messages = withPluginSystemMessages(await promptModule.template.formatMessages(input), policy);
     if (promptModule.cacheStrategy && supportsPromptCaching(resolved)) messages = applyAnthropicCacheControl(messages);
     if (provider !== 'ollama') {
       messages = [

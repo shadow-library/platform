@@ -2,6 +2,7 @@ import { Module } from '@shadow-library/app';
 import { DatabaseModule } from '@shadow-library/modules';
 
 import { AiModule } from '../ai/ai.module';
+import { PluginsModule } from '../plugins/plugins.module';
 import { ActionExecutorRegistry } from './action-registry';
 import { ChangeHistoryController } from './change-history.controller';
 import { ChatCompactionService } from './chat-compaction.service';
@@ -15,7 +16,7 @@ import { RefineController } from './refine.controller';
 import { RefineService } from './refine.service';
 
 @Module({
-  imports: [DatabaseModule, AiModule],
+  imports: [DatabaseModule, AiModule, PluginsModule],
   controllers: [ProposalController, ChangeHistoryController, ChatController, RefineController],
   providers: [ActionExecutorRegistry, ChatTurnRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService],
   exports: [ActionExecutorRegistry, ChatTurnRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService],

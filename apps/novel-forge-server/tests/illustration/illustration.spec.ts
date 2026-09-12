@@ -17,6 +17,7 @@ import { applyInstructionEdit, renderPromptSpec } from '@modules/illustration/pr
 import { ProjectService } from '@modules/project/project/project.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -96,6 +97,7 @@ function buildHarness(db: PrimaryDatabase): Harness {
     new EntityService(dbStub, storage as never),
     new ChapterImageService(dbStub, storage as never),
     new ProjectService(dbStub, {} as never, storage as never),
+    noPluginPolicy(),
   );
 
   (globalThis as unknown as { fetch: unknown }).fetch = async (url: string, init: { body: string }) => {

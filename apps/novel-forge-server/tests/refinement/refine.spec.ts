@@ -12,6 +12,7 @@ import { ProposalService } from '@modules/refinement/proposal.service';
 import { RefineService } from '@modules/refinement/refine.service';
 import { REQUIRED_BIBLE_DOCS } from '@modules/refinement/required-bible-docs';
 import { type PrimaryDatabase, schema } from '@server/database';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -63,7 +64,7 @@ describe.if(pgAvailable)('RefineService', () => {
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
     const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop);
-    refine = new RefineService(databaseService, assembler, modelRouter, workflowRuns, new ProposalService(databaseService));
+    refine = new RefineService(databaseService, assembler, modelRouter, workflowRuns, new ProposalService(databaseService), noPluginPolicy());
 
     const [project] = await db
       .insert(schema.projects)

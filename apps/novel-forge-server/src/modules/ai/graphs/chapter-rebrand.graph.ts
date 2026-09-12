@@ -6,6 +6,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Rebrand } from '@server/database';
 import * as schema from '@server/database/schemas';
 
+import { type ForgeCallPolicy, type PluginPolicyService, type ScopedPolicyResolver } from '../../plugins/plugin-policy.service';
 import { type GlossaryLike, renderGlossarySlice, type ResidueIssue, scanResidue, selectGlossarySlice } from '../../rebrand/residue-scan';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
@@ -19,6 +20,7 @@ export interface RebrandGraphServices {
   db: PrimaryDatabase;
   contextAssembler: ContextAssembler;
   modelRouter: ModelRouterService;
+  pluginPolicy: PluginPolicyService;
   checkpointer: BaseCheckpointSaver;
 }
 
@@ -76,7 +78,14 @@ export function createChapterRebrandGraph(services: RebrandGraphServices): Retur
 }
 
 function buildChapterRebrandGraph(services: RebrandGraphServices) {
-  const { db, contextAssembler, modelRouter, checkpointer } = services;
+  const { db, contextAssembler, modelRouter, pluginPolicy, checkpointer } = services;
+
+  // One `project_plugins` read for the run: the pack and every conversion attempt share the one scope.
+  let resolver: Promise<ScopedPolicyResolver> | undefined;
+  async function policyFor(projectId: bigint, chapter: number): Promise<ForgeCallPolicy> {
+    resolver ??= pluginPolicy.scoped(projectId);
+    return (await resolver).for({ role: 'rebrand', chapter });
+  }
 
   async function loadChapter(state: RebrandState) {
     const projectId = BigInt(state.projectId);
@@ -120,13 +129,19 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     const projectId = BigInt(state.projectId);
     const glossarySlice = renderGlossarySlice(selectGlossarySlice(state.chapterProse, state.glossary));
 
-    const pack = await contextAssembler.forRebrand(projectId, state.chapter, {
-      worldNotes: state.worldNotes,
-      directives: state.directives,
-      glossarySlice,
-      carryState: state.carryState ? JSON.stringify(state.carryState) : null,
-      prevBody: state.prevBody,
-    });
+    const policy = await policyFor(projectId, state.chapter);
+    const pack = await contextAssembler.forRebrand(
+      projectId,
+      state.chapter,
+      {
+        worldNotes: state.worldNotes,
+        directives: state.directives,
+        glossarySlice,
+        carryState: state.carryState ? JSON.stringify(state.carryState) : null,
+        prevBody: state.prevBody,
+      },
+      { policy },
+    );
     if (pack.id) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
 
     logger.debug('rebrand assembleContext', { runId: state.runId, chapter: state.chapter, glossarySliceLength: glossarySlice.length, contextPackLength: pack.rendered.length });
@@ -151,6 +166,7 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
       { stableContext: state.stableContext, volatileContext: state.volatileContext, chapterProse: state.chapterProse, repairNotes: state.repairNotes || 'none' },
       ctx,
       projectRow as ProjectConfig | undefined,
+      await policyFor(projectId, state.chapter),
     )) as RebrandConvertOutput;
 
     logger.debug('rebrand convert', {

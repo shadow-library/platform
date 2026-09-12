@@ -15,6 +15,7 @@ import { ChatService } from '@modules/refinement/chat.service';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { type PrimaryDatabase, schema } from '@server/database';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -65,6 +66,7 @@ describe.if(pgAvailable)('ChatService ideation guards', () => {
       new ToolRegistryService(),
       noop,
       new ChatCompactionService(databaseService, modelRouter, workflowRuns),
+      noPluginPolicy(),
     );
 
     const [project] = await db

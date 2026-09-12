@@ -8,6 +8,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { createChapterRebrandGraph, routeAfterAudit } from '@modules/ai/graphs/chapter-rebrand.graph';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 interface ScriptedCall {
@@ -50,7 +51,7 @@ function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, convert
       renderedVolatile: 'VOLATILE-GLOSSARY-SLICE',
     }),
   };
-  return { db, contextAssembler, modelRouter, checkpointer } as never;
+  return { db, contextAssembler, modelRouter, pluginPolicy: noPluginPolicy(), checkpointer } as never;
 }
 
 async function seedProject(db: PrimaryDatabase, name: string, settings: Record<string, unknown> | null = null) {

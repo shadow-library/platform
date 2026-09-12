@@ -9,7 +9,16 @@ import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { PluginHost, ScopedPluginHostFactory } from './plugin-host.service';
 import { needsReview } from './plugin.service';
-import { type ForgePlugin, type PluginContextSection, type ScopedPluginHost, type WriterClass, type WritingKnobs } from './plugin.types';
+import {
+  type CallContext,
+  type DecisionPoint,
+  type ForgePlugin,
+  type PluginContextSection,
+  type ProjectContext,
+  type ScopedPluginHost,
+  type WriterClass,
+  type WritingKnobs,
+} from './plugin.types';
 
 export interface PluginStamp {
   id: string;
@@ -40,6 +49,8 @@ export interface ProjectBaseline {
 
 export interface ScopedPolicyResolver {
   for(call: PolicyCall): ForgeCallPolicy;
+  /** §5.4: a pack outlives the call that assembles it, so its guard runs against the lowest class among the roles that will read it. */
+  forPack(call: PolicyCall, consumers: readonly string[]): ForgeCallPolicy;
 }
 
 export function raisedContainment(policy: { raised?: boolean } | undefined): { generator: 'unrestricted'; isolated: true } | Record<string, never> {
@@ -61,6 +72,42 @@ interface ActivePlugin {
 
 function baselineClass(project: ProjectBaseline | undefined): WriterClass {
   return project?.contentMode === 'unrestricted' ? 'permissive' : 'standard';
+}
+
+function callContext(entry: ActivePlugin, call: PolicyCall, writerClass: WriterClass): ProjectContext & CallContext {
+  return { config: entry.config, host: entry.host, role: call.role, promptKey: call.promptKey ?? call.role, chapter: call.chapter, writerClass };
+}
+
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+function normalizeSystemMessage(value: unknown): { role: 'system'; content: string } | undefined {
+  const record = asRecord(value);
+  const content = readString(record?.['content']);
+  return content.trim() ? { role: 'system', content } : undefined;
+}
+
+function normalizeContextSection(pluginId: string, value: unknown): PluginContextSection | undefined {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  const key = readString(record['key']).trim();
+  const rendered = readString(record['rendered']);
+  if (!key || !rendered.trim()) return undefined;
+  const title = readString(record['title']).trim();
+  return {
+    key: `plugin:${pluginId}:${key}`,
+    title: title || key,
+    rendered,
+    segment: record['segment'] === 'stable' ? 'stable' : 'volatile',
+    // Fail closed: only the exact literal opens a section to a standard call, so a mangled or missing field withholds it.
+    minWriterClass: record['minWriterClass'] === 'standard' ? 'standard' : 'permissive',
+    ...(record['required'] === true ? { required: true } : {}),
+  };
 }
 
 @Injectable()
@@ -86,7 +133,7 @@ export class PluginPolicyService {
     const row = project ?? (await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { contentMode: true } }));
     const baseline = baselineClass(row);
     const active = await this.loadActive(projectId);
-    return { for: call => this.build(active, baseline, call) };
+    return { for: call => this.build(active, baseline, call, [call.role]), forPack: (call, consumers) => this.build(active, baseline, call, consumers) };
   }
 
   private async loadActive(projectId: bigint): Promise<ActivePlugin[]> {
@@ -112,28 +159,50 @@ export class PluginPolicyService {
     return active;
   }
 
-  private build(active: ActivePlugin[], baseline: WriterClass, call: PolicyCall): ForgeCallPolicy {
+  private build(active: ActivePlugin[], baseline: WriterClass, call: PolicyCall, consumers: readonly string[]): ForgeCallPolicy {
     if (active.length === 0) return emptyPolicy(baseline);
 
-    const plugins: PluginStamp[] = [];
-    let votedPermissive = false;
-    for (const entry of active) {
-      plugins.push({ id: entry.id, version: entry.version, configHash: entry.configHash });
-      if (!entry.plugin.decideWriterClass) continue;
-      const ctx = { config: entry.config, host: entry.host, role: call.role, promptKey: call.promptKey ?? call.role, chapter: call.chapter, writerClass: baseline };
-      // A vote only ever raises: lowering a permissive project to standard is the author's setting, not a plugin's.
-      if (this.safely(entry.id, 'call.route', () => entry.plugin.decideWriterClass?.(ctx)) === 'permissive') votedPermissive = true;
+    const plugins: PluginStamp[] = active.map(entry => ({ id: entry.id, version: entry.version, configHash: entry.configHash }));
+
+    // Settled before a single additive hook runs, and at the lowest class among the consumers, so §5.4's guard reads a class no later reader can undercut.
+    let writerClass: WriterClass = baseline;
+    for (const role of consumers) {
+      writerClass = this.classFor(active, baseline, { ...call, role });
+      if (writerClass === 'standard') break;
     }
 
-    const content = {
-      writerClass: (votedPermissive ? 'permissive' : baseline) as WriterClass,
-      raised: votedPermissive && baseline === 'standard',
-      plugins,
-      systemMessages: [] as { role: 'system'; content: string }[],
-      contextSections: [] as PluginContextSection[],
-      knobs: {} as WritingKnobs,
-    };
+    const systemMessages: { role: 'system'; content: string }[] = [];
+    const contextSections: PluginContextSection[] = [];
+    for (const entry of active) {
+      if (!entry.plugin.contributeSystemMessages && !entry.plugin.contributeContextSections) continue;
+      const ctx = callContext(entry, call, writerClass);
+      for (const value of this.contributions(entry.id, 'prompt.contribute', () => entry.plugin.contributeSystemMessages?.(ctx))) {
+        const message = normalizeSystemMessage(value);
+        if (message) systemMessages.push(message);
+      }
+      for (const value of this.contributions(entry.id, 'context.contribute', () => entry.plugin.contributeContextSections?.(ctx))) {
+        const section = normalizeContextSection(entry.id, value);
+        if (section) contextSections.push(section);
+      }
+    }
+
+    const content = { writerClass, raised: writerClass === 'permissive' && baseline === 'standard', plugins, systemMessages, contextSections, knobs: {} as WritingKnobs };
     return { ...content, digest: computeContentHash(content) };
+  }
+
+  private classFor(active: ActivePlugin[], baseline: WriterClass, call: PolicyCall): WriterClass {
+    let votedPermissive = false;
+    for (const entry of active) {
+      if (!entry.plugin.decideWriterClass) continue;
+      // A vote only ever raises: lowering a permissive project to standard is the author's setting, not a plugin's.
+      if (this.safely(entry.id, 'call.route', () => entry.plugin.decideWriterClass?.(callContext(entry, call, baseline))) === 'permissive') votedPermissive = true;
+    }
+    return votedPermissive ? 'permissive' : baseline;
+  }
+
+  private contributions(pluginId: string, point: DecisionPoint, fn: () => unknown): unknown[] {
+    const result = this.safely(pluginId, point, fn);
+    return Array.isArray(result) ? result : [];
   }
 
   /** §10: a misbehaving plugin degrades its own decision point and never fails the generation. */

@@ -17,19 +17,24 @@ import { DEFAULT_WRITING_INSTRUCTIONS } from '../prompts/authoring-preamble';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 import { CatalogService } from './catalog.service';
 import { computeDormantThreads, renderDormantThreads } from './dormant-threads';
+import { pluginContextSections } from './plugin-sections';
 import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextSegment, type ContextTier, joinSections, renderSection, splitSegments } from './sections';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
 
-export interface ChapterPackOptions {
-  budgetTokens?: number;
-  dryRun?: boolean;
-  /** The call's resolved policy, threaded ahead of assembly so the writer class is already fixed when sections are chosen. */
+export interface PackPolicyOptions {
+  /** The policy of the roles that will read this pack, resolved ahead of assembly so the writer class is already fixed when sections are chosen. */
   policy?: ForgeCallPolicy;
 }
 
-export interface IdeationPackOptions {
+export interface PackOptions extends PackPolicyOptions {
   budgetTokens?: number;
+}
+
+export interface ChapterPackOptions extends PackOptions {
   dryRun?: boolean;
+}
+
+export interface IdeationPackOptions extends ChapterPackOptions {
   /** Question ids the turn pipeline has decided must be settled this turn rather than asked again. */
   commitIds?: string[];
 }
@@ -585,7 +590,7 @@ export class ContextAssembler {
 
     for (const s of excessEntitySections) sections.push(s);
 
-    return this.finalize(projectId, 'generation', chapter, sections, unresolvedRefs, budgetTokens, opts?.dryRun);
+    return this.finalize(projectId, 'generation', chapter, sections, unresolvedRefs, budgetTokens, opts);
   }
 
   // The POV character's card is the one entity card that never pays the shared ENTITY_CARD_BUDGET cap: the
@@ -647,7 +652,7 @@ export class ContextAssembler {
     return sections;
   }
 
-  async forOutline(projectId: bigint, chapter: number, opts?: { budgetTokens?: number }): Promise<AssembledPack & { id: bigint | null }> {
+  async forOutline(projectId: bigint, chapter: number, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? DEFAULT_BUDGET;
 
     const [currentVolume, recentChapters, prevVolumes] = await Promise.all([
@@ -713,10 +718,10 @@ export class ContextAssembler {
       }
     }
 
-    return this.finalize(projectId, 'outline', chapter, sections, [], budgetTokens, false);
+    return this.finalize(projectId, 'outline', chapter, sections, [], budgetTokens, opts);
   }
 
-  async forRevision(projectId: bigint, chapter: number, feedbackId: bigint, opts?: { budgetTokens?: number }): Promise<AssembledPack & { id: bigint | null }> {
+  async forRevision(projectId: bigint, chapter: number, feedbackId: bigint, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? DEFAULT_BUDGET;
 
     const [project, brief, prevChapter, currentVolume, recentChapters, prevDraft, currentDraft, feedbackRows] = await Promise.all([
@@ -798,10 +803,10 @@ export class ContextAssembler {
     }
     sections.push(makeSection('writing_style', project?.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS, 'canonical', []));
 
-    return this.finalize(projectId, 'revision', chapter, sections, unresolvedRefs, budgetTokens, false);
+    return this.finalize(projectId, 'revision', chapter, sections, unresolvedRefs, budgetTokens, opts);
   }
 
-  async forValidationWindow(projectId: bigint, from: number, to: number, opts?: { budgetTokens?: number }): Promise<AssembledPack & { id: bigint | null }> {
+  async forValidationWindow(projectId: bigint, from: number, to: number, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? DEFAULT_BUDGET;
 
     const [chapterRows, threadRows, mysteryRows, worldFactRows] = await Promise.all([
@@ -857,7 +862,7 @@ export class ContextAssembler {
       sections.push(makeSection('world_facts', lines.join('\n'), 'canonical', []));
     }
 
-    return this.finalize(projectId, 'validation', null, sections, [], budgetTokens, false);
+    return this.finalize(projectId, 'validation', null, sections, [], budgetTokens, opts);
   }
 
   /**
@@ -865,7 +870,7 @@ export class ContextAssembler {
    * volatile carries only the artifacts whose revision moved since the session started. History is
    * NOT part of the pack — it rides as prompt messages so provider caching can extend across turns.
    */
-  async forChatTurn(projectId: bigint, session: ChatScopeInput): Promise<AssembledPack & { id: bigint | null }> {
+  async forChatTurn(projectId: bigint, session: ChatScopeInput, opts?: PackPolicyOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = session.scopeType === 'project' ? CHAT_HUB_BUDGET : CHAT_PACK_BUDGET;
     const refValue = session.scopeRef?.includes(':') ? (session.scopeRef.split(':')[1] ?? '') : (session.scopeRef ?? '');
 
@@ -1034,7 +1039,7 @@ export class ContextAssembler {
     if (changed.length > 0) sections.push(makeSection('changed_since', changed.join('\n'), 'working', []));
 
     const purpose = session.scopeType === 'project' ? 'chat_hub' : 'chat';
-    return this.finalize(projectId, purpose, null, sections, unresolvedRefs, budgetTokens, false);
+    return this.finalize(projectId, purpose, null, sections, unresolvedRefs, budgetTokens, opts);
   }
 
   /**
@@ -1068,7 +1073,7 @@ export class ContextAssembler {
     if (router) sections.push({ ...makeSection('round_questions', renderRoundQuestions(router, opts?.commitIds ?? []), 'working', []), required: true });
     if (state.concepts.length > 0) sections.push(makeSection('concept_history', renderConceptHistory(state.concepts), 'working', ['seed']));
 
-    return this.finalize(seed.projectId, 'ideation', null, sections, [], opts?.budgetTokens ?? IDEATION_BUDGET, opts?.dryRun);
+    return this.finalize(seed.projectId, 'ideation', null, sections, [], opts?.budgetTokens ?? IDEATION_BUDGET, opts);
   }
 
   /** The live production picture the hub reasons over: cursor, draft states, stale plans, open work. */
@@ -1098,7 +1103,7 @@ export class ContextAssembler {
   }
 
   /** Pack for the arc-plan chain (design §10.3): the volume, its neighbours' handoffs, premise, skeleton, catalog. */
-  async forArcPlanning(projectId: bigint, volumeKey: string, opts?: { budgetTokens?: number }): Promise<AssembledPack & { id: bigint | null }> {
+  async forArcPlanning(projectId: bigint, volumeKey: string, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? ARC_PLAN_BUDGET;
 
     const [project, volumes, catalogText, openThreads, openMysteries] = await Promise.all([
@@ -1131,16 +1136,16 @@ export class ContextAssembler {
     const dormantText = renderDormantThreads(computeDormantThreads(openThreads, openMysteries, project?.storyCurrentChapter ?? 0));
     if (dormantText) sections.push(makeSection('dormant_threads', dormantText, 'working', []));
 
-    return this.finalize(projectId, 'arc_plan', null, sections, [], budgetTokens, false);
+    return this.finalize(projectId, 'arc_plan', null, sections, [], budgetTokens, opts);
   }
 
   /** Pack for premise enhancement; the bible audit reuses it with a fuller document inventory. */
-  async forPremise(projectId: bigint, opts?: { budgetTokens?: number }): Promise<AssembledPack & { id: bigint | null }> {
-    return this.premisePack(projectId, 'premise', 1, opts?.budgetTokens ?? PREMISE_BUDGET);
+  async forPremise(projectId: bigint, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
+    return this.premisePack(projectId, 'premise', 1, opts?.budgetTokens ?? PREMISE_BUDGET, opts);
   }
 
-  async forAudit(projectId: bigint, opts?: { budgetTokens?: number }): Promise<AssembledPack & { id: bigint | null }> {
-    return this.premisePack(projectId, 'audit', 5, opts?.budgetTokens ?? AUDIT_BUDGET);
+  async forAudit(projectId: bigint, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
+    return this.premisePack(projectId, 'audit', 5, opts?.budgetTokens ?? AUDIT_BUDGET, opts);
   }
 
   /**
@@ -1148,7 +1153,7 @@ export class ContextAssembler {
    * proper noun the seeder must map — the extracted entity roster (with aliases) and world facts.
    * Both are empty on an unextracted project; the opening chapters travel as a template var instead.
    */
-  async forRebrandSeed(projectId: bigint, opts?: { budgetTokens?: number }): Promise<AssembledPack & { id: bigint | null }> {
+  async forRebrandSeed(projectId: bigint, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const [project, entities, facts] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), with: { aliases: true }, orderBy: [schema.entities.type, schema.entities.name] }),
@@ -1168,7 +1173,7 @@ export class ContextAssembler {
       sections.push(asStable(makeSection('world_facts', facts.map(f => `${f.category}/${f.key}: ${f.value}`).join('\n'), 'canonical', [])));
     }
 
-    return this.finalize(projectId, 'rebrand_seed', null, sections, [], opts?.budgetTokens ?? REBRAND_SEED_BUDGET, false);
+    return this.finalize(projectId, 'rebrand_seed', null, sections, [], opts?.budgetTokens ?? REBRAND_SEED_BUDGET, opts);
   }
 
   /**
@@ -1182,6 +1187,7 @@ export class ContextAssembler {
     projectId: bigint,
     chapter: number,
     input: { worldNotes: string; directives: string | null; glossarySlice: string; carryState: string | null; prevBody: string | null },
+    opts?: PackPolicyOptions,
   ): Promise<AssembledPack & { id: bigint | null }> {
     const sections: ContextSection[] = [asStable(makeSection('world_notes', input.worldNotes, 'canonical', []))];
     if (input.directives) sections.push(asStable(makeSection('directives', input.directives, 'approved_intent', [])));
@@ -1189,7 +1195,7 @@ export class ContextAssembler {
     if (input.carryState) sections.push(makeSection('carry_state', input.carryState, 'working', []));
     if (input.prevBody) sections.push(makeSectionTail('prev_ending', input.prevBody, PREV_ENDING_TAIL, 'canonical', [`conversion:${chapter - 1}`]));
 
-    return this.finalize(projectId, 'rebrand', chapter, sections, [], REBRAND_BUDGET, false);
+    return this.finalize(projectId, 'rebrand', chapter, sections, [], REBRAND_BUDGET, opts);
   }
 
   /**
@@ -1197,11 +1203,16 @@ export class ContextAssembler {
    * cache prefix, byte-identical across chapters); the glossary slice is volatile. The source prose
    * itself travels as a template var, never in the pack, so the stable segment never churns.
    */
-  async forReforgeOutline(projectId: bigint, chapter: number, input: { worldNotes: string; glossarySlice: string }): Promise<AssembledPack & { id: bigint | null }> {
+  async forReforgeOutline(
+    projectId: bigint,
+    chapter: number,
+    input: { worldNotes: string; glossarySlice: string },
+    opts?: PackPolicyOptions,
+  ): Promise<AssembledPack & { id: bigint | null }> {
     const sections: ContextSection[] = [asStable(makeSection('world_notes', input.worldNotes, 'canonical', []))];
     sections.push(makeSection('glossary_slice', input.glossarySlice, 'canonical', []));
 
-    return this.finalize(projectId, 'reforge_outline', chapter, sections, [], REFORGE_OUTLINE_BUDGET, false);
+    return this.finalize(projectId, 'reforge_outline', chapter, sections, [], REFORGE_OUTLINE_BUDGET, opts);
   }
 
   /**
@@ -1215,13 +1226,14 @@ export class ContextAssembler {
     projectId: bigint,
     window: number | null,
     input: { worldNotes: string; glossarySlice: string | null; signalDigest: string | null; carryState: string | null },
+    opts?: PackPolicyOptions,
   ): Promise<AssembledPack & { id: bigint | null }> {
     const sections: ContextSection[] = [asStable(makeSection('world_notes', input.worldNotes, 'canonical', []))];
     if (input.glossarySlice) sections.push(makeSection('glossary_slice', input.glossarySlice, 'canonical', []));
     if (input.signalDigest) sections.push(makeSection('signal_digest', input.signalDigest, 'working', []));
     if (input.carryState) sections.push(makeSection('carry_state', input.carryState, 'working', []));
 
-    return this.finalize(projectId, 'reforge_analysis', window, sections, [], REFORGE_ANALYSIS_BUDGET, false);
+    return this.finalize(projectId, 'reforge_analysis', window, sections, [], REFORGE_ANALYSIS_BUDGET, opts);
   }
 
   /**
@@ -1245,6 +1257,7 @@ export class ContextAssembler {
       carryState: string | null;
       prevBody: string | null;
     },
+    opts?: PackPolicyOptions,
   ): Promise<AssembledPack & { id: bigint | null }> {
     const sections: ContextSection[] = [asStable(makeSection('world_notes', input.worldNotes, 'canonical', []))];
     if (input.directives) sections.push(asStable(makeSection('directives', input.directives, 'approved_intent', [])));
@@ -1256,7 +1269,7 @@ export class ContextAssembler {
     if (input.carryState) sections.push(makeSection('carry_state', input.carryState, 'working', []));
     if (input.prevBody) sections.push(makeSectionTail('prev_ending', input.prevBody, PREV_ENDING_TAIL, 'canonical', [`reforge:${chapter - 1}`]));
 
-    return this.finalize(projectId, 'reforge', chapter, sections, [], REFORGE_BUDGET, false);
+    return this.finalize(projectId, 'reforge', chapter, sections, [], REFORGE_BUDGET, opts);
   }
 
   /**
@@ -1284,6 +1297,7 @@ export class ContextAssembler {
       carryState: string | null;
       prevBody: string | null;
     },
+    opts?: PackPolicyOptions,
   ): Promise<AssembledPack & { id: bigint | null }> {
     const sections: ContextSection[] = [asStable(makeSection('world_notes', input.worldNotes, 'canonical', []))];
     if (input.directives) sections.push(asStable(makeSection('directives', input.directives, 'approved_intent', [])));
@@ -1299,7 +1313,7 @@ export class ContextAssembler {
     if (input.carryState) sections.push(makeSection('carry_state', input.carryState, 'working', []));
     if (input.prevBody) sections.push(makeSectionTail('prev_ending', input.prevBody, PREV_ENDING_TAIL, 'canonical', [`output:${outputChapter - 1}`]));
 
-    return this.finalize(projectId, 'reforge_transform', outputChapter, sections, [], REFORGE_TRANSFORM_BUDGET, false);
+    return this.finalize(projectId, 'reforge_transform', outputChapter, sections, [], REFORGE_TRANSFORM_BUDGET, opts);
   }
 
   /**
@@ -1308,7 +1322,12 @@ export class ContextAssembler {
    * subject looks are volatile. `subjectKey` is the entity key, the chapter number as text, or null
    * for the project cover.
    */
-  async forIllustration(projectId: bigint, subjectType: schema.Illustration.SubjectType, subjectKey: string | null): Promise<AssembledPack & { id: bigint | null }> {
+  async forIllustration(
+    projectId: bigint,
+    subjectType: schema.Illustration.SubjectType,
+    subjectKey: string | null,
+    opts?: PackPolicyOptions,
+  ): Promise<AssembledPack & { id: bigint | null }> {
     const [project, artStyle] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.bibleDocuments.findFirst({
@@ -1326,7 +1345,7 @@ export class ContextAssembler {
     if (subjectType === 'entity' && subjectKey) sections.push(...(await this.entitySubjectSections(projectId, subjectKey)));
     if (subjectType === 'chapter' && subjectKey) sections.push(...(await this.chapterSubjectSections(projectId, Number(subjectKey))));
 
-    return this.finalize(projectId, 'illustration', subjectType === 'chapter' && subjectKey ? Number(subjectKey) : null, sections, [], ILLUSTRATION_BUDGET, false);
+    return this.finalize(projectId, 'illustration', subjectType === 'chapter' && subjectKey ? Number(subjectKey) : null, sections, [], ILLUSTRATION_BUDGET, opts);
   }
 
   private async entitySubjectSections(projectId: bigint, entityKey: string): Promise<ContextSection[]> {
@@ -1388,7 +1407,13 @@ export class ContextAssembler {
     return sections;
   }
 
-  private async premisePack(projectId: bigint, purpose: ContextPurpose, inventoryLines: number, budgetTokens: number): Promise<AssembledPack & { id: bigint | null }> {
+  private async premisePack(
+    projectId: bigint,
+    purpose: ContextPurpose,
+    inventoryLines: number,
+    budgetTokens: number,
+    opts?: PackPolicyOptions,
+  ): Promise<AssembledPack & { id: bigint | null }> {
     const [project, docs] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
@@ -1401,7 +1426,7 @@ export class ContextAssembler {
       sections.push(asStable(makeSection('doc_inventory', inventory, 'canonical', [])));
     }
 
-    return this.finalize(projectId, purpose, null, sections, [], budgetTokens, false);
+    return this.finalize(projectId, purpose, null, sections, [], budgetTokens, opts);
   }
 
   private async changedSince(projectId: bigint, since: Date): Promise<string[]> {
@@ -1464,9 +1489,10 @@ export class ContextAssembler {
     sections: ContextSection[],
     unresolvedRefs: string[],
     budgetTokens: number,
-    dryRun?: boolean,
+    opts?: { dryRun?: boolean; policy?: ForgeCallPolicy },
   ): Promise<AssembledPack & { id: bigint | null }> {
-    const { fitting: fittingSections, omitted } = applyBudget(sections, budgetTokens);
+    const contributed = [...sections, ...pluginContextSections(opts?.policy, sections)];
+    const { fitting: fittingSections, omitted } = applyBudget(contributed, budgetTokens);
     // Stable sections render first so the prefix stays byte-identical across calls with unchanged
     // canon (the provider prompt-cache contract); callers list stable sections first, so for the
     // legacy all-volatile purposes this is a no-op.
@@ -1478,7 +1504,7 @@ export class ContextAssembler {
     const hash = createHash('sha256').update(rendered).digest('hex');
 
     let id: bigint | null = null;
-    if (!dryRun) {
+    if (!opts?.dryRun) {
       const [inserted] = await this.db
         .insert(schema.contextPacks)
         .values({ projectId, purpose, chapter, hash, budgetTokens, usedTokens, sections: fittingSections as never, unresolvedRefs, omitted: omitted as never, rendered })

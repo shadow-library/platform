@@ -11,6 +11,7 @@ import { VolumeService } from '@modules/bible/volume/volume.service';
 import { GenerationService } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -51,7 +52,7 @@ describe.if(pgAvailable)('arc module & gates', () => {
     const noop = {} as never;
     const jobService = { enqueue: async () => 'job-1' } as never;
     const jobExecutor = { dispatch: async () => undefined } as never;
-    generationService = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, jobService, jobExecutor, noop, noop, noop);
+    generationService = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, jobService, jobExecutor, noop, noop, noPluginPolicy());
   });
 
   // Leaving the pool open starves later spec files of connections and silently skips their suites.
@@ -156,7 +157,7 @@ describe.if(pgAvailable)('arc module & gates', () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
+      noPluginPolicy(),
     );
 
     // Gate 2: all arcs of the volume must be approved first.
@@ -205,7 +206,7 @@ describe.if(pgAvailable)('arc module & gates', () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
+      noPluginPolicy(),
     );
 
     await outliner.outlineArc(projectId, 'v1_a1', {});

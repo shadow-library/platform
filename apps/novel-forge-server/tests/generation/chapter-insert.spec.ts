@@ -9,6 +9,7 @@ import { ChapterInsertService } from '@modules/generation/chapter-insert.service
 import { parseBriefBody, renderBriefBody, shiftBriefBody, shiftChapterMentions, shiftChapterNumber, shiftChapterReferences } from '@server/common';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -148,7 +149,7 @@ describe.if(pgAvailable)('ChapterInsertService.insertAfter', () => {
   function buildService(outlined?: unknown[]): { service: ChapterInsertService; structured: ReturnType<typeof mock> } {
     const structured = mock(async () => outlined ?? []);
     const contextAssembler = { forOutline: mock(async () => ({ rendered: 'CATALOG' })) } as never;
-    const service = new ChapterInsertService({ getPostgresClient: () => db } as never, { structured } as never, contextAssembler);
+    const service = new ChapterInsertService({ getPostgresClient: () => db } as never, { structured } as never, contextAssembler, noPluginPolicy());
     return { service, structured };
   }
 
@@ -377,6 +378,7 @@ describe.if(pgAvailable)('ChapterInsertService.insertAfter', () => {
         {
           forOutline: mock(async () => ({ rendered: 'CATALOG' })),
         } as never,
+        noPluginPolicy(),
       );
 
       await expectCode(service.insertAfter(projectId, 5, { briefOrigin: 'planner', intent: 'a dark interlude' }), 'CHP_004');

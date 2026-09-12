@@ -2,6 +2,7 @@ import { Module } from '@shadow-library/app';
 import { DatabaseModule } from '@shadow-library/modules';
 
 import { AiModule } from '../ai/ai.module';
+import { PluginsModule } from '../plugins/plugins.module';
 import { ReforgeAnalysisService } from './reforge-analysis.service';
 import { ReforgeCutService } from './reforge-cut.service';
 import { ReforgePlanService } from './reforge-plan.service';
@@ -14,7 +15,7 @@ import { ReforgeService } from './reforge.service';
 // WorkflowRunService. The reforge controller lives in PipelineModule (the HTTP seam), keeping the
 // module graph acyclic (Rebrand and Ai never import Reforge).
 @Module({
-  imports: [DatabaseModule, AiModule],
+  imports: [DatabaseModule, AiModule, PluginsModule],
   providers: [ReforgeService, ReforgeAnalysisService, ReforgeCutService, ReforgePlanService, ReforgePromoteService],
   exports: [ReforgeService, ReforgeAnalysisService, ReforgeCutService, ReforgePlanService, ReforgePromoteService],
 })

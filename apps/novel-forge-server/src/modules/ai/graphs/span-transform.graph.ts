@@ -7,6 +7,7 @@ import { type PrimaryDatabase, type Rebrand, type Reforge, type ReforgeTransform
 import * as schema from '@server/database/schemas';
 
 // Direct file imports of DI-free pure functions — never a feature barrel, whose services import the AI module.
+import { type ForgeCallPolicy, type PluginPolicyService, type ScopedPolicyResolver } from '../../plugins/plugin-policy.service';
 import { type GlossaryLike, renderGlossarySlice, type ResidueIssue, scanResidue, selectGlossarySlice } from '../../rebrand/residue-scan';
 import { renderCutLedger, type ResurfacedCut, scanResurfacedCuts, selectCutSlice, slugifyCutKey } from '../../reforge/cut-ledger';
 import { locateOutputChapter } from '../../reforge/plan-validation';
@@ -20,6 +21,7 @@ export interface SpanTransformServices {
   db: PrimaryDatabase;
   contextAssembler: ContextAssembler;
   modelRouter: ModelRouterService;
+  pluginPolicy: PluginPolicyService;
   checkpointer: BaseCheckpointSaver;
 }
 
@@ -106,7 +108,14 @@ export function createSpanTransformGraph(services: SpanTransformServices): Retur
 }
 
 function buildSpanTransformGraph(services: SpanTransformServices) {
-  const { db, contextAssembler, modelRouter, checkpointer } = services;
+  const { db, contextAssembler, modelRouter, pluginPolicy, checkpointer } = services;
+
+  // One `project_plugins` read for the run: the pack and every write attempt share the one scope.
+  let resolver: Promise<ScopedPolicyResolver> | undefined;
+  async function policyFor(projectId: bigint, outputChapter: number): Promise<ForgeCallPolicy> {
+    resolver ??= pluginPolicy.scoped(projectId);
+    return (await resolver).for({ role: 'reforge', chapter: outputChapter });
+  }
 
   /**
    * Resolves which span this output chapter belongs to from the plan itself, so a single-output re-run
@@ -186,19 +195,25 @@ function buildSpanTransformGraph(services: SpanTransformServices) {
       options,
     );
 
-    const pack = await contextAssembler.forReforgeTransform(projectId, state.outputChapter, {
-      worldNotes: state.worldNotes,
-      directives: state.directives,
-      instructions: state.instructions,
-      targetWords: state.settings.targetWords ?? null,
-      cutLedger: renderCutLedger(stableSlice),
-      discoveredCuts: discovered.length > 0 ? renderCutLedger(discovered) : null,
-      planSpan: renderPlanSpan(span, state.outputChapter, state.indexInSpan),
-      bridge: span.bridgeDirective,
-      glossarySlice,
-      carryState: state.carryState ? JSON.stringify(state.carryState) : null,
-      prevBody: state.prevBody,
-    });
+    const policy = await policyFor(projectId, state.outputChapter);
+    const pack = await contextAssembler.forReforgeTransform(
+      projectId,
+      state.outputChapter,
+      {
+        worldNotes: state.worldNotes,
+        directives: state.directives,
+        instructions: state.instructions,
+        targetWords: state.settings.targetWords ?? null,
+        cutLedger: renderCutLedger(stableSlice),
+        discoveredCuts: discovered.length > 0 ? renderCutLedger(discovered) : null,
+        planSpan: renderPlanSpan(span, state.outputChapter, state.indexInSpan),
+        bridge: span.bridgeDirective,
+        glossarySlice,
+        carryState: state.carryState ? JSON.stringify(state.carryState) : null,
+        prevBody: state.prevBody,
+      },
+      { policy },
+    );
     if (pack.id) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
 
     logger.debug('span transform context', { runId: state.runId, outputChapter: state.outputChapter, ledgerEntries: stableSlice.length, packLength: pack.rendered.length });
@@ -229,6 +244,7 @@ function buildSpanTransformGraph(services: SpanTransformServices) {
       { stableContext: state.stableContext, volatileContext: state.volatileContext, sourceProse: state.sourceProse, repairNotes: state.repairNotes || 'none' },
       ctx,
       projectRow as ProjectConfig | undefined,
+      await policyFor(projectId, state.outputChapter),
     )) as ReforgeTransformWriteOutput;
 
     logger.debug('span transform write', {

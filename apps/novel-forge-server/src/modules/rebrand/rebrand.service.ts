@@ -13,6 +13,7 @@ import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { PROMPT_REGISTRY } from '../ai/prompts';
 import { type RebrandGlossarySeedOutput } from '../ai/schemas';
+import { PluginPolicyService } from '../plugins/plugin-policy.service';
 
 export interface RebrandConfigUpdate {
   directives?: string | null;
@@ -76,6 +77,7 @@ export class RebrandService {
     private readonly contextAssembler: ContextAssembler,
     private readonly modelRouter: ModelRouterService,
     private readonly workflowRunService: WorkflowRunService,
+    private readonly pluginPolicy: PluginPolicyService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -193,9 +195,10 @@ export class RebrandService {
     }
     this.logger.info('seedGlossary: seeding world notes and name mappings', { projectId, jobId });
 
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'rebrand' });
     const [project, pack, chapterNumberRows] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-      this.contextAssembler.forRebrandSeed(projectId),
+      this.contextAssembler.forRebrandSeed(projectId, { policy }),
       this.db.query.chapters.findMany({ where: eq(schema.chapters.projectId, projectId), orderBy: [asc(schema.chapters.number)], columns: { number: true } }),
     ]);
     const sampleNumbers = selectSeedSampleChapters(chapterNumberRows.map(c => c.number));
@@ -218,7 +221,13 @@ export class RebrandService {
     const { result } = await this.workflowRunService.runChain(projectId, 'rebrand-glossary', 'seed', { jobId }, async runId => {
       if (pack.id) await this.workflowRunService.linkContextPack(runId, pack.id);
       const ctx = { projectId, runId, node: 'seedGlossary', promptKey: prompt.key, promptVersion: prompt.version, role: 'rebrand' };
-      const output = (await this.modelRouter.structured(prompt, { contextPack: pack.rendered, openingChapters }, ctx, project as ProjectConfig)) as RebrandGlossarySeedOutput;
+      const output = (await this.modelRouter.structured(
+        prompt,
+        { contextPack: pack.rendered, openingChapters },
+        ctx,
+        project as ProjectConfig,
+        policy,
+      )) as RebrandGlossarySeedOutput;
 
       await this.db.update(schema.rebrands).set({ worldNotes: output.worldNotes, updatedAt: new Date() }).where(eq(schema.rebrands.id, rebrand.id));
       if (output.mappings.length > 0) {

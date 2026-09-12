@@ -142,7 +142,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
 
     for (const window of state.windows) {
       try {
-        const pack = await contextAssembler.forValidationWindow(projectId, window.from, window.to);
+        const pack = await contextAssembler.forValidationWindow(projectId, window.from, window.to, { policy });
 
         const toolCtx: ToolContext = {
           chapter: null,

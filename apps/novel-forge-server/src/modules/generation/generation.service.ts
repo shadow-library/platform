@@ -13,6 +13,7 @@ import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { type ContextSection } from '../ai/context/sections';
 import { truncateAtParagraph } from '../ai/context/token-budget';
 import { applyContinuityDelta, continuityHasHeldEntries, filterToHeldEntries } from '../ai/graphs/apply-continuity';
+import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
 import { type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService } from '../ai/model-router.service';
 import { buildOutlinePrompt, PROMPT_REGISTRY } from '../ai/prompts';
@@ -351,8 +352,9 @@ export class GenerationService {
     // written inside the arc — anchoring on chapterStart would hide every chapter the arc already spent.
     const asOfChapter = latestFinalized ? latestFinalized.number + 1 : arc.chapterStart;
 
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'outline', chapter: asOfChapter });
     const [contextPack, siblings, project] = await Promise.all([
-      this.contextAssembler.forOutline(projectId, asOfChapter),
+      this.contextAssembler.forOutline(projectId, asOfChapter, { policy }),
       this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.volumeKey, arc.volumeKey)), orderBy: asc(schema.arcs.ordinal) }),
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
@@ -378,6 +380,7 @@ export class GenerationService {
       { catalog, volumePlan, startChapter: arc.chapterStart, endChapter: arc.chapterEnd, extraContext: body.context ?? '' },
       ctx,
       project as never,
+      policy,
     );
 
     const chapters = (
@@ -813,7 +816,8 @@ export class GenerationService {
   }
 
   async getDraftPrompt(projectId: bigint, chapter: number): Promise<{ markdown: string }> {
-    const pack = await this.contextAssembler.forChapter(projectId, chapter);
+    const resolver = await this.pluginPolicy.scoped(projectId);
+    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy: resolver.forPack({ role: 'generation', chapter }, CHAPTER_PACK_CONSUMERS) });
     return { markdown: pack.rendered };
   }
 
@@ -1157,8 +1161,9 @@ export class GenerationService {
 
   async proposeContinuity(projectId: bigint, chapter: number): Promise<Generation.ContinuityProposal> {
     const draft = await this.getDraft(projectId, chapter);
-    const pack = await this.contextAssembler.forChapter(projectId, chapter);
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'continuity', chapter }, project);
+    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
 
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.continuity.key, promptVersion: PROMPT_REGISTRY.continuity.version, role: PROMPT_REGISTRY.continuity.key };
     const proposal = await this.modelRouter.structured(
@@ -1166,6 +1171,7 @@ export class GenerationService {
       { contextPack: pack.rendered, chapterNumber: chapter, chapterProse: draft.body },
       ctx,
       project as never,
+      policy,
     );
 
     const [row] = await this.db
@@ -1188,8 +1194,9 @@ export class GenerationService {
    */
   async extractChapterToBible(projectId: bigint, chapter: number): Promise<Refinement.Proposal> {
     const draft = await this.getDraft(projectId, chapter);
-    const pack = await this.contextAssembler.forChapter(projectId, chapter);
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'extraction', chapter }, project);
+    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
 
     const promptModule = PROMPT_REGISTRY['chapter-extract'];
     const ctx = { projectId, promptKey: promptModule.key, promptVersion: promptModule.version, role: promptModule.role ?? promptModule.key };
@@ -1198,6 +1205,7 @@ export class GenerationService {
       { contextPack: pack.rendered, chapterNumber: chapter, chapterProse: draft.body },
       ctx,
       project as never,
+      policy,
     )) as ChapterExtractOutput;
 
     const changeSet = (output.changeSet ?? []) as unknown as ChangeOp[];
@@ -1211,7 +1219,7 @@ export class GenerationService {
       summary: output.summary?.trim() || `Canon from chapter ${chapter}`,
       changeSet,
       allowedOps: ['entity.upsert', 'entity.remove', 'bible_document.upsert', 'bible_document.remove'],
-      model: this.modelRouter.resolveModel(promptModule.role ?? 'extraction', project as never).model,
+      model: this.modelRouter.resolveModel(promptModule.role ?? 'extraction', project as never, policy).model,
     });
   }
 
@@ -1282,8 +1290,9 @@ export class GenerationService {
 
   async reviewChapter(projectId: bigint, chapter: number): Promise<{ disposition: string; note?: string; findings?: { severity: string; text: string }[] }> {
     const draft = await this.getDraft(projectId, chapter);
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'review', chapter });
     const [pack, brief] = await Promise.all([
-      this.contextAssembler.forChapter(projectId, chapter),
+      this.contextAssembler.forChapter(projectId, chapter, { policy }),
       this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
     ]);
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
@@ -1294,6 +1303,7 @@ export class GenerationService {
       { contextPack: pack.rendered, chapterBrief: brief?.body ?? '', draftBody: draft.body },
       ctx,
       project as never,
+      policy,
     )) as {
       disposition: string;
       note?: string;

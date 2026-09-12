@@ -24,6 +24,7 @@ import { ChatService, SCOPE_CHAT_ROLE } from '../refinement/chat.service';
 import { type ScopedTurnResult } from '../refinement/chat-turn.registry';
 import { declinedOpNote, ProposalApplyService } from '../refinement/proposal-apply.service';
 import { ProposalService } from '../refinement/proposal.service';
+import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { ProjectService } from '../project/project/project.service';
 import { matchPlaybooks } from './constraint-playbooks';
 import { type CreateSeedBody, type ListSeedsQuery, type ListSeedsResponse, type SeedResponse, type SeedStressResponse, type SeedSummaryResponse } from './ideation.dto';
@@ -70,6 +71,7 @@ export class IdeationService {
     private readonly proposalApplyService: ProposalApplyService,
     private readonly compaction: ChatCompactionService,
     private readonly chatService: ChatService,
+    private readonly pluginPolicy: PluginPolicyService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -318,7 +320,8 @@ export class IdeationService {
     const commitIds = await this.circlingIds(session.id, round);
     if (commitIds.length > 0) this.logger.info('studio turn: committing on the author’s behalf', { projectId, sessionId: session.id, commitIds });
 
-    const [pack, history] = await Promise.all([this.contextAssembler.forIdeationTurn(seed, round, { commitIds }), this.compaction.buildHistory(session)]);
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'chat' });
+    const [pack, history] = await Promise.all([this.contextAssembler.forIdeationTurn(seed, round, { commitIds, policy }), this.compaction.buildHistory(session)]);
     const prompt = buildIdeationTurnPrompt(round);
     const model = this.resolveSessionModel(session, ctx.project as ProjectConfig | undefined);
 
@@ -330,6 +333,7 @@ export class IdeationService {
         { stableContext: pack.renderedStable, history, volatileContext: pack.renderedVolatile || 'nothing', userMessage: content },
         { projectId, runId, node: 'ideation-turn', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat' },
         this.withSessionModel(ctx.project, model),
+        policy,
       )) as IdeationTurnOutput;
 
       // One transaction for everything the model's answer produced: a reply the author can see with no
@@ -368,7 +372,8 @@ export class IdeationService {
   private async conceptsTurn(ctx: StudioTurnContext, round: RouterResult, content: string): Promise<ScopedTurnResult> {
     const { session, seed } = ctx;
     const projectId = seed.projectId;
-    const pack = await this.contextAssembler.forIdeationConcepts(seed);
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'chat' });
+    const pack = await this.contextAssembler.forIdeationConcepts(seed, { policy });
     const prompt = PROMPT_REGISTRY['ideation-concepts'];
     const model = this.resolveSessionModel(session, ctx.project as ProjectConfig | undefined);
     const filters = matchPlaybooks(seed.constraints ?? []).matched.filter(match => match.playbook.conceptFilter);
@@ -383,6 +388,7 @@ export class IdeationService {
           { stableContext: pack.renderedStable, volatileContext },
           telemetry,
           this.withSessionModel(ctx.project, model),
+          policy,
         )) as IdeationConceptsOutput;
 
       const volatile = [pack.renderedVolatile || 'nothing', renderAuthorDirection(content)].filter(Boolean).join('\n\n');
@@ -440,7 +446,8 @@ export class IdeationService {
     const projectId = seed.projectId;
     const dimensions = readinessDimensions(toRouterSeedState(seed));
     const prompt = buildIdeationStressPrompt(dimensions);
-    const pack = await this.contextAssembler.forIdeationConcepts(seed);
+    const policy = await this.pluginPolicy.resolve(projectId, { role: prompt.role ?? 'judge' });
+    const pack = await this.contextAssembler.forIdeationConcepts(seed, { policy });
     const target = session ? `session:${session.id}` : `seed:${seed.id}`;
     const chat = session && transcript ? { session, content: transcript.content } : null;
     const precheck = [renderReadinessPrecheck(dimensions), chat ? renderAuthorDirection(chat.content) : ''].filter(Boolean).join('\n\n');
@@ -453,6 +460,7 @@ export class IdeationService {
         { stableContext: pack.renderedStable, precheck },
         { projectId, runId, node: 'ideation-stress', promptKey: prompt.key, promptVersion: prompt.version, role: prompt.role ?? 'judge' },
         input.project as ProjectConfig | undefined,
+        policy,
       )) as IdeationStressOutput;
 
       const readiness = output.readiness as unknown as Ideation.ReadinessEntry[];

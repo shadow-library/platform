@@ -20,6 +20,7 @@ import { buildChatRefinePrompt, renderScopeInstructions, scopeAllowedOps } from 
 import { RetrievalService } from '../ai/retrieval';
 import { type ChatRefineOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
+import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
 import { type ApplyResult, declinedOpNote, ProposalApplyService } from './proposal-apply.service';
@@ -104,6 +105,7 @@ export class ChatService {
     private readonly toolRegistry: ToolRegistryService,
     private readonly retrievalService: RetrievalService,
     private readonly compaction: ChatCompactionService,
+    private readonly pluginPolicy: PluginPolicyService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -330,8 +332,9 @@ export class ChatService {
     const isHub = session.scopeType === 'project';
     await this.compaction.compactIfNeeded(projectId, session, CHAT_HISTORY_BUDGET);
 
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'chat' });
     const [pack, history, project] = await Promise.all([
-      this.contextAssembler.forChatTurn(projectId, session),
+      this.contextAssembler.forChatTurn(projectId, session, { policy }),
       this.compaction.buildHistory(session),
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
@@ -354,7 +357,7 @@ export class ChatService {
       const turnHistory = [...history];
       const invoke = (): Promise<ChatRefineOutput> => {
         const input = { scopeInstructions, stableContext: pack.renderedStable, history: turnHistory, volatileContext: pack.renderedVolatile || 'nothing', userMessage: content };
-        return this.modelRouter.structured(prompt, input, ctx, effectiveProject as ProjectConfig | undefined) as Promise<ChatRefineOutput>;
+        return this.modelRouter.structured(prompt, input, ctx, effectiveProject as ProjectConfig | undefined, policy) as Promise<ChatRefineOutput>;
       };
 
       // Declared-lookup rounds (chat-hub design §6 step 4): execute the requested read-only tools,

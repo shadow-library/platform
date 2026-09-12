@@ -20,6 +20,7 @@ import { ProposalApplyService } from '@modules/refinement/proposal-apply.service
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { seedContentHash } from '@server/common';
 import { type Ideation, type PrimaryDatabase, type Refinement, schema } from '@server/database';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -161,8 +162,8 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
     proposals = new ProposalService(databaseService);
     applier = new ProposalApplyService(databaseService, new ActionExecutorRegistry());
     const compaction = new ChatCompactionService(databaseService, modelRouter, workflowRuns);
-    const chat = new ChatService(databaseService, assembler, modelRouter, workflowRuns, proposals, applier, new ToolRegistryService(), noop, compaction);
-    ideation = new IdeationService(databaseService, noop, noop, assembler, modelRouter, workflowRuns, proposals, applier, compaction, chat);
+    const chat = new ChatService(databaseService, assembler, modelRouter, workflowRuns, proposals, applier, new ToolRegistryService(), noop, compaction, noPluginPolicy());
+    ideation = new IdeationService(databaseService, noop, noop, assembler, modelRouter, workflowRuns, proposals, applier, compaction, chat, noPluginPolicy());
   });
 
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());

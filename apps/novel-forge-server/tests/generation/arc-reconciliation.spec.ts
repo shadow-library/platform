@@ -8,6 +8,8 @@ import { GenerationService } from '@modules/generation/generation.service';
 import { ActionExecutorRegistry, ProposalApplyService, ProposalService } from '@modules/refinement';
 import { type Generation, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { emptyPolicy } from '@modules/plugins';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -82,7 +84,7 @@ describe.if(pgAvailable)('arc reconciliation on finalization', () => {
       noop,
       noop,
       noop,
-      noop,
+      noPluginPolicy(),
     );
     return { service, structured, forOutline, finalization };
   }
@@ -258,7 +260,7 @@ describe.if(pgAvailable)('arc reconciliation on finalization', () => {
 
     await service.finalize(projectId, { chapter: 5 });
 
-    expect(forOutline).toHaveBeenCalledWith(projectId, 5);
+    expect(forOutline).toHaveBeenCalledWith(projectId, 5, { policy: emptyPolicy() });
     expect(structured.mock.calls[0]?.[1]).toMatchObject({ catalog: expect.stringContaining('the mentor betrays the crew') });
   });
 
@@ -268,7 +270,7 @@ describe.if(pgAvailable)('arc reconciliation on finalization', () => {
 
     await service.outlineArc(projectId, 'vol_1_arc_1', {});
 
-    expect(forOutline).toHaveBeenCalledWith(projectId, 1);
+    expect(forOutline).toHaveBeenCalledWith(projectId, 1, { policy: emptyPolicy() });
   });
 
   it('should skip persisting a brief whose chapter already has a non-final draft', async () => {

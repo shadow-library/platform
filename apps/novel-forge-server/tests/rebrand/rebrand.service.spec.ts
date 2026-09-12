@@ -6,6 +6,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { RebrandService, selectSeedSampleChapters } from '@modules/rebrand';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -70,7 +71,7 @@ describe.if(pgAvailable)('RebrandService', () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
     const databaseService = { getPostgresClient: () => db } as never;
-    service = new RebrandService(databaseService, contextAssembler, modelRouter, workflowRunService);
+    service = new RebrandService(databaseService, contextAssembler, modelRouter, workflowRunService, noPluginPolicy());
 
     const [project] = await db
       .insert(schema.projects)

@@ -12,6 +12,7 @@ import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { PROMPT_REGISTRY } from '../ai/prompts';
 import { type ReforgePlanOutput, type ReforgePlanSpanSchema } from '../ai/schemas/reforge-transform.schema';
+import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { buildBridgeDirectives } from './cut-ledger';
 import { DEFAULT_MAX_SPAN_SOURCE_CHAPTERS, DEFAULT_MIN_SPAN_CHAPTERS, deriveOutputNumbering, type PlanSpanLike, spanKeyFor, validateTransformPlan } from './plan-validation';
 import { ReforgeAnalysisService } from './reforge-analysis.service';
@@ -46,6 +47,7 @@ export class ReforgePlanService {
     private readonly contextAssembler: ContextAssembler,
     private readonly modelRouter: ModelRouterService,
     private readonly workflowRunService: WorkflowRunService,
+    private readonly pluginPolicy: PluginPolicyService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -87,12 +89,13 @@ export class ReforgePlanService {
     const minSpanChapters = reforge.settings?.minSpanChapters ?? DEFAULT_MIN_SPAN_CHAPTERS;
     const targetCompression = reforge.settings?.targetCompression;
     const prompt = PROMPT_REGISTRY['reforge-plan'];
-    const pack = await this.contextAssembler.forReforgeAnalysis(projectId, null, {
-      worldNotes: rebrand?.worldNotes ?? NO_RENAME_BIBLE,
-      glossarySlice: null,
-      signalDigest: null,
-      carryState: reforge.instructions,
-    });
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'plan' });
+    const pack = await this.contextAssembler.forReforgeAnalysis(
+      projectId,
+      null,
+      { worldNotes: rebrand?.worldNotes ?? NO_RENAME_BIBLE, glossarySlice: null, signalDigest: null, carryState: reforge.instructions },
+      { policy },
+    );
 
     const planBrief = [
       `The source has ${sourceChapterCount} chapters — your spans must cover chapters 1 to ${sourceChapterCount} exactly once.`,
@@ -112,7 +115,7 @@ export class ReforgePlanService {
         cardIndex: cards.map(card => `${card.chapter} [${card.movement}] ${card.card.summary}`).join('\n'),
         planBrief,
       };
-      return (await this.modelRouter.structured(prompt, vars, ctx, project as ProjectConfig)) as ReforgePlanOutput;
+      return (await this.modelRouter.structured(prompt, vars, ctx, project as ProjectConfig, policy)) as ReforgePlanOutput;
     });
 
     const spans = result.spans.map(toSpanInput);

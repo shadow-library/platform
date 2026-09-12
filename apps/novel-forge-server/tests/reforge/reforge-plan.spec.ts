@@ -9,6 +9,7 @@ import { ReforgeCutService } from '@modules/reforge/reforge-cut.service';
 import { ReforgeService } from '@modules/reforge/reforge.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -63,7 +64,16 @@ function buildService(db: PrimaryDatabase, calls: string[] = []): ReforgePlanSer
     linkContextPack: async () => undefined,
   } as never;
 
-  return new ReforgePlanService(databaseService, reforgeService, analysisService, new ReforgeCutService(databaseService), contextAssembler, modelRouter, workflowRunService);
+  return new ReforgePlanService(
+    databaseService,
+    reforgeService,
+    analysisService,
+    new ReforgeCutService(databaseService),
+    contextAssembler,
+    modelRouter,
+    workflowRunService,
+    noPluginPolicy(),
+  );
 }
 
 describe.if(pgAvailable)('ReforgePlanService', () => {

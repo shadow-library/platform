@@ -6,6 +6,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Rebrand, type Reforge } from '@server/database';
 import * as schema from '@server/database/schemas';
 
+import { type ForgeCallPolicy, type PluginPolicyService, type ScopedPolicyResolver } from '../../plugins/plugin-policy.service';
 import { type GlossaryLike, renderGlossarySlice, type ResidueIssue, scanResidue, selectGlossarySlice } from '../../rebrand/residue-scan';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
@@ -19,6 +20,7 @@ export interface ReforgeGraphServices {
   db: PrimaryDatabase;
   contextAssembler: ContextAssembler;
   modelRouter: ModelRouterService;
+  pluginPolicy: PluginPolicyService;
   checkpointer: BaseCheckpointSaver;
 }
 
@@ -105,7 +107,14 @@ export function createChapterReforgeGraph(services: ReforgeGraphServices): Retur
 }
 
 function buildChapterReforgeGraph(services: ReforgeGraphServices) {
-  const { db, contextAssembler, modelRouter, checkpointer } = services;
+  const { db, contextAssembler, modelRouter, pluginPolicy, checkpointer } = services;
+
+  // One `project_plugins` read for the run: both packs this graph builds resolve off the same scope.
+  let resolver: Promise<ScopedPolicyResolver> | undefined;
+  async function policyFor(projectId: bigint, chapter: number): Promise<ForgeCallPolicy> {
+    resolver ??= pluginPolicy.scoped(projectId);
+    return (await resolver).for({ role: 'reforge', chapter });
+  }
 
   async function loadChapter(state: ReforgeState) {
     const projectId = BigInt(state.projectId);
@@ -155,7 +164,8 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
   async function outlineContext(state: ReforgeState) {
     const projectId = BigInt(state.projectId);
     const glossarySlice = renderGlossarySlice(selectGlossarySlice(state.chapterProse, state.glossary));
-    const pack = await contextAssembler.forReforgeOutline(projectId, state.chapter, { worldNotes: state.worldNotes, glossarySlice });
+    const policy = await policyFor(projectId, state.chapter);
+    const pack = await contextAssembler.forReforgeOutline(projectId, state.chapter, { worldNotes: state.worldNotes, glossarySlice }, { policy });
     if (pack.id) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
 
     logger.debug('reforge outlineContext', { runId: state.runId, chapter: state.chapter, glossarySliceLength: glossarySlice.length, packLength: pack.rendered.length });
@@ -173,6 +183,7 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
       { contextPack: state.outlinePack, chapterProse: state.chapterProse },
       ctx,
       projectRow as ProjectConfig | undefined,
+      await policyFor(projectId, state.chapter),
     )) as ReforgeOutlineOutput;
 
     logger.debug('reforge outline', { runId: state.runId, chapter: state.chapter, beats: result.beats.length });
@@ -181,15 +192,21 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
 
   async function writeContext(state: ReforgeState) {
     const projectId = BigInt(state.projectId);
-    const pack = await contextAssembler.forReforge(projectId, state.chapter, {
-      worldNotes: state.worldNotes,
-      directives: state.directives,
-      instructions: state.instructions,
-      targetWords: state.settings.targetWords ?? null,
-      glossarySlice: state.glossarySlice,
-      carryState: state.carryState ? JSON.stringify(state.carryState) : null,
-      prevBody: state.prevBody,
-    });
+    const policy = await policyFor(projectId, state.chapter);
+    const pack = await contextAssembler.forReforge(
+      projectId,
+      state.chapter,
+      {
+        worldNotes: state.worldNotes,
+        directives: state.directives,
+        instructions: state.instructions,
+        targetWords: state.settings.targetWords ?? null,
+        glossarySlice: state.glossarySlice,
+        carryState: state.carryState ? JSON.stringify(state.carryState) : null,
+        prevBody: state.prevBody,
+      },
+      { policy },
+    );
     if (pack.id) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
 
     logger.debug('reforge writeContext', { runId: state.runId, chapter: state.chapter, packLength: pack.rendered.length });
@@ -220,6 +237,7 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
       },
       ctx,
       projectRow as ProjectConfig | undefined,
+      await policyFor(projectId, state.chapter),
     )) as ReforgeWriteOutput;
 
     logger.debug('reforge write', {

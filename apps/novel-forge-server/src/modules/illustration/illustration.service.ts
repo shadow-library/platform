@@ -13,6 +13,7 @@ import { type GeneratedImage, ModelRouterService, type ProjectConfig } from '../
 import { illustrationComposePrompt } from '../ai/prompts/illustration-compose.prompt';
 import { EntityService } from '../bible/entity/entity.service';
 import { ChapterImageService } from '../generation/chapter-image.service';
+import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { ProjectService } from '../project/project/project.service';
 import { applyInstructionEdit, hashInstructions, type InstructionEdit, renderPromptSpec } from './prompt-spec';
 
@@ -70,6 +71,7 @@ export class IllustrationService {
     private readonly entityService: EntityService,
     private readonly chapterImageService: ChapterImageService,
     private readonly projectService: ProjectService,
+    private readonly pluginPolicy: PluginPolicyService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -199,7 +201,11 @@ export class IllustrationService {
     instructions: string[],
     runId: string,
   ): Promise<Illustration.PromptSpec> {
-    const [pack, anchor] = await Promise.all([this.assembler.forIllustration(projectId, subjectType, subjectKey), this.loadAppearance(projectId, subjectType, subjectKey)]);
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'illustration' });
+    const [pack, anchor] = await Promise.all([
+      this.assembler.forIllustration(projectId, subjectType, subjectKey, { policy }),
+      this.loadAppearance(projectId, subjectType, subjectKey),
+    ]);
 
     const composed = await this.modelRouter.structured(
       illustrationComposePrompt,
@@ -211,6 +217,7 @@ export class IllustrationService {
       },
       { projectId, runId, node: 'compose', promptKey: illustrationComposePrompt.key, promptVersion: illustrationComposePrompt.version, role: 'illustration' },
       project,
+      policy,
     );
 
     return {

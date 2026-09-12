@@ -11,6 +11,7 @@ import { parseKnowledgeContract } from '@modules/bible/fact/knowledge-view';
 import { GenerationService } from '@modules/generation/generation.service';
 import { type Generation, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -73,7 +74,21 @@ describe.if(pgAvailable)('outliner-authored knowledge contracts', () => {
     const databaseService = { getPostgresClient: () => db } as never;
     const contextAssembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
     const noop = {} as never;
-    return new GenerationService(databaseService, noop, { structured: mock(async () => briefs) } as never, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    return new GenerationService(
+      databaseService,
+      noop,
+      { structured: mock(async () => briefs) } as never,
+      contextAssembler,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noPluginPolicy(),
+    );
   }
 
   interface ProjectFixture {

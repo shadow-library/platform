@@ -13,6 +13,7 @@ import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { PROMPT_REGISTRY } from '../ai/prompts';
 import { type ReforgeAnalyzeWindowOutput, type ReforgeArcSchema, type ReforgeFindingSchema, type ReforgeSynthesizeOutput } from '../ai/schemas/reforge-transform.schema';
+import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { renderAnalysisReport } from './analysis-report';
 import { type AnalysisSignals, computeAnalysisSignals, renderSignalDigest, type SignalChapter } from './analysis-signals';
 import { ReforgeService } from './reforge.service';
@@ -72,6 +73,7 @@ export class ReforgeAnalysisService {
     private readonly contextAssembler: ContextAssembler,
     private readonly modelRouter: ModelRouterService,
     private readonly workflowRunService: WorkflowRunService,
+    private readonly pluginPolicy: PluginPolicyService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -249,18 +251,19 @@ export class ReforgeAnalysisService {
     input: { window: number; label: string; worldNotes: string; signalDigest: string; carryState: string | null; chapters: string; jobId?: string; runIds: string[] },
   ): Promise<ReforgeAnalyzeWindowOutput> {
     const prompt = PROMPT_REGISTRY['reforge-analyze-window'];
-    const pack = await this.contextAssembler.forReforgeAnalysis(projectId, input.window, {
-      worldNotes: input.worldNotes,
-      glossarySlice: null,
-      signalDigest: input.signalDigest,
-      carryState: input.carryState,
-    });
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'extraction', chapter: input.window });
+    const pack = await this.contextAssembler.forReforgeAnalysis(
+      projectId,
+      input.window,
+      { worldNotes: input.worldNotes, glossarySlice: null, signalDigest: input.signalDigest, carryState: input.carryState },
+      { policy },
+    );
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'reforge-analyze-window', `window-${input.window}`, { jobId: input.jobId }, async runId => {
       if (pack.id) await this.workflowRunService.linkContextPack(runId, pack.id);
       const ctx = { projectId, runId, node: 'analyzeWindow', promptKey: prompt.key, promptVersion: prompt.version, role: 'extraction' };
       const vars = { stableContext: pack.renderedStable, volatileContext: pack.renderedVolatile, windowLabel: input.label, chapters: input.chapters };
-      const output = (await this.modelRouter.structured(prompt, vars, ctx, project)) as ReforgeAnalyzeWindowOutput;
+      const output = (await this.modelRouter.structured(prompt, vars, ctx, project, policy)) as ReforgeAnalyzeWindowOutput;
 
       await this.db
         .insert(schema.reforgeChapterCards)
@@ -309,18 +312,19 @@ export class ReforgeAnalysisService {
     target: string,
   ): Promise<ReforgeSynthesizeOutput> {
     const prompt = PROMPT_REGISTRY['reforge-synthesize'];
-    const pack = await this.contextAssembler.forReforgeAnalysis(projectId, null, {
-      worldNotes: input.worldNotes,
-      glossarySlice: null,
-      signalDigest: renderSignalDigest(input.signals),
-      carryState: null,
-    });
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'extraction' });
+    const pack = await this.contextAssembler.forReforgeAnalysis(
+      projectId,
+      null,
+      { worldNotes: input.worldNotes, glossarySlice: null, signalDigest: renderSignalDigest(input.signals), carryState: null },
+      { policy },
+    );
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'reforge-synthesize', target, { jobId: input.jobId }, async runId => {
       if (pack.id) await this.workflowRunService.linkContextPack(runId, pack.id);
       const ctx = { projectId, runId, node: 'synthesize', promptKey: prompt.key, promptVersion: prompt.version, role: 'extraction' };
       const vars = { stableContext: pack.renderedStable, volatileContext: pack.renderedVolatile, scope, cardIndex };
-      return (await this.modelRouter.structured(prompt, vars, ctx, project)) as ReforgeSynthesizeOutput;
+      return (await this.modelRouter.structured(prompt, vars, ctx, project, policy)) as ReforgeSynthesizeOutput;
     });
 
     input.runIds.push(runId);

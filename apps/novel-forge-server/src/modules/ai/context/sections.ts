@@ -108,12 +108,19 @@ const SECTION_LABELS: Record<string, string> = {
   cast_appearance: '## CAST APPEARANCE',
 };
 
+export const CORE_SECTION_KEYS: ReadonlySet<string> = new Set(Object.keys(SECTION_LABELS));
+
 function sectionLabel(key: string): string {
   return SECTION_LABELS[key] ?? '## ' + key.toUpperCase().replace(/_/g, ' ');
 }
 
 export function renderSection(key: string, content: string): string {
   return `${sectionLabel(key)}\n\n${content}`;
+}
+
+/** A plugin section is headed by its manifest-supplied title, never by a `SECTION_LABELS` lookup its namespaced key could never hit. */
+export function renderPluginSection(title: string, content: string): string {
+  return `## ${title.toUpperCase()}\n\n${content}`;
 }
 
 export function joinSections(sections: ContextSection[]): string {

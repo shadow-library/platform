@@ -198,7 +198,9 @@ The plugin returns a class or `undefined` (no opinion). Core resolves it:
 - `permissive` → `UNRESTRICTED_GROUP_DEFAULTS`, clamped by `isUnrestrictedAllowed`.
 
 **`call.route` reaches every role, not only `generation`.** It lives in `resolveModel`, so `outline`, `plan`,
-`arc`, `bible`, `judge` and the rest all pass through it. That matters as the last fallback when a planning
+`arc`, `bible`, `judge` and the rest all pass through it — and every call that reads a plugin-gated pack is
+handed the **same** policy object that gated it, so the class the pack was assembled at and the class the
+model is routed at cannot drift apart. That matters as the last fallback when a planning
 model balks at plotting a novel's darker material: the plugin routes the _planning_ call to the permissive
 class too, and the briefs are written there. There is no call in the pipeline a plugin cannot move, so the
 design never depends on a standard-class model agreeing to a task.
@@ -277,6 +279,18 @@ interface PluginContextSection {
 cannot enter a pack destined for a standard model, because the class is known before assembly begins — there
 is no ordering in which the check can be skipped.
 
+**The class the guard reads is the lowest among the roles that will consume the pack.** Rule 6 assembles the
+pack once per run while §5.3 routes per role, so one pack can outlive the call that built it: chapter
+generation assembles under `generation` and the `judge` and `fix` nodes reload the same `context_packs` row.
+`ScopedPolicyResolver.forPack(call, consumers)` therefore resolves every consuming role off the one scope and
+guards against the minimum, so a plugin that raises `generation` alone cannot bake a permissive section into a
+pack a standard-class judge reads. The cost is accepted: that writer loses its permissive section for as long
+as it shares a pack with a standard consumer. §16's real path is `generateUnrestricted`, whose pack has one
+consumer, so it is unaffected. A purpose consumed by a single call passes that call's own policy, and passes that same object on to
+`structured()`/`chatFor()`. Where a pack has several consumers the two differ on purpose: the **pack** is
+clamped to the minimum, while each **call** routes at its own role's class — the clamp decides what may be
+written into a shared artifact, not what a given model is allowed to be.
+
 Plugin sections are rendered into the pack, counted against the token budget like every other section, and
 persisted with the `context_packs` row for reproducibility. They are **never** indexed, never retrievable,
 and never reach a publish payload — they are not prose.
@@ -347,16 +361,38 @@ promptVersion, input }`, and `llm_cache.requestHash` is globally unique — not 
 3. **Query load.** One `project_plugins` read per run, not one per model call — graphs make dozens.
 4. **Ordering.** The writer class is fixed before assembly, which is what makes §5.4's guard structural.
 
+`ScopedPolicyResolver` exposes both `for(call)` — the policy of one model call — and `forPack(call, consumers)`,
+which returns the same shape with `writerClass` (and therefore `raised` and `digest`) resolved at the lowest
+class among `consumers`, and the additive hooks run at that class. Both answer off the one `project_plugins`
+read, so §5.4's rule costs no extra query.
+
 ### 6.1 Coverage limit — state it, do not paper over it
 
-`buildMessages` is on the `structured()` path. Three call sites use a raw `chatFor()` client and bypass it:
-`chapter-generation.graph.ts:330` (judge), `novel-validation.graph.ts:156`, and
-`generation.service.ts:693` (`judgeDraft`).
+`call.route` and `context.contribute` reach **every** wired purpose: each pack-assembling call site resolves a
+policy, gates its pack with it, and hands the same object to the model call, so both points are honoured at
+generation, outline, revision, validation, chat, ideation, arc planning, premise, audit, rebrand, reforge,
+transform, analysis, illustration and the extraction/continuity/review passes over a chapter pack.
 
-`call.route` **is** honoured on those paths, because it lives in `resolveModel` and all three thread the
-resolved policy into `chatFor`. `prompt.contribute` is not.
-The loader logs a warning when a manifest declares `prompt.contribute` for a role that never routes through
-`structured()`.
+`prompt.contribute` reaches only what `structured()`'s `buildMessages` covers, so it stops at the three raw
+`chatFor()` clients that format their own messages — `chapter-generation.graph.ts` (judge),
+`novel-validation.graph.ts`, and `generation.service.ts` (`judgeDraft`).
+
+A second set of calls is left **unrouted** as well, and deliberately: every model call that reads no
+plugin-gated pack. Those are the graders reading prose the pipeline already produced (`chapter-rebrand.graph.ts`
+audit, `chapter-reforge.graph.ts` judge, `span-transform.graph.ts` judge) and the chains that build their own
+inputs (`plan`, `skeleton`, `epitome`, `chapter-summarize`, `recombine`, `bible-builder`, `source-extraction`,
+`chat-compact`, the whole-book `outline`, and `chapter-finalization`'s continuity pass). Nothing a plugin
+contributed reaches any of them, so there is no class to keep in step. `illustration.service.ts`'s image call
+is the one call reading downstream of a gated pack that stays unrouted: the compose call ahead of it is gated
+and routed, and what it hands on is a persisted prompt spec — a core artifact, and therefore §5.3.1's
+sanitization rule, not the router's problem. Routing an image model is a separate decision from routing a
+text one and is not taken here.
+
+**There is no loader warning for the gap, because none can be written.** A manifest declares decision points,
+never roles, and `contributeSystemMessages` chooses its roles at call time from `ctx.role` — the loader has
+nothing to inspect. A runtime check cannot stand in either: `judge` reaches `structured()` at one call site and
+`chatFor()` at another, so the role does not discriminate. The limit is stated here and nowhere else; a
+warning that cannot fire would be worse than none.
 
 ---
 
@@ -853,8 +889,17 @@ from a real directory.
   every node's call; apply the isolated-draft invariant where the draft is persisted
 - `src/modules/ai/graphs/novel-validation.graph.ts` — thread the policy into its raw `chatFor()` client, so
   §6.1's coverage claim holds without an asterisk
-- `src/modules/ai/context/context-assembler.service.ts` — accept the policy, merge plugin sections, enforce
-  `minWriterClass`
+- `src/modules/ai/context/context-assembler.service.ts` — every purpose accepts the policy; `finalize` merges
+  plugin sections and enforces `minWriterClass`
+- `src/modules/ai/context/plugin-sections.ts` — the `minWriterClass` guard itself; `context/sections.ts` gains
+  `CORE_SECTION_KEYS` and `renderPluginSection`
+- `src/modules/ai/graphs/chapter-rebrand.graph.ts`, `chapter-reforge.graph.ts`, `span-transform.graph.ts` —
+  resolve a scoped policy per run and thread it into both their packs and the calls that read them
+- `src/modules/generation/chapter-insert.service.ts`, `src/modules/refinement/{chat,refine}.service.ts`,
+  `src/modules/ideation/ideation.service.ts`, `src/modules/rebrand/rebrand.service.ts`,
+  `src/modules/reforge/{reforge-plan,reforge-analysis}.service.ts`,
+  `src/modules/illustration/illustration.service.ts` — resolve a policy per request and thread the **same**
+  object into both the pack and the model call; their modules import `PluginsModule`
 - `src/modules/ai/telemetry.handler.ts` — carry plugin stamps onto the `model_calls` row
 - `src/modules/generation/generation.service.ts` — resolve the policy once per generation; apply the
   isolated-draft invariant when the class was raised
@@ -889,7 +934,7 @@ against it.
 - [x] **PG4** — `PluginPolicyService` + `ForgeCallPolicy` + `call.route` + writer-class resolution + the
       isolated-draft invariant + **`hashRequest` digest** + `model_calls` stamps. Verify: fixture test 5, 7,
       12; one `project_plugins` read per run.
-- [ ] **PG5** — `context.contribute` + `minWriterClass` guard + `prompt.contribute`. Verify: fixture tests 1,
+- [x] **PG5** — `context.contribute` + `minWriterClass` guard + `prompt.contribute`. Verify: fixture tests 1,
       3, 4, 6; a hook that throws drops its contribution without failing generation.
 - [ ] **PG6** — `canon.augment` + `brief.policy` + `BriefUpdateOp.writeMode` + `refinement_kind` `'plugin'` +
       the §12 op allowlist + `POST .../augment`. Verify: fixture tests 8, 9; the proposal applies and reverts

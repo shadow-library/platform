@@ -13,6 +13,7 @@ import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { ModelRouterService } from '../ai/model-router.service';
 import { buildOutlinePrompt } from '../ai/prompts';
 import { type OutlineOutput } from '../ai/schemas';
+import { PluginPolicyService } from '../plugins/plugin-policy.service';
 
 export interface InsertOptions {
   briefOrigin: 'hand' | 'planner';
@@ -119,6 +120,7 @@ export class ChapterInsertService {
     private readonly databaseService: DatabaseService,
     private readonly modelRouter: ModelRouterService,
     private readonly contextAssembler: ContextAssembler,
+    private readonly pluginPolicy: PluginPolicyService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -314,8 +316,9 @@ export class ChapterInsertService {
    */
   private async planBrief(projectId: bigint, afterChapter: number, intent: string): Promise<PlannedSlotBrief> {
     const newChapter = afterChapter + 1;
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'outline', chapter: newChapter });
     const [pack, volume, arc, neighbours] = await Promise.all([
-      this.contextAssembler.forOutline(projectId, newChapter),
+      this.contextAssembler.forOutline(projectId, newChapter, { policy }),
       this.coveringVolume(projectId, afterChapter, this.db),
       this.coveringArc(projectId, afterChapter, this.db),
       this.db.query.briefs.findMany({
@@ -337,7 +340,7 @@ export class ChapterInsertService {
     const prompt = buildOutlinePrompt(newChapter, newChapter);
     const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
     const vars = { catalog, volumePlan, startChapter: newChapter, endChapter: newChapter, extraContext: `Insert a single new chapter here. Author's intent: ${intent}` };
-    const outlined = (await this.modelRouter.structured(prompt, vars, ctx, project as never)) as OutlineOutput;
+    const outlined = (await this.modelRouter.structured(prompt, vars, ctx, project as never, policy)) as OutlineOutput;
 
     const chapter = outlined[0];
     if (!chapter) throw AppErrorCode.BRF_001.create();

@@ -76,6 +76,9 @@ export type JudgeFinding = JudgeOutput['findings'][number];
 
 const logger = Logger.getLogger(APP_NAME, 'chapter-generation.graph');
 
+// `judge` and `fix` reload the assembled pack from `context_packs` rather than building their own, so §5.4's guard runs against the lowest of the three classes.
+export const CHAPTER_PACK_CONSUMERS = ['generation', 'judge', 'fix'] as const;
+
 // Normalize finding text for dedup comparison.
 function normalizeFinding(text: string): string {
   return text.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -182,9 +185,16 @@ export function createChapterGenerationGraph(services: GraphServices) {
     return (await resolver).for(call);
   }
 
+  async function packPolicyFor(projectId: bigint, call: PolicyCall): Promise<ForgeCallPolicy> {
+    resolver ??= pluginPolicy.scoped(projectId);
+    return (await resolver).forPack(call, CHAPTER_PACK_CONSUMERS);
+  }
+
   async function assembleContext(state: ChapterGenState) {
-    const policy = await policyFor(BigInt(state.projectId), { role: 'generation', chapter: state.chapter });
-    const pack = await contextAssembler.forChapter(BigInt(state.projectId), state.chapter, { policy });
+    const projectId = BigInt(state.projectId);
+    const call: PolicyCall = { role: 'generation', chapter: state.chapter };
+    const policy = await policyFor(projectId, call);
+    const pack = await contextAssembler.forChapter(projectId, state.chapter, { policy: await packPolicyFor(projectId, call) });
     // Link the pack to the run row so the run detail can show the prompt anatomy behind the tokens.
     if (pack.id !== null) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
     return { contextPackId: pack.id ? String(pack.id) : null, writerClassRaised: policy.raised, nodeTrace: ['assembleContext'] };

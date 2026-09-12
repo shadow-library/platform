@@ -6,9 +6,9 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { createChapterGenerationGraph } from '@modules/ai/graphs/chapter-generation.graph';
-import { emptyPolicy } from '@modules/plugins';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { FULL_LENGTH_DRAFT_BODY } from '@tests/fixtures/draft-body';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
@@ -53,7 +53,7 @@ function buildServices(db: PrimaryDatabase, body: string) {
     telemetry: {},
     toolRegistry,
     indexingService: {},
-    pluginPolicy: { scoped: async () => ({ for: () => emptyPolicy() }) },
+    pluginPolicy: noPluginPolicy(),
     checkpointer: new MemorySaver(),
   } as never;
 }

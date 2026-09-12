@@ -9,10 +9,12 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { ContextAssembler } from '../ai/context/context-assembler.service';
+import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { buildArcPlanPrompt, PROMPT_REGISTRY } from '../ai/prompts';
 import { type ArcPlanOutput, type BibleAuditOutput, type PremiseEnhanceOutput } from '../ai/schemas';
+import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChangeOp } from './change-set';
 import { ProposalService } from './proposal.service';
 import { type ContextPreviewResponse } from './refine.dto';
@@ -55,6 +57,7 @@ export class RefineService {
     private readonly modelRouter: ModelRouterService,
     private readonly workflowRunService: WorkflowRunService,
     private readonly proposalService: ProposalService,
+    private readonly pluginPolicy: PluginPolicyService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -77,7 +80,8 @@ export class RefineService {
     });
 
     const prompt = PROMPT_REGISTRY['premise-enhance'];
-    const pack = await this.contextAssembler.forPremise(projectId);
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'premise' }, project);
+    const pack = await this.contextAssembler.forPremise(projectId, { policy });
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'premise-enhance', 'premise', { overview: effectiveOverview }, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
@@ -87,6 +91,7 @@ export class RefineService {
         { stableContext: pack.rendered, overview: effectiveOverview },
         ctx,
         project as ProjectConfig,
+        policy,
       )) as PremiseEnhanceOutput;
 
       const proposal = await this.proposalService.create(projectId, {
@@ -117,8 +122,9 @@ export class RefineService {
     assertActiveProject(project);
 
     const prompt = PROMPT_REGISTRY['bible-audit'];
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'audit' }, project);
     const [pack, docs] = await Promise.all([
-      this.contextAssembler.forAudit(projectId),
+      this.contextAssembler.forAudit(projectId, { policy }),
       this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
     ]);
     const docInventory = docs.length > 0 ? docs.map(d => `${d.section}/${d.slug} (revision ${d.revision})`).join('\n') : 'none';
@@ -132,6 +138,7 @@ export class RefineService {
         { stableContext: pack.rendered, docInventory, manifest: renderManifest() },
         ctx,
         project as ProjectConfig,
+        policy,
       )) as BibleAuditOutput;
 
       this.logger.info('auditBible: findings', { projectId, runId, findings: output.findings.length, changeSetOps: output.changeSet.length });
@@ -174,7 +181,8 @@ export class RefineService {
     const endChapter = volume.endChapter as number;
     this.logger.info('planArcs: starting', { projectId, volumeKey, startChapter, endChapter, arcCount: opts?.arcCount });
     const prompt = buildArcPlanPrompt(startChapter, endChapter);
-    const pack = await this.contextAssembler.forArcPlanning(projectId, volumeKey);
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'arc' }, project);
+    const pack = await this.contextAssembler.forArcPlanning(projectId, volumeKey, { policy });
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'arc-plan', `volume:${volumeKey}`, { arcCount: opts?.arcCount }, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
@@ -187,7 +195,7 @@ export class RefineService {
         arcCount: opts?.arcCount ?? 'decide from the material',
         guidance: opts?.guidance ?? '',
       };
-      const output = (await this.modelRouter.structured(prompt, input, ctx, project as ProjectConfig)) as ArcPlanOutput;
+      const output = (await this.modelRouter.structured(prompt, input, ctx, project as ProjectConfig, policy)) as ArcPlanOutput;
 
       const changeSet: ChangeOp[] = output.arcs.map((arc, index) => ({
         op: 'arc.upsert',
@@ -237,24 +245,27 @@ export class RefineService {
     };
   }
 
-  private assemblePreview(projectId: bigint, query: ContextPreviewInput): ReturnType<ContextAssembler['forChatTurn']> {
+  private async assemblePreview(projectId: bigint, query: ContextPreviewInput): ReturnType<ContextAssembler['forChatTurn']> {
+    const resolver = await this.pluginPolicy.scoped(projectId);
+    const chapter = query.chapter ?? 1;
     switch (query.purpose) {
       case 'generation':
-        return this.contextAssembler.forChapter(projectId, query.chapter ?? 1, { dryRun: true });
+        return this.contextAssembler.forChapter(projectId, chapter, { dryRun: true, policy: resolver.forPack({ role: 'generation', chapter }, CHAPTER_PACK_CONSUMERS) });
       case 'outline':
-        return this.contextAssembler.forOutline(projectId, query.chapter ?? 1);
+        return this.contextAssembler.forOutline(projectId, chapter, { policy: resolver.for({ role: 'outline', chapter }) });
       case 'chat': {
         if (!query.scopeType) throw AppErrorCode.CHT_003.create();
-        return this.contextAssembler.forChatTurn(projectId, { scopeType: query.scopeType as Refinement.ChatScope, scopeRef: query.scopeRef ?? null, createdAt: new Date() });
+        const session = { scopeType: query.scopeType as Refinement.ChatScope, scopeRef: query.scopeRef ?? null, createdAt: new Date() };
+        return this.contextAssembler.forChatTurn(projectId, session, { policy: resolver.for({ role: 'chat' }) });
       }
       case 'arc_plan': {
         if (!query.volumeKey) throw AppErrorCode.VOL_001.create();
-        return this.contextAssembler.forArcPlanning(projectId, query.volumeKey);
+        return this.contextAssembler.forArcPlanning(projectId, query.volumeKey, { policy: resolver.for({ role: 'arc' }) });
       }
       case 'premise':
-        return this.contextAssembler.forPremise(projectId);
+        return this.contextAssembler.forPremise(projectId, { policy: resolver.for({ role: 'premise' }) });
       default:
-        return this.contextAssembler.forAudit(projectId);
+        return this.contextAssembler.forAudit(projectId, { policy: resolver.for({ role: 'audit' }) });
     }
   }
 }

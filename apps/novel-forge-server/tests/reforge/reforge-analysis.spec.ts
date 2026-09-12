@@ -8,6 +8,7 @@ import { ReforgeAnalysisService } from '@modules/reforge/reforge-analysis.servic
 import { ReforgeService } from '@modules/reforge/reforge.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 interface ScriptedCall {
@@ -84,7 +85,7 @@ function buildService(db: PrimaryDatabase, calls: ScriptedCall[], failWindows: n
     linkContextPack: async () => undefined,
   } as never;
 
-  return new ReforgeAnalysisService(databaseService, new ReforgeService(databaseService), contextAssembler, modelRouter, workflowRunService);
+  return new ReforgeAnalysisService(databaseService, new ReforgeService(databaseService), contextAssembler, modelRouter, workflowRunService, noPluginPolicy());
 }
 
 describe.if(pgAvailable)('ReforgeAnalysisService', () => {

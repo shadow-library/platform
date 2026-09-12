@@ -8,6 +8,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { createChapterReforgeGraph, routeAfterFidelityJudge } from '@modules/ai/graphs/chapter-reforge.graph';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 interface ScriptedCall {
@@ -50,7 +51,7 @@ function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, outline
       return { id: null, rendered: 'STABLE-WORLD-NOTES\n\nVOLATILE-CARRY-STATE', renderedStable: 'STABLE-WORLD-NOTES', renderedVolatile: 'VOLATILE-CARRY-STATE' };
     },
   };
-  return { db, contextAssembler, modelRouter, checkpointer } as never;
+  return { db, contextAssembler, modelRouter, pluginPolicy: noPluginPolicy(), checkpointer } as never;
 }
 
 async function seedProject(

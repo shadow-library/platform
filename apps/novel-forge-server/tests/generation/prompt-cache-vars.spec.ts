@@ -13,6 +13,7 @@ import { GenerationService } from '@modules/generation/generation.service';
 import { emptyPolicy } from '@modules/plugins';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -100,7 +101,7 @@ describe.if(pgAvailable)('generation path prompt-cache vars', () => {
       modelRouter,
       telemetry: {},
       toolRegistry: { forNode: () => [], getRaw: () => [] },
-      pluginPolicy: { scoped: async () => ({ for: () => emptyPolicy() }) },
+      pluginPolicy: noPluginPolicy(),
       checkpointer: new MemorySaver(),
     } as never;
 

@@ -7,6 +7,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { createSpanTransformGraph, routeAfterTransformJudge } from '@modules/ai/graphs/span-transform.graph';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 interface ScriptedCall {
@@ -50,7 +51,7 @@ function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, writeOu
       return { id: null, rendered: 'PACK', renderedStable: 'STABLE-LEDGER', renderedVolatile: 'VOLATILE-SPAN' };
     },
   };
-  return { db, contextAssembler, modelRouter, checkpointer } as never;
+  return { db, contextAssembler, modelRouter, pluginPolicy: noPluginPolicy(), checkpointer } as never;
 }
 
 describe.if(pgAvailable)('span-transform graph', () => {
