@@ -168,6 +168,33 @@ describe('ModelRouterService.buildClient', () => {
       expect(router.buildClient(LOCAL_TEST_DEFAULTS[role])).toBeInstanceOf(ChatOllama);
     }
   });
+
+  describe('against a model endpoint that keeps failing', () => {
+    let requests = 0;
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => {
+        requests++;
+        return new Response('upstream unavailable', { status: 503 });
+      },
+    });
+    const baseUrl = `http://127.0.0.1:${server.port}`;
+
+    const failOnce = async (client: { invoke: (input: string) => Promise<unknown> }): Promise<number> => {
+      requests = 0;
+      await client.invoke('hi').catch(() => undefined);
+      return requests;
+    };
+
+    it('should send exactly one request per openrouter invoke, leaving retries to the router', async () => {
+      setConfig('ai.openrouter.api.url', baseUrl);
+      try {
+        expect(await failOnce(router.buildClient({ provider: 'openrouter', model: 'x-ai/grok-4.6' }))).toBe(1);
+      } finally {
+        setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
+      }
+    }, 5_000);
+  });
 });
 
 describe('resolveReasoningEffort', () => {

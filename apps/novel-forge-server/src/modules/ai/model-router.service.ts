@@ -192,9 +192,12 @@ export class ModelRouterService {
         // missing-configuration fault surfaces three pointless retries later as a 400 "unparseable response".
         const apiKey = Config.get('ai.openrouter.api.key');
         if (!apiKey) throw AppErrorCode.AI_006.create();
+        // `invokeResilient` owns retries. Left at LangChain's default of 6, each of its attempts became seven
+        // with exponential backoff, and a gateway refusing in milliseconds took five minutes to fail a turn.
         return new ChatOpenAI({
           model: resolved.model,
           apiKey,
+          maxRetries: 0,
           configuration: { baseURL: Config.get('ai.openrouter.api.url') },
           ...(effort ? { modelKwargs: { reasoning: { effort } } } : {}),
         });
