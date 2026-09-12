@@ -202,9 +202,14 @@ export const ResetIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
-export const SparkIcon = (p: IconProps): React.JSX.Element => (
+const SPARK_RAYS = ['M12 3v4', 'M18.4 5.6l-2.8 2.8', 'M17 12h4', 'M15.6 15.6l2.8 2.8', 'M12 17v4', 'M8.4 15.6l-2.8 2.8', 'M3 12h4', 'M5.6 5.6l2.8 2.8'];
+
+/** Rays run clockwise from twelve o'clock, so `rayClassName` with `:nth-child` delays reads as a sweep. */
+export const SparkIcon = ({ rayClassName, ...p }: IconProps & { rayClassName?: string }): React.JSX.Element => (
   <SvgIcon {...p}>
-    <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" />
+    {SPARK_RAYS.map(ray => (
+      <path key={ray} d={ray} className={rayClassName} />
+    ))}
   </SvgIcon>
 );
 

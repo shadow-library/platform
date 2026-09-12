@@ -1,19 +1,46 @@
 import { useEffect, useState } from 'react';
-import { Button, Spinner } from '@shadow-library/ui';
+import { Button } from '@shadow-library/ui';
 
 import { SparkIcon } from '@/components/icons';
-import { type FailedTurnResponse, type PendingTurnResponse } from '@/lib/apis';
+import { type FailedTurnResponse, type TurnState } from '@/lib/apis';
 
 import styles from './TurnStatus.module.css';
 
-// What each turn graph is actually doing, in the author's terms. A bare spinner cannot distinguish a
-// slow turn from a dead one, and the graph is the only phase the server reports without streaming.
-const PHASE: Record<string, string> = {
-  'chat-turn': 'Reading the chapter and your ask',
-  'ideation-turn': 'Shaping the next questions',
-  'ideation-concepts': 'Drafting concept cards',
-  'ideation-stress': 'Stress-testing the sheet',
+type ReplyShape = 'questions' | 'cards' | 'readiness' | 'prose';
+
+interface Phase {
+  label: string;
+  slowLabel: string;
+  shape: ReplyShape;
+}
+
+interface FailureCopy {
+  title: string;
+  reason: string;
+}
+
+// The graph is the only phase the server reports without streaming, so it names the wait and decides which
+// shape the placeholder takes — the reply then lands in the space the placeholder already holds.
+const PHASES: Record<string, Phase> = {
+  'chat-turn': { label: 'Reading the chapter and your ask', slowLabel: 'Still reading the chapter and your ask', shape: 'prose' },
+  'ideation-turn': { label: 'Shaping the next questions', slowLabel: 'Still shaping the next questions', shape: 'questions' },
+  'ideation-concepts': { label: 'Drafting concept cards', slowLabel: 'Still drafting concept cards', shape: 'cards' },
+  'ideation-stress': { label: 'Stress-testing the sheet', slowLabel: 'Still stress-testing the sheet', shape: 'readiness' },
 };
+
+// The server's error messages are written for the model call log. A code missing here gets the generic copy,
+// so a new server code reads as vague rather than wrong.
+const FAILURE_COPY: Record<string, FailureCopy> = {
+  AI_001: { title: 'The model’s answer came back unreadable', reason: 'It replied, but not in a shape that could be used.' },
+  AI_002: { title: 'This model can’t be used here', reason: 'Pick a different model for this conversation, then try again.' },
+  AI_003: { title: 'This model isn’t allowed for this project', reason: 'Unrestricted projects can only use models on their allowlist.' },
+  AI_006: { title: 'AI isn’t set up on this server', reason: 'The model provider’s key has to be configured first.' },
+  AI_007: { title: 'Couldn’t reach the model', reason: 'It didn’t respond after a few tries.' },
+  AI_008: { title: 'Too many model calls right now', reason: 'Wait a moment, then try again.' },
+  AI_009: { title: 'AI spending limit reached', reason: 'Model calls are paused for this account until the limit resets.' },
+};
+
+const UNKNOWN_FAILURE: FailureCopy = { title: 'That turn didn’t finish', reason: 'Something went wrong on the server.' };
 
 // Past this the wait is worth naming: the median turn lands well inside it, so the copy switching is
 // itself the signal that this one is unusual.
@@ -38,57 +65,126 @@ function formatElapsed(ms: number): string {
 }
 
 interface TurnStatusProps {
-  /** The running turn as the server reports it; absent for the beat between sending and the first poll. */
-  pending: PendingTurnResponse | null | undefined;
-  /** A turn this tab has in flight, which covers that beat. */
+  state: TurnState;
+  /** A turn this tab has in flight, which covers the beat between sending and the first poll. */
   sending: boolean;
-  failed: FailedTurnResponse | null | undefined;
   /** Phase copy for a turn whose graph is not known yet. */
   fallbackLabel: string;
-  onRetry?: () => void;
+  onRetry: (content: string) => void;
 }
 
-export function TurnStatus({ pending, sending, failed, fallbackLabel, onRetry }: TurnStatusProps): React.JSX.Element | null {
-  const elapsed = useElapsed(pending?.startedAt);
+export function TurnStatus({ state, sending, fallbackLabel, onRetry }: TurnStatusProps): React.JSX.Element | null {
+  const running = state.kind === 'pending' ? state.pending : null;
+  const elapsed = useElapsed(running?.startedAt);
 
-  if (pending || sending) {
-    const phase = (pending && PHASE[pending.graph]) ?? fallbackLabel;
-    const slow = elapsed >= SLOW_AFTER_MS;
-    return (
-      <div className={styles.row} data-state="pending" role="status" aria-live="polite">
-        <div className={styles.avatar}>
-          <SparkIcon size={15} />
-        </div>
-        <div className={styles.body}>
-          <div className={styles.line}>
-            <Spinner size="sm" />
-            <span className={styles.phase}>{phase}…</span>
-            {elapsed >= SHOW_ELAPSED_AFTER_MS && <span className={styles.elapsed}>{formatElapsed(elapsed)}</span>}
-          </div>
-          <div className={styles.track} />
-          {slow && <p className={styles.note}>Longer than usual — it is still running, and the reply lands here when it does.</p>}
-        </div>
-      </div>
-    );
-  }
+  if (running) return <GhostReply phase={PHASES[running.graph]} fallbackLabel={fallbackLabel} elapsed={elapsed} />;
+  // A failure the server has recorded outranks this tab's own in-flight send: the call is over, whatever the request is still doing.
+  if (state.kind === 'failed') return <FailedTurn failed={state.failed} onRetry={() => onRetry(state.retryContent)} />;
+  if (sending || state.kind === 'pending') return <GhostReply fallbackLabel={fallbackLabel} elapsed={0} />;
+  return null;
+}
 
-  if (!failed) return null;
+interface GhostReplyProps {
+  phase?: Phase;
+  fallbackLabel: string;
+  elapsed: number;
+}
+
+function GhostReply({ phase, fallbackLabel, elapsed }: GhostReplyProps): React.JSX.Element {
+  const slow = elapsed >= SLOW_AFTER_MS;
+  const label = phase ? (slow ? phase.slowLabel : phase.label) : fallbackLabel;
+  const shape = phase?.shape ?? 'prose';
 
   return (
-    <div className={styles.row} data-state="failed" role="status" aria-live="polite">
+    <div className={styles.row} data-pace={slow ? 'slow' : 'steady'}>
+      <div className={styles.avatar}>
+        <SparkIcon size={15} rayClassName={styles.ray} />
+      </div>
+      <div className={styles.col}>
+        <div className={styles.bubble}>
+          <div className={styles.caption}>
+            <span className={styles.phase} role="status">
+              {label}…
+            </span>
+            {elapsed >= SHOW_ELAPSED_AFTER_MS && (
+              <span className={styles.elapsed} aria-hidden="true">
+                {formatElapsed(elapsed)}
+              </span>
+            )}
+          </div>
+          {shape === 'readiness' ? <ReadinessGhost /> : <LinesGhost count={shape === 'cards' ? 1 : shape === 'prose' ? 4 : 3} />}
+          {slow && <p className={styles.note}>This one’s taking longer than usual. The model is still answering.</p>}
+        </div>
+        {shape === 'questions' && (
+          <div className={styles.chips} aria-hidden="true">
+            <span className={styles.chip} />
+            <span className={styles.chip} />
+            <span className={styles.chip} />
+          </div>
+        )}
+        {shape === 'cards' && (
+          <div className={styles.cards} aria-hidden="true">
+            {[0, 1, 2, 3].map(card => (
+              <div key={card} className={styles.card}>
+                <LinesGhost count={3} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LinesGhost({ count }: { count: number }): React.JSX.Element {
+  return (
+    <div className={styles.lines} aria-hidden="true">
+      {Array.from({ length: count }, (_, line) => (
+        <span key={line} className={styles.line} />
+      ))}
+    </div>
+  );
+}
+
+function ReadinessGhost(): React.JSX.Element {
+  return (
+    <div className={styles.readiness} aria-hidden="true">
+      {[0, 1, 2, 3].map(row => (
+        <div key={row} className={styles.readinessRow}>
+          <span className={styles.line} />
+          <span className={styles.verdict} />
+          <span className={styles.line} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface FailedTurnProps {
+  /** Absent when the transcript was stranded without a run the server could report on. */
+  failed: FailedTurnResponse | null;
+  onRetry: () => void;
+}
+
+function FailedTurn({ failed, onRetry }: FailedTurnProps): React.JSX.Element {
+  const copy = (failed?.code && FAILURE_COPY[failed.code]) || UNKNOWN_FAILURE;
+
+  return (
+    <div className={styles.row} data-state="failed">
       <div className={styles.avatar}>
         <SparkIcon size={15} />
       </div>
-      <div className={styles.body}>
-        <span className={styles.failedTitle}>That turn didn’t finish{failed.message ? ` — ${failed.message}` : '.'}</span>
-        <p className={styles.note}>Your message is still here. Nothing on the sheet changed.</p>
-        {onRetry && (
-          <div className={styles.failedActions}>
+      <div className={styles.col}>
+        <div className={styles.bubble} role="status">
+          <span className={styles.failureTitle}>{copy.title}</span>
+          <p className={styles.failureReason}>{copy.reason} Your message is saved and nothing was changed.</p>
+          <div className={styles.failureActions}>
             <Button size="sm" variant="secondary" onClick={onRetry}>
               Try again
             </Button>
+            {failed?.code && <span className={styles.code}>{failed.code}</span>}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

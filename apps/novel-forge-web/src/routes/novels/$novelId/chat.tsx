@@ -606,13 +606,7 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
               </div>
             ),
           )}
-          <TurnStatus
-            pending={state.kind === 'pending' ? state.pending : null}
-            sending={turn.isPending}
-            failed={state.kind === 'failed' ? state.failed : null}
-            fallbackLabel={isAuto ? 'Forge is working' : 'Forge is reading your ask'}
-            onRetry={state.kind === 'failed' ? () => resend(state.retryContent) : undefined}
-          />
+          <TurnStatus state={state} sending={turn.isPending} fallbackLabel={isAuto ? 'Forge is working' : 'Forge is reading your ask'} onRetry={resend} />
         </div>
       </div>
 

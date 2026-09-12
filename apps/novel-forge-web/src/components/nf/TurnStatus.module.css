@@ -1,6 +1,20 @@
 .row {
+  --ghost: var(--sh-surface-well);
+  --ghost-glint: color-mix(in srgb, var(--sh-accent) 18%, var(--sh-surface-well));
+  --ghost-edge: color-mix(in srgb, var(--sh-accent) 24%, var(--sh-border-subtle));
+  --ray-cycle: 1.2s;
+  --ray-step: 150ms;
+  --shimmer-cycle: 1.8s;
+
   display: flex;
   gap: 12px;
+}
+
+/* A slow turn is still a healthy one: the pace eases off, the colour never changes. */
+.row[data-pace='slow'] {
+  --ray-cycle: 2s;
+  --ray-step: 250ms;
+  --shimmer-cycle: 3.2s;
 }
 
 .avatar {
@@ -16,84 +30,257 @@
 }
 
 .row[data-state='failed'] .avatar {
-  background: var(--sh-surface-subtle);
+  background: var(--sh-surface-well);
   border: 1px solid var(--sh-border-subtle);
   color: var(--sh-text-tertiary);
 }
 
-.body {
-  min-width: 0;
+/* Negative delays start each ray mid-cycle, so the sweep is already turning on the first frame. */
+.ray {
+  animation: ray var(--ray-cycle) linear infinite;
+  animation-delay: calc(var(--ray-index) * var(--ray-step) * -1);
+}
+
+.ray:nth-child(1) {
+  --ray-index: 7;
+}
+
+.ray:nth-child(2) {
+  --ray-index: 6;
+}
+
+.ray:nth-child(3) {
+  --ray-index: 5;
+}
+
+.ray:nth-child(4) {
+  --ray-index: 4;
+}
+
+.ray:nth-child(5) {
+  --ray-index: 3;
+}
+
+.ray:nth-child(6) {
+  --ray-index: 2;
+}
+
+.ray:nth-child(7) {
+  --ray-index: 1;
+}
+
+.ray:nth-child(8) {
+  --ray-index: 0;
+}
+
+@keyframes ray {
+  0% {
+    opacity: 1;
+  }
+
+  65%,
+  100% {
+    opacity: 0.28;
+  }
+}
+
+.col {
   flex: 1;
+  min-width: 0;
+  max-width: 92%;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-top: 4px;
-}
-
-.line {
-  display: flex;
   gap: 10px;
-  align-items: center;
-  color: var(--sh-text-tertiary);
-  font-size: var(--sh-text-body-sm);
 }
 
-.phase {
+.bubble {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: 14px 14px 14px 4px;
+  padding: 12px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--sh-text-body-sm);
   color: var(--sh-text-secondary);
 }
 
+.phase {
+  font-weight: 500;
+}
+
 .elapsed {
+  font-family: var(--sh-font-mono);
+  font-size: 11.5px;
+  color: var(--sh-text-tertiary);
   font-variant-numeric: tabular-nums;
 }
 
 .note {
-  color: var(--sh-text-tertiary);
-  font-size: var(--sh-text-body-sm);
   margin: 0;
-}
-
-.failedTitle {
-  color: var(--sh-text-primary);
   font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
 }
 
-.failedActions {
+.lines {
   display: flex;
+  flex-direction: column;
   gap: 8px;
+}
+
+/* Every placeholder shares one sweep timing, so the lines read as a single reply being written. */
+.line,
+.verdict {
+  display: block;
+  height: 9px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--ghost) 0%, var(--ghost) 35%, var(--ghost-glint) 50%, var(--ghost) 65%, var(--ghost) 100%);
+  background-size: 300% 100%;
+  animation: shimmer var(--shimmer-cycle) ease-in-out infinite;
+}
+
+.line:nth-child(1) {
+  width: 94%;
+}
+
+.line:nth-child(2) {
+  width: 84%;
+}
+
+.line:nth-child(3) {
+  width: 76%;
+}
+
+.line:last-child {
+  width: 52%;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: 0% 0;
+  }
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  height: 30px;
+  border: 1px dashed var(--ghost-edge);
+  border-radius: 99px;
+}
+
+.chip:nth-child(1) {
+  width: 168px;
+}
+
+.chip:nth-child(2) {
+  width: 132px;
+}
+
+.chip:nth-child(3) {
+  width: 150px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.card {
+  border: 1px dashed var(--ghost-edge);
+  border-radius: var(--sh-radius-lg);
+  padding: 10px;
+}
+
+.card .line {
+  height: 7px;
+}
+
+.readiness {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.readinessRow {
+  display: grid;
+  grid-template-columns: 26% 16% minmax(0, 1fr);
+  gap: 10px;
   align-items: center;
 }
 
-/* The bar reads as forward motion without claiming a percentage the server cannot report. */
-.track {
-  height: 2px;
-  border-radius: 2px;
-  background: var(--sh-border-subtle);
-  overflow: hidden;
+.readinessRow .line {
+  width: 100%;
+  height: 7px;
 }
 
-.track::after {
+.readinessRow .line:last-child {
+  width: 86%;
+}
+
+.verdict {
+  height: 14px;
+  border-radius: 99px;
+}
+
+.failureTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--sh-text-body);
+  font-weight: 500;
+  color: var(--sh-text-primary);
+}
+
+.failureTitle::before {
   content: '';
-  display: block;
-  height: 100%;
-  width: 35%;
-  border-radius: 2px;
-  background: linear-gradient(90deg, transparent, var(--sh-indigo-500), transparent);
-  animation: sweep 1.6s ease-in-out infinite;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sh-danger-text);
+  flex-shrink: 0;
 }
 
-@keyframes sweep {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(340%);
-  }
+.failureReason {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.failureActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.code {
+  font-family: var(--sh-font-mono);
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .track::after {
+  .ray,
+  .line,
+  .verdict {
     animation: none;
-    width: 100%;
-    background: var(--sh-border-strong);
   }
 }

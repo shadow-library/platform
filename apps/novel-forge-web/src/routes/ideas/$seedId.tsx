@@ -534,6 +534,9 @@ function StudioScreen(): React.JSX.Element {
   const changesQuery = useListChangesQuery(seedId);
 
   const messages = messagesQuery.data?.messages ?? [];
+  // Whatever the transcript held when it first loaded is history; a reply outside this set landed while the author watched.
+  const [historyIds, setHistoryIds] = useState<ReadonlySet<string> | null>(null);
+  if (historyIds === null && messagesQuery.data) setHistoryIds(new Set(messagesQuery.data.messages.map(message => message.id)));
   const state = turnState(messagesQuery.data);
   // The composer locks on this tab's own request OR a turn the server still has running — the latter is
   // what stops a second tab or a refresh from racing a reply that is already on its way.
@@ -598,7 +601,7 @@ function StudioScreen(): React.JSX.Element {
               const payload = message.payload;
               const applied = message.proposalId ? appliedChanges.get(message.proposalId) : undefined;
               return (
-                <div key={message.id} className={styles.assistantRow}>
+                <div key={message.id} className={styles.assistantRow} data-arrived={historyIds && !historyIds.has(message.id) ? 'true' : undefined}>
                   <div className={styles.avatar}>
                     <SparkIcon size={15} />
                   </div>
@@ -617,13 +620,7 @@ function StudioScreen(): React.JSX.Element {
                 </div>
               );
             })}
-            <TurnStatus
-              pending={state.kind === 'pending' ? state.pending : null}
-              sending={turn.isPending}
-              failed={state.kind === 'failed' ? state.failed : null}
-              fallbackLabel="The studio is reading what you wrote"
-              onRetry={state.kind === 'failed' ? () => send(state.retryContent) : undefined}
-            />
+            <TurnStatus state={state} sending={turn.isPending} fallbackLabel="The studio is reading what you wrote" onRetry={send} />
           </div>
         </div>
 
