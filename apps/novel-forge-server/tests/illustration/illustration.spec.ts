@@ -1,6 +1,9 @@
 import { SQL } from 'bun';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
-import { and, eq } from 'drizzle-orm';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { Config } from '@shadow-library/common';
 
@@ -14,9 +17,10 @@ import { EntityService } from '@modules/bible/entity/entity.service';
 import { ChapterImageService } from '@modules/generation/chapter-image.service';
 import { IllustrationModule } from '@modules/illustration/illustration.module';
 import { IllustrationService } from '@modules/illustration/illustration.service';
-import { applyInstructionEdit, renderPromptSpec } from '@modules/illustration/prompt-spec';
+import { applyInstructionEdit, hashInstructions, renderPromptSpec } from '@modules/illustration/prompt-spec';
+import { setProjectCover, uploadedCoverPromptSpec } from '@modules/illustration/uploaded-cover';
 import { ProjectService } from '@modules/project/project/project.service';
-import { type PrimaryDatabase } from '@server/database';
+import { type Illustration, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -50,6 +54,7 @@ interface ImageRequest {
 
 interface Harness {
   service: IllustrationService;
+  storage: unknown;
   imageRequests: ImageRequest[];
   composePrompts: string[];
   deleted: string[];
@@ -83,6 +88,7 @@ function buildHarness(db: PrimaryDatabase): Harness {
     deleted,
     compose: { basePrompt: 'a lone swordsman on a frozen ridge, backlit', subjectFraming: 'half-body portrait, shallow depth of field', styleNotes: 'ink wash, muted palette' },
     service: undefined as unknown as IllustrationService,
+    storage,
   };
 
   const dbStub = { getPostgresClient: () => db } as never;
@@ -399,6 +405,202 @@ describe.if(pgAvailable)('IllustrationService — canon-driven generation', () =
     expect(scoped[0]?.status).toBe('saved');
     expect(scoped[0]?.prompt).toContain('silver hair');
     expect(await harness.service.list(projectId)).toHaveLength(2);
+  });
+
+  function projectService(): ProjectService {
+    return new ProjectService({ getPostgresClient: () => db } as never, {} as never, harness.storage as never);
+  }
+
+  async function uploadCover(projectId: bigint, image = 'aW1hZ2U='): Promise<string> {
+    const project = await projectService().setCover(projectId, image, 'image/png');
+    return project.coverImagePath as string;
+  }
+
+  function coverIllustrations(projectId: bigint): Promise<Illustration.Row[]> {
+    return db.query.illustrations.findMany({
+      where: and(eq(schema.illustrations.projectId, projectId), eq(schema.illustrations.subjectType, 'cover')),
+      orderBy: [desc(schema.illustrations.id)],
+    });
+  }
+
+  describe('uploaded covers', () => {
+    it('should open one active cover illustration on the upload when the cover is set', async () => {
+      const projectId = await seedProject('illustration-uploaded-cover');
+      const ref = await uploadCover(projectId);
+
+      const rows = await coverIllustrations(projectId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ status: 'active', subjectKey: null, selectedRef: ref, revision: 1, promptSpec: uploadedCoverPromptSpec() });
+      expect(rows[0]?.candidates).toEqual([{ ref, createdAt: expect.any(String), instructionsHash: hashInstructions([]) }]);
+
+      const covers = await harness.service.list(projectId, { subjectType: 'cover' });
+      expect(covers).toHaveLength(1);
+      expect(covers[0]).toMatchObject({ origin: 'uploaded', selectedUrl: `https://cdn.test/${ref}` });
+      expect(await harness.service.list(projectId, { subjectType: 'entity' })).toHaveLength(0);
+    });
+
+    it('should not create records when listing a cover written outside setProjectCover', async () => {
+      const projectId = await seedProject('illustration-list-read-only');
+      await db.update(schema.projects).set({ coverImagePath: 'ref-untracked-cover' }).where(eq(schema.projects.id, projectId));
+
+      expect(await harness.service.list(projectId)).toHaveLength(0);
+      expect(await coverIllustrations(projectId)).toHaveLength(0);
+    });
+
+    it('should open a single illustration when the same cover is set concurrently', async () => {
+      const projectId = await seedProject('illustration-uploaded-cover-race');
+      const ref = await uploadCover(projectId);
+      await db.delete(schema.illustrations).where(eq(schema.illustrations.projectId, projectId));
+
+      await Promise.all([setProjectCover(db, projectId, ref), setProjectCover(db, projectId, ref), setProjectCover(db, projectId, ref)]);
+
+      expect(await coverIllustrations(projectId)).toHaveLength(1);
+    });
+
+    it('should not open one for a generated cover saved from the Illustrations tab', async () => {
+      const projectId = await seedProject('illustration-generated-cover');
+      const started = await harness.service.start(projectId, { subjectType: 'cover' });
+      await harness.service.select(projectId, started.id, started.candidates[0]!.ref);
+      await harness.service.save(projectId, started.id, 'cover');
+
+      const items = await harness.service.list(projectId);
+      expect(items).toHaveLength(1);
+      expect(items[0]?.origin).toBe('generated');
+    });
+
+    it('should not open a second one when the current cover is uploaded again', async () => {
+      const projectId = await seedProject('illustration-uploaded-cover-again');
+      const ref = await uploadCover(projectId);
+      await projectService().setCoverRef(projectId, ref);
+
+      expect(await coverIllustrations(projectId)).toHaveLength(1);
+    });
+
+    it('should open a new one for a replacement upload', async () => {
+      const projectId = await seedProject('illustration-uploaded-cover-replace');
+      await uploadCover(projectId);
+      const replacement = await uploadCover(projectId, 'b3RoZXI=');
+
+      const rows = await coverIllustrations(projectId);
+      expect(rows).toHaveLength(2);
+      expect(rows[0]?.selectedRef).toBe(replacement);
+    });
+
+    it('should leave the illustrations untouched when the cover is cleared', async () => {
+      const projectId = await seedProject('illustration-uploaded-cover-clear');
+      await uploadCover(projectId);
+
+      await projectService().clearCover(projectId);
+
+      expect((await coverIllustrations(projectId)).map(row => row.status)).toEqual(['active']);
+    });
+
+    it('should refine an uploaded cover from the upload and save the result as the cover', async () => {
+      const projectId = await seedProject('illustration-uploaded-cover-refine');
+      const ref = await uploadCover(projectId);
+      const [adopted] = await harness.service.list(projectId);
+
+      const refined = await harness.service.refine(projectId, adopted!.id, { add: 'warmer palette' });
+      expect(harness.composePrompts).toHaveLength(0);
+      expect(harness.imageRequests[0]?.input_references).toHaveLength(1);
+      expect(harness.imageRequests[0]?.prompt).toContain('warmer palette');
+      expect(refined.candidates).toHaveLength(3);
+
+      const pick = refined.candidates[1]!.ref;
+      await harness.service.select(projectId, adopted!.id, pick);
+      await harness.service.save(projectId, adopted!.id, 'cover');
+
+      const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+      expect(project?.coverImagePath).toBe(pick);
+      expect(harness.deleted).toContain(ref);
+      expect(await coverIllustrations(projectId)).toHaveLength(1);
+    });
+
+    it('should reopen an upload that a refined illustration left behind as a stale candidate', async () => {
+      const projectId = await seedProject('illustration-uploaded-cover-stale');
+      const original = await uploadCover(projectId);
+      const [adopted] = await harness.service.list(projectId);
+      const refined = await harness.service.refine(projectId, adopted!.id, { add: 'warmer palette' });
+      await harness.service.select(projectId, adopted!.id, refined.candidates[1]!.ref);
+      await harness.service.save(projectId, adopted!.id, 'cover');
+
+      await projectService().setCoverRef(projectId, original);
+
+      const rows = await coverIllustrations(projectId);
+      expect(rows.map(row => [row.status, row.selectedRef])).toEqual([
+        ['active', original],
+        ['saved', refined.candidates[1]!.ref],
+      ]);
+      expect(rows[1]?.candidates.map(candidate => candidate.ref)).toContain(original);
+    });
+
+    it('should open a fresh one when the cover is set back to an image whose illustration is saved', async () => {
+      const projectId = await seedProject('illustration-saved-cover-reset');
+      const started = await harness.service.start(projectId, { subjectType: 'cover' });
+      const ref = started.candidates[0]!.ref;
+      await harness.service.select(projectId, started.id, ref);
+      await harness.service.save(projectId, started.id, 'cover');
+
+      await projectService().setCoverRef(projectId, ref);
+
+      const rows = await coverIllustrations(projectId);
+      expect(rows.map(row => [row.status, row.selectedRef])).toEqual([
+        ['active', ref],
+        ['saved', ref],
+      ]);
+      expect(rows[0]?.promptSpec.promptKey).toBe('uploaded-cover');
+    });
+
+    it('should keep the cover object on discard and reopen the cover when it is uploaded again', async () => {
+      const projectId = await seedProject('illustration-uploaded-cover-discard');
+      const ref = await uploadCover(projectId);
+      const [adopted] = await harness.service.list(projectId);
+
+      await harness.service.discard(projectId, adopted!.id);
+      expect(harness.deleted).not.toContain(ref);
+
+      await projectService().setCoverRef(projectId, ref);
+      expect((await coverIllustrations(projectId)).map(row => row.status)).toEqual(['active', 'discarded']);
+    });
+  });
+
+  describe('0032 uploaded cover backfill', () => {
+    const backfill = readFileSync(resolve(import.meta.dir, '../../generated/drizzle/0032_backfill_uploaded_cover_illustrations.sql'), 'utf-8');
+
+    async function seedCover(name: string, ref: string): Promise<bigint> {
+      const projectId = await seedProject(name);
+      await db.update(schema.projects).set({ coverImagePath: ref }).where(eq(schema.projects.id, projectId));
+      return projectId;
+    }
+
+    it('should backfill the same record setProjectCover writes, once however often it runs', async () => {
+      const projectId = await seedCover('illustration-backfill', `ref-backfill-${Date.now()}`);
+      const expected = await seedProject('illustration-backfill-expected');
+      await setProjectCover(db, expected, `ref-backfill-expected-${Date.now()}`);
+
+      await db.execute(sql.raw(backfill));
+      await db.execute(sql.raw(backfill));
+
+      const [row] = await coverIllustrations(projectId);
+      const [reference] = await coverIllustrations(expected);
+      expect(await coverIllustrations(projectId)).toHaveLength(1);
+      expect(await coverIllustrations(expected)).toHaveLength(1);
+      expect(row?.promptSpec).toEqual(reference!.promptSpec);
+      expect(row).toMatchObject({ status: 'active', subjectKey: null, revision: 1, selectedRef: row?.candidates[0]?.ref });
+      expect(row?.candidates[0]?.instructionsHash).toBe(reference!.candidates[0]!.instructionsHash);
+      expect(new Date(row!.candidates[0]!.createdAt).toISOString()).toBe(row!.candidates[0]!.createdAt);
+    });
+
+    it('should skip a project whose cover a generated illustration already holds', async () => {
+      const projectId = await seedProject('illustration-backfill-generated');
+      const started = await harness.service.start(projectId, { subjectType: 'cover' });
+      await harness.service.select(projectId, started.id, started.candidates[0]!.ref);
+      await harness.service.save(projectId, started.id, 'cover');
+
+      await db.execute(sql.raw(backfill));
+
+      expect(await coverIllustrations(projectId)).toHaveLength(1);
+    });
   });
 
   it('should refuse to touch an illustration owned by another project', async () => {

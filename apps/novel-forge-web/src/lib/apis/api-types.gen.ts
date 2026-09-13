@@ -4721,6 +4721,8 @@ export interface components {
       subjectKey?: null | string;
       status: components['schemas']['IllustrationStatus'];
       revision: number;
+      /** @description 'uploaded' when the session was opened on a cover the author supplied rather than composed from the canon; its prompt only reworks that image. */
+      origin: components['schemas']['IllustrationOrigin'];
       /** @description The author instruction list, in application order — refine edits address it by index. */
       instructions: string[];
       /** @description The exact prompt text sent to the image model for the current revision. */
@@ -4737,6 +4739,8 @@ export interface components {
     };
     /** @enum {string} */
     IllustrationStatus: 'active' | 'saved' | 'discarded';
+    /** @enum {string} */
+    IllustrationOrigin: 'generated' | 'uploaded';
     IllustrationCandidateResponse: {
       ref: string;
       /** @description Absolute public object-storage URL resolved using the server runtime configuration. */
@@ -4744,6 +4748,7 @@ export interface components {
       createdAt: string;
       instructionsHash: string;
     };
+    /** @description Newest first. Setting a project cover by upload, ingest, import or promotion opens an 'uploaded' cover illustration on it. */
     ListIllustrationsResponse: {
       items: components['schemas']['IllustrationResponse'][];
     };
@@ -14061,6 +14066,7 @@ export type StartIllustrationBody = components['schemas']['StartIllustrationBody
 export type IllustrationSubjectType = components['schemas']['IllustrationSubjectType'];
 export type IllustrationResponse = components['schemas']['IllustrationResponse'];
 export type IllustrationStatus = components['schemas']['IllustrationStatus'];
+export type IllustrationOrigin = components['schemas']['IllustrationOrigin'];
 export type IllustrationCandidateResponse = components['schemas']['IllustrationCandidateResponse'];
 export type ListIllustrationsResponse = components['schemas']['ListIllustrationsResponse'];
 export type RefineIllustrationBody = components['schemas']['RefineIllustrationBody'];

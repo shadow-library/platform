@@ -52,6 +52,7 @@ export const RefinementProposalStatus = EnumType.create('RefinementProposalStatu
 export const IllustrationSubjectType = EnumType.create('IllustrationSubjectType', schema.illustrationSubjectType.enumValues);
 export const IllustrationStatus = EnumType.create('IllustrationStatus', schema.illustrationStatus.enumValues);
 export const IllustrationSaveTarget = EnumType.create('IllustrationSaveTarget', ['portrait', 'gallery', 'chapter', 'cover']);
+export const IllustrationOrigin = EnumType.create('IllustrationOrigin', ['generated', 'uploaded']);
 export const NovelGenre = EnumType.create('NovelGenre', [...NOVEL_GENRES]);
 export const NovelTag = EnumType.create('NovelTag', [...NOVEL_TAGS]);
 export const SexualContentRating = EnumType.create('SexualContentRating', [...CONTENT_RATING_LEVELS.sexualContent]);

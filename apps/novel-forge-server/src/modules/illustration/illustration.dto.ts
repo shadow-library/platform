@@ -1,7 +1,7 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-import { IllustrationSaveTarget, IllustrationStatus, IllustrationSubjectType } from '@server/common';
+import { IllustrationOrigin, IllustrationSaveTarget, IllustrationStatus, IllustrationSubjectType } from '@server/common';
 import { type Illustration } from '@server/database';
 
 @Schema()
@@ -109,6 +109,11 @@ export class IllustrationResponse {
   @Field(() => Integer)
   revision: number;
 
+  @Field(() => IllustrationOrigin, {
+    description: "'uploaded' when the session was opened on a cover the author supplied rather than composed from the canon; its prompt only reworks that image.",
+  })
+  origin: Illustration.Origin;
+
   @Field(() => [String], { description: 'The author instruction list, in application order — refine edits address it by index.' })
   instructions: string[];
 
@@ -134,7 +139,7 @@ export class IllustrationResponse {
   updatedAt: Date;
 }
 
-@Schema()
+@Schema({ description: "Newest first. Setting a project cover by upload, ingest, import or promotion opens an 'uploaded' cover illustration on it." })
 export class ListIllustrationsResponse {
   @Field(() => [IllustrationResponse])
   items: IllustrationResponse[];

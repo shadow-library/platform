@@ -1,4 +1,4 @@
-import { and, desc, eq, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
@@ -16,6 +16,7 @@ import { ChapterImageService } from '../generation/chapter-image.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { ProjectService } from '../project/project/project.service';
 import { applyInstructionEdit, hashInstructions, type InstructionEdit, renderPromptSpec } from './prompt-spec';
+import { illustrationReferences, UPLOADED_COVER_PROMPT_KEY } from './uploaded-cover';
 
 export interface StartIllustrationInput {
   subjectType: Illustration.SubjectType;
@@ -37,6 +38,7 @@ export interface PresentedIllustration {
   subjectKey: string | null;
   status: Illustration.Status;
   revision: number;
+  origin: Illustration.Origin;
   instructions: string[];
   prompt: string;
   candidates: PresentedCandidate[];
@@ -312,16 +314,7 @@ export class IllustrationService {
       this.db.$count(schema.entityImages, eq(schema.entityImages.imagePath, ref)),
       this.db.$count(schema.chapterImages, eq(schema.chapterImages.imagePath, ref)),
       this.db.$count(schema.projects, eq(schema.projects.coverImagePath, ref)),
-      this.db.$count(
-        schema.illustrations,
-        and(
-          ne(schema.illustrations.id, excludeIllustrationId),
-          ne(schema.illustrations.status, 'discarded'),
-          // Unrolled rather than `@> '[{"ref":…}]'::jsonb`: the bun-sql driver binds a JSON-string
-          // parameter in a form the containment operator never matches.
-          or(eq(schema.illustrations.selectedRef, ref), sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${schema.illustrations.candidates}) e WHERE e->>'ref' = ${ref})`),
-        ),
-      ),
+      this.db.$count(schema.illustrations, and(ne(schema.illustrations.id, excludeIllustrationId), ne(schema.illustrations.status, 'discarded'), illustrationReferences(ref))),
     ]);
     return counts.some(count => count > 0);
   }
@@ -334,6 +327,7 @@ export class IllustrationService {
       subjectKey: row.subjectKey,
       status: row.status,
       revision: row.revision,
+      origin: row.promptSpec.promptKey === UPLOADED_COVER_PROMPT_KEY ? 'uploaded' : 'generated',
       instructions: row.promptSpec.instructions,
       prompt: renderPromptSpec(row.promptSpec),
       candidates: row.candidates.map(candidate => ({ ...candidate, imageUrl: this.storage.getPublicUrl(candidate.ref) })),

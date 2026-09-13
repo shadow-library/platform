@@ -8,6 +8,7 @@ import { type Job, type PrimaryDatabase, type Rebrand, type Reforge, type Reforg
 
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
+import { setProjectCover } from '../illustration/uploaded-cover';
 import { landFinalChapters } from '../novel-import/land-chapters';
 import { PublishRunner } from '../publishing/publish-runner';
 import { RebrandService } from '../rebrand/rebrand.service';
@@ -452,7 +453,7 @@ export class JobExecutor {
       this.logger.debug('runImport: storing cover asset', { jobId: job.id, projectId });
       const bytes = new Uint8Array(Buffer.from(cover.dataBase64, 'base64'));
       const ref = await this.storage.save(bytes, { contentType: cover.mimeType });
-      await this.db.update(schema.projects).set({ coverImagePath: ref, updatedAt: new Date() }).where(eq(schema.projects.id, projectId));
+      await setProjectCover(this.db, projectId, ref);
     }
 
     if (mode === 'source') {

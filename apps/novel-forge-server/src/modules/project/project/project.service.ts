@@ -11,6 +11,7 @@ import { type Bible, type Chapter, type Knowledge, type Plan, type PrimaryDataba
 
 import { isRegisteredModel } from '../../ai/defaults';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
+import { setProjectCover } from '../../illustration/uploaded-cover';
 import { assertUnderProjectCap } from './project-limits';
 import {
   type CloneProjectBody,
@@ -148,12 +149,9 @@ export class ProjectService {
 
   /** Points the cover at an object already in storage — the path the illustration subsystem takes, since it saved the bytes itself. */
   async setCoverRef(id: bigint, ref: string): Promise<Project.Presented> {
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) });
-    if (!project) throw AppErrorCode.PRJ_001.create();
-
     // Content-addressed refs are immutable and deduplicated, so the previous cover is left in place
     // (it may still back another project); setting a new cover only repoints this project's ref.
-    const [result] = await this.db.update(schema.projects).set({ coverImagePath: ref, updatedAt: new Date() }).where(eq(schema.projects.id, id)).returning();
+    const result = await setProjectCover(this.db, id, ref);
     if (!result) throw AppErrorCode.PRJ_001.create();
     return this.present(result);
   }

@@ -145,6 +145,9 @@ describe.if(pgAvailable)('JobExecutor.runImport', () => {
     expect(harness.coverSaves).toEqual([{ contentType: 'image/jpeg', bytes: Buffer.byteLength('cover-bytes') }]);
     const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     expect(project?.coverImagePath).toBe(COVER_REF);
+
+    const covers = await db.query.illustrations.findMany({ where: and(eq(schema.illustrations.projectId, projectId), eq(schema.illustrations.subjectType, 'cover')) });
+    expect(covers.map(cover => [cover.status, cover.selectedRef])).toEqual([['active', COVER_REF]]);
   });
 
   it('should report progress across chapter batches', async () => {

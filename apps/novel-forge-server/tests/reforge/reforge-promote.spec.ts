@@ -1,6 +1,6 @@
 import { SQL } from 'bun';
 import { describe, expect, it } from 'bun:test';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { ReforgePromoteService } from '@modules/reforge/reforge-promote.service';
@@ -113,6 +113,20 @@ describe.if(pgAvailable)('Reforge promotion', () => {
     const chapter = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${result.projectId}/chapters/1/publish`).body({});
     expect(chapter.statusCode).toBe(202);
     expect(chapter.json()).toMatchObject({ chapter: 1, publishedOrdinal: 1 });
+  });
+
+  it('should carry the source cover onto the promoted project as an editable cover illustration', async () => {
+    const { projectId } = await seedApprovedTransform();
+    const db = testEnv.getPostgresClient();
+    await db
+      .update(schema.projects)
+      .set({ coverImagePath: 'ref-reforge-cover' })
+      .where(eq(schema.projects.id, BigInt(projectId)));
+
+    const result = await testEnv.getService(ReforgePromoteService).promote(BigInt(projectId), {});
+
+    const covers = await db.query.illustrations.findMany({ where: and(eq(schema.illustrations.projectId, result.projectId), eq(schema.illustrations.subjectType, 'cover')) });
+    expect(covers.map(cover => [cover.status, cover.selectedRef])).toEqual([['active', 'ref-reforge-cover']]);
   });
 
   it('should be idempotent per plan revision', async () => {

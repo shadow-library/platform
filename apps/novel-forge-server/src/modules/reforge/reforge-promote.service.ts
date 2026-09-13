@@ -7,6 +7,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type ReforgeTransform, schema } from '@server/database';
 
+import { trackUploadedCover } from '../illustration/uploaded-cover';
 // A direct file import of the landing helper, never the novel-import barrel — the barrel's services
 // would drag their module in, exactly as chapter-reforge.graph.ts imports residue-scan directly.
 import { landFinalChapters } from '../novel-import/land-chapters';
@@ -91,6 +92,7 @@ export class ReforgePromoteService {
         .returning()
         .catch(err => this.databaseService.translateError(err));
       if (!project) throw AppError.internal(`failed to create the promoted project for plan ${plan.id}`);
+      if (project.coverImagePath) await trackUploadedCover(tx, project.id, project.coverImagePath, project.ownerId);
 
       // Mirrors ProjectService.create: a `new_novel` project is born with contentless `<section>/default`
       // placeholder bible docs, filled later by extraction or the chat hub like any imported final novel.

@@ -63,7 +63,8 @@ const SAVE_TARGETS: Record<IllustrationSubjectType, { target: IllustrationSaveTa
   cover: [{ target: 'cover', label: 'Save as cover' }],
 };
 
-function subjectLabel(illustration: Pick<IllustrationResponse, 'subjectType' | 'subjectKey'>): string {
+function subjectLabel(illustration: Pick<IllustrationResponse, 'subjectType' | 'subjectKey' | 'origin'>): string {
+  if (illustration.origin === 'uploaded') return 'Uploaded cover';
   if (illustration.subjectType === 'cover') return 'Project cover';
   if (illustration.subjectType === 'chapter') return `Chapter ${illustration.subjectKey}`;
   return illustration.subjectKey ?? 'Entity';
@@ -339,7 +340,9 @@ function IllustrationDetail({ novelId, illustration }: IllustrationDetailProps):
           </div>
 
           <div>
-            <div className={styles.sectionLabel}>Composed prompt · derived from the canon, not editable</div>
+            <div className={styles.sectionLabel}>
+              {illustration.origin === 'uploaded' ? 'Rework prompt · renders from the selected image, not editable' : 'Composed prompt · derived from the canon, not editable'}
+            </div>
             <pre className={styles.prompt}>{illustration.prompt}</pre>
           </div>
 

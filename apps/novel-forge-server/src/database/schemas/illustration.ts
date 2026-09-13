@@ -9,6 +9,7 @@ export namespace Illustration {
   export type SubjectType = InferEnum<typeof illustrationSubjectType>;
   export type Status = InferEnum<typeof illustrationStatus>;
   export type SaveTarget = 'portrait' | 'gallery' | 'chapter' | 'cover';
+  export type Origin = 'generated' | 'uploaded';
 
   /** The composed, editable image prompt. Every regeneration renders its text from this object — never from a concatenated string. */
   export interface PromptSpec {
