@@ -108,6 +108,12 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ILL_006 = AppErrorCode.badRequest('ILL_006', 'Illustration subject requires an entity key or chapter number');
   static readonly ILL_007 = AppErrorCode.badRequest('ILL_007', 'Refinement must add, remove, or replace exactly one instruction');
   static readonly ILL_008 = AppErrorCode.badRequest('ILL_008', 'Instruction index is out of range');
+  static readonly ILL_009 = AppErrorCode.badRequest('ILL_009', 'Reference source {source} has an invalid source id');
+  static readonly ILL_010 = AppErrorCode.notFound('ILL_010', 'Reference image not found for {source}');
+  static readonly ILL_011 = AppErrorCode.badRequest('ILL_011', 'The image model accepts at most {capacity} reference image(s), but {count} were requested');
+  static readonly ILL_012 = AppErrorCode.badRequest('ILL_012', 'Reference image for {source} is {size} bytes, over the {limit} byte limit');
+  static readonly ILL_013 = AppErrorCode.badRequest('ILL_013', 'Reference images total {size} bytes, over the {limit} byte request limit');
+  static readonly ILL_014 = AppErrorCode.badRequest('ILL_014', 'Reference image for {source} is {contentType}; only PNG, JPEG and WebP are supported');
 
   /*!
    * Continuity Errors
