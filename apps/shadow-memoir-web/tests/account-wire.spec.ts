@@ -120,11 +120,23 @@ describe('Account settings over the wire', () => {
     expect(result.message).toContain('next daily rollover');
   });
 
-  it('should surface a refusal in the server’s own words', async () => {
-    httpFake({ 'PATCH /api/v1/account': () => ({ status: 400, body: { code: 'ACC_001', type: 'BadRequest', message: 'defaultCurrency is immutable' } }) });
+  it('should surface a refusal in owner copy rather than the server’s message', async () => {
+    httpFake({
+      'PATCH /api/v1/account': () => ({
+        status: 400,
+        body: { code: 'ACC_004', type: 'BadRequest', message: "Field 'defaultCurrency' is immutable and cannot be changed via PATCH" },
+      }),
+    });
 
     const result = await (await provider()).dispatchCommand({ type: 'day.set', patch: { timezone: 'Nowhere/Nowhere' } });
-    expect(result).toMatchObject({ status: 'rejected', message: 'defaultCurrency is immutable' });
+    expect(result).toEqual({ status: 'rejected', message: 'That setting can’t be changed.', error: { code: 'ACC_004', kind: 'refusal' } });
+  });
+
+  it('should fall back to the screen’s own copy for an unknown code', async () => {
+    httpFake({ 'PATCH /api/v1/account': () => ({ status: 500, body: { code: 'S999', type: 'Internal', message: 'Unknown Error' } }) });
+
+    const result = await (await provider()).dispatchCommand({ type: 'day.set', patch: { timezone: 'Europe/Lisbon' } });
+    expect(result).toEqual({ status: 'rejected', message: 'That setting could not be saved.', error: { code: 'S999', kind: 'unavailable' } });
   });
 
   it('should patch one notification category without touching the others', async () => {
@@ -184,13 +196,13 @@ describe('Data export over the wire', () => {
     expect(view.sets.find(set => set.name === 'Journal')?.meta).toBe('1 entry');
   });
 
-  it('should refuse a second archive in the server’s own words', async () => {
+  it('should refuse a second archive in owner copy', async () => {
     httpFake({
       'POST /api/v1/account/export': () => ({ status: 409, body: { code: 'EXP_002', type: 'Conflict', message: 'Export request limit reached for today; try again later' } }),
     });
 
     const result = await (await provider()).dispatchCommand({ type: 'export.prepare' });
-    expect(result).toMatchObject({ status: 'rejected', message: 'Export request limit reached for today; try again later' });
+    expect(result).toMatchObject({ status: 'rejected', message: 'You’ve already asked for an export today. Try again tomorrow.', error: { code: 'EXP_002', kind: 'refusal' } });
   });
 });
 

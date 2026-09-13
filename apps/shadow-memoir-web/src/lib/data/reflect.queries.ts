@@ -1,5 +1,6 @@
-import { useMutation, type UseMutationResult, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
+import { type CommandHook, legacySettledResult, readSettledResult, useDomainCommand } from './command-runner';
 import { type SettledCommandResult } from './command.types';
 import { useMemoirData } from './data-context';
 import {
@@ -47,10 +48,15 @@ export function useCoach(): UseQueryResult<CoachView> {
   return useQuery({ queryKey: reflectKeys.coach, queryFn: () => reflect.getCoach() }, queryClient);
 }
 
-export function useReflectCommand(): UseMutationResult<SettledCommandResult, Error, ReflectCommand> {
+export type ReflectCommandHook = CommandHook<ReflectCommand, SettledCommandResult, SettledCommandResult>;
+
+export function useReflectCommand(): ReflectCommandHook {
   const { reflect, queryClient } = useMemoirData();
-  return useMutation(
-    { mutationFn: (command: ReflectCommand) => reflect.dispatchCommand(command), onSuccess: () => void queryClient.invalidateQueries({ queryKey: reflectKeys.all }) },
+  return useDomainCommand({
     queryClient,
-  );
+    dispatch: command => reflect.dispatchCommand(command),
+    read: readSettledResult,
+    legacy: legacySettledResult,
+    refresh: () => queryClient.invalidateQueries({ queryKey: reflectKeys.all }),
+  });
 }

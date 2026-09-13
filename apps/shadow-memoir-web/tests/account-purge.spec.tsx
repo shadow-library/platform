@@ -2,17 +2,7 @@ import { render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { type Command } from '@/lib/data';
-import {
-  type AccountMarker,
-  CommandNotQueuedError,
-  type DeltaPage,
-  type KeyValueBacking,
-  MemoirStore,
-  NOT_QUEUED_MESSAGE,
-  SYNC_META_KEYS,
-  type SyncEngine,
-  SyncEngineProvider,
-} from '@/lib/sync';
+import { type AccountMarker, type DeltaPage, type KeyValueBacking, MemoirStore, SYNC_META_KEYS, type SyncEngine, SyncEngineProvider } from '@/lib/sync';
 
 import { createSyncedTestData, createTestEngine, type FakeServer, sharedBacking, sharedMarker, type TestEngine, type TestEngineOptions } from './sync-harness';
 
@@ -369,12 +359,18 @@ describe('two tabs on different accounts', () => {
     await engineFor('usr_B', backing, marker).engine.start();
 
     await expect(a.engine.enqueue(COMPLETE, TODAY)).resolves.toEqual({ status: 'refused', boundary: 'owner-changed' });
-    expect(await data.provider.dispatchCommand(COMPLETE)).toEqual({ status: 'rejected', message: NOT_QUEUED_MESSAGE });
+    const refused = { delivery: { status: 'refused', boundary: 'owner-changed' } };
+    expect(await data.provider.dispatchCommand(COMPLETE)).toMatchObject(refused);
     expect((await data.provider.getDay(TODAY)).occurrences.find(occurrence => occurrence.questId === 'q1')?.state).toBe('upcoming');
 
     const draft = { amountText: '7.50', currency: 'EUR' as const, categoryId: 'transport' as const, occurredOnDate: TODAY, note: 'Taxi' };
-    await expect(data.finance.dispatchCommand({ type: 'expense.create', draft })).rejects.toBeInstanceOf(CommandNotQueuedError);
+    expect(await data.finance.dispatchCommand({ type: 'expense.create', draft })).toMatchObject(refused);
     expect((await data.finance.expenses({ range: 'month', search: '', limit: 8 })).items).toEqual([]);
+
+    expect(await data.quickLogs.dispatchCommand({ type: 'sidequest.log', draft: { date: TODAY, name: 'Fixed the bike', statAffinity: 'body' } })).toMatchObject(refused);
+    expect((await data.quickLogs.sideQuests()).items).toEqual([]);
+
+    expect(await data.hero.dispatchCommand({ type: 'title.display', titleId: null })).toMatchObject(refused);
   });
 
   it("should never show a stale tab the other account's queue or export job", async () => {

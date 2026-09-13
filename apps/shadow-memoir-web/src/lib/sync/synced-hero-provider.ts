@@ -5,6 +5,7 @@ import {
   type Cosmetic,
   COSMETICS,
   createHeroProvider,
+  type DispatchOptions,
   type HeroCommand,
   type HeroDeck,
   type HeroProvider,
@@ -15,6 +16,7 @@ import {
 } from '@/lib/data';
 
 import { isHeroCommand } from './command-wire';
+import { ignoreAccountBoundary } from './memoir-store';
 import { type HeroGrants, projectHeroGrants } from './projection';
 import { type SyncEngine } from './sync-engine';
 
@@ -121,12 +123,13 @@ export class SyncedHeroProvider implements HeroProvider {
     return { ...recovery, intensity: day.pendingIntensity ?? day.intensity };
   }
 
-  async dispatchCommand(command: HeroCommand): Promise<SettledCommandResult> {
+  async dispatchCommand(command: HeroCommand, options?: DispatchOptions): Promise<SettledCommandResult> {
     if (command.type === 'intensity.set') return this.account.dispatchCommand({ type: 'day.set', patch: { intensity: command.mode } });
 
     const result = this.applyLocally(this.grants, command);
     if (result.status === 'rejected') return result;
-    await this.sync.enqueue(command, this.sync.today);
-    return result;
+    const delivery = await this.sync.enqueue(command, this.sync.today, options);
+    if (delivery.status === 'refused') await this.reproject().catch(ignoreAccountBoundary);
+    return { ...result, delivery };
   }
 }

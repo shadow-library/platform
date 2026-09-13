@@ -114,6 +114,32 @@ describe('Coaching requests', () => {
     expect(String(calls.at(-1)?.body?.['id'])).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  it('should resubmit an unanswered question under the same id', async () => {
+    let attempt = 0;
+    const calls = httpFake({
+      'POST /api/v1/ai/tasks': () => (attempt++ === 0 ? { status: 503, body: { code: 'S001', type: 'Unavailable', message: 'down' } } : { status: 201, body: TASK }),
+    });
+    const reflect = await provider();
+
+    expect(await reflect.dispatchCommand({ type: 'ai.submit', question: 'Why do Thursdays keep failing?' })).toMatchObject({ status: 'rejected', error: { kind: 'unavailable' } });
+    expect(await reflect.dispatchCommand({ type: 'ai.submit', question: 'Why do Thursdays keep failing?' })).toMatchObject({ status: 'applied' });
+
+    const ids = calls.filter(call => call.path === '/api/v1/ai/tasks').map(call => call.body?.['id']);
+    expect(ids).toHaveLength(2);
+    expect(ids[1]).toBe(ids[0]);
+  });
+
+  it('should mint a new id once a question has been accepted', async () => {
+    const calls = httpFake({ 'POST /api/v1/ai/tasks': () => ({ status: 201, body: TASK }) });
+    const reflect = await provider();
+
+    await reflect.dispatchCommand({ type: 'ai.submit', question: 'Why do Thursdays keep failing?' });
+    await reflect.dispatchCommand({ type: 'ai.submit', question: 'Why do Thursdays keep failing?' });
+
+    const ids = calls.filter(call => call.path === '/api/v1/ai/tasks').map(call => call.body?.['id']);
+    expect(new Set(ids).size).toBe(2);
+  });
+
   it('should never reach the server with an empty question', async () => {
     const calls = httpFake({});
     const result = await (await provider()).dispatchCommand({ type: 'ai.submit', question: '   ' });
@@ -135,11 +161,11 @@ describe('Coaching requests', () => {
     expect(result.message).toContain('Coach raises the allowance');
   });
 
-  it('should surface the daily cap in the server’s own words', async () => {
+  it('should surface the daily cap in owner copy as a request worth retrying', async () => {
     httpFake({ 'POST /api/v1/ai/tasks': () => ({ status: 429, body: { code: 'AI_002', type: 'BadRequest', message: 'Daily AI quota exhausted; try again tomorrow' } }) });
 
     const result = await (await provider()).dispatchCommand({ type: 'ai.submit', question: 'Why do Thursdays keep failing?' });
-    expect(result).toMatchObject({ status: 'rejected', message: 'Daily AI quota exhausted; try again tomorrow' });
+    expect(result).toMatchObject({ status: 'rejected', message: 'Today’s requests are used up. Try again tomorrow.', error: { code: 'AI_002', kind: 'unavailable' } });
   });
 
   it('should refuse to cancel a task the worker already claimed', async () => {
@@ -148,7 +174,7 @@ describe('Coaching requests', () => {
     });
 
     const result = await (await provider()).dispatchCommand({ type: 'ai.cancel', requestId: 'task-1' });
-    expect(result).toMatchObject({ status: 'rejected', message: 'This task is no longer pending and cannot be cancelled' });
+    expect(result).toMatchObject({ status: 'rejected', message: 'It has already started, so it can’t be cancelled.', error: { code: 'AI_004', kind: 'refusal' } });
   });
 
   it('should count only this month’s charged tasks against the free allowance', async () => {

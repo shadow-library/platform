@@ -1,6 +1,10 @@
 import { addDays, DEFAULT_LOCALE, parseISODate, toISODate } from '@shadow-library/ui';
 
+import { type Command } from './command.types';
+import { type FinanceCommand } from './finance.types';
+import { type HeroCommand } from './hero.types';
 import { type OccurrenceState, type ReasonTag, type StatAffinity, type Strictness, type Weekday } from './quest.types';
+import { type QuickLogCommand } from './quick-logs.types';
 
 export const WEEKDAYS: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
@@ -61,6 +65,38 @@ export const REASON_LABELS: Record<ReasonTag, string> = {
   poorly_planned: 'poorly planned',
   other: 'other',
 };
+
+type OutboxCommandType = Command['type'] | FinanceCommand['type'] | QuickLogCommand['type'] | HeroCommand['type'];
+
+export const COMMAND_LABELS: Partial<Record<OutboxCommandType, string>> = {
+  'quest.complete': 'Quest completed',
+  'quest.partial': 'Quest partly done',
+  'quest.skip': 'Quest skipped',
+  'quest.postpone': 'Quest postponed',
+  'quest.reschedule': 'Quest moved',
+  'quest.create': 'New quest',
+  'quest.update': 'Quest edited',
+  'expense.create': 'Expense',
+  'expense.update': 'Expense edited',
+  'expense.delete': 'Expense deleted',
+  'subscription.create': 'New subscription',
+  'subscription.setActive': 'Subscription paused or resumed',
+  'subscription.confirmCycle': 'Subscription charge confirmed',
+  'journal.save': 'Journal entry',
+  'meal.log': 'Meal',
+  'meal.logPreset': 'Meal',
+  'meal.savePreset': 'Meal preset',
+  'weight.save': 'Weight',
+  'sidequest.log': 'Side quest',
+  'health.save': 'Health entry',
+  'title.display': 'Displayed title',
+  'cosmetic.purchase': 'Cosmetic bought',
+  'cosmetic.equip': 'Cosmetic equipped',
+};
+
+export function commandLabel(type: string): string {
+  return COMMAND_LABELS[type as OutboxCommandType] ?? 'Change';
+}
 
 export function toDate(value: string): Date {
   return parseISODate(value) ?? new Date(value);

@@ -1,4 +1,4 @@
-import { type Command, type CommandResult } from './command.types';
+import { type Command, type CommandResult, type DispatchOptions } from './command.types';
 import { type QuestDetail, type QuestDraft, type QuestSummary } from './quest.types';
 import { type CaptureTarget, type DayView, type PlanView, type QuestDraftPreview } from './view.types';
 
@@ -24,5 +24,5 @@ export interface DataProvider {
   previewDraft(draft: QuestDraft): Promise<QuestDraftPreview>;
   /** Quest-name matching for Quick Capture — today's occurrences only, ranked best-first. */
   findOccurrences(query: string, date: string): Promise<CaptureTarget[]>;
-  dispatchCommand(command: Command): Promise<CommandResult>;
+  dispatchCommand(command: Command, options?: DispatchOptions): Promise<CommandResult>;
 }

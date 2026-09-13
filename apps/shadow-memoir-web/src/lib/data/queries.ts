@@ -1,7 +1,9 @@
-import { useMutation, type UseMutationResult, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-import { type Command, type CommandResult } from './command.types';
-import { type PlanRange, type QuestFilter } from './data-provider';
+import { occurrenceSupersededCopy, refusedCopy } from './command-feedback';
+import { type CommandHook, type LocalReading, useDomainCommand } from './command-runner';
+import { type Command, type CommandConfirmation, type CommandOutcome, type CommandResult } from './command.types';
+import { type DataProvider, type PlanRange, type QuestFilter } from './data-provider';
 import { useMemoirData } from './data-context';
 import { type QuestDetail, type QuestDraft, type QuestSummary } from './quest.types';
 import { type CaptureTarget, type DayView, type PlanView, type QuestDraftPreview, type QuickLogTile } from './view.types';
@@ -55,16 +57,36 @@ export function useOccurrenceSearch(query: string): UseQueryResult<CaptureTarget
   return useQuery({ queryKey: memoirKeys.occurrences(query, today), queryFn: () => provider.findOccurrences(query, today), enabled: query.trim().length > 0 }, queryClient);
 }
 
-export function useCommand(): UseMutationResult<CommandResult, Error, Command> {
+export type QuestCommandHook = CommandHook<Command, CommandResult, CommandOutcome, CommandConfirmation>;
+
+function readQuestResult(result: CommandResult): LocalReading<CommandOutcome, CommandConfirmation> {
+  if (result.status === 'needs-confirmation') return { kind: 'confirm', confirmation: result };
+  if (result.status === 'rejected') return { kind: 'rejected', message: result.message, error: result.error };
+  return { kind: 'done', local: result, delivery: result.delivery, xpAwarded: result.xpAwarded, coinsAwarded: result.coinsAwarded };
+}
+
+function legacyQuestResult(result: CommandResult): CommandResult {
+  if (result.status === 'needs-confirmation' || result.status === 'rejected' || result.delivery?.status !== 'refused') return result;
+  return { status: 'rejected', message: refusedCopy(result.delivery.boundary) };
+}
+
+/** The server reports which outcome won an occurrence; the mock and older servers leave it to the delta, which has landed by the time a claim settles. */
+async function describeOccurrenceWinner(provider: DataProvider, command: Command, result: Record<string, unknown>): Promise<string | null> {
+  if (typeof result['state'] === 'string' || !('occurrenceId' in command)) return null;
+  const date = command.occurrenceId.split(':')[1];
+  if (!date) return null;
+  const occurrence = (await provider.getDay(date)).occurrences.find(item => item.id === command.occurrenceId);
+  return occurrence && occurrence.state !== 'upcoming' ? occurrenceSupersededCopy(occurrence.state) : null;
+}
+
+export function useCommand(): QuestCommandHook {
   const { provider, queryClient } = useMemoirData();
-  return useMutation(
-    {
-      mutationFn: (command: Command) => provider.dispatchCommand(command),
-      onSuccess: result => {
-        if (result.status === 'needs-confirmation') return;
-        void queryClient.invalidateQueries({ queryKey: memoirKeys.all });
-      },
-    },
+  return useDomainCommand({
     queryClient,
-  );
+    dispatch: (command, options) => provider.dispatchCommand(command, options),
+    read: readQuestResult,
+    legacy: legacyQuestResult,
+    refresh: () => queryClient.invalidateQueries({ queryKey: memoirKeys.all }),
+    describeSuperseded: (command, result) => describeOccurrenceWinner(provider, command, result),
+  });
 }

@@ -1,5 +1,6 @@
-import { useMutation, type UseMutationResult, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
+import { type CommandHook, legacySettledResult, readSettledResult, useDomainCommand } from './command-runner';
 import { type SettledCommandResult } from './command.types';
 import { useMemoirData } from './data-context';
 import { type HeroCommand, type HeroDeck, type RecoveryView } from './hero.types';
@@ -20,10 +21,15 @@ export function useRecovery(): UseQueryResult<RecoveryView> {
   return useQuery({ queryKey: heroKeys.recovery, queryFn: () => hero.getRecovery() }, queryClient);
 }
 
-export function useHeroCommand(): UseMutationResult<SettledCommandResult, Error, HeroCommand> {
+export type HeroCommandHook = CommandHook<HeroCommand, SettledCommandResult, SettledCommandResult>;
+
+export function useHeroCommand(): HeroCommandHook {
   const { hero, queryClient } = useMemoirData();
-  return useMutation(
-    { mutationFn: (command: HeroCommand) => hero.dispatchCommand(command), onSuccess: () => void queryClient.invalidateQueries({ queryKey: heroKeys.all }) },
+  return useDomainCommand({
     queryClient,
-  );
+    dispatch: (command, options) => hero.dispatchCommand(command, options),
+    read: readSettledResult,
+    legacy: legacySettledResult,
+    refresh: () => queryClient.invalidateQueries({ queryKey: heroKeys.all }),
+  });
 }

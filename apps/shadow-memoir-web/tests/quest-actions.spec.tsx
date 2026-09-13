@@ -1,10 +1,13 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { toast } from '@shadow-library/ui';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TodayScreen } from '@/features/today';
 import { type MemoirData, type OccurrenceState } from '@/lib/data';
+import { type DeltaPage, type SyncedMemoirData, SyncEngineProvider, type WireCommandOutcome } from '@/lib/sync';
 
 import { createMemoirTestData, renderScreen } from './harness';
+import { applied, createSyncedTestData, createTestEngine, rejected, superseded, type TestEngineOptions } from './sync-harness';
 
 const TODAY = '2026-08-22';
 
@@ -173,5 +176,166 @@ describe('TodayScreen quest actions', () => {
 
     const note = (await screen.findByLabelText('Reason note')) as HTMLTextAreaElement;
     expect(note.value).toBe('');
+  });
+});
+
+const SYNCED_TODAY = '2026-08-24';
+
+function questRow(id: string, name: string): Record<string, unknown> {
+  return {
+    id,
+    name,
+    notes: null,
+    startTimeMin: 420,
+    durationMin: 30,
+    statAffinity: 'body',
+    strictness: 'routine',
+    optionalStreakOptIn: false,
+    recurrence: { frequency: 'daily', interval: 1, startDate: '2026-08-01', end: { kind: 'never' }, exceptions: [] },
+    moduleLink: null,
+    reminderEnabled: false,
+    reminderLeadMin: 0,
+    healthThreshold: null,
+    active: true,
+    syncSeq: id,
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+  };
+}
+
+function logRow(state: OccurrenceState): Record<string, unknown> {
+  return {
+    id: 'log-1',
+    questId: 'q1',
+    date: SYNCED_TODAY,
+    state,
+    xpAwarded: 0,
+    coinsAwarded: 0,
+    reasonTag: state === 'skipped' ? 'schedule_conflict' : null,
+    reasonNote: null,
+    rescheduledToMin: null,
+    postponedToDate: null,
+    statAffinity: 'body',
+    performedAt: `${SYNCED_TODAY}T07:30:00.000Z`,
+    createdAt: `${SYNCED_TODAY}T07:30:00.000Z`,
+    syncSeq: '2',
+  };
+}
+
+function page(overrides: Partial<DeltaPage>): DeltaPage {
+  return { cursor: '1', hasMore: false, domains: {}, tombstones: [], ...overrides };
+}
+
+function syncedToday(
+  outcome: (commandId: string) => WireCommandOutcome,
+  afterFlush: DeltaPage = page({ domains: {} }),
+  fetchImpl?: TestEngineOptions['fetchImpl'],
+): SyncedMemoirData {
+  const { engine } = createTestEngine({
+    today: SYNCED_TODAY,
+    pages: [page({ domains: { quests: [questRow('q1', 'Morning run'), questRow('q2', 'Evening stretch')] } }), afterFlush],
+    outcomes: batch => batch.commandIds.map(outcome),
+    fetchImpl,
+  });
+  const data = createSyncedTestData(engine);
+  renderScreen(
+    <SyncEngineProvider data={data}>
+      <TodayScreen />
+    </SyncEngineProvider>,
+    { value: data },
+  );
+  return data;
+}
+
+describe('TodayScreen quest outcomes', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('should not toast success when the server rejects', async () => {
+    const success = vi.spyOn(toast, 'success');
+    const warning = vi.spyOn(toast, 'warning');
+    const data = syncedToday(id => rejected(id, 'This quest log is outside its 7-day edit window', 'QST_006'), page({ cursor: '2', domains: {} }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark complete: Morning run' }));
+
+    await waitFor(() => expect(warning).toHaveBeenCalledWith('Couldn’t complete ‘Morning run’ — undone: Entries older than 7 days can’t be changed.', undefined));
+    expect(warning).toHaveBeenCalledTimes(1);
+    expect(success).not.toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: 'Mark complete: Morning run' })).toBeDefined();
+    expect(data.engine.getSnapshot().notices).toEqual([]);
+  });
+
+  it('should keep the actions overlay open and name the quest when a completion is rejected', async () => {
+    const warning = vi.spyOn(toast, 'warning');
+    syncedToday(id => rejected(id, 'no', 'QST_006'), page({ cursor: '2', domains: {} }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Morning run' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Complete' }));
+
+    await waitFor(() => expect(warning).toHaveBeenCalledWith('Couldn’t complete ‘Morning run’ — undone: Entries older than 7 days can’t be changed.', undefined));
+    expect(screen.getByRole('button', { name: 'Complete' })).toBeDefined();
+  });
+
+  it('should warn when another device superseded the action', async () => {
+    const warning = vi.spyOn(toast, 'warning');
+    const success = vi.spyOn(toast, 'success');
+    syncedToday(id => superseded(id), page({ cursor: '2', domains: { quest_logs: [logRow('skipped')] } }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark complete: Morning run' }));
+
+    await waitFor(() => expect(warning).toHaveBeenCalledWith('‘Morning run’ changed on another device: Another device already recorded it as skipped.', undefined));
+    expect(success).not.toHaveBeenCalled();
+  });
+
+  it('should toast success once the server applies the completion', async () => {
+    const success = vi.spyOn(toast, 'success');
+    const neutral = vi.spyOn(toast, 'neutral');
+    syncedToday(id => applied(id), page({ cursor: '2', domains: { quest_logs: [logRow('completed')] } }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark complete: Morning run' }));
+
+    await waitFor(() => expect(success).toHaveBeenCalledTimes(1));
+    expect(success.mock.calls[0]?.[0]).toContain('Morning run');
+    expect(neutral).not.toHaveBeenCalled();
+  });
+
+  it('should keep another quest’s actions available while one completion waits for the server', async () => {
+    let answer: () => void = () => undefined;
+    const held = new Promise<void>(resolve => (answer = resolve));
+    syncedToday(
+      id => applied(id),
+      page({ cursor: '2', domains: {} }),
+      server => async (input, init) => {
+        if (String(input).includes('/sync/commands')) await held;
+        return server.fetchImpl(input, init);
+      },
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark complete: Morning run' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Evening stretch' }));
+
+    expect((await screen.findByRole('button', { name: 'Complete' })).hasAttribute('disabled')).toBe(false);
+    answer();
+  });
+
+  it('should fall back to generic superseded copy when the winner cannot be read back', async () => {
+    const warning = vi.spyOn(toast, 'warning');
+    const data = syncedToday(id => superseded(id), page({ cursor: '2', domains: {} }));
+    const trigger = await screen.findByRole('button', { name: 'Mark complete: Morning run' });
+    vi.spyOn(data.provider, 'getDay').mockRejectedValue(new Error('mirror unreadable'));
+
+    fireEvent.click(trigger);
+
+    await waitFor(() => expect(warning).toHaveBeenCalledWith('‘Morning run’ changed on another device: Another device got there first, so this change wasn’t applied.', undefined));
+  });
+
+  it('should report a dispatch that throws instead of leaving an unhandled rejection', async () => {
+    const danger = vi.spyOn(toast, 'danger');
+    const data = syncedToday(id => applied(id));
+    const trigger = await screen.findByRole('button', { name: 'Mark complete: Morning run' });
+    vi.spyOn(data.provider, 'dispatchCommand').mockRejectedValue(new Error('store refused'));
+
+    fireEvent.click(trigger);
+
+    await waitFor(() => expect(danger).toHaveBeenCalledWith('Couldn’t complete ‘Morning run’: Something went wrong on our side.', undefined));
   });
 });

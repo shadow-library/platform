@@ -5,6 +5,7 @@ import {
   averageOf,
   type CurrencyCode,
   type DayValue,
+  type DispatchOptions,
   formatMetricValue,
   HEALTH_METRICS,
   type HealthMetricEntry,
@@ -29,6 +30,7 @@ import {
 } from '@/lib/data';
 
 import { isQuickLogCommand, mintCommandIds } from './command-wire';
+import { ignoreAccountBoundary } from './memoir-store';
 import { projectFinanceRows, projectQuickLogRows, type QuickLogRows } from './projection';
 import { type SyncEngine } from './sync-engine';
 
@@ -256,7 +258,7 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
     return null;
   }
 
-  async dispatchCommand(command: QuickLogCommand): Promise<QuickLogCommandResult> {
+  async dispatchCommand(command: QuickLogCommand, options?: DispatchOptions): Promise<QuickLogCommandResult> {
     const resolved = command.type === 'health.save' ? { ...command, metricId: this.state.metricIds[command.key] } : command;
     const minted = mintCommandIds(resolved) as QuickLogCommand;
 
@@ -266,7 +268,8 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
     const result = applyQuickLogCommand(this.state, minted, { linkage });
     if (result.needsConfirmation) return result;
 
-    await this.sync.enqueue(minted, this.sync.today);
-    return result;
+    const delivery = await this.sync.enqueue(minted, this.sync.today, options);
+    if (delivery.status === 'refused') await this.reproject().catch(ignoreAccountBoundary);
+    return { ...result, delivery };
   }
 }

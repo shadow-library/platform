@@ -1,6 +1,9 @@
+import { type DispatchOptions, type OutcomeTicket, type ServerSettlement, type UnconfirmedReason } from '@/lib/data/command.types';
+
+import { isServerBacked } from './command-wire';
 import { AccountBoundaryError, ignoreAccountBoundary, type MemoirStore, type StoreBoundary } from './memoir-store';
 import { type DomainRows, projectWorldState } from './projection';
-import { Outbox } from './outbox';
+import { type AckedCommand, Outbox } from './outbox';
 import { SyncClient, toSyncFailureReason } from './sync-client';
 import {
   type CommandEnvelope,
@@ -28,26 +31,32 @@ export interface SyncEngineOptions {
   principal?: () => Promise<string>;
   /** Called when this engine's account no longer owns the session or the store, so the shell can rebuild for the account that does. */
   onAccountChanged?: () => void;
+  /** How long a claimed outcome is waited for before the claim answers `unconfirmed` and lets the outcome arrive as a notice instead. */
+  outcomeTimeoutMs?: number;
 }
 
 /** `local` commands have no server handler; `refused` ones reached a store this engine's account no longer holds, and the caller must undo its optimistic apply. */
-export type EnqueueResult = { status: 'queued' } | { status: 'local' } | { status: 'refused'; boundary: StoreBoundary };
+export type EnqueueResult = { status: 'queued'; commandId: string; ticket?: OutcomeTicket } | { status: 'local' } | { status: 'refused'; boundary: StoreBoundary };
 
-export const NOT_QUEUED_MESSAGE = "That change wasn't saved: a different account is now signed in on this browser.";
-
-export class CommandNotQueuedError extends Error {
-  constructor() {
-    super(NOT_QUEUED_MESSAGE);
-    this.name = 'CommandNotQueuedError';
-  }
+interface OutcomeClaim {
+  commandType: SyncCommand['type'];
+  resolve: (settlement: ServerSettlement) => void;
+  timer: ReturnType<typeof setTimeout> | null;
+  /** The server's answer, held until the pass that brought it has also pulled what it changed. */
+  known: AckedCommand['settlement'] | null;
+  delivered: boolean;
 }
 
 const DEFAULT_MAX_PAGES = 50;
+const DEFAULT_OUTCOME_TIMEOUT_MS = 8_000;
 const MAX_PULL_ROUNDS = 20;
 
 const LOADING: SyncReadiness = { kind: 'loading' };
 const READY: SyncReadiness = { kind: 'ready' };
 const DELETION_PENDING: SyncReadiness = { kind: 'failed', reason: 'deletion-pending' };
+
+/** A server error may clear on the replay a claim is still waiting for; the others leave nothing sending until the owner acts. */
+const UNSENDABLE: Record<SyncFailureReason, UnconfirmedReason | null> = { server: null, offline: 'offline', 'deletion-pending': 'deletion', 'signed-out': 'held' };
 
 const FAILURE_STATES: Record<SyncFailureReason, NetState> = { server: 'failed', offline: 'offline', 'deletion-pending': 'failed', 'signed-out': 'signed-out' };
 
@@ -92,6 +101,8 @@ export class SyncEngine {
   private deletionPending = false;
   private coldFailure: SyncFailureReason | null = null;
   private inFlight: Promise<void> | null = null;
+  private passRequested = false;
+  private readonly claims = new Map<string, OutcomeClaim>();
 
   constructor(private readonly options: SyncEngineOptions) {
     this.store = options.store;
@@ -163,7 +174,9 @@ export class SyncEngine {
 
   /** Ends this engine's hold on the store. A pass still running stops at its next read or write instead of finishing into whatever opens the store next. */
   stop(): void {
+    this.passRequested = false;
     this.store.close();
+    this.settleClaims({ status: 'unconfirmed', reason: 'slow' });
   }
 
   async hydrate(): Promise<void> {
@@ -176,20 +189,28 @@ export class SyncEngine {
     this.patch({ queuedCount: await this.outbox.size(), lastSyncedAt, readiness: this.readiness() });
   }
 
-  /** Enqueues a command for the server; the caller has already applied it locally. Purely-local commands return without queueing. */
-  async enqueue(command: SyncCommand, localDate: string): Promise<EnqueueResult> {
+  /**
+   * Enqueues a command for the server; the caller has already applied it locally. Purely-local commands return
+   * without queueing. With `awaitOutcome`, the outcome is claimed before the entry exists, so no pass can settle it
+   * unclaimed and raise a notice the claimant is about to present itself.
+   */
+  async enqueue(command: SyncCommand, localDate: string, options: DispatchOptions = {}): Promise<EnqueueResult> {
+    const commandId = this.outbox.mintCommandId();
+    const ticket = options.awaitOutcome && isServerBacked(command) ? this.claim(commandId, command.type) : undefined;
     try {
-      const entry = await this.outbox.enqueue(command, localDate);
+      const entry = await this.outbox.enqueue(command, localDate, commandId);
       if (!entry) return { status: 'local' };
       this.patch({ queuedCount: await this.outbox.size() });
     } catch (error) {
+      this.dropClaim(commandId);
       if (!(error instanceof AccountBoundaryError)) throw error;
       this.leaveAccount(error);
       return { status: 'refused', boundary: error.boundary };
     }
     if (!isOnline()) this.markOffline();
-    else if (this.snapshot.state !== 'signed-out') void this.sync();
-    return { status: 'queued' };
+    else if (this.snapshot.state === 'signed-out') this.settleClaims({ status: 'unconfirmed', reason: 'held' });
+    else this.requestPass();
+    return ticket ? { status: 'queued', commandId, ticket } : { status: 'queued', commandId };
   }
 
   dismissNotice(commandId: string): void {
@@ -198,12 +219,79 @@ export class SyncEngine {
 
   /** Flush then pull, serialized — two overlapping passes would post the same batch twice and race the cursor. */
   sync(): Promise<void> {
-    return (this.inFlight ??= this.runSync().finally(() => void (this.inFlight = null)));
+    return (this.inFlight ??= this.runSync().finally(() => this.afterPass()));
+  }
+
+  /** A command enqueued while a pass is past its flush would otherwise sit until something else starts one. */
+  private requestPass(): void {
+    if (this.inFlight) this.passRequested = true;
+    else void this.sync();
+  }
+
+  private afterPass(): void {
+    this.inFlight = null;
+    if (!this.passRequested) return;
+    this.passRequested = false;
+    if (isOnline() && this.snapshot.state !== 'signed-out') void this.sync();
   }
 
   private markOffline(): void {
     this.coldFailure = 'offline';
     this.patch({ state: 'offline', readiness: this.readiness() });
+    this.settleClaims({ status: 'unconfirmed', reason: 'offline' });
+  }
+
+  private claim(commandId: string, commandType: SyncCommand['type']): OutcomeTicket {
+    let resolve: (settlement: ServerSettlement) => void = () => undefined;
+    const settled = new Promise<ServerSettlement>(done => (resolve = done));
+    const claim: OutcomeClaim = { commandType, resolve, timer: null, known: null, delivered: false };
+    claim.timer = setTimeout(() => this.settleClaim(commandId, claim, { status: 'unconfirmed', reason: 'slow' }), this.options.outcomeTimeoutMs ?? DEFAULT_OUTCOME_TIMEOUT_MS);
+    this.claims.set(commandId, claim);
+    return { settled, acknowledge: () => this.dropClaim(commandId), release: () => this.releaseClaim(commandId) };
+  }
+
+  /** A claim answered without the server's outcome lets go of it, so the outcome still reaches the owner as a notice when it lands. */
+  private settleClaim(commandId: string, claim: OutcomeClaim, fallback: ServerSettlement): void {
+    if (claim.delivered) return;
+    if (claim.timer) clearTimeout(claim.timer);
+    claim.timer = null;
+    claim.delivered = true;
+    if (claim.known) return claim.resolve(claim.known);
+    this.claims.delete(commandId);
+    claim.resolve(fallback);
+  }
+
+  /** Without a fallback only the claims whose outcome is known are answered; the rest keep waiting for a replay in a later pass, or their timeout. */
+  private settleClaims(fallback?: ServerSettlement): void {
+    for (const [commandId, claim] of [...this.claims]) {
+      if (claim.known) this.settleClaim(commandId, claim, claim.known);
+      else if (fallback) this.settleClaim(commandId, claim, fallback);
+    }
+  }
+
+  /** Claims whose outcome is known stay for the post-pull `settleClaims`, so their toast never lands before the revert. */
+  private settleWaitingClaims(fallback: ServerSettlement): void {
+    for (const [commandId, claim] of [...this.claims]) if (!claim.known) this.settleClaim(commandId, claim, fallback);
+  }
+
+  private dropClaim(commandId: string): void {
+    const claim = this.claims.get(commandId);
+    if (claim?.timer) clearTimeout(claim.timer);
+    this.claims.delete(commandId);
+  }
+
+  private releaseClaim(commandId: string): void {
+    const claim = this.claims.get(commandId);
+    this.dropClaim(commandId);
+    if (claim?.known) this.raiseNotices([{ commandId, commandType: claim.commandType, settlement: claim.known }]);
+  }
+
+  private raiseNotices(settled: { commandId: string; commandType: SyncCommand['type']; settlement: AckedCommand['settlement'] }[]): void {
+    const notices: SyncNotice[] = settled.flatMap(({ commandId, commandType, settlement }) => {
+      if (settlement.status === 'applied') return [];
+      return [{ commandId, commandType, outcome: settlement.status, code: 'code' in settlement ? settlement.code : null }];
+    });
+    if (notices.length) this.patch({ notices: [...this.snapshot.notices, ...notices] });
   }
 
   private async runSync(): Promise<void> {
@@ -223,6 +311,7 @@ export class SyncEngine {
       if (!complete && !this.mirrorReady) this.coldFailure = 'server';
       const state = interrupted || !complete ? 'failed' : 'online';
       this.patch({ state, lastSyncedAt, queuedCount: await this.outbox.size(), readiness: this.readiness(), sending: [] });
+      this.settleClaims();
     } catch (error) {
       await this.handleFailure(error).catch(ignoreAccountBoundary);
     }
@@ -239,6 +328,8 @@ export class SyncEngine {
     if (reason === 'deletion-pending') await this.setDeletionPending(true);
     else this.coldFailure = reason;
     this.patch({ state: FAILURE_STATES[reason], queuedCount: await this.outbox.size(), readiness: this.readiness(), sending: [] });
+    const held = UNSENDABLE[reason];
+    this.settleClaims(held ? { status: 'unconfirmed', reason: held } : undefined);
   }
 
   /** A pulled mirror stays readable through any failure except a deletion, which no retry recovers from; that one holds until a pass succeeds. */
@@ -271,16 +362,15 @@ export class SyncEngine {
   }
 
   /**
-   * Posts batches in strict order until the queue drains or a command fails. A short outcome list means
-   * everything from the first unacked command onward is still queued, so the next pass resends from there
-   * under the same ids — the server replays their recorded outcomes rather than re-running them.
+   * Posts batches in strict order until the queue drains or a command fails in a way a resend can fix. A short
+   * outcome list means everything from the first unacked command onward is still queued, so the next pass resends
+   * from there under the same ids — the server replays their recorded outcomes rather than re-running them. A
+   * claimed command's outcome is held for its claimant; every other non-applied one is a notice.
    */
   private async flush(): Promise<boolean> {
-    const notices: SyncNotice[] = [];
-
     for (let posted = 0; ; posted += 1) {
       const batch = await this.outbox.nextBatch();
-      if (batch.length === 0) break;
+      if (batch.length === 0) return false;
       if (posted > 0) await this.confirmPrincipal();
 
       this.patch({ sending: batch.map(entry => entry.commandId) });
@@ -290,20 +380,26 @@ export class SyncEngine {
       const result = await this.outbox.ack(batch, response.outcomes);
       this.patch({ sending: [] });
       await this.publishProjection();
-      notices.push(...result.notices);
-      if (result.interrupted) {
-        if (notices.length) this.patch({ notices: [...this.snapshot.notices, ...notices] });
-        return true;
-      }
+      this.holdOrNotify(result.settled);
+      if (result.progress === 'held') this.settleWaitingClaims({ status: 'unconfirmed', reason: 'held' });
+      if (result.progress !== 'continue') return true;
     }
+  }
 
-    if (notices.length) this.patch({ notices: [...this.snapshot.notices, ...notices] });
-    return false;
+  private holdOrNotify(settled: AckedCommand[]): void {
+    const unclaimed = settled.filter(({ entry, settlement }) => {
+      const claim = this.claims.get(entry.commandId);
+      if (!claim || claim.delivered) return true;
+      claim.known = settlement;
+      return false;
+    });
+    this.raiseNotices(unclaimed.map(({ entry, settlement }) => ({ commandId: entry.commandId, commandType: entry.command.type, settlement })));
   }
 
   /** A closed store belongs to an engine nobody renders any more; the other two leave this tab speaking for an account the session no longer is. */
   private leaveAccount(error: AccountBoundaryError): void {
-    if (error.boundary === 'closed') return;
+    if (error.boundary === 'closed') return this.settleClaims({ status: 'unconfirmed', reason: 'slow' });
+    this.settleClaims({ status: 'refused', boundary: error.boundary });
     this.patch({ state: 'signed-out', sending: [] });
     this.options.onAccountChanged?.();
   }

@@ -115,10 +115,28 @@ export type SyncFailureReason = 'server' | 'offline' | 'deletion-pending' | 'sig
 /** Whether this device holds a pulled mirror for the account: `loading` and `failed` mean an empty mirror is not an empty account. */
 export type SyncReadiness = { kind: 'loading' } | { kind: 'failed'; reason: SyncFailureReason } | { kind: 'ready' };
 
-/** A command the server refused. Surfaced once, calmly, then dropped — the outbox never holds a rejection. */
+export type SyncNoticeOutcome = 'rejected' | 'superseded' | 'failed';
+
+/**
+ * A command whose outcome nobody on screen is waiting for — replayed after a reload, released by a screen that
+ * went away, or answered after its screen stopped waiting. Surfaced once, then dropped; the outbox never holds it.
+ */
 export interface SyncNotice {
   commandId: string;
-  message: string;
+  commandType: SyncCommand['type'];
+  outcome: SyncNoticeOutcome;
+  code: string | null;
+}
+
+/** A command the server failed in a way no resend can change. It leaves the queue so the commands behind it can go, and is kept here so it is never lost silently. */
+export interface DeadLetter {
+  commandId: string;
+  type: string;
+  command: SyncCommand;
+  localDate: string;
+  createdAt: string;
+  code: string | null;
+  deadLetteredAt: string;
 }
 
 export interface SyncSnapshot {
@@ -145,4 +163,5 @@ export const SYNC_META_KEYS = {
   outboxSeq: 'outbox-seq',
   exportJobId: 'export-job-id',
   weeklyReview: 'weekly-review',
+  deadLetters: 'dead-letters',
 } as const;

@@ -1,5 +1,6 @@
 import { addDays, toISODate } from '@shadow-library/ui';
 
+import { type DispatchOptions } from './command.types';
 import { deriveCapAdvisory } from './entry-caps';
 import { categoryBreakdown, convertToHomeMinor, daysBetween, monthlyEquivalentMinor, parseAmountToMinor, sumHomeMinor } from './finance.rules';
 import {
@@ -28,7 +29,7 @@ export interface FinanceProvider {
   expense(id: string): Promise<ExpenseDetail | null>;
   subscriptions(): Promise<SubscriptionsView>;
   categories(): Promise<CategoriesView>;
-  dispatchCommand(command: FinanceCommand): Promise<FinanceCommandResult>;
+  dispatchCommand(command: FinanceCommand, options?: DispatchOptions): Promise<FinanceCommandResult>;
 }
 
 const HOME_CURRENCY: CurrencyCode = 'EUR';

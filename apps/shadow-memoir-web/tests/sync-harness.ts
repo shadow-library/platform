@@ -45,12 +45,17 @@ export function applied(commandId: string, replayed = false): WireCommandOutcome
   return { commandId, status: 'applied', result: {}, replayed };
 }
 
-export function rejected(commandId: string, message: string): WireCommandOutcome {
-  return { commandId, status: 'rejected', result: {}, replayed: false, error: { code: 'CMD_002', message } };
+export function rejected(commandId: string, message: string, code = 'CMD_002'): WireCommandOutcome {
+  return { commandId, status: 'rejected', result: {}, replayed: false, error: { code, message } };
 }
 
-export function failed(commandId: string, message = 'transaction rolled back'): WireCommandOutcome {
-  return { commandId, status: 'failed', result: {}, replayed: false, error: { code: 'CMD_003', message } };
+export function superseded(commandId: string, result: Record<string, unknown> = {}): WireCommandOutcome {
+  return { commandId, status: 'superseded', result, replayed: false };
+}
+
+/** Defaults to a rate-limit code, which a resend can clear, so the command stays queued; pass a catalogue refusal such as `QST_003` to model a dead letter. */
+export function failed(commandId: string, message = 'transaction rolled back', code = 'S007'): WireCommandOutcome {
+  return { commandId, status: 'failed', result: {}, replayed: false, error: { code, message } };
 }
 
 export function createFakeServer(options: FakeServerOptions = {}): FakeServer {
@@ -111,6 +116,7 @@ export interface TestEngineOptions extends FakeServerOptions {
   onAccountChanged?: () => void;
   marker?: AccountMarker;
   fetchImpl?: (server: FakeServer) => typeof fetch;
+  outcomeTimeoutMs?: number;
 }
 
 /** One browser's last-account record, shared by every tab's store the way localStorage is. */
@@ -129,6 +135,7 @@ export function createTestEngine(options: TestEngineOptions = {}): TestEngine {
     today: options.today ?? '2026-08-24',
     principal: options.principal,
     onAccountChanged: options.onAccountChanged,
+    outcomeTimeoutMs: options.outcomeTimeoutMs,
   });
   return { engine, store, server };
 }

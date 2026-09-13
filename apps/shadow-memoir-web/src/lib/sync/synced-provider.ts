@@ -4,6 +4,7 @@ import {
   type CommandResult,
   type DataProvider,
   type DayView,
+  type DispatchOptions,
   MemoirEngine,
   type MemoirWorldState,
   needsConfirmation,
@@ -18,7 +19,7 @@ import {
 
 import { isQuestCommand, isServerBacked } from './command-wire';
 import { ignoreAccountBoundary } from './memoir-store';
-import { NOT_QUEUED_MESSAGE, type SyncEngine } from './sync-engine';
+import { type SyncEngine } from './sync-engine';
 
 function occurrenceOf(command: Command): string | null {
   return 'occurrenceId' in command ? command.occurrenceId : null;
@@ -98,18 +99,17 @@ export class SyncedDataProvider implements DataProvider {
   }
 
   /** A confirmation is a local decision the owner has not made yet, so it never reaches the outbox. */
-  dispatchCommand(command: Command): Promise<CommandResult> {
-    return this.serialize(() => this.dispatchNow(command));
+  dispatchCommand(command: Command, options?: DispatchOptions): Promise<CommandResult> {
+    return this.serialize(() => this.dispatchNow(command, options));
   }
 
-  private async dispatchNow(command: Command): Promise<CommandResult> {
+  private async dispatchNow(command: Command, options?: DispatchOptions): Promise<CommandResult> {
     const result = await this.engine.dispatchCommand(command);
     if (needsConfirmation(result) || result.status === 'rejected') return result;
     const occurrenceId = occurrenceOf(command);
     if (occurrenceId && isServerBacked(command)) this.queued.add(occurrenceId);
-    const queued = await this.sync.enqueue(command, this.world.today);
-    if (queued.status !== 'refused') return result;
-    await this.reproject().catch(ignoreAccountBoundary);
-    return { status: 'rejected', message: NOT_QUEUED_MESSAGE };
+    const delivery = await this.sync.enqueue(command, this.world.today, options);
+    if (delivery.status === 'refused') await this.reproject().catch(ignoreAccountBoundary);
+    return { ...result, delivery };
   }
 }

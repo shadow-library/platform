@@ -1,3 +1,4 @@
+import { type CommandDelivery } from './command.types';
 import { type EntryCapAdvisory } from './entry-caps';
 
 export type CurrencyCode = 'EUR' | 'USD' | 'GBP' | 'NOK' | 'SEK' | 'DKK' | 'CHF' | 'JPY' | 'INR' | 'AUD' | 'CAD' | 'NZD' | 'SGD' | 'HKD' | 'PLN' | 'CZK' | 'ZAR' | 'BRL';
@@ -269,4 +270,5 @@ export interface FinanceCommandResult {
   message: string;
   /** Present once the month's entry allowance is nearly or fully used. Advisory only — the write already happened. */
   advisory?: EntryCapAdvisory;
+  delivery?: CommandDelivery;
 }

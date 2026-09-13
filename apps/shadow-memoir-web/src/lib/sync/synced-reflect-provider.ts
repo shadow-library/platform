@@ -1,5 +1,3 @@
-import { isApiError } from '@shadow-library/web';
-
 import { aiApi } from '@/lib/apis';
 import {
   type AiConsent,
@@ -7,6 +5,7 @@ import {
   type AiRequestState,
   type AiResult,
   type CoachView,
+  commandRefusal,
   createReflectProvider,
   deriveHistory,
   deriveInsights,
@@ -102,6 +101,8 @@ export class SyncedReflectProvider implements ReflectProvider {
   private review: ReviewLocalState = { answers: {}, complete: false };
   private pending: Promise<void> = Promise.resolve();
   private readonly restored: Promise<void>;
+  /** The id a question is submitted under until the server accepts it, so asking again after a lost answer finds the task instead of creating a second. */
+  private submission: { queryText: string; id: string } | null = null;
 
   constructor(private readonly sync: SyncEngine) {
     this.narrative = createReflectProvider({ today: sync.today, persona: 'active' });
@@ -201,7 +202,7 @@ export class SyncedReflectProvider implements ReflectProvider {
           await this.sync.sync();
           return applied('Cancelled, and the request went back to your quota.');
         } catch (error) {
-          return this.refusal(error, 'That request could not be cancelled.');
+          return commandRefusal(error, 'That request could not be cancelled.');
         }
 
       case 'ai.applySuggestion':
@@ -210,7 +211,7 @@ export class SyncedReflectProvider implements ReflectProvider {
           await this.sync.sync();
           return applied('Recorded. The quest is unchanged until you make the edit yourself.');
         } catch (error) {
-          return this.refusal(error, 'That offer could not be recorded.');
+          return commandRefusal(error, 'That offer could not be recorded.');
         }
 
       case 'review.answer':
@@ -250,7 +251,7 @@ export class SyncedReflectProvider implements ReflectProvider {
       await this.sync.sync();
       return applied('Saved. Either consent can be withdrawn on its own, and withdrawing one excludes it from future reads.');
     } catch (error) {
-      return this.refusal(error, 'That consent could not be saved.');
+      return commandRefusal(error, 'That consent could not be saved.');
     }
   }
 
@@ -258,19 +259,15 @@ export class SyncedReflectProvider implements ReflectProvider {
     const queryText = question.trim();
     if (queryText.length === 0) return { status: 'rejected', message: 'A question is needed before anything is queued.' };
 
+    const id = this.submission?.queryText === queryText ? this.submission.id : uuidv7(Date.now());
+    this.submission = { queryText, id };
     try {
-      await aiApi.submitTask({ id: uuidv7(Date.now()), queryText });
+      await aiApi.submitTask({ id, queryText });
+      this.submission = null;
       await this.sync.sync();
       return applied('Queued. The answer will be here within a few hours.');
     } catch (error) {
-      return this.refusal(error, 'That request could not be queued.');
+      return commandRefusal(error, 'That request could not be queued.');
     }
-  }
-
-  /** `AI_001` is the paywall, and it is a plan question rather than a failure — the screen turns it into a link. */
-  private refusal(error: unknown, fallback: string): SettledCommandResult {
-    if (!isApiError(error)) return { status: 'rejected', message: fallback };
-    if (error.code === 'AI_001') return { status: 'rejected', message: 'Both requests this month are used. Coach raises the allowance, and the count resets on its own.' };
-    return { status: 'rejected', message: error.message };
   }
 }

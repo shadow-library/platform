@@ -1,4 +1,4 @@
-import { type SettledCommandResult } from './command.types';
+import { type DispatchOptions, type SettledCommandResult } from './command.types';
 import { type Persona } from './fixtures';
 import { type Achievement, type Cosmetic, type HeroCommand, type HeroDeck, type HeroIntensityMode, type HeroTitle, type RecoveryView } from './hero.types';
 import { type HeroState } from './view.types';
@@ -6,7 +6,7 @@ import { type HeroState } from './view.types';
 export interface HeroProvider {
   getDeck(): Promise<HeroDeck>;
   getRecovery(): Promise<RecoveryView>;
-  dispatchCommand(command: HeroCommand): Promise<SettledCommandResult>;
+  dispatchCommand(command: HeroCommand, options?: DispatchOptions): Promise<SettledCommandResult>;
 }
 
 export interface AchievementSeed {

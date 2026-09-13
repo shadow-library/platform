@@ -4,7 +4,7 @@ import { Alert, Button, Card, EmptyState, Skeleton } from '@shadow-library/ui';
 
 import { QuestRow } from '@/features/quests/quest-row';
 import { useQuestActions } from '@/features/quests/quest-actions';
-import { formatDayName, type QuestOccurrence, useCommand, useDay, useMemoirData, useQuickLogTiles } from '@/lib/data';
+import { formatDayName, useDay, useMemoirData, useQuickLogTiles } from '@/lib/data';
 
 import { DayRail } from './day-rail';
 import { HeroCard } from './hero-card';
@@ -15,12 +15,7 @@ export function TodayScreen(): ReactElement {
   const navigate = useNavigate();
   const day = useDay();
   const tiles = useQuickLogTiles();
-  const command = useCommand();
   const actions = useQuestActions();
-
-  const complete = (occurrence: QuestOccurrence): void => {
-    command.mutate({ type: 'quest.complete', occurrenceId: occurrence.id });
-  };
 
   return (
     <section className={styles.screen} aria-labelledby="today-title">
@@ -94,7 +89,7 @@ export function TodayScreen(): ReactElement {
                   <Card.Body className={styles.listBody}>
                     <ul className={styles.list}>
                       {day.data.occurrences.map(occurrence => (
-                        <QuestRow key={occurrence.id} occurrence={occurrence} onComplete={complete} onOpenActions={actions.open} />
+                        <QuestRow key={occurrence.id} occurrence={occurrence} onComplete={actions.complete} onOpenActions={actions.open} />
                       ))}
                     </ul>
                   </Card.Body>

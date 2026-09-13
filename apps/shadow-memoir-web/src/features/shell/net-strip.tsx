@@ -1,7 +1,8 @@
 import { useLocation } from '@tanstack/react-router';
-import { type ReactElement, useEffect, useState } from 'react';
-import { Button, toast } from '@shadow-library/ui';
+import { type ReactElement, useEffect, useRef, useState } from 'react';
+import { Button } from '@shadow-library/ui';
 
+import { notifyNotice } from '@/lib/data';
 import { type SyncSnapshot, useSyncEngine, useSyncStatus } from '@/lib/sync';
 
 import { useSystemOverlays } from './system-overlays';
@@ -26,8 +27,8 @@ function stripCopy({ state, queuedCount, readiness }: SyncSnapshot): StripCopy {
 
 /**
  * The one place the sync layer speaks to the owner about itself: a quiet strip while anything is not
- * "online", and a single calm notice per rejected command. Rejections are toasts rather than a blocking
- * dialog because the local effect already stands — the next delta pull is what corrects it.
+ * "online", and one toast per notice — a command the server did not apply that no screen was waiting for
+ * (a replay after a reload, or a screen that went away). A screen that ran the command presents its own outcome.
  */
 export function NetStrip(): ReactElement | null {
   const status = useSyncStatus();
@@ -35,10 +36,13 @@ export function NetStrip(): ReactElement | null {
   const overlays = useSystemOverlays();
   const { pathname } = useLocation();
   const [retrying, setRetrying] = useState(false);
+  const shown = useRef(new Set<string>());
 
+  /** StrictMode runs this twice against the same snapshot before the dismissal lands, so a notice is remembered, not just dismissed. */
   useEffect(() => {
     for (const notice of status.notices) {
-      toast.neutral(notice.message);
+      if (!shown.current.has(notice.commandId)) notifyNotice(notice);
+      shown.current.add(notice.commandId);
       engine?.dismissNotice(notice.commandId);
     }
   }, [status.notices, engine]);

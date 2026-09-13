@@ -1,12 +1,14 @@
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useState } from 'react';
-import { Button, DescriptionList, Slider, Textarea, TimePicker, toast } from '@shadow-library/ui';
+import { Button, DescriptionList, Slider, Textarea, TimePicker } from '@shadow-library/ui';
 
 import { OverlaySurface } from '@/components/OverlaySurface';
 import {
   type Command,
   type CommandConfirmation,
+  failureCopy,
   formatTime,
+  notifyOutcome,
   type QuestOccurrence,
   REASON_LABELS,
   REASON_TAGS,
@@ -23,8 +25,17 @@ type Step = 'actions' | 'partial' | 'reschedule' | null;
 
 export interface QuestActions {
   open: (occurrence: QuestOccurrence) => void;
+  complete: (occurrence: QuestOccurrence) => void;
   overlays: ReactNode;
 }
+
+const ACTION_VERBS: Partial<Record<Command['type'], string>> = {
+  'quest.complete': 'complete',
+  'quest.partial': 'save the partial for',
+  'quest.skip': 'skip',
+  'quest.postpone': 'postpone',
+  'quest.reschedule': 'move',
+};
 
 interface QuestActionDefinition {
   id: string;
@@ -44,24 +55,26 @@ export function useQuestActions(): QuestActions {
   const [restoreFocusTo, setRestoreFocusTo] = useState<HTMLElement | null>(null);
 
   const close = (): void => setStep(null);
+  const busy = occurrence !== null && command.isPendingFor(pending => 'occurrenceId' in pending && pending.occurrenceId === occurrence.id);
+
+  const settle = async (payload: Command, target: QuestOccurrence, andClose: boolean): Promise<void> => {
+    const feedback = { action: ACTION_VERBS[payload.type] ?? 'save', subject: target.questName };
+    const outcome = await command.run(payload).catch(() => null);
+    if (!outcome) return notifyOutcome({ status: 'failed', message: failureCopy(null), code: null, undone: false }, { ...feedback, success: '' });
+    if (outcome.status === 'needs-confirmation') {
+      setConfirmation(outcome.confirmation);
+      setConfirmationOpen(true);
+      setStep(null);
+      return;
+    }
+
+    const saved = outcome.status === 'applied' || outcome.status === 'queued-offline';
+    notifyOutcome(outcome, { ...feedback, success: saved ? outcome.local.message : '' });
+    if (saved && andClose) close();
+  };
 
   const dispatch = (payload: Command, andClose = true): void => {
-    command.mutate(payload, {
-      onSuccess: result => {
-        if (result.status === 'needs-confirmation') {
-          setConfirmation(result);
-          setConfirmationOpen(true);
-          setStep(null);
-          return;
-        }
-        if (result.status === 'rejected') {
-          toast.warning(result.message);
-          return;
-        }
-        toast.neutral(result.message);
-        if (andClose) close();
-      },
-    });
+    if (occurrence) void settle(payload, occurrence, andClose);
   };
 
   const overlays = (
@@ -80,8 +93,17 @@ export function useQuestActions(): QuestActions {
               void navigate({ to: '/quests/$questId', params: { questId: occurrence.questId } });
             }}
             dispatch={dispatch}
+            pending={busy}
           />
-          <PartialOverlay key={`partial-${occurrence.id}`} occurrence={occurrence} open={step === 'partial'} restoreFocusTo={restoreFocusTo} onClose={close} dispatch={dispatch} />
+          <PartialOverlay
+            key={`partial-${occurrence.id}`}
+            occurrence={occurrence}
+            open={step === 'partial'}
+            restoreFocusTo={restoreFocusTo}
+            onClose={close}
+            dispatch={dispatch}
+            pending={busy}
+          />
           <RescheduleOverlay
             key={`reschedule-${occurrence.id}`}
             occurrence={occurrence}
@@ -89,6 +111,7 @@ export function useQuestActions(): QuestActions {
             restoreFocusTo={restoreFocusTo}
             onClose={close}
             dispatch={dispatch}
+            pending={busy}
           />
         </>
       ) : null}
@@ -97,6 +120,7 @@ export function useQuestActions(): QuestActions {
           confirmation={confirmation}
           open={confirmationOpen}
           restoreFocusTo={restoreFocusTo}
+          pending={busy}
           onClose={() => setConfirmationOpen(false)}
           onConfirm={() => {
             dispatch(confirmation.command, false);
@@ -113,6 +137,7 @@ export function useQuestActions(): QuestActions {
       setStep('actions');
       setOccurrence(next);
     },
+    complete: target => void settle({ type: 'quest.complete', occurrenceId: target.id }, target, false),
     overlays,
   };
 }
@@ -123,6 +148,7 @@ interface OverlayProps {
   restoreFocusTo: HTMLElement | null;
   onClose: () => void;
   dispatch: (command: Command, andClose?: boolean) => void;
+  pending: boolean;
 }
 
 function summaryLine(occurrence: QuestOccurrence): string {
@@ -146,6 +172,7 @@ function ActionListOverlay({
   onReschedule,
   onEdit,
   dispatch,
+  pending,
 }: OverlayProps & { onPartial: () => void; onReschedule: () => void; onEdit: () => void }): ReactElement {
   const spendsHp = occurrence.strictness === 'anchor' || occurrence.strictness === 'routine';
   const actions: QuestActionDefinition[] = [
@@ -209,7 +236,8 @@ function ActionListOverlay({
               type="button"
               className={styles.action}
               onClick={action.run}
-              disabled={Boolean(action.disabledReason)}
+              disabled={Boolean(action.disabledReason) || pending}
+              aria-busy={pending || undefined}
               aria-label={action.label}
               aria-describedby={`${action.id}-rule`}
             >
@@ -225,7 +253,7 @@ function ActionListOverlay({
   );
 }
 
-function PartialOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch }: OverlayProps): ReactElement {
+function PartialOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pending }: OverlayProps): ReactElement {
   const target = occurrence.partialTarget;
   const max = target?.target ?? 100;
   const unit = target?.unit ?? '%';
@@ -248,7 +276,11 @@ function PartialOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch }:
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={() => dispatch({ type: 'quest.partial', occurrenceId: occurrence.id, progress, reasonTag: reason, note: note || undefined })}>
+          <Button
+            variant="primary"
+            loading={pending}
+            onClick={() => dispatch({ type: 'quest.partial', occurrenceId: occurrence.id, progress, reasonTag: reason, note: note || undefined })}
+          >
             Save partial
           </Button>
         </>
@@ -289,7 +321,7 @@ function toMinuteOfDay(time: string): number {
   return (hours ?? 0) * 60 + (minutes ?? 0);
 }
 
-function RescheduleOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch }: OverlayProps): ReactElement {
+function RescheduleOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pending }: OverlayProps): ReactElement {
   const [time, setTime] = useState(formatTime(occurrence.startTimeMinutes) ?? '09:00');
 
   return (
@@ -307,7 +339,7 @@ function RescheduleOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch
           <Button variant="ghost" onClick={onClose}>
             Keep the plan
           </Button>
-          <Button variant="primary" onClick={() => dispatch({ type: 'quest.reschedule', occurrenceId: occurrence.id, toMin: toMinuteOfDay(time) })}>
+          <Button variant="primary" loading={pending} onClick={() => dispatch({ type: 'quest.reschedule', occurrenceId: occurrence.id, toMin: toMinuteOfDay(time) })}>
             Move it
           </Button>
         </>
@@ -329,11 +361,12 @@ interface RescheduleCapOverlayProps {
   confirmation: CommandConfirmation;
   open: boolean;
   restoreFocusTo: HTMLElement | null;
+  pending: boolean;
   onClose: () => void;
   onConfirm: () => void;
 }
 
-function RescheduleCapOverlay({ confirmation, open, restoreFocusTo, onClose, onConfirm }: RescheduleCapOverlayProps): ReactElement {
+function RescheduleCapOverlay({ confirmation, open, restoreFocusTo, pending, onClose, onConfirm }: RescheduleCapOverlayProps): ReactElement {
   return (
     <OverlaySurface
       open={open}
@@ -346,7 +379,7 @@ function RescheduleCapOverlay({ confirmation, open, restoreFocusTo, onClose, onC
           <Button variant="ghost" onClick={onClose}>
             {confirmation.cancelLabel}
           </Button>
-          <Button variant="primary" onClick={onConfirm}>
+          <Button variant="primary" loading={pending} onClick={onConfirm}>
             {confirmation.confirmLabel}
           </Button>
         </>

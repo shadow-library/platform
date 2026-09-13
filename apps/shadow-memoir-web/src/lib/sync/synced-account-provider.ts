@@ -12,6 +12,8 @@ import {
   BILLING_TRIAL_LINE,
   billingPlans,
   type BillingView,
+  commandLabel,
+  commandRefusal,
   type DayPreferences,
   DELETION_ACKNOWLEDGEMENTS,
   DELETION_ALTERNATIVES,
@@ -36,7 +38,7 @@ import {
 
 import { projectEntitlement, projectRecordCounts } from './projection';
 import { type SyncEngine } from './sync-engine';
-import { SYNC_META_KEYS, type SyncCommand } from './sync.types';
+import { SYNC_META_KEYS } from './sync.types';
 
 const INTENSITY_LOCAL: Record<string, HeroIntensityMode> = { low_intensity: 'gentle', standard: 'standard', high_intensity: 'demanding' };
 
@@ -47,32 +49,6 @@ const INTENSITY_WIRE: Record<HeroIntensityMode, 'low_intensity' | 'standard' | '
 };
 
 const EXPORT_STAGES: Record<ExportJobResponseDto['status'], ExportJob['stage']> = { pending: 'preparing', running: 'preparing', done: 'ready', failed: 'failed' };
-
-const COMMAND_LABELS: Partial<Record<SyncCommand['type'], string>> = {
-  'quest.complete': 'Quest completed',
-  'quest.partial': 'Quest partly done',
-  'quest.skip': 'Quest skipped',
-  'quest.postpone': 'Quest postponed',
-  'quest.reschedule': 'Quest moved',
-  'quest.create': 'New quest',
-  'quest.update': 'Quest edited',
-  'expense.create': 'Expense',
-  'expense.update': 'Expense edited',
-  'expense.delete': 'Expense deleted',
-  'subscription.create': 'New subscription',
-  'subscription.setActive': 'Subscription paused or resumed',
-  'subscription.confirmCycle': 'Subscription charge confirmed',
-  'journal.save': 'Journal entry',
-  'meal.log': 'Meal',
-  'meal.logPreset': 'Meal',
-  'meal.savePreset': 'Meal preset',
-  'weight.save': 'Weight',
-  'sidequest.log': 'Side quest',
-  'health.save': 'Health entry',
-  'title.display': 'Displayed title',
-  'cosmetic.purchase': 'Cosmetic bought',
-  'cosmetic.equip': 'Cosmetic equipped',
-};
 
 function toClock(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
@@ -93,11 +69,6 @@ function rejected(message: string): SettledCommandResult {
 
 function errorCode(error: unknown): string | null {
   return isApiError(error) ? error.code : null;
-}
-
-/** The message the server sent, which already reads as a sentence — a hand-written substitute would only be less accurate. */
-function refusal(error: unknown, fallback: string): SettledCommandResult {
-  return rejected(isApiError(error) ? error.message : fallback);
 }
 
 function deviceLabel(userAgent: string | null): string {
@@ -230,7 +201,7 @@ export class SyncedAccountProvider implements AccountProvider {
     const queue: QueueEntry[] = pending.map((entry, index) => ({
       id: entry.commandId,
       state: sending.has(entry.commandId) ? 'sent' : 'queued',
-      text: COMMAND_LABELS[entry.command.type] ?? 'Change',
+      text: commandLabel(entry.command.type),
       meta: `Created ${createdAt.format(new Date(entry.createdAt))} · position ${index + 1}`,
       retryable: false,
     }));
@@ -287,7 +258,7 @@ export class SyncedAccountProvider implements AccountProvider {
           });
           return applied('Set up. Your home currency is fixed from here so your totals stay comparable.');
         } catch (error) {
-          return refusal(error, 'That could not be saved.');
+          return commandRefusal(error, 'That could not be saved.');
         }
 
       case 'notification.set':
@@ -295,7 +266,7 @@ export class SyncedAccountProvider implements AccountProvider {
           await accountApi.patch({ notificationPrefs: { [command.preferenceId]: command.enabled } });
           return applied(command.enabled ? 'On. Sent by email only.' : 'Off.');
         } catch (error) {
-          return refusal(error, 'That preference could not be saved.');
+          return commandRefusal(error, 'That preference could not be saved.');
         }
 
       case 'notification.setPush':
@@ -307,7 +278,7 @@ export class SyncedAccountProvider implements AccountProvider {
           void this.sync.sync();
           return applied('That device will stop receiving notifications.');
         } catch (error) {
-          return refusal(error, 'That device could not be removed.');
+          return commandRefusal(error, 'That device could not be removed.');
         }
 
       case 'billing.checkout':
@@ -316,7 +287,7 @@ export class SyncedAccountProvider implements AccountProvider {
           if (typeof window !== 'undefined') window.location.assign(session.url);
           return applied('Opening the payment provider’s checkout.');
         } catch (error) {
-          return refusal(error, 'Checkout could not be started.');
+          return commandRefusal(error, 'Checkout could not be started.');
         }
 
       case 'export.prepare':
@@ -325,7 +296,7 @@ export class SyncedAccountProvider implements AccountProvider {
           await this.sync.store.writeMeta(SYNC_META_KEYS.exportJobId, job.id);
           return applied('Preparing your archive. You can leave this page.');
         } catch (error) {
-          return refusal(error, 'The export could not be started.');
+          return commandRefusal(error, 'The export could not be started.');
         }
 
       case 'export.dismiss':
@@ -360,7 +331,7 @@ export class SyncedAccountProvider implements AccountProvider {
       if (deferred) return applied('Staged. It takes effect at your next daily rollover, so the day in progress is not rewritten.');
       return applied('Saved. Changing your wake window never rewrites past days.');
     } catch (error) {
-      return refusal(error, 'That setting could not be saved.');
+      return commandRefusal(error, 'That setting could not be saved.');
     }
   }
 
@@ -373,7 +344,7 @@ export class SyncedAccountProvider implements AccountProvider {
       void this.sync.sync();
       return applied(enabled ? 'Push is on for this browser.' : 'Push is off for this browser.');
     } catch (error) {
-      return refusal(error, 'That could not be saved for this device.');
+      return commandRefusal(error, 'That could not be saved for this device.');
     }
   }
 
@@ -389,7 +360,7 @@ export class SyncedAccountProvider implements AccountProvider {
       this.awaitingReauth = false;
       return applied('The erasure has started. It runs to completion on its own, and it cannot be undone.');
     } catch (error) {
-      if (errorCode(error) !== 'IAM_003') return refusal(error, 'That could not be started.');
+      if (errorCode(error) !== 'IAM_003') return commandRefusal(error, 'That could not be started.');
       this.awaitingReauth = true;
       return applied('Nothing is scheduled yet. The next confirmation happens on your Shadow account.');
     }

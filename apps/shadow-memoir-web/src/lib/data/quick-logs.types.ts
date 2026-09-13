@@ -1,3 +1,4 @@
+import { type CommandDelivery } from './command.types';
 import { type EntryCapAdvisory } from './entry-caps';
 import { type StatAffinity } from './quest.types';
 
@@ -284,4 +285,5 @@ export interface QuickLogCommandResult {
   /** Set when a same-day weight already exists and the save was not confirmed. Nothing was written. */
   needsConfirmation?: { kind: 'weight-replace'; existing: WeightEntry };
   linkageOffer?: QuestLinkageOffer;
+  delivery?: CommandDelivery;
 }

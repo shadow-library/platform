@@ -1,4 +1,4 @@
-import { useMutation, type UseMutationResult, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import {
   type AccountCommand,
@@ -11,6 +11,7 @@ import {
   type NotificationSettings,
   type OnboardingStatus,
 } from './account.types';
+import { type CommandHook, legacySettledResult, readSettledResult, useDomainCommand } from './command-runner';
 import { type SettledCommandResult } from './command.types';
 import { useMemoirData } from './data-context';
 
@@ -76,10 +77,15 @@ export function useOnboardingStatus(): UseQueryResult<OnboardingStatus> {
   return useQuery({ queryKey: accountKeys.onboarding, queryFn: () => account.getOnboarding() }, queryClient);
 }
 
-export function useAccountCommand(): UseMutationResult<SettledCommandResult, Error, AccountCommand> {
+export type AccountCommandHook = CommandHook<AccountCommand, SettledCommandResult, SettledCommandResult>;
+
+export function useAccountCommand(): AccountCommandHook {
   const { account, queryClient } = useMemoirData();
-  return useMutation(
-    { mutationFn: (command: AccountCommand) => account.dispatchCommand(command), onSuccess: () => queryClient.invalidateQueries({ queryKey: accountKeys.all }) },
+  return useDomainCommand({
     queryClient,
-  );
+    dispatch: command => account.dispatchCommand(command),
+    read: readSettledResult,
+    legacy: legacySettledResult,
+    refresh: () => queryClient.invalidateQueries({ queryKey: accountKeys.all }),
+  });
 }

@@ -1,5 +1,6 @@
 import { addDays, toISODate } from '@shadow-library/ui';
 
+import { type DispatchOptions } from './command.types';
 import { deriveCapAdvisory } from './entry-caps';
 import { type CurrencyCode } from './finance.types';
 import { type QuickLogTile } from './view.types';
@@ -46,7 +47,7 @@ export interface QuickLogProvider {
   weight(): Promise<WeightView>;
   health(date: string): Promise<HealthView>;
   sideQuests(): Promise<SideQuestsView>;
-  dispatchCommand(command: QuickLogCommand): Promise<QuickLogCommandResult>;
+  dispatchCommand(command: QuickLogCommand, options?: DispatchOptions): Promise<QuickLogCommandResult>;
 }
 
 function today(): string {

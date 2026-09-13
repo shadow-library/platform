@@ -1,6 +1,7 @@
 import {
   applyFinanceCommand,
   type CategoriesView,
+  type DispatchOptions,
   type ExpenseDetail,
   type ExpensePage,
   type ExpenseQuery,
@@ -20,7 +21,7 @@ import {
 import { isFinanceCommand, isServerBacked, mintCommandIds } from './command-wire';
 import { projectFinanceRows } from './projection';
 import { ignoreAccountBoundary } from './memoir-store';
-import { CommandNotQueuedError, type SyncEngine } from './sync-engine';
+import { type SyncEngine } from './sync-engine';
 
 function monthOf(date: string): string {
   return date.slice(0, 7);
@@ -85,13 +86,13 @@ export class SyncedFinanceProvider implements FinanceProvider {
     return financeCategoriesView(this.state);
   }
 
-  dispatchCommand(command: FinanceCommand): Promise<FinanceCommandResult> {
+  dispatchCommand(command: FinanceCommand, options?: DispatchOptions): Promise<FinanceCommandResult> {
     return this.serialize(async () => {
       const minted = mintCommandIds(command) as FinanceCommand;
       const result = applyFinanceCommand(this.state, minted, isServerBacked(minted) ? 'queued' : 'synced');
-      if ((await this.sync.enqueue(minted, this.sync.today)).status !== 'refused') return result;
-      await this.reproject().catch(ignoreAccountBoundary);
-      throw new CommandNotQueuedError();
+      const delivery = await this.sync.enqueue(minted, this.sync.today, options);
+      if (delivery.status === 'refused') await this.reproject().catch(ignoreAccountBoundary);
+      return { ...result, delivery };
     });
   }
 }
