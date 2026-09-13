@@ -27,7 +27,6 @@ import { ForgeBar } from '@/components/nf/ForgeBar';
 import { ImageGallery } from '@/components/nf/ImageGallery';
 import {
   type AmendChapterResponse,
-  type BriefWriteMode,
   type DraftResponse,
   externalStopChapter,
   hasActiveJob,
@@ -58,6 +57,7 @@ import {
   useSummarizeChapterMutation,
   useUpdateDraftMutation,
 } from '@/lib/apis';
+import { buildChapterRows, type ChapterFilter, chapterSummary, countChapterRows, filterChapterRows } from '@/lib/chapter-list';
 
 import styles from './chapters.module.css';
 
@@ -403,13 +403,16 @@ function FillSlotDialog({ novelId, chapter, onOpenChange, onFilled }: FillSlotDi
   );
 }
 
-type Filter = 'all' | 'needs_review' | 'draft' | 'final';
+const FILTERS: readonly { value: ChapterFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'not_written', label: 'Not written' },
+  { value: 'needs_review', label: 'Needs review' },
+  { value: 'draft', label: 'Drafts' },
+  { value: 'final', label: 'Final' },
+];
 
-interface ChapterRow {
-  chapter: number;
-  title?: string | null;
-  draft?: DraftResponse;
-  writeMode?: BriefWriteMode;
+function formatChapterNumber(chapter: number): string {
+  return String(chapter).padStart(2, '0');
 }
 
 interface ChapterListProps {
@@ -424,7 +427,7 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
   const statusQuery = useProjectStatusQuery(novelId);
   const generate = useGenerateMutation(novelId);
   const jobsQuery = useListJobsQuery(novelId);
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filter, setFilter] = useState<ChapterFilter>('all');
   const drafts = useMemo(() => [...(draftsQuery.data?.items ?? [])].sort((a, b) => a.chapter - b.chapter), [draftsQuery.data]);
   const activeJob = jobsQuery.data?.items.find(j => j.kind === 'generate' && (j.status === 'pending' || j.status === 'in_progress'));
 
@@ -489,25 +492,12 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
     });
   };
 
-  const counts = {
-    all: drafts.length,
-    needs_review: drafts.filter(d => d.reviewStatus === 'needs_review' || d.reviewStatus === 'contradiction').length,
-    draft: drafts.filter(d => d.status === 'draft').length,
-    final: drafts.filter(d => d.status === 'final').length,
-  };
-  const visible = drafts.filter(d => {
-    if (filter === 'all') return true;
-    if (filter === 'needs_review') return d.reviewStatus === 'needs_review' || d.reviewStatus === 'contradiction';
-    return d.status === filter;
-  });
-  const totalWords = drafts.reduce((sum, d) => sum + wordCount(d.body), 0);
-
   // Unwritten brief slots are rows too — an external-write slot only exists as a brief until someone
   // fills it, and it has to be reachable from this list to be fillable at all.
-  const rows: ChapterRow[] = [
-    ...visible.map(draft => ({ chapter: draft.chapter, title: draft.title, draft })),
-    ...(filter === 'all' ? briefs.filter(b => !drafted.has(b.chapter)).map(b => ({ chapter: b.chapter, title: b.title, writeMode: b.writeMode })) : []),
-  ].sort((a, b) => a.chapter - b.chapter);
+  const allRows = useMemo(() => buildChapterRows(drafts, briefs), [drafts, briefs]);
+  const counts = countChapterRows(allRows);
+  const rows = filterChapterRows(allRows, filter);
+  const totalWords = drafts.reduce((sum, d) => sum + wordCount(d.body), 0);
 
   // Mirrors the backend's CHP_003 gate — a finalized chapter never moves, so nothing inserts below it.
   const frontier = Math.max(0, ...drafts.filter(d => d.status === 'final').map(d => d.chapter));
@@ -519,9 +509,7 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
         <div className={styles.listHead}>
           <div className={styles.listHeadMain}>
             <h1 className={styles.title}>Chapters</h1>
-            <p className={styles.subtitle}>
-              {drafts.length} drafts · {totalWords.toLocaleString()} words
-            </p>
+            <p className={styles.subtitle}>{chapterSummary(counts, totalWords)}</p>
           </div>
           <ButtonGroup variant="primary" aria-label="Chapter creation">
             <Button loading={generate.isPending || createManual.isPending} prefix={<PlusIcon />} onClick={canGenerate ? startGeneration : writeManually}>
@@ -560,94 +548,128 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
         )}
 
         <div className={styles.filterWrap}>
-          <SegmentedControl value={filter} onValueChange={v => setFilter(v as Filter)}>
-            <SegmentedControl.Item value="all">All {counts.all}</SegmentedControl.Item>
-            <SegmentedControl.Item value="needs_review">Needs review {counts.needs_review}</SegmentedControl.Item>
-            <SegmentedControl.Item value="draft">Drafts {counts.draft}</SegmentedControl.Item>
-            <SegmentedControl.Item value="final">Final {counts.final}</SegmentedControl.Item>
+          <SegmentedControl value={filter} onValueChange={v => setFilter(v as ChapterFilter)}>
+            {FILTERS.map(({ value, label }) => (
+              <SegmentedControl.Item key={value} value={value}>
+                {label} <span className={styles.filterCount}>{counts[value]}</span>
+              </SegmentedControl.Item>
+            ))}
           </SegmentedControl>
         </div>
 
         <QueryState
-          isLoading={draftsQuery.isLoading}
+          isLoading={draftsQuery.isLoading || briefsQuery.isLoading}
           error={draftsQuery.error}
           isEmpty={rows.length === 0}
-          emptyTitle="No chapters drafted yet"
-          emptyDescription="Generate your first chapter from its brief."
-          emptyAction={{ label: 'Generate first chapter', onClick: startGeneration }}
+          emptyTitle={filter === 'all' ? 'No chapters yet' : `No chapters match “${FILTERS.find(f => f.value === filter)?.label}”`}
+          emptyDescription={filter === 'all' ? (canGenerate ? 'Generate your first chapter from its brief.' : generateReason) : 'Pick another filter to see the rest of the list.'}
+          emptyAction={
+            filter === 'all'
+              ? { label: canGenerate ? 'Generate first chapter' : 'Write chapter 1', onClick: canGenerate ? startGeneration : writeManually }
+              : { label: 'Show all chapters', onClick: () => setFilter('all') }
+          }
         >
-          <div className={styles.listBody}>
-            {rows.map(({ chapter, title, draft, writeMode }) => {
-              if (!draft) {
+          <ul className={styles.listBody} aria-label="Chapters">
+            {rows.map(row => {
+              if (row.kind === 'planned') {
                 return (
-                  <div key={`slot-${chapter}`} className={`${styles.rowChapter} ${styles.rowSlot}`}>
-                    <span className={styles.rowNum}>{String(chapter).padStart(2, '0')}</span>
-                    <span className={styles.rowTitle}>{title ?? 'Untitled chapter'}</span>
-                    {writeMode === 'external' && (
-                      <Tooltip content="The primary writer skips this slot — fill it with the unrestricted writer or your own prose.">
-                        <span>
-                          <StatusChip intent="warning">external slot</StatusChip>
-                        </span>
-                      </Tooltip>
-                    )}
-                    <span className={styles.rowWords} />
-                    <span className={styles.rowStatus}>
-                      <StatusChip intent="neutral" dot>
-                        Not written
-                      </StatusChip>
+                  <li key={`slot-${row.chapter}`} className={`${styles.row} ${styles.rowPlanned}`}>
+                    <span className={styles.rowNum}>{formatChapterNumber(row.chapter)}</span>
+                    <span className={styles.rowMain}>
+                      <span className={`${styles.rowTitle} ${row.title ? '' : styles.rowTitleUntitled}`}>{row.title ?? 'Untitled chapter'}</span>
+                      {row.writeMode === 'external' && (
+                        <Tooltip content="The primary writer skips this slot — fill it with the unrestricted writer or your own prose.">
+                          <span className={styles.badge}>
+                            <StatusChip intent="warning">external slot</StatusChip>
+                          </span>
+                        </Tooltip>
+                      )}
                     </span>
-                    <div className={styles.slotActions}>
-                      <Button variant="secondary" size="sm" prefix={<UploadIcon size={14} />} onClick={() => setFillTarget(chapter)}>
+                    <span className={styles.rowMeta}>
+                      <span className={styles.rowOrigin} />
+                      <span className={styles.rowWords} />
+                      <span className={styles.rowStatus}>
+                        <span className={styles.plannedChip}>
+                          <span className={styles.plannedDot} />
+                          Not written
+                        </span>
+                      </span>
+                    </span>
+                    <span className={styles.rowActions}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        prefix={<UploadIcon size={14} />}
+                        onClick={() => setFillTarget(row.chapter)}
+                        aria-label={`Fill slot for chapter ${row.chapter}`}
+                      >
                         Fill slot
                       </Button>
-                    </div>
-                    <ChevronRightIcon size={16} className={styles.iconPlaceholder} />
-                  </div>
+                    </span>
+                  </li>
                 );
               }
+              const { draft } = row;
               const meta = statusMeta(draft);
-              const blocked = isFinalizeBlocked(draft);
+              const words = wordCount(draft.body);
+              const open = (): void => onOpen(draft.chapter);
               return (
-                <div
-                  key={draft.id}
-                  role="button"
-                  tabIndex={0}
-                  className={`nf-selrow ${styles.rowChapter}`}
-                  onClick={() => onOpen(draft.chapter)}
-                  onKeyDown={e => e.key === 'Enter' && onOpen(draft.chapter)}
-                >
-                  <span className={styles.rowNum}>{String(draft.chapter).padStart(2, '0')}</span>
-                  <span className={styles.rowTitle}>{draft.title ?? 'Untitled chapter'}</span>
-                  {isIsolated(draft) && <UnrestrictedBadge />}
-                  {blocked && (
-                    <Tooltip content="Finalize is refused until this chapter has a summary and continuation state.">
-                      <span>
-                        <StatusChip intent="danger">needs summary</StatusChip>
+                <li key={draft.id}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open chapter ${draft.chapter}: ${draft.title ?? 'Untitled chapter'}`}
+                    className={`nf-selrow ${styles.row} ${styles.rowWritten}`}
+                    onClick={open}
+                    onKeyDown={e => {
+                      if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+                      e.preventDefault();
+                      open();
+                    }}
+                  >
+                    <span className={styles.rowNum}>{formatChapterNumber(draft.chapter)}</span>
+                    <span className={styles.rowMain}>
+                      <span className={`${styles.rowTitle} ${draft.title ? '' : styles.rowTitleUntitled}`}>{draft.title ?? 'Untitled chapter'}</span>
+                      {isIsolated(draft) && (
+                        <span className={styles.badge}>
+                          <UnrestrictedBadge />
+                        </span>
+                      )}
+                      {isFinalizeBlocked(draft) && (
+                        <Tooltip content="Finalize is refused until this chapter has a summary and continuation state.">
+                          <span className={styles.badge}>
+                            <StatusChip intent="danger">needs summary</StatusChip>
+                          </span>
+                        </Tooltip>
+                      )}
+                    </span>
+                    <span className={styles.rowMeta}>
+                      <span className={styles.rowOrigin}>
+                        <StatusChip intent={draft.generator === 'human' ? 'neutral' : 'accent'}>{draft.generator === 'human' ? 'You' : 'AI'}</StatusChip>
                       </span>
-                    </Tooltip>
-                  )}
-                  <StatusChip intent={draft.generator === 'human' ? 'neutral' : 'accent'}>{draft.generator === 'human' ? 'You' : 'AI'}</StatusChip>
-                  <span className={styles.rowWords}>{wordCount(draft.body).toLocaleString()} words</span>
-                  <span className={styles.rowStatus}>
-                    <StatusChip intent={meta.intent} dot>
-                      {meta.label}
-                    </StatusChip>
-                  </span>
-                  <div className="nf-rowactions">
-                    {draft.chapter >= frontier && (
-                      <RowAction label={`Insert a chapter after ${draft.chapter}`} onClick={() => setInsertAfter(draft.chapter)}>
-                        <PlusIcon size={14} />
+                      <span className={styles.rowWords}>{words === 0 ? 'Empty' : `${words.toLocaleString()} words`}</span>
+                      <span className={styles.rowStatus}>
+                        <StatusChip intent={meta.intent} dot>
+                          {meta.label}
+                        </StatusChip>
+                      </span>
+                    </span>
+                    <span className={`nf-rowactions ${styles.rowActions}`}>
+                      {draft.chapter >= frontier && (
+                        <RowAction label={`Insert a chapter after ${draft.chapter}`} onClick={() => setInsertAfter(draft.chapter)}>
+                          <PlusIcon size={14} />
+                        </RowAction>
+                      )}
+                      <RowAction label={`Delete chapter ${draft.chapter}`} danger onClick={() => setDeleteTarget(draft)}>
+                        <TrashIcon size={14} />
                       </RowAction>
-                    )}
-                    <RowAction label={`Delete chapter ${draft.chapter}`} danger onClick={() => setDeleteTarget(draft)}>
-                      <TrashIcon size={14} />
-                    </RowAction>
+                    </span>
+                    <ChevronRightIcon size={16} className={styles.rowChevron} />
                   </div>
-                  <ChevronRightIcon size={16} className={styles.iconPlaceholder} />
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </QueryState>
       </div>
 

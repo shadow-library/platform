@@ -164,57 +164,222 @@
 
 .filterWrap {
   margin: 26px 0 4px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.filterCount {
+  margin-left: 4px;
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
 }
 
 .listBody {
-  margin-top: 8px;
+  container-type: inline-size;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  background: var(--sh-surface-card);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  overflow: hidden;
 }
 
-.rowChapter {
-  gap: 16px;
-  padding: 15px 12px;
+.listBody > li + li {
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+
+/* Two-class selector so the grid wins over the global `.nf-selrow` flex layout regardless of stylesheet order. */
+.listBody .row {
+  display: grid;
+  grid-template-columns: 3ch minmax(0, 1fr) auto 96px 16px;
+  grid-template-areas: 'num main meta actions chevron';
+  align-items: center;
+  column-gap: 16px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 16px;
   border-radius: 0;
-  border-bottom: 1px solid var(--sh-border-subtle);
+  background: transparent;
+  transition: background 0.12s;
+}
+
+.listBody .rowWritten:hover,
+.listBody .rowPlanned:focus-within {
+  background: var(--sh-bg-hover);
+}
+
+.listBody .rowWritten:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: calc(-1 * var(--sh-focus-ring-width));
 }
 
 .rowNum {
+  grid-area: num;
   font-family: var(--sh-font-mono);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
   color: var(--sh-text-tertiary);
-  width: 22px;
-  flex-shrink: 0;
+}
+
+.rowMain {
+  grid-area: main;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .rowTitle {
-  flex: 1;
   min-width: 0;
   font-size: var(--sh-text-body);
   font-weight: 500;
+  color: var(--sh-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: left;
+}
+
+.rowTitleUntitled {
+  font-style: italic;
+  color: var(--sh-text-tertiary);
+}
+
+.badge {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.rowMeta {
+  grid-area: meta;
+  display: grid;
+  grid-template-columns: 40px 88px 118px;
+  align-items: center;
+  column-gap: 12px;
+}
+
+.rowOrigin {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .rowWords {
   font-size: 12px;
   color: var(--sh-text-tertiary);
   font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-  width: 80px;
   text-align: right;
+  white-space: nowrap;
 }
 
 .rowStatus {
-  width: 118px;
-  flex-shrink: 0;
   display: flex;
-  justify-content: flex-start;
 }
 
-.iconPlaceholder {
+.rowActions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.rowChevron {
+  grid-area: chevron;
+  width: 16px;
   color: var(--sh-text-placeholder);
-  flex-shrink: 0;
+  transition:
+    color 0.12s,
+    transform 0.12s;
+}
+
+.rowWritten:hover .rowChevron,
+.rowWritten:focus-visible .rowChevron {
+  color: var(--sh-text-secondary);
+  transform: translateX(2px);
+}
+
+.rowPlanned .rowNum {
+  color: var(--sh-text-placeholder);
+}
+
+.rowPlanned .rowTitle {
+  font-weight: 400;
+  color: var(--sh-text-secondary);
+}
+
+.rowPlanned .rowTitleUntitled {
+  color: var(--sh-text-tertiary);
+}
+
+.plannedChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: var(--sh-border-width) dashed var(--sh-border-strong);
+  border-radius: var(--sh-radius-full);
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--sh-text-tertiary);
+  white-space: nowrap;
+}
+
+.plannedDot {
+  width: 6px;
+  height: 6px;
+  border: 1.5px solid var(--sh-text-placeholder);
+  border-radius: 50%;
+}
+
+@media (hover: none) {
+  .listBody .rowActions {
+    opacity: 1;
+  }
+
+  .listBody .rowActions :global(.nf-rowaction) {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@container (max-width: 640px) {
+  .listBody .row {
+    grid-template-columns: 3ch minmax(0, 1fr) auto 16px;
+    grid-template-areas:
+      'num main main chevron'
+      '. meta actions actions';
+    row-gap: 8px;
+    padding-block: 12px;
+  }
+
+  .rowMeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    min-width: 0;
+  }
+
+  .rowOrigin:empty,
+  .rowWords:empty {
+    display: none;
+  }
+
+  .listBody .rowActions {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .listBody .row,
+  .rowChevron {
+    transition: none;
+  }
+
+  .rowWritten:hover .rowChevron,
+  .rowWritten:focus-visible .rowChevron {
+    transform: none;
+  }
 }
 
 .verdict {
@@ -529,20 +694,6 @@
   display: flex;
   justify-content: center;
   z-index: 5;
-}
-
-.rowSlot {
-  display: flex;
-  align-items: center;
-  background: var(--sh-surface-well);
-}
-
-.rowSlot .rowTitle {
-  color: var(--sh-text-secondary);
-}
-
-.slotActions {
-  flex-shrink: 0;
 }
 
 .dialogForm {
