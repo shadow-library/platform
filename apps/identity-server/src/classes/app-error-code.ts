@@ -182,6 +182,29 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ORG_011_REVOKE = AppErrorCode.validation('ORG_011', 'The application is not entitled in this organisation', 400);
 
   /*!
+   * Bot Error Codes
+   */
+
+  /** The organisation already holds the maximum number of bots that are not deleted */
+  static readonly BOT_001 = AppErrorCode.conflict('BOT_001', 'Organisation has reached its maximum number of bots');
+  /** Bots belong to TEAM organisations only; a personal workspace has no bots */
+  static readonly BOT_002 = AppErrorCode.conflict('BOT_002', 'Bots are available to team organisations only');
+  /** Handles are unique within an organisation, deleted bots included, because owned records keep displaying them */
+  static readonly BOT_003 = AppErrorCode.conflict('BOT_003', 'Bot handle already taken');
+  /** A bot may hold at most two unrevoked, unexpired keys so rotation can overlap without accumulating credentials */
+  static readonly BOT_006 = AppErrorCode.conflict('BOT_006', 'Bot already has the maximum number of active keys');
+  /** Key expiry must be in the future and no more than 365 days away */
+  static readonly BOT_007 = AppErrorCode.validation('BOT_007', 'Key expiry is out of range', 400);
+  /** Absent, deleted, or owned by another organisation — indistinguishable by design */
+  static readonly BOT_009 = AppErrorCode.notFound('BOT_009', 'Bot not found');
+  /** The bot's lifecycle status does not permit the operation, such as suspending a suspended bot or issuing a key to one that is not active */
+  static readonly BOT_010 = AppErrorCode.conflict('BOT_010', "Operation not permitted in the bot's current status");
+  /** The key does not exist under this bot */
+  static readonly BOT_011 = AppErrorCode.notFound('BOT_011', 'Bot key not found');
+  /** An IP allowlist entry is not an IPv4 or IPv6 address or CIDR range, or the list has more than 20 distinct entries */
+  static readonly BOT_012 = AppErrorCode.validation('BOT_012', 'Invalid IP allowlist', 400);
+
+  /*!
    * Organisation Policy Error Codes
    */
 

@@ -9,4 +9,6 @@ export const constraintErrorMap: Record<string, AppError> = {
   user_phones_verified_phone_unique: AppErrorCode.USR_004.create(),
   identity_providers_organisation_unique: AppErrorCode.FED_003.create(),
   identity_providers_global_kind_unique: AppErrorCode.FED_003.create(),
+  bots_organisation_handle_unique: AppErrorCode.BOT_003.create(),
+  bot_keys_expiry_within_365_days: AppErrorCode.BOT_007.create(),
 };

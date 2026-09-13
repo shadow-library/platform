@@ -16,6 +16,8 @@ export const REGEX = {
   SLUG: /^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])?$/,
   APPLICATION_NAME: /^[a-z0-9][a-z0-9-]{1,62}$/,
   SUBDOMAIN: /^[a-z0-9][a-z0-9-]{0,62}$/,
+  BOT_HANDLE: /^[a-z0-9](-?[a-z0-9])*$/,
+  BOT_CLIENT_ID: /^bot_[0-9A-Za-z]{22}$/,
 } as const satisfies Record<string, RegExp>;
 
 export const isNumericId = (value: string): boolean => REGEX.ID.test(value);
@@ -41,5 +43,6 @@ export const PATTERN = {
   SLUG: shapedAs(REGEX.SLUG, ERROR_MESSAGES.INVALID_SLUG),
   APPLICATION_NAME: shapedAs(REGEX.APPLICATION_NAME, ERROR_MESSAGES.INVALID_APPLICATION_NAME),
   SUBDOMAIN: shapedAs(REGEX.SUBDOMAIN, ERROR_MESSAGES.INVALID_SUBDOMAIN),
+  BOT_HANDLE: shapedAs(REGEX.BOT_HANDLE, ERROR_MESSAGES.INVALID_BOT_HANDLE),
   IDENTIFIER: shapedAs(identifier, ERROR_MESSAGES.INVALID_IDENTIFIER),
 } as const satisfies Record<string, FieldPattern>;

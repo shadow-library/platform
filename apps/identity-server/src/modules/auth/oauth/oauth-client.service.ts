@@ -1,11 +1,11 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 
-import { and, arrayContains, eq, gt, inArray, isNull, ne, or } from 'drizzle-orm';
+import { and, arrayContains, eq, gt, inArray, isNull, ne, notExists, or } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME, OIDC_PROTOCOL_SCOPES } from '@server/constants';
+import { APP_NAME, OIDC_PROTOCOL_SCOPES, REGEX } from '@server/constants';
 import { type ElevationIntent } from '@server/modules/auth/session';
 import { ApiResource, DatabaseService, OAuthClient, PrimaryDatabase, schema, Scope } from '@server/modules/infrastructure/datastore';
 
@@ -108,7 +108,8 @@ export class OAuthClientService {
     const clientId = input.id ?? randomUUID();
 
     await this.db.transaction(async tx => {
-      const existing = await tx.$count(schema.oauthClients, eq(schema.oauthClients.applicationId, input.applicationId));
+      const botClients = tx.select({ id: schema.bots.id }).from(schema.bots).where(eq(schema.bots.clientId, schema.oauthClients.id));
+      const existing = await tx.$count(schema.oauthClients, and(eq(schema.oauthClients.applicationId, input.applicationId), notExists(botClients)));
       if (existing >= MAX_CLIENTS_PER_APPLICATION) throw AppErrorCode.ADM_004.create();
       if (isWorkload) await this.assertExactSubjectsUnclaimed(tx, clientId, workloadSubjects);
 
@@ -512,7 +513,7 @@ export class OAuthClientService {
   }
 
   private isValidClientId(value: string): boolean {
-    return CLIENT_ID_PATTERN.test(value);
+    return CLIENT_ID_PATTERN.test(value) || REGEX.BOT_CLIENT_ID.test(value);
   }
 
   private assertValidClientId(id: string): void {

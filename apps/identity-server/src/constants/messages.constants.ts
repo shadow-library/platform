@@ -20,6 +20,7 @@ export const ERROR_MESSAGES = {
   INVALID_SLUG: 'must be at most 48 characters long, contain only lowercase letters, numbers, or hyphens, and start and end with a letter or number',
   INVALID_APPLICATION_NAME: 'must be 2-63 characters long, contain only lowercase letters, numbers, or hyphens, and start with a letter or number',
   INVALID_SUBDOMAIN: 'must be 1-63 characters long, contain only lowercase letters, numbers, or hyphens, and start with a letter or number',
+  INVALID_BOT_HANDLE: 'must be 1-39 characters long, contain only lowercase letters, numbers, or single hyphens, and start and end with a letter or number',
   EXPIRY_NOT_APPLICABLE: 'may only accompany a suspension, which is the sole status that lapses on its own',
   EXPIRY_MUST_BE_FUTURE: 'must be a point in the future',
 } as const satisfies Record<string, string>;

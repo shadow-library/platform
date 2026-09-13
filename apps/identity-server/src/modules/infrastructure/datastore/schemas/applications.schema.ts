@@ -13,11 +13,14 @@ export namespace Application {
   export type Visibility = InferEnum<typeof applicationVisibility>;
   export type OrganisationApplication = InferSelectModel<typeof organisationApplications>;
   export type OrganisationApplicationSource = InferEnum<typeof organisationApplicationSource>;
+  export type BotGrantLevel = InferEnum<typeof botGrantLevel>;
 }
 
 export const applicationVisibility = pgEnum('application_visibility', ['PUBLIC', 'RESTRICTED', 'INTERNAL']);
 
 export const organisationApplicationSource = pgEnum('organisation_application_source', ['PLATFORM_RELEASE', 'ORG_ASSIGNMENT']);
+
+export const botGrantLevel = pgEnum('bot_grant_level', ['read', 'write']);
 
 export const applications = pgTable(
   'applications',
@@ -79,6 +82,10 @@ export const applicationRoles = pgTable(
     roleName: varchar('role_name', { length: 255 }).notNull(),
     description: text('description'),
     isDefault: boolean('is_default').notNull().default(false),
+    botGrantable: boolean('bot_grantable').notNull().default(false),
+    botResource: varchar('bot_resource', { length: 64 }),
+    botLevel: botGrantLevel('bot_level'),
+    isSensitive: boolean('is_sensitive').notNull().default(false),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
