@@ -110,6 +110,11 @@ export interface OutboxEntry extends CommandEnvelope {
 
 export type NetState = 'online' | 'offline' | 'syncing' | 'failed' | 'signed-out';
 
+export type SyncFailureReason = 'server' | 'offline' | 'deletion-pending' | 'signed-out';
+
+/** Whether this device holds a pulled mirror for the account: `loading` and `failed` mean an empty mirror is not an empty account. */
+export type SyncReadiness = { kind: 'loading' } | { kind: 'failed'; reason: SyncFailureReason } | { kind: 'ready' };
+
 /** A command the server refused. Surfaced once, calmly, then dropped — the outbox never holds a rejection. */
 export interface SyncNotice {
   commandId: string;
@@ -123,6 +128,9 @@ export interface SyncSnapshot {
   notices: SyncNotice[];
   /** Set when the local mirror could not be opened at all. There is no data to render and no pass to retry into, so the shell says so instead of showing an empty day. */
   initError: string | null;
+  readiness: SyncReadiness;
+  /** Epoch ms when `readiness` last became `ready`; a mirror query whose data is older is still showing its pre-pull answer. */
+  readySince: number;
 }
 
 export const SYNC_META_KEYS = {
@@ -130,6 +138,8 @@ export const SYNC_META_KEYS = {
   epoch: 'sync-epoch',
   deviceId: 'device-id',
   lastSyncedAt: 'last-synced-at',
+  mirrorReady: 'mirror-ready',
+  deletionPending: 'deletion-pending',
   outboxSeq: 'outbox-seq',
   exportJobId: 'export-job-id',
   weeklyReview: 'weekly-review',

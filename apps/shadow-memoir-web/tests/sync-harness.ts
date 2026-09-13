@@ -26,6 +26,7 @@ export interface FakeServerOptions {
   /** One entry per POST, in order; a shorter list than the batch models a run cut short by a failure. */
   outcomes?: (batch: RecordedBatch, attempt: number) => WireCommandOutcome[];
   status?: () => number;
+  errorCode?: string;
 }
 
 export interface FakeServer {
@@ -58,7 +59,7 @@ export function createFakeServer(options: FakeServerOptions = {}): FakeServer {
     const url = String(input);
     const status = options.status?.() ?? 200;
     const headers = { 'x-sync-epoch': server.epoch, 'content-type': 'application/json' };
-    if (status !== 200) return new Response(JSON.stringify({ message: 'no' }), { status, headers });
+    if (status !== 200) return new Response(JSON.stringify({ code: options.errorCode, message: 'no' }), { status, headers });
 
     if (url.includes('/account/devices/')) {
       server.deviceRegistrations.push(url.split('/').pop() as string);

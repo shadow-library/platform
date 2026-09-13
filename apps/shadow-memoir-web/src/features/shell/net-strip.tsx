@@ -1,18 +1,28 @@
 import { useLocation } from '@tanstack/react-router';
-import { type ReactElement, useEffect } from 'react';
-import { toast } from '@shadow-library/ui';
+import { type ReactElement, useEffect, useState } from 'react';
+import { Button, toast } from '@shadow-library/ui';
 
-import { type NetState, useSyncEngine, useSyncStatus } from '@/lib/sync';
+import { type SyncSnapshot, useSyncEngine, useSyncStatus } from '@/lib/sync';
 
 import { useSystemOverlays } from './system-overlays';
 import styles from './net-strip.module.css';
 
-const MESSAGES: Record<Exclude<NetState, 'online'>, string> = {
-  offline: 'Offline. Everything you log is kept on this device and syncs when you reconnect.',
-  syncing: 'Syncing your queued changes.',
-  failed: 'Some changes are still waiting. They will be retried.',
-  'signed-out': 'Signed out. Your data and queue are intact — sign in to resume syncing.',
-};
+const DELETION_MESSAGE = 'This account is being deleted, so nothing on this device syncs any more.';
+
+interface StripCopy {
+  message: string;
+  retry: boolean;
+}
+
+function stripCopy({ state, queuedCount, readiness }: SyncSnapshot): StripCopy {
+  if (readiness.kind === 'failed' && readiness.reason === 'deletion-pending') return { message: DELETION_MESSAGE, retry: false };
+  if (state === 'offline') return { message: 'Offline. Everything you log is kept on this device and syncs when you reconnect.', retry: false };
+  if (state === 'signed-out') return { message: 'Signed out. Your data and queue are intact — sign in to resume syncing.', retry: false };
+  if (state === 'syncing') return { message: queuedCount > 0 ? 'Syncing your queued changes…' : 'Syncing…', retry: false };
+  if (queuedCount > 0) return { message: "Some changes haven't synced yet.", retry: true };
+  if (readiness.kind === 'ready') return { message: "Couldn't reach Shadow Memoir. Everything on this device is kept.", retry: true };
+  return { message: "Couldn't reach Shadow Memoir, so your data hasn't loaded yet.", retry: true };
+}
 
 /**
  * The one place the sync layer speaks to the owner about itself: a quiet strip while anything is not
@@ -24,6 +34,7 @@ export function NetStrip(): ReactElement | null {
   const engine = useSyncEngine();
   const overlays = useSystemOverlays();
   const { pathname } = useLocation();
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     for (const notice of status.notices) {
@@ -39,10 +50,24 @@ export function NetStrip(): ReactElement | null {
 
   if (!engine || status.state === 'online') return null;
 
+  const copy = stripCopy(status);
+  const retry = (): void => {
+    if (retrying) return;
+    setRetrying(true);
+    void engine.sync().finally(() => setRetrying(false));
+  };
+
   return (
-    <div className={styles.strip} data-state={status.state} role="status">
-      <span>{MESSAGES[status.state]}</span>
-      {status.queuedCount > 0 ? <span className={styles.count}>{status.queuedCount} queued</span> : null}
+    <div className={styles.strip} data-state={status.state} role="status" aria-busy={retrying || undefined}>
+      <span>{copy.message}</span>
+      <span className={styles.actions}>
+        {status.queuedCount > 0 ? <span className={styles.count}>{status.queuedCount} queued</span> : null}
+        {copy.retry || retrying ? (
+          <Button size="sm" variant="secondary" onClick={retry}>
+            {retrying ? 'Trying again…' : 'Try again'}
+          </Button>
+        ) : null}
+      </span>
     </div>
   );
 }

@@ -14,7 +14,10 @@ import { SyncedQuickLogProvider } from './synced-quick-log-provider';
 import { SyncedReflectProvider } from './synced-reflect-provider';
 import { type SyncSnapshot } from './sync.types';
 
-const OFFLINE_SNAPSHOT: SyncSnapshot = { state: 'offline', queuedCount: 0, lastSyncedAt: null, notices: [], initError: null };
+const OFFLINE_SNAPSHOT: SyncSnapshot = { state: 'offline', queuedCount: 0, lastSyncedAt: null, notices: [], initError: null, readiness: { kind: 'ready' }, readySince: 0 };
+
+/** The server cannot know whether this device holds a mirror, so it paints the pre-sync state rather than a failure. */
+const SERVER_SNAPSHOT: SyncSnapshot = { ...OFFLINE_SNAPSHOT, readiness: { kind: 'loading' } };
 
 /** localStorage marker for the account whose mirror this device currently holds — see {@link purgeIfAccountChanged}. */
 const LAST_ACCOUNT_KEY = 'shadow-memoir:last-account';
@@ -35,7 +38,7 @@ export function useSyncStatus(): SyncSnapshot {
   return useSyncExternalStore(
     listener => engine?.subscribe(listener) ?? (() => undefined),
     () => engine?.getSnapshot() ?? OFFLINE_SNAPSHOT,
-    () => OFFLINE_SNAPSHOT,
+    () => SERVER_SNAPSHOT,
   );
 }
 

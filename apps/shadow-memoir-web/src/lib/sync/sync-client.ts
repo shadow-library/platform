@@ -1,8 +1,19 @@
-import { csrfSetCookie, ensureCsrfToken, resolveCsrfConfig } from '@shadow-library/web';
+import { csrfSetCookie, ensureCsrfToken, isApiError, resolveCsrfConfig } from '@shadow-library/web';
 
-import { type CommandBatchResponse, type CommandEnvelope, type DeltaPage, type DeltaResponse, type SyncDomain } from './sync.types';
+import { type CommandBatchResponse, type CommandEnvelope, type DeltaPage, type DeltaResponse, type SyncDomain, type SyncFailureReason } from './sync.types';
 
-export type SyncFailureKind = 'unauthorized' | 'forbidden' | 'offline' | 'rejected' | 'server';
+export type SyncFailureKind = 'unauthorized' | 'forbidden' | 'deletion-pending' | 'offline' | 'rejected' | 'server';
+
+const DELETION_PENDING_CODE = 'ACC_002';
+
+const FAILURE_REASONS: Record<SyncFailureKind, SyncFailureReason> = {
+  unauthorized: 'signed-out',
+  forbidden: 'server',
+  'deletion-pending': 'deletion-pending',
+  offline: 'offline',
+  rejected: 'server',
+  server: 'server',
+};
 
 /** Every non-2xx the sync layer can act on, named — the engine branches on `kind`, never on a status number. */
 export class SyncTransportError extends Error {
@@ -30,11 +41,26 @@ export interface DeltaRequest {
 const SYNC_EPOCH_HEADER = 'x-sync-epoch';
 
 /** Only a 401 means the session itself is gone. A 403 refuses this one request — a CSRF token the server did not recognise, a guard this route applies — and retrying is the honest answer to it. */
-function classify(status: number): SyncFailureKind {
+function classify(status: number, code: string | null): SyncFailureKind {
+  if (code === DELETION_PENDING_CODE) return 'deletion-pending';
   if (status === 401) return 'unauthorized';
   if (status === 403) return 'forbidden';
   if (status >= 400 && status < 500) return 'rejected';
   return 'server';
+}
+
+function failureReasonOf(error: unknown): SyncFailureReason {
+  if (error instanceof SyncTransportError) return FAILURE_REASONS[error.kind];
+  if (!isApiError(error)) return 'server';
+  if (error.code === DELETION_PENDING_CODE) return 'deletion-pending';
+  if (error.status === 401) return 'signed-out';
+  return error.code === 'NETWORK_ERROR' ? 'offline' : 'server';
+}
+
+export function toSyncFailureReason(error: unknown, online: boolean): SyncFailureReason {
+  const reason = failureReasonOf(error);
+  // A network error while the browser reports a connection is an unreachable server, and no `online` event will ever retry it.
+  return reason === 'offline' && online ? 'server' : reason;
 }
 
 /**
@@ -87,16 +113,20 @@ export class SyncClient {
       throw new SyncTransportError('offline', 0, 'Unable to reach the server');
     }
 
-    if (!response.ok) throw new SyncTransportError(classify(response.status), response.status, await readMessage(response));
+    if (!response.ok) {
+      const failure = await readFailure(response);
+      throw new SyncTransportError(classify(response.status, failure.code), response.status, failure.message);
+    }
     return response;
   }
 }
 
-async function readMessage(response: Response): Promise<string> {
+async function readFailure(response: Response): Promise<{ code: string | null; message: string }> {
+  const fallback = `Request failed with status ${response.status}`;
   try {
-    const body = (await response.json()) as { message?: string };
-    return body.message ?? `Request failed with status ${response.status}`;
+    const body = (await response.json()) as { code?: unknown; message?: unknown };
+    return { code: typeof body.code === 'string' ? body.code : null, message: typeof body.message === 'string' ? body.message : fallback };
   } catch {
-    return `Request failed with status ${response.status}`;
+    return { code: null, message: fallback };
   }
 }

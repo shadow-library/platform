@@ -1,16 +1,19 @@
 import { type MemoirStore } from './memoir-store';
 import { type DomainRows, projectWorldState } from './projection';
 import { Outbox } from './outbox';
-import { SyncClient, SyncTransportError } from './sync-client';
+import { SyncClient, toSyncFailureReason } from './sync-client';
 import {
   type CommandEnvelope,
   type DeltaPage,
+  type NetState,
   type OutboxEntry,
   SNAPSHOT_DOMAINS,
   SYNC_DOMAINS,
   SYNC_META_KEYS,
   type SyncCommand,
+  type SyncFailureReason,
   type SyncNotice,
+  type SyncReadiness,
   type SyncSnapshot,
 } from './sync.types';
 
@@ -24,6 +27,13 @@ export interface SyncEngineOptions {
 }
 
 const DEFAULT_MAX_PAGES = 50;
+const MAX_PULL_ROUNDS = 20;
+
+const LOADING: SyncReadiness = { kind: 'loading' };
+const READY: SyncReadiness = { kind: 'ready' };
+const DELETION_PENDING: SyncReadiness = { kind: 'failed', reason: 'deletion-pending' };
+
+const FAILURE_STATES: Record<SyncFailureReason, NetState> = { server: 'failed', offline: 'offline', 'deletion-pending': 'failed', 'signed-out': 'signed-out' };
 
 function isOnline(): boolean {
   return typeof navigator === 'undefined' || navigator.onLine !== false;
@@ -51,8 +61,19 @@ export class SyncEngine {
   private readonly worldListeners = new Set<() => void>();
   private readonly rows: Partial<DomainRows> = {};
 
-  private snapshot: SyncSnapshot = { state: isOnline() ? 'online' : 'offline', queuedCount: 0, lastSyncedAt: null, notices: [], initError: null };
+  private snapshot: SyncSnapshot = {
+    state: isOnline() ? 'online' : 'offline',
+    queuedCount: 0,
+    lastSyncedAt: null,
+    notices: [],
+    initError: null,
+    readiness: LOADING,
+    readySince: 0,
+  };
   private deviceId: string | undefined;
+  private mirrorReady = false;
+  private deletionPending = false;
+  private coldFailure: SyncFailureReason | null = null;
   private inFlight: Promise<void> | null = null;
 
   constructor(private readonly options: SyncEngineOptions) {
@@ -108,6 +129,10 @@ export class SyncEngine {
    * instead of rendering an empty day forever.
    */
   async start(): Promise<void> {
+    this.mirrorReady = false;
+    this.deletionPending = false;
+    this.coldFailure = null;
+    if (this.snapshot.readiness !== LOADING) this.patch({ readiness: LOADING });
     try {
       await this.hydrate();
     } catch (error) {
@@ -119,7 +144,12 @@ export class SyncEngine {
 
   async hydrate(): Promise<void> {
     await this.hydrateRows();
-    this.patch({ queuedCount: await this.outbox.size(), lastSyncedAt: (await this.store.readMeta<string>(SYNC_META_KEYS.lastSyncedAt)) ?? null });
+    const lastSyncedAt = (await this.store.readMeta<string>(SYNC_META_KEYS.lastSyncedAt)) ?? null;
+    const marker = await this.store.readMeta<string | null>(SYNC_META_KEYS.mirrorReady);
+    // A mirror synced before the marker existed has only `lastSyncedAt`; an epoch reset writes the marker as null.
+    this.mirrorReady = marker === undefined ? lastSyncedAt !== null : marker !== null;
+    this.deletionPending = (await this.store.readMeta<boolean>(SYNC_META_KEYS.deletionPending)) === true;
+    this.patch({ queuedCount: await this.outbox.size(), lastSyncedAt, readiness: this.readiness() });
   }
 
   /** Enqueues a command for the server; the caller has already applied it locally. Purely-local commands return without queueing. */
@@ -140,16 +170,23 @@ export class SyncEngine {
   }
 
   private async runSync(): Promise<void> {
-    if (!isOnline()) return this.patch({ state: 'offline' });
+    if (!isOnline()) {
+      this.coldFailure = 'offline';
+      return this.patch({ state: 'offline', readiness: this.readiness() });
+    }
 
-    this.patch({ state: 'syncing' });
+    this.coldFailure = null;
+    this.patch({ state: 'syncing', readiness: this.readiness() });
     try {
       await this.ensureDeviceRegistered();
       const interrupted = await this.flush();
-      await this.pull();
+      const complete = await this.pullUntilStalled();
       const lastSyncedAt = new Date().toISOString();
+      await this.recordPull(complete, lastSyncedAt);
       await this.store.writeMeta(SYNC_META_KEYS.lastSyncedAt, lastSyncedAt);
-      this.patch({ state: interrupted ? 'failed' : 'online', lastSyncedAt, queuedCount: await this.outbox.size() });
+      if (!complete && !this.mirrorReady) this.coldFailure = 'server';
+      const state = interrupted || !complete ? 'failed' : 'online';
+      this.patch({ state, lastSyncedAt, queuedCount: await this.outbox.size(), readiness: this.readiness() });
     } catch (error) {
       await this.handleFailure(error);
     }
@@ -160,10 +197,30 @@ export class SyncEngine {
    * against local data and the same command ids replay under the new principal once they sign back in.
    */
   private async handleFailure(error: unknown): Promise<void> {
-    const queuedCount = await this.outbox.size();
-    if (error instanceof SyncTransportError && error.kind === 'unauthorized') return this.patch({ state: 'signed-out', queuedCount });
-    if (error instanceof SyncTransportError && error.kind === 'offline') return this.patch({ state: 'offline', queuedCount });
-    this.patch({ state: 'failed', queuedCount });
+    const reason = toSyncFailureReason(error, isOnline());
+    if (reason === 'deletion-pending') await this.setDeletionPending(true);
+    else this.coldFailure = reason;
+    this.patch({ state: FAILURE_STATES[reason], queuedCount: await this.outbox.size(), readiness: this.readiness() });
+  }
+
+  /** A pulled mirror stays readable through any failure except a deletion, which no retry recovers from; that one holds until a pass succeeds. */
+  private readiness(): SyncReadiness {
+    if (this.deletionPending) return DELETION_PENDING;
+    if (this.mirrorReady) return READY;
+    return this.coldFailure ? { kind: 'failed', reason: this.coldFailure } : LOADING;
+  }
+
+  private async recordPull(complete: boolean, at: string): Promise<void> {
+    await this.setDeletionPending(false);
+    if (this.mirrorReady) return;
+    await this.store.writeMeta(SYNC_META_KEYS.mirrorReady, complete ? at : null);
+    this.mirrorReady = complete;
+  }
+
+  private async setDeletionPending(pending: boolean): Promise<void> {
+    if (this.deletionPending === pending) return;
+    await this.store.writeMeta(SYNC_META_KEYS.deletionPending, pending);
+    this.deletionPending = pending;
   }
 
   private async ensureDeviceRegistered(): Promise<void> {
@@ -202,7 +259,17 @@ export class SyncEngine {
     return false;
   }
 
-  private async pull(): Promise<void> {
+  /** Keeps draining past the page budget for as long as the cursor moves; the budget only stops a server that makes no progress. */
+  private async pullUntilStalled(): Promise<boolean> {
+    for (let round = 0; round < MAX_PULL_ROUNDS; round += 1) {
+      const before = await this.store.readMeta<string>(SYNC_META_KEYS.cursor);
+      if (await this.pull()) return true;
+      if ((await this.store.readMeta<string>(SYNC_META_KEYS.cursor)) === before) return false;
+    }
+    return false;
+  }
+
+  private async pull(): Promise<boolean> {
     for (let page = 0; page < this.maxPages; page += 1) {
       const since = (await this.store.readMeta<string>(SYNC_META_KEYS.cursor)) ?? '0';
       const response = await this.client.pullDelta({ since, domains: SYNC_DOMAINS });
@@ -211,8 +278,9 @@ export class SyncEngine {
 
       await this.ingest(response.page);
       await this.store.writeMeta(SYNC_META_KEYS.cursor, response.page.cursor);
-      if (!response.page.hasMore) return;
+      if (!response.page.hasMore) return true;
     }
+    return false;
   }
 
   private async ingest(page: DeltaPage): Promise<void> {
@@ -246,13 +314,17 @@ export class SyncEngine {
     await this.store.writeMeta(SYNC_META_KEYS.epoch, epoch);
     if (known === undefined) return false;
 
+    await this.store.writeMeta(SYNC_META_KEYS.mirrorReady, null);
+    this.mirrorReady = false;
+    this.patch({ readiness: this.readiness() });
     await this.store.clearMirror();
     await this.hydrateRows();
     return true;
   }
 
   private patch(next: Partial<SyncSnapshot>): void {
-    this.snapshot = { ...this.snapshot, ...next };
+    const readySince = next.readiness === READY && this.snapshot.readiness !== READY ? Date.now() : this.snapshot.readySince;
+    this.snapshot = { ...this.snapshot, ...next, readySince };
     for (const listener of this.listeners) listener();
   }
 }

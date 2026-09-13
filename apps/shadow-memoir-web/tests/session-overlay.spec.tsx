@@ -69,7 +69,7 @@ describe('NetStrip session overlay', () => {
   it('should leave a refused request to the strip rather than the overlay', async () => {
     renderNetStrip(403, '/');
 
-    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/still waiting/i));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/couldn't reach/i));
     expect(screen.queryByText(OVERLAY_TITLE)).toBeNull();
   });
 

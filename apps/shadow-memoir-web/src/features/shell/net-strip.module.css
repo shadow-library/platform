@@ -15,6 +15,13 @@
   color: var(--sh-text-primary);
 }
 
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+}
+
 .count {
   flex: none;
   font-variant-numeric: tabular-nums;

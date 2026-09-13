@@ -12,4 +12,5 @@ export * from './synced-hero-provider';
 export * from './synced-provider';
 export * from './synced-quick-log-provider';
 export * from './synced-reflect-provider';
+export * from './use-sync-readiness';
 export * from './uuid';
