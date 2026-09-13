@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
  * Importing user defined packages
  */
 import { Input } from '../Input';
+import { Select } from '../Select';
 import { FormField } from './FormField';
 
 /**
@@ -96,5 +97,34 @@ describe('FormField', () => {
     const describedBy = screen.getByRole('textbox').getAttribute('aria-describedby');
     expect(describedBy).toContain('external-hint');
     expect(describedBy).toContain(screen.getByText('We never share it').id);
+  });
+
+  it('should nest the Select trigger inside its own wrapper rather than directly under FormField', () => {
+    // happy-dom applies no CSS; this checks the DOM precondition the fix relies on.
+    const { container } = render(
+      <FormField label="Timezone">
+        <Select aria-label="Timezone">
+          <Select.Item value="utc">UTC</Select.Item>
+        </Select>
+      </FormField>,
+    );
+    const trigger = screen.getByRole('combobox');
+    const formFieldRoot = container.firstElementChild;
+    expect(trigger.parentElement).not.toBe(formFieldRoot);
+    expect(trigger.parentElement?.parentElement).toBe(formFieldRoot);
+  });
+
+  it('should mark the Select trigger disabled inside a disabled FormField', () => {
+    // happy-dom applies no CSS; this checks the DOM precondition the fix relies on.
+    const { container } = render(
+      <FormField label="Home currency" disabled>
+        <Select aria-label="Home currency">
+          <Select.Item value="eur">EUR</Select.Item>
+        </Select>
+      </FormField>,
+    );
+    const trigger = screen.getByRole('combobox');
+    expect(trigger).toBeDisabled();
+    expect(container.querySelector('[data-disabled] :disabled')).toBe(trigger);
   });
 });

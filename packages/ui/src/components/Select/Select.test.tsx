@@ -106,4 +106,19 @@ describe('Select', () => {
     await user.click(trigger);
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
+
+  it('should contain the hidden native select within the Select root', () => {
+    // happy-dom applies no CSS; this checks the DOM precondition the fix relies on.
+    const { container } = render(
+      <form>
+        <Regions name="region" />
+      </form>,
+    );
+    const form = container.querySelector('form');
+    const trigger = screen.getByRole('combobox');
+    const hiddenSelect = container.querySelector('select[aria-hidden="true"]');
+    expect(hiddenSelect).not.toBeNull();
+    expect(trigger.parentElement).not.toBe(form);
+    expect(hiddenSelect?.parentElement).toBe(trigger.parentElement);
+  });
 });

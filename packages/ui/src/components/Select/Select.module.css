@@ -3,20 +3,22 @@
  * surface reused by Dropdown Menu, Autocomplete, Command Palette, and pickers. Tokens only.
  */
 
+/* Wraps the trigger so Radix's hidden native `<select>` (`position: absolute`) has a positioned ancestor instead of escaping to the page. */
+.root {
+  position: relative;
+  display: flex;
+  width: 100%;
+  /* A `button` shrink-to-fits even at `display: flex`, so `width: 100%` is pinned to content (not the trigger's own `height`) as the flex basis. */
+  flex-basis: content;
+}
+
 /* ── Trigger (Input field surface + chevron) ─────────────── */
 .trigger {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  /*
-   * The trigger is the component's outermost DOM node (Radix's Root renders nothing), and a `button`
-   * shrink-to-fits even when block-level — so unlike Input's `.root` it does need `width: 100%` to fill
-   * a form row. That width would otherwise also become the flex base size and make every flex row
-   * containing a Select run a deficit, so the base is pinned to the content instead.
-   */
   width: 100%;
-  flex-basis: content;
   padding: 0 10px 0 12px;
   background: var(--sh-surface-raised);
   border: var(--sh-border-width) solid var(--sh-border-strong);

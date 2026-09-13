@@ -82,7 +82,7 @@
 
 /* The DS sizes a Select trigger from its content, so an auto-width unit column puts every row's amount
    box at a different x. Pinning both widths squares the column across rows, and `flex: none` stops the
-   amount box being squeezed until its value clips. Both outrank the DS trigger's own `width: 100%`. */
+   amount box being squeezed until its value clips. Both outrank the DS Select root's own `width: 100%`. */
 .durationInputs .durationAmount {
   flex: none;
   width: 84px;

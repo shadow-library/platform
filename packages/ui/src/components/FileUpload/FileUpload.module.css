@@ -7,6 +7,8 @@
 .root {
   /* No `width: 100%`: this block-level box already fills a block or grid parent, and declaring the
      width would also make it the flex base size, starving any flex row it sits in. See Input's `.root`. */
+  /* Contains the hidden `input[type=file]` below (`position: absolute`), which otherwise escapes to the page and extends its scroll height. */
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 12px;

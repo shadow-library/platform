@@ -45,44 +45,46 @@ function SelectRoot({
   'aria-labelledby': ariaLabelledby,
 }: SelectProps) {
   return (
-    <SelectPrimitive.Root
-      value={value}
-      defaultValue={defaultValue}
-      onValueChange={onValueChange}
-      open={open}
-      defaultOpen={defaultOpen}
-      onOpenChange={onOpenChange}
-      disabled={disabled}
-      required={required}
-      name={name}
-      dir={dir}
-    >
-      <SelectPrimitive.Trigger
-        id={triggerId}
-        className={cn(styles.trigger, className)}
-        data-size={size}
-        data-invalid={invalid || undefined}
-        aria-invalid={invalid || undefined}
-        aria-label={ariaLabel}
-        aria-labelledby={ariaLabelledby}
+    <div className={cn(styles.root, className)}>
+      <SelectPrimitive.Root
+        value={value}
+        defaultValue={defaultValue}
+        onValueChange={onValueChange}
+        open={open}
+        defaultOpen={defaultOpen}
+        onOpenChange={onOpenChange}
+        disabled={disabled}
+        required={required}
+        name={name}
+        dir={dir}
       >
-        <SelectPrimitive.Value className={styles.value} placeholder={placeholder} />
-        <SelectPrimitive.Icon className={styles.chevron}>{loading ? <span className={styles.spinner} aria-hidden="true" /> : <ChevronDownIcon />}</SelectPrimitive.Icon>
-      </SelectPrimitive.Trigger>
-      <SelectPrimitive.Portal>
-        <SelectPrimitive.Content className={cn(styles.content, contentClassName)} position="popper" sideOffset={6}>
-          <SelectPrimitive.ScrollUpButton className={styles.scrollButton}>
-            <span className={styles.scrollChevronUp}>
+        <SelectPrimitive.Trigger
+          id={triggerId}
+          className={styles.trigger}
+          data-size={size}
+          data-invalid={invalid || undefined}
+          aria-invalid={invalid || undefined}
+          aria-label={ariaLabel}
+          aria-labelledby={ariaLabelledby}
+        >
+          <SelectPrimitive.Value className={styles.value} placeholder={placeholder} />
+          <SelectPrimitive.Icon className={styles.chevron}>{loading ? <span className={styles.spinner} aria-hidden="true" /> : <ChevronDownIcon />}</SelectPrimitive.Icon>
+        </SelectPrimitive.Trigger>
+        <SelectPrimitive.Portal>
+          <SelectPrimitive.Content className={cn(styles.content, contentClassName)} position="popper" sideOffset={6}>
+            <SelectPrimitive.ScrollUpButton className={styles.scrollButton}>
+              <span className={styles.scrollChevronUp}>
+                <ChevronDownIcon />
+              </span>
+            </SelectPrimitive.ScrollUpButton>
+            <SelectPrimitive.Viewport className={styles.viewport}>{children}</SelectPrimitive.Viewport>
+            <SelectPrimitive.ScrollDownButton className={styles.scrollButton}>
               <ChevronDownIcon />
-            </span>
-          </SelectPrimitive.ScrollUpButton>
-          <SelectPrimitive.Viewport className={styles.viewport}>{children}</SelectPrimitive.Viewport>
-          <SelectPrimitive.ScrollDownButton className={styles.scrollButton}>
-            <ChevronDownIcon />
-          </SelectPrimitive.ScrollDownButton>
-        </SelectPrimitive.Content>
-      </SelectPrimitive.Portal>
-    </SelectPrimitive.Root>
+            </SelectPrimitive.ScrollDownButton>
+          </SelectPrimitive.Content>
+        </SelectPrimitive.Portal>
+      </SelectPrimitive.Root>
+    </div>
   );
 }
 

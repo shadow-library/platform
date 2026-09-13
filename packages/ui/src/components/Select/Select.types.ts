@@ -27,7 +27,7 @@ export interface SelectProps extends RootProps {
   invalid?: boolean;
   /** Swap the chevron for a spinner while options load. */
   loading?: boolean;
-  /** Class applied to the trigger (the visible field). */
+  /** Class applied to the root — the positioning wrapper around the trigger (which fills it), not the trigger's visible surface itself. */
   className?: string;
   /** Class applied to the listbox content surface. */
   contentClassName?: string;

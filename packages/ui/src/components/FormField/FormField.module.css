@@ -11,6 +11,10 @@
 .root[data-disabled] {
   opacity: var(--sh-disabled-opacity);
 }
+/* Resets the control's own disabled opacity — FormField always forwards `disabled`, so without this the two opacities compound. */
+.root[data-disabled] :disabled {
+  opacity: 1;
+}
 
 .labelRow {
   display: flex;
