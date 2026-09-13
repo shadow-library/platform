@@ -73,6 +73,14 @@ describe('AuthClient.exchangeUserToken', () => {
     expect(idp.getRequestCount('/oauth2/token')).toBe(before);
   });
 
+  it('should refuse a bot token as a subject token before any network call', async () => {
+    const botToken = await idp.mintBotToken({ botId: '42', org: '7', audience: AUDIENCE });
+    const before = idp.getRequestCount('/oauth2/token');
+
+    await expect(auth.exchangeUserToken({ subjectToken: botToken, resource: DOWNSTREAM })).rejects.toMatchObject({ code: 'TOKEN_EXCHANGE_REFUSED', status: 400 });
+    expect(idp.getRequestCount('/oauth2/token')).toBe(before);
+  });
+
   it('should refuse a missing subject token, an unreadable one, and a missing resource', async () => {
     const before = idp.getRequestCount('/oauth2/token');
 

@@ -32,8 +32,6 @@ export interface JwtPayload {
   [claim: string]: unknown;
 }
 
-export type PrincipalKind = 'user' | 'service';
-
 /**
  * Authentication assurance level (D-19). `AAL2` is only ever minted from a live step-up grant scoped
  * to one (app session, audience) pair, so it never travels to another service or up to the parent
@@ -41,16 +39,44 @@ export type PrincipalKind = 'user' | 'service';
  */
 export type AssuranceLevel = 'AAL1' | 'AAL2';
 
-export interface AuthPrincipal {
-  kind: PrincipalKind;
+interface PrincipalBase {
   sub: string;
   scopes: string[];
   clientId?: string;
+  claims: JwtPayload;
+}
+
+export interface UserPrincipal extends PrincipalBase {
+  kind: 'user';
   org?: string;
   sid?: string;
   aal?: AssuranceLevel;
-  claims: JwtPayload;
 }
+
+export interface ServicePrincipal extends PrincipalBase {
+  kind: 'service';
+  org?: string;
+  sid?: undefined;
+  aal?: undefined;
+}
+
+/**
+ * An organisation-owned, non-human principal. `sub` and `clientId` are the bot's OAuth client id; a
+ * bot is refused on every guarded route that does not declare `@BotPermission`.
+ */
+export interface BotPrincipal extends PrincipalBase {
+  kind: 'bot';
+  org: string;
+  botId: string;
+  keyId: string;
+  rateLimitPerMinute: number;
+  sid?: undefined;
+  aal?: undefined;
+}
+
+export type AuthPrincipal = UserPrincipal | ServicePrincipal | BotPrincipal;
+
+export type PrincipalKind = AuthPrincipal['kind'];
 
 /** Transport used for every network call; injectable so consumers can test without sockets */
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
@@ -98,6 +124,20 @@ export interface RoleManifest {
    * set, so a manifest that never mentions it behaves exactly as before.
    */
   default?: boolean;
+
+  /** Makes the role grantable to bots; omitted, only people can hold it */
+  bot?: BotGrantManifest;
+}
+
+/** `write` implies `read`: a write role must carry every permission of the read role on the same resource */
+export type BotGrantLevel = 'read' | 'write';
+
+export interface BotGrantManifest {
+  /** The resource the grant is presented under to an organisation admin, e.g. `projects` */
+  resource: string;
+  level: BotGrantLevel;
+  /** Flags the grant as sensitive to organisation admins, as for spend-incurring actions such as AI generation */
+  sensitive?: boolean;
 }
 
 /**

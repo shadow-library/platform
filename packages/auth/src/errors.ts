@@ -38,6 +38,8 @@ export class AuthErrorCode extends ErrorCode {
    * Token Verification Errors
    */
 
+  /** The bearer value carries the bot-key prefix but is malformed, fails its checksum, or was recently refused by identity */
+  static readonly BOT_KEY_INVALID = AuthErrorCode.unauthenticated('BOT_KEY_INVALID', 'Bot key is invalid: {reason}');
   /** The token algorithm is not in the allow-list */
   static readonly ALG_REJECTED = AuthErrorCode.unauthenticated('ALG_REJECTED', 'Token algorithm is not allowed');
   /** The token is not addressed to this audience */

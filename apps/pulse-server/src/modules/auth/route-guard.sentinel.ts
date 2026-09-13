@@ -1,7 +1,7 @@
 import { type HandlerMetadata } from '@shadow-library/app';
 import { AUTH_ROUTE_METADATA } from '@shadow-library/auth/module';
 import { Logger } from '@shadow-library/common';
-import { type AsyncRouteHandler, Middleware, type MiddlewareGenerator } from '@shadow-library/fastify';
+import { type AsyncRouteHandler, ContextService, Middleware, type MiddlewareGenerator } from '@shadow-library/fastify';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
@@ -23,6 +23,10 @@ import { PUBLIC_ROUTE_METADATA } from './public.decorator';
  * rather than treating those routes as a wiring defect. A route reaching the deny path is genuinely
  * undeclared, so it is logged at `warn` — once when the route is registered (to surface the
  * misconfiguration at boot) and again on every rejected request.
+ *
+ * Pulse exposes nothing to bots, so on guarded routes the sentinel also refuses a bot principal. The
+ * SDK already denies a bot on any route without `@BotPermission`; this keeps pulse closed even if one
+ * is ever added by mistake.
  */
 
 const AUTH_ROUTES_PREFIX = `${AUTH_ROUTES_BASE_PATH}/`;
@@ -31,21 +35,33 @@ const AUTH_ROUTES_PREFIX = `${AUTH_ROUTES_BASE_PATH}/`;
 export class RouteGuardSentinel implements MiddlewareGenerator {
   private readonly logger = Logger.getLogger(APP_NAME, RouteGuardSentinel.name);
 
+  constructor(private readonly context: ContextService) {}
+
   /** Namespaced so the router's per-metadata handler cache never collides with the auth guard's entries */
   cacheKey(metadata: HandlerMetadata): string {
     return `pulse-sentinel:${String(metadata.method)}:${String(metadata.path)}`;
   }
 
   generate(metadata: HandlerMetadata): AsyncRouteHandler | undefined {
+    const route = `${String(metadata.method)} ${String(metadata.path)}`;
     const isGuarded = metadata[AUTH_ROUTE_METADATA] !== undefined;
     const isPublic = metadata[PUBLIC_ROUTE_METADATA] === true;
     const isSdkAuthRoute = String(metadata.path ?? '').startsWith(AUTH_ROUTES_PREFIX);
-    if (isGuarded || isPublic || isSdkAuthRoute) return undefined;
+    if (isGuarded) return this.refuseBots(route);
+    if (isPublic || isSdkAuthRoute) return undefined;
 
-    const route = `${String(metadata.method)} ${String(metadata.path)}`;
     this.logger.warn('Route declares no access policy; the default-deny sentinel will reject every request to it — add an auth decorator or @Public()', { route });
     return async (): Promise<void> => {
       this.logger.warn('Rejected request to a route with no declared access policy', { route });
+      throw AppErrorCode.SEC_003.create();
+    };
+  }
+
+  private refuseBots(route: string): AsyncRouteHandler {
+    return async (): Promise<void> => {
+      const principal = this.context.getAuthPrincipalOrNull();
+      if (principal?.kind !== 'bot') return;
+      this.logger.warn('Rejected a bot principal; pulse exposes no route to bots', { route, botId: principal.botId });
       throw AppErrorCode.SEC_003.create();
     };
   }

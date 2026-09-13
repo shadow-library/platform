@@ -1,5 +1,6 @@
 import { type DynamicModule, Module } from '@shadow-library/app';
 import { AuthModule } from '@shadow-library/auth/module';
+import { FastifyModule } from '@shadow-library/fastify';
 
 import { AUTH_ROUTES_BASE_PATH } from './auth.constants';
 import { RouteGuardSentinel } from './route-guard.sentinel';
@@ -25,7 +26,7 @@ export class SessionModule {
   static forRoot(): DynamicModule {
     return {
       module: SessionModule,
-      imports: [AuthModule.forRoot({ routes: { basePath: AUTH_ROUTES_BASE_PATH } })],
+      imports: [AuthModule.forRoot({ routes: { basePath: AUTH_ROUTES_BASE_PATH } }), FastifyModule],
       controllers: [RouteGuardSentinel],
     };
   }

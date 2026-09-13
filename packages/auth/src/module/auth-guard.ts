@@ -3,15 +3,17 @@
  */
 import { type HandlerMetadata } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
-import { ContextService, Middleware } from '@shadow-library/fastify';
+import { ContextService, Middleware, ServerErrorCode } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
-import { AuthPrincipal } from '../interfaces';
+import { AuthPrincipal, BotPrincipal } from '../interfaces';
 import { AuthClient } from '../lib/auth-client';
+import { BOT_KEY_PREFIX, parseBotKey } from '../lib/bot-key';
+import { BotRateLimiter } from '../lib/bot-rate-limiter';
 import { AppSessionService } from './app-session.service';
 import { AUTH_ROUTE_METADATA } from './constants';
 import { AUTH_PRINCIPAL } from './context';
@@ -27,6 +29,8 @@ export interface GuardedRequest {
   headers: Record<string, string | string[] | undefined>;
   /** Path and query of the current request; used verbatim as the `return_to` of a login or step-up bounce */
   url?: string;
+  /** The caller's address as the framework resolved it; forwarded to identity when a bot key is exchanged */
+  ip?: string;
 }
 
 /** The subset of the framework reply the guard needs to bounce a browser instead of erroring at it */
@@ -70,6 +74,7 @@ const isNavigation = (request: GuardedRequest, method: string): boolean => {
 @Middleware({ type: 'preValidation', weight: 100 })
 export class AuthGuard {
   private readonly logger = Logger.getLogger(NAMESPACE, AuthGuard.name);
+  private readonly botRateLimiter = new BotRateLimiter();
 
   constructor(
     private readonly client: AuthClient,
@@ -90,9 +95,8 @@ export class AuthGuard {
     const path = String(metadata.path ?? '/');
     return async (request: GuardedRequest, response?: GuardedResponse): Promise<unknown> => {
       try {
-        const principal = await this.authenticate(request, auth);
-        this.authorize(principal, auth, method, path);
-        if (auth.permission) await this.checkPermission(principal, auth);
+        const principal = await this.authenticate(request, auth, method, path);
+        await this.admit(principal, auth, method, path, response);
         this.context.set(AUTH_PRINCIPAL, principal);
         this.logger.debug('request authenticated', { sub: principal.sub, kind: principal.kind, aal: principal.aal, method, path });
         return undefined;
@@ -102,9 +106,10 @@ export class AuthGuard {
     };
   }
 
-  private async authenticate(request: GuardedRequest, auth: AuthRouteMetadata): Promise<AuthPrincipal> {
+  private async authenticate(request: GuardedRequest, auth: AuthRouteMetadata, method: string, path: string): Promise<AuthPrincipal> {
     const header = request.headers.authorization;
     const token = typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : undefined;
+    if (token?.startsWith(BOT_KEY_PREFIX)) return this.authenticateBot(token, request.ip, auth, method, path);
     if (token) return this.client.verify(token).catch((error: Error) => throwError(this.unauthenticated(error)));
 
     const sessions = this.sessions;
@@ -115,12 +120,61 @@ export class AuthGuard {
     return sessions.resolvePrincipal(handle, { elevated: auth.elevated });
   }
 
+  /**
+   * Everything that can refuse a bot without asking identity is decided before the exchange. The checksum
+   * is public, so a well-formed key proves nothing, and exchanging one on a route no bot may use would
+   * turn every guarded route into a free amplifier against identity's token endpoint.
+   *
+   * An exchange that failed for want of identity — transport, 5xx, a malformed answer — is answered 503
+   * rather than collapsed into 401, so a bot can tell an outage from a revoked key. It still fails closed.
+   */
+  private async authenticateBot(botKey: string, clientIp: string | undefined, auth: AuthRouteMetadata, method: string, path: string): Promise<BotPrincipal> {
+    if (!parseBotKey(botKey)) throw this.unauthenticated(AuthErrorCode.BOT_KEY_INVALID.create({ reason: 'the key is malformed or fails its checksum' }));
+    if (!auth.botPermissions?.length) throw this.denied('bot refused on a route that declares no bot permission', { method, path });
+    if (auth.elevated) throw this.denied('bot refused on a route that requires elevation', { method, path });
+
+    return this.client.resolveBotKey(botKey, clientIp).catch((error: unknown) => {
+      if (!AppError.is(error) || error.status < 500) throw this.unauthenticated(error instanceof Error ? error : new Error(String(error)));
+      this.logger.warn('bot key exchange unavailable', { reason: error.message, method, path });
+      throw AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: 'identity could not exchange the bot key' });
+    });
+  }
+
+  private async admit(principal: AuthPrincipal, auth: AuthRouteMetadata, method: string, path: string, response: GuardedResponse | undefined): Promise<void> {
+    if (principal.kind === 'bot') return this.admitBot(principal, auth, response);
+    this.authorize(principal, auth, method, path);
+    if (auth.permission) await this.checkPermission(principal, auth);
+  }
+
   private authorize(principal: AuthPrincipal, auth: AuthRouteMetadata, method: string, path: string): void {
     if (principal.kind === 'service' && (!principal.clientId || !this.client.isServiceCallerAllowed(principal.clientId, method, path))) {
       throw this.denied('service caller not allowed for this route', { clientId: principal.clientId, method, path });
     }
     if (auth.scopes?.some(scope => !principal.scopes.includes(scope))) throw this.denied('token lacks a required scope', { sub: principal.sub, requiredScopes: auth.scopes });
     if (auth.elevated && principal.aal !== 'AAL2') throw AuthErrorCode.ELEVATION_REQUIRED.create({ reason: 'the presented credential is not elevated' });
+  }
+
+  /**
+   * Service-access rules and scopes do not apply to a bot — an organisation admin grants a bot
+   * permissions, never rules or scopes — so its gate is every `@BotPermission` plus the route's own
+   * `@RequirePermission`, all evaluated in the bot's organisation. Every decision uses the high-risk TTL
+   * so a revoked grant stops the bot within a minute, and `failOpen` never applies.
+   */
+  private async admitBot(principal: BotPrincipal, auth: AuthRouteMetadata, response: GuardedResponse | undefined): Promise<void> {
+    if (!auth.botPermissions?.length || auth.elevated) throw this.denied('bot refused on a route that is not open to bots', { botId: principal.botId });
+
+    const permissions = [...new Set([...(auth.botPermissions ?? []), ...(auth.permission ? [auth.permission] : [])])];
+
+    const decision = this.botRateLimiter.consume(principal.botId, principal.rateLimitPerMinute);
+    if (!decision.allowed) {
+      this.logger.warn('bot rate limit exhausted', { botId: principal.botId, retryAfterSeconds: decision.retryAfterSeconds });
+      response?.header('retry-after', String(decision.retryAfterSeconds));
+      throw ServerErrorCode.S007.create();
+    }
+
+    const checks = permissions.map(action => ({ action, organisationId: principal.org, principal }));
+    const permitted = await this.client.checkAll(checks, { highRisk: true });
+    if (permitted.includes(false)) throw this.denied('bot permission denied', { botId: principal.botId, org: principal.org, permissions });
   }
 
   /**
@@ -171,7 +225,7 @@ export class AuthGuard {
      * codes — a broken scope grant, an unreachable identity — and none of that is the browser's
      * business; leaking it would tell an unauthenticated caller how this service is configured.
      */
-    if (AppError.is(error, AuthGuardErrorCode)) throw error;
+    if (AppError.is(error, AuthGuardErrorCode) || AppError.is(error, ServerErrorCode.S007) || AppError.is(error, AuthErrorCode.TOKEN_EXCHANGE_FAILED)) throw error;
     throw this.unauthenticated(error instanceof Error ? error : new Error(String(error)));
   }
 

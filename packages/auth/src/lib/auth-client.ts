@@ -12,6 +12,7 @@ import {
   AppRegistration,
   AuthClientConfig,
   AuthPrincipal,
+  BotPrincipal,
   CheckInput,
   CheckOptions,
   DirectoryUser,
@@ -26,17 +27,21 @@ import {
   RoleCatalogSyncOptions,
   RoleCatalogSyncResult,
   ServiceAccessRule,
+  ServicePrincipal,
   ServiceTokenOptions,
   TokenExchangeInput,
   UserInfo,
+  UserPrincipal,
 } from '../interfaces';
 import { AppRegistryClient } from './app-registry';
 import { AppSessionClient } from './app-session-client';
+import { BotKeyExchanger } from './bot-key-exchanger';
 import { buildClientAuthentication, isConfidential } from './client-auth';
 import { DiscoveryClient } from './discovery';
 import { RemoteJwks } from './jwks';
 import { type ClaimExpectations, decodeJwt, verifyJwt } from './jwt';
 import { PdpClient } from './pdp-client';
+import { assertValidRoleCatalog } from './role-catalog';
 import { ServiceAccessClient } from './service-access';
 import { ServiceTokenManager } from './token-manager';
 import { assertValidTimeout, withTimeout } from './transport';
@@ -97,6 +102,12 @@ const CONFLICT = 409;
 /** RFC 8693 §2.1 — exchanging one token for another, here to act as the user towards another application */
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 const ACCESS_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:access_token';
+const BOT_KEY_TOKEN_TYPE = 'urn:shadow:token-type:bot-key';
+
+const readString = (value: unknown): string | undefined => (typeof value === 'string' && value.length > 0 ? value : undefined);
+
+/** A 401 is identity refusing this application's own credential, not the key, so it is an outage from the bot's point of view */
+const isBotKeyRejection = (status: number): boolean => status >= 400 && status < 500 && status !== 401;
 
 /**
  * The consumer-facing auth client: offline token verification, PDP checks, M2M tokens, role
@@ -118,6 +129,7 @@ export class AuthClient {
   private readonly discovery: DiscoveryClient;
   private readonly serviceAccess: ServiceAccessClient;
   private readonly apps: AppRegistryClient;
+  private readonly botKeys: BotKeyExchanger;
 
   /** The first-party app-session protocol client; see `AppSessionClient` for why it is M2M-only */
   readonly appSessions: AppSessionClient;
@@ -182,6 +194,7 @@ export class AuthClient {
       appId: config.appId,
       refreshSeconds: config.app?.refreshSeconds,
     });
+    this.botKeys = new BotKeyExchanger({ exchange: (botKey, clientIp) => this.exchangeBotKey(botKey, clientIp), verify: token => this.verifyToken(token) });
     this.logger.info('auth client initialised', { issuer: this.issuer, appId: config.appId, audience: config.audience, hasClientCredentials: Boolean(config.client) });
   }
 
@@ -222,8 +235,18 @@ export class AuthClient {
     this.logger.debug('configured scopes validated against discovery', { scopes });
   }
 
-  /** Verifies a bearer token offline against the issuer's JWKS and returns the resolved principal */
-  async verify(token: string): Promise<AuthPrincipal> {
+  /**
+   * Verifies a bearer token offline against the issuer's JWKS and returns the resolved principal. A bot
+   * token is refused: bots are admitted only by exchanging their key through `resolveBotKey`, which is
+   * where identity checks the bot's IP allowlist and where revocation lag is capped at a minute.
+   */
+  async verify(token: string): Promise<UserPrincipal | ServicePrincipal> {
+    const principal = await this.verifyToken(token);
+    if (principal.kind === 'bot') throw AuthErrorCode.TOKEN_INVALID.create({ reason: 'a bot token is only accepted through bot key exchange' });
+    return principal;
+  }
+
+  private async verifyToken(token: string): Promise<AuthPrincipal> {
     if (!token) throw AuthErrorCode.TOKEN_INVALID.create({ reason: 'no token provided' });
     const payload = await verifyJwt(token, kid => this.jwks.getKey(kid), await this.expectations());
     const principal = this.toPrincipal(payload);
@@ -256,6 +279,34 @@ export class AuthClient {
 
     this.logger.info('back-channel logout token verified', { hasSub: Boolean(sub), hasSid: Boolean(sid) });
     return { sub, sid, claims: payload };
+  }
+
+  /**
+   * Resolves a bot key to the bot it belongs to by exchanging it at identity for a token addressed to
+   * this application, then verifying that token offline. `clientIp` is the caller's address, which
+   * identity checks against the bot's IP allowlist.
+   */
+  resolveBotKey(botKey: string, clientIp?: string): Promise<BotPrincipal> {
+    return this.botKeys.resolve(botKey, clientIp);
+  }
+
+  /**
+   * Identity forces the audience to this client's own resource, so the key can never be replayed into
+   * another application. A credential rejection is `BOT_KEY_INVALID`; anything else — transport, 5xx,
+   * identity refusing this application's own credential, a malformed answer — is `TOKEN_EXCHANGE_FAILED`.
+   */
+  private async exchangeBotKey(botKey: string, clientIp: string | undefined): Promise<string> {
+    const endpoint = (await this.discovery.get()).token_endpoint;
+    const body: Record<string, string> = { grant_type: TOKEN_EXCHANGE_GRANT_TYPE, subject_token: botKey, subject_token_type: BOT_KEY_TOKEN_TYPE };
+    if (clientIp) body.client_ip = clientIp;
+
+    const response = await this.dispatchToOAuthEndpoint(endpoint, body, AuthErrorCode.TOKEN_EXCHANGE_FAILED, 'bot key exchange');
+    if (isBotKeyRejection(response.status)) throw AuthErrorCode.BOT_KEY_INVALID.create({ reason: `identity refused the key with http ${response.status}` });
+    if (!response.ok) throw this.logged(AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: `bot key exchange endpoint returned http ${response.status}` }));
+
+    const payload = (await response.json().catch(() => ({}))) as TokenExchangeResponse;
+    if (!payload.access_token) throw this.logged(AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: 'malformed bot key exchange response' }));
+    return payload.access_token;
   }
 
   /** Asks the PDP whether the principal may perform the action; deny-by-default on any failure */
@@ -331,6 +382,7 @@ export class AuthClient {
       }
     })();
     if (payload.act !== undefined) refuse('the subject token already carries act; delegation is single-hop');
+    if (payload.token_type === 'bot') refuse('a bot token cannot be exchanged');
   }
 
   /** `fetch` with the service token injected and a single automatic retry on a stale-token 401 */
@@ -391,6 +443,7 @@ export class AuthClient {
    */
   async syncRoles(manifest: RoleCatalogManifest, options: RoleCatalogSyncOptions = {}): Promise<RoleCatalogSyncResult> {
     if (!this.config.client) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'role sync requires service-account client credentials' });
+    assertValidRoleCatalog(manifest);
     const token = await this.identityToken(ROLE_SYNC_SCOPE);
     const headers = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
     const url = `${this.issuer}/api/v1/authz/catalog${options.force ? '?force=true' : ''}`;
@@ -471,19 +524,23 @@ export class AuthClient {
     return `${this.issuer}/oauth2/${fallbackPath}`;
   }
 
-  /** Every `/oauth2/*` grant this client drives: form-encoded, authenticated by secret or SA assertion */
   private async postToOAuthEndpoint(endpoint: string, body: Record<string, string>, errorCode: AuthErrorCode, description: string): Promise<Response> {
+    const response = await this.dispatchToOAuthEndpoint(endpoint, body, errorCode, description);
+    if (!response.ok) throw this.logged(errorCode.create({ reason: `${description} endpoint returned http ${response.status}: ${await this.readFailureReason(response)}` }));
+    return response;
+  }
+
+  /** Every `/oauth2/*` grant this client drives: form-encoded, authenticated by secret or SA assertion */
+  private async dispatchToOAuthEndpoint(endpoint: string, body: Record<string, string>, errorCode: AuthErrorCode, description: string): Promise<Response> {
     const client = this.config.client;
     if (!isConfidential(client)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: `${description} requires confidential client credentials` });
 
     const authentication = await buildClientAuthentication(client);
     const headers = { 'content-type': 'application/x-www-form-urlencoded', ...authentication.headers };
     const form = new URLSearchParams({ ...body, ...authentication.body }).toString();
-    const response = await this.transport(endpoint, { method: 'POST', headers, body: form }).catch((error: Error) =>
+    return this.transport(endpoint, { method: 'POST', headers, body: form }).catch((error: Error) =>
       throwError(this.logged(errorCode.create({ reason: `${description} failed: ${error.message}` }))),
     );
-    if (!response.ok) throw this.logged(errorCode.create({ reason: `${description} endpoint returned http ${response.status}: ${await this.readFailureReason(response)}` }));
-    return response;
   }
 
   /**
@@ -572,17 +629,29 @@ export class AuthClient {
   }
 
   private toPrincipal(payload: JwtPayload): AuthPrincipal {
-    if (typeof payload.sub !== 'string' || !payload.sub) throw AuthErrorCode.TOKEN_INVALID.create({ reason: 'missing sub claim' });
-    return {
-      kind: payload.token_type === 'service' ? 'service' : 'user',
-      sub: payload.sub,
-      scopes: typeof payload.scope === 'string' ? payload.scope.split(' ').filter(Boolean) : [],
-      clientId: typeof payload.client_id === 'string' ? payload.client_id : undefined,
-      org: typeof payload.org === 'string' ? payload.org : undefined,
-      sid: typeof payload.sid === 'string' ? payload.sid : undefined,
-      aal: payload.aal === 'AAL2' ? 'AAL2' : payload.aal === 'AAL1' ? 'AAL1' : undefined,
-      claims: payload,
-    };
+    const sub = readString(payload.sub);
+    if (!sub) throw AuthErrorCode.TOKEN_INVALID.create({ reason: 'missing sub claim' });
+
+    const base = { sub, scopes: typeof payload.scope === 'string' ? payload.scope.split(' ').filter(Boolean) : [], clientId: readString(payload.client_id), claims: payload };
+    if (payload.token_type === 'bot') return this.toBotPrincipal(payload, base);
+    if (payload.token_type === 'service') return { ...base, kind: 'service', org: readString(payload.org) };
+
+    const aal = payload.aal === 'AAL2' ? 'AAL2' : payload.aal === 'AAL1' ? 'AAL1' : undefined;
+    return { ...base, kind: 'user', org: readString(payload.org), sid: readString(payload.sid), aal };
+  }
+
+  /** A bot acts only inside its organisation and under its own rate limit, so a token missing either is unusable rather than partially trusted */
+  private toBotPrincipal(payload: JwtPayload, base: Omit<BotPrincipal, 'kind' | 'org' | 'botId' | 'keyId' | 'rateLimitPerMinute'>): BotPrincipal {
+    const org = readString(payload.org);
+    const botId = readString(payload.bot_id);
+    const keyId = readString(payload.bot_key_id);
+    if (!org || !botId || !keyId) throw AuthErrorCode.TOKEN_INVALID.create({ reason: 'a bot token must carry org, bot_id and bot_key_id' });
+
+    const rateLimitPerMinute = payload.rl;
+    if (typeof rateLimitPerMinute !== 'number' || !Number.isSafeInteger(rateLimitPerMinute) || rateLimitPerMinute <= 0) {
+      throw AuthErrorCode.TOKEN_INVALID.create({ reason: 'a bot token must carry a positive integer rl' });
+    }
+    return { ...base, kind: 'bot', org, botId, keyId, rateLimitPerMinute };
   }
 
   private withBearer(init: RequestInit, token: string): RequestInit {

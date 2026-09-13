@@ -90,7 +90,9 @@ Inside Kubernetes, set `client.assertionPath` (or `AUTH_CLIENT_ASSERTION_PATH`) 
 
 ```ts
 const principal = await auth.verify(bearerToken);
-// → { kind: 'user' | 'service', sub, org, sid?, scopes: string[], aal?, claims }
+// → UserPrincipal | ServicePrincipal, discriminated on `kind` ('user' | 'service')
+//   { kind, sub, org?, sid?, scopes: string[], aal?, claims }
+// refuses a bot token (TOKEN_INVALID): bots enter only through key exchange, auth.resolveBotKey (§4.3)
 // throws AppError with AuthErrorCode.TOKEN_EXPIRED | TOKEN_INVALID | AUDIENCE_MISMATCH | ISSUER_MISMATCH | ALG_REJECTED | KEY_UNKNOWN
 // AuthErrorCode extends common's ErrorCode (same catalog pattern as the servers) and the key itself throws:
 // AuthErrorCode.TOKEN_EXPIRED.throw(); narrowing via AppError.is(error, AuthErrorCode.TOKEN_EXPIRED)
@@ -139,6 +141,7 @@ When `roles` is set (and `client` credentials are present), `AuthModule.forRoot`
 
 - **Ownership**: the catalog for an application lives in that application's code, not in hand-run admin calls. The target application is derived from the service-account token, never from the request body — a service can only touch **its own** application's catalog.
 - **Declarative full-sync**: the manifest is the complete truth. Permissions/roles absent from it are **deleted** in identity, cascading into `role_permissions` and `role_assignments`; affected principals are cache-invalidated. A role may only reference permission names it also declares (else an `AppError` with `AuthErrorCode.ROLE_SYNC_FAILED` / HTTP 400).
+- **Bot grants**: a role may carry `bot: { resource, level: 'read' | 'write', sensitive? }` to make it grantable to bots. The SDK refuses (`CONFIG_INVALID`, before any network call) a blank resource, an unknown level, two roles claiming the same `(resource, level)`, and a `write` role missing any permission of the `read` role on the same resource.
 - **Default role**: a role may carry `default: true` to mark it as the application's baseline, granted implicitly to every user. The flag is optional and passed through verbatim; a manifest that omits it is unchanged.
 - **Guardrail**: because it deletes, identity refuses a manifest that would remove too much of the application's catalog — the signature of a truncated or half-generated one — and the SDK surfaces that as `AuthErrorCode.ROLE_SYNC_REFUSED` (409), deliberately distinct from the retryable `ROLE_SYNC_FAILED`. Override it with `auth.syncRoles(manifest, { force: true })` at a call site that means it; `AuthModule`'s startup sync never passes `force`.
 - **Footgun**: the manifest is production config. It is bounded to the pushing application and every sync is audited (`authz.catalog.synced`), but a deliberate forced sync still revokes grants. Assignments (which user has which role) are **not** managed here — they stay an admin operation.
@@ -150,6 +153,23 @@ When `roles` is set (and `client` credentials are present), `AuthModule.forRoot`
 ### 4.2 Admin-managed service access (M2M route allowlist)
 
 There is no per-route caller-allowlist decorator. Which M2M caller may invoke which routes is configured in the identity **admin panel** (`/api/v1/admin/service-access`: target application, caller client, method, path pattern — trailing `*` wildcard). On startup `AuthModule` loads the rules for its own application via `GET /api/v1/authz/service-access` (service token, scope `authz:check`), and the guard enforces them locally: a `kind=service` principal is **denied on every authenticated route** unless a rule covers that caller + method + path. Rules are re-fetched on a TTL (default 300 s, `serviceAccess.refreshSeconds` / `AUTH_SERVICE_ACCESS_REFRESH_SECONDS`), so granting **or revoking** a caller takes effect within one interval; refreshes are singleflighted, a failed refresh logs at warn and keeps the last good rules, and a failed load at startup aborts the boot rather than silently denying everything forever. `auth.refreshServiceAccess()` forces one out of band and never throws.
+
+### 4.3 Bots (organisation-owned principals)
+
+A bot presents `Authorization: Bearer sl_bot_<keyId>_<secret>_<checksum>` — its key, never a token. The guard, in order:
+
+1. validates the key's shape and CRC-32 checksum offline — a bad key is `IAM_001` (401) with no network call;
+2. refuses the bot (`IAM_002`, 403) without contacting identity when the route declares no `@BotPermission` or requires elevation — the checksum is public, so a well-formed key must not buy a token-endpoint call;
+3. exchanges the key at the token endpoint (`subject_token_type=urn:shadow:token-type:bot-key`, `client_ip` = the request's IP, authenticated as this application; identity forces the audience to this application), verifies the returned `token_type: "bot"` JWT, and requires its `bot_key_id` to be the uuid the key encodes;
+4. applies the per-bot rate limit, then PDP-checks every permission.
+
+The verified principal is deep-frozen and cached per `(key, IP)` hash — never the key itself — until `min(exp - 30 s, 60 s)`, and exchanges are single-flight. A definitive refusal (a 4xx other than identity rejecting this application's own credential, or a token that fails validation) is cached for 10 s and answered 401; an outage (transport, 5xx, a 401 on this application's credential, a malformed answer) is not cached and is answered `TOKEN_EXCHANGE_FAILED` (503) — still fail-closed. The key, its hash and the token are never logged.
+
+- **Deny by default**: `@BotPermission` implies `@Authenticated`; class- and method-level uses accumulate, like `scopes`, and the bot must hold every one.
+- For a bot, the gate is every `@BotPermission` **plus** the route's `@RequirePermission`, all PDP-checked in `principal.org` with the 60 s high-risk TTL (`PdpClient` treats every bot decision as high-risk, whoever asks); service-access rules and `@RequireScope` are not evaluated, and `failOpen` never applies. People and services ignore `@BotPermission` entirely — no extra PDP call.
+- **Bot tokens are not bearers**: `auth.verify()` refuses a `token_type: "bot"` JWT, so a bot token presented directly, or through any path other than key exchange, is a 401. That keeps identity's IP-allowlist check and the 60 s revocation bound on every request.
+- **Rate limit**: an in-memory token bucket per bot per replica, sized from the token's `rl` (requests per minute). Exhausted → `S007` (429) with `Retry-After`. The effective limit is `rl × replicas`.
+- An app that resolves principals outside the guard (optional auth, account middleware) must decide explicitly what a bot means there; `BOT_KEY_PREFIX` identifies a key without exchanging it.
 
 ## 5. PDP client
 
@@ -218,7 +238,7 @@ The RP helper owns: PKCE generation/verification, `state`/`nonce` handling, ID-t
 
 `createTestIdP()` spins an in-process mock: generates an ephemeral Ed25519 key, serves discovery + JWKS on a random port, and mints arbitrary user/service tokens — so consuming services can integration-test guards without a running identity service.
 
-It tracks the protocol, not a subset of it. The v1.1 surface it answers for: `GET /api/v1/apps/me` and the `step_up_endpoint` / `app_session_endpoint` discovery keys (§2.1), intent-bound elevation with the `AUTH_007` mismatch refusal, RFC 8693 exchange with scope intersection and the single-hop refusal (§6.1), silently narrowed app-session mints (§4.1.1), and identity's destructive-sync guardrail (§4.1). Drivers for the properties that are otherwise hard to reach: `setAppRegistration` (an admin's grant change mid-test), `setSteppedUp({ clientId, resource })`, `setUnexchangeableScopes`, `setCatalogGuardrail`, `getLastElevationRequest`, `handleOnlyTransport()` (a request arriving with a handle and no application credential — the property the first-party model rests on), and `waitForRequest(path, count)` (wait for a scheduled refresh rather than sleeping past it).
+It tracks the protocol, not a subset of it. The v1.1 surface it answers for: `GET /api/v1/apps/me` and the `step_up_endpoint` / `app_session_endpoint` discovery keys (§2.1), intent-bound elevation with the `AUTH_007` mismatch refusal, RFC 8693 exchange with scope intersection and the single-hop refusal (§6.1), silently narrowed app-session mints (§4.1.1), and identity's destructive-sync guardrail (§4.1). Drivers for the properties that are otherwise hard to reach: `setAppRegistration` (an admin's grant change mid-test), `setSteppedUp({ clientId, resource })`, `setUnexchangeableScopes`, `setCatalogGuardrail`, `getLastElevationRequest`, `handleOnlyTransport()` (a request arriving with a handle and no application credential — the property the first-party model rests on), and `waitForRequest(path, count)` (wait for a scheduled refresh rather than sleeping past it). Bots are tested through their key, as they reach a service: `issueBotKey({ botId, org, clientId?, rateLimitPerMinute?, scopes?, ttlSeconds?, claims? })` registers a key the token endpoint's bot-key exchange redeems (audience forced to the registration's) and returns it for use as a bearer, `revokeBotKey(key)` makes the exchange refuse it, and `getBotKeyExchangeCount()` counts exchanges. `mintBotToken(...)` signs a bot token directly, only to assert that the SDK refuses one presented as a bearer. `grantPermission({ kind: 'bot', sub })` files the grant as a `SERVICE_ACCOUNT`, as the PDP sees it (§4.3).
 
 ## 9. Compatibility contract
 

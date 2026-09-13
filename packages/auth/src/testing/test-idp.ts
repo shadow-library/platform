@@ -6,6 +6,7 @@
  * Importing user defined packages
  */
 import { AppRegistration, AssuranceLevel, FetchLike, Jwk, JwtPayload, PrincipalKind, ServiceAccessRule } from '../interfaces';
+import { formatBotKey } from '../lib/bot-key';
 import { decodeJwt } from '../lib/jwt';
 import { createTestSigner, TestSigner } from './signer';
 
@@ -48,6 +49,26 @@ export interface TestTokenInput {
   ttlSeconds?: number;
   claims?: JwtPayload;
 }
+
+export interface TestBotTokenInput {
+  botId: string;
+  org: string;
+  /** Defaults to `bot_<botId>`, the shape identity registers a bot's OAuth client under */
+  clientId?: string;
+  /** Defaults to a fresh uuid */
+  keyId?: string;
+  /** Defaults to 600, identity's ceiling */
+  rateLimitPerMinute?: number;
+  /** Defaults to the registration's audience, which is what identity forces an exchange to */
+  audience?: string;
+  scopes?: string[];
+  /** Defaults to 300, identity's fixed bot token lifetime; may be negative to mint an expired token */
+  ttlSeconds?: number;
+  claims?: JwtPayload;
+}
+
+/** The exchange always addresses the token to the exchanging application, so a key carries no audience */
+export type TestBotKeyInput = Omit<TestBotTokenInput, 'keyId' | 'audience'>;
 
 export interface TestPrincipalRef {
   kind: PrincipalKind;
@@ -113,6 +134,24 @@ export interface TestIdP {
 
   /** Mints a signed token with sensible claim defaults */
   issueToken(input: TestTokenInput): Promise<string>;
+
+  /**
+   * Registers a bot key the token endpoint's bot-key exchange redeems and returns the full `sl_bot_…`
+   * key. This is how a consumer tests a bot end to end: present the key as a bearer, exactly as a bot does.
+   */
+  issueBotKey(input: TestBotKeyInput): string;
+
+  /**
+   * Signs a bot access token directly, bypassing the exchange. The SDK refuses such a token presented as
+   * a bearer — bots enter only through their key — so this exists to assert that refusal, not to admit a bot.
+   */
+  mintBotToken(input: TestBotTokenInput): Promise<string>;
+
+  /** Makes the exchange refuse the key from now on */
+  revokeBotKey(botKey: string): void;
+
+  /** How many bot-key exchanges the token endpoint has answered, successful or not */
+  getBotKeyExchangeCount(): number;
 
   /** Signs exactly the given claims — no defaults are applied */
   signToken(claims: JwtPayload): Promise<string>;
@@ -226,6 +265,9 @@ const SESSIONS_PATH = '/api/v1/app-sessions';
 const BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
 
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
+const BOT_KEY_TOKEN_TYPE = 'urn:shadow:token-type:bot-key';
+const DEFAULT_BOT_TOKEN_TTL_SECONDS = 300;
+const DEFAULT_BOT_RATE_LIMIT_PER_MINUTE = 600;
 
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
@@ -275,6 +317,8 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   let serviceAccessRules: ServiceAccessRule[] = [];
   let catalogGuardrail = false;
   const unexchangeableScopes = new Set<string>();
+  const botKeys = new Map<string, TestBotTokenInput>();
+  let botKeyExchanges = 0;
 
   /** The default registration is what a real `apps/me` would return for a freshly provisioned app */
   const appId = options.clientId ?? 'test-client';
@@ -310,6 +354,20 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   };
 
   const issueToken = (input: TestTokenInput): Promise<string> => signer.sign(buildClaims(input));
+
+  const mintBotToken = (input: TestBotTokenInput): Promise<string> => {
+    const clientId = input.clientId ?? `bot_${input.botId}`;
+    return issueToken({
+      sub: clientId,
+      kind: 'bot',
+      clientId,
+      org: input.org,
+      audience: input.audience ?? appRegistration.audience,
+      scopes: input.scopes,
+      ttlSeconds: input.ttlSeconds ?? DEFAULT_BOT_TOKEN_TTL_SECONDS,
+      claims: { bot_id: input.botId, bot_key_id: input.keyId ?? crypto.randomUUID(), rl: input.rateLimitPerMinute ?? DEFAULT_BOT_RATE_LIMIT_PER_MINUTE, ...input.claims },
+    });
+  };
 
   const isClientAuthorized = (request: Request, body: Record<string, unknown>): boolean => {
     if (!options.clientId) return true;
@@ -361,6 +419,15 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
       return json({ access_token: accessToken, id_token: idToken, token_type: 'Bearer', expires_in: ttl, scope: (stored.scopes ?? []).join(' '), refresh_token: refreshToken });
     }
 
+    /** Identity forces the audience to the exchanging application's own resource, whatever the request names */
+    if (body.grant_type === TOKEN_EXCHANGE_GRANT_TYPE && body.subject_token_type === BOT_KEY_TOKEN_TYPE) {
+      botKeyExchanges += 1;
+      const bot = botKeys.get(typeof body.subject_token === 'string' ? body.subject_token : '');
+      if (!bot) return json({ error: 'invalid_grant' }, 400);
+      const accessToken = await mintBotToken({ ...bot, audience: appRegistration.audience });
+      return json({ access_token: accessToken, token_type: 'Bearer', expires_in: bot.ttlSeconds ?? DEFAULT_BOT_TOKEN_TTL_SECONDS, audience: appRegistration.audience });
+    }
+
     /**
      * RFC 8693 (D-22): the exchanged token is addressed to the target resource, acts for the subject,
      * and carries only what the subject and the requesting application both hold. Identity narrows
@@ -370,6 +437,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
       const subject = readClaims(typeof body.subject_token === 'string' ? body.subject_token : '');
       if (!subject?.sub) return json({ error: 'invalid_grant' }, 400);
       if (subject.act !== undefined) return json({ error: 'invalid_request', message: 'delegation is single-hop' }, 400);
+      if (subject.token_type === 'bot') return json({ error: 'invalid_grant', message: 'a bot token cannot be exchanged' }, 400);
 
       const held = String(subject.scope ?? '')
         .split(' ')
@@ -615,12 +683,23 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   const url = `http://127.0.0.1:${server.port}`;
   issuer = options.issuer ?? url;
 
-  const grantKey = (principal: TestPrincipalRef, organisationId: string, action: string): string => `${principal.kind}:${principal.sub}:${organisationId}:${action}`;
+  /** A bot reaches the PDP as a SERVICE_ACCOUNT, so its grants are filed exactly where a service's would be */
+  const grantKey = (principal: TestPrincipalRef, organisationId: string, action: string): string =>
+    `${principal.kind === 'bot' ? 'service' : principal.kind}:${principal.sub}:${organisationId}:${action}`;
 
   return {
     issuer,
     url,
     issueToken,
+    mintBotToken,
+    issueBotKey: input => {
+      const keyId = crypto.randomUUID();
+      const botKey = formatBotKey(keyId, crypto.getRandomValues(new Uint8Array(32)));
+      botKeys.set(botKey, { ...input, keyId });
+      return botKey;
+    },
+    revokeBotKey: botKey => void botKeys.delete(botKey),
+    getBotKeyExchangeCount: () => botKeyExchanges,
     signToken: claims => signer.sign(claims),
     createAuthorizationCode: input => {
       const code = crypto.randomUUID();

@@ -17,10 +17,10 @@ hand-rolling config, logging, errors, or validation.
 - `src/index.ts` — functional core (`AuthClient`, interfaces, `AuthErrorCode`).
 - `src/lib/` — internals: discovery, JWKS, JWT verify, PDP client, token manager, client
   authentication, transport, the app registry (derived configuration), the service-access rule cache,
-  and the first-party app-session client plus its access-token cache.
+  the first-party app-session client plus its access-token cache, and the bot-key format, exchanger and per-bot rate limiter.
 - `src/module/` — framework integration (`@shadow-library/auth/module`): `AuthModule`/`RelyingPartyModule`,
   the wired browser auth controllers, guards, decorators (`Authenticated`, `RequirePermission`,
-  `RequireScope`, `RequireElevation`), session cookie/login-state/registry, context augmentation.
+  `RequireScope`, `RequireElevation`, `BotPermission`), session cookie/login-state/registry, context augmentation.
 - `src/rp/` — OIDC relying party (`@shadow-library/auth/rp`): `RelyingParty`, authorization URL, PKCE.
   **Third-party/external consumers only** — a Shadow app uses `AuthModule.forRoot()`.
 - `src/testing/` — test utilities (`@shadow-library/auth/testing`): `createTestIdP`.

@@ -42,6 +42,8 @@ interface PdpResponse {
  * response piggybacks the principal's `authz_version`; observing a bump discards that principal's
  * stale entries so grant changes propagate within one round-trip instead of a full TTL. Transport
  * failures and malformed responses are a DENY unless the caller explicitly opted into fail-open.
+ * A bot's decision is always high-risk: its grants are revocable by an organisation admin at any time,
+ * and a long-TTL entry written by a routine check would otherwise answer the guard's later ones.
  */
 const DEFAULT_TTL_SECONDS = 900;
 const HIGH_RISK_TTL_SECONDS = 60;
@@ -56,7 +58,8 @@ export class PdpClient {
 
   constructor(private readonly options: PdpClientOptions) {}
 
-  async check(input: CheckInput, options: CheckOptions = {}): Promise<boolean> {
+  async check(input: CheckInput, checkOptions: CheckOptions = {}): Promise<boolean> {
+    const options = input.principal.kind === 'bot' ? { ...checkOptions, highRisk: true } : checkOptions;
     const organisationId = input.organisationId ?? input.principal.org;
     if (!organisationId) return false;
 
@@ -110,7 +113,7 @@ export class PdpClient {
     if (token) headers.authorization = `Bearer ${token}`;
 
     const body = JSON.stringify({
-      principalType: input.principal.kind === 'service' ? 'SERVICE_ACCOUNT' : 'USER',
+      principalType: input.principal.kind === 'user' ? 'USER' : 'SERVICE_ACCOUNT',
       principalId: input.principal.sub,
       organisationId,
       action: input.action,

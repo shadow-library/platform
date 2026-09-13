@@ -6,6 +6,7 @@ import { Handler } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
+import { AuthErrorCode } from '../errors';
 import { AUTH_ROUTE_METADATA } from './constants';
 
 /**
@@ -19,6 +20,8 @@ export interface AuthRouteMetadata {
   failOpen?: boolean;
   highRisk?: boolean;
   elevated?: boolean;
+  /** Every permission a bot must hold on this route; class- and method-level `@BotPermission` accumulate, as `scopes` do */
+  botPermissions?: string[];
 }
 
 export interface RequirePermissionOptions {
@@ -59,3 +62,14 @@ export const RequirePermission = (permission: string, options: RequirePermission
  * never attached to ordinary requests, so a user working across two applications steps up in each.
  */
 export const RequireElevation = (...scopes: string[]): AuthDecorator => authRoute({ authenticated: true, elevated: true, ...(scopes.length > 0 && { scopes }) });
+
+/**
+ * Admits bot principals to the route, provided the PDP permits `permission` in the bot's organisation
+ * (implies `@Authenticated`). Without it every bot is refused, whatever else the route declares. It is
+ * evaluated for bots only — people and services on the same route are unaffected — and repeated
+ * across class and method it accumulates: the bot must hold every one.
+ */
+export const BotPermission = (permission: string): AuthDecorator => {
+  if (!permission) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'a bot permission must name a permission' });
+  return authRoute({ authenticated: true, botPermissions: [permission] });
+};

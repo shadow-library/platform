@@ -166,11 +166,14 @@ remove() {}
   SDK; an app wanting default-deny builds that in its own auth module.
 - `getAuthPrincipal()` throws 401 when the guard did not run; `getAuthPrincipalOrNull()` does not.
 - Service (`kind: 'service'`) principals are deny-by-default and need a matching service-access rule.
+- Bot (`kind: 'bot'`) principals are deny-by-default too: refused on every route without `@BotPermission('<permission>')` and on
+  every elevated route, and admitted only through key exchange — `verify()` refuses a bot token. On a bot-enabled route the bot
+  must hold every `@BotPermission` plus the route's `@RequirePermission`. Test with `idp.issueBotKey(...)`, not a minted token.
 - Failures collapse to generic `IAM_001` (401) / `IAM_002` (403). The one exception is `IAM_003`
   (step-up required), which is deliberately actionable.
 - Access-token claims (identity, verified): `iss`, `sub`, `aud` (**plain string, never an array**),
-  `client_id`, `scope` (space-delimited, may be empty), `token_type` (**`user`|`service`** — not
-  `Bearer`), `iat`, `exp`, `jti`; conditionally `org`, `sid`, and `aal` (**uppercase `AAL1`/`AAL2`**, and
+  `client_id`, `scope` (space-delimited, may be empty), `token_type` (**`user`|`service`|`bot`** — not
+  `Bearer`; a bot token adds `org`, `bot_id`, `bot_key_id` and `rl`), `iat`, `exp`, `jti`; conditionally `org`, `sid`, and `aal` (**uppercase `AAL1`/`AAL2`**, and
   **only** on app-session mints — `/oauth2/token` never sets it). There is no `acr`/`amr`/`nbf`.
 
 ## 7. Step-up (AAL2)

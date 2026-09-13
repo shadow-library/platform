@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it, setSystemTime } from 'bun:test';
 
 /**
  * Importing user defined packages
@@ -73,6 +73,23 @@ describe('AuthClient.check (pdp client)', () => {
     // The bump is observed piggybacked on the next uncached response for this principal
     await auth.check({ action: 'posts:read', organisationId: ORG, principal });
     expect(await auth.check({ action: 'posts:write', organisationId: ORG, principal })).toBe(true);
+  });
+
+  it('should send a bot as a service account and cache its decisions for at most 60 s, even when not asked to', async () => {
+    const bot: CheckPrincipal = { kind: 'bot', sub: `bot_${++counter}`, org: ORG };
+    idp.grantPermission(bot, ORG, 'posts:write');
+    const before = idp.getRequestCount('/api/v1/authz/check');
+    expect(await auth.check({ action: 'posts:write', principal: bot })).toBe(true);
+    expect(await auth.check({ action: 'posts:write', principal: bot })).toBe(true);
+    expect(idp.getRequestCount('/api/v1/authz/check')).toBe(before + 1);
+
+    try {
+      setSystemTime(Date.now() + 61_000);
+      await auth.check({ action: 'posts:write', principal: bot });
+      expect(idp.getRequestCount('/api/v1/authz/check')).toBe(before + 2);
+    } finally {
+      setSystemTime();
+    }
   });
 
   it('should batch checks with checkAll', async () => {

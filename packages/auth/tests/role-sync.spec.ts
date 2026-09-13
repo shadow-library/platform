@@ -60,6 +60,44 @@ describe('AuthClient.syncRoles', () => {
     expect(roles.find(role => role.name === 'editor')).not.toHaveProperty('default');
   });
 
+  it('should carry a bot grant through to the wire payload verbatim', async () => {
+    const auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT });
+    const manifest: RoleCatalogManifest = {
+      permissions: [{ name: 'projects:read' }, { name: 'projects:write' }, { name: 'generation:run' }],
+      roles: [
+        { name: 'projects-reader', permissions: ['projects:read'], bot: { resource: 'projects', level: 'read' } },
+        { name: 'projects-writer', permissions: ['projects:read', 'projects:write'], bot: { resource: 'projects', level: 'write' } },
+        { name: 'generator', permissions: ['generation:run'], bot: { resource: 'generation', level: 'write', sensitive: true } },
+      ],
+    };
+    await auth.syncRoles(manifest);
+
+    const roles = idp.getLastCatalog()?.manifest.roles as RoleManifest[];
+    expect(roles).toContainEqual({ name: 'generator', permissions: ['generation:run'], bot: { resource: 'generation', level: 'write', sensitive: true } });
+  });
+
+  it('should refuse an invalid bot grant before contacting identity', async () => {
+    const auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT });
+    const permissions = [{ name: 'projects:read' }, { name: 'projects:write' }];
+    const invalid: RoleManifest[][] = [
+      [{ name: 'blank', permissions: ['projects:read'], bot: { resource: '', level: 'read' } }],
+      [{ name: 'padded', permissions: ['projects:read'], bot: { resource: ' projects', level: 'read' } }],
+      [{ name: 'unknown-level', permissions: ['projects:read'], bot: { resource: 'projects', level: 'admin' as never } }],
+      [
+        { name: 'reader', permissions: ['projects:read'], bot: { resource: 'projects', level: 'read' } },
+        { name: 'writer', permissions: ['projects:write'], bot: { resource: 'projects', level: 'write' } },
+      ],
+      [
+        { name: 'reader', permissions: ['projects:read'], bot: { resource: 'projects', level: 'read' } },
+        { name: 'other-reader', permissions: ['projects:read'], bot: { resource: 'projects', level: 'read' } },
+      ],
+    ];
+    const before = idp.getRequestCount('/api/v1/authz/catalog');
+
+    for (const roles of invalid) await expect(auth.syncRoles({ permissions, roles })).rejects.toMatchObject({ code: 'CONFIG_INVALID' });
+    expect(idp.getRequestCount('/api/v1/authz/catalog')).toBe(before);
+  });
+
   it('should require service-account credentials', async () => {
     const auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE });
     await expect(auth.syncRoles(MANIFEST)).rejects.toMatchObject({ code: 'CONFIG_INVALID' });

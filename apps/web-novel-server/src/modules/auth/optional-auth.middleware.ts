@@ -1,5 +1,5 @@
 import { type HandlerMetadata } from '@shadow-library/app';
-import { AuthClient, type AuthPrincipal } from '@shadow-library/auth';
+import { AuthClient, type AuthPrincipal, BOT_KEY_PREFIX } from '@shadow-library/auth';
 import { AppSessionService, AUTH_PRINCIPAL, parseCookies } from '@shadow-library/auth/module';
 import { Logger } from '@shadow-library/common';
 import { ContextService, type HttpRequest, Middleware, type RouteHandler } from '@shadow-library/fastify';
@@ -17,6 +17,10 @@ import { APP_NAME } from '@server/constants';
  * anonymous and sees the public catalog. That is deliberate — this middleware grants nothing, it
  * only supplies an identity for {@link NovelAccessService} to judge, and turning a stale cookie
  * into a 401 on the public reading surface would break browsing for anyone whose session lapsed.
+ *
+ * Bots read as anonymous too. A bot key is never exchanged here — the catalog grants a bot nothing, so
+ * spending an identity round trip on one would only give a leaked key a way to load identity — and the
+ * SDK's `verify` refuses a bot token presented directly, which lands in the anonymous fallback below.
  */
 
 /** Runs before the access checks in the handlers, and after nothing — no guard attaches to these routes. */
@@ -50,6 +54,7 @@ export class OptionalAuthResolver {
   private async resolve(request: HttpRequest): Promise<AuthPrincipal | undefined> {
     const header = request.headers.authorization;
     const token = typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : undefined;
+    if (token?.startsWith(BOT_KEY_PREFIX)) return undefined;
     try {
       if (token) return await this.client.verify(token);
       const handle = this.sessions.readHandle(parseCookies(request.headers.cookie));
