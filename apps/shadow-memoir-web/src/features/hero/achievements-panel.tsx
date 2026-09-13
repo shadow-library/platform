@@ -3,6 +3,7 @@ import { Card, DescriptionList } from '@shadow-library/ui';
 
 import { screenStyles, useRevealOnSelect } from '@/components/ScreenLayout';
 import { type Achievement } from '@/lib/data';
+import { formatLocalDate } from '@/lib/format';
 
 import styles from './hero.module.css';
 
@@ -34,7 +35,7 @@ export function AchievementsPanel({ achievements }: AchievementsPanelProps): Rea
                 {locked ? '◆' : achievement.crest}
               </span>
               <span className={styles.achievementName}>{locked ? 'Locked' : achievement.name}</span>
-              <span className={styles.achievementMeta}>{locked ? achievement.teaser : `Earned ${achievement.earnedOn}`}</span>
+              <span className={styles.achievementMeta}>{locked ? achievement.teaser : `Earned ${formatLocalDate(achievement.earnedOn)}`}</span>
             </button>
           );
         })}
@@ -52,13 +53,13 @@ export function AchievementsPanel({ achievements }: AchievementsPanelProps): Rea
             <div className={styles.name}>{selected.earnedOn === null ? 'Locked achievement' : selected.name}</div>
             <p className={screenStyles.cardBody}>{selected.earnedOn === null ? selected.teaser : selected.description}</p>
             <DescriptionList layout="row" termWidth={140}>
-              <DescriptionList.Item term="Earned">{selected.earnedOn ?? 'Not yet'}</DescriptionList.Item>
+              <DescriptionList.Item term="Earned">{selected.earnedOn === null ? 'Not yet' : formatLocalDate(selected.earnedOn)}</DescriptionList.Item>
               <DescriptionList.Item term="Reward">{selected.earnedOn === null ? 'Unknown until it happens' : selected.reward}</DescriptionList.Item>
             </DescriptionList>
             <p className={screenStyles.cardBody}>
               {selected.earnedOn === null
                 ? 'Locked achievements show no counter and no progress bar. A number here would turn this into a chore, and you will know when it happens.'
-                : `${earnedCount} of the catalogue is yours so far. They arrive on their own — there is nothing to claim.`}
+                : `${earnedCount} of ${achievements.length} achievements in the catalogue are yours so far. They arrive on their own — there is nothing to claim.`}
             </p>
           </Card.Body>
         </Card>

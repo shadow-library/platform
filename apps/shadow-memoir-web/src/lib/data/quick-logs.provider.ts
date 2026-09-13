@@ -8,6 +8,7 @@ import {
   averageOf,
   deriveThresholdOffer,
   firstOfDayReward,
+  formatMetricValue,
   HEALTH_METRICS,
   isFirstOfDay,
   journalExcerpt,
@@ -217,7 +218,7 @@ function seedMetrics(): HealthMetricEntry[] {
     { key: 'steps', date: today(), value: 8310, loggedAt: at(0, '19:02'), replacedValue: 6240, source: 'manual' },
     { key: 'calories', date: today(), value: 620, loggedAt: at(0, '19:02'), replacedValue: null, source: 'manual' },
     { key: 'sleep', date: today(), value: 7.2, loggedAt: at(0, '06:45'), replacedValue: null, source: 'manual' },
-    { key: 'water', date: today(), value: 1.4, loggedAt: at(0, '17:30'), replacedValue: null, source: 'manual' },
+    { key: 'water', date: today(), value: 1400, loggedAt: at(0, '17:30'), replacedValue: null, source: 'manual' },
     { key: 'steps', date: shiftDays(-1), value: 6910, loggedAt: at(-1, '22:00'), replacedValue: null, source: 'manual' },
     { key: 'calories', date: shiftDays(-1), value: 480, loggedAt: at(-1, '22:00'), replacedValue: null, source: 'manual' },
   ];
@@ -344,7 +345,7 @@ export class FixtureQuickLogProvider implements QuickLogProvider {
         return [
           {
             date: entry.date === today() ? 'Today' : entry.date,
-            text: `${definition.name} ${entry.value}${definition.unit ? ` ${definition.unit}` : ''}${entry.replacedValue === null ? '' : ` · replaced ${entry.replacedValue}`}`,
+            text: `${definition.name} ${formatMetricValue(entry.value, definition)}${entry.replacedValue === null ? '' : ` · replaced ${formatMetricValue(entry.replacedValue, definition)}`}`,
             badge: offer?.met ? 'Threshold met' : null,
           },
         ];

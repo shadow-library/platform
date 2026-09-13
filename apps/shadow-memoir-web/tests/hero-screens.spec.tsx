@@ -3,10 +3,34 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HeroScreen, RecoveryScreen } from '@/features/hero';
+import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen } from './harness';
+import { createSyncedTestData, createTestEngine } from './sync-harness';
 
 const TODAY = '2026-08-22';
+
+const GRANTS_PAGE: DeltaPage = {
+  cursor: '1',
+  hasMore: false,
+  tombstones: [],
+  domains: {
+    achievements_earned: [{ id: 'a1', achievementId: 'first_quest_completed', earnedAt: '2026-05-17T09:00:00.000Z' }],
+    titles_earned: [{ id: 't1', titleId: 'anchor_holder', earnedAt: '2026-05-17T09:00:00.000Z' }],
+  },
+};
+
+function renderSyncedHero(): ReturnType<typeof createTestEngine> {
+  const test = createTestEngine({ today: TODAY, pages: [GRANTS_PAGE] });
+  const data = createSyncedTestData(test.engine);
+  renderScreen(
+    <SyncEngineProvider data={data}>
+      <HeroScreen />
+    </SyncEngineProvider>,
+    { value: data },
+  );
+  return test;
+}
 
 function stubNarrowViewport(): void {
   vi.stubGlobal('matchMedia', (query: string) => ({
@@ -28,16 +52,33 @@ describe('Hero screen', () => {
     expect(screen.getByText('Recent progression')).toBeDefined();
   });
 
+  it('should render an earned achievement and title with a local formatted date, not the raw ISO timestamp', async () => {
+    const zone = process.env.TZ;
+    process.env.TZ = 'Europe/Oslo';
+    try {
+      renderSyncedHero();
+      fireEvent.click(await screen.findByRole('tab', { name: 'Achievements' }));
+      expect(await screen.findByText('Earned 17 May 2026')).toBeDefined();
+      expect(screen.queryByText(/2026-05-17T/)).toBeNull();
+
+      fireEvent.click(screen.getByRole('tab', { name: 'Titles' }));
+      expect(await screen.findByText(/earned 17 May 2026/)).toBeDefined();
+      expect(screen.queryByText(/2026-05-17T/)).toBeNull();
+    } finally {
+      process.env.TZ = zone;
+    }
+  });
+
   it('should show locked achievements as a teaser with no counter', async () => {
     renderScreen(<HeroScreen />, { today: TODAY });
     fireEvent.click(await screen.findByRole('tab', { name: 'Achievements' }));
 
     const locked = await screen.findAllByText('Locked');
     expect(locked.length).toBeGreaterThan(0);
-    expect(screen.queryByText(/of 17/)).toBeNull();
 
     fireEvent.click(locked[1] as HTMLElement);
     expect(await screen.findByText(/Locked achievements show no counter and no progress bar/)).toBeDefined();
+    expect(screen.queryByText(/of 17/)).toBeNull();
   });
 
   it('should move focus to the achievement detail when a tile is selected on narrow layouts', async () => {

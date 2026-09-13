@@ -195,6 +195,21 @@ describe('FE-5 domain projection', () => {
     expect(steps?.offer).toMatchObject({ questId: '5', questTitle: 'Move 8,000 steps', thresholdValue: 8000, currentValue: 8310, met: true });
   });
 
+  it('should describe a metric entry’s logged time in the local zone, not raw UTC', async () => {
+    const zone = process.env.TZ;
+    process.env.TZ = 'Europe/Oslo';
+    try {
+      const { engine } = await started();
+      const health = await new SyncedQuickLogProvider(engine).health(TODAY);
+
+      const steps = health.metrics.find(metric => metric.definition.key === 'steps');
+      expect(steps?.meta).toBe('Logged 21:02');
+      expect(steps?.meta).not.toContain('T19:02');
+    } finally {
+      process.env.TZ = zone;
+    }
+  });
+
   it('should project the earned grants and the equipped cosmetic onto the hero deck', async () => {
     const { engine } = await started();
     const deck = await new SyncedHeroProvider(engine, new SyncedAccountProvider(engine)).getDeck();

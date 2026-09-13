@@ -7,10 +7,12 @@ import {
   deriveThresholdOffer,
   firstOfDayReward,
   type HealthMetricDefinition,
+  type HealthMetricEntry,
   journalExcerpt,
   type MealPreset,
   MONTHLY_ENTRY_CAP,
   nextSideQuestReward,
+  quickLogTiles,
   sameDayWeight,
   SIDE_QUEST_DAILY_REWARD_LIMIT,
   snapshotPresetToMeal,
@@ -83,6 +85,15 @@ describe('health threshold offer', () => {
 
   it('should offer nothing on a blank day', () => {
     expect(deriveThresholdOffer(steps, null)).toBeNull();
+  });
+});
+
+describe('Today quick-log tiles', () => {
+  it('should read the water tile in litres from a millilitre entry', () => {
+    const water: HealthMetricEntry = { key: 'water', date: '2026-08-24', value: 1400, loggedAt: '2026-08-24T17:30:00.000Z', replacedValue: null, source: 'manual' };
+    const tiles = quickLogTiles({ date: '2026-08-24', currency: 'EUR', expenses: [], meals: [], metrics: [water], weights: [], journal: [] });
+
+    expect(tiles.find(tile => tile.id === 'water')?.value).toBe('1.4 l');
   });
 });
 

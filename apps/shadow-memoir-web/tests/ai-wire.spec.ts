@@ -227,3 +227,29 @@ describe('Coaching results', () => {
     expect(await engine.outbox.pending()).toHaveLength(0);
   });
 });
+
+describe('Coaching timestamps', () => {
+  it('should show the submitted/expected time, the result date and the history date in the local zone, not raw UTC', async () => {
+    const zone = process.env.TZ;
+    process.env.TZ = 'Europe/Oslo';
+    try {
+      httpFake({});
+      const coach = await (
+        await provider({
+          ai_tasks: [
+            { ...TASK, status: 'pending' },
+            { ...TASK, id: 'task-2', status: 'done' },
+          ],
+          ai_results: [RESULT],
+        })
+      ).getCoach();
+
+      expect(coach.active?.when).toBe('submitted 11:00 · expected by 00:00');
+      expect(coach.latest?.meta).toBe('Ready 25 August, 08:02');
+      expect(coach.history.find(item => item.id === 'task-2')?.when).toBe('24 Aug 2026');
+      expect(coach.history.every(item => !/\d{4}-\d{2}-\d{2}T/.test(item.when))).toBe(true);
+    } finally {
+      process.env.TZ = zone;
+    }
+  });
+});

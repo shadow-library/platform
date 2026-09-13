@@ -337,7 +337,7 @@ function metricRecord(entry: HealthMetricEntry): HistoryRecord {
     to: '/log',
     fields: [
       { label: 'Value', value: reading },
-      ...(definition.threshold ? [{ label: 'Threshold', value: `${definition.threshold.value} ${definition.unit}` }] : []),
+      ...(definition.threshold ? [{ label: 'Threshold', value: formatMetricValue(definition.threshold.value, definition) }] : []),
       { label: 'Source', value: entry.source === 'health' ? 'Health app' : 'Typed' },
     ],
     haystack: `${definition.name} ${HISTORY_KIND_LABELS.health}`,

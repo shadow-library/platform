@@ -5,6 +5,7 @@ import { EntryCapNote } from '@/components/EntryCapNote';
 import { LinkageOfferNote } from '@/components/LinkageOfferNote';
 import { SparkBars } from '@/components/SparkBars';
 import { type EntryCapAdvisory, kgToLb, type QuestLinkageOffer, todayISODate, useQuickLogCommand, useWeight, type WeightEntry } from '@/lib/data';
+import { formatLocalTime } from '@/lib/format';
 
 import styles from './quick-logs.module.css';
 
@@ -56,7 +57,7 @@ export function WeightScreen(): ReactElement {
                   </p>
                   <p className={styles.hint}>
                     {view.today
-                      ? `Logged ${view.today.loggedAt.slice(11, 16)}${view.today.replacedKg ? ` · replaced ${view.today.replacedKg} kg` : ''} · ${kgToLb(view.today.kg).toFixed(1)} lb`
+                      ? `Logged ${formatLocalTime(view.today.loggedAt)}${view.today.replacedKg ? ` · replaced ${view.today.replacedKg} kg` : ''} · ${kgToLb(view.today.kg).toFixed(1)} lb`
                       : 'Nothing logged today'}
                   </p>
                 </div>

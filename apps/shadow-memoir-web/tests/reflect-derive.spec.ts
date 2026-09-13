@@ -226,6 +226,17 @@ describe('deriveHistory', () => {
   });
 });
 
+describe('metricRecord', () => {
+  it('should render metric records with the metric’s display unit', () => {
+    const water: HealthMetricEntry = { key: 'water', date: '2026-08-22', value: 1400, loggedAt: '2026-08-22T17:30:00.000Z', replacedValue: null, source: 'manual' };
+    const record = deriveRecord(source({ metricEntries: [water] }), `metric:water:2026-08-22`);
+
+    expect(record.title).toBe('Water 1.4 l');
+    expect(record.fields).toContainEqual({ label: 'Value', value: '1.4 l' });
+    expect(record.fields).toContainEqual({ label: 'Threshold', value: '2.0 l' });
+  });
+});
+
 describe('deriveReview', () => {
   const week = Array.from({ length: 7 }, (_, index) => `2026-08-${String(10 + index).padStart(2, '0')}`);
 

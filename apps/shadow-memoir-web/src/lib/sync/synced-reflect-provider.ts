@@ -23,6 +23,7 @@ import {
   type ReviewView,
   type SettledCommandResult,
 } from '@/lib/data';
+import { formatLocalDate, formatLocalTime } from '@/lib/format';
 
 import { ignoreAccountBoundary } from './memoir-store';
 import { type AiResultRow, type AiTaskRow, projectAiRows, projectEntitlement, projectReflectSource } from './projection';
@@ -69,16 +70,16 @@ function nextMonthLabel(): string {
 
 function when(task: AiTaskRow): string {
   const state = TASK_STATES[task.status];
-  if (state === 'queued' || state === 'processing') return `submitted ${task.submittedAt.slice(11, 16)} · expected by ${task.expectedBy.slice(11, 16)}`;
+  if (state === 'queued' || state === 'processing') return `submitted ${formatLocalTime(task.submittedAt)} · expected by ${formatLocalTime(task.expectedBy)}`;
   if (state === 'failed') return `did not finish · no request used${task.error ? ` · ${task.error}` : ''}`;
-  return task.submittedAt.slice(0, 10);
+  return formatLocalDate(task.submittedAt);
 }
 
 function toResult(row: AiResultRow, task: AiTaskRow | undefined): AiResult {
   return {
     id: row.id,
     title: task?.kind === 'scheduled' ? 'Last night’s summary' : (task?.queryText ?? 'Your result'),
-    meta: `Ready ${row.createdAt.slice(0, 16).replace('T', ' ')}`,
+    meta: `Ready ${formatLocalDate(row.createdAt, { month: 'long', year: false })}, ${formatLocalTime(row.createdAt)}`,
     findings: [{ heading: 'Answer', body: row.answer }, ...row.patterns.map((pattern, index) => ({ heading: `Pattern ${index + 1}`, body: pattern }))],
     suggestions: row.suggestions.map((suggestion, index) => ({ id: `${row.id}:${index}`, index, label: suggestion.text, to: `/quests/${suggestion.questId}` })),
     limitationNote: row.limitationNote,

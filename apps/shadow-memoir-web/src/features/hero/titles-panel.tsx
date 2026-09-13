@@ -3,6 +3,7 @@ import { Badge, Button, Card, EmptyState, toast } from '@shadow-library/ui';
 
 import { screenStyles } from '@/components/ScreenLayout';
 import { type HeroDeck, useHeroCommand } from '@/lib/data';
+import { formatLocalDate } from '@/lib/format';
 
 import styles from './hero.module.css';
 
@@ -53,7 +54,7 @@ export function TitlesPanel({ deck }: TitlesPanelProps): ReactElement {
                     ) : null}
                   </div>
                   <span className={styles.tileMeta}>
-                    {title.earnedFrom} · earned {title.earnedOn}
+                    {title.earnedFrom} · earned {formatLocalDate(title.earnedOn)}
                   </span>
                   <div className={styles.tileAction}>
                     <Button size="sm" variant={displayed ? 'ghost' : 'secondary'} disabled={displayed} onClick={() => display(title.id)}>

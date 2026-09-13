@@ -1,5 +1,7 @@
 import { addDays, toISODate } from '@shadow-library/ui';
 
+import { formatLocalTime } from '@/lib/format';
+
 import {
   applyQuickLogCommand,
   averageOf,
@@ -88,7 +90,7 @@ function writingStreak(dates: Set<string>, today: string): number {
 
 function metricMeta(entry: HealthMetricEntry | null): string {
   if (!entry) return 'Nothing logged today — blank, not zero';
-  return `Logged ${entry.loggedAt.slice(11, 16)}`;
+  return `Logged ${formatLocalTime(entry.loggedAt)}`;
 }
 
 /**

@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 
 import { EntryCapNote } from '@/components/EntryCapNote';
 import { HealthMetricsScreen, MealsScreen, WeightScreen } from '@/features/quick-logs';
-import { deriveCapAdvisory, MONTHLY_ENTRY_CAP } from '@/lib/data';
+import { deriveCapAdvisory, FixtureQuickLogProvider, MONTHLY_ENTRY_CAP, setQuickLogProvider, todayISODate } from '@/lib/data';
+import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
 
-import { renderWithQuery } from './harness';
+import { renderScreen, renderWithQuery } from './harness';
+import { createSyncedTestData, createTestEngine } from './sync-harness';
 
 describe('weight screen', () => {
   it('should ask before replacing a value already logged for today', async () => {
@@ -26,6 +28,36 @@ describe('weight screen', () => {
   it('should state that weight is context and never a target', async () => {
     renderWithQuery(<WeightScreen />);
     expect(await screen.findByText(/never sets a goal weight/)).toBeDefined();
+  });
+
+  it('should show today’s logged time in the local zone, not raw UTC', async () => {
+    const zone = process.env.TZ;
+    process.env.TZ = 'Europe/Oslo';
+    try {
+      const today = todayISODate();
+      const page: DeltaPage = {
+        cursor: '1',
+        hasMore: false,
+        tombstones: [],
+        domains: { weights: [{ date: today, kg: '78.40', rewarded: true, loggedAt: `${today}T07:05:00.000Z`, syncSeq: '1' }] },
+      };
+      const test = createTestEngine({ today, pages: [page] });
+      const data = createSyncedTestData(test.engine);
+      setQuickLogProvider(data.quickLogs);
+
+      renderScreen(
+        <SyncEngineProvider data={data}>
+          <WeightScreen />
+        </SyncEngineProvider>,
+        { value: data },
+      );
+
+      expect(await screen.findByText(/^Logged 09:05/)).toBeDefined();
+      expect(screen.queryByText(/T07:05/)).toBeNull();
+    } finally {
+      process.env.TZ = zone;
+      setQuickLogProvider(new FixtureQuickLogProvider());
+    }
   });
 });
 
@@ -48,6 +80,51 @@ describe('meals screen', () => {
   it('should say a blank day is blank rather than zero', async () => {
     renderWithQuery(<MealsScreen />);
     expect(await screen.findByText(/blank, not zero/)).toBeDefined();
+  });
+
+  it('should show a meal’s logged time in the local zone, not raw UTC', async () => {
+    const zone = process.env.TZ;
+    process.env.TZ = 'Europe/Oslo';
+    try {
+      const today = todayISODate();
+      const page: DeltaPage = {
+        cursor: '1',
+        hasMore: false,
+        tombstones: [],
+        domains: {
+          meals: [
+            {
+              id: 'm1',
+              date: today,
+              name: 'Oats',
+              calories: 410,
+              mealType: 'cooked',
+              note: null,
+              presetId: null,
+              rewarded: true,
+              loggedAt: `${today}T07:20:00.000Z`,
+              syncSeq: '1',
+            },
+          ],
+        },
+      };
+      const test = createTestEngine({ today, pages: [page] });
+      const data = createSyncedTestData(test.engine);
+      setQuickLogProvider(data.quickLogs);
+
+      renderScreen(
+        <SyncEngineProvider data={data}>
+          <MealsScreen />
+        </SyncEngineProvider>,
+        { value: data },
+      );
+
+      expect(await screen.findByText('09:20')).toBeDefined();
+      expect(screen.queryByText(/T07:20/)).toBeNull();
+    } finally {
+      process.env.TZ = zone;
+      setQuickLogProvider(new FixtureQuickLogProvider());
+    }
   });
 });
 

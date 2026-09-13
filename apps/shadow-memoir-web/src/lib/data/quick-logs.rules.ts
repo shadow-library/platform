@@ -1,3 +1,5 @@
+import { convertMlToLitres } from '@/lib/format';
+
 import { type CurrencyCode, type Expense } from './finance.types';
 import { formatMinor } from './finance.rules';
 import { type QuickLogTile } from './view.types';
@@ -21,8 +23,11 @@ export const HEALTH_METRICS: HealthMetricDefinition[] = [
   { key: 'steps', name: 'Steps', unit: '', step: 100, precision: 0, threshold: { value: 8000, questTitle: 'Move 8,000 steps', xp: 30 } },
   { key: 'calories', name: 'Calories burned', unit: 'kcal', step: 10, precision: 0, threshold: null },
   { key: 'sleep', name: 'Sleep', unit: 'h', step: 0.1, precision: 1, threshold: { value: 7, questTitle: null, xp: 0 } },
-  { key: 'water', name: 'Water', unit: 'l', step: 0.1, precision: 1, threshold: { value: 2, questTitle: 'Drink 2 litres', xp: 20 } },
+  { key: 'water', name: 'Water', unit: 'l', step: 0.1, precision: 1, threshold: { value: 2000, questTitle: 'Drink 2 litres', xp: 20 } },
 ];
+
+/** Every {@link HealthMetricEntry.value} and {@link HealthMetricDefinition.threshold} is stored the way the server stores it (water in millilitres); this converts to the unit shown. */
+const DISPLAY_CONVERT: Partial<Record<HealthMetricKey, (raw: number) => number>> = { water: convertMlToLitres };
 
 export const SIDE_QUEST_DAILY_REWARD_LIMIT = 3;
 
@@ -153,7 +158,8 @@ export function deriveThresholdOffer(definition: HealthMetricDefinition, value: 
 }
 
 export function formatMetricValue(value: number, definition: HealthMetricDefinition): string {
-  const formatted = definition.precision > 0 ? value.toFixed(definition.precision) : Math.round(value).toLocaleString('en-US');
+  const scaled = (DISPLAY_CONVERT[definition.key] ?? ((raw: number) => raw))(value);
+  const formatted = definition.precision > 0 ? scaled.toFixed(definition.precision) : Math.round(scaled).toLocaleString('en-US');
   return definition.unit ? `${formatted} ${definition.unit}` : formatted;
 }
 

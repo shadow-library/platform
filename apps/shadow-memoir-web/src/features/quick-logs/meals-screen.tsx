@@ -5,6 +5,7 @@ import { EntryCapNote } from '@/components/EntryCapNote';
 import { LinkageOfferNote } from '@/components/LinkageOfferNote';
 import { SparkBars } from '@/components/SparkBars';
 import { type EntryCapAdvisory, MEAL_TYPE_LABELS, type QuestLinkageOffer, todayISODate, useMeals, useQuickLogCommand } from '@/lib/data';
+import { formatLocalTime } from '@/lib/format';
 
 import { MealEntryPanel } from './meal-entry-panel';
 import styles from './quick-logs.module.css';
@@ -62,7 +63,7 @@ export function MealsScreen(): ReactElement {
 
               {view.meals.map(meal => (
                 <div key={meal.id} className={styles.row}>
-                  <span className={styles.rowSlot}>{meal.loggedAt.slice(11, 16)}</span>
+                  <span className={styles.rowSlot}>{formatLocalTime(meal.loggedAt)}</span>
                   <span className={styles.rowMain}>
                     <span className={styles.rowName}>{meal.name}</span>
                     <span className={styles.rowMeta}>
