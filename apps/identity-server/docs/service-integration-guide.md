@@ -382,6 +382,34 @@ Holding the user's token is the point: a compromised service can only act for th
 
 You must already be the audience — you can only exchange a token minted for your own API. Intra-cluster calls need none of this: a call carrying no user is unauthenticated by design, and one that carries the user's own token is already accepted by the callee.
 
+### 6.3 Accepting bot callers
+
+An organisation bot (`architecture.md` §7.4) is a distinct principal kind — `kind: 'bot'` — that authenticates like any other caller, a bearer token verified offline, but stays locked out of your routes until you opt in:
+
+```ts
+import { BotPermission, RequirePermission } from '@shadow-library/auth/module';
+
+@Post('/projects')
+@RequirePermission('novel-forge:projects:write')
+@BotPermission('novel-forge:projects:write')
+create() {
+  /* … */
+}
+```
+
+- **Deny by default.** A bot is refused on every route unless it carries `@BotPermission('<permission>')` — `@Authenticated()` and `@RequirePermission()` alone never admit one. `@BotPermission` is evaluated only for bot principals, so a human request pays no extra PDP round-trip and gains no new failure mode.
+- **Bots skip service-access rules.** §6.1's rules govern `kind = 'service'` callers; a bot's gate is its permission, not an admin-configured caller allowlist.
+- **Declare which roles a bot may hold** in your role catalog manifest (§5.2) with a `bot` field:
+
+```ts
+roles: [{ name: 'NovelForgeProjectsWriter', permissions: ['novel-forge:projects:write'], bot: { resource: 'projects', level: 'write' } }];
+```
+
+`level` is `'read'` or `'write'`; `write` implies `read` for the same resource, and the sync validator rejects a `write` role missing the `read` role's permissions. Add `sensitive: true` for a capability an admin must explicitly reason about before granting (spend, generation, …) — it still surfaces in the catalog, just flagged.
+
+- **Ownership.** A record a bot creates must be owned by the bot, not by a human id borrowed from the request context — store an owner **kind** alongside the owner id (`{ kind: 'bot', id: principal.botId }`), never assume an id column alone identifies a user.
+- **Never log `Authorization`.** A bot's header carries either the long-lived key before exchange or the short-lived JWT after; neither belongs in your request logs, even redacted at debug level.
+
 ---
 
 ## 7. Logging users in (OIDC Authorization Code + PKCE)
