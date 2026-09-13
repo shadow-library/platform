@@ -1,6 +1,7 @@
 export * from './account-settings.service';
 export * from './ai.module';
 export * from './ai-quota.service';
+export * from './appearance-describer.service';
 export * from './context';
 export * from './defaults';
 export * from './graphs';

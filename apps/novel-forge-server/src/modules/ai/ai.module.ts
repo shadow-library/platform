@@ -5,6 +5,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 import { EventsModule } from '../events/events.module';
 import { PluginsModule } from '../plugins/plugins.module';
 import { AccountSettingsService } from './account-settings.service';
+import { AppearanceDescriberService } from './appearance-describer.service';
 import { AiController } from './ai.controller';
 import { AiQuotaService } from './ai-quota.service';
 import { CatalogService } from './context/catalog.service';
@@ -25,6 +26,7 @@ import { ToolRegistryService } from './tools/tool-registry.service';
     TelemetryHandler,
     ModelRouterService,
     AiQuotaService,
+    AppearanceDescriberService,
     EmbeddingService,
     IndexingService,
     RetrievalService,
@@ -37,6 +39,7 @@ import { ToolRegistryService } from './tools/tool-registry.service';
     AccountSettingsService,
     ModelRouterService,
     AiQuotaService,
+    AppearanceDescriberService,
     TelemetryHandler,
     EmbeddingService,
     IndexingService,

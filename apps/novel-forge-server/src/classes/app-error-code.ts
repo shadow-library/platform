@@ -96,6 +96,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AI_008 = AppErrorCode.badRequest('AI_008', 'AI request rate limit reached — too many model calls in the current window, try again shortly', 429);
   static readonly AI_009 = AppErrorCode.badRequest('AI_009', 'AI spend limit reached for this account in the current window — try again later', 429);
   static readonly AI_010 = AppErrorCode.badRequest('AI_010', 'Model {model} accepts at most {max} reference image(s), but {count} were supplied');
+  static readonly AI_011 = AppErrorCode.badRequest('AI_011', 'Model {model} does not accept image input');
+  static readonly AI_012 = AppErrorCode.badRequest('AI_012', 'Appearance description needs the reference image as an inline base64 data: URL');
 
   /*!
    * Illustration Errors

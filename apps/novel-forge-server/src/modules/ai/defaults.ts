@@ -25,6 +25,7 @@ export type AiRole =
   | 'embedding'
   | 'illustration'
   | 'image'
+  | 'vision'
   | 'ideation';
 
 export interface ResolvedModel {
@@ -32,7 +33,7 @@ export interface ResolvedModel {
   model: string;
 }
 
-export type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image' | 'embedding' | 'ideation';
+export type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image' | 'vision' | 'embedding' | 'ideation';
 
 // Every fine-grained role maps to exactly one user-facing model group. Roles stay fine-grained
 // internally (prompts + telemetry + routing); the group is only the unit the author selects a model
@@ -62,6 +63,8 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
   // Composing an image prompt from canon is short mechanical structuring, not authoring or review.
   illustration: 'helper',
   image: 'image',
+  // Not author-selectable: account and project picks for a text-only group must never strip image input from a caller that needs it.
+  vision: 'vision',
   embedding: 'embedding',
   ideation: 'ideation',
 };
@@ -75,7 +78,8 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
 // helper → openai/gpt-5.6-luna, image → x-ai/grok-imagine-image-2.0 (IllustrationService resolves it
 // through `resolveModel('image', project)`, so a project-level override is honoured), ideation →
 // anthropic/claude-opus-5 (the ideation studio has no settings screen, so this is the studio's fixed
-// default rather than a group an author configures).
+// default rather than a group an author configures), vision → openai/gpt-5.6-luna (the cheapest registered model OpenRouter lists
+// with image input; like ideation it is a fixed default, not an author-configured group).
 const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'openrouter', model: 'moonshotai/kimi-k3' },
   planning: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
@@ -83,13 +87,15 @@ const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   chat: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
   helper: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
+  vision: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
   ideation: { provider: 'openrouter', model: 'anthropic/claude-opus-5' },
 };
 
 // Unrestricted is an alternate model map, not a vendor pin. Writing goes to Grok 4.6; planning/chat stay on
 // GLM-5.2 (same structured stack as Standard); review/helper move off Claude/Luna onto DeepSeek V4 Pro.
-// Opus is not on `UNRESTRICTED_LLM_ALLOWLIST`, so ideation falls back to GLM-5.2 there too.
+// Opus is not on `UNRESTRICTED_LLM_ALLOWLIST`, so ideation falls back to GLM-5.2 there too. Vision takes Grok 4.6: DeepSeek and GLM
+// accept no image input, and it is the cheaper of the two allowlisted models that do.
 export const UNRESTRICTED_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
   planning: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
@@ -97,6 +103,7 @@ export const UNRESTRICTED_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   chat: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
   helper: { provider: 'openrouter', model: 'deepseek/deepseek-v4-pro' },
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
+  vision: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
   ideation: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
 };
@@ -130,6 +137,8 @@ const LOCAL_TEST_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   chat: { provider: 'ollama', model: 'qwen3:14b' },
   helper: { provider: 'ollama', model: 'qwen3:8b' },
   image: { provider: 'ollama', model: 'qwen3:8b' },
+  // No registered local model accepts images, so vision calls fail with AI_011 under this profile.
+  vision: { provider: 'ollama', model: 'qwen3:8b' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
   ideation: { provider: 'ollama', model: 'qwen3:14b' },
 };
@@ -167,6 +176,7 @@ export const REASONING_POLICY: Record<ModelGroup, ReasoningEffort> = {
   chat: 'low',
   helper: 'none',
   image: 'none',
+  vision: 'none',
   embedding: 'none',
   ideation: 'low',
 };

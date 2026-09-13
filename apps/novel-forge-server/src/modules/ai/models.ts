@@ -21,6 +21,8 @@ export interface ModelEntry {
   reasoning?: ReasoningSpec;
   /** Max reference images the model honours per request; absent or 0 means unsupported. */
   maxInputReferences?: number;
+  /** Whether a chat call may carry an `image_url` content part — set only where OpenRouter's `architecture.input_modalities` lists `image`. */
+  supportsImageInput?: boolean;
 }
 
 // All supported models. New entries land here; the router validates against this registry. Every LLM
@@ -36,6 +38,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     outputPricePerMToken: 6.0,
     supportsTools: true,
     supportsStructuredOutput: true,
+    supportsImageInput: true,
     reasoning: { mode: 'mandatory', efforts: ['xhigh', 'high', 'medium', 'low'] },
   },
   {
@@ -47,6 +50,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     outputPricePerMToken: 2.5,
     supportsTools: true,
     supportsStructuredOutput: true,
+    supportsImageInput: true,
     reasoning: { mode: 'optional', efforts: ['high', 'medium', 'low', 'none'] },
   },
   // xAI image. OpenRouter's per-model `/endpoints` metadata confirms image input support but documents no reference-count limit, so 1 is the conservative floor.
@@ -61,6 +65,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     outputPricePerMToken: 10.0,
     supportsTools: true,
     supportsStructuredOutput: true,
+    supportsImageInput: true,
     reasoning: { mode: 'optional', efforts: ['max', 'high', 'medium', 'low'] },
   },
   {
@@ -72,6 +77,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     outputPricePerMToken: 25.0,
     supportsTools: true,
     supportsStructuredOutput: true,
+    supportsImageInput: true,
     reasoning: { mode: 'optional', efforts: ['max', 'high', 'medium', 'low'] },
   },
   {
@@ -83,6 +89,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     outputPricePerMToken: 5.0,
     supportsTools: true,
     supportsStructuredOutput: true,
+    supportsImageInput: true,
     reasoning: { mode: 'optional' },
   },
   // OpenAI
@@ -95,6 +102,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     outputPricePerMToken: 15.0,
     supportsTools: true,
     supportsStructuredOutput: true,
+    supportsImageInput: true,
     reasoning: { mode: 'optional', efforts: ['xhigh', 'high', 'medium', 'low', 'none'] },
   },
   {
@@ -106,6 +114,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     outputPricePerMToken: 1.2,
     supportsTools: true,
     supportsStructuredOutput: true,
+    supportsImageInput: true,
     reasoning: { mode: 'optional', efforts: ['max', 'high', 'medium', 'low', 'none'] },
   },
   {
@@ -117,6 +126,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     outputPricePerMToken: 10.0,
     supportsTools: true,
     supportsStructuredOutput: true,
+    supportsImageInput: true,
     reasoning: { mode: 'optional', efforts: ['max', 'high', 'medium', 'low', 'none'] },
   },
   {
@@ -128,6 +138,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     outputPricePerMToken: 4.5,
     supportsTools: true,
     supportsStructuredOutput: true,
+    supportsImageInput: true,
     reasoning: { mode: 'optional', efforts: ['xhigh', 'high', 'medium', 'low', 'none'] },
   },
   // OpenAI image. Confirms image input support the same way, again with no documented reference-count cap.
@@ -142,6 +153,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     outputPricePerMToken: 15.0,
     supportsTools: true,
     supportsStructuredOutput: true,
+    supportsImageInput: true,
     reasoning: { mode: 'optional', efforts: ['max', 'high', 'low'] },
   },
   {
@@ -153,6 +165,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     outputPricePerMToken: 2.28,
     supportsTools: true,
     supportsStructuredOutput: true,
+    supportsImageInput: true,
     reasoning: { mode: 'optional' },
   },
   // Z.AI
@@ -200,6 +213,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     outputPricePerMToken: 1.875,
     supportsTools: true,
     supportsStructuredOutput: true,
+    supportsImageInput: true,
     reasoning: { mode: 'mandatory', efforts: ['high', 'medium', 'low'] },
   },
   // Ollama (local — no pricing, variable context)

@@ -88,6 +88,15 @@ function withPluginSystemMessages(messages: BaseMessage[], policy?: ForgeCallPol
   return [...messages.slice(0, insertAt), ...policy.systemMessages.map(message => new SystemMessage(message.content)), ...messages.slice(insertAt)];
 }
 
+function withImageAttached(messages: BaseMessage[], image: string): BaseMessage[] {
+  const imagePart = { type: 'image_url', image_url: { url: image } };
+  const lastHuman = messages.map(message => message.getType()).lastIndexOf('human');
+  if (lastHuman === -1) return [...messages, new HumanMessage({ content: [imagePart] })];
+  const { content } = messages[lastHuman] as BaseMessage;
+  const textParts = typeof content === 'string' ? [{ type: 'text', text: content }] : content;
+  return messages.map((message, index) => (index === lastHuman ? new HumanMessage({ content: [...textParts, imagePart] }) : message));
+}
+
 function extractJsonBlock(text: string): unknown {
   let depth = 0;
   let start = -1;
@@ -255,11 +264,38 @@ export class ModelRouterService {
   }
 
   async structured<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, ctx: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<T> {
+    return this.runStructured(promptModule, input, ctx, project, policy);
+  }
+
+  /**
+   * `structured` with one image attached to the prompt's last human message. `image` is an HTTP(S) or `data:` URL; it is kept
+   * out of `input` so the debug snapshot and request hash never carry it, and the response is never served from `llm_cache`.
+   */
+  async structuredWithImage<T>(
+    promptModule: PromptModule<T>,
+    input: Record<string, unknown>,
+    image: string,
+    ctx: TelemetryContext,
+    project?: ProjectConfig,
+    policy?: ForgeCallPolicy,
+  ): Promise<T> {
+    return this.runStructured(promptModule, input, ctx, project, policy, image);
+  }
+
+  private async runStructured<T>(
+    promptModule: PromptModule<T>,
+    input: Record<string, unknown>,
+    ctx: TelemetryContext,
+    project?: ProjectConfig,
+    policy?: ForgeCallPolicy,
+    image?: string,
+  ): Promise<T> {
     await this.quota.enforce(ctx.projectId);
     const role = promptModule.role ?? (promptModule.key as AiRole);
     const resolved = await this.resolveFor(role, project, ctx.projectId, policy);
+    if (image !== undefined && !MODEL_MAP[resolved.model]?.supportsImageInput) throw AppErrorCode.AI_011.create({ model: resolved.model });
     const llm = this.buildClient(resolved, { format: toJsonSchemaFormat(promptModule.schema), role });
-    const messages = await this.buildMessages(promptModule, input, resolved, policy);
+    const messages = await this.buildMessages(promptModule, input, resolved, policy, image);
     // Input carries the rendered context pack and user prose — sensitive/large, so it rides on debug
     // (dev-only) as a full snapshot to reproduce the exact model call locally.
     this.logger.debug('structured: invoking model', {
@@ -272,9 +308,10 @@ export class ModelRouterService {
       node: ctx.node,
       inputKeys: Object.keys(input),
       input,
+      withImage: image !== undefined,
     });
 
-    const requestHash = CACHEABLE_ROLES.has(role) ? this.hashRequest(resolved, promptModule, input, policy) : null;
+    const requestHash = image === undefined && CACHEABLE_ROLES.has(role) ? this.hashRequest(resolved, promptModule, input, policy) : null;
     if (requestHash) {
       const cached = await this.db.query.llmCache.findFirst({ where: eq(schema.llmCache.requestHash, requestHash) });
       if (cached) {
@@ -433,9 +470,16 @@ export class ModelRouterService {
   // Ollama gets the required JSON schema appended in-band — grammar-constrained decoding only exists
   // on Ollama, so API models must be told the exact output shape or the creative roles (whose prompts
   // never mention JSON) answer with plain prose.
-  private async buildMessages<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, resolved: ResolvedModel, policy?: ForgeCallPolicy): Promise<BaseMessage[]> {
+  private async buildMessages<T>(
+    promptModule: PromptModule<T>,
+    input: Record<string, unknown>,
+    resolved: ResolvedModel,
+    policy?: ForgeCallPolicy,
+    image?: string,
+  ): Promise<BaseMessage[]> {
     const provider = resolveProvider(resolved);
     let messages = withPluginSystemMessages(await promptModule.template.formatMessages(input), policy);
+    if (image !== undefined) messages = withImageAttached(messages, image);
     if (promptModule.cacheStrategy && supportsPromptCaching(resolved)) messages = applyAnthropicCacheControl(messages);
     if (provider !== 'ollama') {
       messages = [

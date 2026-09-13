@@ -1,5 +1,8 @@
 import { describe, expect, it, mock } from 'bun:test';
 
+import { awaitAllCallbacks } from '@langchain/core/callbacks/promises';
+import { type BaseMessage } from '@langchain/core/messages';
+import { FakeListChatModel } from '@langchain/core/utils/testing';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 
@@ -11,10 +14,14 @@ import {
   ROLE_GROUP,
   UNRESTRICTED_DEFAULTS,
   UNRESTRICTED_GROUP_DEFAULTS,
+  UNRESTRICTED_LLM_ALLOWLIST,
 } from '@modules/ai/defaults';
 import { ModelRouterService, resolveProvider, supportsPromptCaching } from '@modules/ai/model-router.service';
 import { MODEL_MAP, MODEL_REGISTRY } from '@modules/ai/models';
+import { appearanceDescribePrompt } from '@modules/ai/prompts/appearance-describe.prompt';
+import { type AppearanceDescribeOutput } from '@modules/ai/schemas/appearance-describe.schema';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
+import { TelemetryHandler } from '@modules/ai/telemetry.handler';
 import { type AppError, Config } from '@shadow-library/common';
 
 // Minimal DatabaseService stub: cache always misses, cache writes are no-ops.
@@ -337,6 +344,13 @@ describe('MODEL_REGISTRY', () => {
     }
   });
 
+  it('should only mark chat models as accepting image input', () => {
+    for (const m of MODEL_REGISTRY.filter(m => m.supportsImageInput)) expect(m.kind).toBe('llm');
+    expect(MODEL_MAP['z-ai/glm-5.2']?.supportsImageInput).toBeUndefined();
+    expect(MODEL_MAP['deepseek/deepseek-v4-pro']?.supportsImageInput).toBeUndefined();
+    expect(MODEL_MAP['qwen3:8b']?.supportsImageInput).toBeUndefined();
+  });
+
   it('every hosted llm entry is an openrouter vendor/model slug', () => {
     for (const m of MODEL_REGISTRY.filter(m => m.kind === 'llm' && m.provider !== 'ollama')) {
       expect(m.provider).toBe('openrouter');
@@ -513,5 +527,129 @@ describe('ModelRouterService.referenceCapacity', () => {
 
   it('should fall back to zero for a model absent from the registry’s reference metadata', () => {
     expect(MODEL_MAP['anthropic/claude-sonnet-5']?.maxInputReferences ?? 0).toBe(0);
+  });
+});
+
+describe('vision role routing', () => {
+  const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService(), { defaultsFor: async () => undefined } as never);
+
+  it('should default the vision role to an image-capable model in both production and unrestricted maps', () => {
+    expect(MODEL_MAP[PRODUCTION_DEFAULTS.vision.model]?.supportsImageInput).toBe(true);
+    expect(MODEL_MAP[UNRESTRICTED_DEFAULTS.vision.model]?.supportsImageInput).toBe(true);
+    expect(UNRESTRICTED_LLM_ALLOWLIST as readonly string[]).toContain(UNRESTRICTED_DEFAULTS.vision.model);
+  });
+
+  it('should ignore the owner’s text-only helper default when resolving the vision role', () => {
+    const glm = { provider: 'openrouter', model: 'z-ai/glm-5.2' };
+    expect(router.resolveModel('vision', { contentMode: 'standard' }, undefined, { helper: glm })).toEqual(PRODUCTION_DEFAULTS.vision);
+    expect(router.resolveModel('vision', { contentMode: 'unrestricted' }, undefined, { helper: glm })).toEqual(UNRESTRICTED_DEFAULTS.vision);
+  });
+
+  it('should route a permissive plugin policy to the unrestricted vision default', () => {
+    expect(router.resolveModel('vision', { contentMode: 'standard' }, { writerClass: 'permissive' } as never)).toEqual(UNRESTRICTED_DEFAULTS.vision);
+  });
+});
+
+describe('ModelRouterService.structuredWithImage', () => {
+  const IMAGE = `data:image/png;base64,${'QUJD'.repeat(4096)}`;
+  const DESCRIPTION = { appearance: 'A broad-shouldered man in dented plate armour, close-cropped grey hair, a scar across the left brow.', confidence: 'high' };
+  const ctx = { projectId: BigInt(1), promptKey: 'appearance-describe', promptVersion: '1.0.0', role: 'vision' };
+  const input = { subjectLabel: 'Aldric', note: 'the armored man in the center' };
+
+  function makeRouter(client: unknown, db: unknown = stubDatabaseService(), telemetry: unknown = {}): { router: ModelRouterService; buildClient: ReturnType<typeof mock> } {
+    const router = new ModelRouterService(telemetry as never, db as never, stubQuotaService(), { defaultsFor: async () => undefined } as never);
+    const buildClient = mock(() => client);
+    (router as unknown as Record<string, unknown>)['buildClient'] = buildClient;
+    return { router, buildClient };
+  }
+
+  it('should append the image as an image_url part after the text of the last human message', async () => {
+    const invoke = mock<(messages: BaseMessage[]) => Promise<{ content: string }>>(async () => ({ content: JSON.stringify(DESCRIPTION) }));
+    const { router } = makeRouter({ invoke });
+
+    await router.structuredWithImage<AppearanceDescribeOutput>(appearanceDescribePrompt, input, IMAGE, ctx);
+
+    const messages = invoke.mock.calls[0]?.[0] ?? [];
+    const withImage = messages.filter(message => Array.isArray(message.content));
+    expect(withImage).toHaveLength(1);
+    expect(withImage[0]?.getType()).toBe('human');
+    const parts = withImage[0]?.content as { type: string; text?: string; image_url?: { url: string } }[];
+    expect(parts.map(part => part.type)).toEqual(['text', 'image_url']);
+    expect(parts[0]?.text).toContain('Subject: Aldric');
+    expect(parts[0]?.text).toContain('the armored man in the center');
+    expect(parts[1]?.image_url?.url).toBe(IMAGE);
+    expect(messages[0]?.getType()).toBe('system');
+    expect(String(messages.at(-1)?.content)).toContain('JSON schema');
+  });
+
+  it('should throw AI_011 before building a client or fetching when the resolved model accepts no images', async () => {
+    const invoke = mock(async () => ({ content: JSON.stringify(DESCRIPTION) }));
+    const { router, buildClient } = makeRouter({ invoke });
+    const project = { contentMode: 'standard', config: { models: { vision: { provider: 'openrouter', model: 'z-ai/glm-5.2' } } } };
+    const originalFetch = globalThis.fetch;
+    const fetchMock = mock(async () => new Response('{}'));
+    (globalThis as unknown as { fetch: unknown }).fetch = fetchMock;
+
+    let error: AppError | undefined;
+    try {
+      await router.structuredWithImage(appearanceDescribePrompt, input, IMAGE, ctx, project).catch(err => (error = err as AppError));
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(error?.code).toBe('AI_011');
+    expect(buildClient).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('should return the parsed structured output', async () => {
+    const { router } = makeRouter({ invoke: async () => ({ content: JSON.stringify(DESCRIPTION) }) });
+    const result = await router.structuredWithImage<AppearanceDescribeOutput>(appearanceDescribePrompt, input, IMAGE, ctx);
+    expect(result).toEqual(DESCRIPTION as AppearanceDescribeOutput);
+  });
+
+  it('should bypass llm_cache even for a cacheable role, since the request hash cannot see the image', async () => {
+    const findFirst = mock(async () => undefined);
+    const db = { getPostgresClient: () => ({ query: { llmCache: { findFirst } }, insert: () => ({ values: () => ({ onConflictDoNothing: () => Promise.resolve() }) }) }) };
+    const judge = {
+      key: 'judge' as const,
+      version: '1.0.0',
+      kind: 'analytical' as const,
+      system: 'test',
+      template: { formatMessages: async () => [] } as never,
+      schema: JudgeSchema,
+    };
+    const invoke = mock<(messages: BaseMessage[]) => Promise<{ content: string }>>(async () => ({ content: JSON.stringify({ verdict: 'consistent', findings: [] }) }));
+    const { router } = makeRouter({ invoke }, db);
+
+    await router.structuredWithImage<JudgeOutput>(
+      judge,
+      {},
+      IMAGE,
+      { ...ctx, role: 'judge' },
+      { config: { models: { judge: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } } },
+    );
+
+    expect(findFirst).not.toHaveBeenCalled();
+    const imageOnly = invoke.mock.calls[0]?.[0]?.find(message => Array.isArray(message.content));
+    expect((imageOnly?.content as { type: string }[]).map(part => part.type)).toEqual(['image_url']);
+  });
+
+  it('should write a model_calls row that carries no image data and does not count the base64 as prompt tokens', async () => {
+    const rows: unknown[] = [];
+    const telemetryDb = { insert: () => ({ values: async (row: unknown) => void rows.push(row) }) };
+    const telemetry = new TelemetryHandler({ getPostgresClient: () => telemetryDb } as never);
+    const { router } = makeRouter(new FakeListChatModel({ responses: [JSON.stringify(DESCRIPTION)] }), stubDatabaseService(), telemetry);
+
+    await router.structuredWithImage<AppearanceDescribeOutput>(appearanceDescribePrompt, input, IMAGE, ctx);
+    await awaitAllCallbacks();
+
+    expect(rows).toHaveLength(1);
+    const serialized = JSON.stringify(rows[0], (_key, value: unknown) => (typeof value === 'bigint' ? String(value) : value));
+    expect(serialized).toContain('"promptKey":"appearance-describe"');
+    expect(serialized).not.toContain('QUJD');
+    expect(serialized).not.toContain('data:image');
+    expect((rows[0] as { inputTokens: number }).inputTokens).toBeLessThan(2_000);
   });
 });

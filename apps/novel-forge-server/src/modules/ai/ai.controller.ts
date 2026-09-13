@@ -1,7 +1,7 @@
 import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Put, RespondFor } from '@shadow-library/fastify';
 
-import { AccountSettingsService } from './account-settings.service';
+import { ACCOUNT_MODEL_GROUPS, AccountSettingsService } from './account-settings.service';
 import { AccountSettingsResponse, AiModelOption, AiModelsResponse, UpdateAccountSettingsBody } from './ai.dto';
 import { getGroupDefaults, UNRESTRICTED_GROUP_DEFAULTS, UNRESTRICTED_IMAGE_ALLOWLIST, UNRESTRICTED_LLM_ALLOWLIST } from './defaults';
 import { MODEL_REGISTRY } from './models';
@@ -39,13 +39,10 @@ export class AiController {
       supportsStructuredOutput: m.supportsStructuredOutput,
     }));
 
-    // The author picks a model per group, not per fine-grained role. `embedding` is locked (its vector
-    // dimension is bound to the pgvector schema), so it isn't offered. The response's `role` field
-    // carries the group key (`writing` | `planning` | `review` | `chat` | `helper` | `image` | `ideation`).
+    // The author picks a model per group, not per fine-grained role, and only for the author-configurable groups: `embedding` is
+    // locked to the pgvector dimension and `vision` must stay image-capable. The response's `role` field carries the group key.
     const toRoleDefaults = (groups: typeof UNRESTRICTED_GROUP_DEFAULTS) =>
-      Object.entries(groups)
-        .filter(([group]) => group !== 'embedding')
-        .map(([group, resolved]) => ({ role: group, provider: resolved.provider, model: resolved.model }));
+      ACCOUNT_MODEL_GROUPS.map(group => ({ role: group, provider: groups[group].provider, model: groups[group].model }));
 
     return {
       profile: process.env['AI_PROFILE'] ?? 'production',

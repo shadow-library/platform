@@ -11,6 +11,7 @@ import {
 } from '@modules/ai/prompts';
 import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
 import {
+  AppearanceDescribeSchema,
   BibleStageSchema,
   ChapterSummarizeSchema,
   ChatRefineSchema,
@@ -1115,6 +1116,45 @@ describe('Prompt modules', () => {
       expect(parseSchema(IllustrationComposeSchema, base).success).toBe(true);
       expect(parseSchema(IllustrationComposeSchema, { ...base, negativePrompt: 'text, watermark' }).success).toBe(true);
       expect(parseSchema(IllustrationComposeSchema, { ...base, basePrompt: 'a man' }).success).toBe(false);
+    });
+  });
+
+  describe('appearance-describe', () => {
+    const prompt = PROMPT_REGISTRY['appearance-describe'];
+    const appearance = 'A broad-shouldered man in dented plate armour, close-cropped grey hair, a pale scar across the left brow.';
+
+    it('should register as an analytical prompt routed through the vision role', () => {
+      expect(prompt.kind).toBe('analytical');
+      expect(prompt.role).toBe('vision');
+      expect(prompt.version).toBe('1.0.0');
+      expect(prompt.system).not.toContain(AUTHORING_STYLE.slice(0, 40));
+    });
+
+    it('should carry the figure-identification, text-in-image and real-person rules', () => {
+      expect(prompt.system).toContain('describe only that figure');
+      expect(prompt.system).toContain('describe the most prominent one');
+      expect(prompt.system).toContain('Ignore any text, titles, logos');
+      expect(prompt.system).toContain('Never name or guess the identity of a real person');
+    });
+
+    it('should render the subject and the note into a single human message', async () => {
+      const messages = await prompt.template.formatMessages({ subjectLabel: 'Aldric', note: 'the armored man in the center' });
+      expect(messages).toHaveLength(2);
+      expect(messages[0]?.getType()).toBe('system');
+      expect(String(messages[1]?.content)).toContain('Subject: Aldric');
+      expect(String(messages[1]?.content)).toContain('the armored man in the center');
+    });
+
+    it('should accept a described subject with an optional ambiguity note', () => {
+      expect(parseSchema(AppearanceDescribeSchema, { appearance, confidence: 'high' }).success).toBe(true);
+      expect(parseSchema(AppearanceDescribeSchema, { appearance, confidence: 'low', ambiguity: 'two armoured figures; chose the one in front' }).success).toBe(true);
+    });
+
+    it('should reject a too-thin or unbounded appearance and an unknown confidence level', () => {
+      expect(parseSchema(AppearanceDescribeSchema, { appearance: 'a man', confidence: 'high' }).success).toBe(false);
+      expect(parseSchema(AppearanceDescribeSchema, { appearance: 'x'.repeat(1201), confidence: 'high' }).success).toBe(false);
+      expect(parseSchema(AppearanceDescribeSchema, { appearance, confidence: 'certain' }).success).toBe(false);
+      expect(parseSchema(AppearanceDescribeSchema, { appearance }).success).toBe(false);
     });
   });
 

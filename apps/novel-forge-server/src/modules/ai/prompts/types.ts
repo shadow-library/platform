@@ -49,7 +49,8 @@ export type PromptKey =
   | 'reforge-transform-write'
   | 'reforge-transform-judge'
   | 'recombine'
-  | 'illustration-compose';
+  | 'illustration-compose'
+  | 'appearance-describe';
 
 /** Mirrors the `reforge_fidelity` enum — how much latitude the re-author has against the source. */
 export type ReforgeFidelityLevel = 'preserve' | 'close' | 'loose';
