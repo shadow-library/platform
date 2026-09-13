@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
-import { Badge, Button, Input, Kbd, toast } from '@shadow-library/ui';
+import { Badge, Button, Input, Kbd, toast, useMediaQuery } from '@shadow-library/ui';
 
 import { OverlaySurface } from '@/components/OverlaySurface';
 import { AiIcon, LogIcon, MoneyIcon, PlanIcon, QuestIcon, TodayIcon } from '@/components/icons';
@@ -41,6 +41,7 @@ export function QuickCapture({ open, onOpenChange }: QuickCaptureProps): ReactEl
   const [text, setText] = useState('');
   const field = useRef<HTMLInputElement>(null);
   const occurrences = useOccurrenceSearch(text);
+  const isTouchLayout = useMediaQuery('(max-width: 639px)');
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -59,8 +60,12 @@ export function QuickCapture({ open, onOpenChange }: QuickCaptureProps): ReactEl
   }
 
   useEffect(() => {
-    if (open) field.current?.focus();
-  }, [open]);
+    if (!open || !isTouchLayout) return;
+    // BottomSheet has no onOpenAutoFocus hook; deferred a tick past Radix's own mount autofocus
+    // (the grabber), which otherwise wins the input back even when this effect runs after it.
+    const timer = setTimeout(() => field.current?.focus(), 0);
+    return () => clearTimeout(timer);
+  }, [open, isTouchLayout]);
 
   const parse = useMemo(() => parseCapture(text, { date: today, currency, occurrences: occurrences.data ?? [] }), [text, today, currency, occurrences.data]);
 
@@ -82,16 +87,27 @@ export function QuickCapture({ open, onOpenChange }: QuickCaptureProps): ReactEl
   };
 
   return (
-    <OverlaySurface open={open} onOpenChange={onOpenChange} title="Quick capture" size="md">
+    <OverlaySurface
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Quick capture"
+      size="md"
+      sheetSnapPoints={['half', 'full']}
+      sheetDefaultSnap="full"
+      onOpenAutoFocus={event => {
+        event.preventDefault();
+        field.current?.focus();
+      }}
+      footer={
+        isTouchLayout ? (
+          <Button variant="ghost" fullWidth onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        ) : undefined
+      }
+    >
       <div className={styles.body}>
-        <Input
-          value={text}
-          onValueChange={setText}
-          placeholder="coffee 4.20 · 8000 steps · 78.4 kg · j had a good morning"
-          aria-label="Log something, or jump to a screen"
-          ref={field}
-          clearable
-        />
+        <Input value={text} onValueChange={setText} placeholder="coffee 4.20 · 8000 steps · 78.4 kg" aria-label="Log something, or jump to a screen" ref={field} clearable />
 
         {parse.status === 'draft' ? <ParseBand draft={parse.draft} onCommit={commit} /> : null}
 

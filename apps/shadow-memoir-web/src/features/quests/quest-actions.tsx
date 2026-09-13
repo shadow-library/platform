@@ -19,7 +19,7 @@ import {
 
 import styles from './quest-actions.module.css';
 
-type Step = 'actions' | 'partial' | 'reschedule';
+type Step = 'actions' | 'partial' | 'reschedule' | null;
 
 export interface QuestActions {
   open: (occurrence: QuestOccurrence) => void;
@@ -38,20 +38,20 @@ export function useQuestActions(): QuestActions {
   const navigate = useNavigate();
   const command = useCommand();
   const [occurrence, setOccurrence] = useState<QuestOccurrence | null>(null);
-  const [step, setStep] = useState<Step>('actions');
+  const [step, setStep] = useState<Step>(null);
   const [confirmation, setConfirmation] = useState<CommandConfirmation | null>(null);
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [restoreFocusTo, setRestoreFocusTo] = useState<HTMLElement | null>(null);
 
-  const close = (): void => {
-    setOccurrence(null);
-    setStep('actions');
-  };
+  const close = (): void => setStep(null);
 
   const dispatch = (payload: Command, andClose = true): void => {
     command.mutate(payload, {
       onSuccess: result => {
         if (result.status === 'needs-confirmation') {
           setConfirmation(result);
-          setOccurrence(null);
+          setConfirmationOpen(true);
+          setStep(null);
           return;
         }
         if (result.status === 'rejected') {
@@ -66,28 +66,41 @@ export function useQuestActions(): QuestActions {
 
   const overlays = (
     <>
-      {occurrence && step === 'actions' ? (
-        <ActionListOverlay
-          occurrence={occurrence}
-          onClose={close}
-          onPartial={() => setStep('partial')}
-          onReschedule={() => setStep('reschedule')}
-          onEdit={() => {
-            close();
-            void navigate({ to: '/quests/$questId', params: { questId: occurrence.questId } });
-          }}
-          dispatch={dispatch}
-        />
+      {occurrence ? (
+        <>
+          <ActionListOverlay
+            occurrence={occurrence}
+            open={step === 'actions'}
+            restoreFocusTo={restoreFocusTo}
+            onClose={close}
+            onPartial={() => setStep('partial')}
+            onReschedule={() => setStep('reschedule')}
+            onEdit={() => {
+              close();
+              void navigate({ to: '/quests/$questId', params: { questId: occurrence.questId } });
+            }}
+            dispatch={dispatch}
+          />
+          <PartialOverlay key={`partial-${occurrence.id}`} occurrence={occurrence} open={step === 'partial'} restoreFocusTo={restoreFocusTo} onClose={close} dispatch={dispatch} />
+          <RescheduleOverlay
+            key={`reschedule-${occurrence.id}`}
+            occurrence={occurrence}
+            open={step === 'reschedule'}
+            restoreFocusTo={restoreFocusTo}
+            onClose={close}
+            dispatch={dispatch}
+          />
+        </>
       ) : null}
-      {occurrence && step === 'partial' ? <PartialOverlay occurrence={occurrence} onClose={close} dispatch={dispatch} /> : null}
-      {occurrence && step === 'reschedule' ? <RescheduleOverlay occurrence={occurrence} onClose={close} dispatch={dispatch} /> : null}
       {confirmation ? (
         <RescheduleCapOverlay
           confirmation={confirmation}
-          onClose={() => setConfirmation(null)}
+          open={confirmationOpen}
+          restoreFocusTo={restoreFocusTo}
+          onClose={() => setConfirmationOpen(false)}
           onConfirm={() => {
             dispatch(confirmation.command, false);
-            setConfirmation(null);
+            setConfirmationOpen(false);
           }}
         />
       ) : null}
@@ -96,6 +109,7 @@ export function useQuestActions(): QuestActions {
 
   return {
     open: next => {
+      setRestoreFocusTo(document.activeElement instanceof HTMLElement ? document.activeElement : null);
       setStep('actions');
       setOccurrence(next);
     },
@@ -105,6 +119,8 @@ export function useQuestActions(): QuestActions {
 
 interface OverlayProps {
   occurrence: QuestOccurrence;
+  open: boolean;
+  restoreFocusTo: HTMLElement | null;
   onClose: () => void;
   dispatch: (command: Command, andClose?: boolean) => void;
 }
@@ -123,6 +139,8 @@ function summaryLine(occurrence: QuestOccurrence): string {
 
 function ActionListOverlay({
   occurrence,
+  open,
+  restoreFocusTo,
   onClose,
   onPartial,
   onReschedule,
@@ -173,8 +191,9 @@ function ActionListOverlay({
 
   return (
     <OverlaySurface
-      open
+      open={open}
       onOpenChange={onClose}
+      restoreFocusTo={restoreFocusTo}
       title={occurrence.questName}
       description={summaryLine(occurrence)}
       footer={
@@ -206,7 +225,7 @@ function ActionListOverlay({
   );
 }
 
-function PartialOverlay({ occurrence, onClose, dispatch }: OverlayProps): ReactElement {
+function PartialOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch }: OverlayProps): ReactElement {
   const target = occurrence.partialTarget;
   const max = target?.target ?? 100;
   const unit = target?.unit ?? '%';
@@ -216,11 +235,14 @@ function PartialOverlay({ occurrence, onClose, dispatch }: OverlayProps): ReactE
 
   return (
     <OverlaySurface
-      open
+      open={open}
       onOpenChange={onClose}
+      restoreFocusTo={restoreFocusTo}
       title={`Partial — ${occurrence.questName}`}
       description="A partial keeps the streak and grants XP for what you did. It is a real outcome, not a failure."
       size="md"
+      sheetSnapPoints={['half', 'full']}
+      sheetDefaultSnap="full"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -267,16 +289,19 @@ function toMinuteOfDay(time: string): number {
   return (hours ?? 0) * 60 + (minutes ?? 0);
 }
 
-function RescheduleOverlay({ occurrence, onClose, dispatch }: OverlayProps): ReactElement {
+function RescheduleOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch }: OverlayProps): ReactElement {
   const [time, setTime] = useState(formatTime(occurrence.startTimeMinutes) ?? '09:00');
 
   return (
     <OverlaySurface
-      open
+      open={open}
       onOpenChange={onClose}
+      restoreFocusTo={restoreFocusTo}
       title={`Move ${occurrence.questName}`}
       description="A reschedule moves this occurrence's time. It stays on the same day — the recurring plan is never rewritten."
       size="md"
+      sheetSnapPoints={['half', 'full']}
+      sheetDefaultSnap="full"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -300,11 +325,20 @@ function RescheduleOverlay({ occurrence, onClose, dispatch }: OverlayProps): Rea
   );
 }
 
-function RescheduleCapOverlay({ confirmation, onClose, onConfirm }: { confirmation: CommandConfirmation; onClose: () => void; onConfirm: () => void }): ReactElement {
+interface RescheduleCapOverlayProps {
+  confirmation: CommandConfirmation;
+  open: boolean;
+  restoreFocusTo: HTMLElement | null;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+function RescheduleCapOverlay({ confirmation, open, restoreFocusTo, onClose, onConfirm }: RescheduleCapOverlayProps): ReactElement {
   return (
     <OverlaySurface
-      open
+      open={open}
       onOpenChange={onClose}
+      restoreFocusTo={restoreFocusTo}
       title={confirmation.title}
       description={confirmation.body}
       footer={

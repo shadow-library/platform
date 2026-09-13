@@ -115,4 +115,63 @@ describe('TodayScreen quest actions', () => {
     await waitFor(async () => expect(await stateOf(data, 'evening-stretch')).toBe('rescheduled'));
     expect(screen.queryByRole('button', { name: 'Move it anyway' })).toBeNull();
   });
+
+  it('should return focus to the opener when an overlay closes', async () => {
+    renderScreen(<TodayScreen />, { value: data });
+
+    const trigger = await screen.findByRole('button', { name: 'Actions for Evening stretch' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    await screen.findByRole('button', { name: 'Complete' });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0] as HTMLElement);
+
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it('should return focus to the opener on Escape', async () => {
+    renderScreen(<TodayScreen />, { value: data });
+
+    const trigger = await screen.findByRole('button', { name: 'Actions for Evening stretch' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it('should not restore focus to a detached opener', async () => {
+    renderScreen(<TodayScreen />, { value: data });
+
+    const trigger = await screen.findByRole('button', { name: 'Actions for Evening stretch' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    await screen.findByRole('button', { name: 'Complete' });
+    trigger.remove();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0] as HTMLElement);
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Complete' })).toBeNull());
+    expect(trigger.isConnected).toBe(false);
+    expect(document.activeElement).not.toBe(trigger);
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('should reset the partial form for a different occurrence', async () => {
+    renderScreen(<TodayScreen />, { value: data });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Read 20 pages' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Partial' }));
+    fireEvent.change(await screen.findByLabelText('Reason note'), { target: { value: 'left early' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Evening stretch' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Partial' }));
+
+    const note = (await screen.findByLabelText('Reason note')) as HTMLTextAreaElement;
+    expect(note.value).toBe('');
+  });
 });

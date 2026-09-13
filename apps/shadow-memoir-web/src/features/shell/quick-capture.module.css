@@ -4,6 +4,11 @@
   gap: 14px;
 }
 
+.body input {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .sectionLabel {
   margin: 0 0 8px;
   font-size: var(--sh-text-caption);
@@ -36,6 +41,12 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 10px;
+}
+
+@media (max-width: 639px) {
+  .parseFields {
+    grid-template-columns: 1fr;
+  }
 }
 
 .fieldLabel {
@@ -155,4 +166,10 @@
   margin: 0;
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);
+}
+
+@media (max-width: 639px) {
+  .footerHint {
+    display: none;
+  }
 }
