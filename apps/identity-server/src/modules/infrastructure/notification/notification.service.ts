@@ -11,6 +11,8 @@ type OutboxWriter = Pick<PrimaryDatabase, 'insert'>;
 
 const MAX_ATTEMPTS = 5;
 const CLAIMABLE_STATUSES: NotificationOutbox.Status[] = ['PENDING', 'FAILED'];
+/** Each row binds 3 parameters; Postgres caps a statement at 65535, so this stays well clear of that ceiling. */
+const ENQUEUE_CHUNK_SIZE = 1000;
 
 @Injectable()
 export class NotificationService {
@@ -25,7 +27,17 @@ export class NotificationService {
   }
 
   async enqueue(notification: SendNotification, executor: OutboxWriter = this.db): Promise<void> {
-    await executor.insert(schema.notificationOutbox).values({ templateKey: notification.templateKey, recipients: notification.recipients, payload: notification.payload ?? null });
+    await this.enqueueMany([notification], executor);
+  }
+
+  /** Chunks at {@link ENQUEUE_CHUNK_SIZE} rows per statement; every chunk runs against the same `executor`, so a caller-held transaction still commits or rolls back as one unit. */
+  async enqueueMany(notifications: SendNotification[], executor: OutboxWriter = this.db): Promise<void> {
+    for (let offset = 0; offset < notifications.length; offset += ENQUEUE_CHUNK_SIZE) {
+      const chunk = notifications.slice(offset, offset + ENQUEUE_CHUNK_SIZE);
+      await executor
+        .insert(schema.notificationOutbox)
+        .values(chunk.map(notification => ({ templateKey: notification.templateKey, recipients: notification.recipients, payload: notification.payload ?? null })));
+    }
   }
 
   /**

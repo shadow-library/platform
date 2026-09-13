@@ -6,7 +6,7 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
-import { AuditEvent, DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { AuditEvent, DatabaseService, PrimaryDatabase, PrimaryTransaction, schema } from '@server/modules/infrastructure/datastore';
 import { WebhookService } from '@server/modules/infrastructure/webhook';
 
 export interface AuditInput {
@@ -57,45 +57,57 @@ export class AuditService {
     this.db = databaseService.getPostgresClient();
   }
 
-  async record(input: AuditInput): Promise<AuditEvent> {
+  /**
+   * `executor` lets a caller fold this write into a transaction it already holds open (e.g. a
+   * claim it must roll back if the audit write fails) instead of opening a second, independent one.
+   * Passing one moves `pg_advisory_xact_lock` into that transaction, held until the caller commits —
+   * callers passing an executor MUST acquire their own row locks before calling `record()`. Taking a
+   * row lock afterwards, while holding the advisory lock, can deadlock with another transaction
+   * waiting on that same row: Postgres detects lock cycles through row locks, not through an
+   * advisory lock held by a session waiting elsewhere, so the wait never resolves on its own.
+   */
+  async record(input: AuditInput, executor?: PrimaryTransaction): Promise<AuditEvent> {
+    if (executor) return this.writeRecord(executor, input);
+    return this.db.transaction(tx => this.writeRecord(tx, input));
+  }
+
+  private async writeRecord(tx: PrimaryTransaction, input: AuditInput): Promise<AuditEvent> {
     const chainKey = input.organisationId ?? GLOBAL_CHAIN;
     const id = Bun.randomUUIDv7();
     const occurredAt = new Date();
     const detail = this.redact(input.detail ?? undefined);
 
-    return this.db.transaction(async tx => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${chainKey}))`);
-      const [previous] = await tx
-        .select({ hash: schema.auditEvents.hash })
-        .from(schema.auditEvents)
-        .where(this.chainCondition(input.organisationId ?? null))
-        .orderBy(sql`${schema.auditEvents.id} DESC`)
-        .limit(1);
-      const prevHash = previous?.hash ?? null;
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${chainKey}))`);
+    const [previous] = await tx
+      .select({ hash: schema.auditEvents.hash })
+      .from(schema.auditEvents)
+      .where(this.chainCondition(input.organisationId ?? null))
+      .orderBy(sql`${schema.auditEvents.id} DESC`)
+      .limit(1);
+    const prevHash = previous?.hash ?? null;
 
-      const record = {
-        id,
-        occurredAt,
-        organisationId: input.organisationId ?? null,
-        actorType: input.actorType,
-        actorId: input.actorId ?? null,
-        action: input.action,
-        targetType: input.targetType ?? null,
-        targetId: input.targetId ?? null,
-        outcome: input.outcome,
-        ipAddress: input.ipAddress ?? null,
-        correlationId: input.correlationId ?? null,
-        detail: detail ?? null,
-      };
-      const hash = this.computeHash(prevHash, record);
-      const [inserted] = await tx
-        .insert(schema.auditEvents)
-        .values({ ...record, prevHash, hash })
-        .returning();
-      assert(inserted, 'Audit event insertion failed');
-      await this.webhookService.fanOut(inserted, tx);
-      return inserted;
-    });
+    const record = {
+      id,
+      occurredAt,
+      organisationId: input.organisationId ?? null,
+      actorType: input.actorType,
+      actorId: input.actorId ?? null,
+      action: input.action,
+      targetType: input.targetType ?? null,
+      targetId: input.targetId ?? null,
+      outcome: input.outcome,
+      ipAddress: input.ipAddress ?? null,
+      correlationId: input.correlationId ?? null,
+      detail: detail ?? null,
+    };
+    const hash = this.computeHash(prevHash, record);
+    const [inserted] = await tx
+      .insert(schema.auditEvents)
+      .values({ ...record, prevHash, hash })
+      .returning();
+    assert(inserted, 'Audit event insertion failed');
+    await this.webhookService.fanOut(inserted, tx);
+    return inserted;
   }
 
   async listForSubject(subjectId: string, limit = 50): Promise<AuditEvent[]> {

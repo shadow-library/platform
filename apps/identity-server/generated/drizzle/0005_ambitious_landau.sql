@@ -1,0 +1,3 @@
+ALTER TABLE "bot_keys" ADD COLUMN "expiry_audited_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "bot_keys_expiry_reminder_idx" ON "bot_keys" USING btree ("expires_at") WHERE "bot_keys"."revoked_at" IS NULL AND "bot_keys"."expiry_reminded_at" IS NULL;--> statement-breakpoint
+CREATE INDEX "bot_keys_expiry_sweep_idx" ON "bot_keys" USING btree ("expires_at") WHERE "bot_keys"."revoked_at" IS NULL AND "bot_keys"."expiry_audited_at" IS NULL;

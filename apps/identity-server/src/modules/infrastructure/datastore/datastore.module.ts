@@ -5,6 +5,7 @@ import { constraintErrorMap } from './datastore.constants';
 import * as schema from './schemas';
 
 export type PrimaryDatabase = BunSQLDatabase<typeof schema>;
+export type PrimaryTransaction = Parameters<Parameters<PrimaryDatabase['transaction']>[0]>[0];
 
 declare module '@shadow-library/modules' {
   interface DatabaseRecords {

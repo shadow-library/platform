@@ -6,6 +6,7 @@ import { BackChannelLogoutService } from '@server/modules/auth/token';
 import { NotificationService } from '@server/modules/infrastructure/notification';
 import { WebhookDeliveryService } from '@server/modules/infrastructure/webhook';
 
+import { BotKeyExpiryService } from './bot-key-expiry.service';
 import { MaintenanceService } from './maintenance.service';
 
 const MAINTENANCE_EVERY_TICKS = 720;
@@ -24,6 +25,7 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
     private readonly backChannelLogoutService: BackChannelLogoutService,
     private readonly webhookDeliveryService: WebhookDeliveryService,
     private readonly maintenanceService: MaintenanceService,
+    private readonly botKeyExpiryService: BotKeyExpiryService,
   ) {}
 
   async onApplicationReady(): Promise<void> {
@@ -64,6 +66,10 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
       if (this.ticks++ % MAINTENANCE_EVERY_TICKS === 0) {
         await this.maintenanceService.purgeStaleContactClaims();
         await this.maintenanceService.purgeStaleAppSessions();
+        const reminded = await this.botKeyExpiryService.remindExpiringKeys();
+        if (reminded > 0) this.logger.info('Reminded bot key expiries', { reminded });
+        const expired = await this.botKeyExpiryService.sweepExpiredKeys();
+        if (expired > 0) this.logger.info('Audited expired bot keys', { expired });
       }
     } catch (error) {
       this.logger.error('Worker tick failed', { error });

@@ -67,6 +67,7 @@ export const botKeys = pgTable(
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
     lastUsedIp: inet('last_used_ip'),
     expiryRemindedAt: timestamp('expiry_reminded_at', { withTimezone: true }),
+    expiryAuditedAt: timestamp('expiry_audited_at', { withTimezone: true }),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
     revokedBy: bigint('revoked_by', { mode: 'bigint' }).references(() => users.id, { onDelete: 'set null' }),
   },
@@ -75,6 +76,12 @@ export const botKeys = pgTable(
     index('bot_keys_active_bot_id_idx')
       .on(t.botId)
       .where(sql`${t.revokedAt} IS NULL`),
+    index('bot_keys_expiry_reminder_idx')
+      .on(t.expiresAt)
+      .where(sql`${t.revokedAt} IS NULL AND ${t.expiryRemindedAt} IS NULL`),
+    index('bot_keys_expiry_sweep_idx')
+      .on(t.expiresAt)
+      .where(sql`${t.revokedAt} IS NULL AND ${t.expiryAuditedAt} IS NULL`),
     check('bot_keys_expiry_within_365_days', sql`${t.expiresAt} <= ${t.createdAt} + interval '365 days'`),
   ],
 );
