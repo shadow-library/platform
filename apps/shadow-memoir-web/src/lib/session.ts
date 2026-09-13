@@ -20,3 +20,15 @@ export function requireSession(queryClient: QueryClient, returnTo: string): Prom
 export function useSessionGuard(): SessionGuardStatus {
   return useSharedSessionGuard({ query: sessionQueryOptions(), loginTo: '/login' });
 }
+
+/**
+ * Asks the server for the session's subject on a probe key, so a 401 stays out of the shared session query — that
+ * query's error is what `useSessionGuard` redirects on, and an expired session must keep the owner working locally.
+ * Only a successful answer naming a different account moves the shared query, which rebuilds the shell.
+ */
+export async function confirmSessionAccount(queryClient: QueryClient): Promise<string> {
+  const shared = sessionQueryOptions();
+  const session = await queryClient.fetchQuery({ ...shared, queryKey: [...shared.queryKey, 'probe'], gcTime: 0, staleTime: 0 });
+  if (queryClient.getQueryData<SessionResponse>(shared.queryKey)?.sub !== session.sub) queryClient.setQueryData(shared.queryKey, session);
+  return session.sub;
+}

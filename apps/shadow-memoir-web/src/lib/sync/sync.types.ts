@@ -131,6 +131,8 @@ export interface SyncSnapshot {
   readiness: SyncReadiness;
   /** Epoch ms when `readiness` last became `ready`; a mirror query whose data is older is still showing its pre-pull answer. */
   readySince: number;
+  /** Command ids of the batch on the wire right now. */
+  sending: string[];
 }
 
 export const SYNC_META_KEYS = {

@@ -449,7 +449,7 @@ export function financeCategoriesView(state: FinanceState): CategoriesView {
   return { items, homeCurrency: HOME_CURRENCY, uncategorised: { count: uncategorised?.count ?? 0, totalMinor: uncategorised?.totalMinor ?? 0 } };
 }
 
-function buildExpense(id: string, draft: ExpenseDraft): ExpenseDetail {
+function buildExpense(id: string, draft: ExpenseDraft, syncState: ExpenseDetail['syncState']): ExpenseDetail {
   const amountMinor = parseAmountToMinor(draft.amountText, draft.currency) ?? 0;
   const fxRate = lockedRate(draft.currency);
   return {
@@ -465,22 +465,22 @@ function buildExpense(id: string, draft: ExpenseDraft): ExpenseDetail {
     occurredOnDate: draft.occurredOnDate,
     loggedAt: new Date().toISOString(),
     source: draft.source ?? 'manual',
-    syncState: 'synced',
+    syncState,
     audit: [{ text: 'Created', when: 'just now' }],
   };
 }
 
-function createExpense(state: FinanceState, draft: ExpenseDraft): FinanceCommandResult {
-  const expense = buildExpense(draft.id ?? nextExpenseId(), draft);
+function createExpense(state: FinanceState, draft: ExpenseDraft, syncState: ExpenseDetail['syncState']): FinanceCommandResult {
+  const expense = buildExpense(draft.id ?? nextExpenseId(), draft, syncState);
   state.expenses = [expense, ...state.expenses];
   state.monthlyExpenseCount += 1;
   if (draft.source === 'ocr') state.receiptScansUsed += 1;
   return { id: expense.id, message: 'Expense saved.', advisory: deriveCapAdvisory('expenses', state.monthlyExpenseCount) };
 }
 
-function updateExpense(state: FinanceState, id: string, draft: ExpenseDraft): FinanceCommandResult {
+function updateExpense(state: FinanceState, id: string, draft: ExpenseDraft, syncState: ExpenseDetail['syncState']): FinanceCommandResult {
   state.expenses = state.expenses.map(expense =>
-    expense.id === id ? { ...buildExpense(id, draft), audit: [...expense.audit, { text: 'Edited', when: 'just now' }], loggedAt: expense.loggedAt } : expense,
+    expense.id === id ? { ...buildExpense(id, draft, syncState), audit: [...expense.audit, { text: 'Edited', when: 'just now' }], loggedAt: expense.loggedAt } : expense,
   );
   return { id, message: 'Expense updated.' };
 }
@@ -510,32 +510,36 @@ function createSubscription(state: FinanceState, draft: SubscriptionDraft): Fina
  * Confirm-on-fire, idempotent per cycle: a second confirmation of the same billing date finds the
  * expense already written and reports it rather than logging the charge twice.
  */
-function confirmCycle(state: FinanceState, id: string, billingDate: string): FinanceCommandResult {
+function confirmCycle(state: FinanceState, id: string, billingDate: string, syncState: ExpenseDetail['syncState']): FinanceCommandResult {
   const target = state.subscriptions.find(item => item.id === id);
   if (!target) return { id, message: 'That subscription is no longer here.' };
 
   const existing = state.expenses.find(expense => expense.linkedSubscriptionId === id && expense.occurredOnDate === billingDate);
   if (existing) return { id: existing.id, message: 'Already confirmed for this cycle.' };
 
-  const expense = buildExpense(nextExpenseId(), {
-    amountText: target.amountText,
-    currency: target.currency,
-    categoryId: 'subs',
-    occurredOnDate: billingDate,
-    note: target.name,
-  });
+  const expense = buildExpense(
+    nextExpenseId(),
+    {
+      amountText: target.amountText,
+      currency: target.currency,
+      categoryId: 'subs',
+      occurredOnDate: billingDate,
+      note: target.name,
+    },
+    syncState,
+  );
   state.expenses = [{ ...expense, linkedSubscriptionId: id }, ...state.expenses];
   state.subscriptions = state.subscriptions.map(item => (item.id === id ? { ...item, lastConfirmedDate: billingDate } : item));
   return { id: expense.id, message: `${target.name} confirmed for ${billingDate}.` };
 }
 
 /** The optimistic apply, shared by the fixtures and by the sync layer's replay of what is still queued. */
-export function applyFinanceCommand(state: FinanceState, command: FinanceCommand): FinanceCommandResult {
+export function applyFinanceCommand(state: FinanceState, command: FinanceCommand, syncState: ExpenseDetail['syncState'] = 'synced'): FinanceCommandResult {
   switch (command.type) {
     case 'expense.create':
-      return createExpense(state, command.draft);
+      return createExpense(state, command.draft, syncState);
     case 'expense.update':
-      return updateExpense(state, command.id, command.draft);
+      return updateExpense(state, command.id, command.draft, syncState);
     case 'expense.delete':
       state.expenses = state.expenses.filter(expense => expense.id !== command.id);
       return { id: command.id, message: 'Expense deleted.' };
@@ -545,7 +549,7 @@ export function applyFinanceCommand(state: FinanceState, command: FinanceCommand
       state.subscriptions = state.subscriptions.map(item => (item.id === command.id ? { ...item, active: command.active } : item));
       return { id: command.id, message: command.active ? 'Subscription resumed.' : 'Subscription paused.' };
     case 'subscription.confirmCycle':
-      return confirmCycle(state, command.id, command.billingDate);
+      return confirmCycle(state, command.id, command.billingDate, syncState);
     case 'category.rename':
       state.categories = state.categories.map(category => (category.id === command.id ? { ...category, name: command.name } : category));
       return { id: command.id, message: 'Renamed. Every past expense follows the new name; the amounts are untouched.' };

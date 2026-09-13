@@ -14,7 +14,7 @@ import {
 import { type SettledCommandResult } from './command.types';
 import { useMemoirData } from './data-context';
 
-const accountKeys = {
+export const accountKeys = {
   all: ['memoir', 'account'] as const,
   day: ['memoir', 'account', 'day'] as const,
   behaviour: ['memoir', 'account', 'behaviour'] as const,

@@ -1,5 +1,6 @@
 import { memoirQueryClient } from '@/lib/data';
 import {
+  type AccountMarker,
   type DeltaPage,
   type KeyValueBacking,
   MemoirStore,
@@ -101,10 +102,34 @@ export interface TestEngine {
   server: FakeServer;
 }
 
-export function createTestEngine(options: FakeServerOptions & { backing?: KeyValueBacking; today?: string } = {}): TestEngine {
+export interface TestEngineOptions extends FakeServerOptions {
+  backing?: KeyValueBacking;
+  today?: string;
+  /** Binds the store to an account, as the app does; omitted, the store is unbound and skips every ownership check. */
+  accountId?: string;
+  principal?: () => Promise<string>;
+  onAccountChanged?: () => void;
+  marker?: AccountMarker;
+  fetchImpl?: (server: FakeServer) => typeof fetch;
+}
+
+/** One browser's last-account record, shared by every tab's store the way localStorage is. */
+export function sharedMarker(initial: string | null = null): AccountMarker {
+  let value = initial;
+  return { read: () => value, write: accountId => void (value = accountId) };
+}
+
+export function createTestEngine(options: TestEngineOptions = {}): TestEngine {
   const server = createFakeServer(options);
-  const store = new MemoirStore(options.backing ?? sharedBacking());
-  const engine = new SyncEngine({ store, client: new SyncClient({ fetchImpl: server.fetchImpl }), today: options.today ?? '2026-08-24' });
+  const store = new MemoirStore(options.backing ?? sharedBacking(), { accountId: options.accountId, marker: options.marker });
+  const fetchImpl = options.fetchImpl?.(server) ?? server.fetchImpl;
+  const engine = new SyncEngine({
+    store,
+    client: new SyncClient({ fetchImpl }),
+    today: options.today ?? '2026-08-24',
+    principal: options.principal,
+    onAccountChanged: options.onAccountChanged,
+  });
   return { engine, store, server };
 }
 

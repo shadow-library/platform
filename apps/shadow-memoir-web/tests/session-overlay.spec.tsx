@@ -1,11 +1,15 @@
+import { type QueryClient } from '@tanstack/react-query';
 import { screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { type ReactElement } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NetStrip, SystemOverlayProvider } from '@/features/shell';
+import { sessionQueryOptions } from '@/lib/apis';
+import { confirmSessionAccount, useSessionGuard } from '@/lib/session';
 import { type NetState, SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen } from './harness';
-import { createSyncedTestData, createTestEngine } from './sync-harness';
+import { createSyncedTestData, createTestEngine, sharedMarker } from './sync-harness';
 
 const TODAY = '2026-08-24';
 const OVERLAY_TITLE = 'Your session ended while you were offline';
@@ -78,5 +82,45 @@ describe('NetStrip session overlay', () => {
 
     await waitFor(() => expect(screen.getByRole('status')).toBeDefined());
     expect(screen.queryByText(OVERLAY_TITLE)).toBeNull();
+  });
+});
+
+function GuardStatus(): ReactElement {
+  return <output aria-label="Session guard">{useSessionGuard()}</output>;
+}
+
+describe('session principal check', () => {
+  beforeEach(() => setOnline(true));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('should keep the signed-out overlay and not redirect when the principal check returns 401', async () => {
+    const sessionRequests: string[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      sessionRequests.push(String(input));
+      return new Response(JSON.stringify({ code: 'IAM_001', message: 'Authentication required' }), { status: 401, headers: { 'content-type': 'application/json' } });
+    });
+    const shell: { client?: QueryClient } = {};
+    const { engine } = createTestEngine({ today: TODAY, accountId: 'usr_A', marker: sharedMarker(), principal: () => confirmSessionAccount(shell.client as QueryClient) });
+    const data = createSyncedTestData(engine);
+    shell.client = data.queryClient;
+    const sessionKey = sessionQueryOptions().queryKey;
+    data.queryClient.setQueryData(sessionKey, { sub: 'usr_A', scopes: [] });
+
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <SystemOverlayProvider>
+          <NetStrip />
+          <GuardStatus />
+        </SystemOverlayProvider>
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    expect(await screen.findByText(OVERLAY_TITLE)).toBeDefined();
+    expect(sessionRequests.some(url => url.includes('/session'))).toBe(true);
+    expect(engine.getSnapshot().state).toBe('signed-out');
+    expect(data.queryClient.getQueryState(sessionKey)?.status).toBe('success');
+    expect(data.queryClient.getQueryData(sessionKey)).toMatchObject({ sub: 'usr_A' });
+    expect(screen.getByLabelText('Session guard').textContent).toBe('authenticated');
   });
 });

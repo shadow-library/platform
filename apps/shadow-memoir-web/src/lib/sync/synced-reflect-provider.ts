@@ -25,6 +25,7 @@ import {
   type SettledCommandResult,
 } from '@/lib/data';
 
+import { ignoreAccountBoundary } from './memoir-store';
 import { type AiResultRow, type AiTaskRow, projectAiRows, projectEntitlement, projectReflectSource } from './projection';
 import { type SyncEngine } from './sync-engine';
 import { SYNC_META_KEYS } from './sync.types';
@@ -105,7 +106,7 @@ export class SyncedReflectProvider implements ReflectProvider {
   constructor(private readonly sync: SyncEngine) {
     this.narrative = createReflectProvider({ today: sync.today, persona: 'active' });
     this.source = projectReflectSource(sync.domains(), sync.today);
-    this.restored = this.restoreReview();
+    this.restored = this.restoreReview().catch(ignoreAccountBoundary);
     sync.subscribeProjection(() => (this.pending = this.pending.then(() => this.reproject())));
   }
 

@@ -1,11 +1,13 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { OnboardingScreen } from '@/features/onboarding';
 import { AppSyncScreen, BillingScreen, DeleteAccountScreen, ExportScreen, NotificationSettingsScreen, SettingsScreen } from '@/features/settings';
+import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
 import { OnboardingGate } from '@/routes/_app';
 
 import { renderScreen } from './harness';
+import { createSyncedTestData, createTestEngine, type FakeServer, type TestEngineOptions } from './sync-harness';
 
 const TODAY = '2026-08-22';
 
@@ -112,6 +114,164 @@ describe('App and sync', () => {
   it('should have nothing waiting on a fresh account', async () => {
     renderScreen(<AppSyncScreen />, { today: TODAY, persona: 'new' });
     expect(await screen.findByText('Nothing is waiting')).toBeDefined();
+  });
+});
+
+function setOnline(online: boolean): void {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value: online });
+}
+
+interface HeldPath {
+  fetchImpl: (server: FakeServer) => typeof fetch;
+  hold: () => void;
+  release: () => void;
+}
+
+function held(path: string): HeldPath {
+  let release = (): void => undefined;
+  let gate: Promise<void> | null = null;
+  const hold = (): void => void (gate = new Promise<void>(resolve => (release = resolve)));
+  hold();
+  const fetchImpl = (server: FakeServer): typeof fetch =>
+    (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (gate && String(input).includes(path)) await gate;
+      return server.fetchImpl(input, init);
+    }) as typeof fetch;
+  return {
+    fetchImpl,
+    hold,
+    release: () => {
+      gate = null;
+      release();
+    },
+  };
+}
+
+function renderSyncedAppSync(options: TestEngineOptions = {}): ReturnType<typeof createTestEngine> {
+  const test = createTestEngine({ today: TODAY, ...options });
+  const data = createSyncedTestData(test.engine);
+  renderScreen(
+    <SyncEngineProvider data={data}>
+      <AppSyncScreen />
+    </SyncEngineProvider>,
+    { value: data },
+  );
+  return test;
+}
+
+const DEVICE_PAGE: DeltaPage = {
+  cursor: '1',
+  hasMore: false,
+  tombstones: [],
+  domains: { devices: [{ id: 'd-1', userAgent: 'Mozilla/5.0 (Macintosh) Chrome/120', lastSeenAt: '2026-08-22T08:00:00.000Z' }] },
+};
+
+describe('App and sync, synced', () => {
+  afterEach(() => setOnline(true));
+
+  it('should say syncing during the first sync rather than synced with no devices', async () => {
+    const gate = held('/sync/delta');
+    renderSyncedAppSync({ fetchImpl: gate.fetchImpl, pages: [DEVICE_PAGE] });
+
+    expect(await screen.findByRole('heading', { name: 'Syncing' })).toBeDefined();
+    expect(screen.queryByText('Online and synced')).toBeNull();
+    expect(screen.queryByText('No devices yet')).toBeNull();
+
+    gate.release();
+    expect(await screen.findByRole('heading', { name: 'Online and synced' })).toBeDefined();
+    expect(await screen.findByText('Chrome · Macintosh')).toBeDefined();
+  });
+
+  it('should update App & sync status live', async () => {
+    const { engine } = renderSyncedAppSync({ pages: [DEVICE_PAGE] });
+    expect(await screen.findByRole('heading', { name: 'Online and synced' })).toBeDefined();
+
+    setOnline(false);
+    await engine.enqueue({ type: 'quest.complete', occurrenceId: `q1:${TODAY}` }, TODAY);
+
+    expect(await screen.findByRole('heading', { name: 'Offline — working from this device' })).toBeDefined();
+    expect(await screen.findByText('Queued changes: 1')).toBeDefined();
+    expect(screen.getAllByText(/position \d/)).toHaveLength(1);
+  });
+
+  it('should keep the queued count equal to the listed rows and say signed out when the session is gone', async () => {
+    let status = 200;
+    const { engine } = renderSyncedAppSync({ status: () => status });
+    expect(await screen.findByRole('heading', { name: 'Online and synced' })).toBeDefined();
+
+    status = 401;
+    for (const questId of ['a', 'b', 'c']) await engine.enqueue({ type: 'quest.complete', occurrenceId: `${questId}:${TODAY}` }, TODAY);
+
+    expect(await screen.findByRole('heading', { name: 'Signed out' })).toBeDefined();
+    expect(await screen.findByText('Queued changes: 3')).toBeDefined();
+    expect(screen.getAllByText(/position \d/)).toHaveLength(3);
+    expect(screen.queryByText(/about two minutes/)).toBeNull();
+  });
+
+  it('should show pending feedback on Sync now and settle', async () => {
+    const gate = held('/sync/delta');
+    renderSyncedAppSync({ fetchImpl: gate.fetchImpl });
+    gate.release();
+    expect(await screen.findByRole('heading', { name: 'Online and synced' })).toBeDefined();
+
+    gate.hold();
+    fireEvent.click(screen.getByRole('button', { name: 'Sync now' }));
+
+    const busy = await screen.findByRole('button', { name: 'Syncing…' });
+    expect(busy.getAttribute('aria-busy')).toBe('true');
+    expect((busy as HTMLButtonElement).disabled).toBe(true);
+
+    gate.release();
+    expect(await screen.findByRole('button', { name: 'Sync now' })).toBeDefined();
+    expect(await screen.findByText(/^Last synced /)).toBeDefined();
+  });
+
+  it('should mark only the batch on the wire as sent', async () => {
+    const gate = held('/sync/commands');
+    setOnline(false);
+    const { engine } = renderSyncedAppSync({ fetchImpl: gate.fetchImpl });
+    await engine.enqueue({ type: 'quest.complete', occurrenceId: `a:${TODAY}` }, TODAY);
+    setOnline(true);
+
+    void engine.sync();
+    expect(await screen.findByText('Sent')).toBeDefined();
+    await engine.enqueue({ type: 'quest.complete', occurrenceId: `b:${TODAY}` }, TODAY);
+
+    await waitFor(() => expect(screen.getAllByText(/position \d/)).toHaveLength(2));
+    expect(screen.getAllByText('Sent')).toHaveLength(1);
+    expect(screen.getAllByText('Queued')).toHaveLength(1);
+    gate.release();
+  });
+
+  it('should not promise a retry for the head of a failed queue', async () => {
+    setOnline(false);
+    const { engine } = renderSyncedAppSync({ status: () => 500 });
+    await engine.enqueue({ type: 'quest.complete', occurrenceId: `a:${TODAY}` }, TODAY);
+    setOnline(true);
+    await engine.sync();
+
+    expect(await screen.findByRole('heading', { name: 'Sync did not go through' })).toBeDefined();
+    expect(await screen.findByText('Queued')).toBeDefined();
+    expect(screen.queryByText('Retrying')).toBeNull();
+  });
+
+  it('should show human command labels with local times', async () => {
+    const zone = process.env.TZ;
+    process.env.TZ = 'Asia/Dubai';
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-22T09:37:00.000Z'));
+    try {
+      setOnline(false);
+      const { engine } = renderSyncedAppSync();
+      await engine.enqueue({ type: 'expense.create', draft: { amountText: '4.20', currency: 'EUR', categoryId: 'food', occurredOnDate: TODAY, note: 'coffee' } }, TODAY);
+
+      expect(await screen.findByText('Expense')).toBeDefined();
+      expect(screen.getByText(/^Created (13:37|01:37\spm) · position 1$/i)).toBeDefined();
+      expect(screen.queryByText('expense.create')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      process.env.TZ = zone;
+    }
   });
 });
 

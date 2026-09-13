@@ -17,9 +17,10 @@ import {
   type SubscriptionsView,
 } from '@/lib/data';
 
-import { isFinanceCommand, mintCommandIds } from './command-wire';
+import { isFinanceCommand, isServerBacked, mintCommandIds } from './command-wire';
 import { projectFinanceRows } from './projection';
-import { type SyncEngine } from './sync-engine';
+import { ignoreAccountBoundary } from './memoir-store';
+import { CommandNotQueuedError, type SyncEngine } from './sync-engine';
 
 function monthOf(date: string): string {
   return date.slice(0, 7);
@@ -44,13 +45,23 @@ export class SyncedFinanceProvider implements FinanceProvider {
 
   constructor(private readonly sync: SyncEngine) {
     this.state = toState(projectFinanceRows(sync.domains()), sync.today);
-    sync.subscribeProjection(() => (this.pending = this.pending.then(() => this.reproject())));
+    sync.subscribeProjection(() => this.serialize(() => this.reproject()));
   }
 
-  /** Rebuilds from the server's rows, then replays whatever is still queued over them — an acked command has left the queue, so the replay cannot double it. */
+  /** A dispatch applied to the state a running reprojection is about to replace would vanish until the next pull, so the two take turns. */
+  private serialize<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.pending.then(task);
+    this.pending = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  /** Rebuilds from the server's rows, then replays whatever is still queued over them as queued — an acked command has left the queue, so the replay cannot double it. */
   async reproject(): Promise<void> {
     const state = toState(projectFinanceRows(this.sync.domains()), this.sync.today);
-    for (const entry of await this.sync.outbox.pending()) if (isFinanceCommand(entry.command)) applyFinanceCommand(state, entry.command);
+    for (const entry of await this.sync.outbox.pending()) if (isFinanceCommand(entry.command)) applyFinanceCommand(state, entry.command, 'queued');
     this.state = state;
   }
 
@@ -74,10 +85,13 @@ export class SyncedFinanceProvider implements FinanceProvider {
     return financeCategoriesView(this.state);
   }
 
-  async dispatchCommand(command: FinanceCommand): Promise<FinanceCommandResult> {
-    const minted = mintCommandIds(command) as FinanceCommand;
-    const result = applyFinanceCommand(this.state, minted);
-    await this.sync.enqueue(minted, this.sync.today);
-    return result;
+  dispatchCommand(command: FinanceCommand): Promise<FinanceCommandResult> {
+    return this.serialize(async () => {
+      const minted = mintCommandIds(command) as FinanceCommand;
+      const result = applyFinanceCommand(this.state, minted, isServerBacked(minted) ? 'queued' : 'synced');
+      if ((await this.sync.enqueue(minted, this.sync.today)).status !== 'refused') return result;
+      await this.reproject().catch(ignoreAccountBoundary);
+      throw new CommandNotQueuedError();
+    });
   }
 }

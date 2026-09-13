@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo } from 'react';
 import { Spinner } from '@shadow-library/ui';
@@ -6,7 +6,7 @@ import { Spinner } from '@shadow-library/ui';
 import { AppShell } from '@/features/shell';
 import { sessionQueryOptions } from '@/lib/apis';
 import { MemoirDataProvider, useOnboardingStatus } from '@/lib/data';
-import { requireSession, useSessionGuard } from '@/lib/session';
+import { confirmSessionAccount, requireSession, useSessionGuard } from '@/lib/session';
 import { createSyncedMemoirData, SyncEngineProvider } from '@/lib/sync';
 
 export const Route = createFileRoute('/_app')({
@@ -21,20 +21,25 @@ export const Route = createFileRoute('/_app')({
  */
 function AuthenticatedShell(): ReactElement {
   const status = useSessionGuard();
-  const data = useMemo(() => createSyncedMemoirData(), []);
-  // `beforeLoad` already ensured the session, so this reads it from cache; `sub` keys the account-change purge.
-  const accountId = useQuery(sessionQueryOptions()).data?.sub ?? null;
+  const queryClient = useQueryClient();
+  const accountId = useQuery(sessionQueryOptions()).data?.sub;
+  const data = useMemo(() => {
+    if (!accountId) return null;
+    const principal = (): Promise<string> => confirmSessionAccount(queryClient);
+    const onAccountChanged = (): void => void principal().catch(() => undefined);
+    return createSyncedMemoirData({ accountId, principal, onAccountChanged });
+  }, [accountId, queryClient]);
 
-  if (status === 'redirecting')
+  if (status === 'redirecting' || !data)
     return (
       <div className="flex items-center justify-center" style={{ minHeight: '100dvh' }}>
-        <Spinner aria-label="Redirecting to sign-in" />
+        <Spinner aria-label={status === 'redirecting' ? 'Redirecting to sign-in' : 'Opening your account'} />
       </div>
     );
 
   return (
-    <MemoirDataProvider value={data}>
-      <SyncEngineProvider data={data} accountId={accountId}>
+    <MemoirDataProvider key={accountId} value={data}>
+      <SyncEngineProvider data={data}>
         <OnboardingGate>
           <AppShell>
             <Outlet />

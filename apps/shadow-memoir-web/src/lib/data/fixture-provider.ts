@@ -178,7 +178,10 @@ function seedWorldState(options: FixtureProviderOptions = {}): MemoirWorldState 
  * one implementation, so an offline completion and a fixture completion cannot disagree about the effect.
  */
 export class MemoirEngine implements DataProvider {
-  constructor(private readonly state: MemoirWorldState) {}
+  constructor(
+    private readonly state: MemoirWorldState,
+    private readonly queuedOccurrences: ReadonlySet<string> = new Set(),
+  ) {}
 
   get world(): MemoirWorldState {
     return this.state;
@@ -211,7 +214,7 @@ export class MemoirEngine implements DataProvider {
       streakDays: progress.currentStreakDays,
       shields: progress.shields,
       locked: quest.preCommit && this.state.locks.has(date),
-      queued: false,
+      queued: this.queuedOccurrences.has(occurrenceKey(quest.id, date)),
       threshold: quest.healthThreshold
         ? {
             metric: quest.healthThreshold.metric,

@@ -1,4 +1,4 @@
-import { type MemoirStore } from './memoir-store';
+import { AccountBoundaryError, ignoreAccountBoundary, type MemoirStore, type StoreBoundary } from './memoir-store';
 import { type DomainRows, projectWorldState } from './projection';
 import { Outbox } from './outbox';
 import { SyncClient, toSyncFailureReason } from './sync-client';
@@ -24,6 +24,22 @@ export interface SyncEngineOptions {
   deviceId?: string;
   /** Bounds a `hasMore` drain so a pathological server can never spin the client forever. */
   maxPages?: number;
+  /** The session's current subject, asked at the start of every pass and before each later batch: the cookie can change hands under a running tab. */
+  principal?: () => Promise<string>;
+  /** Called when this engine's account no longer owns the session or the store, so the shell can rebuild for the account that does. */
+  onAccountChanged?: () => void;
+}
+
+/** `local` commands have no server handler; `refused` ones reached a store this engine's account no longer holds, and the caller must undo its optimistic apply. */
+export type EnqueueResult = { status: 'queued' } | { status: 'local' } | { status: 'refused'; boundary: StoreBoundary };
+
+export const NOT_QUEUED_MESSAGE = "That change wasn't saved: a different account is now signed in on this browser.";
+
+export class CommandNotQueuedError extends Error {
+  constructor() {
+    super(NOT_QUEUED_MESSAGE);
+    this.name = 'CommandNotQueuedError';
+  }
 }
 
 const DEFAULT_MAX_PAGES = 50;
@@ -69,6 +85,7 @@ export class SyncEngine {
     initError: null,
     readiness: LOADING,
     readySince: 0,
+    sending: [],
   };
   private deviceId: string | undefined;
   private mirrorReady = false;
@@ -129,6 +146,7 @@ export class SyncEngine {
    * instead of rendering an empty day forever.
    */
   async start(): Promise<void> {
+    this.store.open();
     this.mirrorReady = false;
     this.deletionPending = false;
     this.coldFailure = null;
@@ -136,10 +154,16 @@ export class SyncEngine {
     try {
       await this.hydrate();
     } catch (error) {
+      if (error instanceof AccountBoundaryError) return;
       return this.patch({ initError: error instanceof Error ? error.message : 'The local store could not be opened.' });
     }
     this.patch({ initError: null });
     await this.sync();
+  }
+
+  /** Ends this engine's hold on the store. A pass still running stops at its next read or write instead of finishing into whatever opens the store next. */
+  stop(): void {
+    this.store.close();
   }
 
   async hydrate(): Promise<void> {
@@ -153,11 +177,19 @@ export class SyncEngine {
   }
 
   /** Enqueues a command for the server; the caller has already applied it locally. Purely-local commands return without queueing. */
-  async enqueue(command: SyncCommand, localDate: string): Promise<void> {
-    const entry = await this.outbox.enqueue(command, localDate);
-    if (!entry) return;
-    this.patch({ queuedCount: await this.outbox.size() });
-    if (this.snapshot.state !== 'signed-out' && isOnline()) void this.sync();
+  async enqueue(command: SyncCommand, localDate: string): Promise<EnqueueResult> {
+    try {
+      const entry = await this.outbox.enqueue(command, localDate);
+      if (!entry) return { status: 'local' };
+      this.patch({ queuedCount: await this.outbox.size() });
+    } catch (error) {
+      if (!(error instanceof AccountBoundaryError)) throw error;
+      this.leaveAccount(error);
+      return { status: 'refused', boundary: error.boundary };
+    }
+    if (!isOnline()) this.markOffline();
+    else if (this.snapshot.state !== 'signed-out') void this.sync();
+    return { status: 'queued' };
   }
 
   dismissNotice(commandId: string): void {
@@ -169,15 +201,19 @@ export class SyncEngine {
     return (this.inFlight ??= this.runSync().finally(() => void (this.inFlight = null)));
   }
 
+  private markOffline(): void {
+    this.coldFailure = 'offline';
+    this.patch({ state: 'offline', readiness: this.readiness() });
+  }
+
   private async runSync(): Promise<void> {
-    if (!isOnline()) {
-      this.coldFailure = 'offline';
-      return this.patch({ state: 'offline', readiness: this.readiness() });
-    }
+    if (!isOnline()) return this.markOffline();
 
     this.coldFailure = null;
     this.patch({ state: 'syncing', readiness: this.readiness() });
     try {
+      await this.confirmPrincipal();
+      await this.store.sweepForeign();
       await this.ensureDeviceRegistered();
       const interrupted = await this.flush();
       const complete = await this.pullUntilStalled();
@@ -186,21 +222,23 @@ export class SyncEngine {
       await this.store.writeMeta(SYNC_META_KEYS.lastSyncedAt, lastSyncedAt);
       if (!complete && !this.mirrorReady) this.coldFailure = 'server';
       const state = interrupted || !complete ? 'failed' : 'online';
-      this.patch({ state, lastSyncedAt, queuedCount: await this.outbox.size(), readiness: this.readiness() });
+      this.patch({ state, lastSyncedAt, queuedCount: await this.outbox.size(), readiness: this.readiness(), sending: [] });
     } catch (error) {
-      await this.handleFailure(error);
+      await this.handleFailure(error).catch(ignoreAccountBoundary);
     }
   }
 
   /**
    * §4.3: a dead session leaves IndexedDB and the outbox exactly as they are. The owner keeps working
-   * against local data and the same command ids replay under the new principal once they sign back in.
+   * against local data and the same command ids replay once the same account signs back in. A different
+   * account never inherits them: its data is built over a fresh store that empties itself on open.
    */
   private async handleFailure(error: unknown): Promise<void> {
+    if (error instanceof AccountBoundaryError) return this.leaveAccount(error);
     const reason = toSyncFailureReason(error, isOnline());
     if (reason === 'deletion-pending') await this.setDeletionPending(true);
     else this.coldFailure = reason;
-    this.patch({ state: FAILURE_STATES[reason], queuedCount: await this.outbox.size(), readiness: this.readiness() });
+    this.patch({ state: FAILURE_STATES[reason], queuedCount: await this.outbox.size(), readiness: this.readiness(), sending: [] });
   }
 
   /** A pulled mirror stays readable through any failure except a deletion, which no retry recovers from; that one holds until a pass succeeds. */
@@ -240,14 +278,18 @@ export class SyncEngine {
   private async flush(): Promise<boolean> {
     const notices: SyncNotice[] = [];
 
-    for (;;) {
+    for (let posted = 0; ; posted += 1) {
       const batch = await this.outbox.nextBatch();
       if (batch.length === 0) break;
+      if (posted > 0) await this.confirmPrincipal();
 
+      this.patch({ sending: batch.map(entry => entry.commandId) });
       const response = await this.client.postCommands(batch.map(toEnvelope));
       await this.reconcileEpoch(response.epoch);
 
       const result = await this.outbox.ack(batch, response.outcomes);
+      this.patch({ sending: [] });
+      await this.publishProjection();
       notices.push(...result.notices);
       if (result.interrupted) {
         if (notices.length) this.patch({ notices: [...this.snapshot.notices, ...notices] });
@@ -257,6 +299,20 @@ export class SyncEngine {
 
     if (notices.length) this.patch({ notices: [...this.snapshot.notices, ...notices] });
     return false;
+  }
+
+  /** A closed store belongs to an engine nobody renders any more; the other two leave this tab speaking for an account the session no longer is. */
+  private leaveAccount(error: AccountBoundaryError): void {
+    if (error.boundary === 'closed') return;
+    this.patch({ state: 'signed-out', sending: [] });
+    this.options.onAccountChanged?.();
+  }
+
+  private async confirmPrincipal(): Promise<void> {
+    if (this.store.ownerChanged()) throw new AccountBoundaryError('owner-changed');
+    const { principal } = this.options;
+    if (!principal || this.store.accountId === undefined) return;
+    if ((await principal()) !== this.store.accountId) throw new AccountBoundaryError('principal-changed');
   }
 
   /** Keeps draining past the page budget for as long as the cursor moves; the budget only stops a server that makes no progress. */
@@ -273,6 +329,8 @@ export class SyncEngine {
     for (let page = 0; page < this.maxPages; page += 1) {
       const since = (await this.store.readMeta<string>(SYNC_META_KEYS.cursor)) ?? '0';
       const response = await this.client.pullDelta({ since, domains: SYNC_DOMAINS });
+      // Checked after the response: a cookie that changed hands mid-drain has already answered this page as the other account.
+      await this.confirmPrincipal();
       const reset = await this.reconcileEpoch(response.epoch);
       if (reset) continue;
 
@@ -297,6 +355,11 @@ export class SyncEngine {
 
   private async hydrateRows(): Promise<void> {
     for (const domain of SYNC_DOMAINS) this.rows[domain] = await this.store.readDomain(domain);
+    await this.publishProjection();
+  }
+
+  /** Also runs after an ack, so a queued badge clears even when the pull that follows fails. */
+  private async publishProjection(): Promise<void> {
     await Promise.all([...this.projectionListeners].map(listener => listener()));
     for (const listener of this.worldListeners) listener();
   }

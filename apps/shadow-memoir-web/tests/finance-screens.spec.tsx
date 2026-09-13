@@ -1,10 +1,13 @@
-import { fireEvent, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { onlineManager } from '@tanstack/react-query';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import { ExpenseEntryPanel, SubscriptionsScreen } from '@/features/finance';
-import { type ExpenseDetail } from '@/lib/data';
+import { ExpenseEntryPanel, ExpensesScreen, SubscriptionsScreen } from '@/features/finance';
+import { type ExpenseDetail, todayISODate } from '@/lib/data';
+import { SyncEngineProvider } from '@/lib/sync';
 
-import { renderWithQuery } from './harness';
+import { renderScreen, renderWithQuery } from './harness';
+import { createSyncedTestData, createTestEngine } from './sync-harness';
 
 const TODAY = '2026-08-23';
 
@@ -74,5 +77,38 @@ describe('subscriptions screen', () => {
   it('should present an unconfirmed past charge as waiting, never as a failure', async () => {
     renderWithQuery(<SubscriptionsScreen />);
     expect(await screen.findByText('Waiting to be confirmed')).toBeDefined();
+  });
+});
+
+function setOffline(offline: boolean): void {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value: !offline });
+  onlineManager.setOnline(!offline);
+  window.dispatchEvent(new Event(offline ? 'offline' : 'online'));
+}
+
+describe('expenses screen', () => {
+  afterEach(() => setOffline(false));
+
+  it('should show a queued badge for unsynced rows', async () => {
+    const { engine } = createTestEngine({ today: todayISODate() });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <ExpensesScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+    await waitFor(() => expect(engine.getSnapshot().state).toBe('online'));
+
+    setOffline(true);
+    await data.finance.dispatchCommand({
+      type: 'expense.create',
+      draft: { amountText: '7.50', currency: 'EUR', categoryId: 'transport', occurredOnDate: todayISODate(), note: 'Offline taxi' },
+    });
+    await data.queryClient.invalidateQueries();
+
+    expect(await screen.findByText('Queued')).toBeDefined();
+    expect(screen.getByText('One expense is waiting to sync')).toBeDefined();
+    expect(engine.getSnapshot()).toMatchObject({ state: 'offline', queuedCount: 1 });
   });
 });

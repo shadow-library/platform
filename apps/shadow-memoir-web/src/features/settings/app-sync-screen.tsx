@@ -1,15 +1,15 @@
 import { Link } from '@tanstack/react-router';
-import { type ReactElement } from 'react';
+import { type ReactElement, useState } from 'react';
 import { Badge, Button, Card, EmptyState, Skeleton, Statistic } from '@shadow-library/ui';
 
 import { Screen, ScreenColumns, screenStyles } from '@/components/ScreenLayout';
 import { useAccountCommand, useAppSync } from '@/lib/data';
 import { useSystemOverlays } from '@/features/shell';
-import { useSyncEngine } from '@/lib/sync';
+import { useSyncEngine, useSyncReadiness } from '@/lib/sync';
 
 import styles from './settings.module.css';
 
-const STATUS_GLYPHS = { online: '✓', offline: '◷', syncing: '↻', failed: '⚠' } as const;
+const STATUS_GLYPHS = { online: '✓', offline: '◷', syncing: '↻', failed: '⚠', 'signed-out': '⚿' } as const;
 
 const QUEUE_LABELS = { queued: 'Queued', sent: 'Sent', retrying: 'Retrying', conflict: 'Needs a decision' } as const;
 
@@ -18,6 +18,14 @@ export function AppSyncScreen(): ReactElement {
   const command = useAccountCommand();
   const engine = useSyncEngine();
   const overlays = useSystemOverlays();
+  const readiness = useSyncReadiness();
+  const [syncing, setSyncing] = useState(false);
+
+  const syncNow = (): void => {
+    if (!engine || syncing) return;
+    setSyncing(true);
+    void engine.sync().finally(() => setSyncing(false));
+  };
 
   return (
     <Screen
@@ -72,14 +80,14 @@ export function AppSyncScreen(): ReactElement {
                   <p className={styles.sectionNote}>{sync.data.body}</p>
                 </div>
                 <div className={styles.actions}>
-                  <Button size="sm" variant="secondary" onClick={() => void engine?.sync()}>
+                  <Button size="sm" variant="secondary" loading={syncing} loadingText="Syncing…" disabled={!engine || syncing} onClick={syncNow}>
                     Sync now
                   </Button>
                 </div>
               </div>
               <div className={styles.stats}>
                 <Statistic label="Queued changes" value={sync.data.queuedCount} size="sm" />
-                <Statistic label="Registered devices" value={sync.data.devices.length} size="sm" />
+                <Statistic label="Registered devices" value={sync.data.devices.length} size="sm" loading={readiness.kind === 'loading'} error={readiness.kind === 'failed'} />
               </div>
               <p className={screenStyles.cardBody}>
                 {sync.data.lastSyncedAt ? `Last synced ${new Date(sync.data.lastSyncedAt).toLocaleString()}.` : 'This device has not completed a sync yet.'}
@@ -118,7 +126,11 @@ export function AppSyncScreen(): ReactElement {
           <Card padding="md">
             <Card.Body>
               <h2 className={screenStyles.cardTitle}>Devices</h2>
-              {sync.data.devices.length === 0 ? (
+              {readiness.kind === 'loading' ? (
+                <Skeleton.List rows={2} />
+              ) : readiness.kind === 'failed' ? (
+                <EmptyState size="inline" title="Devices haven't loaded yet" description="They appear once this device completes a sync." />
+              ) : sync.data.devices.length === 0 ? (
                 <EmptyState size="inline" title="No devices yet" description="A device registers itself the first time it syncs." />
               ) : (
                 <ul className={styles.deviceRows}>

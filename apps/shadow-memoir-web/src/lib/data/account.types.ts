@@ -112,7 +112,7 @@ export interface DeletionView {
   gracePeriodNote: string;
 }
 
-type SyncStatus = 'online' | 'offline' | 'syncing' | 'failed';
+type SyncStatus = 'online' | 'offline' | 'syncing' | 'failed' | 'signed-out';
 
 type QueueEntryState = 'queued' | 'sent' | 'retrying' | 'conflict';
 

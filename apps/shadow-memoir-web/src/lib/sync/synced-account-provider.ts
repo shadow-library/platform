@@ -36,7 +36,7 @@ import {
 
 import { projectEntitlement, projectRecordCounts } from './projection';
 import { type SyncEngine } from './sync-engine';
-import { SYNC_META_KEYS } from './sync.types';
+import { SYNC_META_KEYS, type SyncCommand } from './sync.types';
 
 const INTENSITY_LOCAL: Record<string, HeroIntensityMode> = { low_intensity: 'gentle', standard: 'standard', high_intensity: 'demanding' };
 
@@ -47,6 +47,32 @@ const INTENSITY_WIRE: Record<HeroIntensityMode, 'low_intensity' | 'standard' | '
 };
 
 const EXPORT_STAGES: Record<ExportJobResponseDto['status'], ExportJob['stage']> = { pending: 'preparing', running: 'preparing', done: 'ready', failed: 'failed' };
+
+const COMMAND_LABELS: Partial<Record<SyncCommand['type'], string>> = {
+  'quest.complete': 'Quest completed',
+  'quest.partial': 'Quest partly done',
+  'quest.skip': 'Quest skipped',
+  'quest.postpone': 'Quest postponed',
+  'quest.reschedule': 'Quest moved',
+  'quest.create': 'New quest',
+  'quest.update': 'Quest edited',
+  'expense.create': 'Expense',
+  'expense.update': 'Expense edited',
+  'expense.delete': 'Expense deleted',
+  'subscription.create': 'New subscription',
+  'subscription.setActive': 'Subscription paused or resumed',
+  'subscription.confirmCycle': 'Subscription charge confirmed',
+  'journal.save': 'Journal entry',
+  'meal.log': 'Meal',
+  'meal.logPreset': 'Meal',
+  'meal.savePreset': 'Meal preset',
+  'weight.save': 'Weight',
+  'sidequest.log': 'Side quest',
+  'health.save': 'Health entry',
+  'title.display': 'Displayed title',
+  'cosmetic.purchase': 'Cosmetic bought',
+  'cosmetic.equip': 'Cosmetic equipped',
+};
 
 function toClock(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
@@ -194,22 +220,25 @@ export class SyncedAccountProvider implements AccountProvider {
     }
   }
 
+  /** The count is the rows themselves, never the snapshot's, so the number and the list can't disagree. Net-state changes refetch this through `SyncEngineProvider`. */
   async getAppSync(): Promise<AppSyncView> {
     const snapshot = this.sync.getSnapshot();
-    const status: AppSyncView['status'] = snapshot.state === 'signed-out' ? 'failed' : snapshot.state;
+    const status = snapshot.state;
     const pending = await this.sync.outbox.pending();
+    const sending = new Set(snapshot.sending);
+    const createdAt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
     const queue: QueueEntry[] = pending.map((entry, index) => ({
       id: entry.commandId,
-      state: 'queued',
-      text: entry.type,
-      meta: `Created ${entry.createdAt.slice(11, 16)} · position ${index + 1}`,
+      state: sending.has(entry.commandId) ? 'sent' : 'queued',
+      text: COMMAND_LABELS[entry.command.type] ?? 'Change',
+      meta: `Created ${createdAt.format(new Date(entry.createdAt))} · position ${index + 1}`,
       retryable: false,
     }));
 
     return {
       status,
       ...SYNC_COPY[status],
-      queuedCount: snapshot.queuedCount,
+      queuedCount: queue.length,
       lastSyncedAt: snapshot.lastSyncedAt,
       queue,
       devices: await this.devices(),

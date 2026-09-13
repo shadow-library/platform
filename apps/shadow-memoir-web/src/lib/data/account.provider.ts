@@ -58,8 +58,9 @@ export const REAUTH_HANDOFF_COPY = {
 export const SYNC_COPY: Record<AppSyncView['status'], { title: string; body: string }> = {
   online: { title: 'Online and synced', body: 'Everything on this device matches the server.' },
   offline: { title: 'Offline — working from this device', body: 'Every screen still works. Insights, coaching and exports are the only things that wait for a connection.' },
-  syncing: { title: 'Syncing', body: 'Sending queued changes in the order you made them.' },
-  failed: { title: 'Sync did not go through', body: 'Your data is safe on this device. The next attempt is in about two minutes, or retry it now.' },
+  syncing: { title: 'Syncing', body: 'Sending anything queued in the order you made it, then bringing this device up to date.' },
+  failed: { title: 'Sync did not go through', body: 'Your data is safe on this device. It tries again when you next make a change or reconnect, or you can retry it now.' },
+  'signed-out': { title: 'Signed out', body: 'Your data and queue are kept on this device. Sign in again to resume syncing; retrying will not help until then.' },
 };
 
 export const OFFLINE_CAPABILITIES = [

@@ -187,6 +187,51 @@ function renderStrip(engine: SyncEngine): void {
   );
 }
 
+describe('offline strip', () => {
+  beforeEach(() => setOnline(true));
+
+  it('should mark the strip offline with the queued count when the device drops offline after load', async () => {
+    const { engine } = createTestEngine({ today: TODAY });
+    renderStrip(engine);
+    await waitFor(() => expect(engine.getSnapshot().state).toBe('online'));
+
+    setOnline(false);
+    window.dispatchEvent(new Event('offline'));
+    expect(await screen.findByText(/^Offline\./)).toBeDefined();
+
+    await engine.enqueue({ type: 'quest.complete', occurrenceId: `q1:${TODAY}` }, TODAY);
+    expect(await screen.findByText('1 queued')).toBeDefined();
+  });
+});
+
+describe('device registration', () => {
+  beforeEach(() => setOnline(true));
+
+  it('should reuse the stored device id after reload', async () => {
+    const backing = sharedBacking();
+    const first = createTestEngine({ backing, accountId: 'usr_A' });
+    await first.engine.start();
+    first.engine.stop();
+    const reloaded = createTestEngine({ backing, accountId: 'usr_A' });
+    await reloaded.engine.start();
+
+    expect(first.server.deviceRegistrations).toHaveLength(1);
+    expect(reloaded.server.deviceRegistrations).toEqual(first.server.deviceRegistrations);
+  });
+
+  it('should register a new device id deliberately when another account opens the store', async () => {
+    const backing = sharedBacking();
+    const first = createTestEngine({ backing, accountId: 'usr_A' });
+    await first.engine.start();
+    first.engine.stop();
+    const next = createTestEngine({ backing, accountId: 'usr_B' });
+    await next.engine.start();
+
+    expect(next.server.deviceRegistrations).toHaveLength(1);
+    expect(next.server.deviceRegistrations).not.toEqual(first.server.deviceRegistrations);
+  });
+});
+
 describe('sync readiness', () => {
   beforeEach(() => setOnline(true));
 

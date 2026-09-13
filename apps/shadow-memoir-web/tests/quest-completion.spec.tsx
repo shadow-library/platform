@@ -116,6 +116,47 @@ describe('completing a quest from Today', () => {
     expect(await screen.findByRole('button', { name: 'Completed: Morning run' })).toBeDefined();
   });
 
+  it('should show a queued badge for unsynced rows', async () => {
+    const { engine } = createTestEngine({
+      today: TODAY,
+      pages: [page({ domains: { quests: [dailyQuestRow('q1', 'Morning run')] } }), page({ cursor: '2', domains: { quest_logs: [completedLogRow()] } })],
+    });
+    renderToday(createSyncedTestData(engine));
+
+    expect(await screen.findByRole('button', { name: 'Mark complete: Morning run' })).toBeDefined();
+    expect(screen.queryByText('Queued')).toBeNull();
+    setOffline(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Mark complete: Morning run' }));
+
+    expect(await screen.findByText('Queued')).toBeDefined();
+
+    setOffline(false);
+    await waitFor(async () => expect(await engine.outbox.size()).toBe(0));
+    await waitFor(() => expect(screen.queryByText('Queued')).toBeNull());
+    expect(screen.getByRole('button', { name: 'Completed: Morning run' })).toBeDefined();
+  });
+
+  it('should clear the queued badge once the server acks even when the pull after it fails', async () => {
+    let failPulls = false;
+    const { engine } = createTestEngine({
+      today: TODAY,
+      pages: [page({ domains: { quests: [dailyQuestRow('q1', 'Morning run')] } })],
+      fetchImpl: server => async (input, init) => (failPulls && String(input).includes('/sync/delta') ? new Response('{}', { status: 500 }) : server.fetchImpl(input, init)),
+    });
+    renderToday(createSyncedTestData(engine));
+
+    expect(await screen.findByRole('button', { name: 'Mark complete: Morning run' })).toBeDefined();
+    setOffline(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Mark complete: Morning run' }));
+    expect(await screen.findByText('Queued')).toBeDefined();
+
+    failPulls = true;
+    setOffline(false);
+    await waitFor(() => expect(engine.getSnapshot().state).toBe('failed'));
+    expect(await engine.outbox.size()).toBe(0);
+    await waitFor(() => expect(screen.queryByText('Queued')).toBeNull());
+  });
+
   it('should dispatch and flush a completion straight away while online', async () => {
     const { engine, server } = createTestEngine({ today: TODAY, pages: [page({ domains: { quests: [dailyQuestRow('q1', 'Morning run')] } })] });
     const data = createSyncedTestData(engine);

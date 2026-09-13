@@ -177,6 +177,17 @@ describe('SyncEngine outbox flush', () => {
     expect(await store.readOutbox()).toHaveLength(1);
   });
 
+  it('should mark the engine offline when enqueueing offline', async () => {
+    const { engine } = createTestEngine();
+    await engine.sync();
+    expect(engine.getSnapshot().state).toBe('online');
+
+    setOnline(false);
+    await engine.enqueue(complete(`a:${TODAY}`), TODAY);
+
+    expect(engine.getSnapshot()).toMatchObject({ state: 'offline', queuedCount: 1 });
+  });
+
   it('should register the device once and reuse the id it stored', async () => {
     const backing = sharedBacking();
     const first = createTestEngine({ backing });
