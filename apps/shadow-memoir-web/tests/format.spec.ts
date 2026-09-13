@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { convertMlToLitres, formatCount, formatEnum, formatLocalDate, formatLocalTime, formatRelativeDay, timeZoneOptions } from '@/lib/format';
+import { convertMlToLitres, formatCount, formatEnum, formatLocalDate, formatLocalTime, formatRelativeDay, parseMinuteOfDay, timeZoneOptions } from '@/lib/format';
 
 import { withTimeZone } from './setup';
 
@@ -74,6 +74,14 @@ describe('formatEnum', () => {
 
   it('should de-slug and title-case an unmapped value', () => {
     expect(formatEnum('blobs_deleted')).toBe('Blobs Deleted');
+  });
+});
+
+describe('parseMinuteOfDay', () => {
+  it('should read an HH:MM clock as minutes since midnight', () => {
+    expect(parseMinuteOfDay('00:00')).toBe(0);
+    expect(parseMinuteOfDay('06:30')).toBe(390);
+    expect(parseMinuteOfDay('23:59')).toBe(1439);
   });
 });
 

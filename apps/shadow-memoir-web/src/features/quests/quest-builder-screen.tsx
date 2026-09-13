@@ -18,6 +18,7 @@ import {
   WEEKDAY_LABELS,
   WEEKDAYS,
 } from '@/lib/data';
+import { parseMinuteOfDay } from '@/lib/format';
 
 import styles from './quests.module.css';
 
@@ -41,11 +42,7 @@ export function QuestBuilderScreen(): ReactElement {
   const [threshold, setThreshold] = useState(false);
   const [preCommit, setPreCommit] = useState(true);
 
-  const startTimeMinutes = useMemo(() => {
-    if (!time) return null;
-    const [hours, minutes] = time.split(':').map(Number);
-    return (hours ?? 0) * 60 + (minutes ?? 0);
-  }, [time]);
+  const startTimeMinutes = useMemo(() => (time ? parseMinuteOfDay(time) : null), [time]);
 
   const draft = useMemo<QuestDraft>(
     () => ({

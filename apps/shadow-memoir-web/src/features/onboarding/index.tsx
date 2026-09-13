@@ -1,8 +1,9 @@
 import { useNavigate } from '@tanstack/react-router';
-import { type ReactElement, useState } from 'react';
-import { Alert, Badge, Button, Card, DescriptionList, FormField, Input, SegmentedControl, Select, Slider, Tag, TimePicker, toast, toISODate } from '@shadow-library/ui';
+import { type FormEvent, type ReactElement, useEffect, useRef, useState } from 'react';
+import { Alert, Badge, Button, Card, DescriptionList, FormField, Input, SegmentedControl, Select, Slider, Tag, TimePicker, toISODate } from '@shadow-library/ui';
 
 import {
+  notifyOutcome,
   type QuestDraft,
   STAT_LABELS,
   type StatAffinity,
@@ -16,6 +17,7 @@ import {
   WEEKDAY_LABELS,
   WEEKDAYS,
 } from '@/lib/data';
+import { parseMinuteOfDay } from '@/lib/format';
 
 import styles from './onboarding.module.css';
 
@@ -77,11 +79,23 @@ export function OnboardingScreen(): ReactElement {
   const [recurrence, setRecurrence] = useState<Recurrence>('chosen');
   const [days, setDays] = useState<Weekday[]>(['mon', 'tue', 'wed', 'thu', 'fri']);
   const [timesPerWeek, setTimesPerWeek] = useState(4);
+  const [startTime, setStartTime] = useState<string | null>(null);
+  const [questError, setQuestError] = useState<string | null>(null);
+  const onboardedRef = useRef(false);
+  const submittingRef = useRef(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
   const heading = HEADINGS[step] as (typeof HEADINGS)[number];
   const questName = name.trim().length > 0 ? name.trim() : 'Your first quest';
   const dayCount = recurrence === 'daily' ? 7 : recurrence === 'count' ? timesPerWeek : days.length;
   const currencyLocked = day.data?.currencyLocked ?? false;
+  const startTimeMinutes = strictness === 'anchor' && startTime ? parseMinuteOfDay(startTime) : null;
+  const anchorNeedsTime = strictness === 'anchor' && startTimeMinutes === null;
+  const isSubmitting = command.isPending || questCommand.isPending;
+
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, [step]);
 
   const toggleDay = (weekday: Weekday): void => {
     setDays(current => (current.includes(weekday) ? current.filter(item => item !== weekday) : [...current, weekday]));
@@ -90,7 +104,7 @@ export function OnboardingScreen(): ReactElement {
   const draft = (): QuestDraft => ({
     name: questName,
     notes: null,
-    startTimeMinutes: null,
+    startTimeMinutes,
     durationMinutes: 10,
     statAffinity: stat,
     strictness,
@@ -112,35 +126,67 @@ export function OnboardingScreen(): ReactElement {
     active: true,
   });
 
-  /** The quest is created after the account is onboarded, because the gate on `/` only lets go once `onboarding_completed_at` is set. */
-  const finish = (): void => {
-    command.mutate(
-      { type: 'onboarding.complete', submission: { currency, timezone, wakeTime, sleepTime } },
-      {
-        onSuccess: async result => {
-          if (result.status === 'rejected') {
-            toast.neutral(result.message);
-            return;
-          }
-          await questCommand.mutateAsync({ type: 'quest.create', draft: draft() });
-          await navigate({ to: '/' });
-        },
-      },
-    );
+  /**
+   * The quest is created after the account is onboarded, because the gate on `/` only lets go once
+   * `onboarding_completed_at` is set. `submittingRef` blocks a re-entrant call synchronously — before
+   * `isPending` has even re-rendered the button — so a double-click can never send a second request, and
+   * `onboardedRef` remembers a completed (or already-completed) account across a retry so a quest that
+   * failed to create is retried without re-submitting onboarding or creating a second quest.
+   */
+  const finish = async (): Promise<void> => {
+    if (anchorNeedsTime || submittingRef.current) return;
+    submittingRef.current = true;
+    setQuestError(null);
+
+    try {
+      if (!onboardedRef.current) {
+        const outcome = await command.run({ type: 'onboarding.complete', submission: { currency, timezone, wakeTime, sleepTime } });
+        const alreadyOnboarded = outcome.status === 'rejected' && outcome.code === 'ACC_003';
+        if (outcome.status !== 'applied' && !alreadyOnboarded) {
+          notifyOutcome(outcome, { success: '', action: 'finish setup' });
+          return;
+        }
+        onboardedRef.current = true;
+      }
+
+      const questOutcome = await questCommand.run({ type: 'quest.create', draft: draft() });
+      if (questOutcome.status === 'needs-confirmation') return;
+
+      const questSaved = questOutcome.status === 'applied' || questOutcome.status === 'queued-offline';
+      notifyOutcome(questOutcome, { success: questSaved ? questOutcome.local.message : '', action: 'create', subject: questName });
+      if (questSaved) {
+        await navigate({ to: '/' });
+        return;
+      }
+      setQuestError(questOutcome.message);
+    } finally {
+      submittingRef.current = false;
+    }
+  };
+
+  const advanceOrFinish = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    if (step === HEADINGS.length - 1) {
+      void finish();
+      return;
+    }
+    if (step === 3 && anchorNeedsTime) return;
+    setQuestError(null);
+    setStep(current => Math.min(HEADINGS.length - 1, current + 1));
   };
 
   return (
     <section className={styles.page} aria-labelledby="onboarding-title">
-      <div className={styles.wrap}>
+      <form className={styles.wrap} onSubmit={advanceOrFinish} noValidate>
         <div className={styles.head}>
           <div>
             <div className={styles.brand}>Shadow Memoir</div>
             <h1 className={styles.title} id="onboarding-title">
               Set up
             </h1>
-            <p className={styles.subtitle}>
+            <h2 ref={headingRef} tabIndex={-1} className={styles.subtitle}>
               {heading.title} · {heading.subtitle}
-            </p>
+            </h2>
           </div>
           <span className={styles.stepLabel}>
             Step {step + 1} of {HEADINGS.length}
@@ -293,6 +339,19 @@ export function OnboardingScreen(): ReactElement {
                   </button>
                 ))}
               </div>
+
+              {strictness === 'anchor' ? (
+                <FormField
+                  label="Start time"
+                  required
+                  helper="Anchor quests happen at a fixed time each day, with thirty minutes of grace."
+                  error={anchorNeedsTime ? 'Choose a start time to continue.' : undefined}
+                  className={styles.startTimeField}
+                >
+                  <TimePicker value={startTime} onValueChange={setStartTime} hour12={false} aria-label="Start time" />
+                </FormField>
+              ) : null}
+
               <Alert intent="info" title="Shields cover the days you could not help">
                 You earn one shield for each kept week, up to three. A shield protects a streak on an unavoidable miss, with no explanation required from you.
               </Alert>
@@ -322,28 +381,47 @@ export function OnboardingScreen(): ReactElement {
                 Next is your Today screen with this quest on it. Nothing else is set up, and nothing else needs to be — expenses, meals, weight and journal all work whenever you
                 first reach for them.
               </p>
+              {questError ? (
+                <Alert intent="danger" title="Your first quest could not be created">
+                  {questError}
+                </Alert>
+              ) : null}
             </Card.Body>
           </Card>
         ) : null}
 
         <div className={styles.footer}>
-          <Button variant="ghost" disabled={step === 0} onClick={() => setStep(current => Math.max(0, current - 1))}>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={step === 0}
+            onClick={() => {
+              setQuestError(null);
+              setStep(current => Math.max(0, current - 1));
+            }}
+          >
             Back
           </Button>
           {step === HEADINGS.length - 1 ? (
-            <Button variant="primary" onClick={finish}>
+            <Button type="submit" variant="primary" loading={isSubmitting}>
               Create it and start
             </Button>
           ) : (
-            <Button variant="primary" onClick={() => setStep(current => Math.min(HEADINGS.length - 1, current + 1))}>
+            <Button type="submit" variant="primary" disabled={step === 3 && anchorNeedsTime}>
               {step === HEADINGS.length - 2 ? 'Review' : 'Continue'}
             </Button>
           )}
           <span className={styles.footNote}>
-            {step === 0 ? 'Nothing is saved until the last step.' : step === HEADINGS.length - 1 ? 'You can change all of this later.' : 'Two minutes, and no tour afterwards.'}
+            {step === 3 && anchorNeedsTime
+              ? 'Anchor needs a start time before you can continue.'
+              : step === 0
+                ? 'Nothing is saved until the last step.'
+                : step === HEADINGS.length - 1
+                  ? 'You can change all of this later.'
+                  : 'Two minutes, and no tour afterwards.'}
           </span>
         </div>
-      </div>
+      </form>
     </section>
   );
 }

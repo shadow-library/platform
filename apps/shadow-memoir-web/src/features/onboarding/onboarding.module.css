@@ -39,6 +39,7 @@
 .subtitle {
   margin: 0;
   font-size: var(--sh-text-body-sm);
+  font-weight: 400;
   color: var(--sh-text-secondary);
 }
 
@@ -270,6 +271,11 @@
   gap: 6px;
   flex-wrap: wrap;
   margin: 10px 0 16px;
+}
+
+.startTimeField {
+  margin-top: 16px;
+  max-width: 220px;
 }
 
 .footer {

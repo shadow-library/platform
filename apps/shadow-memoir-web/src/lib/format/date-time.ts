@@ -57,6 +57,12 @@ export function formatRelativeDay(value: string | null | undefined, today: strin
   return formatLocalDate(value);
 }
 
+/** Reads a 24-hour `HH:MM` clock string (from `TimePicker`) as minutes since midnight. */
+export function parseMinuteOfDay(value: string): number {
+  const [hours, minutes] = value.split(':').map(Number);
+  return (hours ?? 0) * 60 + (minutes ?? 0);
+}
+
 export interface TimeZoneOption {
   value: string;
   label: string;
