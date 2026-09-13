@@ -1,6 +1,7 @@
 export * from './enums';
 export * from './extraction.schema';
 export * from './generation.schema';
+export * from './chapter-expand.schema';
 export * from './judge.schema';
 export * from './fix.schema';
 export * from './outline.schema';

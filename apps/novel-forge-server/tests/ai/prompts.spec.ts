@@ -36,14 +36,13 @@ import {
   validatePlanContiguity,
 } from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
+import { WORD_TARGET_AIM, WORD_TARGET_MAX, WORD_TARGET_MIN } from '@modules/eval/deterministic-metrics';
 import { reforgeFidelity } from '@server/database/schemas';
 
 describe('Prompt modules', () => {
   describe('AUTHORING_STYLE invariant', () => {
-    // `generation` is the exception: its chapter-writing craft rules are author-configurable, so they
-    // arrive at runtime via the project's `instructions` (the context pack's `writing_style` section)
-    // rather than being hardcoded into the prompt's system message.
-    const CONTEXT_STYLED_KEYS = new Set(['generation']);
+    // Their craft rules, POV and tense included, come from the project's editable `instructions` via the context pack.
+    const CONTEXT_STYLED_KEYS = new Set(['generation', 'chapter-expand']);
 
     it('authoring prompts contain AUTHORING_STYLE (except the context-styled generation prompt)', () => {
       const authoring = Object.values(PROMPT_REGISTRY).filter(p => p.kind === 'authoring' && !CONTEXT_STYLED_KEYS.has(p.key));
@@ -822,9 +821,73 @@ describe('Prompt modules', () => {
     });
   });
 
+  describe('chapter length', () => {
+    const words = (count: number): string => count.toLocaleString('en-US');
+
+    it('should state a concrete floor, aim and ceiling in the generation prompt, sourced from the mechanical-check band', () => {
+      expect(PROMPT_REGISTRY.generation.system).toContain(`at least ${words(WORD_TARGET_MIN)} words`);
+      expect(PROMPT_REGISTRY.generation.system).toContain(`about ${words(WORD_TARGET_AIM)}`);
+      expect(PROMPT_REGISTRY.generation.system).toContain(words(WORD_TARGET_MAX));
+      expect(PROMPT_REGISTRY.generation.system).not.toContain('not a hard wall');
+    });
+
+    it('should keep the continuation cut from licensing a short chapter', () => {
+      expect(PROMPT_REGISTRY.generation.system).toContain('decides where the chapter ends, not how long it is');
+    });
+
+    it('should keep the aim inside the target band', () => {
+      expect(WORD_TARGET_AIM).toBeGreaterThan(WORD_TARGET_MIN);
+      expect(WORD_TARGET_AIM).toBeLessThan(WORD_TARGET_MAX);
+    });
+
+    it('should route chapter-expand as generation and render the draft with its word targets in the volatile tail', async () => {
+      const prompt = PROMPT_REGISTRY['chapter-expand'];
+      expect(prompt.role).toBe('generation');
+      expect(prompt.cacheStrategy?.stableVars).toEqual(['stableContext']);
+      const messages = await prompt.template.formatMessages({
+        stableContext: 'STABLE-PACK',
+        volatileContext: 'VOLATILE-PACK',
+        chapterBrief: 'BRIEF',
+        endingContract: 'Hook type: cliffhanger',
+        draftBody: 'DRAFT-BODY',
+        draftWords: 1397,
+        minWords: 1800,
+        aimWords: 2200,
+        missingWords: 803,
+        guidance: 'REPAIR-GUIDANCE',
+      });
+      expect(messages).toHaveLength(3);
+      expect(String(messages[1]?.content)).toBe('STABLE-PACK');
+      const tail = String(messages[2]?.content);
+      for (const expected of [
+        'VOLATILE-PACK',
+        'BRIEF',
+        '## ENDING CONTRACT\nHook type: cliffhanger',
+        'Current draft (1397 words):\nDRAFT-BODY',
+        'Additional guidance: REPAIR-GUIDANCE',
+        'at least 1800 words',
+        'about 2200',
+        '803 more',
+      ]) {
+        expect(tail).toContain(expected);
+      }
+    });
+
+    it('should forbid chapter-expand from adding events or moving the final beat', () => {
+      expect(PROMPT_REGISTRY['chapter-expand'].system).toContain('Add no new plot events');
+      expect(PROMPT_REGISTRY['chapter-expand'].system).toContain('never continues past it');
+    });
+
+    it('should leave point of view and tense to the project instructions in chapter-expand', () => {
+      expect(PROMPT_REGISTRY['chapter-expand'].version).toBe('1.1.0');
+      expect(PROMPT_REGISTRY['chapter-expand'].system).not.toContain('third-person limited');
+      expect(PROMPT_REGISTRY['chapter-expand'].system).not.toContain(AUTHORING_STYLE.slice(0, 40));
+    });
+  });
+
   describe('knowledge contract (generation/judge v2.2, character-knowledge design §5–6)', () => {
     it('generation v2.2 states the epistemic rule for the knowledge sections', () => {
-      expect(PROMPT_REGISTRY.generation.version).toBe('2.4.0');
+      expect(PROMPT_REGISTRY.generation.version).toBe('2.5.0');
       expect(PROMPT_REGISTRY.generation.system).toContain('## KNOWN FACTS (POV CAST)');
       expect(PROMPT_REGISTRY.generation.system).toContain('## REVEALED THIS CHAPTER');
       expect(PROMPT_REGISTRY.generation.system).toContain('## BEHAVIORAL CONSTRAINTS');

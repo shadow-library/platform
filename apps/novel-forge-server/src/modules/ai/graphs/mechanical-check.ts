@@ -10,10 +10,7 @@ import {
 } from '../../eval/deterministic-metrics';
 import { type JudgeFinding } from '../schemas';
 
-// The generation prompt tells the model to treat 1,800–2,600 words as "a guide, not a hard wall", so the
-// target band alone can only be advisory. These wider bounds are the structural floor/ceiling underneath
-// that guidance — ~600 words of slack on each side, past which the draft is a truncation or a runaway
-// rather than a chapter that ran long.
+// ~600 words of slack either side of the target band: past these the draft is a truncation or a runaway, not a chapter that ran long or short.
 export const WORD_COUNT_HARD_MIN = 1200;
 export const WORD_COUNT_HARD_MAX = 3200;
 

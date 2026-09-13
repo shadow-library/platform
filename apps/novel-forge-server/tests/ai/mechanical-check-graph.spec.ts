@@ -29,10 +29,11 @@ const pgAvailable = await (async () => {
 // ~2,800 words: over the 1,800–2,600 target band but well inside the hard ceiling, so soft-only.
 const SOFT_BODY = `${FULL_LENGTH_DRAFT_BODY} ${'She waited by the wall and counted the lamps again. '.repeat(100)}`.trim();
 
-function buildServices(db: PrimaryDatabase, body: string) {
+function buildServices(db: PrimaryDatabase, body: string, expandedBody?: string) {
   const modelRouter = {
     structured: async (promptModule: { key: string }) => {
       if (promptModule.key === 'generation') return { title: 'Chapter Title', body, summary: 'A summary.', state: {} };
+      if (promptModule.key === 'chapter-expand' && expandedBody) return { body: expandedBody };
       return { title: 'Chapter Title' };
     },
     chatFor: () => ({
@@ -122,6 +123,22 @@ describe.if(pgAvailable)('mechanical check node', () => {
     expect(outcome).toBe('accepted');
 
     const draft = await db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, 1)) });
+    expect(draft?.judgeNote).toBeNull();
+  });
+
+  it('should persist the expanded prose when the first draft lands under the target band', async () => {
+    const projectId = await seedProject();
+    const short = FULL_LENGTH_DRAFT_BODY.split(' ').slice(0, 1400).join(' ');
+    const graph = createChapterGenerationGraph(buildServices(db, short, FULL_LENGTH_DRAFT_BODY));
+    const runId = `mechanical-expand-${projectId}`;
+    const finalState = (await graph.invoke(
+      { projectId: String(projectId), chapter: 1, volumeKey: '', guidance: '', autoFix: false, maxFixes: 0, runId },
+      { configurable: { thread_id: runId } },
+    )) as { outcome: string | null };
+
+    expect(finalState.outcome).toBe('accepted');
+    const draft = await db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, 1)) });
+    expect(draft?.body).toBe(FULL_LENGTH_DRAFT_BODY);
     expect(draft?.judgeNote).toBeNull();
   });
 

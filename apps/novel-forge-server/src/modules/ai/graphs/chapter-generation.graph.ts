@@ -21,6 +21,7 @@ import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handl
 import { runToolLoop } from '../tools/tool-loop';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
 import { type ToolContext } from '../tools/types';
+import { expandShortDraft } from './draft-expansion';
 import { checkDraftMechanics } from './mechanical-check';
 
 export interface GraphServices {
@@ -224,13 +225,22 @@ export function createChapterGenerationGraph(services: GraphServices) {
     };
 
     const policy = await policyFor(projectId, { role: 'generation', chapter: state.chapter });
+    const chapterBrief = renderChapterBrief(brief);
+    const endingContract = renderEndingContract(brief?.endingContract);
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
-      { stableContext, volatileContext, chapterBrief: renderChapterBrief(brief), endingContract: renderEndingContract(brief?.endingContract), guidance: state.guidance },
+      { stableContext, volatileContext, chapterBrief, endingContract, guidance: state.guidance },
       ctx,
       projectRow as ProjectConfig | undefined,
       policy,
     )) as { title: string; body: string; summary: string; state?: Record<string, string> };
+    const expansion = await expandShortDraft(
+      modelRouter,
+      { body: result.body, stableContext, volatileContext, chapterBrief, endingContract, guidance: state.guidance },
+      ctx,
+      projectRow as ProjectConfig | undefined,
+      policy,
+    );
 
     let title = result.title ?? '';
     let raised = policy.raised;
@@ -242,9 +252,18 @@ export function createChapterGenerationGraph(services: GraphServices) {
       title = titleResult.title ?? '';
     }
 
-    logger.debug('generation draftChapter', { runId: state.runId, chapter: state.chapter, attempt: state.attempt, proseLength: result.body.length, title });
+    logger.debug('generation draftChapter', {
+      runId: state.runId,
+      chapter: state.chapter,
+      attempt: state.attempt,
+      proseLength: expansion.body.length,
+      draftWords: expansion.initialWords,
+      words: expansion.finalWords,
+      expansionPasses: expansion.passes,
+      title,
+    });
     return {
-      prose: result.body,
+      prose: expansion.body,
       title,
       summary: result.summary,
       continuationState: (result.state ?? {}) as Record<string, string>,
@@ -543,16 +562,33 @@ export function createChapterGenerationGraph(services: GraphServices) {
     };
 
     const policy = await policyFor(projectId, { role: 'generation', chapter: state.chapter });
+    const chapterBrief = renderChapterBrief(brief);
+    const endingContract = renderEndingContract(brief?.endingContract);
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
-      { stableContext, volatileContext, chapterBrief: renderChapterBrief(brief), endingContract: renderEndingContract(brief?.endingContract), guidance },
+      { stableContext, volatileContext, chapterBrief, endingContract, guidance },
       ctx,
       projectRow as ProjectConfig | undefined,
       policy,
     )) as { title: string; body: string; summary: string; state?: Record<string, string> };
+    const expansion = await expandShortDraft(
+      modelRouter,
+      { body: result.body, stableContext, volatileContext, chapterBrief, endingContract, guidance },
+      ctx,
+      projectRow as ProjectConfig | undefined,
+      policy,
+    );
+    logger.debug('generation repairRewrite', {
+      runId: state.runId,
+      chapter: state.chapter,
+      attempt: state.attempt,
+      draftWords: expansion.initialWords,
+      words: expansion.finalWords,
+      expansionPasses: expansion.passes,
+    });
 
     return {
-      prose: result.body,
+      prose: expansion.body,
       title: result.title || state.title,
       summary: result.summary,
       continuationState: (result.state ?? {}) as Record<string, string>,

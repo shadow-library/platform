@@ -14,6 +14,7 @@ import { type ContextSection } from '../ai/context/sections';
 import { truncateAtParagraph } from '../ai/context/token-budget';
 import { applyContinuityDelta, continuityHasHeldEntries, filterToHeldEntries } from '../ai/graphs/apply-continuity';
 import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
+import { expandShortDraft } from '../ai/graphs/draft-expansion';
 import { type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService } from '../ai/model-router.service';
 import { buildOutlinePrompt, PROMPT_REGISTRY } from '../ai/prompts';
@@ -1083,25 +1084,28 @@ export class GenerationService {
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'generation', chapter }, { contentMode: 'unrestricted' });
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.generation.key, promptVersion: PROMPT_REGISTRY.generation.version, role: PROMPT_REGISTRY.generation.key };
+    const promptVars = {
+      stableContext: pack.renderedStable,
+      volatileContext: pack.renderedVolatile,
+      chapterBrief: renderChapterBrief(brief),
+      endingContract: renderEndingContract(brief?.endingContract),
+    };
+    const routedProject = { ...project, contentMode: 'unrestricted' } as never;
 
-    const result = (await this.modelRouter.structured(
-      PROMPT_REGISTRY.generation,
-      {
-        stableContext: pack.renderedStable,
-        volatileContext: pack.renderedVolatile,
-        chapterBrief: renderChapterBrief(brief),
-        endingContract: renderEndingContract(brief?.endingContract),
-        guidance: body.guidance ?? '',
-      },
-      ctx,
-      { ...project, contentMode: 'unrestricted' } as never,
-      policy,
-    )) as {
+    const generated = (await this.modelRouter.structured(PROMPT_REGISTRY.generation, { ...promptVars, guidance: body.guidance ?? '' }, ctx, routedProject, policy)) as {
       title: string;
       body: string;
       summary: string;
       state?: Record<string, string>;
     };
+    const expansion = await expandShortDraft(
+      this.modelRouter,
+      { ...promptVars, guidance: body.guidance ?? '', body: generated.body },
+      { ...ctx, node: 'generateUnrestricted' },
+      routedProject,
+      policy,
+    );
+    const result = { ...generated, body: expansion.body };
 
     // The replacement and the descendant invalidation it forces commit together: a crash between them
     // would leave later drafts looking valid against prose that no longer exists. `setWhere` re-checks

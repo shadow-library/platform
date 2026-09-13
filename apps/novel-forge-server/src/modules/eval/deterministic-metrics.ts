@@ -28,6 +28,7 @@
 
 export const WORD_TARGET_MIN = 1800;
 export const WORD_TARGET_MAX = 2600;
+export const WORD_TARGET_AIM = 2200;
 
 const SENTENCE_BAND_MIN = 6;
 const SENTENCE_BAND_MAX = 22;

@@ -7,6 +7,7 @@ import { type AiRole } from '../defaults';
 export type PromptKey =
   | 'extraction'
   | 'generation'
+  | 'chapter-expand'
   | 'judge'
   | 'fix'
   | 'outline'
