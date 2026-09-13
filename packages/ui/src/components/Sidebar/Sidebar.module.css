@@ -304,7 +304,7 @@
 .item[data-active],
 .item[data-status='active'] {
   background: var(--sh-accent-soft);
-  color: var(--sh-accent);
+  color: var(--sh-accent-text);
   font-weight: 500;
 }
 
@@ -321,7 +321,7 @@
 }
 .item[data-active] .icon,
 .item[data-status='active'] .icon {
-  color: var(--sh-accent);
+  color: var(--sh-accent-text);
 }
 .label {
   flex: 1;

@@ -85,6 +85,13 @@
   background: var(--sh-accent-soft);
 }
 
+/* --sh-text-tertiary falls below 4.5:1 on the accent-soft tint; use --sh-text-secondary here. */
+.dayCard[data-today='true'] .dayLoad,
+.dayCard[data-today='true'] .dayNote,
+.dayCard[data-today='true'] .lock {
+  color: var(--sh-text-secondary);
+}
+
 .dayHead {
   display: flex;
   align-items: baseline;
@@ -198,6 +205,12 @@
   color: var(--sh-text-tertiary);
 }
 
+/* --sh-text-tertiary falls below 4.5:1 on both tinted item backgrounds; use --sh-text-secondary. */
+.dayItem[data-tone='kept'] .dayItemMeta,
+.dayItem[data-tone='closed'] .dayItemMeta {
+  color: var(--sh-text-secondary);
+}
+
 .month {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -228,6 +241,10 @@
 
 .monthCell[data-today='true'] {
   background: var(--sh-accent-soft);
+}
+
+.monthCell[data-today='true'] .lock {
+  color: var(--sh-text-secondary);
 }
 
 .monthCellHead {

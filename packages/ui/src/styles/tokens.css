@@ -18,6 +18,7 @@
   --sh-neutral-200: #e5e7eb;
   --sh-neutral-300: #c8cdd4;
   --sh-neutral-400: #9ca3af;
+  --sh-neutral-450: #79808d; /* dark-mode text-tertiary: sits between 400/500 to clear 4.5:1 on card + app */
   --sh-neutral-500: #707784;
   --sh-neutral-600: #525866;
   --sh-neutral-700: #343842;
@@ -105,6 +106,8 @@
   --sh-accent-active: var(--sh-indigo-800);
   --sh-accent-soft: var(--sh-indigo-50);
   --sh-on-accent: var(--sh-neutral-white);
+  /* Accent as text (active nav, links): dark overrides to a lighter step to clear 4.5:1. */
+  --sh-accent-text: var(--sh-accent);
 
   /* ── Semantic · Borders (light) ───────────────────────────── */
   --sh-border-subtle: var(--sh-neutral-150);
@@ -300,7 +303,8 @@
 
   --sh-surface-app: var(--sh-neutral-950);
   --sh-surface-card: var(--sh-neutral-900);
-  --sh-surface-well: var(--sh-neutral-850);
+  /* Translucent so nested wells stay distinct from whatever surface they sit on. */
+  --sh-surface-well: rgb(255 255 255 / 0.04);
   --sh-surface-raised: var(--sh-neutral-850);
   --sh-surface-tooltip: var(--sh-neutral-200);
   --sh-surface-thumb: var(--sh-neutral-700);
@@ -310,7 +314,7 @@
 
   --sh-text-primary: var(--sh-neutral-100);
   --sh-text-secondary: var(--sh-neutral-400);
-  --sh-text-tertiary: var(--sh-neutral-500);
+  --sh-text-tertiary: var(--sh-neutral-450);
   --sh-text-placeholder: var(--sh-neutral-500);
   --sh-text-on-tooltip: var(--sh-neutral-900);
 
@@ -318,8 +322,10 @@
   --sh-accent-hover: var(--sh-indigo-400);
   --sh-accent-active: var(--sh-indigo-300);
   --sh-accent-soft: rgb(91 92 235 / 0.15);
+  --sh-accent-text: var(--sh-indigo-400);
 
-  --sh-border-subtle: var(--sh-neutral-850);
+  /* Translucent, not --sh-neutral-850, so the border stays visible against --sh-surface-raised. */
+  --sh-border-subtle: rgb(255 255 255 / 0.08);
   --sh-border-default: var(--sh-neutral-800);
   --sh-border-strong: var(--sh-neutral-700);
   --sh-border-interactive: var(--sh-neutral-600);
