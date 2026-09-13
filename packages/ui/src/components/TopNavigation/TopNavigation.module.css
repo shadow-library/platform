@@ -9,14 +9,11 @@
   align-items: center;
   gap: 16px;
   /* The bar extends under the status bar / notch in standalone PWAs: safe-area padding
-     grows the box while the 60px content row stays centered (insets are 0 on desktop). */
-  height: calc(60px + var(--sh-safe-top));
+     grows the box while the content row (--sh-topbar-height) stays centered (insets are 0 on desktop). */
+  height: calc(var(--sh-topbar-height) + var(--sh-safe-top));
   padding: var(--sh-safe-top) calc(clamp(14px, 3vw, 26px) + var(--sh-safe-right)) 0 calc(clamp(14px, 3vw, 26px) + var(--sh-safe-left));
   background: var(--sh-surface-card);
   border-bottom: var(--sh-border-width) solid var(--sh-border-subtle);
-}
-[data-density='compact'] .bar {
-  height: calc(48px + var(--sh-safe-top));
 }
 
 /* Hamburger — only below md, where the shell swaps the persistent sidebar for the nav drawer

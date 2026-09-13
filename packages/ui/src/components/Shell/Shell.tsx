@@ -45,7 +45,7 @@ export const PAGE_WIDTH = 1200;
  * scrolls so mobile browsers keep their URL-bar auto-hide.
  */
 export const Shell = forwardRef<HTMLDivElement, ShellProps>(function Shell(
-  { sidebar, topbar, bottomNav, theme = 'light', density = 'comfortable', contentWidth = PAGE_WIDTH, contentPadding = 'md', className, children, ...props },
+  { sidebar, topbar, bottomNav, stickyTopbar, theme = 'light', density = 'comfortable', contentWidth = PAGE_WIDTH, contentPadding = 'md', className, children, ...props },
   ref,
 ) {
   const [navOpen, setNavOpen] = useState(false);
@@ -77,7 +77,11 @@ export const Shell = forwardRef<HTMLDivElement, ShellProps>(function Shell(
         </a>
         {hasSidebar ? <div className={styles.sidebarSlot}>{sidebar}</div> : null}
         <div className={styles.body}>
-          {topbar}
+          {topbar != null ? (
+            <div className={styles.topbarSlot} data-sticky={stickyTopbar || undefined}>
+              {topbar}
+            </div>
+          ) : null}
           <main id="sh-main-content" className={styles.main} data-padding={contentPadding}>
             <div className={styles.content} style={{ maxWidth: contentWidth === 'fluid' ? undefined : contentWidth }}>
               <ShellContentContext.Provider value={true}>{children}</ShellContentContext.Provider>

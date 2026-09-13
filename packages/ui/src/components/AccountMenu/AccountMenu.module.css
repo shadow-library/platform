@@ -59,16 +59,12 @@
   font-size: var(--sh-text-body-sm);
   font-weight: 600;
   color: var(--sh-text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .headerEmail {
   font-size: var(--sh-text-caption);
   font-weight: 400;
   color: var(--sh-text-tertiary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }

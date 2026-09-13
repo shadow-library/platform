@@ -217,4 +217,14 @@ describe('AppShell', () => {
     await renderShell({ nav: section([{ to: '/account', label: 'Overview' }]) });
     expect(screen.getByText('content')).toBeInTheDocument();
   });
+
+  it('should pass stickyTopbar through to Shell', async () => {
+    await renderShell({ nav: section([{ to: '/account', label: 'Overview' }]), stickyTopbar: true });
+    expect(document.querySelector('[data-sticky]')).toBeInTheDocument();
+  });
+
+  it('should leave the top bar unpinned when stickyTopbar is not set', async () => {
+    await renderShell({ nav: section([{ to: '/account', label: 'Overview' }]) });
+    expect(document.querySelector('[data-sticky]')).not.toBeInTheDocument();
+  });
 });

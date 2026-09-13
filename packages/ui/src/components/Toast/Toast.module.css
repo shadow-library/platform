@@ -15,21 +15,23 @@
 .viewport > * {
   pointer-events: auto;
 }
-/* Edge offsets clear the device safe areas (notch / home indicator) in standalone PWAs. */
+/* Edge offsets clear the device safe areas (notch / home indicator) in standalone PWAs.
+   --sh-toast-offset-top lets a consumer whose own fixed chrome (a sticky top bar) would otherwise sit
+   under the stack push it down further; set on an ancestor of wherever `<Toaster>` is rendered. */
 .viewport[data-placement='top-start'] {
   left: calc(16px + var(--sh-safe-left));
-  top: calc(16px + var(--sh-safe-top));
+  top: calc(var(--sh-toast-offset-top, 16px) + var(--sh-safe-top));
   flex-direction: column;
 }
 .viewport[data-placement='top-center'] {
   left: 50%;
-  top: calc(16px + var(--sh-safe-top));
+  top: calc(var(--sh-toast-offset-top, 16px) + var(--sh-safe-top));
   transform: translateX(-50%);
   flex-direction: column;
 }
 .viewport[data-placement='top-end'] {
   right: calc(16px + var(--sh-safe-right));
-  top: calc(16px + var(--sh-safe-top));
+  top: calc(var(--sh-toast-offset-top, 16px) + var(--sh-safe-top));
   flex-direction: column;
 }
 .viewport[data-placement='bottom-start'] {
@@ -66,6 +68,12 @@
 /* ── Intent glyph (the only colored element) ─────────────── */
 .toast[data-intent='neutral'] {
   --toast-accent: var(--sh-neutral-solid);
+}
+/* --sh-neutral-solid flips to a light gray in dark mode (for a solid chip on a dark page), which leaves
+   the icon's own white glyph unreadable against it; pin a dark accent here instead. */
+:root[data-theme='dark'] .toast[data-intent='neutral'],
+:global(.dark) .toast[data-intent='neutral'] {
+  --toast-accent: var(--sh-neutral-700);
 }
 .toast[data-intent='info'] {
   --toast-accent: var(--sh-info-solid);

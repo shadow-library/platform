@@ -113,6 +113,8 @@ export interface AppShellProps {
   storageKey?: string;
   /** Phone-only bottom navigation. */
   bottomNav?: ReactNode;
+  /** Pin the top bar to the viewport below md too. @default false */
+  stickyTopbar?: boolean;
   contentWidth?: number | 'fluid';
   contentPadding?: ShellContentPadding;
   className?: string;

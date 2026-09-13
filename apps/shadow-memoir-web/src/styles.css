@@ -19,6 +19,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  --sh-toast-offset-top: calc(var(--sh-topbar-height) + 12px);
 }
 
 a {

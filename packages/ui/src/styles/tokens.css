@@ -263,6 +263,10 @@
      reach the chrome edges) still has to centre its own column on the same measure. */
   --sh-page-max: 1200px;
 
+  /* `TopNavigation`'s content-row height, excluding the safe-area inset it also pads by. Exposed so a
+     consumer opting into `Shell`'s `stickyTopbar` can reserve the same clearance for its own content. */
+  --sh-topbar-height: 60px;
+
   /*
    * Breakpoints (reference) — matching the Foundations grid (xs–2xl).
    * CSS custom properties cannot be used inside media queries, so these document the
@@ -282,6 +286,7 @@
   --sh-control-height-md: 28px;
   --sh-control-height-lg: 32px;
   --sh-row-height: 32px;
+  --sh-topbar-height: 48px;
 }
 
 /* Touch density — finger-first metrics for mobile/PWA shells: the default (md) control meets the
@@ -371,7 +376,11 @@
   --sh-focus-ring: var(--sh-indigo-400);
   --sh-focus-field-ring: rgb(130 131 240 / 0.2);
 
-  --sh-scrim: rgb(9 9 11 / 0.55);
+  /* rgb(9 9 11) is --sh-neutral-950, dark's own --sh-surface-app — a scrim in that color is invisible over
+     that surface at any opacity, since compositing a color with itself never changes it. True black at a
+     higher opacity still dims the lighter surfaces/text an overlay actually sits over (cards, raised
+     panels, --sh-text-primary), which is where a scrim reads as present. */
+  --sh-scrim: rgb(0 0 0 / 0.72);
 
   /* Dark elevates with surface tint, not shadow. */
   --sh-shadow-e1: none;

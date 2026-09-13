@@ -24,8 +24,8 @@ const OFFLINE_SNAPSHOT: SyncSnapshot = {
   sending: [],
 };
 
-/** The server cannot know whether this device holds a mirror, so it paints the pre-sync state rather than a failure. */
-const SERVER_SNAPSHOT: SyncSnapshot = { ...OFFLINE_SNAPSHOT, readiness: { kind: 'loading' } };
+/** `state` stays `online` so NetStrip paints nothing rather than an "Offline…" strip no client has confirmed. */
+const SERVER_SNAPSHOT: SyncSnapshot = { ...OFFLINE_SNAPSHOT, state: 'online', readiness: { kind: 'loading' } };
 
 const LAST_ACCOUNT_KEY = 'shadow-memoir:last-account';
 
@@ -40,6 +40,13 @@ const LAST_ACCOUNT_MARKER: AccountMarker = {
   write: accountId => {
     try {
       localStorage.setItem(LAST_ACCOUNT_KEY, accountId);
+    } catch {
+      return;
+    }
+  },
+  clear: () => {
+    try {
+      localStorage.removeItem(LAST_ACCOUNT_KEY);
     } catch {
       return;
     }

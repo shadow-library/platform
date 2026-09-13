@@ -1,6 +1,6 @@
 import { type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 
-import { AiIcon, HeroIcon, HistoryIcon, InsightsIcon, LogIcon, MoneyIcon, PlanIcon, ReviewIcon, SettingsIcon, TodayIcon } from '@/components/icons';
+import { AiIcon, HeroIcon, HistoryIcon, InsightsIcon, LogIcon, MoneyIcon, PlanIcon, QuestIcon, ReviewIcon, SettingsIcon, TodayIcon } from '@/components/icons';
 
 /**
  * The five destinations the phone's bottom bar carries — capture and completion, in the order a day is
@@ -26,6 +26,7 @@ export const DESKTOP_NAV: NavConfig = {
       items: [
         { to: '/', label: 'Today', icon: <TodayIcon size={16} />, exact: true },
         { to: '/plan', label: 'Planning Board', icon: <PlanIcon size={16} /> },
+        { to: '/quests', label: 'Quests', icon: <QuestIcon size={16} /> },
       ],
     },
     {
@@ -33,6 +34,7 @@ export const DESKTOP_NAV: NavConfig = {
       items: [
         { to: '/log', label: 'Journal', icon: <LogIcon size={16} />, exact: true },
         { to: '/log/meals', label: 'Meals', icon: <LogIcon size={16} /> },
+        { to: '/log/weight', label: 'Weight', icon: <LogIcon size={16} /> },
         { to: '/log/health', label: 'Body & health', icon: <LogIcon size={16} /> },
         { to: '/log/sidequests', label: 'Side quests', icon: <LogIcon size={16} /> },
         { to: '/finance', label: 'Money', icon: <MoneyIcon size={16} /> },

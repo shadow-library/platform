@@ -14,6 +14,12 @@ export interface ShellProps extends ComponentPropsWithoutRef<'div'> {
   /** The top bar landmark (e.g. `TopNavigation`), pinned above the content. */
   topbar?: ReactNode;
   /**
+   * Pin `topbar` to the viewport top below md too, where the shell itself does not scroll (the document
+   * does). Off by default: a product with no content that needs the top bar to stay reachable mid-scroll
+   * opts in explicitly rather than every consumer's phone layout shifting at once.
+   */
+  stickyTopbar?: boolean;
+  /**
    * Phone-only primary navigation (e.g. `BottomNavigation`), pinned to the viewport bottom and hidden
    * from md up. Opt-in: the content region only reserves room for it when it is passed.
    */

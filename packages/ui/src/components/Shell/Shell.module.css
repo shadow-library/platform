@@ -37,6 +37,17 @@
   }
 }
 
+/* `stickyTopbar`: below md the shell lets the document scroll rather than `.main` (only `.main` gets its
+   own scrollport from md up), so an opted-in topbar pins itself directly (breakpoint token
+   --sh-breakpoint-md 768). */
+@media (max-width: 767px) {
+  .topbarSlot[data-sticky] {
+    position: sticky;
+    top: 0;
+    z-index: var(--sh-z-shell);
+  }
+}
+
 /* ── Sidebar slot / mobile nav drawer ────────────────────── */
 .sidebarSlot {
   display: contents;

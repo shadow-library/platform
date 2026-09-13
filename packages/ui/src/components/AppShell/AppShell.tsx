@@ -142,6 +142,7 @@ export function AppShell({
   collapsible = false,
   storageKey,
   bottomNav,
+  stickyTopbar,
   contentWidth,
   contentPadding,
   className,
@@ -196,7 +197,15 @@ export function AppShell({
   );
 
   return (
-    <Shell sidebar={sidebar} topbar={topbar} bottomNav={bottomNav} contentWidth={contentWidth} contentPadding={contentPadding} className={cn(styles.root, className)}>
+    <Shell
+      sidebar={sidebar}
+      topbar={topbar}
+      bottomNav={bottomNav}
+      stickyTopbar={stickyTopbar}
+      contentWidth={contentWidth}
+      contentPadding={contentPadding}
+      className={cn(styles.root, className)}
+    >
       {children}
     </Shell>
   );

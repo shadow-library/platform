@@ -20,6 +20,11 @@
   border-color: var(--sh-border-strong);
 }
 
+.paletteTrigger:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+
 .paletteLabel {
   flex: 1;
   overflow: hidden;
@@ -38,14 +43,66 @@
   }
 }
 
-/* Phone-only: desktop uses Cmd+K. Position here; z-index comes from Fab. */
-.fab {
+/* `.shellRoot .fab`, not `.fab` alone: Fab's own `.root { display: inline-flex }` is one class too, so a
+   same-specificity override would depend on stylesheet order. */
+.shellRoot .fab {
   position: fixed;
   right: 16px;
   bottom: calc(var(--sh-shell-bottom-nav-height, 56px) + var(--sh-safe-bottom) + 16px);
 }
 
+@media (min-width: 768px) {
+  .shellRoot .fab {
+    display: none;
+  }
+}
+
 /* Matches .fab's 16px gap + Fab md 48px so content ends above the FAB. */
 .fabClearance {
   --sh-shell-bottom-extra: calc(16px + 48px);
+}
+
+/* `.dark` is on `<html>` (ThemeProvider), an ancestor of `.shellRoot`, not a class on it — a descendant
+   combinator, not a compound selector. `[role="dialog"]` is Radix's own contract for `Dialog.Content`. */
+:global(.dark) .shellRoot > :global([role='dialog']) {
+  border-inline-end: var(--sh-border-width) solid var(--sh-border-default);
+}
+
+.drawerAccount {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drawerIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.drawerIdentityText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.drawerName {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  overflow-wrap: break-word;
+}
+
+.drawerEmail {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+  overflow-wrap: break-word;
+}
+
+.drawerActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }

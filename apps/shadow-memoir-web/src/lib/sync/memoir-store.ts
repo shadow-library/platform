@@ -104,6 +104,7 @@ export function ignoreAccountBoundary(error: unknown): void {
 export interface AccountMarker {
   read(): string | null;
   write(accountId: string): void;
+  clear?(): void;
 }
 
 export interface MemoirStoreOptions {
@@ -130,6 +131,7 @@ export class MemoirStore {
   private markOpened: () => void = () => undefined;
   private claim: Promise<void> | null = null;
   private closed = false;
+  private wiping = false;
 
   constructor(
     private readonly backing: KeyValueBacking = createBacking(),
@@ -152,7 +154,7 @@ export class MemoirStore {
   }
 
   private guard(): KeyValueBacking {
-    if (this.closed) throw new AccountBoundaryError('closed');
+    if (this.closed || this.wiping) throw new AccountBoundaryError('closed');
     return this.backing;
   }
 
@@ -206,6 +208,21 @@ export class MemoirStore {
   async sweepForeign(): Promise<void> {
     if (this.accountId === undefined || this.ownerChanged()) return;
     await this.deleteForeign(await (await this.readable()).keys());
+  }
+
+  /** Deletes this account's keys (device id kept) in place rather than dropping the whole database, which blocks on any other tab's connection. */
+  async wipeAccount(): Promise<void> {
+    if (this.accountId === undefined) return;
+    await this.writable();
+    this.wiping = true;
+    try {
+      const deviceIdKey = `${this.scope}${META_PREFIX}${SYNC_META_KEYS.deviceId}`;
+      for (const key of await this.backing.keys()) if (key.startsWith(this.scope) && key !== deviceIdKey) await this.backing.delete(key);
+      if (this.options.marker?.read() === this.accountId) this.options.marker.clear?.();
+      this.closed = true;
+    } finally {
+      this.wiping = false;
+    }
   }
 
   private async scopedKeys(prefix: string): Promise<string[]> {

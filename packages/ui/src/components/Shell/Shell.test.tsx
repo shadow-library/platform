@@ -82,6 +82,23 @@ describe('Shell', () => {
     expect(root).toHaveClass('dark');
     expect(root).toHaveAttribute('data-density', 'compact');
   });
+
+  it('marks the top bar sticky only when stickyTopbar is set', () => {
+    const { container, rerender } = render(
+      <Shell topbar={<header>bar</header>} stickyTopbar>
+        content
+      </Shell>,
+    );
+    expect(container.querySelector('[data-sticky]')).toBeInTheDocument();
+
+    rerender(<Shell topbar={<header>bar</header>}>content</Shell>);
+    expect(container.querySelector('[data-sticky]')).not.toBeInTheDocument();
+  });
+
+  it('renders no top-bar wrapper when there is no topbar', () => {
+    const { container } = render(<Shell stickyTopbar>content</Shell>);
+    expect(container.querySelector('[data-sticky]')).not.toBeInTheDocument();
+  });
 });
 
 describe('Shell · content region', () => {

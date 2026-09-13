@@ -72,6 +72,13 @@
   border-radius: var(--sh-radius-sm);
 }
 
+/* `useRevealOnSelect` only scrolls below 1000px, where the sticky phone top bar would otherwise cover a revealed heading. */
+@media (max-width: 767px) {
+  .revealTarget {
+    scroll-margin-top: calc(var(--sh-topbar-height) + var(--sh-safe-top) + 12px);
+  }
+}
+
 .cardTitle {
   margin: 0 0 10px;
   font-size: var(--sh-text-caption);

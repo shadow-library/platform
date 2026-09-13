@@ -17,6 +17,7 @@ import {
   SyncEngine,
   SyncEngineProvider,
   useSyncReadiness,
+  useSyncStatus,
 } from '@/lib/sync';
 
 import { renderScreen } from './harness';
@@ -500,6 +501,22 @@ describe('sync readiness', () => {
     );
 
     expect(html).toContain('loading');
+  });
+
+  it('should not carry an offline verdict in the server snapshot', () => {
+    const { engine } = createTestEngine({ today: TODAY });
+    function Probe(): ReactElement {
+      return <span>{useSyncStatus().state}</span>;
+    }
+
+    const html = renderToString(
+      <SyncEngineProvider data={createSyncedTestData(engine)}>
+        <Probe />
+      </SyncEngineProvider>,
+    );
+
+    expect(html).toContain('online');
+    expect(html).not.toContain('offline');
   });
 });
 

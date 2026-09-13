@@ -1,13 +1,28 @@
+/* Breaks out of `.main`'s own gutters (its `--sh-shell-gutter-*`/safe-area custom properties cascade in
+   from `packages/ui`'s Shell.module.css regardless of module scoping) with a matching negative margin. */
 .strip {
+  position: sticky;
+  top: 0;
+  z-index: var(--sh-z-sticky);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
-  padding: 8px 16px;
+  margin-block-start: calc(-1 * var(--sh-shell-gutter-block, 20px));
+  margin-inline: calc(-1 * max(var(--sh-shell-gutter-inline, 16px), var(--sh-safe-left))) calc(-1 * max(var(--sh-shell-gutter-inline, 16px), var(--sh-safe-right)));
+  padding-block: 8px;
+  padding-inline: max(var(--sh-shell-gutter-inline, 16px), var(--sh-safe-left)) max(var(--sh-shell-gutter-inline, 16px), var(--sh-safe-right));
   font-size: var(--sh-text-body-sm);
   color: var(--sh-text-secondary);
-  background: var(--sh-surface-subtle);
-  border-bottom: 1px solid var(--sh-border-subtle);
+  background: var(--sh-surface-well);
+  border-bottom: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+
+@media (max-width: 767px) {
+  .strip {
+    top: calc(var(--sh-topbar-height) + var(--sh-safe-top));
+  }
 }
 
 .strip[data-state='failed'],
