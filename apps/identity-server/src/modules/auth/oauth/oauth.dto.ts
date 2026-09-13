@@ -76,6 +76,14 @@ export class TokenRequestBody {
 
   @Field({ optional: true, description: 'Accepted only to reject it; the actor is always the authenticated caller.' })
   actor_token?: string;
+
+  @Field({
+    optional: true,
+    maxLength: 64,
+    description:
+      'Address of the caller that presented a bot key to the exchanging service, checked against the bot IP allowlist. Only first-party clients may exchange bot keys, so only they can supply it; without it the connection address is used.',
+  })
+  client_ip?: string;
 }
 
 @Schema()

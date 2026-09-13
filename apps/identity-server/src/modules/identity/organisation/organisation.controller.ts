@@ -3,6 +3,7 @@ import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Res
 
 import { ERROR_MESSAGES } from '@server/constants';
 import { Auth, Context } from '@server/modules/access';
+import { BOT_PERMISSIONS } from '@server/modules/identity/bot/bot.constants';
 import { type Organisation } from '@server/modules/infrastructure/datastore';
 import { OrganisationApplicationService, type OrganisationApplicationsView } from '@server/modules/system/application';
 
@@ -23,7 +24,7 @@ import {
   UpdateMemberStatusBody,
   UpdateOrganisationBody,
 } from './organisation.dto';
-import { type MemberListItem, OrganisationService } from './organisation.service';
+import { type MemberListItem, type MemberManager, OrganisationService } from './organisation.service';
 
 @HttpController('/api/v1/organisations')
 export class OrganisationController {
@@ -34,6 +35,11 @@ export class OrganisationController {
 
   private caller() {
     return { session: Context.getSession(), ip: Context.getClientInfo().ip };
+  }
+
+  private memberManager(): MemberManager {
+    const caller = Context.getCaller();
+    return caller.kind === 'bot' ? caller : { ...caller, membership: Context.getMembership() };
   }
 
   private auditActor(): { actorId: string; ip?: string } {
@@ -78,7 +84,7 @@ export class OrganisationController {
   }
 
   @Get('/:organisationId/members')
-  @Auth({ orgMember: true })
+  @Auth({ orgMember: true, bot: BOT_PERMISSIONS.membersRead })
   @RespondFor(200, MembersResponse)
   async listOrganisationMembers(@Params() params: OrganisationIdParams): Promise<{ members: MemberListItem[] }> {
     return { members: await this.organisationService.listMemberItems(params.organisationId) };
@@ -93,11 +99,11 @@ export class OrganisationController {
   }
 
   @Patch('/:organisationId/members/:userId/status')
-  @Auth({ orgRole: 'ADMIN' })
+  @Auth({ orgRole: 'ADMIN', bot: BOT_PERMISSIONS.membersWrite })
   @RespondFor(200, OrganisationActionResponse)
   async changeOrganisationMemberStatus(@Params() params: MemberParams, @Body() body: UpdateMemberStatusBody): Promise<OrganisationActionResponse> {
     const until = this.parseExpiry(body.status, body.until);
-    await this.organisationService.changeMemberStatus(this.caller(), Context.getMembership(), params.organisationId, params.userId, body.status, { reason: body.reason, until });
+    await this.organisationService.changeMemberStatus(this.memberManager(), params.organisationId, params.userId, body.status, { reason: body.reason, until });
     return { success: true };
   }
 
@@ -118,26 +124,26 @@ export class OrganisationController {
   }
 
   @Get('/:organisationId/invitations')
-  @Auth({ orgRole: 'ADMIN' })
+  @Auth({ orgRole: 'ADMIN', bot: BOT_PERMISSIONS.invitationsWrite })
   @RespondFor(200, InvitationsResponse)
   async listOrganisationInvitations(@Params() params: OrganisationIdParams): Promise<{ invitations: Organisation.Invitation[] }> {
     return { invitations: await this.organisationService.listPendingInvitations(params.organisationId) };
   }
 
   @Post('/:organisationId/invitations')
-  @Auth({ orgRole: 'ADMIN' })
+  @Auth({ orgRole: 'ADMIN', bot: BOT_PERMISSIONS.invitationsWrite })
   @HttpStatus(200)
   @RespondFor(200, OrganisationActionResponse)
   async inviteOrganisationMember(@Params() params: OrganisationIdParams, @Body() body: InviteMemberBody): Promise<OrganisationActionResponse> {
-    await this.organisationService.inviteMember(this.caller(), Context.getOrganisation(), body.email, body.role);
+    await this.organisationService.inviteMember(Context.getCaller(), Context.getOrganisation(), body.email, body.role);
     return { success: true };
   }
 
   @Delete('/:organisationId/invitations/:invitationId')
-  @Auth({ orgRole: 'ADMIN' })
+  @Auth({ orgRole: 'ADMIN', bot: BOT_PERMISSIONS.invitationsWrite })
   @RespondFor(200, OrganisationActionResponse)
   async revokeOrganisationInvitation(@Params() params: InvitationParams): Promise<OrganisationActionResponse> {
-    await this.organisationService.revokeInvitation(this.caller(), params.organisationId, params.invitationId);
+    await this.organisationService.revokeInvitation(Context.getCaller(), params.organisationId, params.invitationId);
     return { success: true };
   }
 

@@ -1,22 +1,28 @@
 import { type FastifyRequest } from 'fastify';
 import { type HandlerMetadata } from '@shadow-library/app';
-import { Config } from '@shadow-library/common';
+import { Config, Logger } from '@shadow-library/common';
 import { AsyncRouteHandler, Middleware, MiddlewareGenerator } from '@shadow-library/fastify';
 
 import { AppErrorCode } from '@server/classes';
+import { APP_NAME } from '@server/constants';
 import { AdminAccessService } from '@server/modules/admin';
 import { type JwtClaims, KeyService } from '@server/modules/auth/keys';
 import { SessionAuthService, SessionService } from '@server/modules/auth/session';
+import { PolicyDecisionService } from '@server/modules/authz';
+import { BOT_KEY_PREFIX, BotKeyExchangeService } from '@server/modules/identity/bot';
 import { OrganisationService } from '@server/modules/identity/organisation';
+import { ApplicationService } from '@server/modules/system/application';
 
 import { ACCESS_METADATA } from './access.decorator';
 import { type AuthContext, type AuthenticatedRequest, type AuthOptions } from './access.types';
 import { clientInfoOf } from './auth-context.accessor';
 
 const PLATFORM_AUDIENCE = 'shadow-identity';
+const BOT_BEARER_PREFIX = `Bearer ${BOT_KEY_PREFIX}`;
 
 @Middleware({ type: 'preHandler', weight: 100 })
 export class AccessGuard implements MiddlewareGenerator {
+  private readonly logger = Logger.getLogger(APP_NAME, AccessGuard.name);
   private readonly issuer = Config.get('oauth.issuer');
 
   constructor(
@@ -25,6 +31,9 @@ export class AccessGuard implements MiddlewareGenerator {
     private readonly adminAccessService: AdminAccessService,
     private readonly organisationService: OrganisationService,
     private readonly keyService: KeyService,
+    private readonly botKeyExchangeService: BotKeyExchangeService,
+    private readonly policyDecisionService: PolicyDecisionService,
+    private readonly applicationService: ApplicationService,
   ) {}
 
   cacheKey(metadata: HandlerMetadata): string {
@@ -37,6 +46,13 @@ export class AccessGuard implements MiddlewareGenerator {
 
     return async (request: FastifyRequest): Promise<void> => {
       const context: AuthContext = { clientInfo: clientInfoOf(request as AuthenticatedRequest) };
+
+      const botKey = this.botKeyOf(request);
+      if (botKey !== null) {
+        await this.authenticateBot(request, options, botKey, context, String(metadata.path));
+        (request as AuthenticatedRequest).auth = context;
+        return;
+      }
 
       if (options.service) {
         context.serviceToken = this.verifyServiceToken(request, options.service === true ? undefined : options.service);
@@ -60,6 +76,44 @@ export class AccessGuard implements MiddlewareGenerator {
 
       (request as AuthenticatedRequest).auth = context;
     };
+  }
+
+  private botKeyOf(request: FastifyRequest): string | null {
+    const header = request.headers.authorization;
+    return typeof header === 'string' && header.startsWith(BOT_BEARER_PREFIX) ? header.slice('Bearer '.length) : null;
+  }
+
+  private async authenticateBot(request: FastifyRequest, options: AuthOptions, key: string, context: AuthContext, route: string): Promise<void> {
+    const authentication = await this.botKeyExchangeService.authenticate(key, context.clientInfo.ip, 'direct');
+    if (authentication.status === 'rate_limited') throw AppErrorCode.SEC_001.create();
+    if (authentication.status === 'denied') throw AppErrorCode.AUTH_005.create();
+
+    const { bot } = authentication;
+    const denial = { securityEvent: 'bot.access_denied', botId: bot.id.toString(), clientId: bot.clientId, route };
+    if (!options.bot || options.elevated || options.permission || options.service) {
+      this.logger.warn('bot refused: the route does not admit bots', denial);
+      throw AppErrorCode.ORG_007.create();
+    }
+
+    const organisationId = this.organisationIdOf(request, options.orgParam);
+    if (organisationId !== bot.organisationId) {
+      this.logger.warn("bot refused: the route names another organisation than the bot's own", denial);
+      throw AppErrorCode.ORG_001.create();
+    }
+
+    const organisation = await this.organisationService.getById(organisationId);
+    if (!organisation || organisation.status !== 'ACTIVE') throw AppErrorCode.ORG_001.create();
+
+    const principal = { type: 'SERVICE_ACCOUNT' as const, id: bot.clientId };
+    const platformApplicationId = this.applicationService.getApplicationOrThrow(APP_NAME).id;
+    const decision = await this.policyDecisionService.checkForApplication({ principal, organisationId: organisationId.toString(), action: options.bot }, platformApplicationId);
+    if (decision.decision !== 'PERMIT') {
+      this.logger.warn('bot refused: permission not granted', { ...denial, permission: options.bot });
+      throw AppErrorCode.ORG_007.create();
+    }
+
+    context.bot = bot;
+    context.organisation = organisation;
   }
 
   private organisationIdOf(request: FastifyRequest, orgParam = 'organisationId'): bigint {

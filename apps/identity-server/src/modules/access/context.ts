@@ -6,9 +6,10 @@ import { AppErrorCode } from '@server/classes';
 import { type AdminActor } from '@server/modules/admin';
 import { type JwtClaims } from '@server/modules/auth/keys';
 import { type ValidatedSession } from '@server/modules/auth/session';
+import { type AuthenticatedBot } from '@server/modules/identity/bot';
 import { type Organisation } from '@server/modules/infrastructure/datastore';
 
-import { type AuthContext, type AuthenticatedRequest, type ClientInfo } from './access.types';
+import { type AuthContext, type AuthenticatedRequest, type Caller, type ClientInfo } from './access.types';
 import { clientInfoOf } from './auth-context.accessor';
 
 type ExtendedContext = ContextService & typeof AUTH_CONTEXT_EXTENSION;
@@ -52,6 +53,17 @@ const AUTH_CONTEXT_EXTENSION = {
     const request = this.getRequest() as AuthenticatedRequest;
     return request.auth?.clientInfo ?? clientInfoOf(request);
   },
+  getBot(this: ContextService): AuthenticatedBot {
+    const bot = authOf(this).bot;
+    if (!bot) throw AppErrorCode.AUTH_005.create();
+    return bot;
+  },
+  getCaller(this: ContextService): Caller {
+    const auth = authOf(this);
+    if (auth.bot) return { kind: 'bot', bot: auth.bot, ip: auth.clientInfo.ip };
+    if (!auth.session) throw AppErrorCode.AUTH_005.create();
+    return { kind: 'user', session: auth.session, ip: auth.clientInfo.ip };
+  },
 };
 
 let boundContext: ExtendedContext | null = null;
@@ -69,6 +81,8 @@ export const Context = {
   getOrganisation: (): Organisation => current().getOrganisation(),
   getServiceToken: (): JwtClaims => current().getServiceToken(),
   getClientInfo: (): ClientInfo => current().getClientInfo(),
+  getBot: (): AuthenticatedBot => current().getBot(),
+  getCaller: (): Caller => current().getCaller(),
 };
 
 @Injectable()

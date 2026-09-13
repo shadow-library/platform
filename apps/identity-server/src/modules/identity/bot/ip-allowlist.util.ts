@@ -11,6 +11,7 @@ export const MAX_IP_ALLOWLIST_ENTRIES = 20;
 
 const PREFIX_PATTERN = /^\d{1,3}$/;
 const IPV6_GROUPS = 8;
+const IPV4_MAPPED_PATTERN = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i;
 
 function parseIPv4(address: string): bigint {
   return address.split('.').reduce((value, octet) => (value << 8n) | BigInt(Number(octet)), 0n);
@@ -72,6 +73,13 @@ export function normaliseCidr(entry: string): string | null {
   const network = (parsed.value >> hostBits) << hostBits;
   const formatted = parsed.bits === 32 ? formatIPv4(network) : formatIPv6(network);
   return `${formatted}/${length}`;
+}
+
+export function normaliseClientIp(value: string): string | null {
+  const address = value.trim();
+  const mapped = IPV4_MAPPED_PATTERN.exec(address)?.[1];
+  if (mapped !== undefined && isIPv4(mapped)) return mapped;
+  return parseAddress(address) ? address : null;
 }
 
 export function normaliseIpAllowlist(entries: string[]): string[] {

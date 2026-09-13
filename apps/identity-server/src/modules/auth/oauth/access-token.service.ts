@@ -13,9 +13,16 @@ export interface AccessTokenInput {
   organisationId?: string;
   sessionId?: string;
   ttlSeconds: number;
-  actorType: 'user' | 'service';
+  actorType: 'user' | 'service' | 'bot';
   aal?: 'AAL1' | 'AAL2';
   actorClientId?: string;
+  bot?: BotTokenClaims;
+}
+
+export interface BotTokenClaims {
+  botId: string;
+  keyId: string;
+  rateLimitPerMinute: number;
 }
 
 export interface IdTokenInput {
@@ -51,16 +58,17 @@ export class AccessTokenService {
       sub: input.subject,
       aud: input.audience,
       client_id: input.clientId,
-      scope: input.scope,
       token_type: input.actorType,
       iat,
       exp: iat + input.ttlSeconds,
       jti: randomUUID(),
     };
+    if (input.actorType !== 'bot') claims.scope = input.scope;
     if (input.organisationId) claims.org = input.organisationId;
     if (input.sessionId) claims.sid = input.sessionId;
     if (input.aal) claims.aal = input.aal;
     if (input.actorClientId) claims.act = { sub: input.actorClientId };
+    if (input.bot) Object.assign(claims, { bot_id: input.bot.botId, bot_key_id: input.bot.keyId, rl: input.bot.rateLimitPerMinute });
     return { token: this.keyService.sign(claims).token, expiresIn: input.ttlSeconds };
   }
 

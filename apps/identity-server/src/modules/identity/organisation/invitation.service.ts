@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
@@ -14,7 +14,9 @@ export interface InviteInput {
   organisation: Organisation;
   email: string;
   role: Exclude<Organisation.MemberRole, 'OWNER'>;
-  invitedBy: bigint;
+  invitedBy: bigint | null;
+  /** Roles a still-pending invitation to the same address may hold for this one to replace it; any other pending role refuses the invite with ORG_007. Unset replaces any. */
+  replaceableRoles?: readonly Organisation.MemberRole[];
 }
 
 export interface AcceptedInvitation {
@@ -58,10 +60,13 @@ export class InvitationService {
     const expiresAt = new Date(Date.now() + INVITATION_TTL_DAYS * 86_400_000);
 
     const invitation = await this.db.transaction(async tx => {
-      await tx
+      const replaced = await tx
         .update(schema.organisationInvitations)
         .set({ revokedAt: new Date() })
-        .where(and(eq(schema.organisationInvitations.organisationId, organisationId), eq(schema.organisationInvitations.email, email), this.pendingCondition()));
+        .where(and(eq(schema.organisationInvitations.organisationId, organisationId), eq(schema.organisationInvitations.email, email), this.pendingCondition()))
+        .returning({ role: schema.organisationInvitations.role });
+      const replaceable = input.replaceableRoles;
+      if (replaceable && replaced.some(row => !replaceable.includes(row.role))) throw AppErrorCode.ORG_007.create();
       const created = await tx
         .insert(schema.organisationInvitations)
         .values({ organisationId, email, role: input.role, tokenHash: this.hashToken(token), invitedBy: input.invitedBy, expiresAt })
@@ -84,14 +89,14 @@ export class InvitationService {
     });
   }
 
-  async revoke(organisationId: bigint, invitationId: bigint): Promise<Organisation.Invitation> {
-    const [revoked] = await this.db
-      .update(schema.organisationInvitations)
-      .set({ revokedAt: new Date() })
-      .where(and(eq(schema.organisationInvitations.id, invitationId), eq(schema.organisationInvitations.organisationId, organisationId), this.pendingCondition()))
-      .returning();
-    if (!revoked) throw AppErrorCode.ORG_005.create();
-    return revoked;
+  async revoke(organisationId: bigint, invitationId: bigint, revocableRoles?: readonly Organisation.MemberRole[]): Promise<Organisation.Invitation> {
+    const pending = and(eq(schema.organisationInvitations.id, invitationId), eq(schema.organisationInvitations.organisationId, organisationId), this.pendingCondition());
+    const role = revocableRoles ? inArray(schema.organisationInvitations.role, [...revocableRoles]) : undefined;
+    const [revoked] = await this.db.update(schema.organisationInvitations).set({ revokedAt: new Date() }).where(and(pending, role)).returning();
+    if (revoked) return revoked;
+
+    const unrevocable = revocableRoles ? await this.db.query.organisationInvitations.findFirst({ where: pending, columns: { id: true } }) : undefined;
+    throw (unrevocable ? AppErrorCode.ORG_007 : AppErrorCode.ORG_005).create();
   }
 
   async accept(userId: bigint, token: string): Promise<AcceptedInvitation> {

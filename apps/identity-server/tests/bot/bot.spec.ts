@@ -33,6 +33,7 @@ interface BotJson {
   activeKeyCount: number;
   lastUsedAt?: string;
   lastUsedIp?: string;
+  nextKeyExpiresAt?: string;
   createdBy?: UserRefJson;
   createdAt: string;
   suspendedAt?: string;
@@ -335,6 +336,16 @@ describe('Organisation bots', () => {
         code: 'ADM_004',
       });
     });
+
+    it('should leave bot clients out of the OAuth client listing', async () => {
+      const bot = await createBot();
+      const clients = env.getService(OAuthClientService);
+      const application = env.getService(ApplicationService).getApplicationOrThrow(APP_NAME);
+
+      expect((await clients.listClients(application.id)).map(client => client.id)).not.toContain(bot.clientId);
+      expect((await clients.listClients()).map(client => client.id)).not.toContain(bot.clientId);
+      expect(await clients.getClient(bot.clientId)).not.toBeNull();
+    });
   });
 
   describe('GET /api/v1/organisations/:organisationId/bots', () => {
@@ -423,6 +434,35 @@ describe('Organisation bots', () => {
         expect(response.statusCode).toBe(409);
         expect(codeOf(response)).toBe('BOT_010');
       }
+    });
+  });
+
+  describe('inactive organisation', () => {
+    it('should refuse key creation, bot updates and resumption with BOT_013 but allow suspension and key revocation', async () => {
+      const bot = await createBot();
+      const key = await createKey(bot.id);
+      const suspended = await createBot();
+      await request('post', `${basePath()}/${suspended.id}/suspend`, adminSecret);
+      await db
+        .update(schema.organisations)
+        .set({ status: 'SUSPENDED' })
+        .where(eq(schema.organisations.id, BigInt(orgId)));
+
+      const refused: [Method, string, Record<string, unknown>?][] = [
+        ['post', `${basePath()}/${bot.id}/keys`, { name: 'ci', expiresAt: expiryIn(30) }],
+        ['patch', `${basePath()}/${bot.id}`, { displayName: 'Renamed' }],
+        ['patch', `${basePath()}/${bot.id}`, {}],
+        ['post', `${basePath()}/${suspended.id}/resume`, undefined],
+      ];
+      for (const [method, path, body] of refused) {
+        const response = await request(method, path, adminSecret, body);
+        expect(response.statusCode).toBe(409);
+        expect(codeOf(response)).toBe('BOT_013');
+      }
+
+      expect((await request('delete', `${basePath()}/${bot.id}/keys/${key.id}`, adminSecret)).statusCode).toBe(200);
+      expect((await request('post', `${basePath()}/${bot.id}/suspend`, adminSecret)).statusCode).toBe(200);
+      expect((await db.query.bots.findFirst({ where: eq(schema.bots.id, BigInt(bot.id)) }))?.displayName).toBe('Release notes');
     });
   });
 
@@ -518,7 +558,7 @@ describe('Organisation bots', () => {
 
     it('should refuse an expiry that is not in the future or more than 365 days away with BOT_007', async () => {
       const bot = await createBot();
-      for (const expiresAt of [new Date(Date.now() - 1000).toISOString(), expiryIn(366), 'next tuesday']) {
+      for (const expiresAt of [new Date(Date.now() - 1000).toISOString(), expiryIn(366)]) {
         const response = await keyRequest(bot.id, { expiresAt });
         expect(response.statusCode).toBe(400);
         expect(codeOf(response)).toBe('BOT_007');
@@ -526,6 +566,42 @@ describe('Organisation bots', () => {
 
       const longest = await createKey(bot.id, { expiresAt: new Date(Date.now() + 365 * DAY_MS - 60_000).toISOString() });
       expect(longest.status).toBe('ACTIVE');
+    });
+
+    it('should refuse an expiry that is not a strict ISO-8601 date-time at the schema boundary', async () => {
+      const bot = await createBot();
+      const nextYear = new Date(Date.now() + 180 * DAY_MS);
+      const day = nextYear.toISOString().slice(0, 10);
+      for (const expiresAt of ['next tuesday', 'Mar 7 2027', nextYear.toUTCString(), day, `${day}T09:30`, `${day} 09:30:00Z`, `${day}T09:30:00`, String(nextYear.getTime())]) {
+        const response = await keyRequest(bot.id, { expiresAt });
+        expect(response.statusCode).toBe(422);
+      }
+
+      for (const expiresAt of [`${day}T09:30:00Z`, `${day}T09:30:00.123+04:00`]) expect((await keyRequest(bot.id, { expiresAt })).statusCode).toBe(201);
+    });
+
+    it('should never exceed two active keys under concurrent creates', async () => {
+      const bot = await createBot();
+      await createKey(bot.id);
+
+      const responses = await Promise.all([keyRequest(bot.id), keyRequest(bot.id), keyRequest(bot.id)]);
+      expect(responses.filter(response => response.statusCode === 201)).toHaveLength(1);
+      expect(responses.filter(response => response.statusCode === 409).map(codeOf)).toEqual(['BOT_006', 'BOT_006']);
+      expect(await db.$count(schema.botKeys, eq(schema.botKeys.botId, BigInt(bot.id)))).toBe(2);
+    });
+
+    it('should report the earliest expiry among active keys as nextKeyExpiresAt', async () => {
+      const bot = await createBot();
+      expect(((await request('get', `${basePath()}/${bot.id}`, adminSecret)).json() as BotJson).nextKeyExpiresAt).toBeUndefined();
+
+      const later = await createKey(bot.id, { expiresAt: expiryIn(90) });
+      const sooner = await createKey(bot.id, { expiresAt: expiryIn(30) });
+      const detail = (await request('get', `${basePath()}/${bot.id}`, adminSecret)).json() as BotJson;
+      expect(detail.nextKeyExpiresAt).toBe(sooner.expiresAt);
+
+      await request('delete', `${basePath()}/${bot.id}/keys/${sooner.id}`, adminSecret);
+      const listing = (await request('get', basePath(), adminSecret)).json() as BotsJson;
+      expect(listing.bots.find(item => item.id === bot.id)?.nextKeyExpiresAt).toBe(later.expiresAt);
     });
 
     it('should refuse to issue a key to a suspended bot with BOT_010', async () => {

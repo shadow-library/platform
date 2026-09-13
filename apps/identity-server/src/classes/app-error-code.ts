@@ -203,6 +203,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly BOT_011 = AppErrorCode.notFound('BOT_011', 'Bot key not found');
   /** An IP allowlist entry is not an IPv4 or IPv6 address or CIDR range, or the list has more than 20 distinct entries */
   static readonly BOT_012 = AppErrorCode.validation('BOT_012', 'Invalid IP allowlist', 400);
+  /** Key issuance, bot changes and resumption need an active organisation; suspending a bot and revoking its keys stay available */
+  static readonly BOT_013 = AppErrorCode.conflict('BOT_013', 'Organisation is not active');
 
   /*!
    * Organisation Policy Error Codes
@@ -279,4 +281,6 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly OAU_004 = AppErrorCode.badRequest('invalid_scope', 'The requested scope or grant is invalid');
   /** invalid_target (RFC 8707) — the requested resource is not a registered API resource */
   static readonly OAU_005 = AppErrorCode.badRequest('invalid_target', 'The requested resource is unknown or not permitted');
+  /** unauthorized_client — the authenticated client may not use this grant, such as a bot key exchange by a client that is not first-party */
+  static readonly OAU_006 = AppErrorCode.badRequest('unauthorized_client', 'The client is not authorized to use this grant');
 }

@@ -18,6 +18,7 @@ export const REGEX = {
   SUBDOMAIN: /^[a-z0-9][a-z0-9-]{0,62}$/,
   BOT_HANDLE: /^[a-z0-9](-?[a-z0-9])*$/,
   BOT_CLIENT_ID: /^bot_[0-9A-Za-z]{22}$/,
+  ISO_DATE_TIME: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/,
 } as const satisfies Record<string, RegExp>;
 
 export const isNumericId = (value: string): boolean => REGEX.ID.test(value);
@@ -44,5 +45,6 @@ export const PATTERN = {
   APPLICATION_NAME: shapedAs(REGEX.APPLICATION_NAME, ERROR_MESSAGES.INVALID_APPLICATION_NAME),
   SUBDOMAIN: shapedAs(REGEX.SUBDOMAIN, ERROR_MESSAGES.INVALID_SUBDOMAIN),
   BOT_HANDLE: shapedAs(REGEX.BOT_HANDLE, ERROR_MESSAGES.INVALID_BOT_HANDLE),
+  ISO_DATE_TIME: shapedAs(REGEX.ISO_DATE_TIME, ERROR_MESSAGES.INVALID_DATE_TIME),
   IDENTIFIER: shapedAs(identifier, ERROR_MESSAGES.INVALID_IDENTIFIER),
 } as const satisfies Record<string, FieldPattern>;

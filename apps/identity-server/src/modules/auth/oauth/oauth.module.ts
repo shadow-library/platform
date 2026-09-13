@@ -3,6 +3,7 @@ import { Module } from '@shadow-library/app';
 import { KeyModule } from '@server/modules/auth/keys';
 import { SessionModule } from '@server/modules/auth/session';
 import { TokenModule } from '@server/modules/auth/token';
+import { BotModule } from '@server/modules/identity/bot';
 import { UserModule } from '@server/modules/identity/user';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
@@ -22,7 +23,7 @@ import { OAuthService } from './oauth.service';
 import { WorkloadIdentityService } from './workload-identity.service';
 
 @Module({
-  imports: [DatabaseModule, KeyModule, SessionModule, TokenModule, UserModule, AuditModule, ApplicationModule, PolicyModule, SecurityModule],
+  imports: [DatabaseModule, KeyModule, SessionModule, TokenModule, UserModule, AuditModule, ApplicationModule, PolicyModule, SecurityModule, BotModule],
   controllers: [OAuthController, ConsentController, MeConsentController, AppsController],
   providers: [OAuthClientService, AuthorizationCodeService, AccessTokenService, ConsentService, OAuthService, WorkloadIdentityService],
   exports: [OAuthClientService, AccessTokenService, ConsentService, AuthorizationCodeService],

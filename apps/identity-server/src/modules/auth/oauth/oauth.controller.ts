@@ -114,6 +114,7 @@ export class OAuthController {
         subjectTokenType: body.subject_token_type,
         requestedTokenType: body.requested_token_type,
         actorToken: body.actor_token,
+        clientIp: body.client_ip,
       },
       credential,
     );
@@ -136,7 +137,7 @@ export class OAuthController {
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
     const claims = token ? this.keyService.verify(token) : null;
     if (!claims || typeof claims.sub !== 'string' || typeof claims.exp !== 'number' || claims.exp * 1000 <= Date.now()) throw AppErrorCode.OAU_002.create();
-    if (claims.token_type === 'service') throw AppErrorCode.OAU_002.create();
+    if (claims.token_type === 'service' || claims.token_type === 'bot') throw AppErrorCode.OAU_002.create();
 
     const userId = BigInt(claims.sub);
     const scopes = new Set(typeof claims.scope === 'string' ? claims.scope.split(' ').filter(Boolean) : []);

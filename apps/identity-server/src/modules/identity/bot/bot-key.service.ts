@@ -5,7 +5,7 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, REGEX } from '@server/constants';
 import { type Bot, DatabaseService, type PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
 import { generateBotKey } from './bot-key.util';
@@ -66,12 +66,14 @@ export class BotKeyService {
     const { key, row } = await this.db.transaction(async tx => {
       // Locks the bot row so concurrent requests cannot both count one active key and each add a second.
       const [bot] = await tx
-        .select({ id: schema.bots.id, status: schema.bots.status })
+        .select({ id: schema.bots.id, status: schema.bots.status, organisationStatus: schema.organisations.status })
         .from(schema.bots)
+        .innerJoin(schema.organisations, eq(schema.organisations.id, schema.bots.organisationId))
         .where(and(eq(schema.bots.id, botId), eq(schema.bots.organisationId, organisationId)))
-        .for('no key update');
+        .for('no key update', { of: schema.bots });
       if (!bot || bot.status === 'DELETED') throw AppErrorCode.BOT_009.create();
       if (bot.status !== 'ACTIVE') throw AppErrorCode.BOT_010.create();
+      if (bot.organisationStatus !== 'ACTIVE') throw AppErrorCode.BOT_013.create();
 
       const active = await tx.$count(schema.botKeys, and(eq(schema.botKeys.botId, bot.id), isNull(schema.botKeys.revokedAt), gt(schema.botKeys.expiresAt, now)));
       if (active >= MAX_ACTIVE_KEYS_PER_BOT) throw AppErrorCode.BOT_006.create();
@@ -121,6 +123,7 @@ export class BotKeyService {
   }
 
   private parseExpiry(value: string, now: Date): Date {
+    if (!REGEX.ISO_DATE_TIME.test(value)) throw AppErrorCode.BOT_007.create();
     const expiresAt = new Date(value);
     const time = expiresAt.getTime();
     if (Number.isNaN(time) || time <= now.getTime() || time > now.getTime() + MAX_BOT_KEY_LIFETIME_MS) throw AppErrorCode.BOT_007.create();

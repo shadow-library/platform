@@ -10,3 +10,6 @@ export const OAUTH_CALLBACK_PATH = '/api/auth/callback';
 /** RFC 8693 grant and token-type identifiers for delegated user context across applications. */
 export const TOKEN_EXCHANGE_GRANT = 'urn:ietf:params:oauth:grant-type:token-exchange';
 export const ACCESS_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:access_token';
+
+/** Subject token type for exchanging an organisation bot key (D-23) through the same RFC 8693 grant. */
+export const BOT_KEY_TOKEN_TYPE = 'urn:shadow:token-type:bot-key';

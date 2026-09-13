@@ -7,10 +7,11 @@ import { Context } from '@server/modules/access';
 import { KeyService } from '@server/modules/auth/keys';
 import { SessionService } from '@server/modules/auth/session';
 import { RefreshTokenClientMismatchError, RefreshTokenReuseError, RefreshTokenService } from '@server/modules/auth/token';
+import { BOT_ACCESS_TOKEN_TTL_SECONDS, BotKeyExchangeService, normaliseClientIp } from '@server/modules/identity/bot';
 import { UserEmailService, UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { OAuthClient } from '@server/modules/infrastructure/datastore';
-import { RateLimiterService } from '@server/modules/infrastructure/security';
+import { GENERAL_LIMIT, GENERAL_WINDOW_SECONDS, IP_GENERAL_BUCKET, RateLimiterService } from '@server/modules/infrastructure/security';
 import { ApplicationAccessService } from '@server/modules/system/application';
 import { PolicyService } from '@server/modules/system/policy';
 
@@ -18,7 +19,7 @@ import { AccessTokenService } from './access-token.service';
 import { AuthorizationCodeService } from './authorization-code.service';
 import { ConsentService } from './consent.service';
 import { OAuthClientService } from './oauth-client.service';
-import { ACCESS_TOKEN_TYPE, DEFAULT_AUDIENCE, TOKEN_EXCHANGE_GRANT } from './oauth.constants';
+import { ACCESS_TOKEN_TYPE, BOT_KEY_TOKEN_TYPE, DEFAULT_AUDIENCE, TOKEN_EXCHANGE_GRANT } from './oauth.constants';
 import { verifyPkce } from './pkce';
 import { WorkloadIdentityService } from './workload-identity.service';
 
@@ -60,6 +61,7 @@ export interface TokenParams {
   subjectTokenType?: string;
   requestedTokenType?: string;
   actorToken?: string;
+  clientIp?: string;
 }
 
 export interface TokenResult {
@@ -108,6 +110,7 @@ export class OAuthService {
     private readonly policyService: PolicyService,
     private readonly rateLimiterService: RateLimiterService,
     private readonly applicationAccessService: ApplicationAccessService,
+    private readonly botKeyExchangeService: BotKeyExchangeService,
   ) {}
 
   private tokenPolicyScope(client: OAuthClient, userOrganisationId?: bigint | null): { organisationIds: (bigint | null | undefined)[] } {
@@ -322,6 +325,7 @@ export class OAuthService {
 
   private async tokenExchange(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {
     const client = await this.authenticateGrantClient(credential);
+    if (params.subjectTokenType === BOT_KEY_TOKEN_TYPE) return this.botKeyExchange(client, params);
     if (!params.subjectToken || params.subjectTokenType !== ACCESS_TOKEN_TYPE) throw AppErrorCode.OAU_001.create();
     if (params.requestedTokenType && params.requestedTokenType !== ACCESS_TOKEN_TYPE) throw AppErrorCode.OAU_001.create();
     if (params.actorToken) throw AppErrorCode.OAU_001.create();
@@ -388,6 +392,69 @@ export class OAuthService {
       scope,
     });
     return { accessToken, tokenType: 'Bearer', expiresIn, scope, issuedTokenType: ACCESS_TOKEN_TYPE };
+  }
+
+  private async botKeyExchange(client: OAuthClient, params: TokenParams): Promise<TokenResult> {
+    if (!params.subjectToken || params.actorToken) throw AppErrorCode.OAU_001.create();
+    if (params.requestedTokenType && params.requestedTokenType !== ACCESS_TOKEN_TYPE) throw AppErrorCode.OAU_001.create();
+    if (params.scope?.trim()) throw AppErrorCode.OAU_004.create();
+    if (!client.isFirstParty) {
+      this.logger.warn('bot key exchange rejected: only first-party clients may exchange bot keys', { securityEvent: 'oauth.exchange_denied', clientId: client.id });
+      throw AppErrorCode.OAU_006.create();
+    }
+
+    const audience = await this.clientService.resolveOwnAudience(client);
+    if (!audience) {
+      this.logger.warn('bot key exchange rejected: the client exposes no resource audience', { securityEvent: 'oauth.exchange_denied', clientId: client.id });
+      throw AppErrorCode.OAU_006.create();
+    }
+    if (params.resource !== undefined && params.resource !== audience) throw AppErrorCode.OAU_005.create();
+
+    const callerIp = params.clientIp ?? Context.getClientInfo().ip;
+    const chargedIp = normaliseClientIp(callerIp) ?? Context.getClientInfo().ip;
+    await this.assertIpBudget(chargedIp);
+
+    const authentication = await this.botKeyExchangeService.authenticate(params.subjectToken, callerIp, 'exchange');
+    if (authentication.status === 'rate_limited') throw AppErrorCode.SEC_001.create();
+    if (authentication.status === 'denied') {
+      await this.chargeIp(chargedIp);
+      throw AppErrorCode.OAU_003.create();
+    }
+
+    const { bot } = authentication;
+    const { token: accessToken, expiresIn } = this.accessTokenService.mintAccessToken({
+      subject: bot.clientId,
+      audience,
+      scope: '',
+      clientId: bot.clientId,
+      organisationId: bot.organisationId.toString(),
+      ttlSeconds: BOT_ACCESS_TOKEN_TTL_SECONDS,
+      actorType: 'bot',
+      bot: { botId: bot.id.toString(), keyId: bot.keyId, rateLimitPerMinute: bot.rateLimitPerMinute },
+    });
+
+    this.logger.info('access token issued', {
+      securityEvent: 'oauth.token_exchanged',
+      grantType: 'token-exchange:bot-key',
+      clientId: client.id,
+      subject: bot.clientId,
+      botId: bot.id.toString(),
+      keyId: bot.keyId,
+      organisationId: bot.organisationId.toString(),
+      audience,
+    });
+    return { accessToken, tokenType: 'Bearer', expiresIn, scope: '', issuedTokenType: ACCESS_TOKEN_TYPE };
+  }
+
+  private async assertIpBudget(ip: string): Promise<void> {
+    if (this.rateLimiterService.isAllowlisted(ip)) return;
+    const decision = await this.rateLimiterService.peek(IP_GENERAL_BUCKET, ip, GENERAL_LIMIT, GENERAL_WINDOW_SECONDS);
+    if (!decision.allowed) throw AppErrorCode.SEC_001.create();
+  }
+
+  private async chargeIp(ip: string): Promise<void> {
+    if (this.rateLimiterService.isAllowlisted(ip)) return;
+    await this.rateLimiterService.consume(IP_GENERAL_BUCKET, ip, GENERAL_LIMIT, GENERAL_WINDOW_SECONDS);
   }
 
   private async exchangeScopes(client: OAuthClient, target: string, requestedScope?: string): Promise<string> {
@@ -653,7 +720,7 @@ export class OAuthService {
 
     const client = credential.clientId ? await this.clientService.getClient(credential.clientId) : await this.clientService.resolveClientBySubject(workload.subject);
     const matches = client !== null && (!credential.clientId || this.clientService.subjectMatchesClient(client, workload.subject));
-    if (!client || !client.isActive || !matches) {
+    if (!client || !client.isActive || !matches || (await this.clientService.isBotClient(client.id))) {
       this.logger.warn('client authentication failed: workload subject not bound to an active client', {
         securityEvent: 'oauth.client_auth_failed',
         workloadSubject: workload.subject,
@@ -674,6 +741,10 @@ export class OAuthService {
     const client = await this.clientService.getClient(clientId);
     if (!client || !client.isActive) {
       this.logger.debug('oauth client lookup failed: unknown or inactive client', { clientId });
+      throw AppErrorCode.OAU_002.create();
+    }
+    if (await this.clientService.isBotClient(client.id)) {
+      this.logger.warn('client authentication refused: bot clients never authenticate at the token endpoint', { securityEvent: 'oauth.client_auth_failed', clientId: client.id });
       throw AppErrorCode.OAU_002.create();
     }
     return client;

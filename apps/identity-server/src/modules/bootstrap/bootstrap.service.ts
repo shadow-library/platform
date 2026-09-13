@@ -8,6 +8,7 @@ import { ADMIN_PERMISSIONS, IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/mo
 import { APP_SESSION_SCOPE } from '@server/modules/auth/app-session';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService } from '@server/modules/authz';
+import { BOT_PERMISSION_DESCRIPTIONS, IDENTITY_BOT_ROLES } from '@server/modules/identity/bot';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
@@ -53,6 +54,7 @@ export class BootstrapService implements OnModuleInit {
     await this.ensurePlatformScopes();
     const organisationId = await this.ensurePlatformOrganisation();
     await this.ensureAdminAuthorization();
+    await this.ensureBotRoles();
     const adminUserId = await this.ensureBootstrapAdmin(organisationId);
     await this.ecosystemSeedService.seed({ adminUserId, platformOrganisationId: organisationId });
   }
@@ -87,6 +89,23 @@ export class BootstrapService implements OnModuleInit {
     for (const permission of Object.values(ADMIN_PERMISSIONS)) {
       const permissionId = await this.policyDecisionService.ensurePermission(application.id, permission, ADMIN_PERMISSION_DESCRIPTIONS[permission]);
       await this.policyDecisionService.grantPermissionToRole(role.id, permissionId);
+    }
+  }
+
+  private async ensureBotRoles(): Promise<void> {
+    const application = this.applicationService.getApplicationOrThrow(APP_NAME);
+    for (const definition of IDENTITY_BOT_ROLES) {
+      const role = await this.applicationRoleService.ensureBotGrantableRole(APP_NAME, {
+        roleName: definition.name,
+        description: definition.description,
+        botResource: definition.resource,
+        botLevel: definition.level,
+        isSensitive: false,
+      });
+      for (const permission of definition.permissions) {
+        const permissionId = await this.policyDecisionService.ensurePermission(application.id, permission, BOT_PERMISSION_DESCRIPTIONS[permission]);
+        await this.policyDecisionService.grantPermissionToRole(role.id, permissionId);
+      }
     }
   }
 

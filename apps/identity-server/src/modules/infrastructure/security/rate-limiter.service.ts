@@ -52,6 +52,11 @@ export class RateLimiterService {
 
   async consume(bucket: string, key: string, limit: number, windowSeconds: number): Promise<RateDecision> {
     if (!this.enabled) return { allowed: true, remaining: limit, retryAfterSeconds: 0 };
+    return this.enforce(bucket, key, limit, windowSeconds);
+  }
+
+  /** Counts against a product quota rather than an abuse control, so the `rate-limit.enabled` kill switch does not lift it. */
+  async enforce(bucket: string, key: string, limit: number, windowSeconds: number): Promise<RateDecision> {
     const redisKey = `rl:${bucket}:${key}`;
     const results =
       (await this.redis.multi().incr(redisKey).call('EXPIRE', redisKey, windowSeconds, 'NX').ttl(redisKey).exec()) ??

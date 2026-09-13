@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'bun:test';
 
-import { normaliseCidr, normaliseIpAllowlist } from '@server/modules/identity/bot/ip-allowlist.util';
+import { normaliseCidr, normaliseClientIp, normaliseIpAllowlist } from '@server/modules/identity/bot/ip-allowlist.util';
 
 describe('ip-allowlist', () => {
+  describe('normaliseClientIp', () => {
+    it('should keep plain addresses, unwrap IPv4-mapped IPv6 and reject anything else', () => {
+      expect(normaliseClientIp(' 198.51.100.7 ')).toBe('198.51.100.7');
+      expect(normaliseClientIp('2001:db8::1')).toBe('2001:db8::1');
+      expect(normaliseClientIp('::FFFF:198.51.100.7')).toBe('198.51.100.7');
+      for (const value of ['', 'localhost', '198.51.100.0/24', 'fe80::1%eth0', '999.1.1.1']) expect(normaliseClientIp(value)).toBeNull();
+    });
+  });
+
   describe('normaliseCidr', () => {
     it('should accept IPv4 ranges and treat a bare address as a single host', () => {
       expect(normaliseCidr('203.0.113.0/24')).toBe('203.0.113.0/24');

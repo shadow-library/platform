@@ -1,6 +1,7 @@
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, RespondFor } from '@shadow-library/fastify';
 
 import { Auth, Context } from '@server/modules/access';
+import { BOT_PERMISSIONS } from '@server/modules/identity/bot/bot.constants';
 
 import { type DomainDetail, DomainService } from './domain.service';
 import { DomainItem, DomainParams, DomainsResponse, OrganisationActionResponse, OrganisationIdParams, RegisterDomainBody } from './organisation.dto';
@@ -14,7 +15,7 @@ export class DomainController {
   }
 
   @Get()
-  @Auth({ orgMember: true })
+  @Auth({ orgMember: true, bot: BOT_PERMISSIONS.domainsRead })
   @RespondFor(200, DomainsResponse)
   async listDomains(@Params() params: OrganisationIdParams): Promise<{ domains: DomainDetail[] }> {
     return { domains: await this.domainService.listDomainItems(params.organisationId) };

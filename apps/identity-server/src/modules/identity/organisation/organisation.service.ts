@@ -6,6 +6,7 @@ import { AppError, Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, isNumericId } from '@server/constants';
+import { type BotCaller, type Caller, type UserCaller } from '@server/modules/access';
 import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
 import { RefreshTokenService } from '@server/modules/auth/token';
 import { PolicyDecisionService } from '@server/modules/authz';
@@ -63,7 +64,10 @@ export interface MembershipWithOrganisation {
   organisation: Organisation;
 }
 
+export type MemberManager = (UserCaller & { membership: Organisation.Member }) | BotCaller;
+
 const ROLE_RANK: Record<Organisation.MemberRole, number> = { MEMBER: 0, ADMIN: 1, OWNER: 2 };
+const BOT_INVITABLE_ROLES: readonly Organisation.MemberRole[] = ['MEMBER'];
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])?$/;
 
 const ROLE_CHANGED_TEMPLATE = 'organisation-role-changed';
@@ -87,12 +91,13 @@ export class OrganisationService {
     this.db = databaseService.getPostgresClient();
   }
 
-  private async audit(caller: CallerContext, organisationId: bigint, action: string, targetType?: string, targetId?: string): Promise<void> {
+  private async audit(caller: CallerContext | Caller, organisationId: bigint, action: string, targetType?: string, targetId?: string): Promise<void> {
+    const actor =
+      'bot' in caller ? { actorType: 'SERVICE_ACCOUNT' as const, actorId: caller.bot.clientId } : { actorType: 'USER' as const, actorId: caller.session.userId.toString() };
     await this.auditService.record({
       action,
       outcome: 'SUCCESS',
-      actorType: 'USER',
-      actorId: caller.session.userId.toString(),
+      ...actor,
       organisationId: organisationId.toString(),
       targetType,
       targetId,
@@ -278,20 +283,11 @@ export class OrganisationService {
    * tenant. The same rank, owner and last-owner protections as removal apply — suspending the only owner would strand
    * the organisation with nobody able to administer it.
    */
-  async changeMemberStatus(
-    caller: CallerContext,
-    callerMembership: Organisation.Member,
-    organisationId: bigint,
-    targetUserId: bigint,
-    status: Organisation.MemberStatus,
-    hold: MemberStatusHold = {},
-  ): Promise<void> {
+  async changeMemberStatus(caller: MemberManager, organisationId: bigint, targetUserId: bigint, status: Organisation.MemberStatus, hold: MemberStatusHold = {}): Promise<void> {
     const target = await this.getMembership(targetUserId, organisationId);
     if (!target) throw AppErrorCode.USR_001.create();
-    if (target.userId === caller.session.userId) throw AppErrorCode.ORG_007.create();
-    if (target.role === 'OWNER' && (callerMembership.role !== 'OWNER' || !this.sessionService.isSelfServiceElevated(caller.session)))
-      throw (callerMembership.role !== 'OWNER' ? AppErrorCode.ORG_007 : AppErrorCode.AUTH_006).create();
-    if (callerMembership.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[callerMembership.role]) throw AppErrorCode.ORG_007.create();
+    if (caller.kind === 'bot') this.assertBotMayManage(target);
+    else this.assertMemberMayManage(caller, target);
     if (status !== 'ACTIVE' && target.role === 'OWNER') await this.assertNotLastOwner(organisationId, targetUserId);
 
     const restored = status === 'ACTIVE';
@@ -314,6 +310,18 @@ export class OrganisationService {
     if (email) await this.notificationService.enqueue({ templateKey: MEMBER_STATUS_TEMPLATE, recipients: { email }, payload: { status, reason: hold.reason ?? null } });
   }
 
+  private assertMemberMayManage(caller: UserCaller & { membership: Organisation.Member }, target: Organisation.Member): void {
+    const role = caller.membership.role;
+    if (target.userId === caller.session.userId) throw AppErrorCode.ORG_007.create();
+    if (target.role === 'OWNER' && (role !== 'OWNER' || !this.sessionService.isSelfServiceElevated(caller.session)))
+      throw (role !== 'OWNER' ? AppErrorCode.ORG_007 : AppErrorCode.AUTH_006).create();
+    if (role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[role]) throw AppErrorCode.ORG_007.create();
+  }
+
+  private assertBotMayManage(target: Organisation.Member): void {
+    if (ROLE_RANK[target.role] >= ROLE_RANK.ADMIN) throw AppErrorCode.ORG_007.create();
+  }
+
   async removeOrganisationMember(caller: CallerContext, callerMembership: Organisation.Member, organisationId: bigint, targetUserId: bigint): Promise<void> {
     const target = await this.getMembership(targetUserId, organisationId);
     if (!target) throw AppErrorCode.USR_001.create();
@@ -333,13 +341,17 @@ export class OrganisationService {
     return this.invitationService.listPending(organisationId);
   }
 
-  async inviteMember(caller: CallerContext, organisation: Organisation, email: string, role: Exclude<Organisation.MemberRole, 'OWNER'>): Promise<void> {
-    const invitation = await this.invitationService.invite({ organisation, email, role, invitedBy: caller.session.userId });
+  async inviteMember(caller: Caller, organisation: Organisation, email: string, role: Exclude<Organisation.MemberRole, 'OWNER'>): Promise<void> {
+    if (caller.kind === 'bot' && !BOT_INVITABLE_ROLES.includes(role)) throw AppErrorCode.ORG_007.create();
+    const invitation =
+      caller.kind === 'bot'
+        ? await this.invitationService.invite({ organisation, email, role, invitedBy: null, replaceableRoles: BOT_INVITABLE_ROLES })
+        : await this.invitationService.invite({ organisation, email, role, invitedBy: caller.session.userId });
     await this.audit(caller, organisation.id, 'org.invitation_sent', 'organisation_invitation', invitation.id.toString());
   }
 
-  async revokeInvitation(caller: CallerContext, organisationId: bigint, invitationId: bigint): Promise<void> {
-    const invitation = await this.invitationService.revoke(organisationId, invitationId);
+  async revokeInvitation(caller: Caller, organisationId: bigint, invitationId: bigint): Promise<void> {
+    const invitation = await this.invitationService.revoke(organisationId, invitationId, caller.kind === 'bot' ? BOT_INVITABLE_ROLES : undefined);
     await this.audit(caller, organisationId, 'org.invitation_revoked', 'organisation_invitation', invitation.id.toString());
   }
 

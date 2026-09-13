@@ -15,6 +15,12 @@ export interface IRole {
   description?: string;
 }
 
+export interface BotGrantableRole extends IRole {
+  botResource: string;
+  botLevel: Application.BotGrantLevel;
+  isSensitive: boolean;
+}
+
 @Injectable()
 export class ApplicationRoleService {
   private readonly logger = Logger.getLogger(APP_NAME, ApplicationRoleService.name);
@@ -42,6 +48,25 @@ export class ApplicationRoleService {
       .catch(error => this.databaseService.translateError(error));
     assert(role, `Failed to add role ${newRole.roleName} to application ${service}`);
     this.logger.info(`added new role to the application ${service}: ${newRole.roleName}`);
+    await this.applicationService.loadApplications();
+    return role;
+  }
+
+  async ensureBotGrantableRole(service: string, definition: BotGrantableRole): Promise<Application.Role> {
+    const application = this.applicationService.getApplicationOrThrow(service);
+    const botColumns = {
+      description: definition.description,
+      botGrantable: true,
+      botResource: definition.botResource,
+      botLevel: definition.botLevel,
+      isSensitive: definition.isSensitive,
+    };
+    const [role] = await this.db
+      .insert(schema.applicationRoles)
+      .values({ applicationId: application.id, roleName: definition.roleName, ...botColumns })
+      .onConflictDoUpdate({ target: [schema.applicationRoles.applicationId, schema.applicationRoles.roleName], set: { ...botColumns, updatedAt: new Date() } })
+      .returning();
+    assert(role, `Failed to ensure role ${definition.roleName} on application ${service}`);
     await this.applicationService.loadApplications();
     return role;
   }

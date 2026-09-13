@@ -3,6 +3,7 @@ import { type FastifyRequest } from 'fastify';
 import { type AdminActor, type AdminPermission } from '@server/modules/admin';
 import { type JwtClaims } from '@server/modules/auth/keys';
 import { type ValidatedSession } from '@server/modules/auth/session';
+import { type AuthenticatedBot, type BotPermission } from '@server/modules/identity/bot';
 import { type Organisation } from '@server/modules/infrastructure/datastore';
 
 /**
@@ -28,6 +29,11 @@ export interface AuthOptions {
    * only subject is the caller itself.
    */
   service?: string | true;
+  /**
+   * Also admit an organisation bot presenting `Authorization: Bearer sl_bot_…` when the PDP grants it this permission in the
+   * organisation named by `orgParam`. Never honoured together with `elevated`, `permission` or `service`.
+   */
+  bot?: BotPermission;
   /** Explicitly unauthenticated. Documents intent and makes the guard a no-op for the route. */
   public?: boolean;
 }
@@ -50,8 +56,24 @@ export interface AuthContext {
   /** The organisation resolved by the `orgRole` mode, so handlers need not re-fetch it. */
   organisation?: Organisation;
   serviceToken?: JwtClaims;
+  /** The bot authenticated by the `bot` mode; a bot request carries no session or membership. */
+  bot?: AuthenticatedBot;
   clientInfo: ClientInfo;
 }
+
+export interface UserCaller {
+  kind: 'user';
+  session: ValidatedSession;
+  ip: string;
+}
+
+export interface BotCaller {
+  kind: 'bot';
+  bot: AuthenticatedBot;
+  ip: string;
+}
+
+export type Caller = UserCaller | BotCaller;
 
 /** A request augmented by the access guard with its resolved authentication context. */
 export type AuthenticatedRequest = FastifyRequest & { auth?: AuthContext };

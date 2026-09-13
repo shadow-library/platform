@@ -5,6 +5,7 @@ import { PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService, ServiceAccessService } from '@server/modules/authz';
 import { BootstrapService, ECOSYSTEM_SEED, EcosystemSeedService } from '@server/modules/bootstrap';
+import { IDENTITY_BOT_ROLES } from '@server/modules/identity/bot';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
@@ -73,6 +74,49 @@ describe('BootstrapService', () => {
 
     const clients = await env.getPostgresClient().select().from(schema.oauthClients);
     expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'memoir', 'novel-forge', 'pulse', 'web-novel']);
+  });
+
+  it('should seed the bot-grantable identity roles idempotently, restoring their bot columns', async () => {
+    const db = env.getPostgresClient();
+    const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+    const names = IDENTITY_BOT_ROLES.map(role => role.name);
+    const botRoles = () =>
+      db.query.applicationRoles.findMany({ where: and(eq(schema.applicationRoles.applicationId, applicationId), inArray(schema.applicationRoles.roleName, names)) });
+    const grants = async () =>
+      db.$count(
+        schema.rolePermissions,
+        inArray(
+          schema.rolePermissions.roleId,
+          (await botRoles()).map(role => role.id),
+        ),
+      );
+    const before = await grants();
+
+    await db.update(schema.applicationRoles).set({ botGrantable: false, botResource: null, botLevel: null }).where(inArray(schema.applicationRoles.roleName, names));
+    const bootstrap = new BootstrapService(
+      env.getService(ApplicationService),
+      env.getService(ApplicationRoleService),
+      env.getService(UserService),
+      env.getService(OAuthClientService),
+      env.getService(PolicyDecisionService),
+      env.getService(OrganisationService),
+      env.getService(EcosystemSeedService),
+    );
+    await bootstrap.onModuleInit();
+    await bootstrap.onModuleInit();
+
+    const roles = await botRoles();
+    expect(roles.map(role => role.roleName).sort()).toEqual([...names].sort());
+    for (const definition of IDENTITY_BOT_ROLES) {
+      expect(roles.find(role => role.roleName === definition.name)).toMatchObject({
+        botGrantable: true,
+        botResource: definition.resource,
+        botLevel: definition.level,
+        isSensitive: false,
+      });
+    }
+    expect(before).toBe(IDENTITY_BOT_ROLES.reduce((total, role) => total + role.permissions.length, 0));
+    expect(await grants()).toBe(before);
   });
 
   it('should seed the ecosystem applications, their clients and the notification access rule', async () => {

@@ -73,7 +73,10 @@ export class CreateBotKeyBody {
   @Field({ minLength: 1, maxLength: 64, description: 'Where the key will live, such as the CI system or environment that holds it.' })
   name: string;
 
-  @Field({ minLength: 1, maxLength: 64, description: 'ISO-8601 expiry, strictly in the future and at most 365 days away.' })
+  @Field({
+    ...PATTERN.ISO_DATE_TIME,
+    description: 'ISO-8601 date-time with seconds and a time zone, such as 2027-03-07T09:30:00Z; strictly in the future and at most 365 days away.',
+  })
   expiresAt: string;
 }
 
@@ -124,6 +127,10 @@ export class BotItem {
   @Field(() => String, { optional: true, description: 'Caller address of that most recent use.' })
   @Transform('strip:null')
   lastUsedIp?: string;
+
+  @Field(() => String, { optional: true, description: 'Earliest expiry among the keys that are neither revoked nor expired; absent when the bot has no active key.' })
+  @Transform('strip:null')
+  nextKeyExpiresAt?: string;
 
   @Field(() => BotUserItem, { optional: true })
   @Transform('strip:null')

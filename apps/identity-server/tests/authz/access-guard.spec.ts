@@ -10,6 +10,7 @@ import { ADMIN_PERMISSIONS, AdminAccessService, IAM_ADMIN_ROLE, PLATFORM_ORG_NAM
 import { KeyService } from '@server/modules/auth/keys';
 import { SESSION_COOKIE_NAME, SessionAuthService, SessionService } from '@server/modules/auth/session';
 import { PolicyDecisionService } from '@server/modules/authz';
+import { BOT_PERMISSIONS, BotKeyExchangeService, BotKeyService, BotService } from '@server/modules/identity/bot';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { ApplicationService } from '@server/modules/system/application';
@@ -58,6 +59,9 @@ describe('AccessGuard', () => {
       env.getService(AdminAccessService),
       env.getService(OrganisationService),
       env.getService(KeyService),
+      env.getService(BotKeyExchangeService),
+      env.getService(PolicyDecisionService),
+      env.getService(ApplicationService),
     );
   });
 
@@ -140,6 +144,40 @@ describe('AccessGuard', () => {
     const outsider = await sessionFor('guard-outsider@example.com', 'AAL1');
     const denied = (await resolve({ orgRole: 'ADMIN' }, requestWith(outsider.secret, { organisationId: organisation.id.toString() }))) as Error;
     expect((denied as { code?: string }).code).toBe('ORG_001');
+  });
+
+  it('should admit a permitted bot only on a route that declares bot alone, never alongside elevated, permission or service', async () => {
+    const owner = await sessionFor('guard-bot-owner@example.com', 'AAL1');
+    const organisation = await env.getService(OrganisationService).createTeam(owner.userId, { name: 'Guard bots' });
+    const bot = await env.getService(BotService).createBot({ userId: owner.userId }, organisation.id, { handle: 'guard', displayName: 'Guard' });
+    const { key } = await env
+      .getService(BotKeyService)
+      .createKey({ userId: owner.userId }, organisation.id, bot.id, { name: 'ci', expiresAt: new Date(Date.now() + 86_400_000).toISOString() });
+    const role = env
+      .getService(ApplicationService)
+      .getApplicationOrThrow('shadow-identity')
+      .roles.find(candidate => candidate.roleName === 'OrgMembersManager');
+    await env.getService(PolicyDecisionService).assignRole({ type: 'SERVICE_ACCOUNT', id: bot.clientId }, role?.id ?? 0, organisation.id.toString());
+
+    const botRequest = (): FastifyRequest =>
+      ({ cookies: {}, headers: { authorization: `Bearer ${key}` }, params: { organisationId: organisation.id.toString() }, ip: '203.0.113.7' }) as unknown as FastifyRequest;
+    const permission = BOT_PERMISSIONS.membersWrite;
+
+    const context = (await resolve({ orgRole: 'ADMIN', bot: permission }, botRequest())) as AuthContext;
+    expect(context.bot?.clientId).toBe(bot.clientId);
+    expect(context.organisation?.id).toBe(organisation.id);
+    expect(context.session).toBeUndefined();
+
+    const combined: AuthOptions[] = [
+      { orgRole: 'ADMIN', bot: permission, elevated: true },
+      { bot: permission, permission: ADMIN_PERMISSIONS.usersRead },
+      { bot: permission, service: true },
+      { orgRole: 'ADMIN' },
+    ];
+    for (const options of combined) {
+      const denied = (await resolve(options, botRequest())) as Error;
+      expect((denied as { code?: string }).code).toBe('ORG_007');
+    }
   });
 
   it('should reject a service-mode route presenting no bearer token', async () => {

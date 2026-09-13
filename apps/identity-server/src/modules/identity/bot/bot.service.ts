@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 
-import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, exists, inArray, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
@@ -11,6 +11,7 @@ import { type Bot, DatabaseService, type PrimaryDatabase, schema } from '@server
 import { ApplicationService } from '@server/modules/system/application';
 
 import { generateBotClientId } from './bot-key.util';
+import { BOT_ACCESS_TOKEN_TTL_SECONDS } from './bot.constants';
 import { normaliseIpAllowlist } from './ip-allowlist.util';
 
 export interface BotActor {
@@ -35,6 +36,7 @@ export interface BotSummary {
   activeKeyCount: number;
   lastUsedAt: Date | null;
   lastUsedIp: string | null;
+  nextKeyExpiresAt: Date | null;
   createdBy: BotUserRef | null;
   createdAt: Date;
   updatedAt: Date;
@@ -71,6 +73,7 @@ interface KeyStats {
   activeKeyCount: number;
   lastUsedAt: Date | null;
   lastUsedIp: string | null;
+  nextKeyExpiresAt: Date | null;
 }
 
 type BotChanges = Partial<Pick<Bot, 'displayName' | 'description' | 'ipAllowlist' | 'rateLimitPerMinute'>>;
@@ -78,9 +81,8 @@ type BotChanges = Partial<Pick<Bot, 'displayName' | 'description' | 'ipAllowlist
 export const MAX_BOTS_PER_ORGANISATION = 25;
 export const MAX_BOT_RATE_LIMIT_PER_MINUTE = 600;
 
-const BOT_ACCESS_TOKEN_TTL_SECONDS = 300;
 const MANAGEABLE_STATUSES: Bot.Status[] = ['ACTIVE', 'SUSPENDED'];
-const EMPTY_KEY_STATS: KeyStats = { activeKeyCount: 0, lastUsedAt: null, lastUsedIp: null };
+const EMPTY_KEY_STATS: KeyStats = { activeKeyCount: 0, lastUsedAt: null, lastUsedIp: null, nextKeyExpiresAt: null };
 
 @Injectable()
 export class BotService {
@@ -182,7 +184,7 @@ export class BotService {
     const [updated] = await this.db
       .update(schema.bots)
       .set({ ...changes, updatedAt: new Date() })
-      .where(and(this.ownedBy(organisationId, botId), inArray(schema.bots.status, MANAGEABLE_STATUSES)))
+      .where(and(this.ownedBy(organisationId, botId), inArray(schema.bots.status, MANAGEABLE_STATUSES), this.organisationIsActive()))
       .returning();
     if (!updated) return this.throwUnavailable(organisationId, botId);
 
@@ -192,13 +194,13 @@ export class BotService {
 
   async suspendBot(actor: BotActor, organisationId: bigint, botId: bigint): Promise<void> {
     const now = new Date();
-    const suspended = await this.transition(organisationId, botId, 'ACTIVE', { status: 'SUSPENDED', suspendedAt: now, suspendedBy: actor.userId, updatedAt: now }, false);
+    const suspended = await this.transition(organisationId, botId, 'ACTIVE', { status: 'SUSPENDED', suspendedAt: now, suspendedBy: actor.userId, updatedAt: now }, false, false);
     await this.record(actor, suspended, 'bot.suspended');
     this.logger.info('suspended organisation bot', { organisationId: organisationId.toString(), botId: botId.toString() });
   }
 
   async resumeBot(actor: BotActor, organisationId: bigint, botId: bigint): Promise<void> {
-    const resumed = await this.transition(organisationId, botId, 'SUSPENDED', { status: 'ACTIVE', suspendedAt: null, suspendedBy: null, updatedAt: new Date() }, true);
+    const resumed = await this.transition(organisationId, botId, 'SUSPENDED', { status: 'ACTIVE', suspendedAt: null, suspendedBy: null, updatedAt: new Date() }, true, true);
     await this.record(actor, resumed, 'bot.resumed');
     this.logger.info('resumed organisation bot', { organisationId: organisationId.toString(), botId: botId.toString() });
   }
@@ -241,29 +243,45 @@ export class BotService {
     return and(eq(schema.bots.id, botId), eq(schema.bots.organisationId, organisationId));
   }
 
+  private async assertOrganisationActive(organisationId: bigint): Promise<void> {
+    const organisation = await this.db.query.organisations.findFirst({ where: eq(schema.organisations.id, organisationId), columns: { status: true } });
+    if (organisation?.status !== 'ACTIVE') throw AppErrorCode.BOT_013.create();
+  }
+
+  private organisationIsActive() {
+    const activeOrganisation = this.db
+      .select({ id: schema.organisations.id })
+      .from(schema.organisations)
+      .where(and(eq(schema.organisations.id, schema.bots.organisationId), eq(schema.organisations.status, 'ACTIVE')));
+    return exists(activeOrganisation);
+  }
+
   private async requireManageableBot(organisationId: bigint, botId: bigint): Promise<Bot> {
     const bot = await this.requireBot(organisationId, botId);
     if (!MANAGEABLE_STATUSES.includes(bot.status)) throw AppErrorCode.BOT_010.create();
+    await this.assertOrganisationActive(organisationId);
     return bot;
   }
 
-  private async throwUnavailable(organisationId: bigint, botId: bigint): Promise<never> {
-    await this.requireBot(organisationId, botId);
+  private async throwUnavailable(organisationId: bigint, botId: bigint, from?: Bot.Status): Promise<never> {
+    const bot = await this.requireBot(organisationId, botId);
+    const statusAllows = from === undefined ? MANAGEABLE_STATUSES.includes(bot.status) : bot.status === from;
+    if (statusAllows) await this.assertOrganisationActive(organisationId);
     throw AppErrorCode.BOT_010.create();
   }
 
-  private async transition(organisationId: bigint, botId: bigint, from: Bot.Status, set: Partial<Bot>, clientActive: boolean): Promise<Bot> {
+  private async transition(organisationId: bigint, botId: bigint, from: Bot.Status, set: Partial<Bot>, clientActive: boolean, requireActiveOrganisation: boolean): Promise<Bot> {
     const bot = await this.db.transaction(async tx => {
       const [updated] = await tx
         .update(schema.bots)
         .set(set)
-        .where(and(this.ownedBy(organisationId, botId), eq(schema.bots.status, from)))
+        .where(and(this.ownedBy(organisationId, botId), eq(schema.bots.status, from), requireActiveOrganisation ? this.organisationIsActive() : undefined))
         .returning();
       if (!updated) return null;
       await tx.update(schema.oauthClients).set({ isActive: clientActive, updatedAt: new Date() }).where(eq(schema.oauthClients.id, updated.clientId));
       return updated;
     });
-    return bot ?? this.throwUnavailable(organisationId, botId);
+    return bot ?? this.throwUnavailable(organisationId, botId, from);
   }
 
   private async summarise(bots: Bot[]): Promise<BotSummary[]> {
@@ -296,6 +314,9 @@ export class BotService {
         activeKeyCount: sql<number>`count(*) FILTER (WHERE ${schema.botKeys.revokedAt} IS NULL AND ${schema.botKeys.expiresAt} > now())`.mapWith(Number),
         lastUsedAt: sql<Date | null>`max(${schema.botKeys.lastUsedAt})`.mapWith(schema.botKeys.lastUsedAt),
         lastUsedIp: sql<string | null>`(array_agg(host(${schema.botKeys.lastUsedIp}) ORDER BY ${schema.botKeys.lastUsedAt} DESC NULLS LAST))[1]`,
+        nextKeyExpiresAt: sql<Date | null>`min(${schema.botKeys.expiresAt}) FILTER (WHERE ${schema.botKeys.revokedAt} IS NULL AND ${schema.botKeys.expiresAt} > now())`.mapWith(
+          schema.botKeys.expiresAt,
+        ),
       })
       .from(schema.botKeys)
       .where(inArray(schema.botKeys.botId, botIds))

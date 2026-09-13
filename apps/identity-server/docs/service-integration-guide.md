@@ -408,6 +408,7 @@ roles: [{ name: 'NovelForgeProjectsWriter', permissions: ['novel-forge:projects:
 `level` is `'read'` or `'write'`; `write` implies `read` for the same resource, and the sync validator rejects a `write` role missing the `read` role's permissions. Add `sensitive: true` for a capability an admin must explicitly reason about before granting (spend, generation, …) — it still surfaces in the catalog, just flagged.
 
 - **Ownership.** A record a bot creates must be owned by the bot, not by a human id borrowed from the request context — store an owner **kind** alongside the owner id (`{ kind: 'bot', id: principal.botId }`), never assume an id column alone identifies a user.
+- **Trust proxies deliberately.** The SDK forwards the bot's address as `client_ip` for the bot's IP allowlist, read from `request.ip`. Behind an ingress, set `APP_TRUST_PROXY` to the ingress's trusted CIDR list, never `true`: trusting `X-Forwarded-For` from any hop lets a caller forge an allowlisted address and bypass the allowlist.
 - **Never log `Authorization`.** A bot's header carries either the long-lived key before exchange or the short-lived JWT after; neither belongs in your request logs, even redacted at debug level.
 
 ---

@@ -108,8 +108,7 @@ export class OAuthClientService {
     const clientId = input.id ?? randomUUID();
 
     await this.db.transaction(async tx => {
-      const botClients = tx.select({ id: schema.bots.id }).from(schema.bots).where(eq(schema.bots.clientId, schema.oauthClients.id));
-      const existing = await tx.$count(schema.oauthClients, and(eq(schema.oauthClients.applicationId, input.applicationId), notExists(botClients)));
+      const existing = await tx.$count(schema.oauthClients, and(eq(schema.oauthClients.applicationId, input.applicationId), this.isNotBotClient()));
       if (existing >= MAX_CLIENTS_PER_APPLICATION) throw AppErrorCode.ADM_004.create();
       if (isWorkload) await this.assertExactSubjectsUnclaimed(tx, clientId, workloadSubjects);
 
@@ -393,9 +392,25 @@ export class OAuthClientService {
   }
 
   async listClients(applicationId?: number): Promise<OAuthClient[]> {
-    return this.db.query.oauthClients.findMany({
-      ...(applicationId !== undefined ? { where: eq(schema.oauthClients.applicationId, applicationId) } : {}),
-    });
+    const ofApplication = applicationId === undefined ? undefined : eq(schema.oauthClients.applicationId, applicationId);
+    return this.db.select().from(schema.oauthClients).where(and(ofApplication, this.isNotBotClient()));
+  }
+
+  async isBotClient(clientId: string): Promise<boolean> {
+    if (REGEX.BOT_CLIENT_ID.test(clientId)) return true;
+    const bot = await this.db.query.bots.findFirst({ where: eq(schema.bots.clientId, clientId), columns: { id: true } });
+    return bot !== undefined;
+  }
+
+  async resolveOwnAudience(client: OAuthClient): Promise<string | null> {
+    const application = await this.db.query.applications.findFirst({ where: eq(schema.applications.id, client.applicationId), columns: { name: true } });
+    if (!application) return null;
+    const audience = applicationAudience(application.name);
+    return (await this.getResourceOwner(audience)) === client.applicationId ? audience : null;
+  }
+
+  private isNotBotClient() {
+    return notExists(this.db.select({ id: schema.bots.id }).from(schema.bots).where(eq(schema.bots.clientId, schema.oauthClients.id)));
   }
 
   static toAuthMethod(method: OAuthClient.AuthMethod): 'none' | 'client_secret' | 'workload_identity' {

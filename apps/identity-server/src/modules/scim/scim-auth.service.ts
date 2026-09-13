@@ -46,6 +46,7 @@ export class ScimAuthService {
     const clientId = typeof claims.client_id === 'string' ? claims.client_id : null;
     const client = clientId ? await this.oauthClientService.getClient(clientId) : null;
     if (!client || !client.isActive) throw new ScimError(401, 'Unknown client');
+    if (await this.oauthClientService.isBotClient(client.id)) throw new ScimError(403, 'Bot clients cannot provision');
     if (!client.organisationId) throw new ScimError(403, 'Client is not bound to an organisation');
     return { clientId: client.id, organisationId: client.organisationId };
   }
