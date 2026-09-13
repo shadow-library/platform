@@ -232,6 +232,13 @@
       "when": 1789319814274,
       "tag": "0032_backfill_uploaded_cover_illustrations",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1789322160092,
+      "tag": "0033_sloppy_the_santerians",
+      "breakpoints": true
     }
   ]
 }

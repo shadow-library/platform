@@ -382,7 +382,7 @@ describe.if(pgAvailable)('IllustrationService — canon-driven generation', () =
       subjectType: 'entity',
       subjectKey: 'hero',
       promptSpec: { basePrompt: 'b', subjectFraming: 'f', styleNotes: 's', instructions: [], promptKey: 'illustration-compose', promptVersion: '1.0.0' },
-      candidates: [{ ref: first.candidates[0]!.ref, createdAt: new Date().toISOString(), instructionsHash: 'x' }],
+      candidates: [{ ref: first.candidates[0]!.ref, createdAt: new Date().toISOString(), instructionsHash: 'x', referenceRefs: [] }],
     });
 
     await harness.service.discard(projectId, first.id);
@@ -431,7 +431,7 @@ describe.if(pgAvailable)('IllustrationService — canon-driven generation', () =
       const rows = await coverIllustrations(projectId);
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ status: 'active', subjectKey: null, selectedRef: ref, revision: 1, promptSpec: uploadedCoverPromptSpec() });
-      expect(rows[0]?.candidates).toEqual([{ ref, createdAt: expect.any(String), instructionsHash: hashInstructions([]) }]);
+      expect(rows[0]?.candidates).toEqual([{ ref, createdAt: expect.any(String), instructionsHash: hashInstructions([]), referenceRefs: [] }]);
 
       const covers = await harness.service.list(projectId, { subjectType: 'cover' });
       expect(covers).toHaveLength(1);

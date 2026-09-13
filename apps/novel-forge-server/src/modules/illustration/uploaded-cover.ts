@@ -52,7 +52,7 @@ export async function trackUploadedCover(tx: PrimaryDatabase, projectId: bigint,
     subjectType: 'cover',
     subjectKey: null,
     promptSpec,
-    candidates: [{ ref, createdAt: new Date().toISOString(), instructionsHash: hashInstructions(promptSpec.instructions) }],
+    candidates: [{ ref, createdAt: new Date().toISOString(), instructionsHash: hashInstructions(promptSpec.instructions), referenceRefs: [] }],
     selectedRef: ref,
     ownerId,
   });

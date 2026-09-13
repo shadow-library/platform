@@ -250,12 +250,12 @@ export class IllustrationService {
     );
 
     const instructionsHash = hashInstructions(promptSpec.instructions);
-    return Promise.all(images.map(image => this.persist(image, instructionsHash)));
+    return Promise.all(images.map(image => this.persist(image, instructionsHash, referenceRefs)));
   }
 
-  private async persist(image: GeneratedImage, instructionsHash: string): Promise<Illustration.Candidate> {
+  private async persist(image: GeneratedImage, instructionsHash: string, referenceRefs: string[]): Promise<Illustration.Candidate> {
     const ref = await this.storage.save(image.bytes, { contentType: image.contentType });
-    return { ref, createdAt: new Date().toISOString(), instructionsHash };
+    return { ref, createdAt: new Date().toISOString(), instructionsHash, referenceRefs };
   }
 
   private async toDataUrl(ref: string): Promise<string> {

@@ -10,6 +10,21 @@ export namespace Illustration {
   export type Status = InferEnum<typeof illustrationStatus>;
   export type SaveTarget = 'portrait' | 'gallery' | 'chapter' | 'cover';
   export type Origin = 'generated' | 'uploaded';
+  export type ReferenceSource = 'cover' | 'portrait' | 'gallery' | 'chapter-image' | 'candidate';
+  export type ReferenceRole = 'likeness' | 'style' | 'edit-source';
+  export type ReferenceOrigin = 'auto' | 'attached';
+
+  /** One image sent to the model as a reference, resolved server-side from `source` (+ `sourceId`) to a storage `ref`. */
+  export interface Reference {
+    source: ReferenceSource;
+    sourceId?: string;
+    ref: string;
+    role: ReferenceRole;
+    note?: string;
+    origin: ReferenceOrigin;
+    /** The auto-rule name that attached this reference, or `'attached'` for a client-chosen one. */
+    reason: string;
+  }
 
   /** The composed, editable image prompt. Every regeneration renders its text from this object — never from a concatenated string. */
   export interface PromptSpec {
@@ -32,6 +47,8 @@ export namespace Illustration {
     createdAt: string;
     /** sha256 of the instruction list that produced this candidate — identifies which revision it belongs to. */
     instructionsHash: string;
+    /** Storage refs of the references sent alongside this generation, in the order sent. Backfilled to `[]` for pre-existing candidates by migration 0033. */
+    referenceRefs: string[];
   }
 }
 
@@ -53,6 +70,7 @@ export const illustrations = pgTable(
     status: illustrationStatus('status').notNull().default('active'),
     promptSpec: jsonb('prompt_spec').$type<Illustration.PromptSpec>().notNull(),
     candidates: jsonb('candidates').$type<Illustration.Candidate[]>().notNull(),
+    references: jsonb('references').$type<Illustration.Reference[]>().notNull().default([]),
     selectedRef: varchar('selected_ref'),
     revision: integer('revision').notNull().default(1),
     ownerId: bigint('owner_id', { mode: 'bigint' }),
