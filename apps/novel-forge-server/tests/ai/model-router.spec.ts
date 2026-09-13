@@ -13,7 +13,7 @@ import {
   UNRESTRICTED_GROUP_DEFAULTS,
 } from '@modules/ai/defaults';
 import { ModelRouterService, resolveProvider, supportsPromptCaching } from '@modules/ai/model-router.service';
-import { MODEL_REGISTRY } from '@modules/ai/models';
+import { MODEL_MAP, MODEL_REGISTRY } from '@modules/ai/models';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
 import { type AppError, Config } from '@shadow-library/common';
 
@@ -433,5 +433,85 @@ describe('ModelRouterService.structured (repair ladder)', () => {
     const router = makeRouter(fakeChain);
 
     await expect(router.structured<JudgeOutput>(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' })).rejects.toThrow();
+  });
+});
+
+// The over-capacity cases never reach the model_calls insert, so the shared cache-only stub covers them;
+// the success case does, and needs a chainable `insert().values().catch()` the shared stub doesn't offer.
+function stubDatabaseServiceForImages(): never {
+  const noopInsert = { values: () => ({ catch: () => Promise.resolve() }) };
+  const db = { query: { llmCache: { findFirst: async () => undefined } }, insert: () => noopInsert };
+  return { getPostgresClient: () => db } as never;
+}
+
+describe('ModelRouterService.images reference validation', () => {
+  function makeRouter(): ModelRouterService {
+    return new ModelRouterService({} as never, stubDatabaseServiceForImages(), stubQuotaService(), { defaultsFor: async () => undefined } as never);
+  }
+
+  const ctx = { projectId: BigInt(1), promptKey: 'illustration-compose', promptVersion: '1.0.0', role: 'image' as const };
+
+  it('should throw AI_010 when the request exceeds the resolved model’s reference capacity', async () => {
+    const router = makeRouter();
+    const maxInputReferences = MODEL_MAP[PRODUCTION_DEFAULTS.image.model]?.maxInputReferences ?? 0;
+    const overLimit = Array.from({ length: maxInputReferences + 1 }, (_, i) => `data:image/png;base64,${i}`);
+
+    let error: { code: string } | undefined;
+    await router.images({ prompt: 'a lone tower', n: 1, inputReferences: overLimit }, ctx).catch(err => (error = err as { code: string }));
+    expect(error?.code).toBe('AI_010');
+  });
+
+  it('should throw AI_010 for a model that accepts no reference images at all', async () => {
+    const router = makeRouter();
+    const project = { contentMode: 'standard', config: { models: { image: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } } };
+
+    let error: { code: string } | undefined;
+    await router.images({ prompt: 'a lone tower', n: 1, inputReferences: ['data:image/png;base64,x'] }, ctx, project).catch(err => (error = err as { code: string }));
+    expect(error?.code).toBe('AI_010');
+  });
+
+  it('should not validate reference capacity when no references are supplied', async () => {
+    setConfig('ai.openrouter.api.key', 'test-key');
+    setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
+    const originalFetch = globalThis.fetch;
+    (globalThis as unknown as { fetch: unknown }).fetch = async () => ({
+      ok: true,
+      json: async () => ({ data: [{ b64_json: Buffer.from('png').toString('base64'), media_type: 'image/png' }] }),
+    });
+    try {
+      const router = makeRouter();
+      const images = await router.images({ prompt: 'a lone tower', n: 1 }, ctx);
+      expect(images).toHaveLength(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe('ModelRouterService.referenceCapacity', () => {
+  function makeRouter(): ModelRouterService {
+    return new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService(), { defaultsFor: async () => undefined } as never);
+  }
+
+  it('should resolve the capacity of the standard-profile image default', async () => {
+    const router = makeRouter();
+    const expected = MODEL_MAP[PRODUCTION_DEFAULTS.image.model]?.maxInputReferences ?? 0;
+    expect(await router.referenceCapacity({ contentMode: 'standard' })).toBe(expected);
+  });
+
+  it('should resolve the capacity of the unrestricted-profile image default', async () => {
+    const router = makeRouter();
+    const expected = MODEL_MAP[UNRESTRICTED_DEFAULTS.image.model]?.maxInputReferences ?? 0;
+    expect(await router.referenceCapacity({ contentMode: 'unrestricted' })).toBe(expected);
+  });
+
+  it('should honour a project-level image override', async () => {
+    const router = makeRouter();
+    const project = { contentMode: 'standard', config: { models: { image: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } } };
+    expect(await router.referenceCapacity(project)).toBe(0);
+  });
+
+  it('should fall back to zero for a model absent from the registry’s reference metadata', () => {
+    expect(MODEL_MAP['anthropic/claude-sonnet-5']?.maxInputReferences ?? 0).toBe(0);
   });
 });

@@ -188,6 +188,14 @@ export class ModelRouterService {
     return this.resolveModel(role, project, policy, account);
   }
 
+  // Lets a caller (e.g. the reference resolver) learn how many reference images the image model that
+  // would actually be used can accept, before it composes a request. No `policy` parameter: `images()`
+  // itself resolves without one, so accepting one here could answer for a model it would never enforce.
+  async referenceCapacity(project?: ProjectConfig, projectId?: bigint): Promise<number> {
+    const resolved = await this.resolveFor('image', project, projectId);
+    return MODEL_MAP[resolved.model]?.maxInputReferences ?? 0;
+  }
+
   // Every hosted vendor is reached through OpenRouter's OpenAI-compatible endpoint, so one client
   // covers them all; `ai.openrouter.api.url` redirects the leg at an in-cluster gateway speaking the
   // same wire protocol. Ollama stays local and keeps its own client.
@@ -334,6 +342,9 @@ export class ModelRouterService {
   async images(request: ImageRequest, ctx: TelemetryContext, project?: ProjectConfig): Promise<GeneratedImage[]> {
     await this.quota.enforce(ctx.projectId);
     const resolved = await this.resolveFor('image', project, ctx.projectId);
+    const maxInputReferences = MODEL_MAP[resolved.model]?.maxInputReferences ?? 0;
+    const referenceCount = request.inputReferences?.length ?? 0;
+    if (referenceCount > maxInputReferences) throw AppErrorCode.AI_010.create({ model: resolved.model, max: maxInputReferences, count: referenceCount });
     const apiKey = Config.get('ai.openrouter.api.key');
     if (!apiKey) throw AppErrorCode.AI_004.create();
     const url = `${Config.get('ai.openrouter.api.url')}/images`;

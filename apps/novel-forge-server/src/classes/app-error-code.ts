@@ -95,6 +95,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AI_007 = new AppErrorCode('AI_007', 'AI model call failed — see the model call log', 502);
   static readonly AI_008 = AppErrorCode.badRequest('AI_008', 'AI request rate limit reached — too many model calls in the current window, try again shortly', 429);
   static readonly AI_009 = AppErrorCode.badRequest('AI_009', 'AI spend limit reached for this account in the current window — try again later', 429);
+  static readonly AI_010 = AppErrorCode.badRequest('AI_010', 'Model {model} accepts at most {max} reference image(s), but {count} were supplied');
 
   /*!
    * Illustration Errors

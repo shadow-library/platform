@@ -19,6 +19,8 @@ export interface ModelEntry {
   supportsTools?: boolean;
   supportsStructuredOutput?: boolean;
   reasoning?: ReasoningSpec;
+  /** Max reference images the model honours per request; absent or 0 means unsupported. */
+  maxInputReferences?: number;
 }
 
 // All supported models. New entries land here; the router validates against this registry. Every LLM
@@ -47,8 +49,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsStructuredOutput: true,
     reasoning: { mode: 'optional', efforts: ['high', 'medium', 'low', 'none'] },
   },
-  // xAI image
-  { id: 'x-ai/grok-imagine-image-2.0', provider: 'openrouter', kind: 'image' },
+  // xAI image. OpenRouter's per-model `/endpoints` metadata confirms image input support but documents no reference-count limit, so 1 is the conservative floor.
+  { id: 'x-ai/grok-imagine-image-2.0', provider: 'openrouter', kind: 'image', maxInputReferences: 1 },
   // Anthropic
   {
     id: 'anthropic/claude-sonnet-5',
@@ -128,7 +130,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsStructuredOutput: true,
     reasoning: { mode: 'optional', efforts: ['xhigh', 'high', 'medium', 'low', 'none'] },
   },
-  { id: 'openai/gpt-5.4-image-2', provider: 'openrouter', kind: 'image' },
+  // OpenAI image. Confirms image input support the same way, again with no documented reference-count cap.
+  { id: 'openai/gpt-5.4-image-2', provider: 'openrouter', kind: 'image', maxInputReferences: 1 },
   // Moonshot AI
   {
     id: 'moonshotai/kimi-k3',
