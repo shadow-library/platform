@@ -5,7 +5,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
-export type IngestAction = 'novel.upsert' | 'chapter.push' | 'cover.set';
+export type IngestAction = 'novel.upsert' | 'chapter.push' | 'cover.set' | 'original.push' | 'originals.manifest';
 
 export type IngestOutcome = 'created' | 'exists' | 'landed' | 'noop' | 'applied' | 'not_found' | 'out_of_order' | 'conflict' | 'error';
 

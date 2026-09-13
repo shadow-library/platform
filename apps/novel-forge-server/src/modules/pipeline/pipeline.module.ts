@@ -11,6 +11,8 @@ import { RebrandModule } from '../rebrand/rebrand.module';
 import { ReforgeController } from '../reforge/reforge.controller';
 import { ReforgeModule } from '../reforge/reforge.module';
 import { SourceModule } from '../source/source.module';
+import { TranslationController } from '../translation/translation.controller';
+import { TranslationModule } from '../translation/translation.module';
 import { PipelineController } from './pipeline.controller';
 
 /**
@@ -23,7 +25,7 @@ import { PipelineController } from './pipeline.controller';
  */
 @Module({
   /** `FastifyModule` for `ContextService`: the publishing controller reads the session's active organisation off the principal. */
-  imports: [SourceModule, ExtractionModule, PlanningModule, JobsModule, RebrandModule, ReforgeModule, PublishingModule, FastifyModule],
-  controllers: [PipelineController, RebrandController, ReforgeController, PublishingController],
+  imports: [SourceModule, ExtractionModule, PlanningModule, JobsModule, RebrandModule, ReforgeModule, TranslationModule, PublishingModule, FastifyModule],
+  controllers: [PipelineController, RebrandController, ReforgeController, TranslationController, PublishingController],
 })
 export class PipelineModule {}

@@ -4,3 +4,7 @@ export * from './term-matcher';
 export * from './glossary-slice';
 export * from './fidelity-scan';
 export * from './segment-source';
+export * from './translation.dto';
+export * from './translation.service';
+export * from './translation.controller';
+export * from './translation.module';

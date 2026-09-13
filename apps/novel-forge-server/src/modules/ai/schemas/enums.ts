@@ -44,20 +44,6 @@ export const ReforgeFindingKind = EnumType.create('ReforgeFindingKind', [
   'arc_boundary',
   'quality_outlier',
 ]);
-// Temporary: category and treatment become DB enums with the translation schema — replace both with imports from `@server/common` then, as `RebrandGlossaryCategory` already is.
-export const TranslationTermCategory = EnumType.create('TranslationTermCategory', [
-  'character',
-  'place',
-  'organization',
-  'profession',
-  'title',
-  'rank',
-  'ability',
-  'item',
-  'creature',
-  'term',
-]);
-export const TranslationTreatment = EnumType.create('TranslationTreatment', ['translate', 'localize', 'transliterate', 'preserve']);
 export const TranslationAuditIssueType = EnumType.create('TranslationAuditIssueType', [
   'omission',
   'addition',

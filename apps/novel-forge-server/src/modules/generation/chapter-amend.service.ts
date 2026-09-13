@@ -4,7 +4,7 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertActiveProject, decideAmendRepublish, declaredDraftFields, sanitizeMarkdown } from '@server/common';
+import { applyAmendRepublish, assertActiveProject, declaredDraftFields, sanitizeMarkdown } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Chapter, type DbExecutor, type PrimaryDatabase, schema } from '@server/database';
 
@@ -68,7 +68,7 @@ export class ChapterAmendService {
       if (!amended) throw AppErrorCode.CHP_001.create();
 
       await this.recordRevision(tx, projectId, chapterNumber, amended);
-      const decision = await this.republish(tx, projectId, chapterNumber, amended);
+      const decision = await applyAmendRepublish(tx, projectId, chapterNumber, renderChapterPayload(amended));
       return { amended, decision };
     });
 
@@ -119,33 +119,6 @@ export class ChapterAmendService {
         summary: chapter.summary,
       })
       .onConflictDoNothing();
-  }
-
-  /** `publishedOrdinal` is absent from the set clause on purpose: it is the reader's URL, frozen the moment the chapter first published. */
-  private async republish(tx: DbExecutor, projectId: bigint, chapterNumber: number, chapter: Chapter.Row) {
-    const payload = renderChapterPayload(chapter);
-    const ledger = await tx.query.chapterPublications.findFirst({
-      where: and(eq(schema.chapterPublications.projectId, projectId), eq(schema.chapterPublications.chapter, chapterNumber)),
-      orderBy: desc(schema.chapterPublications.publishedOrdinal),
-    });
-
-    const decision = decideAmendRepublish(ledger ?? null, payload.contentHash);
-    if (!ledger || !decision.republish) return decision;
-
-    await tx
-      .update(schema.chapterPublications)
-      .set({
-        title: payload.title,
-        authorNote: payload.authorNote ?? null,
-        contentHash: payload.contentHash,
-        revision: decision.revision,
-        status: 'scheduled',
-        error: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.chapterPublications.id, ledger.id));
-
-    return decision;
   }
 
   /**

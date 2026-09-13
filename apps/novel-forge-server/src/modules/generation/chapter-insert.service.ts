@@ -61,6 +61,7 @@ interface ShiftTarget {
  * - `chapter_chunks.chapter`, `validation_reports.chapter`, `extraction_runs.chapter` — written only from `done` chapters.
  * - `volumes.start_chapter`/`end_chapter`, `arcs.chapter_start`/`chapter_end` — ranges, grown by `growPlan` rather than shifted.
  * - `chapter_conversions`, `chapter_reforges`, `rebrand_glossary`, `reforge_*` — keyed to source projects, outside this path.
+ * - `chapter_translations` — keyed to translation projects, which have no brief/draft pipeline to insert into.
  * - every `ordinal`, `*_count` and `chapters_analyzed` column — positions and counts, not chapter numbers.
  */
 const SHIFT_TARGETS: ShiftTarget[] = [

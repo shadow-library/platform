@@ -1,6 +1,8 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
-import { TranslationAuditIssueType, TranslationAuditVerdict, TranslationTermCategory, TranslationTreatment } from './enums';
+import { TranslationGlossaryCategory, TranslationTreatment } from '@server/common';
+
+import { TranslationAuditIssueType, TranslationAuditVerdict } from './enums';
 
 @Schema()
 export class TranslationTermAlternative {
@@ -25,7 +27,7 @@ export class TranslationTermSuggestion {
   @Field(() => [TranslationTermAlternative], { optional: true, description: 'other renderings worth considering, each with the reason it might win' })
   alternatives?: TranslationTermAlternative[];
 
-  @Field(() => TranslationTermCategory)
+  @Field(() => TranslationGlossaryCategory)
   category: 'character' | 'place' | 'organization' | 'profession' | 'title' | 'rank' | 'ability' | 'item' | 'creature' | 'term';
 
   @Field(() => TranslationTreatment, { description: 'translate the sense, localize to an English equivalent, transliterate the sound, or preserve the original characters' })
