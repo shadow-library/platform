@@ -307,6 +307,17 @@ export const SunIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
+export const BotIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <rect x="4" y="8" width="16" height="12" rx="3" />
+    <path d="M12 8V4.5" />
+    <circle cx="12" cy="3.5" r="1" />
+    <circle cx="9" cy="14" r="1.2" />
+    <circle cx="15" cy="14" r="1.2" />
+    <path d="M2 13v3M22 13v3" />
+  </SvgIcon>
+);
+
 export const BrandGlyph = ({ size = 24 }: { size?: number }): React.JSX.Element => (
   <svg width={size} height={size} viewBox="0 0 28 28" fill="none" aria-hidden="true">
     <rect x="7" y="7" width="17" height="17" rx="5" fill="var(--sh-accent-soft)" />

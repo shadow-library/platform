@@ -1530,6 +1530,216 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/organisations/{organisationId}/oauth-apps': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Apps */
+    get: operations['get_api_v1_organisations_organisationId_oauth_apps'];
+    put?: never;
+    /** Register App */
+    post: operations['post_api_v1_organisations_organisationId_oauth_apps'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/oauth-apps/scope-catalog': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Scope Catalog */
+    get: operations['get_api_v1_organisations_organisationId_oauth_apps_scope_catalog'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/oauth-apps/{applicationId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get App */
+    get: operations['get_api_v1_organisations_organisationId_oauth_apps_applicationId'];
+    put?: never;
+    post?: never;
+    /** Delete App */
+    delete: operations['delete_api_v1_organisations_organisationId_oauth_apps_applicationId'];
+    options?: never;
+    head?: never;
+    /** Update App */
+    patch: operations['patch_api_v1_organisations_organisationId_oauth_apps_applicationId'];
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/oauth-apps/{applicationId}/rotate-secret': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Rotate Secret */
+    post: operations['post_api_v1_organisations_organisationId_oauth_apps_applicationId_rotate_secret'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/oauth-apps/{applicationId}/scopes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Grant Scope */
+    post: operations['post_api_v1_organisations_organisationId_oauth_apps_applicationId_scopes'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/oauth-apps/{applicationId}/scopes/{scopeId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Revoke Scope */
+    delete: operations['delete_api_v1_organisations_organisationId_oauth_apps_applicationId_scopes_scopeId'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Bots */
+    get: operations['get_api_v1_organisations_organisationId_bots'];
+    put?: never;
+    /** Create Bot */
+    post: operations['post_api_v1_organisations_organisationId_bots'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Bot */
+    get: operations['get_api_v1_organisations_organisationId_bots_botId'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update Bot */
+    patch: operations['patch_api_v1_organisations_organisationId_bots_botId'];
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}/suspend': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Suspend Bot */
+    post: operations['post_api_v1_organisations_organisationId_bots_botId_suspend'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}/resume': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Resume Bot */
+    post: operations['post_api_v1_organisations_organisationId_bots_botId_resume'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}/keys': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Keys */
+    get: operations['get_api_v1_organisations_organisationId_bots_botId_keys'];
+    put?: never;
+    /** Create Key */
+    post: operations['post_api_v1_organisations_organisationId_bots_botId_keys'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}/keys/{keyId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Revoke Key */
+    delete: operations['delete_api_v1_organisations_organisationId_bots_botId_keys_keyId'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/internal/users/resolve': {
     parameters: {
       query?: never;
@@ -3324,6 +3534,187 @@ export interface components {
     };
     RemovePhoneBody: {
       phone: string;
+    };
+    OrgOAuthAppsResponse: {
+      apps: components['schemas']['OrgOAuthAppItem'][];
+    };
+    OrgOAuthAppItem: {
+      applicationId: number;
+      clientId: string;
+      displayName?: string;
+      isActive: boolean;
+      createdAt: string;
+    };
+    RegisterOrgOAuthAppBody: {
+      /** @description Name shown to members on the consent screen and in their connected-apps list. */
+      displayName: string;
+      /**
+       * @description WEB_CONFIDENTIAL issues a client secret; SPA_PUBLIC and NATIVE_PUBLIC are secretless PKCE clients.
+       * @enum {string}
+       */
+      kind: 'WEB_CONFIDENTIAL' | 'SPA_PUBLIC' | 'NATIVE_PUBLIC';
+      /** @description Exact redirect URIs. https only, except http://localhost or http://127.0.0.1 for public clients and a custom scheme for NATIVE_PUBLIC. Wildcards are rejected. */
+      redirectUris: string[];
+      /** @description Public landing page for the app; must be an https URL. */
+      homePageUrl?: string;
+      /** @description Icon shown on the consent screen; must be an https URL. */
+      logoUrl?: string;
+      /** @description Grants the refresh_token grant so the app can keep access while the member is away. */
+      offlineAccess?: boolean;
+    };
+    RegisterOrgOAuthAppResponse: {
+      applicationId: number;
+      clientId: string;
+      /** @description Client secret returned exactly once; only its Argon2id hash is stored. */
+      clientSecret?: string;
+    };
+    OrgOAuthAppScopeCatalogResponse: {
+      scopes: components['schemas']['OrgOAuthAppScopeItem'][];
+    };
+    OrgOAuthAppScopeItem: {
+      scopeId: string;
+      name: string;
+      description?: string;
+      /** @description Audience the scope belongs to; the app must request it as the resource indicator. */
+      resourceIdentifier: string;
+      /** @description Display name of the platform application that owns the scope. */
+      applicationDisplayName?: string;
+    };
+    OrgOAuthAppDetailResponse: {
+      applicationId: number;
+      clientId: string;
+      displayName?: string;
+      isActive: boolean;
+      createdAt: string;
+      /** @enum {string} */
+      kind: 'WEB_CONFIDENTIAL' | 'SPA_PUBLIC' | 'NATIVE_PUBLIC';
+      redirectUris: string[];
+      /** @description Scope names granted to the client, in addition to the OIDC protocol scopes every client may request. */
+      scopes: string[];
+      homePageUrl?: string;
+      logoUrl?: string;
+    };
+    UpdateOrgOAuthAppBody: {
+      displayName?: string;
+      /** @description Public landing page for the app; must be an https URL. */
+      homePageUrl?: string;
+      /** @description Icon shown on the consent screen; must be an https URL. */
+      logoUrl?: string;
+      /** @description Replaces the full redirect URI set; the same scheme rules as registration apply. */
+      redirectUris?: string[];
+      /** @description Deactivating stops the app from being granted to members at the authorization endpoint. */
+      isActive?: boolean;
+    };
+    RotateOrgOAuthAppSecretResponse: {
+      /** @description Replacement client secret, shown exactly once. */
+      secret: string;
+      /** @description Moment the superseded secrets stop being accepted, leaving an overlap window to roll the change out. */
+      previousSecretsExpireAt: string;
+    };
+    GrantOrgOAuthAppScopeBody: {
+      /** @description Scope from the organisation scope catalog; anything outside it is rejected. */
+      scopeId: string;
+    };
+    BotsResponse: {
+      bots: components['schemas']['BotItem'][];
+      usage: components['schemas']['BotUsageItem'];
+    };
+    BotItem: {
+      id: string;
+      /** @description OAuth client backing the bot; it is the principal id in role assignments and issued tokens. */
+      clientId: string;
+      handle: string;
+      displayName: string;
+      description?: string;
+      /** @enum {string} */
+      status: 'ACTIVE' | 'SUSPENDED' | 'DELETING' | 'DELETED';
+      ipAllowlist: string[];
+      rateLimitPerMinute: number;
+      /** @description Keys that are neither revoked nor expired. */
+      activeKeyCount: number;
+      /** @description Most recent use of any of the bot keys. */
+      lastUsedAt?: string;
+      /** @description Caller address of that most recent use. */
+      lastUsedIp?: string;
+      createdBy?: components['schemas']['BotUserItem'];
+      createdAt: string;
+      updatedAt: string;
+      suspendedAt?: string;
+      suspendedBy?: components['schemas']['BotUserItem'];
+    };
+    BotUserItem: {
+      id: string;
+      displayName?: string;
+    };
+    BotUsageItem: {
+      /** @description Bots that count toward the limit: every bot not yet deleted. */
+      count: number;
+      limit: number;
+    };
+    CreateBotBody: {
+      /** @description Organisation-unique handle rendered as `<handle>[bot]` on everything the bot owns; it can never change. */
+      handle: string;
+      displayName: string;
+      description?: string;
+      /** @description IPv4 or IPv6 addresses or CIDR ranges allowed to exchange the bot keys; host bits are cleared and duplicates dropped. Empty allows every address. */
+      ipAllowlist?: string[];
+      /** @description Requests per minute each app accepts from the bot. Defaults to 600, which is also the ceiling. */
+      rateLimitPerMinute?: number;
+    };
+    UpdateBotBody: {
+      displayName?: string;
+      /** @description null clears the description. */
+      description?: string | null;
+      /** @description Replaces the full allowlist; the same rules as creation apply and an empty list allows every address. */
+      ipAllowlist?: string[];
+      rateLimitPerMinute?: number;
+    };
+    BotKeysResponse: {
+      keys: components['schemas']['BotKeyItem'][];
+    };
+    BotKeyItem: {
+      id: string;
+      name: string;
+      /** @description First 16 characters of the key, safe to display for recognising it. */
+      keyPrefix: string;
+      /**
+       * @description REVOKED wins over EXPIRED when both apply.
+       * @enum {string}
+       */
+      status: 'ACTIVE' | 'EXPIRED' | 'REVOKED';
+      expiresAt: string;
+      createdAt: string;
+      createdBy?: components['schemas']['BotUserItem'];
+      lastUsedAt?: string;
+      lastUsedIp?: string;
+      revokedAt?: string;
+      revokedBy?: components['schemas']['BotUserItem'];
+    };
+    CreateBotKeyBody: {
+      /** @description Where the key will live, such as the CI system or environment that holds it. */
+      name: string;
+      /** @description ISO-8601 expiry, strictly in the future and at most 365 days away. */
+      expiresAt: string;
+    };
+    CreatedBotKeyResponse: {
+      id: string;
+      name: string;
+      /** @description First 16 characters of the key, safe to display for recognising it. */
+      keyPrefix: string;
+      /**
+       * @description REVOKED wins over EXPIRED when both apply.
+       * @enum {string}
+       */
+      status: 'ACTIVE' | 'EXPIRED' | 'REVOKED';
+      expiresAt: string;
+      createdAt: string;
+      createdBy?: components['schemas']['BotUserItem'];
+      lastUsedAt?: string;
+      lastUsedIp?: string;
+      revokedAt?: string;
+      revokedBy?: components['schemas']['BotUserItem'];
+      /** @description The full key, returned exactly once; only a SHA-256 hash of its secret is stored. */
+      key: string;
     };
     ResolveUsersBody: {
       emails: string[];
@@ -8234,6 +8625,765 @@ export interface operations {
       };
     };
   };
+  get_api_v1_organisations_organisationId_oauth_apps: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrgOAuthAppsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_organisations_organisationId_oauth_apps: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RegisterOrgOAuthAppBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RegisterOrgOAuthAppResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_oauth_apps_scope_catalog: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrgOAuthAppScopeCatalogResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_oauth_apps_applicationId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        applicationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrgOAuthAppDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_organisations_organisationId_oauth_apps_applicationId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        applicationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_organisations_organisationId_oauth_apps_applicationId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        applicationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateOrgOAuthAppBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_organisations_organisationId_oauth_apps_applicationId_rotate_secret: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        applicationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RotateOrgOAuthAppSecretResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_organisations_organisationId_oauth_apps_applicationId_scopes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        applicationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GrantOrgOAuthAppScopeBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_organisations_organisationId_oauth_apps_applicationId_scopes_scopeId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        applicationId: string;
+        scopeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_bots: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_organisations_organisationId_bots: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateBotBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotItem'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_bots_botId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotItem'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_organisations_organisationId_bots_botId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateBotBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_organisations_organisationId_bots_botId_suspend: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_organisations_organisationId_bots_botId_resume: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_bots_botId_keys: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotKeysResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_organisations_organisationId_bots_botId_keys: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateBotKeyBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CreatedBotKeyResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_organisations_organisationId_bots_botId_keys_keyId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+        keyId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_internal_users_resolve: {
     parameters: {
       query?: never;
@@ -11552,6 +12702,26 @@ export type ContactOperationResponse = components['schemas']['ContactOperationRe
 export type RemoveEmailBody = components['schemas']['RemoveEmailBody'];
 export type AddPhoneBody = components['schemas']['AddPhoneBody'];
 export type RemovePhoneBody = components['schemas']['RemovePhoneBody'];
+export type OrgOAuthAppsResponse = components['schemas']['OrgOAuthAppsResponse'];
+export type OrgOAuthAppItem = components['schemas']['OrgOAuthAppItem'];
+export type RegisterOrgOAuthAppBody = components['schemas']['RegisterOrgOAuthAppBody'];
+export type RegisterOrgOAuthAppResponse = components['schemas']['RegisterOrgOAuthAppResponse'];
+export type OrgOAuthAppScopeCatalogResponse = components['schemas']['OrgOAuthAppScopeCatalogResponse'];
+export type OrgOAuthAppScopeItem = components['schemas']['OrgOAuthAppScopeItem'];
+export type OrgOAuthAppDetailResponse = components['schemas']['OrgOAuthAppDetailResponse'];
+export type UpdateOrgOAuthAppBody = components['schemas']['UpdateOrgOAuthAppBody'];
+export type RotateOrgOAuthAppSecretResponse = components['schemas']['RotateOrgOAuthAppSecretResponse'];
+export type GrantOrgOAuthAppScopeBody = components['schemas']['GrantOrgOAuthAppScopeBody'];
+export type BotsResponse = components['schemas']['BotsResponse'];
+export type BotItem = components['schemas']['BotItem'];
+export type BotUserItem = components['schemas']['BotUserItem'];
+export type BotUsageItem = components['schemas']['BotUsageItem'];
+export type CreateBotBody = components['schemas']['CreateBotBody'];
+export type UpdateBotBody = components['schemas']['UpdateBotBody'];
+export type BotKeysResponse = components['schemas']['BotKeysResponse'];
+export type BotKeyItem = components['schemas']['BotKeyItem'];
+export type CreateBotKeyBody = components['schemas']['CreateBotKeyBody'];
+export type CreatedBotKeyResponse = components['schemas']['CreatedBotKeyResponse'];
 export type ResolveUsersBody = components['schemas']['ResolveUsersBody'];
 export type ResolveUsersResponse = components['schemas']['ResolveUsersResponse'];
 export type ResolvedUserItem = components['schemas']['ResolvedUserItem'];
@@ -11645,6 +12815,12 @@ export type GetFlowPathParams = Exclude<paths['/api/v1/auth/flow/{flowId}']['get
 export type HandleFederatedCallbackQueryParams = Exclude<paths['/api/v1/auth/federated/callback']['get']['parameters']['query'], undefined>;
 export type ResolveStepUpIntentQueryParams = Exclude<paths['/api/v1/me/mfa/step-up/intent']['get']['parameters']['query'], undefined>;
 export type ListIdentityProvidersPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/identity-providers']['get']['parameters']['path'], undefined>;
+export type ListAppsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/oauth-apps']['get']['parameters']['path'], undefined>;
+export type ListScopeCatalogPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/oauth-apps/scope-catalog']['get']['parameters']['path'], undefined>;
+export type GetAppPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/oauth-apps/{applicationId}']['get']['parameters']['path'], undefined>;
+export type ListBotsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots']['get']['parameters']['path'], undefined>;
+export type GetBotPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}']['get']['parameters']['path'], undefined>;
+export type ListKeysPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}/keys']['get']['parameters']['path'], undefined>;
 export type IsOrganisationMemberPathParams = Exclude<paths['/api/v1/internal/organisations/{organisationId}/members/{userId}']['get']['parameters']['path'], undefined>;
 export type SearchUsersQueryParams = Exclude<paths['/api/v1/admin/users']['get']['parameters']['query'], undefined>;
 export type GetUserDetailPathParams = Exclude<paths['/api/v1/admin/users/{userId}']['get']['parameters']['path'], undefined>;

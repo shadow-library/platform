@@ -10,6 +10,7 @@ export * from './application.api';
 export * from './consent.api';
 export * from './organisation.api';
 export * from './organisation-application.api';
+export * from './bot.api';
 export * from './admin-user.api';
 export * from './admin-client.api';
 export * from './admin-resource.api';

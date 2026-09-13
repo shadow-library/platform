@@ -46,6 +46,9 @@ import { Route as PortalOrganizationsOrgIdProvidersRouteImport } from './routes/
 import { Route as PortalOrganizationsOrgIdMembersRouteImport } from './routes/_portal/organizations/$orgId/members'
 import { Route as PortalOrganizationsOrgIdDomainsRouteImport } from './routes/_portal/organizations/$orgId/domains'
 import { Route as PortalOrganizationsOrgIdApplicationsRouteImport } from './routes/_portal/organizations/$orgId/applications'
+import { Route as PortalOrganizationsOrgIdBotsIndexRouteImport } from './routes/_portal/organizations/$orgId/bots.index'
+import { Route as PortalOrganizationsOrgIdBotsNewRouteImport } from './routes/_portal/organizations/$orgId/bots.new'
+import { Route as PortalOrganizationsOrgIdBotsBotIdRouteImport } from './routes/_portal/organizations/$orgId/bots.$botId'
 
 const ConsoleRoute = ConsoleRouteImport.update({
   id: '/console',
@@ -241,6 +244,24 @@ const PortalOrganizationsOrgIdApplicationsRoute =
     path: '/applications',
     getParentRoute: () => PortalOrganizationsOrgIdRoute,
   } as any)
+const PortalOrganizationsOrgIdBotsIndexRoute =
+  PortalOrganizationsOrgIdBotsIndexRouteImport.update({
+    id: '/bots/',
+    path: '/bots/',
+    getParentRoute: () => PortalOrganizationsOrgIdRoute,
+  } as any)
+const PortalOrganizationsOrgIdBotsNewRoute =
+  PortalOrganizationsOrgIdBotsNewRouteImport.update({
+    id: '/bots/new',
+    path: '/bots/new',
+    getParentRoute: () => PortalOrganizationsOrgIdRoute,
+  } as any)
+const PortalOrganizationsOrgIdBotsBotIdRoute =
+  PortalOrganizationsOrgIdBotsBotIdRouteImport.update({
+    id: '/bots/$botId',
+    path: '/bots/$botId',
+    getParentRoute: () => PortalOrganizationsOrgIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -278,6 +299,9 @@ export interface FileRoutesByFullPath {
   '/organizations/$orgId/security': typeof PortalOrganizationsOrgIdSecurityRoute
   '/organizations/$orgId/settings': typeof PortalOrganizationsOrgIdSettingsRoute
   '/organizations/$orgId/': typeof PortalOrganizationsOrgIdIndexRoute
+  '/organizations/$orgId/bots/$botId': typeof PortalOrganizationsOrgIdBotsBotIdRoute
+  '/organizations/$orgId/bots/new': typeof PortalOrganizationsOrgIdBotsNewRoute
+  '/organizations/$orgId/bots/': typeof PortalOrganizationsOrgIdBotsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -313,6 +337,9 @@ export interface FileRoutesByTo {
   '/organizations/$orgId/security': typeof PortalOrganizationsOrgIdSecurityRoute
   '/organizations/$orgId/settings': typeof PortalOrganizationsOrgIdSettingsRoute
   '/organizations/$orgId': typeof PortalOrganizationsOrgIdIndexRoute
+  '/organizations/$orgId/bots/$botId': typeof PortalOrganizationsOrgIdBotsBotIdRoute
+  '/organizations/$orgId/bots/new': typeof PortalOrganizationsOrgIdBotsNewRoute
+  '/organizations/$orgId/bots': typeof PortalOrganizationsOrgIdBotsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -353,6 +380,9 @@ export interface FileRoutesById {
   '/_portal/organizations/$orgId/security': typeof PortalOrganizationsOrgIdSecurityRoute
   '/_portal/organizations/$orgId/settings': typeof PortalOrganizationsOrgIdSettingsRoute
   '/_portal/organizations/$orgId/': typeof PortalOrganizationsOrgIdIndexRoute
+  '/_portal/organizations/$orgId/bots/$botId': typeof PortalOrganizationsOrgIdBotsBotIdRoute
+  '/_portal/organizations/$orgId/bots/new': typeof PortalOrganizationsOrgIdBotsNewRoute
+  '/_portal/organizations/$orgId/bots/': typeof PortalOrganizationsOrgIdBotsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -392,6 +422,9 @@ export interface FileRouteTypes {
     | '/organizations/$orgId/security'
     | '/organizations/$orgId/settings'
     | '/organizations/$orgId/'
+    | '/organizations/$orgId/bots/$botId'
+    | '/organizations/$orgId/bots/new'
+    | '/organizations/$orgId/bots/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -427,6 +460,9 @@ export interface FileRouteTypes {
     | '/organizations/$orgId/security'
     | '/organizations/$orgId/settings'
     | '/organizations/$orgId'
+    | '/organizations/$orgId/bots/$botId'
+    | '/organizations/$orgId/bots/new'
+    | '/organizations/$orgId/bots'
   id:
     | '__root__'
     | '/'
@@ -466,6 +502,9 @@ export interface FileRouteTypes {
     | '/_portal/organizations/$orgId/security'
     | '/_portal/organizations/$orgId/settings'
     | '/_portal/organizations/$orgId/'
+    | '/_portal/organizations/$orgId/bots/$botId'
+    | '/_portal/organizations/$orgId/bots/new'
+    | '/_portal/organizations/$orgId/bots/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -737,6 +776,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalOrganizationsOrgIdApplicationsRouteImport
       parentRoute: typeof PortalOrganizationsOrgIdRoute
     }
+    '/_portal/organizations/$orgId/bots/': {
+      id: '/_portal/organizations/$orgId/bots/'
+      path: '/bots'
+      fullPath: '/organizations/$orgId/bots/'
+      preLoaderRoute: typeof PortalOrganizationsOrgIdBotsIndexRouteImport
+      parentRoute: typeof PortalOrganizationsOrgIdRoute
+    }
+    '/_portal/organizations/$orgId/bots/new': {
+      id: '/_portal/organizations/$orgId/bots/new'
+      path: '/bots/new'
+      fullPath: '/organizations/$orgId/bots/new'
+      preLoaderRoute: typeof PortalOrganizationsOrgIdBotsNewRouteImport
+      parentRoute: typeof PortalOrganizationsOrgIdRoute
+    }
+    '/_portal/organizations/$orgId/bots/$botId': {
+      id: '/_portal/organizations/$orgId/bots/$botId'
+      path: '/bots/$botId'
+      fullPath: '/organizations/$orgId/bots/$botId'
+      preLoaderRoute: typeof PortalOrganizationsOrgIdBotsBotIdRouteImport
+      parentRoute: typeof PortalOrganizationsOrgIdRoute
+    }
   }
 }
 
@@ -770,6 +830,9 @@ interface PortalOrganizationsOrgIdRouteChildren {
   PortalOrganizationsOrgIdSecurityRoute: typeof PortalOrganizationsOrgIdSecurityRoute
   PortalOrganizationsOrgIdSettingsRoute: typeof PortalOrganizationsOrgIdSettingsRoute
   PortalOrganizationsOrgIdIndexRoute: typeof PortalOrganizationsOrgIdIndexRoute
+  PortalOrganizationsOrgIdBotsBotIdRoute: typeof PortalOrganizationsOrgIdBotsBotIdRoute
+  PortalOrganizationsOrgIdBotsNewRoute: typeof PortalOrganizationsOrgIdBotsNewRoute
+  PortalOrganizationsOrgIdBotsIndexRoute: typeof PortalOrganizationsOrgIdBotsIndexRoute
 }
 
 const PortalOrganizationsOrgIdRouteChildren: PortalOrganizationsOrgIdRouteChildren =
@@ -785,6 +848,11 @@ const PortalOrganizationsOrgIdRouteChildren: PortalOrganizationsOrgIdRouteChildr
     PortalOrganizationsOrgIdSettingsRoute:
       PortalOrganizationsOrgIdSettingsRoute,
     PortalOrganizationsOrgIdIndexRoute: PortalOrganizationsOrgIdIndexRoute,
+    PortalOrganizationsOrgIdBotsBotIdRoute:
+      PortalOrganizationsOrgIdBotsBotIdRoute,
+    PortalOrganizationsOrgIdBotsNewRoute: PortalOrganizationsOrgIdBotsNewRoute,
+    PortalOrganizationsOrgIdBotsIndexRoute:
+      PortalOrganizationsOrgIdBotsIndexRoute,
   }
 
 const PortalOrganizationsOrgIdRouteWithChildren =
