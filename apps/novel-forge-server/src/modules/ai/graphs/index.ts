@@ -8,5 +8,6 @@ export * from './novel-validation.graph';
 export * from './source-extraction.graph';
 export * from './chapter-rebrand.graph';
 export * from './chapter-reforge.graph';
+export * from './chapter-translation.graph';
 export * from './span-transform.graph';
 export * from './workflow-run.service';

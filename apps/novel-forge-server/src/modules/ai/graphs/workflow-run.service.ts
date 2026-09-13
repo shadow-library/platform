@@ -20,6 +20,7 @@ import { createChapterFinalizationGraph, type FinalizationServices } from './cha
 import { createChapterGenerationGraph, type GraphServices } from './chapter-generation.graph';
 import { createChapterRebrandGraph, type RebrandGraphServices } from './chapter-rebrand.graph';
 import { createChapterReforgeGraph, type ReforgeGraphServices } from './chapter-reforge.graph';
+import { createChapterTranslationGraph, type TranslationGraphServices } from './chapter-translation.graph';
 import { createSpanTransformGraph, type SpanTransformServices } from './span-transform.graph';
 import { createNovelValidationGraph, type ValidationServices } from './novel-validation.graph';
 import { createSourceExtractionGraph, type ExtractionServices } from './source-extraction.graph';
@@ -72,6 +73,12 @@ export interface ReforgeChapterInput {
   jobId?: string;
 }
 
+export interface TranslationChapterInput {
+  projectId: bigint;
+  chapter: number;
+  jobId?: string;
+}
+
 export interface SpanTransformInput {
   projectId: bigint;
   planId: bigint;
@@ -95,6 +102,12 @@ export interface WorkflowRunResult {
 // DatabaseModule is configured from rather than Config.get (which returns undefined until the module
 // registers the key lazily on first connect — a wrong-DB fallback risk here).
 const DB_URL = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
+
+// Each segment of a chapter is its own superstep and every repair pass replays the flagged ones, so the
+// LangGraph default of 25 aborts any real chapter mid-translation — and an abort here loses a fully
+// translated chapter as a failed run. This covers segments x (MAX_REPAIRS_CEILING + 1) + the fixed nodes
+// up to a 32-segment chapter, i.e. ~57k source tokens at the default 1,800-token segment size.
+const TRANSLATION_RECURSION_LIMIT = 150;
 
 // jsonb columns serialise via JSON.stringify, which throws on bigint. Every workflow input carries
 // bigint identifiers (projectId, draftId), so coerce them to strings before the row is persisted.
@@ -343,6 +356,27 @@ export class WorkflowRunService {
       return { runId, outcome, status: 'completed' };
     } catch (err) {
       this.logger.error('runChapterReforge failed', { err, runId });
+      await this.failRun(runId, err);
+      return { runId, outcome: 'failed', status: 'failed' };
+    }
+  }
+
+  async runChapterTranslation(input: TranslationChapterInput): Promise<WorkflowRunResult> {
+    const runId = await this.createRun(input.projectId, 'chapter-translation', `chapter-${input.chapter}`, input, input.jobId);
+
+    try {
+      const graph = createChapterTranslationGraph(this.graphServices as TranslationGraphServices);
+      const rawState = await graph.invoke(
+        { projectId: String(input.projectId), chapter: input.chapter, runId },
+        { configurable: { thread_id: runId }, recursionLimit: TRANSLATION_RECURSION_LIMIT },
+      );
+      const finalState = rawState as unknown as { outcome: string | null; nodeTrace?: string[] };
+      const outcome = finalState.outcome ?? 'translated';
+
+      await this.completeRun(runId, outcome, 'completed', finalState.nodeTrace ?? []);
+      return { runId, outcome, status: 'completed' };
+    } catch (err) {
+      this.logger.error('runChapterTranslation failed', { err, runId });
       await this.failRun(runId, err);
       return { runId, outcome: 'failed', status: 'failed' };
     }
