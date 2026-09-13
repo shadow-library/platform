@@ -27,6 +27,9 @@ const { ModelRouterService } = await import('@server/modules/ai/model-router.ser
 const { judgePrompt } = await import('@server/modules/ai/prompts/judge.prompt');
 const { titlePrompt } = await import('@server/modules/ai/prompts/title.prompt');
 const { foundationPrompt } = await import('@server/modules/ai/prompts/bible-builder/foundation.prompt');
+const { translateSeedPrompt } = await import('@server/modules/ai/prompts/translate-seed.prompt');
+const { translateChapterPrompt } = await import('@server/modules/ai/prompts/translate-chapter.prompt');
+const { translateAuditPrompt } = await import('@server/modules/ai/prompts/translate-audit.prompt');
 
 // Minimal no-op telemetry — smoke test does not need DB writes.
 class SmokeNoop extends BaseCallbackHandler {
@@ -98,6 +101,56 @@ try {
   record('generation chat', content.length > 5, `content length=${content.length}`);
 } catch (err) {
   record('generation chat', false, String(err));
+}
+
+// Translation pipeline (TL9): the three prompt modules through the same `router.structured` path the
+// checks above use, chained seed → chapter → audit like a real run — a two-entry glossary slice feeds
+// the chapter translation, and the chapter's own output becomes the audit's aligned pair.
+const zhSample = '叶凡站在城墙之上，望着远方的战场，心中涌起一股寒意。他知道，属于灵界的战争，才刚刚开始。';
+const glossarySlice = '- 叶凡 (character, translate) -> Ye Fan\n- 灵界 (place, translate) -> Spirit Realm';
+let translatedBody = '';
+
+try {
+  const ctx = { projectId: BigInt(1), promptKey: 'translate-seed', promptVersion: '1.0.0', role: 'translate' };
+  const result = await router.structured(
+    translateSeedPrompt,
+    { contextPack: 'PROJECT: A cultivator web novel following Ye Fan as he rises through the spirit realm.', language: 'zh', sampleChapters: `Chapter 1:\n${zhSample}` },
+    ctx,
+  );
+  record('translate-seed structured output', typeof result.styleNotes === 'string' && result.styleNotes.length > 10, `terms=${result.terms.length}`);
+} catch (err) {
+  record('translate-seed structured output', false, String(err));
+}
+
+try {
+  const ctx = { projectId: BigInt(1), promptKey: 'translate-chapter', promptVersion: '1.0.0', role: 'translate' };
+  const result = await router.structured(
+    translateChapterPrompt,
+    {
+      stableContext: `Style notes: third person past tense, honorifics dropped.\nGlossary:\n${glossarySlice}`,
+      volatileContext: 'Term policy: apply the glossary above exactly.',
+      segmentIndex: 1,
+      segmentCount: 1,
+      sourceSegment: zhSample,
+      prevTranslatedTail: 'none',
+      repairNotes: 'none',
+    },
+    ctx,
+  );
+  translatedBody = result.body;
+  record('translate-chapter structured output', typeof result.body === 'string' && result.body.length > 5, `body length=${result.body.length}`);
+} catch (err) {
+  record('translate-chapter structured output', false, String(err));
+}
+
+try {
+  const ctx = { projectId: BigInt(1), promptKey: 'translate-audit', promptVersion: '1.0.0', role: 'audit' };
+  const translation = translatedBody || '(translate-chapter rung produced no body — auditing an empty translation)';
+  const pairs = `### Segment 1\n[original]\n${zhSample}\n[translation]\n${translation}`;
+  const result = await router.structured(translateAuditPrompt, { styleNotes: 'Third person past tense, honorifics dropped.', glossarySlice, pairs }, ctx);
+  record('translate-audit structured output', ['clean', 'issues'].includes(result.verdict), `verdict=${result.verdict}`);
+} catch (err) {
+  record('translate-audit structured output', false, String(err));
 }
 
 const passed = results.filter(r => r.passed).length;
