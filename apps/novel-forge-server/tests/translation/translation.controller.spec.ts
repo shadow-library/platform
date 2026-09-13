@@ -32,10 +32,8 @@ describe.if(pgAvailable)('Translation API', () => {
       .getRouter()
       .mockRequest()
       .post('/api/v1/projects')
-      .body({ name: `translation-api-${Math.random()}`, kind });
-    const projectId = BigInt(response.json().id as string);
-    if (kind === 'translation') await db().update(schema.projects).set({ originalLanguage: language }).where(eq(schema.projects.id, projectId));
-    return projectId;
+      .body({ name: `translation-api-${Math.random()}`, kind, ...(kind === 'translation' ? { originalLanguage: language } : {}) });
+    return BigInt(response.json().id as string);
   }
 
   const pushOriginal = (projectId: bigint, chapter: number, title: string, content: string) =>
