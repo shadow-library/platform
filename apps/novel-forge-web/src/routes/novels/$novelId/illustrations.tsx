@@ -142,8 +142,9 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
   const optionsSubjectKey = subjectType === 'cover' ? undefined : subjectType === 'chapter' ? optionsKey : resolvedKey.trim();
   const optionsReady = subjectType !== 'chapter' || (optionsKey === resolvedKey.trim() && CHAPTER_KEY.test(optionsKey));
   const optionsQuery = useReferenceOptionsQuery(novelId, { subjectType, subjectKey: optionsSubjectKey }, open && !invalid && optionsReady);
-  const options = settledStartOptions(optionsQuery.data, optionsQuery.isPlaceholderData);
-  const refreshing = optionsQuery.isPlaceholderData;
+  const settling = !invalid && !optionsReady;
+  const refreshing = optionsQuery.isPlaceholderData || settling;
+  const options = settledStartOptions(optionsQuery.data, refreshing);
   const meta = collectReferenceMeta(options, options?.autoPreview);
   const plan = options ? planStartSlots(options.capacity, references, subjectType !== 'cover' && autoReferences, options.autoPreview, meta) : undefined;
   const awaitingCapacity = references.length > 0 && !plan && !optionsQuery.error;
@@ -203,7 +204,7 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
               subjectType={subjectType}
               ready={!invalid}
               options={options}
-              loading={optionsQuery.isLoading || (optionsQuery.isFetching && optionsQuery.isPlaceholderData)}
+              loading={optionsQuery.isLoading || settling || (optionsQuery.isFetching && optionsQuery.isPlaceholderData)}
               refreshing={refreshing}
               error={optionsQuery.error}
               plan={plan}
