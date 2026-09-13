@@ -1989,6 +1989,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/illustrations/reference-options': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Reference Options */
+    get: operations['get_api_v1_projects_projectId_illustrations_reference_options'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/illustrations/{id}/references': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Update Illustration References */
+    put: operations['put_api_v1_projects_projectId_illustrations_id_references'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/illustrations/{id}/refine': {
     parameters: {
       query?: never;
@@ -4711,9 +4745,27 @@ export interface components {
       subjectKey?: string;
       /** @description Opening art direction from the author; becomes the first entry in the prompt spec instruction list. */
       instruction?: string;
+      /** @description Project images to send as references, in priority order. More than the image model's capacity is refused with ILL_011. */
+      references?: components['schemas']['AttachReferenceBody'][];
+      /** @description Whether the auto-rules (the entity's portrait, a chapter's cast portraits) may add references. Defaults to true. */
+      autoReferences?: boolean;
     };
     /** @enum {string} */
     IllustrationSubjectType: 'entity' | 'chapter' | 'cover';
+    AttachReferenceBody: {
+      /** @description Which kind of project image to attach. */
+      source: components['schemas']['IllustrationReferenceSource'];
+      /** @description Entity key for 'portrait'; the numeric id for 'gallery', 'chapter-image' and 'candidate' (an illustration id, resolving to its selected image); omitted for 'cover'. */
+      sourceId?: string;
+      /** @description 'likeness' pins the face, hair, build and attire of the figure it shows; 'style' lends palette, medium and rendering only. */
+      role: components['schemas']['IllustrationAttachableReferenceRole'];
+      /** @description Free text scoping the reference, e.g. "the armored man in the center" or "the scar only". Trimmed; blank is dropped. */
+      note?: string;
+    };
+    /** @enum {string} */
+    IllustrationReferenceSource: 'cover' | 'portrait' | 'gallery' | 'chapter-image' | 'candidate';
+    /** @enum {string} */
+    IllustrationAttachableReferenceRole: 'likeness' | 'style';
     IllustrationResponse: {
       id: string;
       projectId: string;
@@ -4728,10 +4780,20 @@ export interface components {
       /** @description The exact prompt text sent to the image model for the current revision. */
       prompt: string;
       candidates: components['schemas']['IllustrationCandidateResponse'][];
+      /** @description Latest per image: one entry per image ever sent, carrying its most recent role and note. Per-round history lives on each candidate `references`. */
+      references: components['schemas']['IllustrationReferenceResponse'][];
+      /** @description The author-attached set every refinement re-resolves; change it with PUT …/references. */
+      attachedReferences: components['schemas']['AttachedReferenceResponse'][];
+      /** @description Whether the auto-rules may add references. */
+      autoReferences: boolean;
       selectedRef?: null | string;
       selectedUrl?: null | string;
       /** @description Appearance the composer derived because the entity had none; PATCH it onto the entity to make it canon. */
       suggestedAppearance?: string;
+      /** @description Set when `suggestedAppearance` was described from a likeness reference rather than derived from canon. */
+      appearanceDescription?: components['schemas']['AppearanceDescriptionResponse'];
+      /** @description References this request skipped, trimmed or merged. Returned by start, refine and references updates only; never stored. */
+      referenceWarnings?: components['schemas']['ReferenceWarningResponse'][];
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -4747,10 +4809,96 @@ export interface components {
       imageUrl: string;
       createdAt: string;
       instructionsHash: string;
+      /** @description Storage refs of the references sent with this candidate, in send order; each matches an entry in the illustration `references`. */
+      referenceRefs: string[];
+      /** @description The references exactly as sent with this candidate — role, note, label, origin and reason — in send order. */
+      references: components['schemas']['IllustrationReferenceResponse'][];
     };
+    IllustrationReferenceResponse: {
+      source: components['schemas']['IllustrationReferenceSource'];
+      sourceId?: string;
+      /** @description Storage ref, matched by candidate `referenceRefs`. */
+      ref: string;
+      /** @description 'edit-source' is the image a refinement reworks; only the server assigns it. */
+      role: components['schemas']['IllustrationReferenceRole'];
+      origin: components['schemas']['IllustrationReferenceOrigin'];
+      /** @description The auto-rule that added the reference (e.g. 'auto:entity-portrait', 'auto:chapter-cast', 'auto:edit-source') or 'attached'. */
+      reason: string;
+      note?: string;
+      /** @description What the image showed when it was sent, as named in the reference manifest. */
+      label?: string;
+      /** @description Display name of the pictured entity, for portrait references. */
+      name?: string;
+      /** @description Absolute public object-storage URL resolved using the server runtime configuration. */
+      url: string;
+    };
+    /** @enum {string} */
+    IllustrationReferenceRole: 'likeness' | 'style' | 'edit-source';
+    /** @enum {string} */
+    IllustrationReferenceOrigin: 'auto' | 'attached';
+    AttachedReferenceResponse: {
+      source: components['schemas']['IllustrationReferenceSource'];
+      sourceId?: string;
+      role: components['schemas']['IllustrationAttachableReferenceRole'];
+      note?: string;
+    };
+    AppearanceDescriptionResponse: {
+      /** @description How sure the vision model was that it described the intended figure. */
+      confidence: components['schemas']['AppearanceConfidenceLevel'];
+      /** @description Set when the image was ambiguous, e.g. several figures and no note naming which one. */
+      ambiguity?: string;
+    };
+    /** @enum {string} */
+    AppearanceConfidenceLevel: 'high' | 'medium' | 'low';
+    ReferenceWarningResponse: {
+      code: components['schemas']['IllustrationReferenceWarningCode'];
+      source: components['schemas']['IllustrationReferenceSource'];
+      sourceId?: string;
+      reason: string;
+    };
+    /** @enum {string} */
+    IllustrationReferenceWarningCode: 'capacity-trimmed' | 'merged-with-edit-source' | 'missing-file' | 'too-large' | 'unsupported-format';
     /** @description Newest first. Setting a project cover by upload, ingest, import or promotion opens an 'uploaded' cover illustration on it. */
     ListIllustrationsResponse: {
       items: components['schemas']['IllustrationResponse'][];
+    };
+    ReferenceOptionsResponse: {
+      /** @description How many reference images the project image model accepts per generation. */
+      capacity: number;
+      cover?: components['schemas']['ReferenceOptionResponse'];
+      /** @description Entities with a portrait, by name. */
+      portraits: components['schemas']['ReferenceOptionResponse'][];
+      /** @description Entity gallery images, newest first. */
+      gallery: components['schemas']['ReferenceOptionResponse'][];
+      /** @description Chapter scene images, newest first. */
+      chapterImages: components['schemas']['ReferenceOptionResponse'][];
+      /** @description Illustrations with a selected image, newest first. */
+      candidates: components['schemas']['ReferenceOptionResponse'][];
+      /** @description True when any group was cut at `limit`. */
+      truncated: boolean;
+      /** @description What the auto-rules would attach at start for this subject, in send order, checked against storage metadata only. */
+      autoPreview: components['schemas']['IllustrationReferenceResponse'][];
+      /** @description Auto references the preview would skip or trim. */
+      autoPreviewWarnings: components['schemas']['ReferenceWarningResponse'][];
+    };
+    ReferenceOptionResponse: {
+      source: components['schemas']['IllustrationReferenceSource'];
+      /** @description Pass back unchanged as the attach `sourceId`. */
+      sourceId?: string;
+      label: string;
+      /** @description Absolute public object-storage URL resolved using the server runtime configuration. */
+      url: string;
+      entityKey?: string;
+      chapter?: number;
+      caption?: string;
+      subjectType?: components['schemas']['IllustrationSubjectType'];
+      subjectKey?: null | string;
+    };
+    UpdateIllustrationReferencesBody: {
+      /** @description The complete attached set, replacing the stored one. Entries already attached (same source and sourceId) are kept with a warning when out of slots; new entries must fit beside the edit source the next refinement sends, or ILL_011. */
+      references: components['schemas']['AttachReferenceBody'][];
+      /** @description Whether the auto-rules may add references on the next refinement. Keeps the stored value when omitted. */
+      autoReferences?: boolean;
     };
     /** @description Exactly one structured edit to the prompt spec instruction list. */
     RefineIllustrationBody: {
@@ -11681,6 +11829,97 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_illustrations_reference_options: {
+    parameters: {
+      query: {
+        subjectType: components['schemas']['IllustrationSubjectType'];
+        /** @description Entity key for 'entity', the chapter number for 'chapter'; omitted for the project cover. */
+        subjectKey?: string;
+        /** @description Maximum entries per group. Defaults to 50. */
+        limit?: number | string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReferenceOptionsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_illustrations_id_references: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateIllustrationReferencesBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IllustrationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_illustrations_id_refine: {
     parameters: {
       query?: never;
@@ -14064,11 +14303,25 @@ export type ProvenanceSummaryResponse = components['schemas']['ProvenanceSummary
 export type ProvenanceFieldResponse = components['schemas']['ProvenanceFieldResponse'];
 export type StartIllustrationBody = components['schemas']['StartIllustrationBody'];
 export type IllustrationSubjectType = components['schemas']['IllustrationSubjectType'];
+export type AttachReferenceBody = components['schemas']['AttachReferenceBody'];
+export type IllustrationReferenceSource = components['schemas']['IllustrationReferenceSource'];
+export type IllustrationAttachableReferenceRole = components['schemas']['IllustrationAttachableReferenceRole'];
 export type IllustrationResponse = components['schemas']['IllustrationResponse'];
 export type IllustrationStatus = components['schemas']['IllustrationStatus'];
 export type IllustrationOrigin = components['schemas']['IllustrationOrigin'];
 export type IllustrationCandidateResponse = components['schemas']['IllustrationCandidateResponse'];
+export type IllustrationReferenceResponse = components['schemas']['IllustrationReferenceResponse'];
+export type IllustrationReferenceRole = components['schemas']['IllustrationReferenceRole'];
+export type IllustrationReferenceOrigin = components['schemas']['IllustrationReferenceOrigin'];
+export type AttachedReferenceResponse = components['schemas']['AttachedReferenceResponse'];
+export type AppearanceDescriptionResponse = components['schemas']['AppearanceDescriptionResponse'];
+export type AppearanceConfidenceLevel = components['schemas']['AppearanceConfidenceLevel'];
+export type ReferenceWarningResponse = components['schemas']['ReferenceWarningResponse'];
+export type IllustrationReferenceWarningCode = components['schemas']['IllustrationReferenceWarningCode'];
 export type ListIllustrationsResponse = components['schemas']['ListIllustrationsResponse'];
+export type ReferenceOptionsResponse = components['schemas']['ReferenceOptionsResponse'];
+export type ReferenceOptionResponse = components['schemas']['ReferenceOptionResponse'];
+export type UpdateIllustrationReferencesBody = components['schemas']['UpdateIllustrationReferencesBody'];
 export type RefineIllustrationBody = components['schemas']['RefineIllustrationBody'];
 export type ReplaceInstruction = components['schemas']['ReplaceInstruction'];
 export type SelectIllustrationBody = components['schemas']['SelectIllustrationBody'];
@@ -14254,6 +14507,8 @@ export type ListSeedsQueryParams = Exclude<paths['/api/v1/seeds']['get']['parame
 export type GetSeedPathParams = Exclude<paths['/api/v1/projects/{projectId}/seed']['get']['parameters']['path'], undefined>;
 export type ListIllustrationsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['query'], undefined>;
 export type ListIllustrationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['path'], undefined>;
+export type ListReferenceOptionsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations/reference-options']['get']['parameters']['query'], undefined>;
+export type ListReferenceOptionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations/reference-options']['get']['parameters']['path'], undefined>;
 export type GetAssetsPathParams = Exclude<paths['/api/v1/projects/{projectId}/assets']['get']['parameters']['path'], undefined>;
 export type GetRebrandStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand']['get']['parameters']['path'], undefined>;
 export type GetGlossaryQueryParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/glossary']['get']['parameters']['query'], undefined>;

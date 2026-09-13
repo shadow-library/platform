@@ -1090,7 +1090,14 @@ describe('Prompt modules', () => {
     it('registers as an analytical helper-group prompt', () => {
       expect(PROMPT_REGISTRY['illustration-compose'].kind).toBe('analytical');
       expect(PROMPT_REGISTRY['illustration-compose'].role).toBe('illustration');
-      expect(PROMPT_REGISTRY['illustration-compose'].version).toBe('1.0.0');
+      expect(PROMPT_REGISTRY['illustration-compose'].version).toBe('1.1.0');
+    });
+
+    it('tells the composer how each reference role constrains the prompt', () => {
+      const system = PROMPT_REGISTRY['illustration-compose'].system;
+      expect(system).toContain('A likeness reference fixes the face, hair, build and attire');
+      expect(system).toContain('palette, medium and rendering only');
+      expect(system).toContain('Never ask for backgrounds, text, lettering or logos to be copied');
     });
 
     it('documents the art-style bible convention so authors know where to put it', () => {
@@ -1102,6 +1109,7 @@ describe('Prompt modules', () => {
         contextPack: 'SUBJECT-CANON-BLOCK',
         subjectType: 'entity',
         subjectLabel: 'hero',
+        references: 'Reference 1 — likeness — portrait of Evan Vale',
         instructions: '1. in falling snow',
       });
       expect(messages).toHaveLength(3);
@@ -1109,6 +1117,7 @@ describe('Prompt modules', () => {
       expect(String(messages[1]?.content)).toBe('SUBJECT-CANON-BLOCK');
       expect(String(messages[2]?.content)).toContain('Subject type: entity');
       expect(String(messages[2]?.content)).toContain('1. in falling snow');
+      expect(String(messages[2]?.content).indexOf('Reference 1 — likeness')).toBeLessThan(String(messages[2]?.content).indexOf('1. in falling snow'));
     });
 
     it('accepts a composed spec without a negative prompt and rejects a too-thin base prompt', () => {

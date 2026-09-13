@@ -36,6 +36,7 @@ interface StoredObject {
 }
 
 interface Harness {
+  reads: string[];
   put(bytes?: Uint8Array | string, contentType?: string): string;
   resolve(input: Partial<ResolveReferencesInput> & { projectId: bigint }): ReturnType<IllustrationReferenceService['resolve']>;
   setCapacity(capacity: number | undefined): void;
@@ -45,6 +46,7 @@ function buildHarness(db: PrimaryDatabase): Harness {
   const objects = new Map<string, StoredObject>();
   const prefix = `ref-${Math.random().toString(36).slice(2)}`;
   let saved = 0;
+  const reads: string[] = [];
   const storage = {
     stat: async (ref: string) => {
       const object = objects.get(ref);
@@ -52,6 +54,7 @@ function buildHarness(db: PrimaryDatabase): Harness {
       return { size: object.bytes.byteLength, contentType: object.contentType };
     },
     read: async (ref: string) => {
+      reads.push(ref);
       const object = objects.get(ref);
       if (!object) throw StorageErrorCode.OBJECT_NOT_FOUND.create({ ref });
       return object;
@@ -66,6 +69,7 @@ function buildHarness(db: PrimaryDatabase): Harness {
   const service = new IllustrationReferenceService(dbStub, storage as never, router);
 
   return {
+    reads,
     put: (bytes = `image-${saved + 1}`, contentType = 'image/png') => {
       const ref = `${prefix}-${++saved}.png`;
       objects.set(ref, { bytes: typeof bytes === 'string' ? new TextEncoder().encode(bytes) : bytes, contentType });
@@ -163,7 +167,7 @@ describe.if(pgAvailable)('IllustrationReferenceService', () => {
 
       const resolved = await harness.resolve({ projectId, attached: [attach('cover')] });
 
-      expect(resolved.references).toEqual([{ source: 'cover', ref, role: 'style', origin: 'attached', reason: 'attached' }]);
+      expect(resolved.references).toEqual([{ source: 'cover', ref, role: 'style', origin: 'attached', reason: 'attached', label: 'the project cover' }]);
       expect(resolved.dataUrls).toEqual([dataUrl('cover')]);
     });
 
@@ -174,7 +178,9 @@ describe.if(pgAvailable)('IllustrationReferenceService', () => {
 
       const resolved = await harness.resolve({ projectId, attached: [attach('portrait', 'hero', 'likeness', '  the scar only  ')] });
 
-      expect(resolved.references).toEqual([{ source: 'portrait', sourceId: 'hero', ref, role: 'likeness', note: 'the scar only', origin: 'attached', reason: 'attached' }]);
+      expect(resolved.references).toEqual([
+        { source: 'portrait', sourceId: 'hero', ref, role: 'likeness', note: 'the scar only', origin: 'attached', reason: 'attached', label: 'portrait of hero', name: 'hero' },
+      ]);
     });
 
     it('should resolve a gallery image by id', async () => {
@@ -263,7 +269,9 @@ describe.if(pgAvailable)('IllustrationReferenceService', () => {
 
       const resolved = await harness.resolve({ projectId, subjectType: 'entity', subjectKey: 'hero' });
 
-      expect(resolved.references).toEqual([{ source: 'portrait', sourceId: 'hero', ref, role: 'likeness', origin: 'auto', reason: 'auto:entity-portrait' }]);
+      expect(resolved.references).toEqual([
+        { source: 'portrait', sourceId: 'hero', ref, role: 'likeness', origin: 'auto', reason: 'auto:entity-portrait', label: 'portrait of hero', name: 'hero' },
+      ]);
       expect(resolved.dataUrls).toEqual([dataUrl('portrait')]);
       expect(resolved.warnings).toEqual([]);
     });
@@ -306,7 +314,9 @@ describe.if(pgAvailable)('IllustrationReferenceService', () => {
 
       const resolved = await harness.resolve({ projectId, subjectType: 'entity', subjectKey: 'hero', autoReferences: false, editSourceRef });
 
-      expect(resolved.references).toEqual([{ source: 'candidate', ref: editSourceRef, role: 'edit-source', origin: 'auto', reason: 'auto:edit-source' }]);
+      expect(resolved.references).toEqual([
+        { source: 'candidate', ref: editSourceRef, role: 'edit-source', origin: 'auto', reason: 'auto:edit-source', label: 'the current image being refined' },
+      ]);
     });
   });
 
@@ -466,6 +476,125 @@ describe.if(pgAvailable)('IllustrationReferenceService', () => {
 
       expect(resolved.dataUrls).toEqual([dataUrl('jpeg-bytes', 'image/jpeg')]);
       expect(resolved.totalBytes).toBe('jpeg-bytes'.length);
+    });
+  });
+  describe('hardening', () => {
+    it('should send an oversized, off-allowlist edit source and clamp the remaining budget to zero for everything else', async () => {
+      const editSourceRef = harness.put(new Uint8Array(MAX_REFERENCE_REQUEST_BYTES + 2 * 1024 * 1024), 'image/jpg');
+      const projectId = await seedProject(harness.put('cover'));
+      await seedEntity(projectId, { key: 'hero', imagePath: harness.put('portrait') });
+      harness.setCapacity(3);
+
+      const resolved = await harness.resolve({ projectId, subjectType: 'entity', subjectKey: 'hero', editSourceRef, carried: [attach('cover')] });
+
+      expect(resolved.references.map(reference => reference.role)).toEqual(['edit-source']);
+      expect(resolved.dataUrls[0]?.startsWith('data:image/jpg;base64,')).toBe(true);
+      expect(resolved.warnings.map(warning => [warning.code, warning.source])).toEqual([
+        ['too-large', 'cover'],
+        ['too-large', 'portrait'],
+      ]);
+      expect(resolved.warnings[0]?.reason).toContain('over the 0 byte remaining request budget');
+    });
+
+    it('should fit newly attached references into the budget the edit source leaves', async () => {
+      const editSourceRef = harness.put(new Uint8Array(6 * 1024 * 1024));
+      const projectId = await seedProject(harness.put(new Uint8Array(3 * 1024 * 1024)));
+      harness.setCapacity(2);
+
+      await expect(harness.resolve({ projectId, editSourceRef, attached: [attach('cover')] })).rejects.toMatchObject({
+        code: 'ILL_013',
+        data: { size: 3 * 1024 * 1024, limit: 2 * 1024 * 1024 },
+      });
+      await expect(harness.resolve({ projectId, editSourceRef: 'ref-never-stored.png' })).rejects.toMatchObject({ code: 'ILL_010' });
+    });
+
+    it('should refuse an attached or carried reference claiming the edit-source role', async () => {
+      const projectId = await seedProject(harness.put());
+      const editSource = attach('cover', undefined, 'edit-source' as ReferenceRequest['role']);
+
+      await expect(harness.resolve({ projectId, attached: [editSource] })).rejects.toMatchObject({ code: 'ILL_015' });
+      await expect(harness.resolve({ projectId, carried: [editSource] })).rejects.toMatchObject({ code: 'ILL_015' });
+    });
+
+    it('should keep the edit source and warn when an attached reference is the image being refined', async () => {
+      const editSourceRef = harness.put('edit');
+      const projectId = await seedProject();
+      const galleryId = await seedGallery(projectId, editSourceRef);
+
+      const resolved = await harness.resolve({ projectId, editSourceRef, attached: [attach('gallery', galleryId, 'likeness', 'the left figure')] });
+
+      expect(resolved.references).toMatchObject([{ role: 'edit-source', ref: editSourceRef }]);
+      expect(resolved.warnings).toMatchObject([{ code: 'merged-with-edit-source', source: 'gallery', sourceId: String(galleryId) }]);
+      expect(resolved.warnings[0]?.reason).toContain('note was not applied');
+    });
+
+    it('should refuse attached references over the request budget from storage heads, before reading any bytes', async () => {
+      const projectId = await seedProject();
+      harness.setCapacity(3);
+      const chunk = new Uint8Array(MAX_REFERENCE_BYTES - 1);
+      for (const key of ['a', 'b', 'c']) await seedEntity(projectId, { key, imagePath: harness.put(chunk) });
+
+      await expect(harness.resolve({ projectId, attached: ['a', 'b', 'c'].map(key => attach('portrait', key)) })).rejects.toMatchObject({ code: 'ILL_013' });
+      expect(harness.reads).toEqual([]);
+    });
+
+    it('should rank carried references below attached ones and trim them with a warning instead of failing', async () => {
+      const editSourceRef = harness.put('edit');
+      const coverRef = harness.put('cover');
+      const projectId = await seedProject(coverRef);
+      await seedEntity(projectId, { key: 'hero', imagePath: harness.put('portrait') });
+
+      const resolved = await harness.resolve({ projectId, subjectType: 'entity', subjectKey: 'hero', editSourceRef, carried: [attach('cover')] });
+
+      expect(resolved.references).toMatchObject([{ role: 'edit-source', ref: editSourceRef }]);
+      expect(resolved.dataUrls).toEqual([dataUrl('edit')]);
+      expect(resolved.warnings.map(warning => [warning.code, warning.source])).toEqual([
+        ['capacity-trimmed', 'cover'],
+        ['capacity-trimmed', 'portrait'],
+      ]);
+    });
+
+    it('should order carried references ahead of auto ones when slots remain', async () => {
+      const coverRef = harness.put('cover');
+      const portraitRef = harness.put('portrait');
+      const projectId = await seedProject(coverRef);
+      await seedEntity(projectId, { key: 'hero', imagePath: portraitRef });
+      harness.setCapacity(3);
+
+      const resolved = await harness.resolve({ projectId, subjectType: 'entity', subjectKey: 'hero', carried: [attach('cover', undefined, 'style', 'palette')] });
+
+      expect(resolved.references.map(reference => [reference.origin, reference.ref, reference.note])).toEqual([
+        ['attached', coverRef, 'palette'],
+        ['auto', portraitRef, undefined],
+      ]);
+    });
+
+    it('should warn rather than fail when a carried reference no longer resolves', async () => {
+      const projectId = await seedProject();
+      await seedEntity(projectId, { key: 'faceless' });
+      await seedEntity(projectId, { key: 'gone', imagePath: 'ref-never-stored.png' });
+
+      const resolved = await harness.resolve({ projectId, carried: [attach('portrait', 'faceless'), attach('portrait', 'gone'), attach('gallery', '999999999')] });
+
+      expect(resolved.references).toEqual([]);
+      expect(resolved.warnings.map(warning => [warning.code, warning.sourceId])).toEqual([
+        ['missing-file', 'faceless'],
+        ['missing-file', '999999999'],
+        ['missing-file', 'gone'],
+      ]);
+    });
+
+    it('should rank and validate from storage heads alone under the metadata load mode', async () => {
+      const projectId = await seedProject(harness.put('cover'));
+      await seedEntity(projectId, { key: 'hero', imagePath: harness.put('portrait') });
+      harness.setCapacity(2);
+
+      const resolved = await harness.resolve({ projectId, subjectType: 'entity', subjectKey: 'hero', attached: [attach('cover')], load: 'metadata' });
+
+      expect(resolved.references.map(reference => reference.source)).toEqual(['cover', 'portrait']);
+      expect(resolved.dataUrls).toEqual([]);
+      expect(resolved.totalBytes).toBe('cover'.length + 'portrait'.length);
+      expect(harness.reads).toEqual([]);
     });
   });
 });

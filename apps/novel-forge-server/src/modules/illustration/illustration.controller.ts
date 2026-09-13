@@ -1,5 +1,5 @@
 import { Authenticated } from '@shadow-library/auth/module';
-import { Body, Get, HttpController, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
+import { Body, Get, HttpController, Params, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
 
 import {
   IllustrationParams,
@@ -7,10 +7,13 @@ import {
   IllustrationResponse,
   ListIllustrationsQuery,
   ListIllustrationsResponse,
+  ReferenceOptionsQuery,
+  ReferenceOptionsResponse,
   RefineIllustrationBody,
   SaveIllustrationBody,
   SelectIllustrationBody,
   StartIllustrationBody,
+  UpdateIllustrationReferencesBody,
 } from './illustration.dto';
 import { IllustrationService } from './illustration.service';
 
@@ -29,6 +32,18 @@ export class IllustrationController {
   @RespondFor(200, ListIllustrationsResponse)
   async listIllustrations(@Params() params: IllustrationProjectParams, @Query() query: ListIllustrationsQuery): Promise<ListIllustrationsResponse> {
     return { items: await this.illustrationService.list(params.projectId, query) };
+  }
+
+  @Get('/reference-options')
+  @RespondFor(200, ReferenceOptionsResponse)
+  listReferenceOptions(@Params() params: IllustrationProjectParams, @Query() query: ReferenceOptionsQuery): Promise<ReferenceOptionsResponse> {
+    return this.illustrationService.referenceOptions(params.projectId, query);
+  }
+
+  @Put('/:id/references')
+  @RespondFor(200, IllustrationResponse)
+  updateIllustrationReferences(@Params() params: IllustrationParams, @Body() body: UpdateIllustrationReferencesBody): Promise<IllustrationResponse> {
+    return this.illustrationService.updateReferences(params.projectId, params.id, body);
   }
 
   @Post('/:id/refine')

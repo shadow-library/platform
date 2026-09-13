@@ -53,6 +53,18 @@ export const IllustrationSubjectType = EnumType.create('IllustrationSubjectType'
 export const IllustrationStatus = EnumType.create('IllustrationStatus', schema.illustrationStatus.enumValues);
 export const IllustrationSaveTarget = EnumType.create('IllustrationSaveTarget', ['portrait', 'gallery', 'chapter', 'cover']);
 export const IllustrationOrigin = EnumType.create('IllustrationOrigin', ['generated', 'uploaded']);
+export const IllustrationReferenceSource = EnumType.create('IllustrationReferenceSource', ['cover', 'portrait', 'gallery', 'chapter-image', 'candidate']);
+export const IllustrationReferenceRole = EnumType.create('IllustrationReferenceRole', ['likeness', 'style', 'edit-source']);
+export const IllustrationAttachableReferenceRole = EnumType.create('IllustrationAttachableReferenceRole', ['likeness', 'style']);
+export const IllustrationReferenceOrigin = EnumType.create('IllustrationReferenceOrigin', ['auto', 'attached']);
+export const IllustrationReferenceWarningCode = EnumType.create('IllustrationReferenceWarningCode', [
+  'capacity-trimmed',
+  'merged-with-edit-source',
+  'missing-file',
+  'too-large',
+  'unsupported-format',
+]);
+export const AppearanceConfidenceLevel = EnumType.create('AppearanceConfidenceLevel', ['high', 'medium', 'low']);
 export const NovelGenre = EnumType.create('NovelGenre', [...NOVEL_GENRES]);
 export const NovelTag = EnumType.create('NovelTag', [...NOVEL_TAGS]);
 export const SexualContentRating = EnumType.create('SexualContentRating', [...CONTENT_RATING_LEVELS.sexualContent]);

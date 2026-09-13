@@ -116,6 +116,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ILL_012 = AppErrorCode.badRequest('ILL_012', 'Reference image for {source} is {size} bytes, over the {limit} byte limit');
   static readonly ILL_013 = AppErrorCode.badRequest('ILL_013', 'Reference images total {size} bytes, over the {limit} byte request limit');
   static readonly ILL_014 = AppErrorCode.badRequest('ILL_014', 'Reference image for {source} is {contentType}; only PNG, JPEG and WebP are supported');
+  static readonly ILL_015 = AppErrorCode.badRequest('ILL_015', 'Reference for {source} cannot use the edit-source role — it is reserved for the image being refined');
 
   /*!
    * Continuity Errors

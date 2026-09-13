@@ -30,14 +30,32 @@ export function hashInstructions(instructions: string[]): string {
   return createHash('sha256').update(JSON.stringify(instructions)).digest('hex');
 }
 
+const ROLE_GUIDANCE: Record<Illustration.ReferenceRole, string> = {
+  'edit-source': 'Edit-source: rework this image, keeping whatever the instructions do not change.',
+  likeness: "Likeness: match the identified figure's face, hair, build and attire; take nothing else from it.",
+  style: 'Style: take palette, medium and rendering only; not its subjects or composition.',
+};
+
+/** One ordered line per reference image with its rich label, for the composer; the image prompt carries only neutral descriptors. */
+export function renderReferenceManifest(references: Illustration.Reference[]): string {
+  return references
+    .map((reference, index) => {
+      const parts = [`Reference ${index + 1}`, reference.role, reference.label ?? reference.source];
+      if (reference.note) parts.push(`note: ${reference.note}`);
+      return parts.join(' — ');
+    })
+    .join('\n');
+}
+
 /**
  * Renders the image prompt the provider receives. The appearance anchor leads so a re-roll of the same
- * entity produces the same character, and the author's instructions land last so a later one visibly
- * overrides the composed defaults.
+ * entity produces the same character, the reference manifest tells the model what each attached image is for,
+ * and the author's instructions land last so a later one visibly overrides the composed defaults.
  */
-export function renderPromptSpec(spec: Illustration.PromptSpec): string {
+export function renderPromptSpec(spec: Illustration.PromptSpec, references: Illustration.Reference[] = []): string {
   return [
     spec.appearanceAnchor ? `Subject appearance (must match exactly): ${spec.appearanceAnchor}` : '',
+    renderReferenceBlock(references),
     spec.basePrompt,
     spec.subjectFraming,
     spec.styleNotes,
@@ -46,4 +64,23 @@ export function renderPromptSpec(spec: Illustration.PromptSpec): string {
   ]
     .filter(Boolean)
     .join('\n\n');
+}
+
+// Captions, subject keys and words like "chapter" or "illustration" leak into image models as literal content, so each image is named only by position, role and portrait name.
+function renderReferenceBlock(references: Illustration.Reference[]): string {
+  if (references.length === 0) return '';
+  const roles = [...new Set(references.map(reference => reference.role))];
+  return [
+    'Reference images (in the order attached):',
+    ...references.map((reference, index) => {
+      const parts = [`Reference image ${index + 1}`, reference.role];
+      if (reference.source === 'portrait' && reference.name) parts.push(reference.name);
+      if (reference.note) parts.push(`note: ${reference.note}`);
+      return parts.join(' — ');
+    }),
+    ...roles.map(role => ROLE_GUIDANCE[role]),
+    roles.some(role => role !== 'edit-source') ? 'Never copy backgrounds, text, watermarks or logos from a likeness or style reference.' : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
