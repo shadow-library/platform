@@ -1,5 +1,6 @@
 import { Logger } from '@shadow-library/common';
 
+import { sourceTerms as combineTerms, escapeRegExp, excerptAround, isCaseInsensitiveTerm } from '@server/common';
 import { APP_NAME } from '@server/constants';
 
 import { DEFAULT_TERM_PACKS, resolveBannedTerms } from './banned-terms';
@@ -22,52 +23,11 @@ export interface ResidueIssue {
 
 // Terms shorter than this are too collision-prone to scan for ("Ye", "Li" are English-adjacent).
 const MIN_TERM_LENGTH = 3;
-const EXCERPT_RADIUS = 60;
 const CJK_PATTERN = /[一-鿿㐀-䶿]/u;
-
-// Single-word glossary terms that collide with ordinary English words ("Long", "Han") stay
-// case-sensitive so a lowercase sentence doesn't false-positive; everything else — multi-word
-// names, CJK, and single words that aren't in this list — scans case-insensitively, because the
-// real failure mode is a leftover like "the huaxia banner" that a strict-case scan never catches.
-const COMMON_WORD_ALLOWLIST = new Set([
-  'long',
-  'han',
-  'sun',
-  'may',
-  'min',
-  'wu',
-  'hu',
-  'chi',
-  'song',
-  'lin',
-  'ming',
-  'sky',
-  'rose',
-  'jade',
-  'grace',
-  'joy',
-  'east',
-  'west',
-  'will',
-]);
 
 const logger = Logger.getLogger(APP_NAME, 'residue-scan');
 
 export const GLOSSARY_SLICE_CAP = 120;
-
-function escapeRegExp(term: string): string {
-  return term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function excerptAround(body: string, index: number, length: number): string {
-  const start = Math.max(0, index - EXCERPT_RADIUS);
-  const end = Math.min(body.length, index + length + EXCERPT_RADIUS);
-  return `${start > 0 ? '…' : ''}${body.slice(start, end)}${end < body.length ? '…' : ''}`;
-}
-
-function isCaseInsensitiveTerm(term: string): boolean {
-  return !term.split(/\s+/).some(word => COMMON_WORD_ALLOWLIST.has(word.toLowerCase()));
-}
 
 function findTerm(body: string, term: string, caseSensitive: boolean): number {
   const pattern = new RegExp(`\\b${escapeRegExp(term)}\\b`, caseSensitive ? '' : 'i');
@@ -81,7 +41,7 @@ function countTerm(body: string, term: string, caseSensitive: boolean): number {
 }
 
 function sourceTerms(entry: GlossaryLike): string[] {
-  return [entry.sourceName, ...(entry.variants ?? [])];
+  return combineTerms(entry.sourceName, entry.variants);
 }
 
 /**
