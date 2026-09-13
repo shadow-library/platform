@@ -1,19 +1,24 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
-import { Alert, Button, Dialog, FormField, Input, SegmentedControl, Select, Spinner, Textarea, toast, Tooltip } from '@shadow-library/ui';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Badge, Button, Dialog, FormField, Input, SegmentedControl, Select, Spinner, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
 import { ImageIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
 import { type ChipIntent, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
+import { CandidateReferences, IllustrationReferencesPanel, StartReferencesSection } from '@/features/illustrations/ReferenceImages';
 import {
+  type AppearanceConfidenceLevel,
+  type AppearanceDescriptionResponse,
   type IllustrationResponse,
   type IllustrationSaveTarget,
   type IllustrationStatus,
   type IllustrationSubjectType,
   listIllustrationsQueryOptions,
+  type ReferenceWarningResponse,
   type RefineIllustrationBody,
   useDiscardIllustrationMutation,
   useListEntitiesQuery,
   useListIllustrationsQuery,
+  useReferenceOptionsQuery,
   useRefineIllustrationMutation,
   useSaveIllustrationMutation,
   useSelectIllustrationMutation,
@@ -21,6 +26,15 @@ import {
   useUpdateEntityMutation,
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
+import {
+  buildAttachPayload,
+  collectReferenceMeta,
+  type DraftReference,
+  planStartSlots,
+  referenceErrorMessage,
+  type ReferenceRoundKind,
+  settledStartOptions,
+} from '@/lib/illustration-references';
 
 import styles from './illustrations.module.css';
 
@@ -31,6 +45,24 @@ interface IllustrationsSearch {
   key?: string;
   illustration?: string;
   start?: boolean;
+}
+
+interface RoundWarnings {
+  illustrationId: string;
+  kind: ReferenceRoundKind;
+  warnings: ReferenceWarningResponse[];
+}
+
+const CHAPTER_KEY = /^[1-9]\d*$/;
+const OPTIONS_DEBOUNCE_MS = 300;
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
 }
 
 function isSubjectType(value: unknown): value is IllustrationSubjectType {
@@ -89,6 +121,8 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
   const [subjectType, setSubjectType] = useState(initial.subjectType);
   const [subjectKey, setSubjectKey] = useState(initial.subjectKey);
   const [instruction, setInstruction] = useState('');
+  const [references, setReferences] = useState<DraftReference[]>([]);
+  const [autoReferences, setAutoReferences] = useState(true);
 
   const [wasOpen, setWasOpen] = useState(open);
   if (wasOpen !== open) {
@@ -97,22 +131,41 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
       setSubjectType(initial.subjectType);
       setSubjectKey(initial.subjectKey);
       setInstruction('');
+      setReferences([]);
+      setAutoReferences(true);
     }
   }
 
   const resolvedKey = subjectType === 'entity' && !subjectKey ? (entities[0]?.entityKey ?? '') : subjectKey;
-  const invalid = subjectType === 'cover' ? false : subjectType === 'chapter' ? !/^\d+$/.test(resolvedKey.trim()) : !resolvedKey;
+  const invalid = subjectType === 'cover' ? false : subjectType === 'chapter' ? !CHAPTER_KEY.test(resolvedKey.trim()) : !resolvedKey;
+  const optionsKey = useDebouncedValue(subjectType === 'chapter' ? resolvedKey.trim() : '', OPTIONS_DEBOUNCE_MS);
+  const optionsSubjectKey = subjectType === 'cover' ? undefined : subjectType === 'chapter' ? optionsKey : resolvedKey.trim();
+  const optionsReady = subjectType !== 'chapter' || (optionsKey === resolvedKey.trim() && CHAPTER_KEY.test(optionsKey));
+  const optionsQuery = useReferenceOptionsQuery(novelId, { subjectType, subjectKey: optionsSubjectKey }, open && !invalid && optionsReady);
+  const options = settledStartOptions(optionsQuery.data, optionsQuery.isPlaceholderData);
+  const refreshing = optionsQuery.isPlaceholderData;
+  const meta = collectReferenceMeta(options, options?.autoPreview);
+  const plan = options ? planStartSlots(options.capacity, references, subjectType !== 'cover' && autoReferences, options.autoPreview, meta) : undefined;
+  const awaitingCapacity = references.length > 0 && !plan && !optionsQuery.error;
+  const overCapacity = (plan?.overBy ?? 0) > 0;
 
   const submit = (): void => {
+    const payload = buildAttachPayload(references);
     start.mutate(
-      { subjectType, subjectKey: subjectType === 'cover' ? undefined : resolvedKey.trim(), instruction: instruction.trim() || undefined },
+      {
+        subjectType,
+        subjectKey: subjectType === 'cover' ? undefined : resolvedKey.trim(),
+        instruction: instruction.trim() || undefined,
+        references: payload.length > 0 ? payload : undefined,
+        autoReferences: subjectType === 'cover' ? undefined : autoReferences,
+      },
       {
         onSuccess: created => {
           toast.success('Candidates generated');
           onOpenChange(false);
           onStarted(created);
         },
-        onError: err => toast.danger(err.message),
+        onError: err => toast.danger(referenceErrorMessage(err)),
       },
     );
   };
@@ -146,6 +199,20 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
                 <Input type="number" min={1} value={subjectKey} onValueChange={setSubjectKey} />
               </FormField>
             )}
+            <StartReferencesSection
+              subjectType={subjectType}
+              ready={!invalid}
+              options={options}
+              loading={optionsQuery.isLoading || (optionsQuery.isFetching && optionsQuery.isPlaceholderData)}
+              refreshing={refreshing}
+              error={optionsQuery.error}
+              plan={plan}
+              drafts={references}
+              onDraftsChange={setReferences}
+              autoReferences={autoReferences}
+              onAutoReferencesChange={setAutoReferences}
+              disabled={start.isPending}
+            />
             <FormField label="Art direction" helper="Optional — becomes the first entry in the instruction list you can keep editing afterwards.">
               <Textarea value={instruction} onValueChange={setInstruction} minRows={3} autoGrow placeholder="e.g. three-quarter view, rain-soaked alley, cold blue key light" />
             </FormField>
@@ -162,7 +229,7 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
               Cancel
             </Button>
           </Dialog.Close>
-          <Button variant="primary" prefix={<SparkIcon />} loading={start.isPending} disabled={invalid} onClick={submit}>
+          <Button variant="primary" prefix={<SparkIcon />} loading={start.isPending} disabled={invalid || overCapacity || awaitingCapacity} onClick={submit}>
             Generate
           </Button>
         </Dialog.Footer>
@@ -175,14 +242,37 @@ interface AppearanceNoticeProps {
   novelId: string;
   entityKey: string;
   appearance: string;
+  description?: AppearanceDescriptionResponse;
 }
 
-function AppearanceNotice({ novelId, entityKey, appearance }: AppearanceNoticeProps): React.JSX.Element {
+interface ConfidenceBadge {
+  intent: 'success' | 'info' | 'warning';
+  label: string;
+}
+
+const CONFIDENCE_BADGE: Record<AppearanceConfidenceLevel, ConfidenceBadge> = {
+  high: { intent: 'success', label: 'High confidence' },
+  medium: { intent: 'info', label: 'Medium confidence' },
+  low: { intent: 'warning', label: 'Low confidence' },
+};
+
+function AppearanceNotice({ novelId, entityKey, appearance, description }: AppearanceNoticeProps): React.JSX.Element {
   const updateEntity = useUpdateEntityMutation(novelId, entityKey);
   const [saved, setSaved] = useState(false);
+  const confidence = description ? CONFIDENCE_BADGE[description.confidence] : undefined;
+  const cautious = !description || description.confidence === 'low';
 
   return (
-    <Alert intent="warning" title="Forge invented this appearance">
+    <Alert intent={cautious ? 'warning' : 'info'} title={description ? 'Forge described this appearance from a reference image' : 'Forge invented this appearance'}>
+      {confidence && (
+        <div className={styles.confidenceRow}>
+          <Badge intent={confidence.intent} dot>
+            {confidence.label}
+          </Badge>
+          {description?.confidence === 'low' && <span className={styles.confidenceHint}>It may describe the wrong figure — check it before adopting.</span>}
+        </div>
+      )}
+      {description?.ambiguity && <p className={styles.alertText}>{description.ambiguity}</p>}
       <p className={styles.alertText}>{appearance}</p>
       <Button
         variant="secondary"
@@ -258,9 +348,12 @@ function InstructionList({ instructions, pending, onReplace, onRemove, onAdd }: 
 interface IllustrationDetailProps {
   novelId: string;
   illustration: IllustrationResponse;
+  roundWarnings: RoundWarnings | undefined;
+  onRound: (kind: ReferenceRoundKind, result: IllustrationResponse) => void;
+  onDismissWarnings: () => void;
 }
 
-function IllustrationDetail({ novelId, illustration }: IllustrationDetailProps): React.JSX.Element {
+function IllustrationDetail({ novelId, illustration, roundWarnings, onRound, onDismissWarnings }: IllustrationDetailProps): React.JSX.Element {
   const illustrationId = illustration.id;
   const refine = useRefineIllustrationMutation(novelId, illustrationId);
   const select = useSelectIllustrationMutation(novelId, illustrationId);
@@ -272,7 +365,13 @@ function IllustrationDetail({ novelId, illustration }: IllustrationDetailProps):
   const busy = refine.isPending || select.isPending || save.isPending || discard.isPending;
 
   const runRefine = (body: RefineIllustrationBody): void => {
-    refine.mutate(body, { onSuccess: () => toast.success('Re-rendered from the edited instructions'), onError: err => toast.danger(err.message) });
+    refine.mutate(body, {
+      onSuccess: result => {
+        toast.success('Re-rendered from the edited instructions');
+        onRound('refine', result);
+      },
+      onError: err => toast.danger(referenceErrorMessage(err)),
+    });
   };
 
   return (
@@ -311,24 +410,33 @@ function IllustrationDetail({ novelId, illustration }: IllustrationDetailProps):
       <div className={`nf-scroll ${styles.paneScroll}`}>
         <div className={styles.detailInner}>
           {illustration.suggestedAppearance && illustration.subjectKey && (
-            <AppearanceNotice novelId={novelId} entityKey={illustration.subjectKey} appearance={illustration.suggestedAppearance} />
+            <AppearanceNotice
+              key={illustrationId}
+              novelId={novelId}
+              entityKey={illustration.subjectKey}
+              appearance={illustration.suggestedAppearance}
+              description={illustration.appearanceDescription}
+            />
           )}
 
           <div>
             <div className={styles.sectionLabel}>Candidates · pick the one to keep</div>
             <div className={styles.candidates} aria-busy={busy || undefined}>
               {illustration.candidates.map(candidate => (
-                <button
-                  key={candidate.ref}
-                  type="button"
-                  className={styles.candidate}
-                  data-selected={candidate.ref === illustration.selectedRef || undefined}
-                  disabled={!active || busy}
-                  onClick={() => select.mutate({ ref: candidate.ref }, { onError: err => toast.danger(err.message) })}
-                >
-                  <img src={candidate.imageUrl} alt="" className={styles.candidateImg} />
-                  <span className={styles.candidateMeta}>{relativeTime(candidate.createdAt)}</span>
-                </button>
+                <div key={candidate.ref} className={styles.candidateCell}>
+                  <button
+                    type="button"
+                    className={styles.candidate}
+                    data-selected={candidate.ref === illustration.selectedRef || undefined}
+                    aria-pressed={candidate.ref === illustration.selectedRef}
+                    disabled={!active || busy}
+                    onClick={() => select.mutate({ ref: candidate.ref }, { onError: err => toast.danger(err.message) })}
+                  >
+                    <img src={candidate.imageUrl} alt="" className={styles.candidateImg} />
+                    <span className={styles.candidateMeta}>{relativeTime(candidate.createdAt)}</span>
+                  </button>
+                  <CandidateReferences references={candidate.references} />
+                </div>
               ))}
               {busy && (
                 <div className={styles.candidatePending}>
@@ -344,6 +452,20 @@ function IllustrationDetail({ novelId, illustration }: IllustrationDetailProps):
               {illustration.origin === 'uploaded' ? 'Rework prompt · renders from the selected image, not editable' : 'Composed prompt · derived from the canon, not editable'}
             </div>
             <pre className={styles.prompt}>{illustration.prompt}</pre>
+          </div>
+
+          <div>
+            <div className={styles.sectionLabel}>{active ? 'Reference images · sent with every re-render' : 'Reference images'}</div>
+            <IllustrationReferencesPanel
+              key={illustrationId}
+              novelId={novelId}
+              illustration={illustration}
+              busy={busy}
+              warnings={roundWarnings?.warnings ?? []}
+              warningsKind={roundWarnings?.kind ?? 'start'}
+              onSaved={result => onRound('save', result)}
+              onDismissWarnings={onDismissWarnings}
+            />
           </div>
 
           <div>
@@ -416,6 +538,9 @@ function IllustrationsScreen(): React.JSX.Element {
   const openIllustration = (id?: string): Promise<void> => goSearch({ search: prev => ({ ...prev, illustration: id, start: undefined }) });
   const pickFilter = (next: SubjectFilter): Promise<void> => goSearch({ search: { subject: next === 'all' ? undefined : next } });
   const closeStart = (): Promise<void> => goSearch({ search: prev => ({ ...prev, start: undefined }) });
+  const [roundWarnings, setRoundWarnings] = useState<RoundWarnings>();
+  const recordRound = (kind: ReferenceRoundKind, result: IllustrationResponse): void =>
+    setRoundWarnings({ illustrationId: result.id, kind, warnings: result.referenceWarnings ?? [] });
 
   return (
     <div className="nf-splitpane">
@@ -483,7 +608,13 @@ function IllustrationsScreen(): React.JSX.Element {
 
       <div className="nf-detail">
         {selected ? (
-          <IllustrationDetail novelId={novelId} illustration={selected} />
+          <IllustrationDetail
+            novelId={novelId}
+            illustration={selected}
+            roundWarnings={roundWarnings?.illustrationId === selected.id ? roundWarnings : undefined}
+            onRound={recordRound}
+            onDismissWarnings={() => setRoundWarnings(undefined)}
+          />
         ) : (
           <div className="nf-pane-empty">Nothing rendered yet — start an illustration for an entity, a chapter scene, or the cover.</div>
         )}
@@ -494,7 +625,10 @@ function IllustrationsScreen(): React.JSX.Element {
         open={Boolean(start)}
         onOpenChange={next => !next && closeStart()}
         initial={{ subjectType: subject ?? 'entity', subjectKey: key ?? '' }}
-        onStarted={created => openIllustration(created.id)}
+        onStarted={created => {
+          recordRound('start', created);
+          return openIllustration(created.id);
+        }}
       />
     </div>
   );

@@ -144,10 +144,30 @@
   line-height: 1.6;
 }
 
+.confidenceRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.confidenceHint {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+}
+
 .candidates {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 12px;
+}
+
+.candidateCell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
 .candidate {
