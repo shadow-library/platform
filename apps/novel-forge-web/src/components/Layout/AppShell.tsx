@@ -191,17 +191,20 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
     renamingIdea ? (
       <IdeaRename compact name={ideaTitle} saving={renameIdea.isPending} onCommit={next => (next == null ? setRenamingIdea(false) : saveIdeaName(next))} />
     ) : (
-      <span className={styles.crumbIdea}>
-        <span>{ideaTitle}</span>
+      <>
+        <span className={styles.crumbName} title={ideaTitle}>
+          {ideaTitle}
+        </span>
         <IconButton variant="ghost" size="sm" aria-label="Rename idea" icon={<EditIcon size={13} />} onClick={() => setRenamingIdea(true)} />
-      </span>
+      </>
     )
   ) : undefined;
 
   const breadcrumb = onIdeaStudio ? (
-    <>
-      {crumbRoot} / {ideaCrumb}
-    </>
+    <span className={styles.crumbTrail}>
+      <span className={styles.crumbRoot}>{crumbRoot} /</span>
+      {ideaCrumb}
+    </span>
   ) : crumbLeaf != null ? (
     `${crumbRoot} / ${crumbLeaf}`
   ) : (

@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, notFound, useNavigate } from '@tanstack/react-router';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
 import { Button, Dialog, FormField, IconButton, Input, Textarea, toast } from '@shadow-library/ui';
 
 import { AppShell } from '@/components/Layout';
@@ -34,7 +34,7 @@ import {
 import { messageTime } from '@/lib/format';
 import { firstTitle } from '@/lib/idea-title';
 import { requireSession } from '@/lib/session';
-import { answeredCount, answerText, composeAnswers, type StudioAnswer, type StudioAnswers } from '@/lib/studio-answers';
+import { answeredCount, answerText, composeAnswers, nextUnanswered, recoverAnswers, type StudioAnswer, type StudioAnswers } from '@/lib/studio-answers';
 
 import styles from './$seedId.module.css';
 
@@ -144,10 +144,31 @@ interface QuestionView {
   direction?: Direction;
 }
 
+// Long enough to see the tick land before the card moves on, short enough that a round of picks never feels held up.
+const AUTO_ADVANCE_MS = 320;
+
+interface PendingAdvance {
+  from: number;
+  to: number;
+}
+
+/**
+ * `open` is the round being answered now. A closed round is `recorded` when its reply could be read back into answers,
+ * so an unanswered question there was skipped, and `unrecorded` when the author replied in their own words.
+ */
+type RoundStatus = 'open' | 'recorded' | 'unrecorded';
+
+interface Round {
+  status: RoundStatus;
+  answers: StudioAnswers;
+}
+
 interface QuestionCardProps {
   questions: StudioQuestionResponse[];
   answers: StudioAnswers;
+  status: RoundStatus;
   onAnswer: (questionId: string, answer: StudioAnswer | undefined) => void;
+  onRoundAnswered?: () => void;
   locked: boolean;
 }
 
@@ -155,20 +176,16 @@ function isTextEntry(target: EventTarget): boolean {
   return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || (target instanceof HTMLElement && target.isContentEditable);
 }
 
-function QuestionCard({ questions, answers, onAnswer, locked }: QuestionCardProps): React.JSX.Element | null {
+function QuestionCard({ questions, answers, status, onAnswer, onRoundAnswered, locked }: QuestionCardProps): React.JSX.Element | null {
   const [view, setView] = useState<QuestionView>({ index: 0 });
   const [ownOpen, setOwnOpen] = useState<ReadonlySet<string>>(() => new Set());
   const [focusOwn, setFocusOwn] = useState<string | null>(null);
+  const [advance, setAdvance] = useState<PendingAdvance | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const ownHintId = useId();
 
   const index = Math.min(view.index, questions.length - 1);
-  const question = questions[index];
-  if (!question) return null;
-  const answer = answers[question.id];
-  const answered = answerText(question, answer) !== undefined;
-  const isLast = index === questions.length - 1;
 
   // Focus on a remounting body or a chevron about to be disabled would fall back to the document and strand the arrow keys.
   const strandsFocus = (active: Element | null, target: number): boolean => {
@@ -178,11 +195,25 @@ function QuestionCard({ questions, answers, onAnswer, locked }: QuestionCardProp
   };
 
   const go = (target: number): void => {
+    setAdvance(null);
     if (target < 0 || target >= questions.length || target === index) return;
     if (strandsFocus(document.activeElement, target)) cardRef.current?.querySelector<HTMLButtonElement>(`[data-pip="${target}"]`)?.focus();
     setView({ index: target, direction: target > index ? 'forward' : 'backward' });
     setFocusOwn(null);
   };
+
+  const advanceTo = useEffectEvent((target: number) => go(target));
+  useEffect(() => {
+    if (!advance) return;
+    const timer = setTimeout(() => advanceTo(advance.to), AUTO_ADVANCE_MS);
+    return () => clearTimeout(timer);
+  }, [advance]);
+
+  const question = questions[index];
+  if (!question) return null;
+  const answer = answers[question.id];
+  const answered = answerText(question, answer) !== undefined;
+  const isLast = index === questions.length - 1;
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
     if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || isTextEntry(event.target)) return;
@@ -197,13 +228,31 @@ function QuestionCard({ questions, answers, onAnswer, locked }: QuestionCardProp
   };
 
   const typeOwn = (text: string): void => {
+    setAdvance(null);
     if (text) onAnswer(question.id, { kind: 'own', text });
     else if (answer?.kind === 'own') onAnswer(question.id, undefined);
   };
 
   const isSelected = (candidate: StudioAnswer): boolean =>
     answer?.kind === candidate.kind && (candidate.kind !== 'option' || (answer.kind === 'option' && answer.index === candidate.index));
-  const select = (candidate: StudioAnswer): void => onAnswer(question.id, isSelected(candidate) ? undefined : candidate);
+
+  const select = (candidate: StudioAnswer): void => {
+    const next = isSelected(candidate) ? undefined : candidate;
+    onAnswer(question.id, next);
+    setAdvance(null);
+    if (!next) return;
+    const after = { ...answers, [question.id]: next };
+    const target = nextUnanswered(questions, after, index);
+    if (target !== undefined) setAdvance({ from: index, to: target });
+    else if (answeredCount(questions, after) === questions.length) onRoundAnswered?.();
+  };
+
+  const badge: { intent: ChipIntent; label: string } | undefined =
+    status === 'open'
+      ? { intent: answered ? 'success' : 'neutral', label: answered ? 'answered' : 'not answered' }
+      : status === 'recorded'
+        ? { intent: answered ? 'success' : 'warning', label: answered ? 'answered' : 'skipped' }
+        : undefined;
 
   return (
     <div ref={cardRef} className={styles.questionCard} role="presentation" onKeyDown={onKeyDown}>
@@ -255,7 +304,8 @@ function QuestionCard({ questions, answers, onAnswer, locked }: QuestionCardProp
       </div>
 
       <div key={index} ref={bodyRef} className={styles.questionBody} data-direction={view.direction}>
-        <StatusChip intent={answered ? 'success' : 'neutral'}>{answered ? 'answered' : 'not answered'}</StatusChip>
+        {advance?.from === index && <span className={styles.advanceBar} aria-hidden="true" />}
+        {badge && <StatusChip intent={badge.intent}>{badge.label}</StatusChip>}
         <div className={styles.questionWording}>{question.wording}</div>
         <div className={styles.questionCoaching}>{question.coaching}</div>
         <div className={styles.options}>
@@ -282,9 +332,11 @@ function QuestionCard({ questions, answers, onAnswer, locked }: QuestionCardProp
             </span>
           </button>
         </div>
-        {ownOpen.has(question.id) || answer?.kind === 'own' ? (
+        {status !== 'open' ? (
+          answer?.kind === 'own' && <p className={styles.ownQuote}>{answer.text}</p>
+        ) : ownOpen.has(question.id) || answer?.kind === 'own' ? (
           <div className={styles.ownAnswer}>
-            <Input
+            <Textarea
               size="sm"
               aria-label="Your own answer"
               aria-describedby={ownHintId}
@@ -293,6 +345,9 @@ function QuestionCard({ questions, answers, onAnswer, locked }: QuestionCardProp
               onValueChange={typeOwn}
               disabled={locked}
               autoFocus={focusOwn === question.id}
+              autoGrow
+              minRows={1}
+              maxRows={8}
             />
             <span id={ownHintId} className={styles.ownHint}>
               Typing here replaces the option you picked.
@@ -308,14 +363,11 @@ function QuestionCard({ questions, answers, onAnswer, locked }: QuestionCardProp
   );
 }
 
-interface QuestionsBlockProps {
+interface QuestionsBlockProps extends Omit<QuestionCardProps, 'questions'> {
   payload: StudioQuestionsPayloadResponse;
-  answers: StudioAnswers;
-  onAnswer: (questionId: string, answer: StudioAnswer | undefined) => void;
-  locked: boolean;
 }
 
-function QuestionsBlock({ payload, answers, onAnswer, locked }: QuestionsBlockProps): React.JSX.Element {
+function QuestionsBlock({ payload, ...card }: QuestionsBlockProps): React.JSX.Element {
   return (
     <div className={styles.payload}>
       {payload.locks && payload.locks.length > 0 && (
@@ -329,7 +381,7 @@ function QuestionsBlock({ payload, answers, onAnswer, locked }: QuestionsBlockPr
           ))}
         </div>
       )}
-      <QuestionCard questions={payload.questions} answers={answers} onAnswer={onAnswer} locked={locked} />
+      <QuestionCard questions={payload.questions} {...card} />
     </div>
   );
 }
@@ -714,6 +766,7 @@ function StudioScreen(): React.JSX.Element {
   const [staged, setStaged] = useState<StagedAnswers>({ messageId: '', answers: NO_ANSWERS });
   const [graduateOpen, setGraduateOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sendRef = useRef<HTMLButtonElement>(null);
 
   const changesQuery = useListChangesQuery(seedId);
 
@@ -730,7 +783,15 @@ function StudioScreen(): React.JSX.Element {
   const appliedChanges = new Map((changesQuery.data?.items ?? []).filter(change => change.status === 'applied').map(change => [change.id, change]));
 
   const lastAssistant = messages.filter(message => message.role === 'assistant').at(-1);
-  const openRound = lastAssistant?.payload?.kind === 'questions' ? { messageId: lastAssistant.id, questions: lastAssistant.payload.questions } : undefined;
+  // A reply after the round closes it, even one whose turn failed: the retry re-sends that reply as written.
+  const repliedTo = new Map<string, string>();
+  messages.forEach((message, position) => {
+    if (message.role !== 'assistant' || message.payload?.kind !== 'questions') return;
+    const reply = messages.slice(position + 1).find(candidate => candidate.role === 'user');
+    if (reply) repliedTo.set(message.id, reply.content);
+  });
+  const openRound =
+    lastAssistant?.payload?.kind === 'questions' && !repliedTo.has(lastAssistant.id) ? { messageId: lastAssistant.id, questions: lastAssistant.payload.questions } : undefined;
   const openAnswers = openRound && staged.messageId === openRound.messageId ? staged.answers : NO_ANSWERS;
   const answered = openRound ? answeredCount(openRound.questions, openAnswers) : 0;
 
@@ -770,6 +831,13 @@ function StudioScreen(): React.JSX.Element {
   const sendComposer = (): void => send(openRound && answered > 0 ? composeAnswers(openRound.questions, openAnswers, input) : input, { draft: input, staged });
 
   const compose = (content: string): void => setInput(current => (current.trim() ? `${current.trim()} ${content}` : content));
+
+  const roundOf = (messageId: string, questions: StudioQuestionResponse[]): Round => {
+    if (messageId === openRound?.messageId) return { status: 'open', answers: openAnswers };
+    const reply = repliedTo.get(messageId);
+    const recovered = reply === undefined ? undefined : recoverAnswers(questions, reply);
+    return recovered ? { status: 'recorded', answers: recovered } : { status: 'unrecorded', answers: NO_ANSWERS };
+  };
 
   if (seedQuery.isLoading) return <PaneLoader />;
   if (seedQuery.error) return <PaneError error={seedQuery.error} />;
@@ -811,8 +879,9 @@ function StudioScreen(): React.JSX.Element {
                     {payload?.kind === 'questions' && (
                       <QuestionsBlock
                         payload={payload}
-                        answers={message.id === openRound?.messageId ? openAnswers : NO_ANSWERS}
+                        {...roundOf(message.id, payload.questions)}
                         onAnswer={(questionId, next) => stageAnswer(message.id, questionId, next)}
+                        onRoundAnswered={() => sendRef.current?.focus()}
                         locked={message.id !== openRound?.messageId || pending || !sessionId}
                       />
                     )}
@@ -863,7 +932,7 @@ function StudioScreen(): React.JSX.Element {
                   </span>
                 </span>
               )}
-              <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} loading={pending} disabled={pending || !sessionId} onClick={sendComposer}>
+              <Button ref={sendRef} variant="primary" size="sm" prefix={<SendIcon size={14} />} loading={pending} disabled={pending || !sessionId} onClick={sendComposer}>
                 {answered > 0 ? `Send ${answered} answer${answered === 1 ? '' : 's'}` : 'Send'}
               </Button>
             </div>

@@ -5,11 +5,14 @@
 }
 
 .crumb {
-  display: inline-flex;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  max-width: 320px;
 }
 
 .crumbWrap {
-  width: min(280px, 60vw);
+  width: 100%;
 }
 
 .cardField {

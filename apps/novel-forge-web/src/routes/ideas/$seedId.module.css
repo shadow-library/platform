@@ -166,9 +166,10 @@
 }
 
 .locks {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px 10px;
   padding: 10px 12px;
   border: 1px solid var(--sh-border-subtle);
   border-radius: var(--sh-radius-md);
@@ -179,6 +180,19 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
+}
+
+/* Rows dissolve into the list's grid, so every chip shares one column sized by the widest and each text starts at its edge. */
+.locks > .blockLabel {
+  grid-column: 1 / -1;
+}
+
+.locks > .lockRow {
+  display: contents;
+}
+
+.locks :global(.nf-chip) {
+  justify-self: start;
 }
 
 .lockText {
@@ -265,11 +279,29 @@
 }
 
 .questionBody {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
   padding: 12px 14px 14px;
+}
+
+/* Runs for exactly AUTO_ADVANCE_MS in $seedId.tsx, so the bar fills as the card is about to move on. */
+.advanceBar {
+  position: absolute;
+  inset: 0 auto auto 0;
+  height: 2px;
+  width: 100%;
+  background: var(--sh-accent);
+  transform-origin: left;
+  animation: advance-fill 320ms linear both;
+}
+
+@keyframes advance-fill {
+  from {
+    transform: scaleX(0);
+  }
 }
 
 .questionBody[data-direction='forward'] {
@@ -292,6 +324,10 @@
 @media (prefers-reduced-motion: reduce) {
   .questionBody[data-direction] {
     animation: none;
+  }
+
+  .advanceBar {
+    display: none;
   }
 }
 
@@ -440,6 +476,17 @@
   flex-direction: column;
   align-self: stretch;
   gap: 4px;
+}
+
+.ownQuote {
+  align-self: stretch;
+  margin: 0;
+  padding: 8px 11px;
+  border-left: 2px solid var(--sh-accent);
+  border-radius: 0 var(--sh-radius-md) var(--sh-radius-md) 0;
+  background: var(--sh-accent-soft);
+  font-size: var(--sh-text-body-sm);
+  white-space: pre-wrap;
 }
 
 .ownHint {
