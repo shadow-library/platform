@@ -869,6 +869,77 @@ describe('ContextAssembler.forRebrandSeed', () => {
   });
 });
 
+describe('ContextAssembler.forTranslate', () => {
+  const input = {
+    styleNotes: 'Past tense, close third. Honorifics dropped. Given name first.',
+    termPolicy: 'Approved entries are binding; provisional entries bind until a reviewer says otherwise.',
+    glossarySlice: '\u53f6\u51e1 \u2192 Ye Fan [character]',
+    prevTranslatedTail: `${'OPENING_MARKER: '.repeat(200)}\n\n${'CLOSING_MARKER: '.repeat(200)}`,
+  };
+
+  it('puts the style notes and term policy in the stable segment and the glossary slice in the volatile tail', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forTranslate(1n, 5, input);
+
+    expect(pack.purpose).toBe('translate');
+    const segments = Object.fromEntries(pack.sections.map(s => [s.key, s.segment]));
+    expect(segments).toMatchObject({ style_notes: 'stable', term_policy: 'stable', glossary_slice: 'volatile', prev_ending: 'volatile' });
+    expect(pack.renderedStable).toContain('Honorifics dropped');
+    expect(pack.renderedStable).toContain('provisional entries bind');
+    expect(pack.renderedVolatile).toContain('Ye Fan');
+  });
+
+  it('keeps the END of the previous translated body in the volatile segment', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forTranslate(1n, 5, input);
+
+    const prevEnding = pack.sections.find(s => s.key === 'prev_ending');
+    expect(prevEnding?.segment).toBe('volatile');
+    expect(prevEnding?.sourceRefs).toEqual(['translation:4']);
+    expect(prevEnding?.rendered).toContain('CLOSING_MARKER');
+    expect(prevEnding?.rendered).not.toContain('OPENING_MARKER');
+    expect(pack.renderedVolatile).toContain('CLOSING_MARKER');
+    expect(pack.renderedStable).not.toContain('CLOSING_MARKER');
+  });
+
+  it('renders the stable segment byte-identical across two assemblies with unchanged inputs', async () => {
+    const assembler = makeAssembler();
+    const first = await assembler.forTranslate(1n, 5, input);
+    const second = await assembler.forTranslate(1n, 6, { ...input, glossarySlice: '\u9f99\u50b2\u5929 \u2192 Long Aotian [character]', prevTranslatedTail: 'a different ending' });
+
+    expect(first.renderedStable.length).toBeGreaterThan(0);
+    expect(second.renderedStable).toBe(first.renderedStable);
+  });
+
+  it('omits the prev ending on the first translated chapter', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forTranslate(1n, 1, { ...input, prevTranslatedTail: null });
+    expect(pack.sections.map(s => s.key)).toEqual(['style_notes', 'term_policy', 'glossary_slice']);
+  });
+});
+
+describe('ContextAssembler.forTranslateSeed', () => {
+  it('renders the overview, extracted entity roster with aliases, and world facts', async () => {
+    const dbOverrides = {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, title: 'Shrouded Peaks', premise: 'A cultivator rises.', brief: null, themes: null, instructions: null })) },
+        entities: { findMany: mock(async () => [{ name: 'Ye Fan', type: 'character', aliases: [{ alias: 'Yefan' }] }]) },
+        worldFacts: { findMany: mock(async () => [{ category: 'geography', key: 'capital', value: 'the Jade Capital' }]) },
+        contextPacks: { findFirst: mock(async () => null) },
+      },
+    };
+
+    const assembler = makeAssembler(dbOverrides);
+    const pack = await assembler.forTranslateSeed(1n);
+
+    expect(pack.purpose).toBe('translate_seed');
+    expect(pack.chapter).toBeNull();
+    expect(pack.rendered).toContain('Title: Shrouded Peaks');
+    expect(pack.rendered).toContain('Ye Fan (character) — aka Yefan');
+    expect(pack.rendered).toContain('geography/capital: the Jade Capital');
+  });
+});
+
 describe('ContextAssembler.forReforgeOutline', () => {
   it('puts world notes in the stable segment and the glossary slice in the volatile tail', async () => {
     const assembler = makeAssembler();

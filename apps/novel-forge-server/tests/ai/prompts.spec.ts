@@ -32,6 +32,9 @@ import {
   ReforgeTransformJudgeSchema,
   ReforgeTransformWriteSchema,
   ReforgeWriteSchema,
+  TranslateSegmentSchema,
+  TranslationAuditSchema,
+  TranslationSeedSchema,
   validateArcCoverage,
   validateOutlineCoverage,
   validatePlanContiguity,
@@ -437,6 +440,104 @@ describe('Prompt modules', () => {
       expect(audit.postValidate?.({ verdict: 'clean', issues: [{ type: 'naming', detail: 'x' }] })[0]).toMatch(/empty issues list/);
       expect(parseSchema(RebrandAuditSchema, { verdict: 'issues', issues: [{ type: 'real_world_reference', detail: 'mentions China' }] }).success).toBe(true);
       expect(parseSchema(RebrandAuditSchema, { verdict: 'maybe', issues: [] }).success).toBe(false);
+    });
+  });
+
+  describe('translate prompt modules', () => {
+    const term = { sourceTerm: '\u53f6\u51e1', target: 'Ye Fan', category: 'character' as const, treatment: 'transliterate' as const, meaning: 'the protagonist' };
+
+    it('registers the three translate prompt keys with the expected roles', () => {
+      for (const key of ['translate-seed', 'translate-chapter', 'translate-audit'] as const) {
+        expect(PROMPT_REGISTRY[key]).toBeDefined();
+        expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
+      }
+      expect(PROMPT_REGISTRY['translate-seed'].role).toBe('translate');
+      expect(PROMPT_REGISTRY['translate-chapter'].role).toBe('translate');
+      // The audit reuses the cacheable `audit` role so identical re-audits hit llm_cache.
+      expect(PROMPT_REGISTRY['translate-audit'].role).toBe('audit');
+    });
+
+    it('registers every translate prompt as analytical so the house style never reaches the author\u2019s prose', () => {
+      for (const key of ['translate-seed', 'translate-chapter', 'translate-audit'] as const) {
+        expect(PROMPT_REGISTRY[key].kind).toBe('analytical');
+        expect(PROMPT_REGISTRY[key].system).not.toContain(AUTHORING_STYLE.slice(0, 40));
+      }
+    });
+
+    it('renders translate-chapter in cache order: system, stable pack, volatile segment tail', async () => {
+      const messages = await PROMPT_REGISTRY['translate-chapter'].template.formatMessages({
+        stableContext: 'STABLE-STYLE-NOTES',
+        volatileContext: 'VOLATILE-GLOSSARY-SLICE',
+        segmentIndex: 2,
+        segmentCount: 3,
+        sourceSegment: 'VOLATILE-SOURCE-SEGMENT',
+        prevTranslatedTail: 'VOLATILE-PREV-SEGMENT-TAIL',
+        repairNotes: 'restore the dropped sentence',
+      });
+      expect(messages).toHaveLength(3);
+      expect(messages[0]?.getType()).toBe('system');
+      expect(String(messages[1]?.content)).toBe('STABLE-STYLE-NOTES');
+      const volatile = String(messages[2]?.content);
+      expect(volatile).toContain('VOLATILE-GLOSSARY-SLICE');
+      expect(volatile).toContain('Source segment 2 of 3');
+      expect(volatile).toContain('VOLATILE-SOURCE-SEGMENT');
+      expect(volatile).toContain('Previous segment ending (continue directly from it; do not restate it): VOLATILE-PREV-SEGMENT-TAIL');
+      expect(volatile).toContain('restore the dropped sentence');
+    });
+
+    it('should tell the in-chapter segment carry apart from the cross-chapter ending', () => {
+      const system = PROMPT_REGISTRY['translate-chapter'].system;
+      expect(system).toContain('PREVIOUS CHAPTER ENDING');
+      expect(system).toContain('inside this same chapter');
+      expect(system).toContain('`none` means this is the first segment');
+    });
+
+    it('names only the stable-segment var in translate-chapter cacheStrategy', () => {
+      expect(PROMPT_REGISTRY['translate-chapter'].cacheStrategy?.stableVars).toEqual(['stableContext']);
+    });
+
+    it('renders translate-seed and translate-audit with their template vars', async () => {
+      const seed = await PROMPT_REGISTRY['translate-seed'].template.formatMessages({ contextPack: 'OVERVIEW', language: 'zh', sampleChapters: 'CH1-ORIGINAL' });
+      expect(String(seed[1]?.content)).toBe('OVERVIEW');
+      expect(String(seed[2]?.content)).toContain('original language: zh');
+      expect(String(seed[2]?.content)).toContain('CH1-ORIGINAL');
+
+      const audit = await PROMPT_REGISTRY['translate-audit'].template.formatMessages({ styleNotes: 'NOTES', glossarySlice: 'SLICE', pairs: 'PAIRS' });
+      expect(String(audit[1]?.content)).toContain('NOTES');
+      expect(String(audit[1]?.content)).toContain('SLICE');
+      expect(String(audit[2]?.content)).toContain('PAIRS');
+    });
+
+    it('validates the translate seed output shape', () => {
+      const styleNotes = 'Past tense, close third. '.repeat(10);
+      expect(parseSchema(TranslationSeedSchema, { styleNotes, terms: [term] }).success).toBe(true);
+      expect(parseSchema(TranslationSeedSchema, { styleNotes: 'too short', terms: [term] }).success).toBe(false);
+      expect(parseSchema(TranslationSeedSchema, { styleNotes, terms: [{ ...term, category: 'weapon' }] }).success).toBe(false);
+      expect(parseSchema(TranslationSeedSchema, { styleNotes, terms: [{ ...term, treatment: 'paraphrase' }] }).success).toBe(false);
+      const full = {
+        ...term,
+        variants: ['\u5c0f\u51e1'],
+        alternatives: [{ target: 'Leaf Fan', rationale: 'renders the surname\u2019s sense' }],
+        contextExcerpt: '\u53f6\u51e1\u7ad9\u4e86\u8d77\u6765\u3002',
+      };
+      expect(parseSchema(TranslationSeedSchema, { styleNotes, terms: [full] }).success).toBe(true);
+    });
+
+    it('validates the translated segment output shape', () => {
+      expect(parseSchema(TranslateSegmentSchema, { body: 'Ye Fan stood up.' }).success).toBe(true);
+      expect(parseSchema(TranslateSegmentSchema, { body: '' }).success).toBe(false);
+      const withExtras = { title: 'The Vale Gate', body: 'Ye Fan stood up.', discoveredTerms: [term], translatorNotes: 'the pun on the sect name is lost' };
+      expect(parseSchema(TranslateSegmentSchema, withExtras).success).toBe(true);
+    });
+
+    it('translate-audit postValidate forces verdict/issues agreement', () => {
+      const audit = PROMPT_REGISTRY['translate-audit'];
+      expect(audit.postValidate?.({ verdict: 'clean', issues: [] })).toEqual([]);
+      expect(audit.postValidate?.({ verdict: 'issues', issues: [] })[0]).toMatch(/at least one issue/);
+      expect(audit.postValidate?.({ verdict: 'clean', issues: [{ type: 'omission', detail: 'x' }] })[0]).toMatch(/empty issues list/);
+      expect(parseSchema(TranslationAuditSchema, { verdict: 'issues', issues: [{ type: 'censorship', segmentIndex: 2, detail: 'the death is softened' }] }).success).toBe(true);
+      expect(parseSchema(TranslationAuditSchema, { verdict: 'maybe', issues: [] }).success).toBe(false);
+      expect(parseSchema(TranslationAuditSchema, { verdict: 'issues', issues: [{ type: 'prose_quality', detail: 'clunky' }] }).success).toBe(false);
     });
   });
 

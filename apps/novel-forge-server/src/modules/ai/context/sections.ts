@@ -16,6 +16,8 @@ export type ContextPurpose =
   | 'reforge'
   | 'reforge_analysis'
   | 'reforge_transform'
+  | 'translate_seed'
+  | 'translate'
   | 'illustration';
 
 // Stable = scope canon that only changes when a proposal is applied or a manual edit lands; volatile
@@ -86,6 +88,8 @@ const SECTION_LABELS: Record<string, string> = {
   instructions: '## AUTHOR INSTRUCTIONS',
   target_length: '## TARGET LENGTH',
   glossary_slice: '## GLOSSARY',
+  style_notes: '## STYLE NOTES',
+  term_policy: '## TERM POLICY',
   carry_state: '## CARRY STATE',
   signal_digest: '## DETERMINISTIC SIGNALS',
   cut_ledger: '## CUT LEDGER — THIS MATERIAL IS GONE',

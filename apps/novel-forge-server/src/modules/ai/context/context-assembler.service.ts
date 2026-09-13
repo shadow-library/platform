@@ -66,6 +66,10 @@ export const PREMISE_BUDGET = 8_000;
 export const AUDIT_BUDGET = 12_000;
 export const REBRAND_SEED_BUDGET = 10_000;
 export const REBRAND_BUDGET = 12_000;
+// Translation carries no story canon into the call: the seed pack is the project overview and the
+// known proper nouns, the chapter pack is the style notes, the term policy and the glossary slice.
+export const TRANSLATE_SEED_BUDGET = 10_000;
+export const TRANSLATE_BUDGET = 12_000;
 // Reforge mirrors the rebrand chapter budget: the source prose (outline pack) and the outline (write
 // pack) both travel as template vars, not pack sections, so the pack itself stays rebrand-sized.
 export const REFORGE_OUTLINE_BUDGET = 12_000;
@@ -1196,6 +1200,58 @@ export class ContextAssembler {
     if (input.prevBody) sections.push(makeSectionTail('prev_ending', input.prevBody, PREV_ENDING_TAIL, 'canonical', [`conversion:${chapter - 1}`]));
 
     return this.finalize(projectId, 'rebrand', chapter, sections, [], REBRAND_BUDGET, opts);
+  }
+
+  /**
+   * Pack for the translation seed (translation design D3): the project overview plus every proper noun
+   * already known — the extracted entity roster (with aliases) and world facts. Both are empty on a
+   * freshly created translation project; the sample chapters travel as a template var instead.
+   */
+  async forTranslateSeed(projectId: bigint, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
+    const [project, entities, facts] = await Promise.all([
+      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+      this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), with: { aliases: true }, orderBy: [schema.entities.type, schema.entities.name] }),
+      this.db.query.worldFacts.findMany({ where: eq(schema.worldFacts.projectId, projectId), orderBy: [schema.worldFacts.category, schema.worldFacts.key] }),
+    ]);
+
+    const sections: ContextSection[] = [];
+    if (project) {
+      const overview = [project.title ? `Title: ${project.title}` : '', this.renderPremise(project)].filter(Boolean).join('\n\n');
+      if (overview) sections.push(asStable(makeSection('premise', overview, 'canonical', ['premise'])));
+    }
+    if (entities.length > 0) {
+      const roster = entities.map(e => `${e.name} (${e.type})${e.aliases.length > 0 ? ` — aka ${e.aliases.map(a => a.alias).join(', ')}` : ''}`).join('\n');
+      sections.push(asStable(makeSection('entity_roster', roster, 'canonical', [])));
+    }
+    if (facts.length > 0) {
+      sections.push(asStable(makeSection('world_facts', facts.map(f => `${f.category}/${f.key}: ${f.value}`).join('\n'), 'canonical', [])));
+    }
+
+    return this.finalize(projectId, 'translate_seed', null, sections, [], opts?.budgetTokens ?? TRANSLATE_SEED_BUDGET, opts);
+  }
+
+  /**
+   * Pack for one chapter translation (translation design D7). The style notes and the term policy are
+   * the stable segment — byte-identical for every chapter and every segment of a chapter, which is what
+   * the provider cache prefix is worth here; the per-chapter glossary slice and the tail of the previous
+   * CHAPTER's translation are volatile. The source segment and the previous SEGMENT's tail travel as
+   * template vars, never in the pack, exactly as `forRebrand` does with the chapter prose. Callers pass
+   * pre-rendered strings — the assembler stays free of translation-table knowledge.
+   */
+  async forTranslate(
+    projectId: bigint,
+    chapter: number,
+    input: { styleNotes: string; termPolicy: string; glossarySlice: string; prevTranslatedTail: string | null },
+    opts?: PackPolicyOptions,
+  ): Promise<AssembledPack & { id: bigint | null }> {
+    const sections: ContextSection[] = [
+      asStable(makeSection('style_notes', input.styleNotes, 'canonical', [])),
+      asStable(makeSection('term_policy', input.termPolicy, 'approved_intent', [])),
+      makeSection('glossary_slice', input.glossarySlice, 'canonical', []),
+    ];
+    if (input.prevTranslatedTail) sections.push(makeSectionTail('prev_ending', input.prevTranslatedTail, PREV_ENDING_TAIL, 'canonical', [`translation:${chapter - 1}`]));
+
+    return this.finalize(projectId, 'translate', chapter, sections, [], TRANSLATE_BUDGET, opts);
   }
 
   /**

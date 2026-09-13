@@ -22,6 +22,7 @@ export * from './rebrand.schema';
 export * from './reforge.schema';
 export * from './reforge-transform.schema';
 export * from './recombine.schema';
+export * from './translation.schema';
 export * from './chat-refine.schema';
 export * from './ideation.schema';
 export * from './idea-name.schema';

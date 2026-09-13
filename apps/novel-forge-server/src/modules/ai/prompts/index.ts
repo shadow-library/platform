@@ -43,6 +43,9 @@ import { reviewPrompt } from './review.prompt';
 import { revisionPrompt } from './revision.prompt';
 import { skeletonPrompt } from './skeleton.prompt';
 import { titlePrompt } from './title.prompt';
+import { translateAuditPrompt } from './translate-audit.prompt';
+import { translateChapterPrompt } from './translate-chapter.prompt';
+import { translateSeedPrompt } from './translate-seed.prompt';
 import { type PromptKey, type PromptModule } from './types';
 import { validationPrompt } from './validation.prompt';
 
@@ -93,6 +96,9 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'reforge-transform-write': reforgeTransformWritePrompt as PromptModule<unknown>,
   'reforge-transform-judge': reforgeTransformJudgePrompt as PromptModule<unknown>,
   recombine: recombinePrompt as PromptModule<unknown>,
+  'translate-seed': translateSeedPrompt as PromptModule<unknown>,
+  'translate-chapter': translateChapterPrompt as PromptModule<unknown>,
+  'translate-audit': translateAuditPrompt as PromptModule<unknown>,
   'illustration-compose': illustrationComposePrompt as PromptModule<unknown>,
   'appearance-describe': appearanceDescribePrompt as PromptModule<unknown>,
 };

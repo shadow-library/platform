@@ -49,6 +49,9 @@ export type PromptKey =
   | 'reforge-transform-write'
   | 'reforge-transform-judge'
   | 'recombine'
+  | 'translate-seed'
+  | 'translate-chapter'
+  | 'translate-audit'
   | 'illustration-compose'
   | 'appearance-describe';
 
