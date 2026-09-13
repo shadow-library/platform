@@ -93,13 +93,16 @@ describe('Account deletion', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Continue to confirmation' }));
 
     expect(await screen.findByText('Confirm it is you, on your Shadow account')).toBeDefined();
-    expect(await screen.findByText(/Nothing is scheduled and nothing is erased until that confirmation comes back/)).toBeDefined();
-    expect(screen.queryByText(/Deletion scheduled/)).toBeNull();
+    expect(await screen.findByText(/nothing is erased before you give it/)).toBeDefined();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 
-  it('should offer lighter options than deletion', async () => {
+  it('should link each lighter option to the setting it stands for', async () => {
     renderScreen(<DeleteAccountScreen />, { today: TODAY });
     expect(await screen.findByText('Pause instead')).toBeDefined();
+    expect(screen.getByRole('link', { name: 'Change intensity' }).getAttribute('href')).toBe('/settings');
+    expect(screen.getByRole('link', { name: 'Export your data' }).getAttribute('href')).toBe('/settings/export');
+    expect(screen.getByRole('link', { name: 'Notification settings' }).getAttribute('href')).toBe('/settings/notifications');
   });
 });
 

@@ -1,6 +1,6 @@
 import { isApiError } from '@shadow-library/web';
 
-import { accountApi, type AccountResponseDto, type ExportJobResponseDto, stepUpUrl } from '@/lib/apis';
+import { accountApi, type AccountResponseDto, type ExportJobResponseDto } from '@/lib/apis';
 import { formatEnum, formatLocalDate, formatLocalTime } from '@/lib/format';
 import {
   type AccountCommand,
@@ -16,9 +16,6 @@ import {
   commandLabel,
   commandRefusal,
   type DayPreferences,
-  DELETION_ACKNOWLEDGEMENTS,
-  DELETION_ALTERNATIVES,
-  DELETION_GRACE_NOTE,
   type DeletionView,
   type ExportJob,
   exportJobCopy,
@@ -31,7 +28,6 @@ import {
   type OnboardingStatus,
   ONLINE_ONLY_NOTE,
   type QueueEntry,
-  REAUTH_HANDOFF_COPY,
   SESSION_NOTE,
   type SettledCommandResult,
   SYNC_COPY,
@@ -39,6 +35,7 @@ import {
 
 import { projectEntitlement, projectRecordCounts } from './projection';
 import { type SyncEngine } from './sync-engine';
+import { SyncedDeletion } from './synced-deletion';
 import { SYNC_META_KEYS } from './sync.types';
 
 const INTENSITY_LOCAL: Record<string, HeroIntensityMode> = { low_intensity: 'gentle', standard: 'standard', high_intensity: 'demanding' };
@@ -93,10 +90,14 @@ function deviceLabel(userAgent: string | null): string {
  */
 export class SyncedAccountProvider implements AccountProvider {
   private behaviour: BehaviourPreferences = { compactDensity: false, reduceMotion: false, dailyJournalPrompt: false, showCosmetics: true };
-  private acknowledged = new Set<string>();
-  private awaitingReauth = false;
+  private readonly deletion: SyncedDeletion;
 
-  constructor(private readonly sync: SyncEngine) {}
+  constructor(
+    private readonly sync: SyncEngine,
+    principal?: () => Promise<string>,
+  ) {
+    this.deletion = new SyncedDeletion(sync, principal);
+  }
 
   private async account(): Promise<AccountResponseDto> {
     return accountApi.get();
@@ -170,28 +171,8 @@ export class SyncedAccountProvider implements AccountProvider {
     }
   }
 
-  /**
-   * The status read is behind the same elevation as the start, so a non-elevated owner is answered
-   * `IAM_003` rather than a state — which is exactly the "nothing has begun" the screen should show.
-   */
-  async getDeletion(): Promise<DeletionView> {
-    const base = {
-      sets: projectRecordCounts(this.sync.domains()),
-      acknowledgements: DELETION_ACKNOWLEDGEMENTS,
-      acknowledged: [...this.acknowledged],
-      reauth: { ...REAUTH_HANDOFF_COPY, continueTo: stepUpUrl(typeof window === 'undefined' ? '/settings/delete' : window.location.pathname) },
-      alternatives: DELETION_ALTERNATIVES,
-      gracePeriodNote: DELETION_GRACE_NOTE,
-    };
-
-    try {
-      const status = await accountApi.deletionStatus();
-      if (status.deletionState === 'none') return { ...base, stage: this.awaitingReauth ? 'awaiting-reauth' : 'idle', stateNote: null };
-      return { ...base, stage: 'scheduled', stateNote: `Erasure in progress · ${status.deletionState.replace(/_/g, ' ')}` };
-    } catch (error) {
-      if (errorCode(error) !== 'IAM_003') throw error;
-      return { ...base, stage: this.awaitingReauth ? 'awaiting-reauth' : 'idle', stateNote: null };
-    }
+  getDeletion(): Promise<DeletionView> {
+    return this.deletion.view();
   }
 
   /** The count is the rows themselves, never the snapshot's, so the number and the list can't disagree. Net-state changes refetch this through `SyncEngineProvider`. */
@@ -306,17 +287,10 @@ export class SyncedAccountProvider implements AccountProvider {
         return applied('');
 
       case 'deletion.acknowledge':
-        if (command.acknowledged) this.acknowledged.add(command.acknowledgementId);
-        else this.acknowledged.delete(command.acknowledgementId);
-        return applied('');
-
+      case 'deletion.continue':
       case 'deletion.begin':
-        return this.beginDeletion();
-
-      default:
-        this.acknowledged.clear();
-        this.awaitingReauth = false;
-        return applied('Stopped. Nothing was started and nothing was deleted.');
+      case 'deletion.abandon':
+        return this.deletion.dispatch(command);
     }
   }
 
@@ -347,24 +321,6 @@ export class SyncedAccountProvider implements AccountProvider {
       return applied(enabled ? 'Push is on for this browser.' : 'Push is off for this browser.');
     } catch (error) {
       return commandRefusal(error, 'That could not be saved for this device.');
-    }
-  }
-
-  /**
-   * The screen stops here on purpose. `IAM_003` is the elevation boundary, and nothing about it is an
-   * error to report — it is the handoff, so the owner is shown the step-up link rather than a failure.
-   */
-  private async beginDeletion(): Promise<SettledCommandResult> {
-    if (this.acknowledged.size < DELETION_ACKNOWLEDGEMENTS.length) return rejected('Both statements need to be true before anything goes further.');
-
-    try {
-      await accountApi.startDeletion();
-      this.awaitingReauth = false;
-      return applied('The erasure has started. It runs to completion on its own, and it cannot be undone.');
-    } catch (error) {
-      if (errorCode(error) !== 'IAM_003') return commandRefusal(error, 'That could not be started.');
-      this.awaitingReauth = true;
-      return applied('Nothing is scheduled yet. The next confirmation happens on your Shadow account.');
     }
   }
 }

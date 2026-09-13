@@ -286,6 +286,62 @@
   color: var(--sh-text-tertiary);
 }
 
+.flowAlert {
+  margin-block: 12px;
+}
+
+.deletionSteps {
+  list-style: none;
+  margin: 14px 0;
+  padding: 0;
+}
+
+.deletionStep {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  min-height: 44px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  font-size: var(--sh-text-body-sm);
+}
+
+.deletionStep:last-child {
+  border-bottom: none;
+}
+
+.deletionStepStatus {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.deletionStep[data-status='done'] .deletionStepStatus {
+  color: var(--sh-success-text);
+}
+
+.deletionStep[data-status='active'] .deletionStepStatus {
+  color: var(--sh-text-primary);
+  font-weight: 600;
+}
+
+.alternatives {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.alternativeLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .acknowledgements {
   display: flex;
   flex-direction: column;

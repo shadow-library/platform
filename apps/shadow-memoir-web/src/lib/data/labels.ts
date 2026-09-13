@@ -1,10 +1,27 @@
 import { addDays, DEFAULT_LOCALE, parseISODate, toISODate } from '@shadow-library/ui';
 
+import { type DeletionProgress } from './account.types';
 import { type Command } from './command.types';
 import { type FinanceCommand } from './finance.types';
 import { type HeroCommand } from './hero.types';
 import { type OccurrenceState, type ReasonTag, type StatAffinity, type Strictness, type Weekday } from './quest.types';
 import { type QuickLogCommand } from './quick-logs.types';
+
+export const DELETION_PROGRESS_COPY: Record<DeletionProgress, { title: string; body: string }> = {
+  pending: { title: 'The erasure has started', body: 'Stored receipt images and export archives are removed first, then your records.' },
+  blobs_deleted: { title: 'The erasure is under way', body: 'Receipt images and export archives are gone. Your records are being erased now.' },
+  data_deleted: { title: 'The erasure is under way', body: 'Your records are erased. The last step asks Shadow to close your account, and it can take a while.' },
+  identity_closed: { title: 'The erasure is nearly done', body: 'Your records are erased and Shadow has closed your account. Only the final clean-up is left.' },
+  done: { title: 'Your data has been erased', body: 'Everything Shadow Memoir held about you is gone.' },
+  unknown: { title: 'The erasure is under way', body: 'This account is being erased. It runs to the end on its own, and nothing more is needed from you.' },
+};
+
+export const DELETION_STEPS: { reachedAt: Exclude<DeletionProgress, 'pending' | 'unknown'>; label: string }[] = [
+  { reachedAt: 'blobs_deleted', label: 'Receipt images and export archives removed' },
+  { reachedAt: 'data_deleted', label: 'Records erased' },
+  { reachedAt: 'identity_closed', label: 'Shadow closes your account' },
+  { reachedAt: 'done', label: 'Final clean-up finished' },
+];
 
 export const WEEKDAYS: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 

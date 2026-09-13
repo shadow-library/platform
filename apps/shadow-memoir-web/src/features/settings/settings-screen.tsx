@@ -8,6 +8,7 @@ import { Screen, ScreenColumns, screenStyles } from '@/components/ScreenLayout';
 import { meQuery } from '@/lib/apis';
 import {
   type BehaviourPreferences,
+  DELETION_TERMS,
   type HeroIntensityMode,
   type SettledCommandResult,
   useAccountCommand,
@@ -54,7 +55,7 @@ const DATA_ROWS: { id: string; label: string; help: string; action: string; to: 
     action: 'Open',
     to: '/settings/notifications',
   },
-  { id: 'delete', label: 'Delete your data', help: 'A thirty-day grace period, confirmed on your Shadow account.', action: 'Delete', to: '/settings/delete' },
+  { id: 'delete', label: 'Delete your data', help: DELETION_TERMS, action: 'Delete', to: '/settings/delete' },
 ];
 
 export function SettingsScreen(): ReactElement {

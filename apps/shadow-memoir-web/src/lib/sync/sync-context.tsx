@@ -97,7 +97,7 @@ export function createSyncedMemoirData(options: SyncedMemoirOptions): SyncedMemo
   const currency = 'EUR';
   const store = new MemoirStore(undefined, { accountId: options.accountId, marker: LAST_ACCOUNT_MARKER });
   const engine = new SyncEngine({ store, today, principal: options.principal, onAccountChanged: options.onAccountChanged });
-  const account = new SyncedAccountProvider(engine);
+  const account = new SyncedAccountProvider(engine, options.principal);
   const finance = new SyncedFinanceProvider(engine);
   const quickLogs = new SyncedQuickLogProvider(engine);
   setFinanceProvider(finance);

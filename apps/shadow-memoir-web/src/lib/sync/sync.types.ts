@@ -162,6 +162,7 @@ export const SYNC_META_KEYS = {
   deletionPending: 'deletion-pending',
   outboxSeq: 'outbox-seq',
   exportJobId: 'export-job-id',
+  deletionFlow: 'deletion-flow',
   weeklyReview: 'weekly-review',
   deadLetters: 'dead-letters',
 } as const;

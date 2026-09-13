@@ -141,8 +141,8 @@ export function createTestEngine(options: TestEngineOptions = {}): TestEngine {
 }
 
 /** The same composition `createSyncedMemoirData` builds in the app, over a test engine — for a screen that has to read and write through the sync layer rather than the fixtures. */
-export function createSyncedTestData(engine: SyncEngine): SyncedMemoirData {
-  const account = new SyncedAccountProvider(engine);
+export function createSyncedTestData(engine: SyncEngine, principal?: () => Promise<string>): SyncedMemoirData {
+  const account = new SyncedAccountProvider(engine, principal);
   const finance = new SyncedFinanceProvider(engine);
   const quickLogs = new SyncedQuickLogProvider(engine);
   return {

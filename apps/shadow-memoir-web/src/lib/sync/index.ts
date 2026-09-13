@@ -7,6 +7,7 @@ export * from './sync-context';
 export * from './sync-engine';
 export * from './sync.types';
 export * from './synced-account-provider';
+export * from './synced-deletion';
 export * from './synced-finance-provider';
 export * from './synced-hero-provider';
 export * from './synced-provider';

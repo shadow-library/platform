@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './../src/routes/__root'
 import { Route as LoginRouteImport } from './../src/routes/login'
+import { Route as ErasureRouteImport } from './../src/routes/erasure'
 import { Route as AppRouteImport } from './../src/routes/_app'
 import { Route as AppIndexRouteImport } from './../src/routes/_app/index'
 import { Route as AppReviewRouteImport } from './../src/routes/_app/review'
@@ -43,6 +44,11 @@ import { Route as AppFinanceExpensesExpenseIdRouteImport } from './../src/routes
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ErasureRoute = ErasureRouteImport.update({
+  id: '/erasure',
+  path: '/erasure',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -194,6 +200,7 @@ const AppFinanceExpensesExpenseIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/erasure': typeof ErasureRoute
   '/login': typeof LoginRoute
   '/ai': typeof AppAiRoute
   '/history': typeof AppHistoryRoute
@@ -224,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/finance/expenses/$expenseId': typeof AppFinanceExpensesExpenseIdRoute
 }
 export interface FileRoutesByTo {
+  '/erasure': typeof ErasureRoute
   '/login': typeof LoginRoute
   '/ai': typeof AppAiRoute
   '/history': typeof AppHistoryRoute
@@ -256,6 +264,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/erasure': typeof ErasureRoute
   '/login': typeof LoginRoute
   '/_app/ai': typeof AppAiRoute
   '/_app/history': typeof AppHistoryRoute
@@ -290,6 +299,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/erasure'
     | '/login'
     | '/ai'
     | '/history'
@@ -320,6 +330,7 @@ export interface FileRouteTypes {
     | '/finance/expenses/$expenseId'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/erasure'
     | '/login'
     | '/ai'
     | '/history'
@@ -351,6 +362,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/erasure'
     | '/login'
     | '/_app/ai'
     | '/_app/history'
@@ -384,6 +396,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  ErasureRoute: typeof ErasureRoute
   LoginRoute: typeof LoginRoute
 }
 
@@ -394,6 +407,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/erasure': {
+      id: '/erasure'
+      path: '/erasure'
+      fullPath: '/erasure'
+      preLoaderRoute: typeof ErasureRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -677,6 +697,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  ErasureRoute: ErasureRoute,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport

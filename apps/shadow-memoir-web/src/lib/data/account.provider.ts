@@ -6,6 +6,7 @@ import {
   type BillingView,
   type DayPreferences,
   type DeletionView,
+  type ErasureDevice,
   type ExportJob,
   type ExportView,
   type NotificationPreference,
@@ -13,7 +14,7 @@ import {
   type OnboardingStatus,
   type PlanId,
 } from './account.types';
-import { type SettledCommandResult } from './command.types';
+import { type CommandOutcome, type SettledCommandResult } from './command.types';
 import { type Persona } from './fixtures';
 
 export interface AccountProvider {
@@ -41,19 +42,69 @@ export const DELETION_ACKNOWLEDGEMENTS: DeletionView['acknowledgements'] = [
 ];
 
 export const DELETION_ALTERNATIVES: DeletionView['alternatives'] = [
-  { title: 'Pause instead', body: 'Set intensity to gentle, or deactivate every quest. Nothing is deleted and the streaks stay as records.' },
-  { title: 'Export and keep the account', body: 'Take the archive now. The account can be deleted at any later time.' },
-  { title: 'Turn off coaching and notifications', body: 'If it is the coaching or the reminders you want gone, both are switches rather than a deletion.' },
+  {
+    title: 'Pause instead',
+    body: 'Set intensity to gentle, or deactivate your quests. Nothing is deleted and the streaks stay as records.',
+    links: [
+      { label: 'Change intensity', to: '/settings' },
+      { label: 'Deactivate quests', to: '/quests' },
+    ],
+  },
+  {
+    title: 'Export and keep the account',
+    body: 'Take the archive now. The account can be deleted at any later time.',
+    links: [{ label: 'Export your data', to: '/settings/export' }],
+  },
+  {
+    title: 'Turn off coaching and notifications',
+    body: 'If it is the coaching or the reminders you want gone, both are switches rather than a deletion.',
+    links: [
+      { label: 'Coaching consent', to: '/ai' },
+      { label: 'Notification settings', to: '/settings/notifications' },
+    ],
+  },
 ];
 
-export const DELETION_GRACE_NOTE =
-  'A thirty-day grace period, then permanent erasure. During the grace period nothing is deleted and you can stop it. If an erasure is interrupted it resumes on its own — you never have to start again.';
+export const DELETION_TERMS = 'Erasure starts the moment you confirm, and it cannot be stopped or undone. If it is interrupted, it resumes on its own.';
 
 export const REAUTH_HANDOFF_COPY = {
   title: 'Confirm it is you, on your Shadow account',
-  body: 'Deleting your data needs a fresh sign-in on the account itself, not in this app. Nothing is scheduled and nothing is erased until that confirmation comes back, and you can walk away from this screen at any point.',
+  body: 'Deleting your data needs a fresh sign-in on the account itself, not in this app. You come back here for the final confirmation, and nothing is erased before you give it.',
   continueLabel: 'Continue on your Shadow account',
 };
+
+export const DELETION_UNACKNOWLEDGED = 'Both statements need to be true before anything goes further.';
+
+export const DELETION_STARTED = 'The erasure has started. It runs to the end on its own.';
+
+export const DELETION_STOPPED = 'Stopped. Nothing was started and nothing was erased.';
+
+export const DELETION_WRONG_ACCOUNT = 'Nothing was erased: this tab is no longer signed in as this account.';
+
+export const DELETION_ACCOUNT_UNCONFIRMED = 'Couldn’t confirm which account is signed in. Nothing was erased.';
+
+export const DELETION_START_UNCONFIRMED_CODE = 'DELETION_START_UNCONFIRMED';
+
+export const DELETION_START_UNCONFIRMED = [
+  'The request was sent, but Shadow Memoir didn’t answer, so the erasure may have started.',
+  'Check again before doing anything else — asking again never starts a second erasure.',
+].join(' ');
+
+export const DELETION_UNEXPECTED = 'Something went wrong on this device. Nothing was sent and nothing was erased.';
+
+/** A started erasure: the server has revoked the session, and `device` says whether this device's copy of the account is gone. */
+export interface ErasureStartedResult extends CommandOutcome {
+  status: 'applied';
+  erasure: { device: ErasureDevice };
+}
+
+export function isErasureStarted(result: SettledCommandResult): result is ErasureStartedResult {
+  return result.status === 'applied' && 'erasure' in result;
+}
+
+export const DELETION_DEVICE_ERROR = 'This device couldn’t read the deletion steps it saved, so nothing was sent and nothing was erased.';
+
+export const REAUTH_EXPIRED_NOTE = 'The confirmation on your Shadow account expired before the erasure started, so nothing was erased. Confirm it is you again to continue.';
 
 export const SYNC_COPY: Record<AppSyncView['status'], { title: string; body: string }> = {
   online: { title: 'Online and synced', body: 'Everything on this device matches the server.' },
@@ -146,7 +197,7 @@ interface AccountFixtureState {
   notifications: NotificationSettings;
   plan: PlanId;
   exportStage: ExportJob['stage'];
-  deletionStage: DeletionView['stage'];
+  deletionStage: Extract<DeletionView['stage']['kind'], 'idle' | 'awaiting-reauth'>;
   acknowledged: Set<string>;
 }
 
@@ -160,9 +211,8 @@ function applied(message: string): SettledCommandResult {
 }
 
 /**
- * The fixture account, kept for stories and component tests. Deletion deliberately has no path to
- * `scheduled`: `deletion.begin` moves to the re-authentication handoff and stops, because only the platform
- * confirming the owner can start an erasure.
+ * The fixture account, kept for stories and component tests. Its session is never elevated, so `deletion.continue` stops at the
+ * re-authentication handoff and nothing can start an erasure.
  */
 export function createAccountProvider({ persona = 'active', currency }: AccountFixtureOptions): AccountProvider {
   const state: AccountFixtureState = {
@@ -218,14 +268,13 @@ export function createAccountProvider({ persona = 'active', currency }: AccountF
     getExport: () => Promise.resolve({ sets, job: exportJobCopy(state.exportStage, state.exportStage === 'ready' ? 'https://example.invalid/archive.zip' : null) }),
     getDeletion: () =>
       Promise.resolve({
-        stage: state.deletionStage,
-        stateNote: null,
+        stage: state.deletionStage === 'idle' ? { kind: 'idle' } : { kind: 'awaiting-reauth', reason: 'step-up' },
         sets,
         acknowledgements: DELETION_ACKNOWLEDGEMENTS,
         acknowledged: [...state.acknowledged],
         reauth: { ...REAUTH_HANDOFF_COPY, continueTo: '/api/auth/step-up' },
         alternatives: DELETION_ALTERNATIVES,
-        gracePeriodNote: DELETION_GRACE_NOTE,
+        terms: DELETION_TERMS,
       }),
     getAppSync: () => {
       const status: AppSyncView['status'] = state.persona === 'new' ? 'online' : 'offline';
@@ -300,16 +349,18 @@ export function createAccountProvider({ persona = 'active', currency }: AccountF
           else state.acknowledged.delete(command.acknowledgementId);
           return Promise.resolve(applied(''));
 
-        case 'deletion.begin':
-          if (state.acknowledged.size < DELETION_ACKNOWLEDGEMENTS.length)
-            return Promise.resolve({ status: 'rejected', message: 'Both statements need to be true before anything goes further.' });
+        case 'deletion.continue':
+          if (state.acknowledged.size < DELETION_ACKNOWLEDGEMENTS.length) return Promise.resolve({ status: 'rejected', message: DELETION_UNACKNOWLEDGED });
           state.deletionStage = 'awaiting-reauth';
-          return Promise.resolve(applied('Nothing is scheduled yet. The next confirmation happens on your Shadow account.'));
+          return Promise.resolve(applied(''));
+
+        case 'deletion.begin':
+          return Promise.resolve({ status: 'rejected', message: REAUTH_EXPIRED_NOTE });
 
         default:
           state.deletionStage = 'idle';
           state.acknowledged.clear();
-          return Promise.resolve(applied('Stopped. Nothing was scheduled and nothing was deleted.'));
+          return Promise.resolve(applied(DELETION_STOPPED));
       }
     },
   };

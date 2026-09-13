@@ -82,11 +82,21 @@ export interface ExportView {
   job: ExportJob;
 }
 
+/** `unknown` is an erasure this session may not read the progress of: the status route needs an elevated session. */
+export type DeletionProgress = 'pending' | 'blobs_deleted' | 'data_deleted' | 'identity_closed' | 'done' | 'unknown';
+
 /**
- * Deletion never reaches `scheduled` from inside the app: the elevated re-authentication happens on the
- * Shadow account, and only its confirmation can start anything (PRD §2.10).
+ * The server starts an erasure the moment it is asked, with no grace period and no way to stop it, so `confirm` is the only stage an
+ * erasure can start from: an elevated session whose owner has acknowledged both statements and asked to continue.
  */
-type DeletionStage = 'idle' | 'awaiting-reauth' | 'scheduled';
+export type DeletionStage =
+  | { kind: 'idle' }
+  | { kind: 'awaiting-reauth'; reason: 'step-up' | 'expired' }
+  | { kind: 'confirm' }
+  | { kind: 'unconfirmed'; reason: 'unreachable' | 'signed-out' }
+  | { kind: 'underway'; progress: DeletionProgress; startedAt: string | null };
+
+export type ErasureDevice = 'removed' | 'kept';
 
 interface DeletionAcknowledgement {
   id: string;
@@ -101,15 +111,20 @@ interface ReauthHandoff {
   continueTo: string;
 }
 
+interface DeletionAlternative {
+  title: string;
+  body: string;
+  links: { label: string; to: string }[];
+}
+
 export interface DeletionView {
   stage: DeletionStage;
-  stateNote: string | null;
   sets: { name: string; meta: string }[];
   acknowledgements: DeletionAcknowledgement[];
   acknowledged: string[];
   reauth: ReauthHandoff;
-  alternatives: { title: string; body: string }[];
-  gracePeriodNote: string;
+  alternatives: DeletionAlternative[];
+  terms: string;
 }
 
 type SyncStatus = 'online' | 'offline' | 'syncing' | 'failed' | 'signed-out';
@@ -169,5 +184,6 @@ export type AccountCommand =
   | { type: 'export.prepare' }
   | { type: 'export.dismiss' }
   | { type: 'deletion.acknowledge'; acknowledgementId: string; acknowledged: boolean }
+  | { type: 'deletion.continue' }
   | { type: 'deletion.begin' }
   | { type: 'deletion.abandon' };
