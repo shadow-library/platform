@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Dialog, FileUpload, Switch, toast } from '@shadow-library/ui';
 
 import { PageContainer, PageHeader, QueryState, SectionCard, StatusChip } from '@/components/nf';
@@ -46,6 +46,21 @@ function resultChips(counts: CollectionResult): React.JSX.Element {
   );
 }
 
+function resultTotals(result: ImportPlanResponse): CollectionResult {
+  return COLLECTIONS.reduce<CollectionResult>(
+    (totals, { key }) => {
+      const counts = result.results[key];
+      return {
+        created: totals.created + counts.created,
+        updated: totals.updated + counts.updated,
+        unchanged: totals.unchanged + counts.unchanged,
+        pruned: totals.pruned + counts.pruned,
+      };
+    },
+    { created: 0, updated: 0, unchanged: 0, pruned: 0 },
+  );
+}
+
 function ImportPlanScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const projectQuery = useProjectQuery(novelId);
@@ -58,9 +73,20 @@ function ImportPlanScreen(): React.JSX.Element {
   const [overwrite, setOverwrite] = useState(false);
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const [result, setResult] = useState<ImportPlanResponse | null>(null);
+  const [uploadKey, setUploadKey] = useState(0);
+  const resultRef = useRef<HTMLDivElement>(null);
 
   const project = projectQuery.data;
   const isNewNovel = project?.kind === 'new_novel';
+
+  useEffect(() => {
+    if (!result) return;
+    const node = resultRef.current;
+    if (!node) return;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    node.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
+    node.focus({ preventScroll: true });
+  }, [result]);
 
   const readBundle = async (file: File): Promise<void> => {
     setResult(null);
@@ -90,6 +116,12 @@ function ImportPlanScreen(): React.JSX.Element {
         onSuccess: response => {
           setResult(response);
           toast.success(response.approval ? 'Plan imported and approved' : 'Plan imported');
+          setBundle(null);
+          setFileName('');
+          setParseError(null);
+          setApprove(true);
+          setOverwrite(false);
+          setUploadKey(key => key + 1);
         },
         onError: err => toast.danger(err.message),
       },
@@ -112,113 +144,121 @@ function ImportPlanScreen(): React.JSX.Element {
             subtitle="Load a plan bundle authored offline — bible documents, entities, volumes, arcs, and chapter briefs land in one transactional call."
           />
 
-          <Alert intent="warning" title="Deprecated">
-            Plan import exists for novels authored with the external planning skill. New novels should be planned in-app via the project chat. This screen will be removed once
-            legacy plans are migrated.
-          </Alert>
-
-          {!isNewNovel ? (
-            <Alert intent="info" title="Plan import is only for new-novel projects">
-              Source projects derive their plan from the source pipeline instead.
+          <div className={styles.stack}>
+            <Alert intent="warning" title="Deprecated">
+              Plan import exists for novels authored with the external planning skill. New novels should be planned in-app via the project chat. This screen will be removed once
+              legacy plans are migrated.
             </Alert>
-          ) : (
-            <>
-              <SectionCard title="Bundle">
-                <div className={styles.form}>
-                  <FileUpload
-                    aria-label="Plan bundle file"
-                    accept={['.json']}
-                    maxFiles={1}
-                    onValueChange={files => {
-                      const file = files[files.length - 1]?.file;
-                      if (file) void readBundle(file);
-                    }}
-                  />
-                  {parseError && (
-                    <Alert intent="danger" title="Cannot read this bundle">
-                      {parseError}
-                    </Alert>
-                  )}
 
-                  {bundle && (
-                    <div className={styles.preview}>
-                      <div className={styles.previewTitle}>{fileName}</div>
-                      <div className={styles.previewGrid}>
-                        {COLLECTIONS.map(({ key, label }) => (
-                          <div key={key} className={styles.previewCell}>
-                            <div className={styles.previewCount}>{bundleCount(bundle, key)}</div>
-                            <div className={styles.previewLabel}>{label}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+            {!isNewNovel ? (
+              <Alert intent="info" title="Plan import is only for new-novel projects">
+                Source projects derive their plan from the source pipeline instead.
+              </Alert>
+            ) : (
+              <>
+                <SectionCard title="Bundle">
+                  <div className={styles.form}>
+                    <FileUpload
+                      key={uploadKey}
+                      aria-label="Plan bundle file"
+                      accept={['.json']}
+                      maxFiles={1}
+                      onValueChange={files => {
+                        const file = files[files.length - 1]?.file;
+                        if (file) void readBundle(file);
+                      }}
+                    />
+                    {parseError && (
+                      <Alert intent="danger" title="Cannot read this bundle">
+                        {parseError}
+                      </Alert>
+                    )}
 
-                  <Switch
-                    label="Approve on import"
-                    description="Lay out chapter ranges and approve volumes and arcs so chapter generation can start immediately."
-                    checked={approve}
-                    onCheckedChange={setApprove}
-                  />
-                  <Switch
-                    label="Overwrite existing plan"
-                    description="Replace matching items and prune ones missing from the bundle. Without this, importing into a project that already has plan data is rejected."
-                    checked={overwrite}
-                    onCheckedChange={setOverwrite}
-                  />
-
-                  <div>
-                    <Button variant="primary" disabled={!bundle} loading={importPlan.isPending} onClick={submit}>
-                      Import bundle
-                    </Button>
-                  </div>
-                </div>
-              </SectionCard>
-
-              {fieldErrors.length > 0 && (
-                <Alert intent="danger" title="The bundle failed validation — fix the workspace and re-pack">
-                  <ul className={styles.issueList}>
-                    {fieldErrors.map(([field, message]) => (
-                      <li key={field}>
-                        <code>{field}</code> — {message}
-                      </li>
-                    ))}
-                  </ul>
-                </Alert>
-              )}
-
-              {result && (
-                <SectionCard title="Results">
-                  <div className={styles.results}>
-                    {COLLECTIONS.map(({ key, label }) => (
-                      <div key={key} className={styles.resultRow}>
-                        <span className={styles.resultLabel}>{label}</span>
-                        {resultChips(result.results[key])}
-                      </div>
-                    ))}
-                    {result.approval && (
-                      <div className={styles.resultRow}>
-                        <span className={styles.resultLabel}>Approval</span>
-                        <span className={styles.chipRow}>
-                          <StatusChip intent="success">{result.approval.volumesApproved} volumes approved</StatusChip>
-                          <StatusChip intent="success">{result.approval.arcsApproved} arcs approved</StatusChip>
-                        </span>
+                    {bundle && (
+                      <div className={styles.preview}>
+                        <div className={styles.previewTitle}>{fileName}</div>
+                        <div className={styles.previewGrid}>
+                          {COLLECTIONS.map(({ key, label }) => (
+                            <div key={key} className={styles.previewCell}>
+                              <div className={styles.previewCount}>{bundleCount(bundle, key)}</div>
+                              <div className={styles.previewLabel}>{label}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
+
+                    <Switch
+                      label="Approve on import"
+                      description="Lay out chapter ranges and approve volumes and arcs so chapter generation can start immediately."
+                      checked={approve}
+                      onCheckedChange={setApprove}
+                    />
+                    <Switch
+                      label="Overwrite existing plan"
+                      description="Replace matching items and prune ones missing from the bundle. Without this, importing into a project that already has plan data is rejected."
+                      checked={overwrite}
+                      onCheckedChange={setOverwrite}
+                    />
+
+                    <div>
+                      <Button variant="primary" disabled={!bundle} loading={importPlan.isPending} onClick={submit}>
+                        Import bundle
+                      </Button>
+                    </div>
                   </div>
-                  {result.warnings.length > 0 && (
-                    <Alert intent="warning" title="Imported with warnings">
-                      <ul className={styles.issueList}>
-                        {result.warnings.map((w, i) => (
-                          <li key={i}>{w}</li>
-                        ))}
-                      </ul>
-                    </Alert>
-                  )}
                 </SectionCard>
-              )}
-            </>
-          )}
+
+                {fieldErrors.length > 0 && (
+                  <Alert intent="danger" title="The bundle failed validation — fix the workspace and re-pack">
+                    <ul className={styles.issueList}>
+                      {fieldErrors.map(([field, message]) => (
+                        <li key={field}>
+                          <code>{field}</code> — {message}
+                        </li>
+                      ))}
+                    </ul>
+                  </Alert>
+                )}
+
+                {result && (
+                  <div ref={resultRef} tabIndex={-1} className={styles.resultsAnchor}>
+                    <SectionCard title="Results">
+                      <Alert intent="success" title={result.approval ? 'Plan imported and approved' : 'Plan imported'} className={styles.successAlert}>
+                        {resultChips(resultTotals(result))}
+                      </Alert>
+                      <div className={styles.results}>
+                        {COLLECTIONS.map(({ key, label }) => (
+                          <div key={key} className={styles.resultRow}>
+                            <span className={styles.resultLabel}>{label}</span>
+                            {resultChips(result.results[key])}
+                          </div>
+                        ))}
+                        {result.approval && (
+                          <div className={styles.resultRow}>
+                            <span className={styles.resultLabel}>Approval</span>
+                            <span className={styles.chipRow}>
+                              <StatusChip intent="success">{result.approval.volumesApproved} volumes approved</StatusChip>
+                              <StatusChip intent="success">{result.approval.arcsApproved} arcs approved</StatusChip>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {result.warnings.length > 0 && (
+                        <Alert intent="warning" title="Imported with warnings">
+                          <ul className={styles.issueList}>
+                            {result.warnings.map((w, i) => (
+                              <li key={i}>{w}</li>
+                            ))}
+                          </ul>
+                        </Alert>
+                      )}
+                    </SectionCard>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </>
       </QueryState>
 
