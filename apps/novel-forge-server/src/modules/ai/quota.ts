@@ -5,6 +5,8 @@ export interface WindowUsageRow {
   calls: number;
   inputTokens: number;
   outputTokens: number;
+  /** Sum of `model_calls.cost_usd` for rows in this group that recorded a real cost — kept separate from `inputTokens`/`outputTokens`, which are summed only over rows without a recorded cost, so the two never double-count the same call. */
+  recordedCostUsd: number;
 }
 
 export interface WindowUsage {
@@ -19,10 +21,11 @@ export interface AiQuotaLimits {
 
 export type QuotaBreach = 'rate' | 'spend' | null;
 
-// Chat calls never persist `model_calls.cost_usd` (only image calls do), so accumulated spend is
-// reconstructed from recorded token counts and the registry's per-million-token prices. Cached input
-// tokens are billed at full input price here — an over-estimate that makes the ceiling conservative,
-// which is the safe direction for a spend guard. Ollama and any unpriced model contribute nothing.
+// Rows without a recorded `model_calls.cost_usd` (every chat/text call, and an image call whose
+// provider response omitted `usage.cost`) fall back to token counts times the registry's
+// per-million-token prices. Cached input tokens are billed at full input price here — an
+// over-estimate that makes the ceiling conservative, which is the safe direction for a spend guard.
+// Ollama and any unpriced model contribute nothing.
 export function estimateCallCostUsd(model: string, inputTokens: number, outputTokens: number): number {
   const entry = MODEL_MAP[model];
   if (!entry) return 0;
@@ -31,12 +34,14 @@ export function estimateCallCostUsd(model: string, inputTokens: number, outputTo
   return (inputTokens / 1_000_000) * inputPrice + (outputTokens / 1_000_000) * outputPrice;
 }
 
+// Recorded cost is authoritative when the provider reported it (currently image calls only); the
+// token-based estimate only ever covers rows that lack one, so a call is never counted twice.
 export function computeWindowUsage(rows: WindowUsageRow[]): WindowUsage {
   let calls = 0;
   let costUsd = 0;
   for (const row of rows) {
     calls += row.calls;
-    costUsd += estimateCallCostUsd(row.model, row.inputTokens, row.outputTokens);
+    costUsd += row.recordedCostUsd + estimateCallCostUsd(row.model, row.inputTokens, row.outputTokens);
   }
   return { calls, costUsd };
 }

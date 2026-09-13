@@ -57,14 +57,21 @@ export class AiQuotaService {
       .select({
         model: schema.modelCalls.model,
         calls: sql<number>`count(*)::int`,
-        inputTokens: sql<string>`coalesce(sum(${schema.modelCalls.inputTokens}), 0)`,
-        outputTokens: sql<string>`coalesce(sum(${schema.modelCalls.outputTokens}), 0)`,
+        inputTokens: sql<string>`coalesce(sum(${schema.modelCalls.inputTokens}) filter (where ${schema.modelCalls.costUsd} is null), 0)`,
+        outputTokens: sql<string>`coalesce(sum(${schema.modelCalls.outputTokens}) filter (where ${schema.modelCalls.costUsd} is null), 0)`,
+        recordedCostUsd: sql<string>`coalesce(sum(${schema.modelCalls.costUsd}) filter (where ${schema.modelCalls.costUsd} is not null), 0)`,
       })
       .from(schema.modelCalls)
       .innerJoin(schema.projects, eq(schema.modelCalls.projectId, schema.projects.id))
       .where(and(eq(schema.projects.ownerId, ownerId), gte(schema.modelCalls.createdAt, windowStart)))
       .groupBy(schema.modelCalls.model);
 
-    return rows.map(row => ({ model: row.model, calls: Number(row.calls), inputTokens: Number(row.inputTokens), outputTokens: Number(row.outputTokens) }));
+    return rows.map(row => ({
+      model: row.model,
+      calls: Number(row.calls),
+      inputTokens: Number(row.inputTokens),
+      outputTokens: Number(row.outputTokens),
+      recordedCostUsd: Number(row.recordedCostUsd),
+    }));
   }
 }
