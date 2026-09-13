@@ -11,6 +11,7 @@ import {
   projectStatusQueryOptions,
   type ResetBody,
   type RoleUsage,
+  translationJobActive,
   useAiUsageQuery,
   useCloneProjectMutation,
   useDeleteCoverMutation,
@@ -19,10 +20,11 @@ import {
   useProjectQuery,
   useProjectStatusQuery,
   useResetProjectMutation,
+  useTranslationStatusQuery,
   useUploadCoverMutation,
   type WorkflowRunDetailResponse,
 } from '@/lib/apis';
-import { LIFECYCLE_PHASES, lifecyclePhase, projectKindIntent, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
+import { LIFECYCLE_PHASES, lifecyclePhase, projectKindIntent, projectKindLabel, projectKindTag, projectTitle, relativeTime, translationLifecycle } from '@/lib/format';
 
 import styles from './overview.module.css';
 
@@ -210,6 +212,8 @@ function OverviewScreen(): React.JSX.Element {
   const statusQuery = useProjectStatusQuery(novelId);
   const usageQuery = useAiUsageQuery(novelId);
   const runsQuery = useListRunsQuery(novelId);
+  const isTranslation = projectQuery.data?.kind === 'translation';
+  const translationQuery = useTranslationStatusQuery(novelId, isTranslation);
   // Only the `import` job needs live polling here (it's the one this screen surfaces progress for); once
   // it settles — or there never was one — stop, rather than polling this project's jobs forever on every
   // overview visit.
@@ -231,7 +235,10 @@ function OverviewScreen(): React.JSX.Element {
   const status = statusQuery.data;
   const usage = usageQuery.data;
   const runs = runsQuery.data?.items ?? [];
-  const phase = lifecyclePhase(status, project?.kind);
+  const translation = translationQuery.data;
+  const phase = isTranslation
+    ? translationLifecycle(translation && { counts: translation.counts, glossary: translation.glossary, jobActive: translationJobActive(translation) })
+    : lifecyclePhase(status, project?.kind);
   const isSource = project?.kind === 'source';
 
   const volumesTotal = status?.volumesTotal ?? 0;

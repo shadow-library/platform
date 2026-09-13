@@ -9,6 +9,7 @@ import { IdeaRename } from '@/components/nf';
 import {
   applySeedName,
   invalidateSeed,
+  translationJobActive,
   useListProjectsQuery,
   useListProposalsQuery,
   useLogoutMutation,
@@ -17,9 +18,10 @@ import {
   useProjectStatusQuery,
   useReviewQueueQuery,
   useSeedQuery,
+  useTranslationStatusQuery,
   useUpdateProjectMutation,
 } from '@/lib/apis';
-import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle } from '@/lib/format';
+import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle, translationLifecycle } from '@/lib/format';
 import { firstTitle } from '@/lib/idea-title';
 
 import { BookIcon, EditIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SparkIcon, SunIcon } from '../icons';
@@ -63,15 +65,21 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   const reviewQuery = useReviewQueueQuery(novelId ?? '', inProject);
   const proposalsQuery = useListProposalsQuery(novelId ?? '', { status: 'pending', limit: PROJECT_LIMIT }, inProject);
   const seedQuery = useSeedQuery(seedId ?? '', onIdeaStudio);
+  const isTranslation = projectQuery.data?.kind === 'translation';
+  const translationQuery = useTranslationStatusQuery(novelId ?? '', inProject && isTranslation);
 
   const project = projectQuery.data;
   const status = statusQuery.data;
-  const phase = lifecyclePhase(status, project?.kind);
+  const translation = translationQuery.data;
+  const phase = isTranslation
+    ? translationLifecycle(translation && { counts: translation.counts, glossary: translation.glossary, jobActive: translationJobActive(translation) })
+    : lifecyclePhase(status, project?.kind);
 
   const badges: Record<string, NavLeaf['badge']> = {
     chapters: { count: status?.chaptersTotal ?? 0 },
     review: { count: reviewQuery.data?.drafts.length ?? 0, intent: 'warning' },
     proposals: { count: proposalsQuery.data?.items.length ?? 0, intent: 'warning' },
+    translation: { count: translation?.glossary.suggested ?? 0, intent: 'warning' },
   };
 
   const options = projects.map(candidate => ({

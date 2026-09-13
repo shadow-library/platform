@@ -19,6 +19,7 @@ export * from './ideation.api';
 export * from './run.api';
 export * from './events.api';
 export * from './rebrand.api';
+export * from './translation.api';
 export * from './reforge.api';
 export * from './reforge-transform.api';
 export * from './source.api';
