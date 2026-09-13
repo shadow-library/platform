@@ -1,15 +1,15 @@
 import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
-import { type ChapterResponse, type ListChapterResponse, type ListChaptersQueryParams } from './api-types.gen';
+import { type ApiV1ProjectsProjectIdSourceChaptersQueryParams, type ChapterResponse, type ListChapterResponse } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
 const chapterKeys = {
   all: (projectId: string) => ['projects', projectId, 'chapters'] as const,
-  list: (projectId: string, params?: ListChaptersQueryParams) => [...chapterKeys.all(projectId), 'list', params] as const,
+  list: (projectId: string, params?: ApiV1ProjectsProjectIdSourceChaptersQueryParams) => [...chapterKeys.all(projectId), 'list', params] as const,
   detail: (projectId: string, n: number) => [...chapterKeys.all(projectId), n] as const,
 };
 
-export const listChaptersQueryOptions = (projectId: string, params?: ListChaptersQueryParams): UseQueryOptions<ListChapterResponse, ApiError> =>
+export const listChaptersQueryOptions = (projectId: string, params?: ApiV1ProjectsProjectIdSourceChaptersQueryParams): UseQueryOptions<ListChapterResponse, ApiError> =>
   queryOptions<ListChapterResponse, ApiError>({
     queryKey: chapterKeys.list(projectId, params),
     queryFn: () =>
@@ -18,7 +18,7 @@ export const listChaptersQueryOptions = (projectId: string, params?: ListChapter
         .execute(),
   });
 
-export function useListChaptersQuery(projectId: string, params?: ListChaptersQueryParams, enabled = true): UseQueryResult<ListChapterResponse, ApiError> {
+export function useListChaptersQuery(projectId: string, params?: ApiV1ProjectsProjectIdSourceChaptersQueryParams, enabled = true): UseQueryResult<ListChapterResponse, ApiError> {
   return useQuery({ ...listChaptersQueryOptions(projectId, params), enabled: enabled && Boolean(projectId) });
 }
 

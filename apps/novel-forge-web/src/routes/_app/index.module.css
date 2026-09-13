@@ -64,6 +64,16 @@
   color: var(--sh-neutral-400);
 }
 
+.coverPlaceholder[data-kind='translation'] {
+  background: var(--sh-indigo-50);
+  color: var(--sh-indigo-300);
+}
+
+.coverPlaceholder[data-kind='curated'] {
+  background: var(--sh-amber-50);
+  color: var(--sh-amber-400);
+}
+
 .cardBody {
   padding: 16px 16px 14px;
 }

@@ -135,6 +135,13 @@ export const GlobeIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
+export const LanguageIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <path d="M4 5h9M8 3v2M11 5c-.6 3.2-2.4 5.9-5 7.8M6 9.5c1.6 1.9 3.6 3.3 5.8 4" />
+    <path d="M14 21l4.5-11L23 21M15.6 17h5.8" />
+  </SvgIcon>
+);
+
 export const ChevronRightIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <path d="M9 6l6 6-6 6" />

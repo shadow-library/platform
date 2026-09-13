@@ -11,7 +11,7 @@ const VARIANT_RULES: VariantRule[] = [
   { pattern: /^\/novels\/[^/]+\/chat\/?$/, variant: 'chat' },
   { pattern: /^\/ideas\/[^/]+\/?$/, variant: 'chat' },
   { pattern: /^\/novels\/[^/]+\/(story-bible|canon-facts|review|proposals|runs|illustrations)\/?$/, variant: 'split' },
-  { pattern: /^\/novels\/[^/]+\/(publish|settings|import-plan|rebrand|reforge|transform)\/?$/, variant: 'form' },
+  { pattern: /^\/novels\/[^/]+\/(publish|settings|import-plan|rebrand|reforge|transform|translation)\/?$/, variant: 'form' },
   { pattern: /^\/(ideas)?\/?$/, variant: 'list' },
   { pattern: /^\/(settings|import)\/?$/, variant: 'form' },
 ];

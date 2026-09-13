@@ -3,10 +3,11 @@ import { useState } from 'react';
 import { Button, SegmentedControl } from '@shadow-library/ui';
 
 import { BookIcon, PlusIcon, SparkIcon, UploadIcon } from '@/components/icons';
+import { projectHomeRoute } from '@/components/Layout';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
 import { listProjectsQueryOptions, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
-import { projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
+import { projectKindIntent, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './index.module.css';
 
@@ -18,7 +19,7 @@ export const Route = createFileRoute('/_app/')({
   component: Dashboard,
 });
 
-type Filter = 'all' | 'source' | 'new_novel';
+type Filter = 'all' | 'source' | 'new_novel' | 'translation' | 'curated';
 
 interface StatProps {
   value?: number;
@@ -71,7 +72,7 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
       )}
       <div className={styles.cardBody}>
         <div className={styles.chipRow}>
-          <StatusChip intent={isSource ? 'info' : 'accent'}>{projectKindTag(project.kind)}</StatusChip>
+          <StatusChip intent={projectKindIntent(project.kind)}>{projectKindTag(project.kind)}</StatusChip>
           <span className={styles.cardId}>#{project.id}</span>
         </div>
         <h3 className={styles.cardTitle}>{projectTitle(project)}</h3>
@@ -113,6 +114,8 @@ function Dashboard(): React.JSX.Element {
 
   const sourceCount = projects.filter(p => p.kind === 'source').length;
   const newCount = projects.filter(p => p.kind === 'new_novel').length;
+  const translationCount = projects.filter(p => p.kind === 'translation').length;
+  const curatedCount = projects.filter(p => p.kind === 'curated').length;
   const visible = filter === 'all' ? projects : projects.filter(p => p.kind === filter);
 
   return (
@@ -140,6 +143,8 @@ function Dashboard(): React.JSX.Element {
           <SegmentedControl.Item value="all">All {projects.length}</SegmentedControl.Item>
           <SegmentedControl.Item value="source">Source {sourceCount}</SegmentedControl.Item>
           <SegmentedControl.Item value="new_novel">Original {newCount}</SegmentedControl.Item>
+          <SegmentedControl.Item value="translation">Translation {translationCount}</SegmentedControl.Item>
+          <SegmentedControl.Item value="curated">Curated {curatedCount}</SegmentedControl.Item>
         </SegmentedControl>
         <div className={styles.spacer} />
         <span className={styles.toolbarNote}>Sorted by last activity</span>
@@ -170,7 +175,7 @@ function Dashboard(): React.JSX.Element {
       <NewNovelModal
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onCreated={project => navigate({ to: '/novels/$novelId/overview', params: { novelId: project.id } })}
+        onCreated={project => navigate({ to: projectHomeRoute(project.kind), params: { novelId: project.id } })}
         onSeedCreated={seed => navigate({ to: '/ideas/$seedId', params: { seedId: seed.projectId } })}
       />
     </div>

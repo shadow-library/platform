@@ -22,7 +22,7 @@ import {
   useUploadCoverMutation,
   type WorkflowRunDetailResponse,
 } from '@/lib/apis';
-import { LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
+import { LIFECYCLE_PHASES, lifecyclePhase, projectKindIntent, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './overview.module.css';
 
@@ -39,13 +39,14 @@ interface NextStep {
 }
 
 interface LifecycleStepperProps {
+  labels: readonly string[];
   completed: number;
 }
 
-function LifecycleStepper({ completed }: LifecycleStepperProps): React.JSX.Element {
+function LifecycleStepper({ labels, completed }: LifecycleStepperProps): React.JSX.Element {
   return (
     <div className={styles.stepper}>
-      {LIFECYCLE_PHASES.map((label, i) => {
+      {labels.map((label, i) => {
         const state = i < completed ? 'done' : i === completed ? 'current' : 'pending';
         return (
           <div key={label} className={styles.stepContents}>
@@ -230,7 +231,7 @@ function OverviewScreen(): React.JSX.Element {
   const status = statusQuery.data;
   const usage = usageQuery.data;
   const runs = runsQuery.data?.items ?? [];
-  const phase = lifecyclePhase(status);
+  const phase = lifecyclePhase(status, project?.kind);
   const isSource = project?.kind === 'source';
 
   const volumesTotal = status?.volumesTotal ?? 0;
@@ -315,7 +316,7 @@ function OverviewScreen(): React.JSX.Element {
             />
             <div className={styles.headerMain}>
               <div className={styles.kindRow}>
-                <StatusChip intent={isSource ? 'info' : 'accent'}>{projectKindTag(project.kind)} project</StatusChip>
+                <StatusChip intent={projectKindIntent(project.kind)}>{projectKindTag(project.kind)} project</StatusChip>
                 <span className={styles.created}>
                   {projectKindLabel(project.kind)} · created {new Date(project.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                 </span>
@@ -356,9 +357,11 @@ function OverviewScreen(): React.JSX.Element {
             </div>
           </div>
 
-          <SectionCard className={styles.sectionSpacer}>
-            <LifecycleStepper completed={phase.completed} />
-          </SectionCard>
+          {LIFECYCLE_PHASES[project.kind].length > 0 && (
+            <SectionCard className={styles.sectionSpacer}>
+              <LifecycleStepper labels={LIFECYCLE_PHASES[project.kind]} completed={phase.completed} />
+            </SectionCard>
+          )}
 
           <div className={styles.statGrid}>
             <StatCard label="Chapters">

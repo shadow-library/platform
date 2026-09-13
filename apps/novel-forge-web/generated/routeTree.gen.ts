@@ -19,6 +19,7 @@ import { Route as AppImportRouteImport } from './../src/routes/_app/import'
 import { Route as AppIdeasRouteImport } from './../src/routes/_app/ideas'
 import { Route as NovelsNovelIdIndexRouteImport } from './../src/routes/novels/$novelId/index'
 import { Route as NovelsNovelIdVolumesRouteImport } from './../src/routes/novels/$novelId/volumes'
+import { Route as NovelsNovelIdTranslationRouteImport } from './../src/routes/novels/$novelId/translation'
 import { Route as NovelsNovelIdTransformRouteImport } from './../src/routes/novels/$novelId/transform'
 import { Route as NovelsNovelIdStoryBibleRouteImport } from './../src/routes/novels/$novelId/story-bible'
 import { Route as NovelsNovelIdSourceRouteImport } from './../src/routes/novels/$novelId/source'
@@ -85,6 +86,12 @@ const NovelsNovelIdVolumesRoute = NovelsNovelIdVolumesRouteImport.update({
   path: '/volumes',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
+const NovelsNovelIdTranslationRoute =
+  NovelsNovelIdTranslationRouteImport.update({
+    id: '/translation',
+    path: '/translation',
+    getParentRoute: () => NovelsNovelIdRoute,
+  } as any)
 const NovelsNovelIdTransformRoute = NovelsNovelIdTransformRouteImport.update({
   id: '/transform',
   path: '/transform',
@@ -191,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/novels/$novelId/source': typeof NovelsNovelIdSourceRoute
   '/novels/$novelId/story-bible': typeof NovelsNovelIdStoryBibleRoute
   '/novels/$novelId/transform': typeof NovelsNovelIdTransformRoute
+  '/novels/$novelId/translation': typeof NovelsNovelIdTranslationRoute
   '/novels/$novelId/volumes': typeof NovelsNovelIdVolumesRoute
   '/novels/$novelId/': typeof NovelsNovelIdIndexRoute
 }
@@ -217,6 +225,7 @@ export interface FileRoutesByTo {
   '/novels/$novelId/source': typeof NovelsNovelIdSourceRoute
   '/novels/$novelId/story-bible': typeof NovelsNovelIdStoryBibleRoute
   '/novels/$novelId/transform': typeof NovelsNovelIdTransformRoute
+  '/novels/$novelId/translation': typeof NovelsNovelIdTranslationRoute
   '/novels/$novelId/volumes': typeof NovelsNovelIdVolumesRoute
   '/novels/$novelId': typeof NovelsNovelIdIndexRoute
 }
@@ -246,6 +255,7 @@ export interface FileRoutesById {
   '/novels/$novelId/source': typeof NovelsNovelIdSourceRoute
   '/novels/$novelId/story-bible': typeof NovelsNovelIdStoryBibleRoute
   '/novels/$novelId/transform': typeof NovelsNovelIdTransformRoute
+  '/novels/$novelId/translation': typeof NovelsNovelIdTranslationRoute
   '/novels/$novelId/volumes': typeof NovelsNovelIdVolumesRoute
   '/novels/$novelId/': typeof NovelsNovelIdIndexRoute
 }
@@ -275,6 +285,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/source'
     | '/novels/$novelId/story-bible'
     | '/novels/$novelId/transform'
+    | '/novels/$novelId/translation'
     | '/novels/$novelId/volumes'
     | '/novels/$novelId/'
   fileRoutesByTo: FileRoutesByTo
@@ -301,6 +312,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/source'
     | '/novels/$novelId/story-bible'
     | '/novels/$novelId/transform'
+    | '/novels/$novelId/translation'
     | '/novels/$novelId/volumes'
     | '/novels/$novelId'
   id:
@@ -329,6 +341,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/source'
     | '/novels/$novelId/story-bible'
     | '/novels/$novelId/transform'
+    | '/novels/$novelId/translation'
     | '/novels/$novelId/volumes'
     | '/novels/$novelId/'
   fileRoutesById: FileRoutesById
@@ -410,6 +423,13 @@ declare module '@tanstack/react-router' {
       path: '/volumes'
       fullPath: '/novels/$novelId/volumes'
       preLoaderRoute: typeof NovelsNovelIdVolumesRouteImport
+      parentRoute: typeof NovelsNovelIdRoute
+    }
+    '/novels/$novelId/translation': {
+      id: '/novels/$novelId/translation'
+      path: '/translation'
+      fullPath: '/novels/$novelId/translation'
+      preLoaderRoute: typeof NovelsNovelIdTranslationRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
     '/novels/$novelId/transform': {
@@ -560,6 +580,7 @@ interface NovelsNovelIdRouteChildren {
   NovelsNovelIdSourceRoute: typeof NovelsNovelIdSourceRoute
   NovelsNovelIdStoryBibleRoute: typeof NovelsNovelIdStoryBibleRoute
   NovelsNovelIdTransformRoute: typeof NovelsNovelIdTransformRoute
+  NovelsNovelIdTranslationRoute: typeof NovelsNovelIdTranslationRoute
   NovelsNovelIdVolumesRoute: typeof NovelsNovelIdVolumesRoute
   NovelsNovelIdIndexRoute: typeof NovelsNovelIdIndexRoute
 }
@@ -581,6 +602,7 @@ const NovelsNovelIdRouteChildren: NovelsNovelIdRouteChildren = {
   NovelsNovelIdSourceRoute: NovelsNovelIdSourceRoute,
   NovelsNovelIdStoryBibleRoute: NovelsNovelIdStoryBibleRoute,
   NovelsNovelIdTransformRoute: NovelsNovelIdTransformRoute,
+  NovelsNovelIdTranslationRoute: NovelsNovelIdTranslationRoute,
   NovelsNovelIdVolumesRoute: NovelsNovelIdVolumesRoute,
   NovelsNovelIdIndexRoute: NovelsNovelIdIndexRoute,
 }

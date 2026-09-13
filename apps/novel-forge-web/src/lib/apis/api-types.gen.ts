@@ -362,6 +362,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/ingest/projects/{projectId}/originals/{chapter}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Push Original */
+    put: operations['put_api_v1_ingest_projects_projectId_originals_chapter'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ingest/projects/{projectId}/originals': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Originals Manifest */
+    get: operations['get_api_v1_ingest_projects_projectId_originals'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects': {
     parameters: {
       query?: never;
@@ -2658,6 +2692,233 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/translation': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Translation Status */
+    get: operations['get_api_v1_projects_projectId_translation'];
+    put?: never;
+    /** Start Translation */
+    post: operations['post_api_v1_projects_projectId_translation'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/translation/config': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Update Config */
+    put: operations['put_api_v1_projects_projectId_translation_config'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/translation/originals/{chapter}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Original */
+    get: operations['get_api_v1_projects_projectId_translation_originals_chapter'];
+    /** Upsert Original */
+    put: operations['put_api_v1_projects_projectId_translation_originals_chapter'];
+    post?: never;
+    /** Delete Original */
+    delete: operations['delete_api_v1_projects_projectId_translation_originals_chapter'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/translation/chapters': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Chapters */
+    get: operations['get_api_v1_projects_projectId_translation_chapters'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/translation/chapters/{chapter}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Chapter */
+    get: operations['get_api_v1_projects_projectId_translation_chapters_chapter'];
+    /** Edit Chapter */
+    put: operations['put_api_v1_projects_projectId_translation_chapters_chapter'];
+    /** Rerun Chapter */
+    post: operations['post_api_v1_projects_projectId_translation_chapters_chapter'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/translation/chapters/{chapter}/finalize': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Finalize Chapter */
+    post: operations['post_api_v1_projects_projectId_translation_chapters_chapter_finalize'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/translation/chapters/{chapter}/reopen': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reopen Chapter */
+    post: operations['post_api_v1_projects_projectId_translation_chapters_chapter_reopen'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/translation/glossary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Glossary */
+    get: operations['get_api_v1_projects_projectId_translation_glossary'];
+    put?: never;
+    /** Create Term */
+    post: operations['post_api_v1_projects_projectId_translation_glossary'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/translation/glossary/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update Term */
+    patch: operations['patch_api_v1_projects_projectId_translation_glossary_id'];
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/translation/glossary/{id}/approve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Approve Term */
+    post: operations['post_api_v1_projects_projectId_translation_glossary_id_approve'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/translation/glossary/{id}/reject': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reject Term */
+    post: operations['post_api_v1_projects_projectId_translation_glossary_id_reject'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/translation/glossary/decisions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Decide Terms */
+    post: operations['post_api_v1_projects_projectId_translation_glossary_decisions'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/translation/manuscript': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Manuscript */
+    get: operations['get_api_v1_projects_projectId_translation_manuscript'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/publish': {
     parameters: {
       query?: never;
@@ -3205,6 +3466,25 @@ export interface components {
       /** @description Digest of exactly `{ title, content, authorNote: null }` as pushed, stamped once when the chapter landed, so a scraper can re-hash its own copy and skip an unchanged chapter. It is deliberately not the published digest, which also covers the author note and the content rating. */
       contentHash: string;
     };
+    OriginalChapterBody: {
+      /** @description The chapter title exactly as the source writes it. */
+      title: string;
+      /** @description The untranslated chapter prose. Rejected with a field error when it does not match the project language. */
+      content: string;
+    };
+    OriginalsManifestResponse: {
+      projectId: string;
+      originalLanguage?: null | string;
+      chapters: components['schemas']['OriginalManifestEntry'][];
+    };
+    OriginalManifestEntry: {
+      chapter: number;
+      contentHash?: null | string;
+      /** @description Null when the chapter has no translation yet. */
+      translationStatus?: components['schemas']['ChapterTranslationStatus'] | null;
+    };
+    /** @enum {string} */
+    ChapterTranslationStatus: 'translated' | 'attention' | 'finalized' | 'failed';
     CreateProjectBody: {
       name: string;
       kind: components['schemas']['ProjectKind'];
@@ -3212,9 +3492,11 @@ export interface components {
       /** @description Instructions for chapter voice, craft, and length; omission uses the application default. */
       instructions?: string;
       contentMode?: components['schemas']['ContentMode'];
+      /** @description BCP 47 language tag of the original prose (for example `zh` or `pt-BR`); required for a `translation` project and rejected for any other kind. */
+      originalLanguage?: string;
     };
     /** @enum {string} */
-    ProjectKind: 'source' | 'new_novel';
+    ProjectKind: 'source' | 'new_novel' | 'translation' | 'curated';
     /** @enum {string} */
     ContentMode: 'standard' | 'unrestricted';
     ProjectResponse: {
@@ -3227,6 +3509,8 @@ export interface components {
       /** @description Absolute public cover URL resolved by the server; absent when the project has no cover. */
       coverUrl?: null | string;
       contentMode: components['schemas']['ContentMode'];
+      /** @description BCP 47 language tag of the original prose; set only on a `translation` project. */
+      originalLanguage?: null | string;
       config?: components['schemas']['ProjectConfig'];
       brief?: null | string;
       /** @description Effective chapter-writing instructions, including the application default. */
@@ -3264,6 +3548,7 @@ export interface components {
       arc?: components['schemas']['ProjectModelRef'];
       embedding?: components['schemas']['ProjectModelRef'];
       image?: components['schemas']['ProjectModelRef'];
+      translate?: components['schemas']['ProjectModelRef'];
     };
     /** @description Provider and model reference used for a project-level AI role override. */
     ProjectModelRef: {
@@ -3297,6 +3582,10 @@ export interface components {
       brief?: string;
       /** @description Chapter-writing instructions; send an empty string to restore the application default. */
       instructions?: string | null;
+      /** @description BCP 47 language tag of the original prose; accepted only on a `translation` project, and only `null` on any other kind. */
+      originalLanguage?: string | null;
+      /** @description Switches the project workflow. Only `curated` to `new_novel` and `translation` to `curated` are accepted. */
+      kind?: components['schemas']['ProjectKind'];
     };
     CloneProjectBody: {
       name: string;
@@ -3472,7 +3761,7 @@ export interface components {
       updatedAt: string;
     };
     /** @enum {string} */
-    JobKind: 'extract' | 'generate' | 'finalize' | 'backfill' | 'rebrand' | 'reforge' | 'publish' | 'import';
+    JobKind: 'extract' | 'generate' | 'finalize' | 'backfill' | 'rebrand' | 'reforge' | 'publish' | 'import' | 'translate';
     /** @enum {string} */
     JobStatus: 'pending' | 'in_progress' | 'done' | 'failed';
     ListDraftResponse: {
@@ -5488,6 +5777,256 @@ export interface components {
       /** @description Chapters that failed reforging and are missing from the markdown below. Always empty in transform mode. */
       failedChapters: number[];
     };
+    TranslationStatusResponse: {
+      translation: components['schemas']['TranslationResponse'];
+      /** @description BCP-47-ish code of the prose being translated from. */
+      originalLanguage?: null | string;
+      counts: components['schemas']['TranslationChapterCountsResponse'];
+      glossary: components['schemas']['TranslationGlossaryCountsResponse'];
+      /** @description Latest translate job, including its job-specific progress fields. */
+      job?: null | {
+        [key: string]: unknown;
+      };
+    };
+    TranslationResponse: {
+      id: string;
+      /** @description Advisory display state only — the executor derives the real phase from the data on every run. */
+      phase: components['schemas']['TranslationPhase'];
+      styleNotes?: null | string;
+      /** @description Settings used for this translation run. */
+      settings?: null | {
+        [key: string]: unknown;
+      };
+      lastError?: null | string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    TranslationPhase: 'pending' | 'seeding' | 'review' | 'translating' | 'done' | 'failed';
+    TranslationChapterCountsResponse: {
+      /** @description Chapters carrying original-language prose. */
+      originals: number;
+      /** @description Originals with no translation row yet. */
+      untranslated: number;
+      translated: number;
+      attention: number;
+      finalized: number;
+      failed: number;
+      /** @description Translations whose glossary or original moved since they were produced. */
+      stale: number;
+    };
+    TranslationGlossaryCountsResponse: {
+      approved: number;
+      suggested: number;
+      rejected: number;
+    };
+    TranslationConfigBody: {
+      /** @description The style guide every chapter is translated against; seeded by the job and editable by hand. */
+      styleNotes?: string | null;
+      settings?: components['schemas']['TranslationSettingsBody'];
+    };
+    TranslationSettingsBody: {
+      /** @description Run the per-chapter AI audit; the deterministic fidelity scan always runs. Default true. */
+      auditEnabled?: boolean;
+      /** @description Max repair attempts before a chapter is persisted as attention (default 1). */
+      maxRepairs?: number;
+      /** @description Stop the job after seeding so the glossary is reviewed before later chapters bind to it (default true). */
+      pauseAfterSeed?: boolean;
+      /** @description Max tokens of original prose per translated segment (default 1800). */
+      segmentTokens?: number;
+      /** @description Per-project overrides for the fidelity ratio bands; per-language defaults apply to whichever band is unset. */
+      fidelityBands?: components['schemas']['FidelityBandsBody'];
+      /**
+       * @description Whether source honorifics survive into the English prose or become English address (default keep).
+       * @enum {string}
+       */
+      honorifics?: 'keep' | 'translate';
+    };
+    FidelityBandsBody: {
+      /** @description Accepted [min, max] ratio of translated length to original length. */
+      lengthRatio?: number[];
+      /** @description Accepted [min, max] ratio of translated paragraph count to original paragraph count. */
+      paragraphRatio?: number[];
+    };
+    OriginalChapterResponse: {
+      chapter: number;
+      title?: null | string;
+      content: string;
+      /** @description Digest of the original title and prose, the same value the ingest manifest reports. */
+      contentHash?: null | string;
+    };
+    TranslationStartBody: {
+      /** @description Explicit chapter numbers to translate; overrides the derived selection. */
+      chapters?: number[];
+      /** @description Re-translate chapters that already have a translation. Finalized chapters are never targets — reopen them first. */
+      force?: boolean;
+      /** @description Cap on the number of chapters this run translates, for trial runs. */
+      limit?: number;
+      /** @description Select chapters whose glossary or original changed since they were translated, instead of untranslated ones. */
+      stale?: boolean;
+    };
+    TranslationChapterListResponse: {
+      items: components['schemas']['TranslationChapterSummaryResponse'][];
+      total: number;
+      page: number;
+      limit: number;
+    };
+    TranslationChapterSummaryResponse: {
+      chapter: number;
+      originalTitle?: null | string;
+      title?: null | string;
+      /** @description Null when the chapter has originals but no translation yet. */
+      status?: components['schemas']['ChapterTranslationStatus'] | null;
+      issueCount: number;
+      /** @description Glossary entries this chapter rendered that are still awaiting review; finalize is blocked while it is non-zero. */
+      pendingTerms: number;
+      glossaryStale: boolean;
+      sourceStale: boolean;
+      revision: number;
+      /** Format: date-time */
+      updatedAt?: null | string;
+    };
+    TranslationChapterDetailResponse: {
+      chapter: number;
+      original: components['schemas']['OriginalTextResponse'];
+      translation: components['schemas']['ChapterTranslationResponse'];
+      appliedTerms: components['schemas']['AppliedTermResponse'][];
+    };
+    OriginalTextResponse: {
+      title?: null | string;
+      content?: null | string;
+    };
+    ChapterTranslationResponse: {
+      chapter: number;
+      title?: null | string;
+      body: string;
+      status: components['schemas']['ChapterTranslationStatus'];
+      issues?: null | components['schemas']['TranslationIssueItem'][];
+      glossaryStale: boolean;
+      sourceStale: boolean;
+      revision: number;
+      lastError?: null | string;
+      /** Format: date-time */
+      editedAt?: null | string;
+      /** Format: date-time */
+      finalizedAt?: null | string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @description A fidelity-scan, audit or run defect recorded on the translation. */
+    TranslationIssueItem: {
+      type?: string;
+      detail?: string;
+    } & {
+      [key: string]: unknown;
+    };
+    AppliedTermResponse: {
+      id: string;
+      sourceTerm: string;
+      target: string;
+      status: components['schemas']['TranslationGlossaryStatus'];
+      revision: number;
+      /** @description The revision of the entry as it was rendered into this chapter. */
+      appliedRevision: number;
+      /** @description True when the entry moved after this chapter rendered it. */
+      stale: boolean;
+    };
+    /** @enum {string} */
+    TranslationGlossaryStatus: 'suggested' | 'approved' | 'rejected';
+    EditTranslationBody: {
+      title?: string;
+      body?: string;
+    };
+    FinalizeChapterResponse: {
+      chapter: number;
+      wordCount: number;
+      /** @description True when the reader-facing digest moved and a republish was scheduled. */
+      republished: boolean;
+      publicationRevision?: number;
+    };
+    /** @enum {string} */
+    TranslationGlossaryCategory: 'character' | 'place' | 'organization' | 'profession' | 'title' | 'rank' | 'ability' | 'item' | 'creature' | 'term';
+    /** @enum {string} */
+    TranslationTreatment: 'translate' | 'localize' | 'transliterate' | 'preserve';
+    TranslationGlossaryListResponse: {
+      items: components['schemas']['TranslationTermResponse'][];
+      total: number;
+      page: number;
+      limit: number;
+    };
+    TranslationTermResponse: {
+      id: string;
+      sourceTerm: string;
+      variants?: null | string[];
+      target: string;
+      category: components['schemas']['TranslationGlossaryCategory'];
+      treatment: components['schemas']['TranslationTreatment'];
+      meaning?: null | string;
+      contextExcerpt?: null | string;
+      alternatives?: null | components['schemas']['TranslationTermAlternativeResponse'][];
+      status: components['schemas']['TranslationGlossaryStatus'];
+      origin: components['schemas']['TranslationGlossaryOrigin'];
+      notes?: null | string;
+      /** @description The chapter the term was discovered in; 0 for seeded terms. */
+      createdChapter?: null | number;
+      /** @description Bumped by every edit; chapters that rendered an earlier revision are marked stale. */
+      revision: number;
+      /** Format: date-time */
+      decidedAt?: null | string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    TranslationTermAlternativeResponse: {
+      target: string;
+      rationale: string;
+    };
+    /** @enum {string} */
+    TranslationGlossaryOrigin: 'seed' | 'discovered' | 'manual';
+    CreateTranslationTermBody: {
+      /** @description The term exactly as the original writes it; unique per project. */
+      sourceTerm: string;
+      /** @description The English rendering every chapter must use. */
+      target: string;
+      category: components['schemas']['TranslationGlossaryCategory'];
+      treatment: components['schemas']['TranslationTreatment'];
+      /** @description Other spellings the original uses for the same thing. */
+      variants?: string[] | null;
+      /** @description What this is, in one phrase, so a reviewer can judge the rendering. */
+      meaning?: string | null;
+      notes?: string | null;
+    };
+    UpdateTranslationTermBody: {
+      target?: string;
+      treatment?: components['schemas']['TranslationTreatment'];
+      category?: components['schemas']['TranslationGlossaryCategory'];
+      meaning?: string | null;
+      variants?: string[] | null;
+      notes?: string | null;
+    };
+    ApproveTranslationTermBody: {
+      /** @description Approve with a different rendering — a modify-and-approve, which bumps the revision. */
+      target?: string;
+      treatment?: components['schemas']['TranslationTreatment'];
+    };
+    TranslationTermDecisionsBody: {
+      decisions: components['schemas']['TranslationTermDecision'][];
+    };
+    TranslationTermDecision: {
+      id: string;
+      /** @enum {string} */
+      decision: 'approve' | 'reject';
+      target?: string;
+      treatment?: components['schemas']['TranslationTreatment'];
+    };
+    TranslationTermDecisionsResponse: {
+      approved: number;
+      rejected: number;
+    };
+    TranslationManuscriptResponse: {
+      markdown: string;
+      /** @description Chapters with originals that are not finalized yet and are therefore missing from the markdown. */
+      pendingChapters: number[];
+    };
     PublishNovelBody: {
       /** @description Reader URL slug; omission derives it from the title. A slug another project holds is rejected. A different one on a later publish renames the novel: the next converge moves it, chapters and all, and the old reader URL stops resolving. */
       novelSlug?: string;
@@ -6628,6 +7167,82 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['IngestManifestResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_ingest_projects_projectId_originals_chapter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OriginalChapterBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_ingest_projects_projectId_originals: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OriginalsManifestResponse'];
         };
       };
       /** @description Default Response */
@@ -13733,6 +14348,805 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_translation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TranslationStatusResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_translation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TranslationStartBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_translation_config: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TranslationConfigBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TranslationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_translation_originals_chapter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OriginalChapterResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_translation_originals_chapter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OriginalChapterBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_translation_originals_chapter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_translation_chapters: {
+    parameters: {
+      query?: {
+        page?: number | string;
+        limit?: number | string;
+        status?: components['schemas']['ChapterTranslationStatus'];
+        /** @description True lists only chapters whose glossary or original moved; false only those that did not. */
+        stale?: boolean | string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TranslationChapterListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_translation_chapters_chapter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TranslationChapterDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_translation_chapters_chapter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EditTranslationBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TranslationChapterDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_translation_chapters_chapter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_translation_chapters_chapter_finalize: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FinalizeChapterResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_translation_chapters_chapter_reopen: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TranslationChapterDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_translation_glossary: {
+    parameters: {
+      query?: {
+        status?: components['schemas']['TranslationGlossaryStatus'];
+        category?: components['schemas']['TranslationGlossaryCategory'];
+        treatment?: components['schemas']['TranslationTreatment'];
+        /** @description Substring match over the source term, its variants and the target. */
+        q?: string;
+        page?: number | string;
+        limit?: number | string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TranslationGlossaryListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_translation_glossary: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateTranslationTermBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TranslationTermResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_projects_projectId_translation_glossary_id: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateTranslationTermBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TranslationTermResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_translation_glossary_id_approve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ApproveTranslationTermBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TranslationTermResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_translation_glossary_id_reject: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TranslationTermResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_translation_glossary_decisions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TranslationTermDecisionsBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TranslationTermDecisionsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_translation_manuscript: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TranslationManuscriptResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_publish: {
     parameters: {
       query?: never;
@@ -14111,6 +15525,10 @@ export type IngestChapterBody = components['schemas']['IngestChapterBody'];
 export type IngestCoverBody = components['schemas']['IngestCoverBody'];
 export type IngestManifestResponse = components['schemas']['IngestManifestResponse'];
 export type IngestManifestChapter = components['schemas']['IngestManifestChapter'];
+export type OriginalChapterBody = components['schemas']['OriginalChapterBody'];
+export type OriginalsManifestResponse = components['schemas']['OriginalsManifestResponse'];
+export type OriginalManifestEntry = components['schemas']['OriginalManifestEntry'];
+export type ChapterTranslationStatus = components['schemas']['ChapterTranslationStatus'];
 export type CreateProjectBody = components['schemas']['CreateProjectBody'];
 export type ProjectKind = components['schemas']['ProjectKind'];
 export type ContentMode = components['schemas']['ContentMode'];
@@ -14412,6 +15830,39 @@ export type ReforgeCutResponse = components['schemas']['ReforgeCutResponse'];
 export type ReforgeCutKind = components['schemas']['ReforgeCutKind'];
 export type ReforgeCutDisposition = components['schemas']['ReforgeCutDisposition'];
 export type ReforgeManuscriptResponse = components['schemas']['ReforgeManuscriptResponse'];
+export type TranslationStatusResponse = components['schemas']['TranslationStatusResponse'];
+export type TranslationResponse = components['schemas']['TranslationResponse'];
+export type TranslationPhase = components['schemas']['TranslationPhase'];
+export type TranslationChapterCountsResponse = components['schemas']['TranslationChapterCountsResponse'];
+export type TranslationGlossaryCountsResponse = components['schemas']['TranslationGlossaryCountsResponse'];
+export type TranslationConfigBody = components['schemas']['TranslationConfigBody'];
+export type TranslationSettingsBody = components['schemas']['TranslationSettingsBody'];
+export type FidelityBandsBody = components['schemas']['FidelityBandsBody'];
+export type OriginalChapterResponse = components['schemas']['OriginalChapterResponse'];
+export type TranslationStartBody = components['schemas']['TranslationStartBody'];
+export type TranslationChapterListResponse = components['schemas']['TranslationChapterListResponse'];
+export type TranslationChapterSummaryResponse = components['schemas']['TranslationChapterSummaryResponse'];
+export type TranslationChapterDetailResponse = components['schemas']['TranslationChapterDetailResponse'];
+export type OriginalTextResponse = components['schemas']['OriginalTextResponse'];
+export type ChapterTranslationResponse = components['schemas']['ChapterTranslationResponse'];
+export type TranslationIssueItem = components['schemas']['TranslationIssueItem'];
+export type AppliedTermResponse = components['schemas']['AppliedTermResponse'];
+export type TranslationGlossaryStatus = components['schemas']['TranslationGlossaryStatus'];
+export type EditTranslationBody = components['schemas']['EditTranslationBody'];
+export type FinalizeChapterResponse = components['schemas']['FinalizeChapterResponse'];
+export type TranslationGlossaryCategory = components['schemas']['TranslationGlossaryCategory'];
+export type TranslationTreatment = components['schemas']['TranslationTreatment'];
+export type TranslationGlossaryListResponse = components['schemas']['TranslationGlossaryListResponse'];
+export type TranslationTermResponse = components['schemas']['TranslationTermResponse'];
+export type TranslationTermAlternativeResponse = components['schemas']['TranslationTermAlternativeResponse'];
+export type TranslationGlossaryOrigin = components['schemas']['TranslationGlossaryOrigin'];
+export type CreateTranslationTermBody = components['schemas']['CreateTranslationTermBody'];
+export type UpdateTranslationTermBody = components['schemas']['UpdateTranslationTermBody'];
+export type ApproveTranslationTermBody = components['schemas']['ApproveTranslationTermBody'];
+export type TranslationTermDecisionsBody = components['schemas']['TranslationTermDecisionsBody'];
+export type TranslationTermDecision = components['schemas']['TranslationTermDecision'];
+export type TranslationTermDecisionsResponse = components['schemas']['TranslationTermDecisionsResponse'];
+export type TranslationManuscriptResponse = components['schemas']['TranslationManuscriptResponse'];
 export type PublishNovelBody = components['schemas']['PublishNovelBody'];
 export type PublicationResponse = components['schemas']['PublicationResponse'];
 export type PublicationStatus = components['schemas']['PublicationStatus'];
@@ -14450,6 +15901,7 @@ export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['param
 export type StreamEventsPathParams = Exclude<paths['/api/v1/projects/{projectId}/events']['get']['parameters']['path'], undefined>;
 export type ListProjectPluginsPathParams = Exclude<paths['/api/v1/projects/{projectId}/plugins']['get']['parameters']['path'], undefined>;
 export type GetManifestPathParams = Exclude<paths['/api/v1/ingest/novels/{sourceRef}/manifest']['get']['parameters']['path'], undefined>;
+export type GetOriginalsManifestPathParams = Exclude<paths['/api/v1/ingest/projects/{projectId}/originals']['get']['parameters']['path'], undefined>;
 export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
 export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
 export type GetProjectStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/status']['get']['parameters']['path'], undefined>;
@@ -14472,12 +15924,12 @@ export type GetRunCallPathParams = Exclude<paths['/api/v1/projects/{projectId}/r
 export type GetAiUsagePathParams = Exclude<paths['/api/v1/projects/{projectId}/ai-usage']['get']['parameters']['path'], undefined>;
 export type SearchProseQueryParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['query'], undefined>;
 export type SearchProsePathParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['path'], undefined>;
-export type GetManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/manuscript']['get']['parameters']['path'], undefined>;
+export type ApiV1ProjectsProjectIdManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/manuscript']['get']['parameters']['path'], undefined>;
 export type ListChapterImagesPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/images']['get']['parameters']['path'], undefined>;
 export type GetJobPathParams = Exclude<paths['/api/v1/jobs/{jobId}']['get']['parameters']['path'], undefined>;
-export type ListChaptersQueryParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['query'], undefined>;
-export type ListChaptersPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['path'], undefined>;
-export type GetChapterPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters/{n}']['get']['parameters']['path'], undefined>;
+export type ApiV1ProjectsProjectIdSourceChaptersQueryParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['query'], undefined>;
+export type ApiV1ProjectsProjectIdSourceChaptersPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['path'], undefined>;
+export type ApiV1ProjectsProjectIdSourceChaptersNPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters/{n}']['get']['parameters']['path'], undefined>;
 export type ListProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['query'], undefined>;
 export type ListProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['path'], undefined>;
 export type GetProposalPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}']['get']['parameters']['path'], undefined>;
@@ -14528,5 +15980,16 @@ export type ListOutputsPathParams = Exclude<paths['/api/v1/projects/{projectId}/
 export type GetOutputPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/outputs/{outputChapter}']['get']['parameters']['path'], undefined>;
 export type ListCutsPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/cuts']['get']['parameters']['path'], undefined>;
 export type GetReforgeManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/manuscript']['get']['parameters']['path'], undefined>;
+export type GetTranslationStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/translation']['get']['parameters']['path'], undefined>;
+export type GetOriginalPathParams = Exclude<paths['/api/v1/projects/{projectId}/translation/originals/{chapter}']['get']['parameters']['path'], undefined>;
+export type ApiV1ProjectsProjectIdTranslationChaptersQueryParams = Exclude<paths['/api/v1/projects/{projectId}/translation/chapters']['get']['parameters']['query'], undefined>;
+export type ApiV1ProjectsProjectIdTranslationChaptersPathParams = Exclude<paths['/api/v1/projects/{projectId}/translation/chapters']['get']['parameters']['path'], undefined>;
+export type ApiV1ProjectsProjectIdTranslationChaptersChapterPathParams = Exclude<
+  paths['/api/v1/projects/{projectId}/translation/chapters/{chapter}']['get']['parameters']['path'],
+  undefined
+>;
+export type ListGlossaryQueryParams = Exclude<paths['/api/v1/projects/{projectId}/translation/glossary']['get']['parameters']['query'], undefined>;
+export type ListGlossaryPathParams = Exclude<paths['/api/v1/projects/{projectId}/translation/glossary']['get']['parameters']['path'], undefined>;
+export type ApiV1ProjectsProjectIdTranslationManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/translation/manuscript']['get']['parameters']['path'], undefined>;
 export type GetAccessPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications/access']['get']['parameters']['path'], undefined>;
 export type ListPublicationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications']['get']['parameters']['path'], undefined>;

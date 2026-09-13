@@ -26,7 +26,7 @@ import { BookIcon, EditIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, Spark
 import styles from './AppShell.module.css';
 import { JobsTray } from './JobsTray';
 import { type NovelParams } from './routes';
-import { PROJECT_SCREENS, type ProjectScreen, SCREEN_LABEL, screensForKind } from './screens';
+import { type ProjectScreen, SCREEN_LABEL, screensForWorkflow } from './screens';
 
 const PROJECT_LIMIT = 50;
 
@@ -66,7 +66,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
 
   const project = projectQuery.data;
   const status = statusQuery.data;
-  const phase = lifecyclePhase(status);
+  const phase = lifecyclePhase(status, project?.kind);
 
   const badges: Record<string, NavLeaf['badge']> = {
     chapters: { count: status?.chaptersTotal ?? 0 },
@@ -90,7 +90,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
     badge: badges[screen.segment],
   });
 
-  const screens = screensForKind(project?.kind);
+  const screens = useMemo(() => screensForWorkflow(project?.kind), [project?.kind]);
   const nav: NavConfig = inProject
     ? {
         variant: 'project',
@@ -125,7 +125,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   const commands = useMemo<CommandItem[]>(() => {
     const items: CommandItem[] = [];
     if (novelId) {
-      for (const screen of PROJECT_SCREENS) {
+      for (const screen of screens) {
         items.push({
           id: `screen-${screen.segment}`,
           group: 'This project',
@@ -149,7 +149,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
       });
     }
     return items;
-  }, [navigate, novelId, projects]);
+  }, [navigate, novelId, projects, screens]);
 
   // Ends the app session, then hands the browser back to the login shim. The SDK ends only this app's
   // session (identity's own persists), so the shim may re-establish it — that is the SDK's logout semantics.
@@ -239,7 +239,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
       actions={inProject ? <JobsTray novelId={novelId} /> : undefined}
       utility={<ThemeToggle />}
       sidebarFooter={
-        inProject ? (
+        inProject && phase.total > 0 ? (
           <div className={styles.lifecycle}>
             <div className={styles.lifecycleHeading}>Lifecycle</div>
             <div className={styles.lifecycleBar}>

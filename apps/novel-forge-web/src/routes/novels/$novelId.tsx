@@ -1,6 +1,6 @@
-import { createFileRoute, notFound, Outlet } from '@tanstack/react-router';
+import { createFileRoute, notFound, Outlet, redirect } from '@tanstack/react-router';
 
-import { AppShell } from '@/components/Layout';
+import { AppShell, screenVisible } from '@/components/Layout';
 import { isApiError, meQuery, projectQueryOptions, useProjectEventStream } from '@/lib/apis';
 import { projectTitle } from '@/lib/format';
 import { requireSession } from '@/lib/session';
@@ -11,11 +11,15 @@ import { requireSession } from '@/lib/session';
 // here also seeds the cache every workspace screen reuses, so they render on the server without a refetch.
 export const Route = createFileRoute('/novels/$novelId')({
   beforeLoad: ({ context, location }) => requireSession(context.queryClient, location.href),
-  loader: async ({ context, params }) => {
+  loader: async ({ context, params, location }) => {
     const me = context.queryClient.ensureQueryData(meQuery).catch(() => undefined);
     try {
       const project = await context.queryClient.ensureQueryData(projectQueryOptions(params.novelId));
       await me;
+      // Once the project's workflow is known, a URL for a screen that workflow hides (typed in, bookmarked,
+      // or left over from a workflow switch) bounces to Overview instead of rendering a screen it can't use.
+      const segment = location.pathname.split('/').filter(Boolean).pop();
+      if (segment && segment !== 'overview' && !screenVisible(segment, project.kind)) throw redirect({ to: '/novels/$novelId/overview', params });
       return project;
     } catch (err) {
       if (isApiError(err) && err.status === 404) throw notFound();
