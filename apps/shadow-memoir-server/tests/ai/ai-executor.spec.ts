@@ -11,9 +11,8 @@ import { DatabaseService } from '@shadow-library/modules';
 import { AiExecutorService, AiWorkerModule, scheduledTaskId } from '@modules/ai-worker';
 import { InferenceClient } from '@modules/inference';
 import { MemoirAuthModule } from '@modules/auth';
-import { DatastoreModule, type PrimaryDatabase, RolePoolService, schema } from '@server/database';
+import { DatastoreModule, type PrimaryDatabase, schema } from '@server/database';
 import { ScriptedInferenceClient } from '@tests/fixtures/inference';
-import { TEST_ROLE_PASSWORD } from '@tests/fixtures/seed';
 import { createDatabaseFromTemplate, dropDatabase } from '@tests/fixtures/template-db';
 
 /** `MemoirAuthModule` (reached through `BillingModule`) resolves `ContextService` from the HTTP core, so the worker graph still boots behind a router even though nothing here serves a request. */
@@ -22,22 +21,11 @@ const TestHttpModule = FastifyModule.forRoot({ imports: [MemoirAuthModule, AiWor
 @Module({ imports: [DatastoreModule, TestHttpModule] })
 class TestAppModule {}
 
-const INSUFFICIENT_PRIVILEGE = '42501';
 const JOURNAL_TEXT = 'the standup ran long again and by the time it ended I had nothing left for the evening run';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost:55433/shadow_memoir';
 const baseUrl = baseConnectionString.replace(/\/[^/]*$/, '');
 const databaseName = `${baseConnectionString.split('/').pop()}_ai_executor_spec`;
-
-function roleUrl(role: string): string {
-  const { protocol, hostname, port } = new URL(baseConnectionString);
-  return `${protocol}//${role}:${TEST_ROLE_PASSWORD}@${hostname}:${port}/${databaseName}`;
-}
-
-/** Drizzle wraps the driver error, so the SQLSTATE the grant layer refused with sits on the cause. */
-function sqlState(error: unknown): string | undefined {
-  return (error as { cause?: { errno?: string } } | undefined)?.cause?.errno;
-}
 
 function stringify(value: unknown): string {
   return JSON.stringify(value, (_key, entry) => (typeof entry === 'bigint' ? String(entry) : entry));
@@ -49,13 +37,11 @@ function daysAgo(days: number): string {
 
 describe('AI batch executor (T-33, ARCHITECTURE §15.2-§15.7)', () => {
   const originalUrl = (Config['cache'].get('database.postgres.url') as string | undefined) ?? baseConnectionString;
-  const originalAiUrl = Config['cache'].get('database.postgres.ai-url') as string | undefined;
   const originalSchedulerEnabled = Config.get('scheduler.enabled');
   const originalFreeCap = Config.get('quotas.ai-free-monthly');
   let app: ShadowApplication;
   let db: PrimaryDatabase;
   let executor: AiExecutorService;
-  let pools: RolePoolService;
   let subject = 0;
 
   async function createAccount(overrides: Partial<typeof schema.accounts.$inferInsert> = {}): Promise<bigint> {
@@ -110,13 +96,11 @@ describe('AI batch executor (T-33, ARCHITECTURE §15.2-§15.7)', () => {
   beforeAll(async () => {
     await createDatabaseFromTemplate(databaseName);
     Config['cache'].set('database.postgres.url', `${baseUrl}/${databaseName}`);
-    Config['cache'].set('database.postgres.ai-url', roleUrl('memoir_ai'));
     Config['cache'].set('scheduler.enabled', false);
 
     app = await ShadowFactory.create(TestAppModule, { overrides: [{ token: InferenceClient, useClass: ScriptedInferenceClient }] });
     db = app.get(DatabaseService).getPostgresClient() as PrimaryDatabase;
     executor = app.get(AiExecutorService);
-    pools = app.get(RolePoolService);
   });
 
   beforeEach(() => ScriptedInferenceClient.reset());
@@ -124,7 +108,6 @@ describe('AI batch executor (T-33, ARCHITECTURE §15.2-§15.7)', () => {
   afterAll(async () => {
     await app.stop();
     Config['cache'].set('database.postgres.url', originalUrl);
-    Config['cache'].set('database.postgres.ai-url', originalAiUrl ?? '');
     Config['cache'].set('scheduler.enabled', originalSchedulerEnabled);
     Config['cache'].set('quotas.ai-free-monthly', originalFreeCap);
     await dropDatabase(databaseName);
@@ -464,28 +447,6 @@ describe('AI batch executor (T-33, ARCHITECTURE §15.2-§15.7)', () => {
 
       expect(await executor.materializeScheduledQueries()).toBe(0);
       expect(await db.select().from(schema.aiTasks).where(eq(schema.aiTasks.accountId, accountId))).toHaveLength(0);
-    });
-  });
-
-  describe('worker pool privileges (§5.4, §28.4)', () => {
-    it("should refuse a Hero write attempted through the executor's own memoir_ai pool", async () => {
-      const accountId = await createAccount();
-      const pool = pools.getPool('memoir_ai');
-
-      let thrown: unknown;
-      await pool
-        .insert(schema.heroEvents)
-        .values({ accountId, dedupeKey: 'ai-forged', type: 'quest_complete', xpDelta: 10, coinsDelta: 5, date: daysAgo(0), rulesetVersion: 1 })
-        .catch(error => (thrown = error));
-      expect(sqlState(thrown)).toBe(INSUFFICIENT_PRIVILEGE);
-
-      thrown = undefined;
-      await pool
-        .update(schema.accounts)
-        .set({ totalXp: 9999n })
-        .where(eq(schema.accounts.id, accountId))
-        .catch(error => (thrown = error));
-      expect(sqlState(thrown)).toBe(INSUFFICIENT_PRIVILEGE);
     });
   });
 });

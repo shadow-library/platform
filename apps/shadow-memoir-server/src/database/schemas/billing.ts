@@ -18,8 +18,7 @@ export const entitlementTier = pgEnum('entitlement_tier', ['free', 'paid']);
 export const entitlementState = pgEnum('entitlement_state', ['free', 'trial', 'active', 'grace', 'lapsed']);
 
 /**
- * One row per account, written **only** by the billing module under `memoir_billing` (ARCHITECTURE
- * §5.4, §16.2). `applied_event_at` is the monotonic apply guard: an out-of-order webhook whose
+ * One row per account, written **only** by the billing module (ARCHITECTURE §16.2). `applied_event_at` is the monotonic apply guard: an out-of-order webhook whose
  * effective instant is not later than this never moves the projection. §16.2 phrases that guard as
  * `updated_at` vs event time, but `updated_at` also moves on writes that carry no provider event
  * (the lapse sweep), which would let a genuinely newer event be mistaken for a stale one.

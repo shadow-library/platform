@@ -16,9 +16,8 @@ import { ScheduledQueryRepository } from './scheduled-query.repository';
 /**
  * The `aiworker` module of ARCHITECTURE §15.2 — in-process on the scheduler today, its own Deployment
  * after the ADR-0002 split, unchanged either way because every claim is a Postgres claim. It imports
- * `BillingModule` for the one thing the `memoir_ai` role deliberately cannot do itself: read
- * `entitlements` (§5.4 grants it zero privilege there), so the execution-time entitlement re-check runs
- * through `EntitlementService` on the API pool.
+ * `BillingModule` so the execution-time entitlement re-check derives the tier through `EntitlementService`
+ * rather than reading `entitlements` directly.
  */
 @Module({
   imports: [DatabaseModule, DatastoreModule, SchedulerModule, BillingModule, InferenceModule, NotificationsModule],

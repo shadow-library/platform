@@ -19,10 +19,8 @@ import { type Entitlement, type PrimaryDatabase, schema } from '@server/database
  */
 
 /**
- * The read half of the entitlement surface, on the API pool — which holds SELECT and nothing else
- * (ARCHITECTURE §5.4). There is deliberately no update or insert method on this class: the write path
- * lives in `BillingRepository` behind the `memoir_billing` pool, so no amount of misuse from a
- * user-facing route can reach a write.
+ * The read half of the entitlement surface. There is deliberately no update or insert method on this
+ * class: the write path lives in `BillingRepository`, which no user-facing route reaches.
  */
 @Injectable()
 export class EntitlementRepository {

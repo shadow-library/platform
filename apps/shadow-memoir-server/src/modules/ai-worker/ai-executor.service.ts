@@ -52,8 +52,7 @@ function inWindow(now: Date, start: number, end: number): boolean {
 }
 
 /**
- * The AI batch executor of ARCHITECTURE §15.2–§15.7, running on T-22's in-process scheduler and reading
- * through the dedicated `memoir_ai` pool. Four sweeps, each doing one thing:
+ * The AI batch executor of ARCHITECTURE §15.2–§15.7, running on T-22's in-process scheduler. Four sweeps, each doing one thing:
  *
  * - the nightly window materializes scheduled queries and then drains the pending backlog;
  * - the retry poll picks up only tasks a previous attempt requeued, so a transient inference failure
@@ -80,9 +79,9 @@ export class AiExecutorService implements OnModuleInit {
     private readonly notifications: NotificationClient,
   ) {}
 
-  /** No `memoir_ai` pool configured means no credential to run as; the sweeps stay unregistered rather than failing every tick, mirroring `EntitlementLapseService`. */
+  /** No inference endpoint means every claimed task would fail and burn its attempts, so the sweeps stay unregistered rather than draining the backlog into `failed`. */
   onModuleInit(): void {
-    if (!Config.get('database.postgres.ai-url')) return;
+    if (!Config.get('ai.inference-url')) return;
 
     this.scheduler.registerSweep(BATCH_SWEEP, Config.get('ai.batch-poll-interval-minutes') * MS_PER_MINUTE, () => this.runBatchWindow());
     this.scheduler.registerSweep(RETRY_SWEEP, Config.get('ai.retry-poll-interval-minutes') * MS_PER_MINUTE, () => this.runRetryPoll());
@@ -220,9 +219,8 @@ export class AiExecutorService implements OnModuleInit {
   }
 
   /**
-   * The restore side of §15.1's `held_upgrade`. It lives here rather than on the billing webhook because
-   * `memoir_billing` holds no privilege on `ai_tasks` at all (§5.4) — the worker role is the only one
-   * that can move a task back to `pending`, so the worker owns the resume.
+   * The restore side of §15.1's `held_upgrade`. It lives here rather than on the billing webhook so the
+   * worker stays the only code path that moves a task back to `pending`.
    */
   async resumeHeld(): Promise<number> {
     const held = await this.repository.listHeld(HELD_PAGE_SIZE);

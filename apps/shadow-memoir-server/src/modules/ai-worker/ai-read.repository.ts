@@ -3,11 +3,12 @@
  */
 import { and, eq, gte, inArray, type SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
+import { DatabaseService } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
  */
-import { RolePoolService, schema } from '@server/database';
+import { type PrimaryDatabase, schema } from '@server/database';
 
 /**
  * Defining types
@@ -20,18 +21,16 @@ export type Rows = Record<string, unknown>[];
  */
 
 /**
- * The §15.5 read scope, expressed one class at a time on the `memoir_ai` pool. The grant matrix is the
- * outer bound and these methods are the inner one: `includeText` and the health/journal split exist so
- * consent decides what is read, not merely what is readable. Every select names its columns — the role
- * holds column-limited grants on `accounts` and `expenses`, and `SELECT *` would ask for columns it is
- * denied and fail the whole assembly.
+ * The §15.5 read scope, expressed one class at a time. `includeText` and the health/journal split exist so
+ * consent decides what is read, not merely what is readable. Every select names its columns so Hero mirror
+ * and receipt columns never reach a prompt.
  */
 @Injectable()
 export class AiReadRepository {
-  constructor(private readonly rolePools: RolePoolService) {}
+  private readonly db: PrimaryDatabase;
 
-  private db(): ReturnType<RolePoolService['getPool']> {
-    return this.rolePools.getPool('memoir_ai');
+  constructor(databaseService: DatabaseService) {
+    this.db = databaseService.getPostgresClient();
   }
 
   /** Free tier reads a trailing window, paid reads everything (PRD §6.4); a null start is the paid case, not "no filter configured". */
@@ -40,7 +39,7 @@ export class AiReadRepository {
   }
 
   async listQuests(accountId: bigint): Promise<Rows> {
-    return this.db()
+    return this.db
       .select({
         id: schema.quests.id,
         name: schema.quests.name,
@@ -73,14 +72,14 @@ export class AiReadRepository {
       performedAt: schema.questLogs.performedAt,
     };
     const columns = includeText ? { ...base, reasonNote: schema.questLogs.reasonNote, reflectionText: schema.questLogs.reflectionText } : base;
-    return this.db()
+    return this.db
       .select(columns)
       .from(schema.questLogs)
       .where(and(eq(schema.questLogs.accountId, accountId), this.window(schema.questLogs.date, windowStart)));
   }
 
   async listHeroEvents(accountId: bigint, windowStart: string | null): Promise<Rows> {
-    return this.db()
+    return this.db
       .select({
         type: schema.heroEvents.type,
         questId: schema.heroEvents.questId,
@@ -98,7 +97,7 @@ export class AiReadRepository {
   }
 
   async listDailyStates(accountId: bigint, windowStart: string | null): Promise<Rows> {
-    return this.db()
+    return this.db
       .select({
         date: schema.dailyStates.date,
         intensityMode: schema.dailyStates.intensityMode,
@@ -128,27 +127,27 @@ export class AiReadRepository {
       completedAt: schema.recoveryQuests.completedAt,
     };
     const [recoveries, comebacks, returners, shields, achievements, titles] = await Promise.all([
-      this.db()
+      this.db
         .select(includeReflection ? { ...recoveryColumns, reflectionText: schema.recoveryQuests.reflectionText } : recoveryColumns)
         .from(schema.recoveryQuests)
         .where(and(eq(schema.recoveryQuests.accountId, accountId), this.window(schema.recoveryQuests.date, windowStart))),
-      this.db()
+      this.db
         .select({ date: schema.comebackEvents.date, kind: schema.comebackEvents.kind, xpBonus: schema.comebackEvents.xpBonus, coinBonus: schema.comebackEvents.coinBonus })
         .from(schema.comebackEvents)
         .where(and(eq(schema.comebackEvents.accountId, accountId), this.window(schema.comebackEvents.date, windowStart))),
-      this.db()
+      this.db
         .select({ date: schema.returnerEvents.date, daysAbsent: schema.returnerEvents.daysAbsent, shieldPending: schema.returnerEvents.shieldPending })
         .from(schema.returnerEvents)
         .where(and(eq(schema.returnerEvents.accountId, accountId), this.window(schema.returnerEvents.date, windowStart))),
-      this.db()
+      this.db
         .select({ date: schema.shieldConsumptions.date, questId: schema.shieldConsumptions.questId })
         .from(schema.shieldConsumptions)
         .where(and(eq(schema.shieldConsumptions.accountId, accountId), this.window(schema.shieldConsumptions.date, windowStart))),
-      this.db()
+      this.db
         .select({ achievementId: schema.achievementsEarned.achievementId, earnedAt: schema.achievementsEarned.earnedAt })
         .from(schema.achievementsEarned)
         .where(eq(schema.achievementsEarned.accountId, accountId)),
-      this.db()
+      this.db
         .select({ titleId: schema.titlesEarned.titleId, earnedAt: schema.titlesEarned.earnedAt })
         .from(schema.titlesEarned)
         .where(eq(schema.titlesEarned.accountId, accountId)),
@@ -167,7 +166,7 @@ export class AiReadRepository {
   /** `receipt_ref` is absent by grant as well as by selection (§15.5): the worker has no reason to know an image exists. */
   async listFinance(accountId: bigint, windowStart: string | null): Promise<Rows> {
     const [expenses, subscriptions] = await Promise.all([
-      this.db()
+      this.db
         .select({
           amountMinor: schema.expenses.amountMinor,
           currency: schema.expenses.currency,
@@ -180,7 +179,7 @@ export class AiReadRepository {
         })
         .from(schema.expenses)
         .where(and(eq(schema.expenses.accountId, accountId), this.window(schema.expenses.occurredOn, windowStart))),
-      this.db()
+      this.db
         .select({
           name: schema.subscriptions.name,
           amountMinor: schema.subscriptions.amountMinor,
@@ -200,13 +199,13 @@ export class AiReadRepository {
    * query rather than after it — an un-consented health entry is never fetched, not fetched and filtered.
    */
   async listMetrics(accountId: bigint, windowStart: string | null, health: boolean): Promise<Rows> {
-    const metrics = await this.db()
+    const metrics = await this.db
       .select({ id: schema.metrics.id, name: schema.metrics.name, unit: schema.metrics.unit, valueType: schema.metrics.valueType, direction: schema.metrics.direction })
       .from(schema.metrics)
       .where(and(eq(schema.metrics.accountId, accountId), eq(schema.metrics.isHealth, health)));
     if (metrics.length === 0) return [];
 
-    const entries = await this.db()
+    const entries = await this.db
       .select({ metricId: schema.metricEntries.metricId, date: schema.metricEntries.date, value: schema.metricEntries.value, source: schema.metricEntries.source })
       .from(schema.metricEntries)
       .where(
@@ -224,21 +223,21 @@ export class AiReadRepository {
 
   /** Body mass is health-class data (`weights.kg` carries the `health` sensitivity classification), so it rides the health consent rather than the meals class it sits next to in the schema. */
   async listWeights(accountId: bigint, windowStart: string | null): Promise<Rows> {
-    return this.db()
+    return this.db
       .select({ date: schema.weights.date, kg: schema.weights.kg })
       .from(schema.weights)
       .where(and(eq(schema.weights.accountId, accountId), this.window(schema.weights.date, windowStart)));
   }
 
   async listMeals(accountId: bigint, windowStart: string | null): Promise<Rows> {
-    return this.db()
+    return this.db
       .select({ date: schema.meals.date, name: schema.meals.name, calories: schema.meals.calories, mealType: schema.meals.mealType })
       .from(schema.meals)
       .where(and(eq(schema.meals.accountId, accountId), this.window(schema.meals.date, windowStart)));
   }
 
   async listSideQuests(accountId: bigint, windowStart: string | null): Promise<Rows> {
-    return this.db()
+    return this.db
       .select({ date: schema.sideQuests.date, name: schema.sideQuests.name, statAffinity: schema.sideQuests.statAffinity, xpAwarded: schema.sideQuests.xpAwarded })
       .from(schema.sideQuests)
       .where(and(eq(schema.sideQuests.accountId, accountId), this.window(schema.sideQuests.date, windowStart)));
@@ -246,7 +245,7 @@ export class AiReadRepository {
 
   /** Called only when `journal_reflection_reason` consent is live (PRD §6.7's listed acceptance criterion). */
   async listJournal(accountId: bigint, windowStart: string | null): Promise<Rows> {
-    return this.db()
+    return this.db
       .select({ date: schema.journalEntries.date, text: schema.journalEntries.text, mood: schema.journalEntries.mood, tags: schema.journalEntries.tags })
       .from(schema.journalEntries)
       .where(and(eq(schema.journalEntries.accountId, accountId), this.window(schema.journalEntries.date, windowStart)));

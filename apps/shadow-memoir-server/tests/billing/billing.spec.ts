@@ -15,7 +15,6 @@ import { BILLING_SIGNATURE_HEADER, BillingModule, EntitlementLapseService, Entit
 import { SchedulerModule } from '@modules/scheduler';
 import { SyncModule } from '@modules/sync';
 import { DatastoreModule, type PrimaryDatabase, schema } from '@server/database';
-import { TEST_ROLE_PASSWORD } from '@tests/fixtures/seed';
 import { createDatabaseFromTemplate, dropDatabase } from '@tests/fixtures/template-db';
 
 import { userToken } from '../test-idp';
@@ -33,11 +32,6 @@ const WEBHOOK_SECRET = 'billing-spec-webhook-secret';
 const CHECKOUT_URL = 'https://pay.example.test/checkout';
 const GRACE_DAYS = 7;
 const DAY_MS = 86_400_000;
-
-function billingRoleUrl(): string {
-  const { protocol, hostname, port } = new URL(baseConnectionString);
-  return `${protocol}//memoir_billing:${TEST_ROLE_PASSWORD}@${hostname}:${port}/${databaseName}`;
-}
 
 interface EventEnvelope {
   id: string;
@@ -97,7 +91,6 @@ describe('Entitlements & billing (T-31)', () => {
   beforeAll(async () => {
     await createDatabaseFromTemplate(databaseName);
     Config['cache'].set('database.postgres.url', `${baseUrl}/${databaseName}`);
-    Config['cache'].set('database.postgres.billing-url', billingRoleUrl());
     Config['cache'].set('billing.webhook-secret', WEBHOOK_SECRET);
     Config['cache'].set('billing.checkout-url', CHECKOUT_URL);
     Config['cache'].set('billing.grace-days', GRACE_DAYS);
@@ -555,18 +548,15 @@ describe('Entitlements & billing (T-31)', () => {
 
   /**
    * Billing is optional configuration. `ShadowFactory.create` is what runs the `onApplicationReady`
-   * hooks that flip the readiness probe to 200, so a provider reaching for the `memoir_billing` pool
-   * during DI — a getter the container evaluates while walking instance properties, an eager pool in a
-   * constructor, a sweep registration that connects — fails `create` and leaves the whole app 503 on
-   * `/health/ready`. Asserting on `create` tests that at its source rather than through a fixed health
-   * port a second test process could be sharing.
+   * hooks that flip the readiness probe to 200, so a billing provider that requires its secrets during
+   * DI fails `create` and leaves the whole app 503 on `/health/ready`. Asserting on `create` tests that
+   * at its source rather than through a fixed health port a second test process could be sharing.
    */
   describe('boot with billing unconfigured', () => {
     let unconfiguredApp: ShadowApplication;
     let unconfiguredRouter: FastifyRouter;
 
     beforeAll(async () => {
-      Config['cache'].delete('database.postgres.billing-url');
       Config['cache'].delete('billing.webhook-secret');
       Config['cache'].delete('billing.checkout-url');
       unconfiguredApp = await ShadowFactory.create(TestAppModule);
@@ -575,12 +565,11 @@ describe('Entitlements & billing (T-31)', () => {
 
     afterAll(async () => {
       await unconfiguredApp.stop();
-      Config['cache'].set('database.postgres.billing-url', billingRoleUrl());
       Config['cache'].set('billing.webhook-secret', WEBHOOK_SECRET);
       Config['cache'].set('billing.checkout-url', CHECKOUT_URL);
     });
 
-    it('should reach application-ready without a billing pool, opening no connection for it', () => {
+    it('should reach application-ready without billing secrets', () => {
       expect(unconfiguredApp.isInitiated()).toBe(true);
       expect(unconfiguredApp.get(EntitlementService)).toBeDefined();
     });

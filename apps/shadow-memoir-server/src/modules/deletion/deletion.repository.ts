@@ -8,7 +8,7 @@ import { DatabaseService } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
-import { type Account, type PrimaryDatabase, RolePoolService, schema } from '@server/database';
+import { type Account, type PrimaryDatabase, schema } from '@server/database';
 
 /**
  * Defining types
@@ -88,10 +88,7 @@ const TERMINAL_STATES: Account.DeletionState[] = ['none', 'done'];
 export class DeletionRepository {
   private readonly db: PrimaryDatabase;
 
-  constructor(
-    databaseService: DatabaseService,
-    private readonly rolePools: RolePoolService,
-  ) {
+  constructor(databaseService: DatabaseService) {
     this.db = databaseService.getPostgresClient();
   }
 
@@ -126,20 +123,17 @@ export class DeletionRepository {
   }
 
   /**
-   * Step 4, as `memoir_deleter` — the one role holding DELETE on the §10.4 append-only tables, so the
-   * "no runtime path mutates history" guarantee survives this. Each table drains in `ctid`-bounded
-   * batches; a pass that hits `maxBatches` returns short and the sweep resumes it, which is what keeps
-   * a very large account from holding one connection for minutes.
+   * Step 4. Each table drains in `ctid`-bounded batches; a pass that hits `maxBatches` returns short and
+   * the sweep resumes it, which is what keeps a very large account from holding one connection for minutes.
    */
   async purge(accountId: bigint, batchSize: number, maxBatches: number): Promise<number> {
-    const db = this.rolePools.getPool('memoir_deleter');
     let deleted = 0;
     let batches = 0;
 
     for (const table of PURGE_ORDER) {
       for (;;) {
         if (batches >= maxBatches) return deleted;
-        const rows = await db.execute(
+        const rows = await this.db.execute(
           sql`DELETE FROM ${sql.raw(table)} WHERE ctid = ANY (ARRAY(SELECT ctid FROM ${sql.raw(table)} WHERE account_id = ${accountId} LIMIT ${batchSize})) RETURNING 1 AS deleted`,
         );
         batches++;
@@ -153,23 +147,20 @@ export class DeletionRepository {
 
   /** Whether any row the purge is responsible for still exists — the re-entry check that makes step 4 idempotent without re-running every table. */
   async hasResidualRows(accountId: bigint): Promise<boolean> {
-    const db = this.rolePools.getPool('memoir_deleter');
     for (const table of PURGE_ORDER) {
-      const rows = await db.execute(sql`SELECT 1 AS present FROM ${sql.raw(table)} WHERE account_id = ${accountId} LIMIT 1`);
+      const rows = await this.db.execute(sql`SELECT 1 AS present FROM ${sql.raw(table)} WHERE account_id = ${accountId} LIMIT 1`);
       if (rows.length > 0) return true;
     }
     return false;
   }
 
   /**
-   * Step 6, as a single guarded DELETE rather than an UPDATE-then-DELETE pair: `memoir_deleter` holds
-   * no UPDATE grant on `accounts`, and splitting the two across pools would leave a window where the
-   * row reads `done` but still exists with nothing left to re-drive it. Row absence *is* the `done`
-   * state; a re-entry that finds no row treats the machine as finished.
+   * Step 6, as a single guarded DELETE rather than an UPDATE-then-DELETE pair, which would leave a window
+   * where the row reads `done` but still exists with nothing left to re-drive it. Row absence *is* the
+   * `done` state; a re-entry that finds no row treats the machine as finished.
    */
   async removeAccount(accountId: bigint): Promise<DeletionRemnant | null> {
-    const db = this.rolePools.getPool('memoir_deleter');
-    const rows = await db.execute<{ id: string; identity_sub: string; created_at: Date; deletion_started_at: Date | null }>(
+    const rows = await this.db.execute<{ id: string; identity_sub: string; created_at: Date; deletion_started_at: Date | null }>(
       sql`DELETE FROM accounts WHERE id = ${accountId} AND deletion_state = 'identity_closed' RETURNING id, identity_sub, created_at, deletion_started_at`,
     );
     const row = rows[0];

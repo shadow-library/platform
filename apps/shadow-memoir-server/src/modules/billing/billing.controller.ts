@@ -25,8 +25,7 @@ import { type CheckoutResult, EntitlementService } from './entitlement.service';
  * `@Authenticated()` on purpose: a payment provider has no identity token to present, so the adapter's
  * signature verification is what stands in its place — see `BillingWebhookService`.
  *
- * There is no route here through which a user token could write an entitlement. That absence is the
- * point, and the `memoir_api` grant (SELECT only) is what holds if one is ever added by mistake.
+ * There is no route here through which a user token could write an entitlement, and that absence is the point.
  */
 @HttpController('/api/v1/billing')
 export class BillingController {

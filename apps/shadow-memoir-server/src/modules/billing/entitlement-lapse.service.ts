@@ -39,9 +39,7 @@ export class EntitlementLapseService implements OnModuleInit {
     private readonly repository: BillingRepository,
   ) {}
 
-  /** No billing pool configured means no credential to run as; the sweep stays unregistered rather than failing a tick every cadence on a replica that was never meant to write entitlements. */
   onModuleInit(): void {
-    if (!Config.get('database.postgres.billing-url')) return;
     this.scheduler.registerSweep(SWEEP_NAME, Config.get('billing.lapse-sweep-interval-minutes') * 60_000, () => this.run());
   }
 

@@ -3,11 +3,12 @@
  */
 import { and, eq, isNotNull, lt, ne, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
+import { DatabaseService } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
  */
-import { type Entitlement, RolePoolService, schema } from '@server/database';
+import { type Entitlement, type PrimaryDatabase, schema } from '@server/database';
 
 import { type NormalizedBillingEvent } from './billing.types';
 import { applyBillingEvent, type EntitlementProjection, FREE_PROJECTION } from './entitlement-lifecycle';
@@ -33,27 +34,24 @@ function toProjection(row: Entitlement.Row | undefined): EntitlementProjection {
 }
 
 /**
- * The only writer of `entitlements`, and it runs on the dedicated `memoir_billing` pool (ARCHITECTURE
- * §5.4, §16.2) — the API pool holds SELECT alone, so even a mistaken write from the command path is
- * refused by Postgres rather than by convention. Deliberately not an `OwnerScopedRepository`: a webhook
- * has no request account to scope to, it discovers one from the purchase token the provider echoes.
+ * The only writer of `entitlements` (ARCHITECTURE §16.2). Deliberately not an `OwnerScopedRepository`: a
+ * webhook has no request account to scope to, it discovers one from the purchase token the provider echoes.
  */
 @Injectable()
 export class BillingRepository {
-  constructor(private readonly rolePools: RolePoolService) {}
+  private readonly db: PrimaryDatabase;
 
-  /** A method rather than a getter: DI walks an instance's properties during init, and a getter would open the billing pool at boot on every replica, including ones that never serve a webhook. */
-  private db(): ReturnType<RolePoolService['getPool']> {
-    return this.rolePools.getPool('memoir_billing');
+  constructor(databaseService: DatabaseService) {
+    this.db = databaseService.getPostgresClient();
   }
 
   async findAccountIdByPurchaseToken(purchaseToken: string): Promise<bigint | null> {
-    const [account] = await this.db().select({ id: schema.accounts.id }).from(schema.accounts).where(eq(schema.accounts.purchaseToken, purchaseToken));
+    const [account] = await this.db.select({ id: schema.accounts.id }).from(schema.accounts).where(eq(schema.accounts.purchaseToken, purchaseToken));
     return account?.id ?? null;
   }
 
   async findAccountIdByProviderRef(provider: string, providerRef: string): Promise<bigint | null> {
-    const [row] = await this.db()
+    const [row] = await this.db
       .select({ accountId: schema.entitlements.accountId })
       .from(schema.entitlements)
       .where(and(eq(schema.entitlements.provider, provider), eq(schema.entitlements.providerRef, providerRef)))
@@ -69,7 +67,7 @@ export class BillingRepository {
    * owner, which the partial unique index refuses at the storage layer anyway.
    */
   async recordConflict(event: NormalizedBillingEvent, provider: string, accountId: bigint): Promise<WebhookApplyResult> {
-    const [inserted] = await this.db()
+    const [inserted] = await this.db
       .insert(schema.billingEvents)
       .values({
         provider,
@@ -96,7 +94,7 @@ export class BillingRepository {
    * reconciliation runbook, and the delivery is acknowledged rather than failed.
    */
   async recordAndApply(event: NormalizedBillingEvent, provider: string, accountId: bigint | null, graceDays: number): Promise<WebhookApplyResult> {
-    return this.db().transaction(async tx => {
+    return this.db.transaction(async tx => {
       const [inserted] = await tx
         .insert(schema.billingEvents)
         .values({
@@ -144,7 +142,7 @@ export class BillingRepository {
     );
     const expiredGrace = and(eq(schema.entitlements.state, 'grace'), isNotNull(schema.entitlements.graceEndsAt), lt(schema.entitlements.graceEndsAt, now));
 
-    const lapsed = await this.db()
+    const lapsed = await this.db
       .update(schema.entitlements)
       .set({ tier: 'free', state: 'lapsed', graceEndsAt: null, syncSeq: sql`nextval('sync_seq')`, updatedAt: now })
       .where(and(ne(schema.entitlements.state, 'lapsed'), or(expiredPeriod, expiredGrace)))

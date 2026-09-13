@@ -28,9 +28,8 @@ export interface WebhookOutcome {
 
 /**
  * `POST /billing/webhooks/{provider}` (ARCHITECTURE §16, §25). The route carries **no identity auth** —
- * the adapter's signature check is the whole authentication decision — and it runs entirely on the
- * `memoir_billing` pool, so the process handling an unauthenticated request holds a connection that
- * cannot reach a quest, a hero event, or anything else outside the entitlement tables.
+ * the adapter's signature check is the whole authentication decision — and it writes only through
+ * `BillingRepository`, never outside the entitlement tables.
  *
  * Everything past verification is acknowledged with 200: a duplicate, a stale event, an unmatched
  * purchase token. A provider retries anything else, and retrying a delivery the system deliberately

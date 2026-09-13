@@ -21,7 +21,6 @@ import { SyncModule } from '@modules/sync';
 import { DatastoreModule, type PrimaryDatabase, schema } from '@server/database';
 import { manifestLogRedactionFormat } from '@server/database/log-redaction';
 import { pseudoAccountId } from '@server/telemetry';
-import { TEST_ROLE_PASSWORD } from '@tests/fixtures/seed';
 import { createDatabaseFromTemplate, dropDatabase } from '@tests/fixtures/template-db';
 
 import { AUDIENCE, userToken } from '../test-idp';
@@ -47,11 +46,6 @@ const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql
 const baseUrl = baseConnectionString.replace(/\/[^/]*$/, '');
 const databaseName = `${baseConnectionString.split('/').pop()}_deletion_spec`;
 const DATE = '2026-08-24';
-
-function roleUrl(role: string): string {
-  const { protocol, hostname, port } = new URL(baseConnectionString);
-  return `${protocol}//${role}:${TEST_ROLE_PASSWORD}@${hostname}:${port}/${databaseName}`;
-}
 
 describe('Resumable account deletion (T-30, ARCHITECTURE §21)', () => {
   const originalUrl = (Config['cache'].get('database.postgres.url') as string | undefined) ?? baseConnectionString;
@@ -247,7 +241,6 @@ describe('Resumable account deletion (T-30, ARCHITECTURE §21)', () => {
 
     await createDatabaseFromTemplate(databaseName);
     Config['cache'].set('database.postgres.url', `${baseUrl}/${databaseName}`);
-    Config['cache'].set('database.postgres.deleter-url', roleUrl('memoir_deleter'));
     app = await ShadowFactory.create(TestAppModule, { overrides: [{ token: IdentityCloseClient, useClass: StubIdentityCloseClient }] });
     router = app.get(Dispatcher) as FastifyRouter;
     db = app.get(DeletionRepository)['db'] as PrimaryDatabase;

@@ -43,11 +43,8 @@ export function scheduledTaskId(accountId: bigint, date: string): string {
 }
 
 /**
- * Materialization runs on the API pool, not `memoir_ai`: §5.4 gives the worker role no INSERT on
- * `ai_tasks` at all — a task row is a user's request, and the worker forging one is exactly what that
- * grant exists to prevent. The nightly sweep therefore writes the scheduled row through the same
- * privilege the user's own submission uses, and only ever with `quota_consumed = false` (§15.7: a
- * scheduled run never touches ad-hoc quota).
+ * The nightly sweep writes the scheduled row the same way the user's own submission does, and only ever
+ * with `quota_consumed = false` (§15.7: a scheduled run never touches ad-hoc quota).
  */
 @Injectable()
 export class ScheduledQueryRepository {
