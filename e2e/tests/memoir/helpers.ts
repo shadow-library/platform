@@ -55,7 +55,7 @@ export interface DeltaPage {
 export async function memoirMutate(ctx: APIRequestContext, method: MutationMethod, url: string, options: MemoirMutateOptions = {}): Promise<APIResponse> {
   await ctx.get(options.csrfSeedPath ?? '/api/auth/session');
 
-  const memoirOrigin = new URL(getProductUrl('memoir') ?? 'https://shadow-memoir.shadow-apps.test').hostname;
+  const memoirOrigin = new URL(getProductUrl('memoir') ?? 'https://memoir.shadow-apps.test').hostname;
   const { cookies } = await ctx.storageState();
   const cookie = cookies.find(c => c.name === 'csrf-token' && c.domain.replace(/^\./, '') === memoirOrigin);
   const token = cookie?.value.split(':')[1];

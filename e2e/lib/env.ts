@@ -49,7 +49,7 @@ const PRODUCT_ENV_VARS: Record<ProductKey, string> = {
 /** The local k3d dev ingress default for each product — confirmed reachable via `kubectl get ingress -A`. */
 const PRODUCT_DEFAULT_URLS: Record<ProductKey, string> = {
   identity: 'https://identity.shadow-apps.test',
-  memoir: 'https://shadow-memoir.shadow-apps.test',
+  memoir: 'https://memoir.shadow-apps.test',
   novelForge: 'https://novelforge.shadow-apps.test',
   pulse: 'https://pulse.shadow-apps.test',
   webNovel: 'https://webnovel.shadow-apps.test',
