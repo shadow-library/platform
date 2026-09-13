@@ -165,12 +165,14 @@ export function SettingsScreen(): ReactElement {
                 <FormField label="Wake time">
                   <TimePicker
                     defaultValue={day.data.wakeTime}
+                    hour12={false}
                     onValueChange={value => command.mutate({ type: 'day.set', patch: { wakeTime: value ?? '' } }, { onSuccess: notify })}
                   />
                 </FormField>
                 <FormField label="Sleep time">
                   <TimePicker
                     defaultValue={day.data.sleepTime}
+                    hour12={false}
                     onValueChange={value => command.mutate({ type: 'day.set', patch: { sleepTime: value ?? '' } }, { onSuccess: notify })}
                   />
                 </FormField>

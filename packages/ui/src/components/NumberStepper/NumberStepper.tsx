@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type ChangeEvent, forwardRef, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, forwardRef, type KeyboardEvent, useEffect, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -16,6 +16,10 @@ import { type NumberStepperProps } from './NumberStepper.types';
  * Declaring the constants
  */
 const PARTIAL = /^-?\d*\.?\d*$/;
+
+function decimalsOf(input: number): number {
+  return String(input).split('.')[1]?.length ?? 0;
+}
 
 function MinusIcon() {
   return (
@@ -49,9 +53,9 @@ function ChevronDown() {
 /**
  * A numeric field with step buttons for quantities adjusted in small increments (replicas, retries,
  * timeouts). The field is role="spinbutton" with aria-valuenow/min/max (+ aria-valuetext for units);
- * step buttons are labelled but removed from the tab order (arrows in the field do the same job).
- * Non-numeric keystrokes are rejected; out-of-range typed values surface on blur, never silently
- * clamped mid-edit. Holding a step button repeats.
+ * step buttons are labelled but removed from the tab order (ArrowUp/ArrowDown in the field do the same job).
+ * Non-numeric keystrokes are rejected; typed values are clamped to the range on blur, never mid-edit.
+ * Holding a step button repeats.
  */
 export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(function NumberStepper(
   {
@@ -79,13 +83,13 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
 
   const format = (input: number): string => (precision != null ? input.toFixed(precision) : String(input));
   const [text, setText] = useState(current != null ? format(current) : '');
-  const [invalidTyped, setInvalidTyped] = useState(false);
+  const [editing, setEditing] = useState(false);
   const holdRef = useRef<{ timeout?: ReturnType<typeof setTimeout>; interval?: ReturnType<typeof setInterval> }>({});
 
   const [syncedValue, setSyncedValue] = useState(current);
   if (syncedValue !== current) {
     setSyncedValue(current);
-    setText(current != null ? format(current) : '');
+    if (!editing) setText(current != null ? format(current) : '');
   }
 
   function clampRound(input: number): number {
@@ -96,39 +100,44 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
   }
 
   function commit(next: number | null): void {
-    setCurrent(next);
-    setInvalidTyped(false);
+    if (next !== current) setCurrent(next);
   }
 
   function stepBy(direction: 1 | -1): void {
     if (disabled || readOnly) return;
     const base = current ?? min ?? 0;
-    const next = clampRound(base + direction * step);
+    const decimals = precision ?? Math.max(decimalsOf(step), decimalsOf(base));
+    const next = clampRound(Number((base + direction * step).toFixed(decimals)));
     commit(next);
     setText(format(next));
+    setEditing(false);
   }
 
   function handleChange(event: ChangeEvent<HTMLInputElement>): void {
     const next = event.target.value;
     if (!PARTIAL.test(next)) return;
     setText(next);
-    if (next === '' || next === '-' || next === '.' || next === '-.') {
-      if (next === '') commit(null);
-      return;
-    }
-    const parsed = Number(next);
-    if (!Number.isNaN(parsed)) commit(precision != null ? Number(parsed.toFixed(precision)) : parsed);
+    setEditing(true);
+    if (next === '-' || next === '.' || next === '-.') return;
+    const parsed = next === '' ? null : Number(next);
+    if (Number.isNaN(parsed)) return;
+    commit(parsed != null && precision != null ? Number(parsed.toFixed(precision)) : parsed);
   }
 
   function handleBlur(): void {
-    if (text === '' || text === '-' || text === '.' || text === '-.') return;
-    const parsed = Number(text);
-    if (Number.isNaN(parsed)) {
-      setInvalidTyped(true);
-      return;
-    }
-    const outOfRange = (min != null && parsed < min) || (max != null && parsed > max);
-    setInvalidTyped(outOfRange);
+    setEditing(false);
+    if (!editing || disabled || readOnly) return setText(current != null ? format(current) : '');
+    const parsed = text === '' ? Number.NaN : Number(text);
+    if (Number.isNaN(parsed)) return setText(current != null ? format(current) : '');
+    const next = clampRound(parsed);
+    commit(next);
+    setText(format(next));
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    stepBy(event.key === 'ArrowUp' ? 1 : -1);
   }
 
   function startHold(direction: 1 | -1): void {
@@ -188,7 +197,7 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
       className={cn(styles.root, className)}
       data-size={size}
       data-buttons={buttons}
-      data-invalid={invalid || invalidTyped || undefined}
+      data-invalid={invalid || undefined}
       data-disabled={disabled || undefined}
       data-readonly={readOnly || undefined}
       data-has-unit={unit != null || undefined}
@@ -210,8 +219,9 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
         aria-valuemin={min}
         aria-valuemax={max}
         aria-valuetext={current != null && unit != null ? `${format(current)} ${unit}` : undefined}
-        aria-invalid={invalid || invalidTyped || undefined}
+        aria-invalid={invalid || undefined}
         onChange={handleChange}
+        onKeyDown={handleKeyDown}
         onBlur={handleBlur}
       />
       {unit != null ? <span className={styles.unit}>{unit}</span> : null}

@@ -289,7 +289,7 @@ function RescheduleOverlay({ occurrence, onClose, dispatch }: OverlayProps): Rea
       }
     >
       <div className={styles.partialBody}>
-        <TimePicker value={time} onValueChange={value => setTime(value ?? time)} aria-label="Move to" />
+        <TimePicker value={time} onValueChange={value => setTime(value ?? time)} hour12={false} aria-label="Move to" />
         <DescriptionList layout="row" termWidth={150}>
           <DescriptionList.Item term="Streak">Kept — a move inside the cap does not break it</DescriptionList.Item>
           <DescriptionList.Item term="HP">Unchanged</DescriptionList.Item>

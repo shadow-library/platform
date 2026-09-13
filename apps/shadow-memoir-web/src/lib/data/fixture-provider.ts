@@ -18,7 +18,9 @@ import {
   type QuestProgress,
   type QuestSummary,
   type ReasonTag,
+  type Recurrence,
   type Strictness,
+  type Weekday,
 } from './quest.types';
 import {
   type ActivityEntry,
@@ -38,6 +40,7 @@ const BASE_COINS: Record<Strictness, number> = { anchor: 2, routine: 1, goal: 1,
 const HP_COST: Record<Strictness, number> = { anchor: 1, routine: 1, goal: 0, recovery: 0, optional: 0 };
 const XP_CEILING = 25;
 const SOFT_CAPACITY_MINUTES = 150;
+const PREVIEW_WINDOW_DAYS = 7;
 
 export interface LogRecord {
   state: OccurrenceState;
@@ -102,6 +105,11 @@ function scheduleSummary(quest: Quest): string {
   const span = days.length === 7 ? 'Every day' : days.length === 6 && !days.includes('sun') ? 'Mon–Sat' : days.map(day => WEEKDAY_LABELS[day]).join(' / ');
   const time = formatTime(quest.startTimeMinutes);
   return time ? `${span} · ${time}` : `${span} · all day`;
+}
+
+function everyNDaysNote(interval: number, occurrences: number): string {
+  const cadence = interval <= 1 ? 'Every day' : `Every ${interval} days`;
+  return `${cadence} — ${occurrences} ${occurrences === 1 ? 'time' : 'times'} in the next ${PREVIEW_WINDOW_DAYS} days.`;
 }
 
 function relativeDayLabel(date: string, today: string): string {
@@ -411,20 +419,30 @@ export class MemoirEngine implements DataProvider {
   }
 
   async previewDraft(draft: QuestDraft): Promise<QuestDraftPreview> {
+    const draftDays = this.draftWeekdays(draft.recurrence);
     const days = WEEKDAYS.map(day => {
       const existing = this.state.quests.filter(quest => quest.active && quest.recurrence.daysOfWeek.includes(day)).reduce((total, quest) => total + quest.durationMinutes, 0);
-      const minutes = existing + (draft.recurrence.daysOfWeek.includes(day) ? draft.durationMinutes : 0);
+      const minutes = existing + (draftDays.includes(day) ? draft.durationMinutes : 0);
       return { label: WEEKDAY_LABELS[day], minutes, percentOfCapacity: Math.round((minutes / SOFT_CAPACITY_MINUTES) * 100) };
     });
     const heaviest = days.reduce((worst, day) => (day.minutes > worst.minutes ? day : worst), days[0] as (typeof days)[number]);
 
     return {
       days,
+      cadenceNote: draft.recurrence.frequency === 'daily' ? everyNDaysNote(draft.recurrence.interval, draftDays.length) : null,
       overloadNote:
         heaviest.percentOfCapacity > 100
           ? `${heaviest.label} would be the heaviest day — about ${formatDuration(heaviest.minutes)}, above your usual load. This is a note, not a limit.`
           : null,
     };
+  }
+
+  /** Mirrors `rules/recurrence.ts` on the server. */
+  private draftWeekdays(recurrence: Recurrence): Weekday[] {
+    if (recurrence.frequency !== 'daily') return recurrence.daysOfWeek;
+    const start = recurrence.startDate === '' ? this.state.today : recurrence.startDate;
+    const interval = Math.max(1, Math.trunc(recurrence.interval));
+    return Array.from({ length: Math.ceil(PREVIEW_WINDOW_DAYS / interval) }, (_, index) => weekdayOf(shiftDate(start, index * interval)));
   }
 
   async findOccurrences(query: string, date: string): Promise<CaptureTarget[]> {

@@ -12,7 +12,7 @@ export const memoirKeys = {
   plan: (range: PlanRange) => ['memoir', 'plan', range.scope, range.anchor] as const,
   quests: (filter: QuestFilter) => ['memoir', 'quests', filter] as const,
   quest: (questId: string) => ['memoir', 'quest', questId] as const,
-  draftPreview: (draft: QuestDraft) => ['memoir', 'draft-preview', draft.durationMinutes, draft.recurrence.daysOfWeek.join('')] as const,
+  draftPreview: (draft: QuestDraft) => ['memoir', 'draft-preview', draft.durationMinutes, draft.recurrence] as const,
   occurrences: (query: string, date: string) => ['memoir', 'occurrences', date, query] as const,
   quickLogTiles: (date: string) => ['memoir', 'quick-log-tiles', date] as const,
 };

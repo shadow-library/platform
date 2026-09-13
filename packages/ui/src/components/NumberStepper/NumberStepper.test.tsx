@@ -4,16 +4,31 @@
 
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { type ReactElement, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 /**
  * Importing user defined packages
  */
 import { NumberStepper } from './NumberStepper';
+import { type NumberStepperProps } from './NumberStepper.types';
 
 /**
  * Declaring the constants
  */
+function FallbackStepper({ fallback, onValueChange, ...props }: NumberStepperProps & { fallback: number }): ReactElement {
+  const [value, setValue] = useState<number | null>(null);
+  return (
+    <NumberStepper
+      {...props}
+      value={value ?? fallback}
+      onValueChange={next => {
+        setValue(next);
+        onValueChange?.(next);
+      }}
+    />
+  );
+}
 
 describe('NumberStepper', () => {
   it('renders a spinbutton with value and range', () => {
@@ -53,6 +68,124 @@ describe('NumberStepper', () => {
   it('exposes aria-valuetext with the unit', () => {
     render(<NumberStepper value={30} unit="sec" aria-label="Timeout" />);
     expect(screen.getByRole('spinbutton')).toHaveAttribute('aria-valuetext', '30 sec');
+  });
+
+  it('should clamp a typed value on blur', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<NumberStepper defaultValue={2} min={1} max={30} onValueChange={onValueChange} aria-label="Every N days" />);
+    const field = screen.getByRole('spinbutton');
+
+    await user.clear(field);
+    await user.type(field, '99');
+    await user.tab();
+    expect(field).toHaveValue('30');
+    expect(onValueChange).toHaveBeenLastCalledWith(30);
+
+    await user.clear(field);
+    await user.type(field, '0');
+    await user.tab();
+    expect(field).toHaveValue('1');
+    expect(onValueChange).toHaveBeenLastCalledWith(1);
+  });
+
+  it('should round a typed value to the precision on blur', async () => {
+    const user = userEvent.setup();
+    render(<NumberStepper defaultValue={70} min={30} max={250} precision={1} aria-label="Weight" />);
+    const field = screen.getByRole('spinbutton');
+
+    await user.clear(field);
+    await user.type(field, '72.46');
+    await user.tab();
+    expect(field).toHaveValue('72.5');
+  });
+
+  it('should restore the value when blurred on a partial number', async () => {
+    const user = userEvent.setup();
+    render(<NumberStepper defaultValue={null} aria-label="Count" />);
+    const field = screen.getByRole('spinbutton');
+
+    await user.type(field, '-');
+    await user.tab();
+    expect(field).toHaveValue('');
+  });
+
+  it('should keep typed text while a controlled parent substitutes a fallback for an empty value', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<FallbackStepper fallback={1} min={1} max={30} precision={0} onValueChange={onValueChange} aria-label="Every N days" />);
+    const field = screen.getByRole('spinbutton');
+
+    await user.click(field);
+    await user.keyboard('{End}{Backspace}5');
+    expect(field).toHaveValue('5');
+    expect(onValueChange).toHaveBeenLastCalledWith(5);
+  });
+
+  it('should keep typed decimal text while a controlled parent substitutes a fallback for an empty value', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<FallbackStepper fallback={72.4} min={30} max={250} step={0.1} precision={1} onValueChange={onValueChange} aria-label="Weight" />);
+    const field = screen.getByRole('spinbutton');
+
+    await user.clear(field);
+    await user.type(field, '75');
+    expect(field).toHaveValue('75');
+    expect(onValueChange).toHaveBeenLastCalledWith(75);
+    await user.tab();
+    expect(field).toHaveValue('75.0');
+  });
+
+  it('should show a controlled update that arrives while focused without edits', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    const { rerender } = render(<NumberStepper value={70} precision={1} onValueChange={onValueChange} aria-label="Weight" />);
+    const field = screen.getByRole('spinbutton');
+
+    await user.click(field);
+    rerender(<NumberStepper value={72.4} precision={1} onValueChange={onValueChange} aria-label="Weight" />);
+    expect(field).toHaveValue('72.4');
+    await user.tab();
+    expect(field).toHaveValue('72.4');
+    expect(onValueChange).not.toHaveBeenCalled();
+  });
+
+  it('should step decimals without floating-point residue', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<NumberStepper defaultValue={0.1} step={0.2} onValueChange={onValueChange} aria-label="Ratio" />);
+
+    await user.click(screen.getByRole('spinbutton'));
+    await user.keyboard('{ArrowUp}');
+    expect(screen.getByRole('spinbutton')).toHaveValue('0.3');
+    expect(onValueChange).toHaveBeenLastCalledWith(0.3);
+  });
+
+  it('should step with arrow keys', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<NumberStepper defaultValue={4} min={1} max={5} onValueChange={onValueChange} aria-label="Every N days" />);
+    const field = screen.getByRole('spinbutton');
+
+    await user.click(field);
+    await user.keyboard('{ArrowUp}');
+    expect(field).toHaveValue('5');
+    await user.keyboard('{ArrowUp}');
+    expect(field).toHaveValue('5');
+    await user.keyboard('{ArrowDown}{ArrowDown}');
+    expect(field).toHaveValue('3');
+    expect(onValueChange.mock.calls).toEqual([[5], [4], [3]]);
+  });
+
+  it('should ignore arrow keys when read-only', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<NumberStepper value={4} readOnly onValueChange={onValueChange} aria-label="Count" />);
+
+    await user.click(screen.getByRole('spinbutton'));
+    await user.keyboard('{ArrowUp}');
+    await user.tab();
+    expect(onValueChange).not.toHaveBeenCalled();
   });
 
   it('keeps step buttons out of the tab order', () => {

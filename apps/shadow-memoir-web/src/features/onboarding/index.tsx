@@ -161,10 +161,10 @@ export function OnboardingScreen(): ReactElement {
               </p>
               <div className={styles.fields}>
                 <FormField label="Wake time" helper="Quests scheduled before this are not counted late.">
-                  <TimePicker value={wakeTime} onValueChange={value => setWakeTime(value ?? wakeTime)} />
+                  <TimePicker value={wakeTime} onValueChange={value => setWakeTime(value ?? wakeTime)} hour12={false} />
                 </FormField>
                 <FormField label="Sleep time" helper="Your day closes here — logs after it still belong to today.">
-                  <TimePicker value={sleepTime} onValueChange={value => setSleepTime(value ?? sleepTime)} />
+                  <TimePicker value={sleepTime} onValueChange={value => setSleepTime(value ?? sleepTime)} hour12={false} />
                 </FormField>
                 <FormField label="Timezone" helper="Detected from your browser. Travel will not move your day unless you change it.">
                   <Select value={timezone} aria-label="Timezone" onValueChange={setTimezone}>

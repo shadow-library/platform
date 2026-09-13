@@ -129,6 +129,8 @@ interface LoadPreviewDay {
 
 export interface QuestDraftPreview {
   days: LoadPreviewDay[];
+  /** How often an every-N-days draft lands in the coming week; `null` for drafts on fixed weekdays. */
+  cadenceNote: string | null;
   overloadNote: string | null;
 }
 

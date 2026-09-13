@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as Popover from '@radix-ui/react-popover';
-import { type KeyboardEvent, type ReactElement, useId, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, type PointerEvent, type ReactElement, useCallback, useId, useMemo, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -13,6 +13,16 @@ import { cn, pad2 } from '@/lib';
 
 import styles from './TimePicker.module.css';
 import { type TimePickerProps } from './TimePicker.types';
+
+/**
+ * Defining types
+ */
+type Interaction = 'idle' | 'typed' | 'navigated';
+
+interface ClockParts {
+  hours: number;
+  minutes: number;
+}
 
 /**
  * Declaring the constants
@@ -41,30 +51,47 @@ function displayText(value: string | null, hour12: boolean): string {
   return minutes != null ? formatMinutes(minutes, hour12) : '';
 }
 
+function splitClock(core: string): ClockParts | null {
+  const separated = /^(\d{1,2})[:.](\d{2})?$/.exec(core);
+  if (separated) return { hours: Number(separated[1]), minutes: Number(separated[2] ?? 0) };
+  if (!/^\d{1,4}$/.test(core)) return null;
+  if (core.length <= 2) return { hours: Number(core), minutes: 0 };
+  const split = core.length - 2;
+  return { hours: Number(core.slice(0, split)), minutes: Number(core.slice(split)) };
+}
+
 /** Loosely parse "9:30", "930", "9.30pm", "21:30" to minutes of day, or null. */
 function parseTime(input: string): number | null {
   const clean = input.trim().toLowerCase().replace(/\s+/g, '');
   if (!clean) return null;
   const periodMatch = /(am|pm|a|p)$/.exec(clean);
   const period = periodMatch?.[1]?.[0] ?? null;
-  const core = (periodMatch ? clean.slice(0, periodMatch.index) : clean).replace(/[:.]/g, '');
-  if (!/^\d{1,4}$/.test(core)) return null;
-  let h: number;
-  let m: number;
-  if (core.length <= 2) {
-    h = Number(core);
-    m = 0;
-  } else if (core.length === 3) {
-    h = Number(core.slice(0, 1));
-    m = Number(core.slice(1));
-  } else {
-    h = Number(core.slice(0, 2));
-    m = Number(core.slice(2));
+  const clock = splitClock(periodMatch ? clean.slice(0, periodMatch.index) : clean);
+  if (!clock) return null;
+  let { hours } = clock;
+  if (period === 'p' && hours < 12) hours += 12;
+  if (period === 'a' && hours === 12) hours = 0;
+  if (hours > 23 || clock.minutes > 59) return null;
+  return hours * 60 + clock.minutes;
+}
+
+function nearestIndex(options: number[], minutes: number | null): number {
+  if (minutes == null) return 0;
+  return options.reduce((best, option, index) => (Math.abs(option - minutes) < Math.abs((options[best] ?? option) - minutes) ? index : best), 0);
+}
+
+/** Scrolls only the list: `scrollIntoView` would also scroll the page and a Dialog body while the popper is still unpositioned. */
+function scrollOptionIntoView(option: Element | null | undefined, block: 'center' | 'nearest'): void {
+  const list = option?.parentElement;
+  if (!(option instanceof HTMLElement) || !list) return;
+  const top = option.offsetTop;
+  const bottom = top + option.offsetHeight;
+  if (block === 'center') {
+    list.scrollTop = top - (list.clientHeight - option.offsetHeight) / 2;
+    return;
   }
-  if (period === 'p' && h < 12) h += 12;
-  if (period === 'a' && h === 12) h = 0;
-  if (h > 23 || m > 59) return null;
-  return h * 60 + m;
+  if (top < list.scrollTop) list.scrollTop = top;
+  else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
 }
 
 function ClockIcon() {
@@ -78,9 +105,10 @@ function ClockIcon() {
 
 /**
  * A time field with a suggestion menu, on 24-hour `HH:MM` strings at the API boundary. Typing is the
- * accessible fast path — loose input ("930", "9.30pm", "21:30") parses on blur, out-of-range/invalid
+ * accessible fast path — loose input ("930", "9.30pm", "21:30") parses on blur or Enter, out-of-range/invalid
  * surfaces then, and the field reverts rather than storing an impossible value. The suggestion list
- * follows Combobox's listbox pattern. (Segmented spinbuttons are a future enhancement.)
+ * follows Combobox's listbox pattern: it opens on the current value, arrows move the highlight, and Enter
+ * picks the highlighted time only after arrow navigation — otherwise it keeps what was typed.
  */
 export function TimePicker({
   value,
@@ -105,11 +133,18 @@ export function TimePicker({
   const [text, setText] = useState(() => displayText(currentValue, hour12));
   const [invalidTyped, setInvalidTyped] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [interaction, setInteraction] = useState<Interaction>('idle');
+  const fieldRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [emitted, setEmitted] = useState(currentValue);
+  const triggerPointerRef = useRef<PointerEvent['pointerType']>('mouse');
   const listId = useId();
+  const interactive = !disabled && !readOnly;
 
   const minMinutes = min ? toMinutes(min) : null;
   const maxMinutes = max ? toMinutes(max) : null;
+  const currentMinutes = currentValue ? toMinutes(currentValue) : null;
 
   const options = useMemo(() => {
     const start = minMinutes ?? 0;
@@ -122,12 +157,41 @@ export function TimePicker({
   const [synced, setSynced] = useState({ value: currentValue, hour12 });
   if (synced.value !== currentValue || synced.hour12 !== hour12) {
     setSynced({ value: currentValue, hour12 });
+    setEmitted(currentValue);
     setText(displayText(currentValue, hour12));
   }
 
+  const attachList = useCallback((node: HTMLDivElement | null) => {
+    listRef.current = node;
+    if (node) scrollOptionIntoView(node.querySelector('[data-active]'), 'center');
+  }, []);
+
+  const isInsideField = (target: EventTarget | null): boolean => target instanceof Node && (fieldRef.current?.contains(target) ?? false);
+
+  function highlight(index: number, block: 'center' | 'nearest'): void {
+    setActiveIndex(index);
+    scrollOptionIntoView(listRef.current?.children[index], block);
+  }
+
+  function openList(): void {
+    if (!interactive) return;
+    const typed = interaction === 'typed' ? parseTime(text) : null;
+    setActiveIndex(nearestIndex(options, typed ?? currentMinutes));
+    setOpen(true);
+  }
+
   function commit(next: string | null): void {
-    setCurrentValue(next);
     setInvalidTyped(false);
+    setInteraction('idle');
+    if (next === emitted) return;
+    setEmitted(next);
+    setCurrentValue(next);
+  }
+
+  function revert(outOfRange: boolean): void {
+    setText(displayText(currentValue, hour12));
+    setInvalidTyped(outOfRange);
+    setInteraction('idle');
   }
 
   function selectMinutes(minutes: number): void {
@@ -136,56 +200,59 @@ export function TimePicker({
     setOpen(false);
   }
 
-  function revertText(): void {
-    setText(displayText(currentValue, hour12));
-  }
-
-  function handleBlur(): void {
-    if (text.trim() === '') {
-      commit(null);
-      return;
-    }
+  function commitText(): void {
+    if (text.trim() === '') return commit(null);
     const minutes = parseTime(text);
-    if (minutes == null) {
-      // Unparseable input is rejected, field left unchanged.
-      revertText();
-      setInvalidTyped(false);
-      return;
-    }
-    if ((minMinutes != null && minutes < minMinutes) || (maxMinutes != null && minutes > maxMinutes)) {
-      revertText();
-      setInvalidTyped(true);
-      return;
-    }
+    if (minutes == null) return revert(false);
+    if ((minMinutes != null && minutes < minMinutes) || (maxMinutes != null && minutes > maxMinutes)) return revert(true);
     commit(toHHMM(minutes));
     setText(formatMinutes(minutes, hour12));
   }
 
+  function handleChange(next: string): void {
+    setText(next);
+    setInteraction('typed');
+    const minutes = parseTime(next);
+    if (!open) {
+      setActiveIndex(nearestIndex(options, minutes ?? currentMinutes));
+      setOpen(true);
+      return;
+    }
+    if (minutes != null) highlight(nearestIndex(options, minutes), 'nearest');
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
-    if (event.key === 'ArrowDown') {
+    if (!interactive) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
-      if (!open) setOpen(true);
-      else setActiveIndex(index => Math.min(options.length - 1, index + 1));
-    } else if (event.key === 'ArrowUp') {
+      if (!open) return openList();
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      highlight(Math.min(options.length - 1, Math.max(0, activeIndex + delta)), 'nearest');
+      setInteraction('navigated');
+      return;
+    }
+    if (event.key === 'Enter') {
+      if (!open && interaction !== 'typed') return;
       event.preventDefault();
-      setActiveIndex(index => Math.max(0, index - 1));
-    } else if (event.key === 'Enter' && open) {
-      event.preventDefault();
-      const minutes = options[activeIndex];
-      if (minutes != null) selectMinutes(minutes);
-    } else if (event.key === 'Escape' && open) {
+      const highlighted = options[activeIndex];
+      if (interaction === 'navigated' && highlighted != null) return selectMinutes(highlighted);
+      commitText();
+      setOpen(false);
+      return;
+    }
+    if (event.key === 'Escape' && open) {
       event.preventDefault();
       setOpen(false);
     }
   }
 
-  const currentMinutes = currentValue ? toMinutes(currentValue) : null;
   const activeId = open && options.length > 0 ? `${listId}-opt-${activeIndex}` : undefined;
 
   return (
-    <Popover.Root open={open} onOpenChange={next => !disabled && !readOnly && setOpen(next)}>
+    <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Anchor asChild>
         <div
+          ref={fieldRef}
           className={cn(styles.field, className)}
           data-size={size}
           data-invalid={invalid || invalidTyped || undefined}
@@ -205,27 +272,54 @@ export function TimePicker({
             disabled={disabled}
             readOnly={readOnly}
             aria-expanded={open}
-            aria-controls={listId}
+            aria-controls={open ? listId : undefined}
             aria-autocomplete="none"
             aria-activedescendant={activeId}
             aria-invalid={invalid || invalidTyped || undefined}
             aria-label={ariaLabel}
-            onChange={event => setText(event.target.value)}
-            onFocus={() => !disabled && !readOnly && setOpen(true)}
+            onChange={event => handleChange(event.target.value)}
+            onFocus={openList}
             onKeyDown={handleKeyDown}
-            onBlur={handleBlur}
+            onBlur={commitText}
           />
-          <Popover.Trigger asChild>
-            <button type="button" className={styles.trigger} aria-label="Choose time" disabled={disabled || readOnly} tabIndex={-1}>
-              <ClockIcon />
-            </button>
-          </Popover.Trigger>
+          <button
+            type="button"
+            className={styles.trigger}
+            aria-label="Choose time"
+            aria-expanded={open}
+            aria-controls={open ? listId : undefined}
+            disabled={!interactive}
+            tabIndex={-1}
+            onPointerDown={event => {
+              event.preventDefault();
+              triggerPointerRef.current = event.pointerType;
+            }}
+            onClick={() => {
+              if (open) return setOpen(false);
+              // A focused input raises the on-screen keyboard over the list on touch devices.
+              if (triggerPointerRef.current !== 'touch') inputRef.current?.focus();
+              openList();
+            }}
+          >
+            <ClockIcon />
+          </button>
         </div>
       </Popover.Anchor>
 
       <Popover.Portal>
-        <Popover.Content className={styles.content} align="start" sideOffset={4} onOpenAutoFocus={event => event.preventDefault()}>
-          <div id={listId} role="listbox" aria-label="Times" className={styles.list}>
+        <Popover.Content
+          className={styles.content}
+          align="start"
+          sideOffset={4}
+          onOpenAutoFocus={event => event.preventDefault()}
+          onPointerDownOutside={event => {
+            if (isInsideField(event.detail.originalEvent.target)) event.preventDefault();
+          }}
+          onFocusOutside={event => {
+            if (isInsideField(event.detail.originalEvent.target)) event.preventDefault();
+          }}
+        >
+          <div ref={attachList} id={listId} role="listbox" aria-label="Times" className={styles.list}>
             {options.map((minutes, index) => {
               const selected = currentMinutes === minutes;
               return (
@@ -239,6 +333,7 @@ export function TimePicker({
                   className={styles.option}
                   data-active={activeIndex === index || undefined}
                   onPointerMove={() => setActiveIndex(index)}
+                  onPointerDown={event => event.preventDefault()}
                   onClick={() => selectMinutes(minutes)}
                 >
                   <span>{formatMinutes(minutes, hour12)}</span>

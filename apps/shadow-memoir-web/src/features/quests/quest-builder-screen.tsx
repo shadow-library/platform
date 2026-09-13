@@ -122,7 +122,7 @@ export function QuestBuilderScreen(): ReactElement {
                     helper="Optional. An untimed quest is judged on the day, not the hour."
                     error={anchorNeedsTime ? 'An Anchor quest needs a start time.' : undefined}
                   >
-                    <TimePicker value={time} onValueChange={setTime} aria-label="Time of day" />
+                    <TimePicker value={time} onValueChange={setTime} hour12={false} aria-label="Time of day" />
                   </FormField>
                   <FormField label="Usual length" helper="Used for the day’s load, never as a timer.">
                     <NumberStepper
@@ -131,6 +131,7 @@ export function QuestBuilderScreen(): ReactElement {
                       min={0}
                       max={240}
                       step={5}
+                      precision={0}
                       aria-label="Usual length in minutes"
                     />
                   </FormField>
@@ -155,14 +156,14 @@ export function QuestBuilderScreen(): ReactElement {
                   </div>
                 </div>
 
-                <FormField label="Repeats" helper="Six days a week is the pattern most people keep.">
+                <FormField label="Repeats" helper={frequency === 'daily' ? 'Counted from today, every 1 to 30 days.' : 'Six days a week is the pattern most people keep.'}>
                   <div className={styles.repeats}>
                     <SegmentedControl value={frequency} onValueChange={value => setFrequency(value as RecurrenceFrequency)} fullWidth>
                       <SegmentedControl.Item value="weekly">Days of week</SegmentedControl.Item>
                       <SegmentedControl.Item value="daily">Every N days</SegmentedControl.Item>
                     </SegmentedControl>
                     {frequency === 'daily' ? (
-                      <NumberStepper value={interval} onValueChange={value => setInterval(value ?? 1)} min={1} max={30} aria-label="Repeat every N days" />
+                      <NumberStepper value={interval} onValueChange={value => setInterval(value ?? 1)} min={1} max={30} precision={0} aria-label="Repeat every N days" />
                     ) : (
                       <div className={styles.dayToggles}>
                         {WEEKDAYS.map(day => (
@@ -214,6 +215,7 @@ export function QuestBuilderScreen(): ReactElement {
           <Card padding="md">
             <Card.Body>
               <h2 className={styles.cardTitle}>Effect on your week</h2>
+              {preview.data?.cadenceNote ? <p className={styles.cardBody}>{preview.data.cadenceNote}</p> : null}
               <ul className={styles.loadList}>
                 {(preview.data?.days ?? []).map(day => (
                   <li key={day.label}>
