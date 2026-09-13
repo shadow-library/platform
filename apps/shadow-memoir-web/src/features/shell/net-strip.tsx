@@ -3,6 +3,7 @@ import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { Button } from '@shadow-library/ui';
 
 import { notifyNotice } from '@/lib/data';
+import { currentPage, signInUrl } from '@/lib/session';
 import { type SyncSnapshot, useSyncEngine, useSyncStatus } from '@/lib/sync';
 
 import { useSystemOverlays } from './system-overlays';
@@ -12,17 +13,17 @@ const DELETION_MESSAGE = 'This account is being deleted, so nothing on this devi
 
 interface StripCopy {
   message: string;
-  retry: boolean;
+  action: 'retry' | 'sign-in' | null;
 }
 
 function stripCopy({ state, queuedCount, readiness }: SyncSnapshot): StripCopy {
-  if (readiness.kind === 'failed' && readiness.reason === 'deletion-pending') return { message: DELETION_MESSAGE, retry: false };
-  if (state === 'offline') return { message: 'Offline. Everything you log is kept on this device and syncs when you reconnect.', retry: false };
-  if (state === 'signed-out') return { message: 'Signed out. Your data and queue are intact — sign in to resume syncing.', retry: false };
-  if (state === 'syncing') return { message: queuedCount > 0 ? 'Syncing your queued changes…' : 'Syncing…', retry: false };
-  if (queuedCount > 0) return { message: "Some changes haven't synced yet.", retry: true };
-  if (readiness.kind === 'ready') return { message: "Couldn't reach Shadow Memoir. Everything on this device is kept.", retry: true };
-  return { message: "Couldn't reach Shadow Memoir, so your data hasn't loaded yet.", retry: true };
+  if (readiness.kind === 'failed' && readiness.reason === 'deletion-pending') return { message: DELETION_MESSAGE, action: null };
+  if (state === 'offline') return { message: 'Offline. Everything you log is kept on this device and syncs when you reconnect.', action: null };
+  if (state === 'signed-out') return { message: 'Your session ended. Your data and queue are kept on this device — sign in again to resume syncing.', action: 'sign-in' };
+  if (state === 'syncing') return { message: queuedCount > 0 ? 'Syncing your queued changes…' : 'Syncing…', action: null };
+  if (queuedCount > 0) return { message: "Some changes haven't synced yet.", action: 'retry' };
+  if (readiness.kind === 'ready') return { message: "Couldn't reach Shadow Memoir. Everything on this device is kept.", action: 'retry' };
+  return { message: "Couldn't reach Shadow Memoir, so your data hasn't loaded yet.", action: 'retry' };
 }
 
 /**
@@ -66,7 +67,12 @@ export function NetStrip(): ReactElement | null {
       <span>{copy.message}</span>
       <span className={styles.actions}>
         {status.queuedCount > 0 ? <span className={styles.count}>{status.queuedCount} queued</span> : null}
-        {copy.retry || retrying ? (
+        {copy.action === 'sign-in' ? (
+          <Button size="sm" variant="secondary" onClick={() => window.location.assign(signInUrl(currentPage()))}>
+            Sign in again
+          </Button>
+        ) : null}
+        {copy.action === 'retry' || retrying ? (
           <Button size="sm" variant="secondary" onClick={retry}>
             {retrying ? 'Trying again…' : 'Try again'}
           </Button>

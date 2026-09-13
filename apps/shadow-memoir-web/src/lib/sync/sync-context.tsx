@@ -1,6 +1,7 @@
-import { createContext, type ReactElement, type ReactNode, useContext, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { Alert, Button, toISODate } from '@shadow-library/ui';
+import { createContext, type ReactElement, type ReactNode, useContext, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { Button, toISODate } from '@shadow-library/ui';
 
+import { StatusPage } from '@/components/StatusPage';
 import { accountKeys, type MemoirData, memoirKeys, memoirQueryClient, setFinanceProvider, setQuickLogProvider } from '@/lib/data';
 
 import { type AccountMarker, MemoirStore } from './memoir-store';
@@ -162,21 +163,40 @@ export function SyncEngineProvider({ data, children }: SyncProviderProps): React
   );
 }
 
+const STORE_UNAVAILABLE =
+  "Shadow Memoir keeps your day on this device and syncs it afterwards, so it can't show anything until the store opens. " +
+  "Private windows and blocked site storage can stop it. Nothing you've logged is lost.";
+
 /** An unopenable mirror is not an empty account: the app has nothing to render and must say so rather than show a day that looks merely new. */
 function StoreGate({ children }: { children: ReactNode }): ReactElement {
   const engine = useSyncEngine();
   const { initError } = useSyncStatus();
+  const [retrying, setRetrying] = useState(false);
   if (!initError) return <>{children}</>;
 
+  const retry = (): void => {
+    if (retrying || !engine) return;
+    setRetrying(true);
+    // Stopping releases a failed IndexedDB open, which the offline store would otherwise hand back to every retry.
+    engine.stop();
+    void engine.start().finally(() => setRetrying(false));
+  };
+
   return (
-    <div className="flex items-center justify-center" style={{ minHeight: '100dvh', padding: '1.5rem' }}>
-      <Alert intent="danger" title="This device could not open its local store">
-        <p>Shadow Memoir keeps your day on the device and syncs it afterwards, so it cannot show anything until the store opens. Nothing you have logged is lost.</p>
-        <p>{initError}</p>
-        <Button variant="primary" onClick={() => void engine?.start()}>
-          Try again
-        </Button>
-      </Alert>
-    </div>
+    <StatusPage
+      title="This device couldn't open its local store"
+      description={STORE_UNAVAILABLE}
+      pending={retrying}
+      actions={
+        <>
+          <Button variant="primary" loading={retrying} loadingText="Trying again…" onClick={retry}>
+            Try again
+          </Button>
+          <Button variant="secondary" disabled={retrying} onClick={() => window.location.reload()}>
+            Reload
+          </Button>
+        </>
+      }
+    />
   );
 }

@@ -1,5 +1,5 @@
 import { type QueryClient } from '@tanstack/react-query';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,7 +12,7 @@ import { renderScreen } from './harness';
 import { createSyncedTestData, createTestEngine, sharedMarker } from './sync-harness';
 
 const TODAY = '2026-08-24';
-const OVERLAY_TITLE = 'Your session ended while you were offline';
+const OVERLAY_TITLE = 'Your session ended';
 
 function setOnline(online: boolean): void {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: online });
@@ -64,10 +64,23 @@ describe('sync failure classification', () => {
 
 describe('NetStrip session overlay', () => {
   beforeEach(() => setOnline(true));
+  afterEach(() => vi.unstubAllGlobals());
 
   it('should raise the session overlay once the session is gone', async () => {
     renderNetStrip(401, '/');
     expect(await screen.findByText(OVERLAY_TITLE)).toBeDefined();
+  });
+
+  it('should offer sign in again when the session expires online', async () => {
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, pathname: '/finance', search: '?range=month', hash: '', assign });
+    renderNetStrip(401, '/finance');
+
+    const dialog = await screen.findByRole('dialog', { name: OVERLAY_TITLE });
+    expect(within(dialog).queryByText(/offline/i)).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Sign in again' }));
+
+    expect(assign).toHaveBeenCalledWith('/api/auth/login?return_to=%2Ffinance%3Frange%3Dmonth');
   });
 
   it('should leave a refused request to the strip rather than the overlay', async () => {

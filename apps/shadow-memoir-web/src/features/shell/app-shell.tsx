@@ -7,7 +7,8 @@ import { isApiError, userDisplayName } from '@shadow-library/web';
 
 import { BellIcon, LogIcon, MemoirMark, MoonIcon, SearchIcon, SunIcon } from '@/components/icons';
 import { formatCount } from '@/lib/format';
-import { loginUrl, logout, meQuery } from '@/lib/apis';
+import { logout, meQuery } from '@/lib/apis';
+import { currentPage, signInUrl } from '@/lib/session';
 import { useSyncEngine, useSyncStatus } from '@/lib/sync';
 
 import styles from './app-shell.module.css';
@@ -81,7 +82,7 @@ function ShellChrome({ children }: AppShellProps): ReactElement {
     signingOutRef.current = true;
     setSigningOut(true);
     toast.neutral('Signing out…');
-    const returnTo = `${window.location.pathname}${window.location.search}`;
+    const returnTo = currentPage();
 
     let redirectTo: string | undefined;
     let sessionGone: boolean;
@@ -108,7 +109,7 @@ function ShellChrome({ children }: AppShellProps): ReactElement {
       }
     }
     engine?.store.close();
-    window.location.assign(redirectTo ?? loginUrl(returnTo));
+    window.location.assign(redirectTo ?? signInUrl(returnTo));
   };
 
   const handleSignOut = (): void => {

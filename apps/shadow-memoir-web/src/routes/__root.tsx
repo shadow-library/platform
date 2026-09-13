@@ -22,11 +22,11 @@ interface RouterContext {
 const PWA_HEAD = { manifestUrl: '/manifest.webmanifest', themeColor: '#4f46e5', appleTouchIcon: '/icons/icon.svg', appleTitle: 'Shadow Memoir' };
 
 export const Route = createRootRouteWithContext<RouterContext>()({
-  head: () => ({
+  head: ({ matches }) => ({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1.0, viewport-fit=cover' },
-      { title: 'Shadow Memoir' },
+      { title: matches.some(match => match.globalNotFound) ? 'Not found · Shadow Memoir' : 'Shadow Memoir' },
       { name: 'description', content: 'Shadow Memoir — a private self-improvement RPG for your commitments, money, body and thoughts.' },
       // Every screen is behind authentication and there is nothing here to index.
       { name: 'robots', content: 'noindex, nofollow' },

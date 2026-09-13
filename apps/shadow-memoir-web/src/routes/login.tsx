@@ -1,12 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { type ReactElement, useEffect } from 'react';
-import { Spinner } from '@shadow-library/ui';
+import { type ReactElement, useEffect, useState } from 'react';
+import { Button } from '@shadow-library/ui';
 
+import { StatusPage } from '@/components/StatusPage';
 import { loginUrl } from '@/lib/apis';
+import { safeReturnTo } from '@/lib/return-to';
 
 interface LoginSearch {
   returnTo: string;
 }
+
+const STALLED_AFTER_MS = 3_000;
 
 /**
  * The only public route. There is no local sign-in UI — the backend's relying-party auth module owns the OIDC
@@ -15,26 +19,34 @@ interface LoginSearch {
  * real route and escape the SPA cleanly.
  */
 export const Route = createFileRoute('/login')({
-  /** Constrain returnTo to a same-origin path (reject `//host` and `\host`) before it reaches the redirect. */
-  validateSearch: (search: Record<string, unknown>): LoginSearch => {
-    const raw = typeof search.returnTo === 'string' ? search.returnTo : '/';
-    const safe = raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('\\') ? raw : '/';
-    return { returnTo: safe };
-  },
+  validateSearch: (search: Record<string, unknown>): LoginSearch => ({ returnTo: safeReturnTo(search.returnTo) }),
   head: () => ({ meta: [{ title: 'Signing in · Shadow Memoir' }] }),
   component: LoginRedirect,
 });
 
 function LoginRedirect(): ReactElement {
   const { returnTo } = Route.useSearch();
+  const [stalled, setStalled] = useState(false);
+  const href = loginUrl(returnTo);
 
   useEffect(() => {
-    window.location.replace(loginUrl(returnTo));
-  }, [returnTo]);
+    window.location.replace(href);
+    const timer = setTimeout(() => setStalled(true), STALLED_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [href]);
 
   return (
-    <div className="flex items-center justify-center" style={{ minHeight: '100dvh' }}>
-      <Spinner aria-label="Redirecting to sign-in" />
-    </div>
+    <StatusPage
+      title="Redirecting to sign-in…"
+      description={stalled ? 'This is taking longer than usual. You can continue to the sign-in page yourself.' : 'One moment while the sign-in page opens.'}
+      pending
+      actions={
+        stalled ? (
+          <Button variant="primary" asChild>
+            <a href={href}>Continue to sign-in</a>
+          </Button>
+        ) : undefined
+      }
+    />
   );
 }

@@ -76,8 +76,22 @@ function memoryBacking(): KeyValueBacking {
   };
 }
 
+/**
+ * Reading `window.indexedDB` itself throws where the browser forbids storage, and the store is built during render. The choice is
+ * made on first use instead, so the failure surfaces from `start()`, and is retried on every call until it succeeds, so the store
+ * gate's retry can recover once storage is allowed again.
+ */
 function createBacking(): KeyValueBacking {
-  return isIndexedDbAvailable() ? offlineBacking() : memoryBacking();
+  let chosen: KeyValueBacking | null = null;
+  const withBacking = <T>(operation: (backing: KeyValueBacking) => Promise<T>): Promise<T> =>
+    new Promise<T>(resolve => resolve(operation((chosen ??= isIndexedDbAvailable() ? offlineBacking() : memoryBacking()))));
+  return {
+    get: <T>(key: string) => withBacking(backing => backing.get<T>(key)),
+    put: (key, value) => withBacking(backing => backing.put(key, value)),
+    delete: key => withBacking(backing => backing.delete(key)),
+    keys: () => withBacking(backing => backing.keys()),
+    close: () => chosen?.close?.(),
+  };
 }
 
 export type StoreBoundary = 'closed' | 'owner-changed' | 'principal-changed';

@@ -1,10 +1,19 @@
-import { useRouter } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
-import { EmptyState } from '@shadow-library/ui';
+import { Button } from '@shadow-library/ui';
+
+import { StatusPage } from './StatusPage';
 
 export default function NotFound(): ReactElement {
-  const router = useRouter();
   return (
-    <EmptyState title="Page not found" description="That page doesn't exist or has moved." action={{ label: 'Back to today', onClick: () => void router.navigate({ to: '/' }) }} />
+    <StatusPage
+      title="Page not found"
+      description="That page doesn't exist or has moved. Everything you've logged is where you left it."
+      actions={
+        <Button variant="primary" asChild>
+          <Link to="/">Back to today</Link>
+        </Button>
+      }
+    />
   );
 }

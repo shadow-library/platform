@@ -1,7 +1,18 @@
-import { type QueryClient } from '@tanstack/react-query';
+import { type QueryClient, queryOptions } from '@tanstack/react-query';
+import { redirect } from '@tanstack/react-router';
 import { requireAuth, type SessionGuardStatus, useSessionGuard as useSharedSessionGuard } from '@shadow-library/web/router';
 
-import { sessionQueryOptions, type SessionResponse } from '@/lib/apis';
+import { accountApi, loginUrl, sessionQueryOptions, type SessionResponse } from '@/lib/apis';
+import { accountKeys, type OnboardingStatus } from '@/lib/data';
+import { safeReturnTo } from '@/lib/return-to';
+
+export function signInUrl(returnTo: unknown): string {
+  return loginUrl(safeReturnTo(returnTo));
+}
+
+export function currentPage(): string {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
 
 /**
  * The auth gate for every route group — nothing in Shadow Memoir is public. An unauthenticated visitor (401) is
@@ -12,11 +23,7 @@ export function requireSession(queryClient: QueryClient, returnTo: string): Prom
   return requireAuth(queryClient, sessionQueryOptions(), { loginTo: '/login', returnTo });
 }
 
-/**
- * `requireSession` runs only when the browser first enters the `_app` group — TanStack reuses the layout
- * match, so its `beforeLoad` never re-runs while navigating inside the shell. This keeps the session live
- * for as long as the shell is mounted and bounces the moment the server reports it is gone.
- */
+/** Re-validates the cached session on navigation and focus, and bounces the moment the server reports it gone. */
 export function useSessionGuard(): SessionGuardStatus {
   return useSharedSessionGuard({ query: sessionQueryOptions(), loginTo: '/login' });
 }
@@ -31,4 +38,49 @@ export async function confirmSessionAccount(queryClient: QueryClient): Promise<s
   const session = await queryClient.fetchQuery({ ...shared, queryKey: [...shared.queryKey, 'probe'], gcTime: 0, staleTime: 0 });
   if (queryClient.getQueryData<SessionResponse>(shared.queryKey)?.sub !== session.sub) queryClient.setQueryData(shared.queryKey, session);
   return session.sub;
+}
+
+export const ONBOARDING_PATH = '/onboarding';
+
+const bootOnboardingOptions = (accountId: string) =>
+  queryOptions({
+    queryKey: ['boot', 'onboarding', accountId] as const,
+    queryFn: async (): Promise<OnboardingStatus> => {
+      const account = await accountApi.get();
+      return { completed: account.onboardingCompletedAt !== null && account.onboardingCompletedAt !== undefined };
+    },
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+
+/** Keyed by account on the router's (dehydrated) client, so the server render and hydration agree on which side of setup the owner is. */
+export function onboardingBootQuery(accountId: string): ReturnType<typeof bootOnboardingOptions> {
+  return bootOnboardingOptions(accountId);
+}
+
+/**
+ * Routes the first entry into the shell by onboarding before anything renders — a 307 during the server render. A failed read
+ * (500, offline, `ACC_002`) resolves to `undefined` and leaves the decision to the client gate, and once the answer is cached,
+ * later navigations are the gate's too: it sees setup complete as soon as the wizard does, which this cache would not.
+ */
+export async function routeByOnboarding(queryClient: QueryClient, accountId: string, pathname: string): Promise<OnboardingStatus | undefined> {
+  const query = onboardingBootQuery(accountId);
+  const cached = queryClient.getQueryData(query.queryKey);
+  if (cached) return cached;
+
+  const status = await queryClient.fetchQuery(query).catch(() => undefined);
+  if (status?.completed === false && pathname !== ONBOARDING_PATH) throw redirect({ to: ONBOARDING_PATH });
+  if (status?.completed === true && pathname === ONBOARDING_PATH) throw redirect({ to: '/' });
+  return status;
+}
+
+/**
+ * Hands the boot answer to memoir's own query, stamped with when it was fetched so hydration does not refetch it. Only a finished
+ * setup is handed over: onboarding cannot be undone, but a cached "not yet" may be minutes old by the time this account is back.
+ */
+export function seedOnboardingStatus(routerClient: QueryClient, memoirClient: QueryClient, accountId: string): void {
+  const { queryKey } = onboardingBootQuery(accountId);
+  const status = routerClient.getQueryData(queryKey);
+  if (status?.completed !== true) return;
+  memoirClient.setQueryData(accountKeys.onboarding, status, { updatedAt: routerClient.getQueryState(queryKey)?.dataUpdatedAt });
 }

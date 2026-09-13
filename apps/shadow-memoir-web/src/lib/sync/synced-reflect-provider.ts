@@ -109,6 +109,8 @@ export class SyncedReflectProvider implements ReflectProvider {
     this.narrative = createReflectProvider({ today: sync.today, persona: 'active' });
     this.source = projectReflectSource(sync.domains(), sync.today);
     this.restored = this.restoreReview().catch(ignoreAccountBoundary);
+    // An unreadable store is reported by the store gate; `updateReview` still refuses to write over a review it could not read.
+    this.restored.catch(() => undefined);
     sync.subscribeProjection(() => (this.pending = this.pending.then(() => this.reproject())));
   }
 

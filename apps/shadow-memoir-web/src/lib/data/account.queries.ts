@@ -72,9 +72,12 @@ export function useAppSync(): UseQueryResult<AppSyncView> {
   return useQuery({ queryKey: accountKeys.appSync, queryFn: () => account.getAppSync() }, queryClient);
 }
 
+const ONBOARDING_STALE_MS = 30_000;
+
+/** Finishing setup invalidates `accountKeys.all`, so the stale window only saves the refetch of an answer the boot just seeded. */
 export function useOnboardingStatus(): UseQueryResult<OnboardingStatus> {
   const { account, queryClient } = useMemoirData();
-  return useQuery({ queryKey: accountKeys.onboarding, queryFn: () => account.getOnboarding() }, queryClient);
+  return useQuery({ queryKey: accountKeys.onboarding, queryFn: () => account.getOnboarding(), staleTime: ONBOARDING_STALE_MS }, queryClient);
 }
 
 export type AccountCommandHook = CommandHook<AccountCommand, SettledCommandResult, SettledCommandResult>;

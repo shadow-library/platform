@@ -6,6 +6,7 @@ import { useServiceWorker } from '@shadow-library/web/pwa';
 import { OverlaySurface } from '@/components/OverlaySurface';
 import { useAppSync } from '@/lib/data';
 import { type InstallOffer, useInstallOffer } from '@/lib/install-offer';
+import { currentPage, signInUrl } from '@/lib/session';
 
 import styles from './system-overlays.module.css';
 
@@ -136,35 +137,41 @@ function SystemOverlays({ kind, install, onClose }: { kind: SystemOverlayKind | 
       <OverlaySurface
         open={kind === 'session-expired'}
         onOpenChange={change}
-        title="Your session ended while you were offline"
+        title="Your session ended"
+        size="md"
         footer={
           <>
-            <Button variant="primary" onClick={onClose}>
-              Keep working offline
+            <Button variant="primary" onClick={() => window.location.assign(signInUrl(currentPage()))}>
+              Sign in again
             </Button>
-            <Button variant="ghost" onClick={() => go('/settings/app')}>
-              See the sync queue
+            <Button variant="ghost" onClick={onClose}>
+              Keep working on this device
             </Button>
           </>
         }
       >
-        <Alert intent="info" title="Nothing was lost">
-          Everything you logged is stored on this device and syncs as soon as the platform restores the session. You can keep logging in the meantime, and nothing needs
-          re-entering.
-        </Alert>
-        <p className={styles.sectionLabel}>Waiting to sync</p>
-        {queue.length === 0 ? (
-          <p className={styles.lead}>Nothing is waiting. Everything you have logged on this device already reached the server.</p>
-        ) : (
-          <ul className={styles.queue}>
-            {queue.map(entry => (
-              <li key={entry.id} className={styles.queueRow}>
-                <span>{entry.text}</span>
-                <span className={styles.queueWhen}>{entry.meta}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <div className={styles.body}>
+          <Alert intent="info" title="Nothing was lost">
+            Everything you logged is stored on this device. Sign in again and it syncs straight away — nothing needs re-entering, and you can keep logging in the meantime.
+          </Alert>
+          <section className={styles.section} aria-labelledby="session-queue-label">
+            <h3 id="session-queue-label" className={styles.sectionLabel}>
+              Waiting to sync
+            </h3>
+            {queue.length === 0 ? (
+              <p className={styles.lead}>Nothing is waiting. Everything you have logged on this device already reached the server.</p>
+            ) : (
+              <ul className={styles.queue}>
+                {queue.map(entry => (
+                  <li key={entry.id} className={styles.queueRow}>
+                    <span>{entry.text}</span>
+                    <span className={styles.queueWhen}>{entry.meta}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
       </OverlaySurface>
 
       <OverlaySurface

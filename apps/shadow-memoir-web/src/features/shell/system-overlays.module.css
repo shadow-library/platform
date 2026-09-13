@@ -52,6 +52,18 @@
   color: var(--sh-text-tertiary);
 }
 
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .sectionLabel {
   margin: 0;
   font-size: var(--sh-text-caption);
