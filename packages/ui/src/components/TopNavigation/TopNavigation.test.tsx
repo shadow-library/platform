@@ -2,6 +2,9 @@
  * Importing npm packages
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -14,6 +17,7 @@ import { TopNavigation } from './TopNavigation';
 /**
  * Declaring the constants
  */
+const css = readFileSync(path.join(import.meta.dirname, 'TopNavigation.module.css'), 'utf-8');
 
 describe('TopNavigation', () => {
   it('renders a banner holding a Top nav landmark and marks the active link', () => {
@@ -109,6 +113,38 @@ describe('TopNavigation', () => {
     render(<TopNavigation brand="Shadow" utility={<button type="button">Account</button>} />);
     expect(screen.getByRole('banner')).toBeInTheDocument();
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+  });
+
+  it('should not overflow the centred top bar when utility content is wide', () => {
+    render(
+      <TopNavigation
+        brand="Shadow Memoir Operator Workspace"
+        search={<button type="button">Log something, or jump to a screen</button>}
+        utility={
+          <>
+            <button type="button" aria-label="Notifications">
+              Bell
+            </button>
+            <button type="button" aria-label="Account menu">
+              Account
+            </button>
+          </>
+        }
+      />,
+    );
+    expect(screen.getByRole('banner')).toHaveAttribute('data-layout', 'centred');
+    expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Account menu' })).toBeInTheDocument();
+
+    // Regression guard: the centred bar's middle column must stay a flexible (fr) track, not `auto`, and
+    // `.start`/`.utility` must opt back into their protected content minimum — an `auto` column claims its
+    // full content width before the outer 1fr columns get a share, pushing the utility cluster off-screen.
+    const centredRule = css.slice(css.indexOf(".bar[data-layout='centred'] {"));
+    expect(centredRule).not.toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto\s*minmax\(0,\s*1fr\)/);
+    expect(centredRule).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*minmax\(0,\s*\d+fr\)\s*minmax\(0,\s*1fr\)/);
+    expect(centredRule).toContain('.start');
+    expect(centredRule).toContain('.utility');
+    expect(centredRule).toContain('min-width: auto;');
   });
 
   it('marks the More trigger active when an overflowed link is active', () => {

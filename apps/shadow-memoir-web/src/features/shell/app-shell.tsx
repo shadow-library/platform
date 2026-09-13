@@ -92,10 +92,11 @@ function ShellChrome({ children }: AppShellProps): ReactElement {
       }
       bottomNav={isPhone ? <PhoneNav /> : undefined}
       contentWidth="fluid"
+      className={isPhone ? styles.fabClearance : undefined}
     >
       <NetStrip />
       {children}
-      {isPhone && <Fab className={styles.fab} placement="static" icon={<LogIcon size={20} />} aria-label="Quick capture" onClick={() => setCaptureOpen(true)} />}
+      {isPhone && <Fab className={styles.fab} placement="fixed" icon={<LogIcon size={20} />} aria-label="Quick capture" onClick={() => setCaptureOpen(true)} />}
       <QuickCapture open={captureOpen} onOpenChange={setCaptureOpen} />
     </Chrome>
   );

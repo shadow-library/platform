@@ -53,7 +53,7 @@ const meta = {
     icon: { control: false },
     variant: { control: 'inline-radio', options: ['primary', 'secondary'] },
     size: { control: 'inline-radio', options: ['md', 'lg'] },
-    placement: { control: 'select', options: ['bottom-end', 'bottom-center', 'bottom-start', 'static'] },
+    placement: { control: 'select', options: ['bottom-end', 'bottom-center', 'bottom-start', 'static', 'fixed'] },
   },
 } satisfies Meta<typeof Fab>;
 
@@ -97,6 +97,15 @@ export const Floating: Story = {
   render: () => (
     <PhoneFrame>
       <Fab icon={<PenIcon />} label="Compose" placement="bottom-end" />
+    </PhoneFrame>
+  ),
+};
+
+/** `fixed` sets `position: fixed` with no offsets, so a consumer's own class supplies them — e.g. to clear a bottom nav. */
+export const FixedWithConsumerOffsets: Story = {
+  render: () => (
+    <PhoneFrame>
+      <Fab icon={<PenIcon />} aria-label="Compose" placement="fixed" style={{ right: 16, bottom: 76 }} />
     </PhoneFrame>
   ),
 };

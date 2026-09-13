@@ -2,6 +2,9 @@
  * Importing npm packages
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -14,6 +17,7 @@ import { AccountMenu } from './AccountMenu';
 /**
  * Declaring the constants
  */
+const css = readFileSync(path.join(import.meta.dirname, 'AccountMenu.module.css'), 'utf-8');
 
 describe('AccountMenu', () => {
   it('should render an avatar trigger naming the account menu', () => {
@@ -83,5 +87,15 @@ describe('AccountMenu', () => {
     await user.keyboard('{Enter}');
 
     expect(await screen.findByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
+  });
+
+  it('should give the account menu trigger the touch target size', () => {
+    render(<AccountMenu name="Ada Lovelace" />);
+    expect(screen.getByRole('button', { name: 'Account menu' })).toBeInTheDocument();
+    // The trigger must scale with --sh-control-height-md (32px comfortable, 44px touch density) like the
+    // bell/toggle/hamburger IconButtons, not stay pinned to the 24px avatar itself.
+    expect(css).toMatch(/\.trigger\s*{[^}]*width:\s*var\(--sh-control-height-md\)/);
+    expect(css).toMatch(/\.trigger\s*{[^}]*height:\s*var\(--sh-control-height-md\)/);
+    expect(css).toContain('pointer: coarse');
   });
 });

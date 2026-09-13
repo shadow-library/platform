@@ -38,11 +38,14 @@
   }
 }
 
-/* The promoted capture action sits above the bottom bar, clear of the home indicator. It exists only on
-   touch — on desktop the same action is Cmd+K, which needs no chrome. */
+/* Phone-only: desktop uses Cmd+K. Position here; z-index comes from Fab. */
 .fab {
   position: fixed;
   right: 16px;
-  bottom: calc(var(--sh-shell-bottom-nav-height, 60px) + var(--sh-safe-bottom) + 16px);
-  z-index: var(--sh-z-sticky);
+  bottom: calc(var(--sh-shell-bottom-nav-height, 56px) + var(--sh-safe-bottom) + 16px);
+}
+
+/* Matches .fab's 16px gap + Fab md 48px so content ends above the FAB. */
+.fabClearance {
+  --sh-shell-bottom-extra: calc(16px + 48px);
 }

@@ -43,10 +43,16 @@
 }
 
 /* With a search field and no destinations, the outer columns share the leftover width equally so the field sits at
-   the true centre of the bar; a flex row would centre it in whatever the brand leaves, moving it with the brand's width. */
+   the true centre of the bar; a flex row would centre it in whatever the brand leaves, moving it with the brand's width.
+   fr tracks (not `auto`) stop the utility cluster being squeezed to zero on a narrow bar; `.start`/`.utility` keep
+   `min-width: auto` so `.search`/`.brand` shrink first. */
 .bar[data-layout='centred'] {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+}
+.bar[data-layout='centred'] .start,
+.bar[data-layout='centred'] .utility {
+  min-width: auto;
 }
 .bar[data-layout='centred'] .brand {
   flex-shrink: 1;

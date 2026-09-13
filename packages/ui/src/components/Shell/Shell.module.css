@@ -202,12 +202,13 @@
    reserves the bar's own height plus that inset counted once — never twice.
    Breakpoint token --sh-breakpoint-md 768. */
 @media (max-width: 767px) {
+  /* --sh-shell-bottom-extra (default 0) lets a consumer reserve extra room above the bottom nav for its own floating chrome. */
   .shell[data-bottom-nav] .main {
-    --sh-shell-bottom-inset: calc(var(--sh-shell-bottom-nav-height) + var(--sh-safe-bottom));
+    --sh-shell-bottom-inset: calc(var(--sh-shell-bottom-nav-height) + var(--sh-safe-bottom) + var(--sh-shell-bottom-extra, 0px));
   }
   /* Full-bleed pages zero every padding, so the reservation has to be restated for them. */
   .shell[data-bottom-nav] .main[data-padding='none'] {
-    padding-bottom: calc(var(--sh-shell-bottom-nav-height) + var(--sh-safe-bottom));
+    padding-bottom: calc(var(--sh-shell-bottom-nav-height) + var(--sh-safe-bottom) + var(--sh-shell-bottom-extra, 0px));
   }
 }
 @media (min-width: 768px) {

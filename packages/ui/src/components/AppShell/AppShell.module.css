@@ -8,8 +8,14 @@
   align-items: center;
   gap: 9px;
   min-width: 0;
+  border-radius: var(--sh-radius-md);
   color: inherit;
   text-decoration: none;
+}
+
+.brand:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
 }
 
 .brandIcon {

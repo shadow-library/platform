@@ -9,8 +9,14 @@
   flex-shrink: 0;
 }
 
+/* Sized like the other top-bar controls (IconButton's md footprint), not the bare 24px avatar. */
 .trigger {
+  position: relative;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sh-control-height-md);
+  height: var(--sh-control-height-md);
   padding: 0;
   border: none;
   background: none;
@@ -21,6 +27,19 @@
 .trigger:focus-visible {
   outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
   outline-offset: var(--sh-focus-ring-offset);
+}
+
+/* ≥44×44 tap target on touch — invisible hit-area extension, coarse pointers only, matching IconButton. */
+@media (pointer: coarse) {
+  .trigger::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, var(--sh-tap-target));
+    height: max(100%, var(--sh-tap-target));
+    transform: translate(-50%, -50%);
+  }
 }
 
 /* ── Menu ────────────────────────────────────────────────── */

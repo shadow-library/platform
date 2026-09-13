@@ -2,6 +2,9 @@
  * Importing npm packages
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -108,6 +111,15 @@ describe('Shell · content region', () => {
       </Shell>,
     );
     expect(screen.getByRole('heading', { name: 'Services' }).closest('[data-framed]')).toBeInTheDocument();
+  });
+
+  it('should let a consumer reserve extra bottom clearance for floating chrome above the bottom nav', () => {
+    const css = readFileSync(path.join(import.meta.dirname, 'Shell.module.css'), 'utf-8');
+    // A consumer (e.g. a phone FAB) sets --sh-shell-bottom-extra on the shell root to grow the content
+    // region's bottom padding past the bottom nav + safe-area reservation, defaulting to 0 so it is a
+    // no-op for every consumer that never sets it.
+    expect(css).toMatch(/--sh-shell-bottom-inset:\s*calc\([\s\S]*?--sh-shell-bottom-extra,\s*0px\)[\s\S]*?\);/);
+    expect(css).toMatch(/padding-bottom:\s*calc\([\s\S]*?--sh-shell-bottom-extra,\s*0px\)[\s\S]*?\);/);
   });
 });
 

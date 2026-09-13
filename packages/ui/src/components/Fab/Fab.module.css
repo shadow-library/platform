@@ -1,12 +1,13 @@
 /*
  * FAB — the promoted action floating above content. Accent fill + e3 (surface contrast carries it in
- * dark, where shadows are none). Fixed placements clear the device safe areas; z-sticky keeps it under
- * every overlay. Extended (label) form is a pill; both forms are ≥48px — tap-target compliant outright.
+ * dark, where shadows are none). Fixed placements clear the device safe areas; one rung above z-shell
+ * clears BottomNavigation while staying under every dropdown-and-up overlay. Extended (label) form is a
+ * pill; both forms are ≥48px — tap-target compliant outright.
  */
 
 .root {
   position: fixed;
-  z-index: var(--sh-z-sticky);
+  z-index: calc(var(--sh-z-shell) + 1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -34,7 +35,7 @@
   cursor: not-allowed;
 }
 
-/* ── Placement (safe-area aware; static opts out for consumer layouts) ── */
+/* ── Placement (safe-area aware). `static` opts out for consumer layouts; `fixed` sets position only, no offsets. ── */
 .root[data-placement='bottom-end'] {
   right: calc(16px + var(--sh-safe-right));
   bottom: calc(16px + var(--sh-safe-bottom));
@@ -50,6 +51,9 @@
 }
 .root[data-placement='static'] {
   position: static;
+}
+.root[data-placement='fixed'] {
+  position: fixed;
 }
 
 /* ── Sizes (square; extended widens into a pill) ─────────── */

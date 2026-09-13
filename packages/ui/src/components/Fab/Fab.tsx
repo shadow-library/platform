@@ -18,9 +18,13 @@ import { type FabProps } from './Fab.types';
 
 /**
  * Floating Action Button — the screen's single promoted action on touch layouts. Floats above the
- * content in a thumb-reachable corner, offset past the device safe areas, at z-sticky (under every
- * overlay). Icon-only by default (pass `aria-label`); a `label` extends it into a pill. Pair it with
- * `BottomNavigation` by stacking their bottom offsets in the consumer layout; keep one per screen.
+ * content in a thumb-reachable corner, offset past the device safe areas, one rung above shell-pinned
+ * chrome like `BottomNavigation` (z-shell) and below every overlay layer (z-dropdown and up), so it never
+ * ties with — and can't cover — a Popover/Select/DropdownMenu/DatePicker near the same corner. Icon-only
+ * by default (pass `aria-label`); a `label` extends it into a pill. Pair it with `BottomNavigation` by
+ * stacking their bottom offsets in the consumer layout, and reserve the same amount from the scrollable
+ * content below it (Shell's `--sh-shell-bottom-extra`) so the FAB never covers the last row; keep one per
+ * screen.
  */
 export const Fab = forwardRef<HTMLButtonElement, FabProps>(function Fab(
   { icon, label, variant = 'primary', size = 'md', placement = 'bottom-end', asChild = false, type, className, children, ...props },

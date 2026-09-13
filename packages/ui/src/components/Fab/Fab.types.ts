@@ -16,8 +16,12 @@ export type FabVariant = 'primary' | 'secondary';
 
 export type FabSize = 'md' | 'lg';
 
-/** Where the FAB floats (safe-area aware). `static` renders in place for consumer-managed layouts. */
-export type FabPlacement = 'bottom-end' | 'bottom-center' | 'bottom-start' | 'static';
+/**
+ * Where the FAB floats (safe-area aware). `static` renders in place for consumer-managed layouts. `fixed`
+ * renders `position: fixed` with no offsets, so a consumer's own class can position it (e.g. above a bottom
+ * nav) without fighting this component's `data-placement` selectors over specificity.
+ */
+export type FabPlacement = 'bottom-end' | 'bottom-center' | 'bottom-start' | 'static' | 'fixed';
 
 export interface FabProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'prefix'> {
   /** The action glyph. Marked decorative (`aria-hidden`) when a `label` names the action. */
