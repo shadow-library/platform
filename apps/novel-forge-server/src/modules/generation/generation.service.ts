@@ -5,7 +5,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertActiveProject, declaredDraftFields, isFinalizable, markDescendantDraftsStale, renderBriefBody, renderChapterBrief, selectGenerationBatch } from '@server/common';
+import { assertAuthoringProject, declaredDraftFields, isFinalizable, markDescendantDraftsStale, renderBriefBody, renderChapterBrief, selectGenerationBatch } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -152,9 +152,9 @@ export class GenerationService {
   }
 
   private async assertActive(projectId: bigint): Promise<void> {
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { status: true } });
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { status: true, kind: true } });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    assertActiveProject(project);
+    assertAuthoringProject(project);
   }
 
   async plan(projectId: bigint, body: PlanBody): Promise<{ volumes: Plan.Volume[] }> {
@@ -163,7 +163,7 @@ export class GenerationService {
       this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
     ]);
     if (!project) throw AppErrorCode.PRJ_001.create();
-    assertActiveProject(project);
+    assertAuthoringProject(project);
 
     // Fresh (non-source) novels have no skeleton; a blank "Novel skeleton:" line makes weak models
     // treat the task as unanswerable and return an empty plan, so state the fallback explicitly.

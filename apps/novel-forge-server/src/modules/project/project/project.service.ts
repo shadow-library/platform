@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
@@ -25,6 +25,12 @@ import {
 } from './project.dto';
 
 const BIBLE_SECTIONS: Bible.Section[] = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
+
+const WORKFLOW_SWITCHES: Partial<Record<Project.Kind, Project.Kind[]>> = { curated: ['new_novel'], translation: ['curated'] };
+
+function assertLanguageMatchesKind(kind: Project.Kind, language: string | null | undefined): void {
+  if ((kind === 'translation') !== (language != null)) throw AppErrorCode.PRJ_006.create();
+}
 
 export interface CreateProjectOptions {
   /** Defaults to `active`; `seed` creates an Ideation Studio project with no blank bible documents. */
@@ -74,6 +80,8 @@ export class ProjectService {
   async create(body: CreateProjectBody, options?: CreateProjectOptions): Promise<Project.Presented> {
     const status = options?.status ?? 'active';
     this.logger.debug('create project', { name: body.name, kind: body.kind, contentMode: body.contentMode, status });
+    if (body.kind === 'curated') throw AppErrorCode.PRJ_005.create();
+    assertLanguageMatchesKind(body.kind, body.originalLanguage);
     await assertUnderProjectCap(this.db, this.ownerId());
 
     const [project] = await this.db
@@ -87,6 +95,7 @@ export class ProjectService {
         // Blank instructions stay null so the column means "use the default"; `present` fills it in.
         instructions: body.instructions?.trim() || null,
         contentMode: body.contentMode,
+        originalLanguage: body.originalLanguage,
       })
       .returning()
       .catch(err => this.databaseService.translateError(err));
@@ -165,6 +174,29 @@ export class ProjectService {
     return this.present(result);
   }
 
+  private async assertWorkflowSwitch(tx: PrimaryDatabase, project: Project.Row, kind: Project.Kind): Promise<void> {
+    if (!WORKFLOW_SWITCHES[project.kind]?.includes(kind)) throw AppErrorCode.PRJ_008.create();
+    if (project.kind !== 'translation') return;
+
+    const [row] = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.chapters)
+      .leftJoin(
+        schema.chapterTranslations,
+        and(eq(schema.chapterTranslations.projectId, schema.chapters.projectId), eq(schema.chapterTranslations.chapter, schema.chapters.number)),
+      )
+      .where(
+        and(
+          eq(schema.chapters.projectId, project.id),
+          isNotNull(schema.chapters.originalContent),
+          or(isNull(schema.chapterTranslations.id), ne(schema.chapterTranslations.status, 'finalized')),
+        ),
+      );
+
+    const count = row?.count ?? 0;
+    if (count > 0) throw AppErrorCode.PRJ_007.create({ count });
+  }
+
   async update(id: bigint, update: UpdateProjectBody): Promise<Project.Presented> {
     this.assertConfigModelsAllowed(update.config);
     const set: Record<string, unknown> = { ...update, updatedAt: new Date() };
@@ -176,15 +208,35 @@ export class ProjectService {
       set.instructions = trimmed && trimmed !== DEFAULT_WRITING_INSTRUCTIONS ? trimmed : null;
     }
 
-    const [result] = await this.db
-      .update(schema.projects)
-      .set(set)
-      .where(eq(schema.projects.id, id))
-      .returning()
-      .catch(err => this.databaseService.translateError(err));
+    return this.db.transaction(async rawTx => {
+      const tx = rawTx as unknown as PrimaryDatabase;
+      const project = await tx.query.projects.findFirst({ where: eq(schema.projects.id, id) });
+      if (!project) throw AppErrorCode.PRJ_001.create();
 
-    if (!result) throw AppErrorCode.PRJ_001.create();
-    return this.present(result);
+      const switchTo = update.kind && update.kind !== project.kind ? update.kind : undefined;
+      if (switchTo) await this.assertWorkflowSwitch(tx, project, switchTo);
+      if (update.originalLanguage !== undefined) assertLanguageMatchesKind(switchTo ?? project.kind, update.originalLanguage);
+
+      const [result] = await tx
+        .update(schema.projects)
+        .set(set)
+        .where(eq(schema.projects.id, id))
+        .returning()
+        .catch(err => this.databaseService.translateError(err));
+
+      if (!result) throw AppErrorCode.PRJ_001.create();
+
+      if (switchTo === 'new_novel') {
+        await tx
+          .insert(schema.bibleDocuments)
+          .values(BIBLE_SECTIONS.map(section => ({ projectId: id, section, slug: 'default' })))
+          .onConflictDoNothing()
+          .catch(err => this.databaseService.translateError(err));
+        this.logger.info('project switched to the authoring workflow', { projectId: id, from: project.kind });
+      }
+
+      return this.present(result);
+    });
   }
 
   async clone(id: bigint, body: CloneProjectBody): Promise<Project.Presented> {
@@ -206,6 +258,7 @@ export class ProjectService {
           name: body.name,
           kind: source.kind,
           title: source.title,
+          originalLanguage: source.originalLanguage,
           contentMode: body.contentMode ?? source.contentMode,
           config: body.config ?? source.config ?? null,
           skeletonCharacterArcs: source.skeletonCharacterArcs,
@@ -217,7 +270,7 @@ export class ProjectService {
       if (!newProject) throw AppErrorCode.S001.create();
 
       if (body.resetDerived !== false) {
-        if (source.kind === 'new_novel') {
+        if (source.kind !== 'source') {
           const [bibleDocs, entities, volumes] = await Promise.all([
             tx.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, id) }),
             tx.query.entities.findMany({ where: eq(schema.entities.projectId, id) }),

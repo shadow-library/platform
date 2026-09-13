@@ -26,6 +26,11 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PRJ_001 = AppErrorCode.notFound('PRJ_001', 'Project not found');
   static readonly PRJ_003 = AppErrorCode.badRequest('PRJ_003', 'Operation not valid for this project kind');
   static readonly PRJ_004 = AppErrorCode.conflict('PRJ_004', 'Project limit reached for this account — delete an existing project before creating another');
+  static readonly PRJ_005 = AppErrorCode.badRequest('PRJ_005', 'Curated projects are created by ingest or promotion');
+  static readonly PRJ_006 = AppErrorCode.badRequest('PRJ_006', 'originalLanguage is required for a translation project and cannot be set on any other kind');
+  static readonly PRJ_007 = AppErrorCode.conflict('PRJ_007', 'Cannot switch to curated while {count} chapter(s) are not finalized — finalize every translated chapter first');
+  static readonly PRJ_008 = AppErrorCode.badRequest('PRJ_008', 'Workflow switch not allowed — only curated to new_novel and translation to curated are supported');
+  static readonly PRJ_009 = AppErrorCode.badRequest('PRJ_009', 'Only original-novel or source projects run the authoring pipeline');
 
   /*!
    * Source Errors

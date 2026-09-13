@@ -79,7 +79,7 @@ describe.if(pgAvailable)('Curated ingest', () => {
   });
 
   describe('PUT /api/v1/ingest/novels/:sourceRef', () => {
-    it('should create the project, its bible placeholders and the imported metadata', async () => {
+    it('should create the curated project and the imported metadata without bible placeholders', async () => {
       const response = await ingest().mockRequest().put(`/api/v1/ingest/novels/${SOURCE_REF}`).body(NOVEL);
       expect(response.statusCode).toBe(201);
       expect(response.json()).toEqual({ projectId: expect.stringMatching(/^\d+$/), created: true });
@@ -88,7 +88,7 @@ describe.if(pgAvailable)('Curated ingest', () => {
       const project = await testEnv.getPostgresClient().query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
       expect(project).toMatchObject({
         ownerId: BigInt(TEST_USER.userId),
-        kind: 'new_novel',
+        kind: 'curated',
         status: 'active',
         name: NOVEL.title,
         title: NOVEL.title,
@@ -100,7 +100,7 @@ describe.if(pgAvailable)('Curated ingest', () => {
       expect(project?.themes).toEqual(['Magic']);
 
       const bible = await testEnv.getPostgresClient().select().from(schema.bibleDocuments).where(eq(schema.bibleDocuments.projectId, projectId));
-      expect(bible).toHaveLength(schema.bibleSection.enumValues.length);
+      expect(bible).toHaveLength(0);
     });
 
     it('should refuse a blank original author and land a padded one trimmed', async () => {
@@ -144,7 +144,7 @@ describe.if(pgAvailable)('Curated ingest', () => {
     });
 
     it('should mask a source reference held by another owner as absent', async () => {
-      await testEnv.getPostgresClient().insert(schema.projects).values({ ownerId: 99n, name: 'Theirs', kind: 'new_novel', sourceRef: 'mvlempyr:9999' });
+      await testEnv.getPostgresClient().insert(schema.projects).values({ ownerId: 99n, name: 'Theirs', kind: 'curated', sourceRef: 'mvlempyr:9999' });
 
       const response = await ingest().mockRequest().put('/api/v1/ingest/novels/mvlempyr:9999').body(NOVEL);
       expect(response.statusCode).toBe(404);

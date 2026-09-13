@@ -57,7 +57,7 @@ export class CuratedIngestService {
         .values({
           ownerId: this.owner(),
           name: body.title,
-          kind: 'new_novel' as const,
+          kind: 'curated' as const,
           title: body.title,
           brief: body.synopsis,
           themes: body.tags ?? null,
@@ -69,10 +69,6 @@ export class CuratedIngestService {
         .onConflictDoNothing({ target: schema.projects.sourceRef })
         .returning();
       if (!project) return null;
-
-      // Mirrors ProjectService.create and NovelImportService.import: a `new_novel` project is born with
-      // contentless `<section>/default` placeholder bible docs.
-      await tx.insert(schema.bibleDocuments).values(schema.bibleSection.enumValues.map(section => ({ projectId: project.id, section, slug: 'default' })));
       return project;
     });
 

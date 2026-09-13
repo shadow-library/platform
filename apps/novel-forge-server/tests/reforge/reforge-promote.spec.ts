@@ -92,7 +92,7 @@ describe.if(pgAvailable)('Reforge promotion', () => {
     expect(result).toMatchObject({ chapters: 2, volumes: 2, alreadyPromoted: false });
 
     const promoted = await db.query.projects.findFirst({ where: eq(schema.projects.id, result.projectId) });
-    expect(promoted).toMatchObject({ kind: 'new_novel', title: 'Ashes of Veldram', sourceProjectId: BigInt(projectId) });
+    expect(promoted).toMatchObject({ kind: 'curated', title: 'Ashes of Veldram', sourceProjectId: BigInt(projectId) });
     expect(await db.query.reforgePlans.findFirst({ where: eq(schema.reforgePlans.id, planId) })).toMatchObject({ promotedProjectId: result.projectId });
 
     const chapters = await db.query.chapters.findMany({ where: eq(schema.chapters.projectId, result.projectId) });
@@ -100,8 +100,8 @@ describe.if(pgAvailable)('Reforge promotion', () => {
     // Landed exactly like a `final`-mode import: numbered from 1, human-authored, locked, publishable.
     expect(chapters[0]).toMatchObject({ number: 1, title: 'Output 1', content: 'Prose of output 1.', status: 'done', generator: 'human', locked: true, wordCount: 4 });
 
-    // The bible placeholders and the seeded volumes make the promoted project immediately workable.
-    expect(await db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, result.projectId) })).toHaveLength(schema.bibleSection.enumValues.length);
+    // A curated project holds a finished manuscript and has no bible; the seeded volumes still index it.
+    expect(await db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, result.projectId) })).toHaveLength(0);
     const volumes = await db.query.volumes.findMany({ where: eq(schema.volumes.projectId, result.projectId) });
     expect(volumes).toMatchObject([
       { volumeKey: 'vol-1', title: 'The Gate Trials', startChapter: 1, endChapter: 1 },

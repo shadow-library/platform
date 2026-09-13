@@ -80,7 +80,7 @@ export class ReforgePromoteService {
         .values({
           ownerId: source.ownerId,
           name: title,
-          kind: 'new_novel',
+          kind: 'curated',
           title,
           brief: source.brief,
           premise: source.premise,
@@ -93,10 +93,6 @@ export class ReforgePromoteService {
         .catch(err => this.databaseService.translateError(err));
       if (!project) throw AppError.internal(`failed to create the promoted project for plan ${plan.id}`);
       if (project.coverImagePath) await trackUploadedCover(tx, project.id, project.coverImagePath, project.ownerId);
-
-      // Mirrors ProjectService.create: a `new_novel` project is born with contentless `<section>/default`
-      // placeholder bible docs, filled later by extraction or the chat hub like any imported final novel.
-      await tx.insert(schema.bibleDocuments).values(schema.bibleSection.enumValues.map(section => ({ projectId: project.id, section, slug: 'default' })));
       return project;
     });
 
