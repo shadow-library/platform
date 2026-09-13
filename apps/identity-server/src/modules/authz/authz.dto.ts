@@ -37,6 +37,18 @@ export class CatalogPermission {
 }
 
 @Schema()
+export class CatalogRoleBotGrant {
+  @Field({ minLength: 1, maxLength: 64, description: 'Resource an organisation admin sees the grant under, such as `projects`. Unique per level within the application.' })
+  resource: string;
+
+  @Field(() => String, { enum: ['read', 'write'], description: '`write` implies `read`: a write role must carry every permission of the read role on the same resource.' })
+  level: 'read' | 'write';
+
+  @Field(() => Boolean, { optional: true, description: 'Flags the grant as sensitive to organisation admins, as for spend-incurring actions. Defaults to false.' })
+  sensitive?: boolean;
+}
+
+@Schema()
 export class CatalogRole {
   @Field({ maxLength: 255 })
   name: string;
@@ -52,6 +64,13 @@ export class CatalogRole {
     description: 'When true, every signed-in application user implicitly holds this role without an assignment.',
   })
   default?: boolean;
+
+  @Field(() => CatalogRoleBotGrant, {
+    optional: true,
+    description:
+      'Makes the role grantable to organisation bots. Sensitivity belongs to this block, not to the role: omitting the block on a later sync revokes bot grantability and resets the resource, level and sensitivity together. A role carrying no permissions may not declare one.',
+  })
+  bot?: CatalogRoleBotGrant;
 }
 
 @Schema()

@@ -58,3 +58,21 @@ export const IDENTITY_BOT_ROLES: readonly BotRoleDefinition[] = [
 ];
 
 export const BOT_KEY_EXCHANGE_LIMIT_PER_MINUTE = 60;
+
+export const BOT_AUDIT_ACTIONS = [
+  'bot.created',
+  'bot.updated',
+  'bot.suspended',
+  'bot.resumed',
+  'bot.permissions.changed',
+  'bot.key.created',
+  'bot.key.revoked',
+  'bot.key.expired',
+  'bot.key.used',
+  'bot.key.exchange_denied',
+  'bot.deletion.requested',
+  'bot.ownership.transferred',
+  'bot.deleted',
+] as const;
+
+export type BotAuditAction = (typeof BOT_AUDIT_ACTIONS)[number];

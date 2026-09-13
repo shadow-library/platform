@@ -1,11 +1,25 @@
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 import { Auth, Context } from '@server/modules/access';
 import { OrganisationActionResponse, OrganisationIdParams } from '@server/modules/identity/organisation/organisation.dto';
 
+import { type BotActivityPage, BotActivityService } from './bot-activity.service';
 import { BotKeyService, type BotKeySummary, type CreatedBotKey } from './bot-key.service';
-import { BotItem, BotKeyParams, BotKeysResponse, BotParams, BotsResponse, CreateBotBody, CreateBotKeyBody, CreatedBotKeyResponse, UpdateBotBody } from './bot.dto';
-import { type BotActor, type BotListing, BotService, type BotSummary } from './bot.service';
+import {
+  BotActivityQuery,
+  BotActivityResponse,
+  BotItem,
+  BotKeyParams,
+  BotKeysResponse,
+  BotParams,
+  BotsResponse,
+  CreateBotBody,
+  CreateBotKeyBody,
+  CreatedBotKeyResponse,
+  UpdateBotBody,
+} from './bot.dto';
+import { type BotListing, BotService, type BotSummary } from './bot.service';
+import { type BotActor } from './bot.types';
 
 @HttpController('/api/v1/organisations/:organisationId/bots')
 @Auth({ orgRole: 'ADMIN' })
@@ -13,6 +27,7 @@ export class BotController {
   constructor(
     private readonly botService: BotService,
     private readonly botKeyService: BotKeyService,
+    private readonly botActivityService: BotActivityService,
   ) {}
 
   private actor(): BotActor {
@@ -63,6 +78,12 @@ export class BotController {
   async resumeBot(@Params() params: BotParams): Promise<OrganisationActionResponse> {
     await this.botService.resumeBot(this.actor(), params.organisationId, params.botId);
     return { success: true };
+  }
+
+  @Get('/:botId/activity')
+  @RespondFor(200, BotActivityResponse)
+  listActivity(@Params() params: BotParams, @Query() query: BotActivityQuery): Promise<BotActivityPage> {
+    return this.botActivityService.listActivity(params.organisationId, params.botId, query);
   }
 
   @Get('/:botId/keys')

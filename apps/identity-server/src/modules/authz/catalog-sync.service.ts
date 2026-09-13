@@ -5,7 +5,7 @@ import { Logger } from '@shadow-library/common';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { AuditService } from '@server/modules/infrastructure/audit';
-import { DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { type Application, DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationService } from '@server/modules/system/application';
 
 import { PolicyDecisionService, type Principal } from './policy-decision.service';
@@ -15,12 +15,29 @@ interface CatalogPermission {
   description?: string;
 }
 
+interface CatalogBotGrant {
+  resource: string;
+  level: Application.BotGrantLevel;
+  sensitive?: boolean;
+}
+
 interface CatalogRole {
   name: string;
   description?: string;
   permissions: string[];
   default?: boolean;
+  bot?: CatalogBotGrant;
 }
+
+interface BotGrantColumns {
+  botGrantable: boolean;
+  botResource: string | null;
+  botLevel: Application.BotGrantLevel | null;
+  isSensitive: boolean;
+}
+
+const BOT_GRANT_LEVELS: readonly Application.BotGrantLevel[] = ['read', 'write'];
+const MAX_BOT_RESOURCE_LENGTH = 64;
 
 export interface CatalogManifest {
   permissions: CatalogPermission[];
@@ -111,6 +128,38 @@ export class CatalogSyncService {
     throw AppErrorCode.AUTHZ_004.create();
   }
 
+  /**
+   * The SDK refuses these shapes before pushing, but this endpoint accepts raw HTTP from any application's
+   * service token, so it is the trust boundary and repeats every check: one role per (resource, level) so an
+   * admin's resource × level choice resolves to exactly one grant; no permission-less grant, which would be
+   * held vacuously by every admin and so bypass the BOT_005 ceiling; and `write` carrying everything `read`
+   * carries, so choosing the higher level never drops access.
+   */
+  private assertValidBotGrants(roles: CatalogRole[]): void {
+    const grants = new Map<string, Partial<Record<Application.BotGrantLevel, CatalogRole>>>();
+    for (const role of roles) {
+      const bot = role.bot;
+      if (!bot) continue;
+      if (bot.resource.trim() !== bot.resource || bot.resource.length === 0 || bot.resource.length > MAX_BOT_RESOURCE_LENGTH) throw AppErrorCode.AUTHZ_001.create();
+      if (!BOT_GRANT_LEVELS.includes(bot.level)) throw AppErrorCode.AUTHZ_001.create();
+      if (role.permissions.length === 0) throw AppErrorCode.AUTHZ_001.create();
+
+      const levels = grants.get(bot.resource) ?? {};
+      if (levels[bot.level]) throw AppErrorCode.AUTHZ_001.create();
+      grants.set(bot.resource, { ...levels, [bot.level]: role });
+    }
+
+    for (const { read, write } of grants.values()) {
+      if (!read || !write) continue;
+      if (!read.permissions.every(permission => write.permissions.includes(permission))) throw AppErrorCode.AUTHZ_001.create();
+    }
+  }
+
+  private botColumnsOf(role: CatalogRole): BotGrantColumns {
+    if (!role.bot) return { botGrantable: false, botResource: null, botLevel: null, isSensitive: false };
+    return { botGrantable: true, botResource: role.bot.resource, botLevel: role.bot.level, isSensitive: role.bot.sensitive ?? false };
+  }
+
   async sync(actorClientId: string, manifest: CatalogManifest): Promise<CatalogSyncResult> {
     const applicationId = await this.resolveApplicationId(actorClientId);
     const permissionNames = new Set(manifest.permissions.map(permission => permission.name));
@@ -118,6 +167,7 @@ export class CatalogSyncService {
     const roleNames = new Set(manifest.roles.map(role => role.name));
     if (roleNames.size !== manifest.roles.length) throw AppErrorCode.AUTHZ_001.create();
     for (const role of manifest.roles) for (const permission of role.permissions) if (!permissionNames.has(permission)) throw AppErrorCode.AUTHZ_001.create();
+    this.assertValidBotGrants(manifest.roles);
 
     await this.assertDeletionAllowed(applicationId, actorClientId, manifest, { permissions: permissionNames, roles: roleNames });
 
@@ -141,14 +191,13 @@ export class CatalogSyncService {
         : eq(schema.permissions.applicationId, applicationId);
       const deletedPermissions = await tx.delete(schema.permissions).where(permissionScope).returning({ id: schema.permissions.id });
 
-      for (const role of manifest.roles)
+      for (const role of manifest.roles) {
+        const columns = { description: role.description ?? null, isDefault: role.default ?? false, ...this.botColumnsOf(role) };
         await tx
           .insert(schema.applicationRoles)
-          .values({ applicationId, roleName: role.name, description: role.description ?? null, isDefault: role.default ?? false })
-          .onConflictDoUpdate({
-            target: [schema.applicationRoles.applicationId, schema.applicationRoles.roleName],
-            set: { description: role.description ?? null, isDefault: role.default ?? false, updatedAt: new Date() },
-          });
+          .values({ applicationId, roleName: role.name, ...columns })
+          .onConflictDoUpdate({ target: [schema.applicationRoles.applicationId, schema.applicationRoles.roleName], set: { ...columns, updatedAt: new Date() } });
+      }
 
       const roleScope = roleNames.size
         ? and(eq(schema.applicationRoles.applicationId, applicationId), notInArray(schema.applicationRoles.roleName, [...roleNames]))

@@ -6,23 +6,18 @@ import { Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
+import { PolicyDecisionService } from '@server/modules/authz';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { type Bot, DatabaseService, type PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationService } from '@server/modules/system/application';
 
 import { generateBotClientId } from './bot-key.util';
+import { assertOrganisationActive, findBot, findManageableBot, MANAGEABLE_BOT_STATUSES } from './bot-lookup.util';
+import { type BotGrantInput, BotPermissionService } from './bot-permission.service';
+import { type BotUserRefLookup, resolveUserRefs } from './bot-user-ref.util';
 import { BOT_ACCESS_TOKEN_TTL_SECONDS } from './bot.constants';
+import { type BotActor, type BotUserRef } from './bot.types';
 import { normaliseIpAllowlist } from './ip-allowlist.util';
-
-export interface BotActor {
-  userId: bigint;
-  ip?: string;
-}
-
-export interface BotUserRef {
-  id: bigint;
-  displayName: string | null;
-}
 
 export interface BotSummary {
   id: bigint;
@@ -60,6 +55,7 @@ export interface CreateBot {
   description?: string;
   ipAllowlist?: string[];
   rateLimitPerMinute?: number;
+  grants?: BotGrantInput[];
 }
 
 export interface UpdateBot {
@@ -81,7 +77,6 @@ type BotChanges = Partial<Pick<Bot, 'displayName' | 'description' | 'ipAllowlist
 export const MAX_BOTS_PER_ORGANISATION = 25;
 export const MAX_BOT_RATE_LIMIT_PER_MINUTE = 600;
 
-const MANAGEABLE_STATUSES: Bot.Status[] = ['ACTIVE', 'SUSPENDED'];
 const EMPTY_KEY_STATS: KeyStats = { activeKeyCount: 0, lastUsedAt: null, lastUsedIp: null, nextKeyExpiresAt: null };
 
 @Injectable()
@@ -93,6 +88,8 @@ export class BotService {
     private readonly databaseService: DatabaseService,
     private readonly applicationService: ApplicationService,
     private readonly auditService: AuditService,
+    private readonly botPermissionService: BotPermissionService,
+    private readonly policyDecisionService: PolicyDecisionService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -115,8 +112,9 @@ export class BotService {
   async createBot(actor: BotActor, organisationId: bigint, input: CreateBot): Promise<BotSummary> {
     const ipAllowlist = normaliseIpAllowlist(input.ipAllowlist ?? []);
     const platformApplication = this.applicationService.getApplicationOrThrow(APP_NAME);
+    const grants = await this.botPermissionService.prepareGrants(organisationId, input.grants ?? []);
 
-    const bot = await this.db.transaction(async tx => {
+    const { bot, granted } = await this.db.transaction(async tx => {
       // Serialises concurrent creates so two cannot both pass the limit check; NO KEY UPDATE leaves FK inserts elsewhere in the organisation unblocked.
       const [organisation] = await tx
         .select({ type: schema.organisations.type, status: schema.organisations.status })
@@ -160,10 +158,13 @@ export class BotService {
         .returning()
         .catch(error => this.databaseService.translateError(error));
       assert(created, 'Bot insertion returned no row');
-      return created;
+
+      const granted = await this.botPermissionService.grantInTransaction(tx, actor, created, grants);
+      return { bot: created, granted };
     });
 
     await this.record(actor, bot, 'bot.created', { handle: bot.handle, clientId: bot.clientId, ipAllowlist: bot.ipAllowlist, rateLimitPerMinute: bot.rateLimitPerMinute });
+    await this.botPermissionService.announceChange(actor, bot, { added: granted, removed: [] });
     this.logger.info('created organisation bot', { organisationId: organisationId.toString(), botId: bot.id.toString(), clientId: bot.clientId });
     return this.getBot(organisationId, bot.id);
   }
@@ -177,14 +178,14 @@ export class BotService {
 
     const fields = Object.keys(changes);
     if (fields.length === 0) {
-      await this.requireManageableBot(organisationId, botId);
+      await findManageableBot(this.db, organisationId, botId);
       return;
     }
 
     const [updated] = await this.db
       .update(schema.bots)
       .set({ ...changes, updatedAt: new Date() })
-      .where(and(this.ownedBy(organisationId, botId), inArray(schema.bots.status, MANAGEABLE_STATUSES), this.organisationIsActive()))
+      .where(and(this.ownedBy(organisationId, botId), inArray(schema.bots.status, MANAGEABLE_BOT_STATUSES), this.organisationIsActive()))
       .returning();
     if (!updated) return this.throwUnavailable(organisationId, botId);
 
@@ -195,34 +196,24 @@ export class BotService {
   async suspendBot(actor: BotActor, organisationId: bigint, botId: bigint): Promise<void> {
     const now = new Date();
     const suspended = await this.transition(organisationId, botId, 'ACTIVE', { status: 'SUSPENDED', suspendedAt: now, suspendedBy: actor.userId, updatedAt: now }, false, false);
+    await this.policyDecisionService.invalidatePrincipal({ type: 'SERVICE_ACCOUNT', id: suspended.clientId });
     await this.record(actor, suspended, 'bot.suspended');
     this.logger.info('suspended organisation bot', { organisationId: organisationId.toString(), botId: botId.toString() });
   }
 
   async resumeBot(actor: BotActor, organisationId: bigint, botId: bigint): Promise<void> {
     const resumed = await this.transition(organisationId, botId, 'SUSPENDED', { status: 'ACTIVE', suspendedAt: null, suspendedBy: null, updatedAt: new Date() }, true, true);
+    await this.policyDecisionService.invalidatePrincipal({ type: 'SERVICE_ACCOUNT', id: resumed.clientId });
     await this.record(actor, resumed, 'bot.resumed');
     this.logger.info('resumed organisation bot', { organisationId: organisationId.toString(), botId: botId.toString() });
   }
 
-  async requireBot(organisationId: bigint, botId: bigint): Promise<Bot> {
-    const bot = await this.db.query.bots.findFirst({ where: and(this.ownedBy(organisationId, botId), ne(schema.bots.status, 'DELETED')) });
-    if (!bot) throw AppErrorCode.BOT_009.create();
-    return bot;
+  requireBot(organisationId: bigint, botId: bigint): Promise<Bot> {
+    return findBot(this.db, organisationId, botId);
   }
 
-  async userRefResolver(userIds: (bigint | null)[]): Promise<(id: bigint | null) => BotUserRef | null> {
-    const ids = [...new Set(userIds.filter((id): id is bigint => id !== null))];
-    const profiles =
-      ids.length === 0
-        ? []
-        : await this.db.query.userProfiles.findMany({
-            where: inArray(schema.userProfiles.userId, ids),
-            columns: { userId: true, displayName: true, firstName: true, lastName: true },
-          });
-    const names = new Map(profiles.map(profile => [profile.userId, profile.displayName ?? ([profile.firstName, profile.lastName].filter(Boolean).join(' ') || null)]));
-    // The fastify response transformer mutates a structuredClone that preserves aliasing, so a shared ref instance fails serialisation the second time it is visited.
-    return id => (id === null ? null : { id, displayName: names.get(id) ?? null });
+  userRefResolver(userIds: (bigint | null)[]): Promise<BotUserRefLookup> {
+    return resolveUserRefs(this.db, userIds);
   }
 
   record(actor: BotActor, bot: Pick<Bot, 'id' | 'organisationId'>, action: string, detail?: Record<string, unknown>): Promise<unknown> {
@@ -243,11 +234,6 @@ export class BotService {
     return and(eq(schema.bots.id, botId), eq(schema.bots.organisationId, organisationId));
   }
 
-  private async assertOrganisationActive(organisationId: bigint): Promise<void> {
-    const organisation = await this.db.query.organisations.findFirst({ where: eq(schema.organisations.id, organisationId), columns: { status: true } });
-    if (organisation?.status !== 'ACTIVE') throw AppErrorCode.BOT_013.create();
-  }
-
   private organisationIsActive() {
     const activeOrganisation = this.db
       .select({ id: schema.organisations.id })
@@ -256,17 +242,10 @@ export class BotService {
     return exists(activeOrganisation);
   }
 
-  private async requireManageableBot(organisationId: bigint, botId: bigint): Promise<Bot> {
-    const bot = await this.requireBot(organisationId, botId);
-    if (!MANAGEABLE_STATUSES.includes(bot.status)) throw AppErrorCode.BOT_010.create();
-    await this.assertOrganisationActive(organisationId);
-    return bot;
-  }
-
   private async throwUnavailable(organisationId: bigint, botId: bigint, from?: Bot.Status): Promise<never> {
     const bot = await this.requireBot(organisationId, botId);
-    const statusAllows = from === undefined ? MANAGEABLE_STATUSES.includes(bot.status) : bot.status === from;
-    if (statusAllows) await this.assertOrganisationActive(organisationId);
+    const statusAllows = from === undefined ? MANAGEABLE_BOT_STATUSES.includes(bot.status) : bot.status === from;
+    if (statusAllows) await assertOrganisationActive(this.db, organisationId);
     throw AppErrorCode.BOT_010.create();
   }
 

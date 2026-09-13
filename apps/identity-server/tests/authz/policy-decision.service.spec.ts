@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { AccessTokenService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService } from '@server/modules/authz';
+import { BotService } from '@server/modules/identity/bot';
+import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
 
@@ -103,5 +105,60 @@ describe('PolicyDecisionService', () => {
     await pdp.revokeRole(principal(), roleId, orgId);
     const decision = await pdp.check({ principal: principal(), organisationId: orgId, action: 'posts:write' });
     expect(decision.decision).toBe('DENY');
+  });
+
+  describe('bot principals', () => {
+    let botOrgId: string;
+    let botClientId: string;
+    let botId: bigint;
+
+    beforeEach(async () => {
+      const organisations = env.getService(OrganisationService);
+      const ownerId = (await env.getService(UserService).createUserWithPassword({ email: 'bot-owner@example.com', password: 'Password@123', status: 'ACTIVE' })).id;
+      botOrgId = (await organisations.createTeam(ownerId, { name: 'Acme' })).id.toString();
+
+      const bot = await env.getService(BotService).createBot({ userId: ownerId }, BigInt(botOrgId), { handle: 'release-notes', displayName: 'Release notes' });
+      botClientId = bot.clientId;
+      botId = bot.id;
+      await pdp.assignRole({ type: 'SERVICE_ACCOUNT', id: botClientId }, roleId, botOrgId);
+    });
+
+    const check = () => pdp.check({ principal: { type: 'SERVICE_ACCOUNT', id: botClientId }, organisationId: botOrgId, action: 'posts:write' });
+
+    it('should permit an active bot holding the role', async () => {
+      expect((await check()).decision).toBe('PERMIT');
+    });
+
+    it('should deny a suspended bot regardless of its grants', async () => {
+      await env.getService(BotService).suspendBot({ userId: 1n }, BigInt(botOrgId), botId);
+      const decision = await check();
+      expect(decision.decision).toBe('DENY');
+      expect(decision.reasons).toEqual(['the bot is not active']);
+    });
+
+    it('should deny every bot of an organisation that is no longer active', async () => {
+      await env.getService(OrganisationService).softDelete(BigInt(botOrgId));
+      const decision = await check();
+      expect(decision.decision).toBe('DENY');
+      expect(decision.reasons).toEqual(['the organisation is not active']);
+    });
+
+    it('should deny a bot asked about another organisation', async () => {
+      const decision = await pdp.check({ principal: { type: 'SERVICE_ACCOUNT', id: botClientId }, organisationId: orgId, action: 'posts:write' });
+      expect(decision.decision).toBe('DENY');
+      expect(decision.reasons).toEqual(['the bot belongs to another organisation']);
+    });
+
+    it('should leave a service account that backs no bot untouched', async () => {
+      const decision = await pdp.check({ principal: { type: 'SERVICE_ACCOUNT', id: 'identity-server' }, organisationId: orgId, action: 'posts:write' });
+      expect(decision.reasons).toEqual(['no assigned role grants this permission']);
+    });
+
+    /** The client id is bot-shaped, so it passes the regex gate and the lookup must be what clears it. */
+    it('should leave a bot-shaped client id with no bot row untouched', async () => {
+      const decision = await pdp.check({ principal: { type: 'SERVICE_ACCOUNT', id: 'bot_0123456789abcdefghijkl' }, organisationId: orgId, action: 'posts:write' });
+      expect(decision.decision).toBe('DENY');
+      expect(decision.reasons).toEqual(['no assigned role grants this permission']);
+    });
   });
 });

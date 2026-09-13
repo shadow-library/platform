@@ -9,7 +9,8 @@ import { APP_NAME, REGEX } from '@server/constants';
 import { type Bot, DatabaseService, type PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
 import { generateBotKey } from './bot-key.util';
-import { type BotActor, BotService, type BotUserRef } from './bot.service';
+import { BotService } from './bot.service';
+import { type BotActor, type BotUserRef } from './bot.types';
 
 export type BotKeyStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED';
 

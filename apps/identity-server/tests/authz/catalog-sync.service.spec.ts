@@ -10,9 +10,15 @@ import { TestEnvironment } from '../test-environment';
 
 const env = new TestEnvironment('catalog-sync').init();
 
+interface BotGrant {
+  resource: string;
+  level: 'read' | 'write';
+  sensitive?: boolean;
+}
+
 interface Manifest {
   permissions: { name: string; description?: string }[];
-  roles: { name: string; description?: string; permissions: string[] }[];
+  roles: { name: string; description?: string; permissions: string[]; bot?: BotGrant }[];
   force?: boolean;
 }
 
@@ -100,6 +106,94 @@ describe('CatalogSyncService', () => {
     await sync.sync(clientId, manifest());
     await sync.sync(clientId, { permissions: [], roles: [], force: true });
     expect(applications.getApplicationOrThrow('shadow-identity').roles.length).toBe(seeded);
+  });
+
+  describe('bot grant metadata', () => {
+    const roleNamed = (name: string) => applications.getApplicationByIdOrThrow(applicationId).roles.find(role => role.roleName === name);
+
+    const withBot = (bot?: BotGrant): Manifest => manifest([{ name: 'editor', permissions: ['posts:write'], ...(bot ? { bot } : {}) }]);
+
+    it('should populate the bot columns a role declares', async () => {
+      await sync.sync(clientId, withBot({ resource: 'posts', level: 'write', sensitive: true }));
+      expect(roleNamed('editor')).toMatchObject({ botGrantable: true, botResource: 'posts', botLevel: 'write', isSensitive: true });
+    });
+
+    it('should default sensitivity to false', async () => {
+      await sync.sync(clientId, withBot({ resource: 'posts', level: 'read' }));
+      expect(roleNamed('editor')).toMatchObject({ botGrantable: true, isSensitive: false });
+    });
+
+    it('should reset the bot columns when a later manifest drops the declaration', async () => {
+      await sync.sync(clientId, withBot({ resource: 'posts', level: 'write', sensitive: true }));
+      await sync.sync(clientId, withBot());
+      expect(roleNamed('editor')).toMatchObject({ botGrantable: false, botResource: null, botLevel: null, isSensitive: false });
+    });
+
+    it('should reject an empty, padded or over-long resource', async () => {
+      await expect(sync.sync(clientId, withBot({ resource: '', level: 'read' }))).rejects.toThrow();
+      await expect(sync.sync(clientId, withBot({ resource: ' posts ', level: 'read' }))).rejects.toThrow();
+      await expect(sync.sync(clientId, withBot({ resource: 'p'.repeat(65), level: 'read' }))).rejects.toThrow();
+    });
+
+    it('should reject an unknown level', async () => {
+      await expect(sync.sync(clientId, withBot({ resource: 'posts', level: 'admin' as 'read' }))).rejects.toThrow();
+    });
+
+    it('should reject a bot grant on a role carrying no permissions', async () => {
+      const roles: Manifest['roles'] = [{ name: 'empty', permissions: [], bot: { resource: 'posts', level: 'read' } }];
+      await expect(sync.sync(clientId, manifest(roles))).rejects.toThrow();
+      expect(roleNamed('empty')).toBeUndefined();
+    });
+
+    it('should allow a permission-less role that declares no bot grant', async () => {
+      await sync.sync(
+        clientId,
+        manifest([
+          { name: 'editor', permissions: ['posts:write'] },
+          { name: 'empty', permissions: [] },
+        ]),
+      );
+      expect(roleNamed('empty')).toMatchObject({ botGrantable: false });
+    });
+
+    it('should reject a write grant that does not carry the read grant’s permissions', async () => {
+      const roles: Manifest['roles'] = [
+        { name: 'reader', permissions: ['posts:write', 'posts:delete'], bot: { resource: 'posts', level: 'read' } },
+        { name: 'writer', permissions: ['posts:write'], bot: { resource: 'posts', level: 'write' } },
+      ];
+      await expect(sync.sync(clientId, manifest(roles))).rejects.toThrow();
+      expect(roleNamed('reader')).toBeUndefined();
+    });
+
+    it('should accept a write grant that is a superset of the read grant', async () => {
+      const roles: Manifest['roles'] = [
+        { name: 'reader', permissions: ['posts:write'], bot: { resource: 'posts', level: 'read' } },
+        { name: 'writer', permissions: ['posts:write', 'posts:delete'], bot: { resource: 'posts', level: 'write' } },
+      ];
+      await sync.sync(clientId, manifest(roles));
+      expect(roleNamed('writer')).toMatchObject({ botGrantable: true, botLevel: 'write' });
+    });
+
+    it('should reject two roles claiming the same resource and level', async () => {
+      const roles: Manifest['roles'] = [
+        { name: 'editor', permissions: ['posts:write'], bot: { resource: 'posts', level: 'write' } },
+        { name: 'publisher', permissions: ['posts:write'], bot: { resource: 'posts', level: 'write' } },
+      ];
+      await expect(sync.sync(clientId, manifest(roles))).rejects.toThrow();
+    });
+
+    it('should leave the seeded shadow-identity bot roles untouched', async () => {
+      const before = applications.getApplicationOrThrow('shadow-identity').roles.filter(role => role.botGrantable);
+      expect(before.length).toBeGreaterThan(0);
+
+      await sync.sync(clientId, withBot({ resource: 'members', level: 'write' }));
+      await sync.sync(clientId, { permissions: [], roles: [], force: true });
+
+      const after = applications.getApplicationOrThrow('shadow-identity').roles.filter(role => role.botGrantable);
+      expect(after.map(role => `${role.roleName}:${role.botResource}:${role.botLevel}`).sort()).toEqual(
+        before.map(role => `${role.roleName}:${role.botResource}:${role.botLevel}`).sort(),
+      );
+    });
   });
 
   describe('deletion guardrail', () => {

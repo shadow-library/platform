@@ -2,12 +2,19 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
 import { PATTERN } from '@server/constants';
+import { type AuditEvent } from '@server/modules/infrastructure/datastore';
+
+import { BOT_AUDIT_ACTIONS, type BotAuditAction } from './bot.constants';
 
 const BOT_STATUSES = ['ACTIVE', 'SUSPENDED', 'DELETING', 'DELETED'] as const;
 const BOT_KEY_STATUSES = ['ACTIVE', 'EXPIRED', 'REVOKED'] as const;
+const BOT_GRANT_LEVELS = ['read', 'write'] as const;
+const AUDIT_OUTCOMES = ['SUCCESS', 'DENIED', 'FAILURE'] as const;
+const AUDIT_ACTOR_TYPES = ['USER', 'SERVICE_ACCOUNT', 'SYSTEM', 'ADMIN'] as const;
 
 type BotStatus = (typeof BOT_STATUSES)[number];
 type BotKeyStatus = (typeof BOT_KEY_STATUSES)[number];
+type BotGrantLevel = (typeof BOT_GRANT_LEVELS)[number];
 
 @Schema()
 export class BotParams {
@@ -24,6 +31,28 @@ export class BotParams {
 export class BotKeyParams extends BotParams {
   @Field({ ...PATTERN.UUID })
   keyId: string;
+}
+
+@Schema()
+export class BotGrantBody {
+  @Field(() => Integer, { minimum: 1, description: 'Application the grant belongs to, as listed by the bot permission catalog.' })
+  applicationId: number;
+
+  @Field({ minLength: 1, maxLength: 64, description: 'Resource the application declares the grant under, such as `members`.' })
+  resource: string;
+
+  @Field(() => String, { enum: [...BOT_GRANT_LEVELS], description: '`write` implies `read`; send one level per resource.' })
+  level: BotGrantLevel;
+}
+
+@Schema()
+export class ReplaceBotPermissionsBody {
+  @Field(() => [BotGrantBody], {
+    maxItems: 100,
+    description:
+      'The full desired set of grants, identified by application, resource and level. Every grant made here that the set omits is revoked — including one whose role has since stopped being bot-grantable, which no set can name and which is therefore always revoked by the next write. Assignments applied by platform staff are never touched. Every entry is re-validated server-side.',
+  })
+  grants: BotGrantBody[];
 }
 
 @Schema()
@@ -51,6 +80,13 @@ export class CreateBotBody {
 
   @Field(() => Integer, { optional: true, minimum: 1, maximum: 600, description: 'Requests per minute each app accepts from the bot. Defaults to 600, which is also the ceiling.' })
   rateLimitPerMinute?: number;
+
+  @Field(() => [BotGrantBody], {
+    optional: true,
+    maxItems: 100,
+    description: 'Grants to apply in the same transaction as the creation, validated exactly as the permissions endpoint validates them.',
+  })
+  grants?: BotGrantBody[];
 }
 
 @Schema()
@@ -220,4 +256,205 @@ export class BotKeysResponse {
 export class CreatedBotKeyResponse extends BotKeyItem {
   @Field({ description: 'The full key, returned exactly once; only a SHA-256 hash of its secret is stored.' })
   key: string;
+}
+
+@Schema()
+export class BotCatalogLevelItem {
+  @Field(() => Integer, { description: 'Application role backing this level; grants are still requested by resource and level.' })
+  roleId: number;
+
+  @Field()
+  roleName: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  description?: string;
+
+  @Field(() => String, { enum: [...BOT_GRANT_LEVELS] })
+  level: BotGrantLevel;
+
+  @Field(() => Boolean, { description: 'The application flags this grant as sensitive, such as a spend-incurring action.' })
+  sensitive: boolean;
+
+  @Field(() => Boolean, { description: 'The role is declared bot-grantable by an application this organisation reaches. Only eligible grants are catalogued.' })
+  eligible: boolean;
+
+  @Field(() => Boolean, { description: 'You hold this permission in the organisation and may therefore grant it. Advisory only — the server re-checks it on every write.' })
+  heldByYou: boolean;
+}
+
+@Schema()
+export class BotCatalogResourceItem {
+  @Field()
+  resource: string;
+
+  @Field(() => [BotCatalogLevelItem], { description: 'Ordered read before write.' })
+  levels: BotCatalogLevelItem[];
+}
+
+@Schema()
+export class BotCatalogApplicationItem {
+  @Field(() => Integer)
+  applicationId: number;
+
+  @Field()
+  name: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  displayName?: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  logoUrl?: string;
+
+  @Field(() => [BotCatalogResourceItem])
+  resources: BotCatalogResourceItem[];
+}
+
+@Schema()
+export class BotPermissionCatalogResponse {
+  @Field(() => [BotCatalogApplicationItem], { description: 'Applications this organisation can reach that declare bot-grantable roles, ordered by application name.' })
+  applications: BotCatalogApplicationItem[];
+}
+
+@Schema()
+export class BotGrantItem {
+  @Field(() => Integer)
+  roleId: number;
+
+  @Field()
+  roleName: string;
+
+  @Field(() => Integer)
+  applicationId: number;
+
+  @Field()
+  application: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  applicationDisplayName?: string;
+
+  @Field(() => String, { optional: true, description: 'Absent once the application stops declaring the role bot-grantable; the next permissions write drops such a grant.' })
+  @Transform('strip:null')
+  resource?: string;
+
+  @Field(() => String, { optional: true, enum: [...BOT_GRANT_LEVELS] })
+  @Transform('strip:null')
+  level?: BotGrantLevel;
+
+  @Field(() => Boolean)
+  sensitive: boolean;
+
+  @Field(() => Boolean, { description: 'The role is still declared bot-grantable by its application.' })
+  eligible: boolean;
+
+  @Field()
+  grantedAt: string;
+
+  @Field(() => BotUserItem, { optional: true })
+  @Transform('strip:null')
+  grantedBy?: BotUserItem;
+
+  @Field(() => Boolean, { description: 'False when the granting administrator no longer holds this permission. The grant stays in force until an admin removes it.' })
+  granterHoldsPermission: boolean;
+
+  @Field(() => Boolean, {
+    description:
+      'This grant was made here and a permissions write can change it. False for an assignment applied by platform staff, shown for transparency but never altered by a write here.',
+  })
+  managed: boolean;
+}
+
+@Schema()
+export class BotPermissionsResponse {
+  @Field(() => [BotGrantItem])
+  grants: BotGrantItem[];
+}
+
+@Schema()
+export class BotActivityQuery {
+  @Field(() => Integer, { default: 25, minimum: 1, maximum: 100 })
+  limit: number;
+
+  @Field({ optional: true, maxLength: 128, description: 'Opaque cursor from a previous page; omit for the newest events.' })
+  cursor?: string;
+
+  @Field(() => String, { optional: true, enum: [...BOT_AUDIT_ACTIONS] })
+  action?: BotAuditAction;
+
+  @Field(() => String, { optional: true, enum: [...AUDIT_OUTCOMES] })
+  outcome?: AuditEvent.Outcome;
+}
+
+@Schema()
+export class BotActivityDetailItem {
+  @Field(() => String, { optional: true, description: 'Why a key exchange was refused, such as `ip_not_allowed`.' })
+  @Transform('strip:null')
+  reason?: string;
+
+  @Field(() => String, { optional: true, description: '`exchange` for a resource server swapping the key for a token, `direct` for a call to identity itself.' })
+  @Transform('strip:null')
+  purpose?: string;
+
+  @Field(() => [String], { optional: true, description: 'Bot fields the update changed.' })
+  @Transform('strip:null')
+  fields?: string[];
+
+  @Field(() => [String], { optional: true, description: 'Grants added, each `<application>:<resource>:<level>`.' })
+  @Transform('strip:null')
+  added?: string[];
+
+  @Field(() => [String], { optional: true, description: 'Grants removed, each `<application>:<resource>:<level>`.' })
+  @Transform('strip:null')
+  removed?: string[];
+}
+
+@Schema()
+export class BotActivityItem {
+  @Field()
+  id: string;
+
+  @Field()
+  occurredAt: string;
+
+  @Field()
+  action: string;
+
+  @Field(() => String, { enum: [...AUDIT_OUTCOMES] })
+  outcome: AuditEvent.Outcome;
+
+  @Field(() => String, { enum: [...AUDIT_ACTOR_TYPES] })
+  actorType: AuditEvent.ActorType;
+
+  @Field(() => BotUserItem, { optional: true, description: 'Present when a person acted; a bot acting on its own key is identified by the key instead.' })
+  @Transform('strip:null')
+  actor?: BotUserItem;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  keyId?: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  keyName?: string;
+
+  @Field(() => String, { optional: true, description: 'Caller address recorded with the event.' })
+  @Transform('strip:null')
+  ip?: string;
+
+  @Field(() => BotActivityDetailItem, { optional: true })
+  @Transform('strip:null')
+  detail?: BotActivityDetailItem;
+}
+
+@Schema()
+export class BotActivityResponse {
+  @Field(() => [BotActivityItem], { description: 'Newest first.' })
+  events: BotActivityItem[];
+
+  @Field(() => String, { optional: true, description: 'Pass as `cursor` for the next page; absent on the last page.' })
+  @Transform('strip:null')
+  nextCursor?: string;
 }

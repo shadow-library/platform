@@ -4,8 +4,18 @@ import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, isNumericId, REGEX } from '@server/constants';
 import { DatabaseService, Permission, PrimaryDatabase, RoleAssignment, schema } from '@server/modules/infrastructure/datastore';
+
+/** Read side of the primary database, so a caller may resolve permissions through its own open transaction. */
+export type AuthzReader = Pick<PrimaryDatabase, 'select' | 'query'>;
+
+export interface PermissionScope {
+  /** Restrict resolution to one application's permissions and default roles. */
+  applicationId?: number;
+  /** Transaction to read through, so validation and the write it guards share one snapshot. Defaults to the pool. */
+  executor?: AuthzReader;
+}
 
 export interface Principal {
   type: RoleAssignment.PrincipalType;
@@ -78,8 +88,38 @@ export class PolicyDecisionService {
     await this.bumpAuthzVersion(principal);
   }
 
+  /**
+   * A bot's lifecycle is not expressible as a role assignment, so a suspended or deleted bot — or one whose
+   * organisation is no longer active — is refused here as well as at key exchange (§7.4). Service accounts
+   * that back no bot are untouched.
+   */
+  private async principalDenial(principal: Principal, organisationId: string): Promise<string | null> {
+    if (principal.type !== 'SERVICE_ACCOUNT' || !REGEX.BOT_CLIENT_ID.test(principal.id)) return null;
+
+    const [bot] = await this.db
+      .select({ status: schema.bots.status, organisationId: schema.bots.organisationId, organisationStatus: schema.organisations.status })
+      .from(schema.bots)
+      .innerJoin(schema.organisations, eq(schema.organisations.id, schema.bots.organisationId))
+      .where(eq(schema.bots.clientId, principal.id))
+      .limit(1);
+    if (!bot) return null;
+
+    if (bot.status !== 'ACTIVE') return 'the bot is not active';
+    if (!isNumericId(organisationId) || bot.organisationId !== BigInt(organisationId)) return 'the bot belongs to another organisation';
+    if (bot.organisationStatus !== 'ACTIVE') return 'the organisation is not active';
+    return null;
+  }
+
+  private denied(request: CheckRequest, reason: string, authzVersion: number): Decision {
+    this.logger.debug('policy decision denied by principal status', { principal: request.principal, organisationId: request.organisationId, action: request.action, reason });
+    return { decision: 'DENY', reasons: [reason], authzVersion };
+  }
+
   async check(request: CheckRequest): Promise<Decision> {
     const authzVersion = await this.resolveAuthzVersion(request.principal, request.organisationId);
+    const denial = await this.principalDenial(request.principal, request.organisationId);
+    if (denial) return this.denied(request, denial, authzVersion);
+
     const permissions = await this.resolvePermissions(request.principal, request.organisationId);
     const decision: Decision = permissions.has(request.action)
       ? { decision: 'PERMIT', reasons: [`granted by role permission '${request.action}'`], authzVersion }
@@ -94,12 +134,15 @@ export class PolicyDecisionService {
     return decision;
   }
 
-  async listPermissions(principal: Principal, organisationId: string): Promise<Set<string>> {
-    return this.resolvePermissions(principal, organisationId);
+  async listPermissions(principal: Principal, organisationId: string, scope: PermissionScope = {}): Promise<Set<string>> {
+    return this.resolvePermissions(principal, organisationId, scope.applicationId, scope.executor);
   }
 
   async checkForApplication(request: CheckRequest, applicationId: number): Promise<Decision> {
     const authzVersion = await this.resolveAuthzVersion(request.principal, request.organisationId);
+    const denial = await this.principalDenial(request.principal, request.organisationId);
+    if (denial) return this.denied(request, denial, authzVersion);
+
     const permissions = await this.resolvePermissions(request.principal, request.organisationId, applicationId);
     const decision: Decision = permissions.has(request.action)
       ? { decision: 'PERMIT', reasons: [`granted by application-scoped role permission '${request.action}'`], authzVersion }
@@ -126,8 +169,8 @@ export class PolicyDecisionService {
     return client.applicationId;
   }
 
-  private async resolvePermissions(principal: Principal, organisationId: string, applicationId?: number): Promise<Set<string>> {
-    const roleIds = await this.resolveRoleIds(principal, organisationId, applicationId);
+  private async resolvePermissions(principal: Principal, organisationId: string, applicationId?: number, db: AuthzReader = this.db): Promise<Set<string>> {
+    const roleIds = await this.resolveRoleIds(principal, organisationId, applicationId, db);
     if (roleIds.size === 0) {
       this.logger.debug('principal resolves no roles in organisation', { principal, organisationId, applicationId });
       return new Set();
@@ -138,7 +181,7 @@ export class PolicyDecisionService {
       applicationId === undefined
         ? inArray(schema.rolePermissions.roleId, ids)
         : and(inArray(schema.rolePermissions.roleId, ids), eq(schema.permissions.applicationId, applicationId));
-    const rows = await this.db
+    const rows = await db
       .select({ name: schema.permissions.name })
       .from(schema.rolePermissions)
       .innerJoin(schema.permissions, eq(schema.rolePermissions.permissionId, schema.permissions.id))
@@ -148,12 +191,12 @@ export class PolicyDecisionService {
     return permissions;
   }
 
-  private async resolveRoleIds(principal: Principal, organisationId: string, applicationId?: number): Promise<Set<number>> {
+  private async resolveRoleIds(principal: Principal, organisationId: string, applicationId: number | undefined, db: AuthzReader): Promise<Set<number>> {
     const orgId = BigInt(organisationId);
     const notExpired = or(isNull(schema.roleAssignments.expiresAt), gt(schema.roleAssignments.expiresAt, new Date()));
     const roleIds = new Set<number>();
 
-    const explicit = await this.db
+    const explicit = await db
       .select({ roleId: schema.roleAssignments.roleId })
       .from(schema.roleAssignments)
       .where(
@@ -168,8 +211,8 @@ export class PolicyDecisionService {
 
     if (principal.type !== 'USER') return roleIds;
 
-    if (await this.isActiveMember(principal.id, orgId)) {
-      const orgWide = await this.db
+    if (await this.isActiveMember(principal.id, orgId, db)) {
+      const orgWide = await db
         .select({ roleId: schema.roleAssignments.roleId })
         .from(schema.roleAssignments)
         .where(
@@ -183,13 +226,13 @@ export class PolicyDecisionService {
       for (const row of orgWide) roleIds.add(row.roleId);
     }
 
-    for (const id of await this.defaultRoleIds(applicationId)) roleIds.add(id);
+    for (const id of await this.defaultRoleIds(applicationId, db)) roleIds.add(id);
     return roleIds;
   }
 
-  private async isActiveMember(userId: string, organisationId: bigint): Promise<boolean> {
-    if (!/^\d+$/.test(userId)) return false;
-    const membership = await this.db.query.organisationMembers.findFirst({
+  private async isActiveMember(userId: string, organisationId: bigint, db: AuthzReader): Promise<boolean> {
+    if (!isNumericId(userId)) return false;
+    const membership = await db.query.organisationMembers.findFirst({
       where: and(eq(schema.organisationMembers.userId, BigInt(userId)), eq(schema.organisationMembers.organisationId, organisationId)),
       with: { organisation: true },
     });
@@ -198,12 +241,12 @@ export class PolicyDecisionService {
     return membership.status === 'SUSPENDED' && membership.statusUntil !== null && membership.statusUntil.getTime() <= Date.now();
   }
 
-  private async defaultRoleIds(applicationId?: number): Promise<number[]> {
+  private async defaultRoleIds(applicationId: number | undefined, db: AuthzReader): Promise<number[]> {
     const scope =
       applicationId === undefined
         ? eq(schema.applicationRoles.isDefault, true)
         : and(eq(schema.applicationRoles.isDefault, true), eq(schema.applicationRoles.applicationId, applicationId));
-    const rows = await this.db.select({ id: schema.applicationRoles.id }).from(schema.applicationRoles).where(scope);
+    const rows = await db.select({ id: schema.applicationRoles.id }).from(schema.applicationRoles).where(scope);
     return rows.map(row => row.id);
   }
 

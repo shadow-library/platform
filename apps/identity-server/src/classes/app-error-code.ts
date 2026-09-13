@@ -191,6 +191,10 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly BOT_002 = AppErrorCode.conflict('BOT_002', 'Bots are available to team organisations only');
   /** Handles are unique within an organisation, deleted bots included, because owned records keep displaying them */
   static readonly BOT_003 = AppErrorCode.conflict('BOT_003', 'Bot handle already taken');
+  /** The role is not declared bot-grantable by its application, or the organisation cannot reach that application — the two are deliberately indistinguishable */
+  static readonly BOT_004 = AppErrorCode.conflict('BOT_004', 'Permission cannot be granted to a bot');
+  /** The granting admin does not hold the permission themselves; a bot never exceeds its granter (§7.4) */
+  static readonly BOT_005 = AppErrorCode.forbidden('BOT_005', 'Permission is not held by the granting administrator');
   /** A bot may hold at most two unrevoked, unexpired keys so rotation can overlap without accumulating credentials */
   static readonly BOT_006 = AppErrorCode.conflict('BOT_006', 'Bot already has the maximum number of active keys');
   /** Key expiry must be in the future and no more than 365 days away */

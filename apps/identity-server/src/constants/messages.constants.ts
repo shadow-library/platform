@@ -24,4 +24,5 @@ export const ERROR_MESSAGES = {
   INVALID_DATE_TIME: 'must be an ISO-8601 date-time with a time zone, such as 2027-03-07T09:30:00Z',
   EXPIRY_NOT_APPLICABLE: 'may only accompany a suspension, which is the sole status that lapses on its own',
   EXPIRY_MUST_BE_FUTURE: 'must be a point in the future',
+  INVALID_CURSOR: 'must be a cursor returned by an earlier page of this endpoint',
 } as const satisfies Record<string, string>;
