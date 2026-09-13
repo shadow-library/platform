@@ -99,10 +99,7 @@
 /* ── Switcher ────────────────────────────────────────────── */
 .switcher {
   flex-shrink: 0;
-  padding: 0 14px 8px;
-}
-.root[data-collapsed] .switcher {
-  padding: 0 8px 8px;
+  padding: 0 0 8px;
 }
 
 .switcherTrigger {
