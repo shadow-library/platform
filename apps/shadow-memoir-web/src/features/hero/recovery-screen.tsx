@@ -29,6 +29,7 @@ export function RecoveryScreen(): ReactElement {
 
       {recovery.data ? (
         <ScreenColumns
+          asideVariant="context"
           aside={
             <>
               {recovery.data.overload ? (

@@ -1,5 +1,6 @@
-import { fireEvent, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HeroScreen, RecoveryScreen } from '@/features/hero';
 
@@ -7,7 +8,18 @@ import { renderScreen } from './harness';
 
 const TODAY = '2026-08-22';
 
+function stubNarrowViewport(): void {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query === '(max-width: 999px)' || query === '(max-width: 899px)',
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+}
+
 describe('Hero screen', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it('should render the crest with its level, coins and HP', async () => {
     renderScreen(<HeroScreen />, { today: TODAY });
     expect(await screen.findByRole('heading', { name: 'Hero' })).toBeDefined();
@@ -26,6 +38,42 @@ describe('Hero screen', () => {
 
     fireEvent.click(locked[1] as HTMLElement);
     expect(await screen.findByText(/Locked achievements show no counter and no progress bar/)).toBeDefined();
+  });
+
+  it('should move focus to the achievement detail when a tile is selected on narrow layouts', async () => {
+    stubNarrowViewport();
+    renderScreen(<HeroScreen />, { today: TODAY });
+    fireEvent.click(await screen.findByRole('tab', { name: 'Achievements' }));
+
+    const locked = await screen.findAllByText('Locked');
+    fireEvent.click(locked[1] as HTMLElement);
+
+    const heading = await screen.findByRole('heading', { level: 2, name: 'Locked' });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+  });
+
+  it('should reveal and focus the achievement detail when a tile is selected with the keyboard', async () => {
+    stubNarrowViewport();
+    const user = userEvent.setup();
+    renderScreen(<HeroScreen />, { today: TODAY });
+    fireEvent.click(await screen.findByRole('tab', { name: 'Achievements' }));
+
+    const lockedName = (await screen.findAllByText('Locked'))[1] as HTMLElement;
+    const lockedButton = lockedName.closest('button') as HTMLButtonElement;
+    lockedButton.focus();
+    await user.keyboard('{Enter}');
+
+    const heading = await screen.findByRole('heading', { level: 2, name: 'Locked' });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+  });
+
+  it('should not move focus to the achievement detail on mount, before any selection', async () => {
+    stubNarrowViewport();
+    renderScreen(<HeroScreen />, { today: TODAY });
+    fireEvent.click(await screen.findByRole('tab', { name: 'Achievements' }));
+
+    await screen.findByRole('heading', { level: 2, name: /^(Locked|Earned)$/ });
+    expect(document.activeElement === document.body || document.activeElement === null).toBe(true);
   });
 
   it('should change the displayed title to another earned one', async () => {
@@ -71,6 +119,8 @@ describe('Hero screen', () => {
 });
 
 describe('Recovery screen', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it('should state what was lost and what was not', async () => {
     renderScreen(<RecoveryScreen />, { today: TODAY, persona: 'recovery' });
     expect(await screen.findByRole('heading', { name: 'Coming back' })).toBeDefined();
@@ -85,5 +135,22 @@ describe('Recovery screen', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Demanding/ }));
     expect((await screen.findByRole('button', { name: /Demanding/ })).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('should render context asides before the main column on narrow layouts', async () => {
+    stubNarrowViewport();
+    renderScreen(<RecoveryScreen />, { today: TODAY, persona: 'recovery' });
+
+    const warning = await screen.findByText('Next week reads heavy');
+    const openChoices = screen.getByText('Open choices');
+    expect(warning.compareDocumentPosition(openChoices) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('should keep the aside after the main column at desktop width', async () => {
+    renderScreen(<RecoveryScreen />, { today: TODAY, persona: 'recovery' });
+
+    const openChoices = await screen.findByText('Open choices');
+    const warning = screen.getByText('Next week reads heavy');
+    expect(openChoices.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

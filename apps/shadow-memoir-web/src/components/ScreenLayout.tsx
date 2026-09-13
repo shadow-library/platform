@@ -1,4 +1,5 @@
-import { type ReactElement, type ReactNode } from 'react';
+import { type ReactElement, type ReactNode, type RefObject, useEffect, useRef } from 'react';
+import { useMediaQuery } from '@shadow-library/ui';
 
 import styles from './ScreenLayout.module.css';
 
@@ -30,16 +31,74 @@ export function Screen({ title, subtitle, actions, children }: ScreenProps): Rea
   );
 }
 
+export type AsideVariant = 'detail' | 'context';
+
 export interface ScreenColumnsProps {
   children: ReactNode;
   aside: ReactNode;
+  /**
+   * 'detail' (default): the aside is a selection's consequence (an achievement, a history record) — it
+   * stays after the main column at every width; pair it with `useRevealOnSelect` to scroll and focus it.
+   * 'context': the aside informs the main column (a warning, background info) — it moves before the main
+   * column below 1000px, so it is read before the choices it explains.
+   */
+  asideVariant?: AsideVariant;
 }
 
-export function ScreenColumns({ children, aside }: ScreenColumnsProps): ReactElement {
+export function ScreenColumns({ children, aside, asideVariant = 'detail' }: ScreenColumnsProps): ReactElement {
+  const isNarrow = useMediaQuery('(max-width: 999px)');
+  const showAsideFirst = asideVariant === 'context' && isNarrow;
+
+  if (showAsideFirst)
+    return (
+      <div className={styles.columns}>
+        <div key="aside" className={styles.column}>
+          {aside}
+        </div>
+        <div key="main" className={styles.column}>
+          {children}
+        </div>
+      </div>
+    );
+
   return (
     <div className={styles.columns}>
-      <div className={styles.column}>{children}</div>
-      <div className={styles.column}>{aside}</div>
+      <div key="main" className={styles.column}>
+        {children}
+      </div>
+      <div key="aside" className={styles.column}>
+        {aside}
+      </div>
     </div>
   );
+}
+
+/**
+ * Reveals a selection's detail on narrow layouts, where the aside stacks far below its trigger: scrolls
+ * the returned ref's element into view (skipped if it is already fully visible) and focuses it once
+ * `ready`. Never fires for the id a component mounts (or auto-selects) with — only for a `selectedId`
+ * that changes afterwards — and never at `narrowQuery`'s wider width, so desktop behaviour is untouched.
+ */
+export function useRevealOnSelect<T extends HTMLElement>(selectedId: string, ready: boolean, narrowQuery = '(max-width: 999px)'): RefObject<T | null> {
+  const target = useRef<T>(null);
+  const previousId = useRef(selectedId);
+  const pending = useRef(false);
+  const isNarrow = useMediaQuery(narrowQuery);
+  const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+
+  useEffect(() => {
+    if (selectedId !== previousId.current) {
+      previousId.current = selectedId;
+      pending.current = isNarrow;
+    }
+    if (!pending.current || !ready || !target.current) return;
+    pending.current = false;
+
+    const rect = target.current.getBoundingClientRect();
+    const fullyVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+    if (!fullyVisible) target.current.scrollIntoView?.({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    target.current.focus({ preventScroll: true });
+  }, [selectedId, ready, isNarrow, reduceMotion]);
+
+  return target;
 }

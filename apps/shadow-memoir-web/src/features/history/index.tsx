@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { Badge, Button, Card, DescriptionList, EmptyState, Input, Pagination, Skeleton } from '@shadow-library/ui';
 
-import { Screen, ScreenColumns, screenStyles } from '@/components/ScreenLayout';
+import { Screen, ScreenColumns, screenStyles, useRevealOnSelect } from '@/components/ScreenLayout';
 import { SearchIcon } from '@/components/icons';
 import { HISTORY_KIND_LABELS, HISTORY_KINDS, type HistoryFilter, useHistory, useHistoryRecord } from '@/lib/data';
 
@@ -17,6 +17,7 @@ export function HistoryScreen(): ReactElement {
   const [selectedId, setSelectedId] = useState('');
   const history = useHistory(filter, query, page);
   const record = useHistoryRecord(selectedId);
+  const detailHeadingRef = useRevealOnSelect<HTMLHeadingElement>(selectedId, record.data?.id === selectedId);
 
   return (
     <Screen
@@ -35,7 +36,9 @@ export function HistoryScreen(): ReactElement {
               <Card padding="md">
                 <Card.Body>
                   <div className={styles.detailKind}>{HISTORY_KIND_LABELS[record.data.kind]}</div>
-                  <p className={styles.detailTitle}>{record.data.title}</p>
+                  <h2 ref={detailHeadingRef} tabIndex={-1} className={`${styles.detailTitle} ${screenStyles.revealTarget}`}>
+                    {record.data.title}
+                  </h2>
                   <p className={styles.detailWhen}>{record.data.when}</p>
                   <DescriptionList layout="row" termWidth={120}>
                     {record.data.fields.map(field => (

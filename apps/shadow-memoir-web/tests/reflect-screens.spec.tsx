@@ -1,5 +1,6 @@
-import { fireEvent, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AiScreen } from '@/features/ai';
 import { HistoryScreen } from '@/features/history';
@@ -15,7 +16,18 @@ async function passTheConsentGate(): Promise<void> {
   fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
 }
 
+function stubNarrowViewport(): void {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query === '(max-width: 999px)',
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+}
+
 describe('History screen', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it('should group the feed by day and open a record', async () => {
     renderScreen(<HistoryScreen />, { today: TODAY });
     expect(await screen.findByRole('heading', { name: 'History' })).toBeDefined();
@@ -46,6 +58,40 @@ describe('History screen', () => {
     renderScreen(<HistoryScreen />, { today: TODAY });
     fireEvent.change(await screen.findByLabelText('Search all records'), { target: { value: 'nothing at all' } });
     expect(await screen.findByText('Nothing matches that yet')).toBeDefined();
+  });
+
+  it('should move focus to the detail when a history row is selected on narrow layouts', async () => {
+    stubNarrowViewport();
+    renderScreen(<HistoryScreen />, { today: TODAY });
+
+    const row = (await screen.findAllByText(/^Morning run — 5 km · /))[0] as HTMLElement;
+    fireEvent.click(row);
+
+    const heading = await screen.findByRole('heading', { level: 2, name: /^Morning run — 5 km/ });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+  });
+
+  it('should move focus to the detail when a history row is selected with the keyboard', async () => {
+    stubNarrowViewport();
+    const user = userEvent.setup();
+    renderScreen(<HistoryScreen />, { today: TODAY });
+
+    const rowText = (await screen.findAllByText(/^Morning run — 5 km · /))[0] as HTMLElement;
+    const rowButton = rowText.closest('button') as HTMLButtonElement;
+    rowButton.focus();
+    await user.keyboard(' ');
+
+    const heading = await screen.findByRole('heading', { level: 2, name: /^Morning run — 5 km/ });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+  });
+
+  it('should not move focus to the detail for the auto-selected newest record before any selection', async () => {
+    stubNarrowViewport();
+    renderScreen(<HistoryScreen />, { today: TODAY });
+
+    await screen.findByText(/^Today · /);
+    expect(screen.getAllByRole('heading', { level: 2 }).length).toBeGreaterThan(0);
+    expect(document.activeElement === document.body || document.activeElement === null).toBe(true);
   });
 });
 

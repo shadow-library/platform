@@ -246,6 +246,7 @@
         "@tanstack/react-query-devtools": "catalog:",
         "@tanstack/react-router-devtools": "catalog:",
         "@testing-library/react": "^16.3.0",
+        "@testing-library/user-event": "^14.6.1",
         "@types/bun": "catalog:",
         "@types/node": "catalog:",
         "@types/react": "catalog:",

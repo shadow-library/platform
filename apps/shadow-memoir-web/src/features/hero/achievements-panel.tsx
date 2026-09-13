@@ -1,7 +1,7 @@
 import { type ReactElement, useState } from 'react';
 import { Card, DescriptionList } from '@shadow-library/ui';
 
-import { screenStyles } from '@/components/ScreenLayout';
+import { screenStyles, useRevealOnSelect } from '@/components/ScreenLayout';
 import { type Achievement } from '@/lib/data';
 
 import styles from './hero.module.css';
@@ -14,6 +14,7 @@ export function AchievementsPanel({ achievements }: AchievementsPanelProps): Rea
   const [selectedId, setSelectedId] = useState(achievements[0]?.id ?? '');
   const selected = achievements.find(item => item.id === selectedId) ?? achievements[0];
   const earnedCount = achievements.filter(item => item.earnedOn !== null).length;
+  const detailHeadingRef = useRevealOnSelect<HTMLHeadingElement>(selectedId, true, '(max-width: 899px)');
 
   return (
     <div className={styles.achievementLayout}>
@@ -42,7 +43,9 @@ export function AchievementsPanel({ achievements }: AchievementsPanelProps): Rea
       {selected ? (
         <Card padding="lg">
           <Card.Body>
-            <h2 className={screenStyles.cardTitle}>{selected.earnedOn === null ? 'Locked' : 'Earned'}</h2>
+            <h2 ref={detailHeadingRef} tabIndex={-1} className={`${screenStyles.cardTitle} ${screenStyles.revealTarget}`}>
+              {selected.earnedOn === null ? 'Locked' : 'Earned'}
+            </h2>
             <div className={styles.detailCrest} aria-hidden>
               {selected.earnedOn === null ? '◆' : selected.crest}
             </div>
