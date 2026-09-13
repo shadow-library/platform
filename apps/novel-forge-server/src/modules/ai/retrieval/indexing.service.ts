@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -71,7 +71,7 @@ export class IndexingService {
   // that have zero chapter_chunks rows, then addProse for each.
   async backfill(projectId: bigint): Promise<{ indexed: number; skipped: number }> {
     const doneChapters = await this.db.query.chapters.findMany({
-      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')),
+      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), isNotNull(schema.chapters.content)),
     });
 
     const indexableChapters = doneChapters.filter(c => !c.isolated);
@@ -91,10 +91,8 @@ export class IndexingService {
 
     for (const chapter of indexableChapters) {
       if (indexedChapters.has(chapter.number)) continue;
-      if (!chapter.content) {
-        skipped++;
-        continue;
-      }
+      // Narrowing only — the query already excludes null content.
+      if (!chapter.content) continue;
       try {
         await this.addProse(projectId, chapter.number, chapter.content, chapter.isolated);
         indexed++;

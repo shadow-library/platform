@@ -89,6 +89,7 @@ describe.if(pgAvailable)('JobExecutor.runImport', () => {
       {} as never,
       imageStorage,
       {} as never,
+      {} as never,
     );
     return { executor, jobService, recombineCalls, coverSaves };
   }

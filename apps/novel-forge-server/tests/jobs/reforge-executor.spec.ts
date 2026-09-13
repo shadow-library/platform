@@ -138,6 +138,7 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
       {} as never,
       {} as never,
       promoteService,
+      {} as never,
     );
     return { executor, jobService, events };
   }

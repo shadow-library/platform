@@ -1,10 +1,10 @@
-import { and, asc, eq, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 import { APP_NAME } from '@server/constants';
-import { type Job, type PrimaryDatabase, type Rebrand, type Reforge, type ReforgeTransform, schema } from '@server/database';
+import { type Job, type PrimaryDatabase, type Rebrand, type Reforge, type ReforgeTransform, schema, type Translation } from '@server/database';
 
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
@@ -17,6 +17,7 @@ import { ReforgeAnalysisService } from '../reforge/reforge-analysis.service';
 import { ReforgePlanService } from '../reforge/reforge-plan.service';
 import { ReforgePromoteService } from '../reforge/reforge-promote.service';
 import { RecombineService } from '../source/recombine.service';
+import { TranslationService } from '../translation/translation.service';
 import { ConcurrencyController } from './concurrency.controller';
 import { JobService } from './job.service';
 
@@ -50,6 +51,14 @@ interface ReforgePayload {
   seedVolumes?: boolean;
 }
 
+interface TranslatePayload {
+  chapters?: number[];
+  force?: boolean;
+  limit?: number;
+  /** Re-translate chapters whose glossary slice or original moved since they were produced. */
+  stale?: boolean;
+}
+
 // Staged on `jobs.payload` by `NovelImportService.import` inside the same transaction that creates the
 // project — kept as a local shape (not imported from the novel-import module) exactly like every other
 // payload interface above, so JobExecutor never depends on the enqueuing feature module.
@@ -77,6 +86,7 @@ export class JobExecutor {
     private readonly publishRunner: PublishRunner,
     private readonly storage: StorageService,
     private readonly reforgePromoteService: ReforgePromoteService,
+    private readonly translationService: TranslationService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -149,6 +159,8 @@ export class JobExecutor {
         return this.runPublish(job);
       case 'import':
         return this.runImport(job);
+      case 'translate':
+        return this.runTranslate(job);
       default:
         throw AppError.internal(`Unsupported job kind: ${job.kind}`);
     }
@@ -637,5 +649,152 @@ export class JobExecutor {
       .set({ status, lastError, updatedAt: new Date() })
       .where(eq(schema.reforges.projectId, projectId))
       .catch(err => this.logger.warn('failed to update reforge status', { err, status }));
+  }
+
+  // Three phases, each derived from data — never from translations.phase, which is advisory display
+  // state. Divergences from runRebrand (translation design D5): the seed can pause the run for term
+  // review, a finalized chapter is never a target, and a failed run never overwrites a good row.
+  private async runTranslate(job: Job.Row): Promise<void> {
+    const projectId = job.projectId;
+    const payload = (job.payload ?? {}) as TranslatePayload;
+    this.logger.info('runTranslate: starting', { jobId: job.id, projectId, force: payload.force, limit: payload.limit, stale: payload.stale, chapters: payload.chapters });
+
+    try {
+      const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+      if (!project) throw AppError.internal(`project ${projectId} not found`);
+      const translation = await this.translationService.getOrCreate(projectId);
+      const originals = await this.db.$count(schema.chapters, and(eq(schema.chapters.projectId, projectId), isNotNull(schema.chapters.originalContent)));
+      this.logger.debug('runTranslate: phase 1 — originals present', { jobId: job.id, projectId, originals });
+      if (originals === 0) throw AppError.internal(`project ${projectId} has no originals — paste or push original chapters before running translate`);
+
+      this.logger.info('runTranslate: phase 2 — glossary seed', { jobId: job.id, projectId });
+      await this.setTranslationPhase(projectId, 'seeding');
+      await this.jobService.progress(job.id, { done: 0, total: originals, current: 'glossary', phase: 'seeding' });
+      const seed = await this.translationService.seedGlossary(projectId, job.id);
+
+      // A paused pipeline is not a failed one: the job lands `done` and a second POST continues into
+      // phase 3, where the seed is a no-op. The seed is the one review worth blocking on — protagonist
+      // and faction names bind every one of thousands of later chapters.
+      if (seed.seeded && seed.suggestions > 0 && (translation.settings?.pauseAfterSeed ?? true)) {
+        this.logger.info('runTranslate: pausing for term review', { jobId: job.id, projectId, suggestions: seed.suggestions });
+        await this.setTranslationPhase(projectId, 'review');
+        await this.jobService.progress(job.id, { done: 0, total: originals, current: 'awaiting term review', phase: 'review' });
+        return;
+      }
+
+      await this.setTranslationPhase(projectId, 'translating');
+      const targets = await this.selectTranslationChapters(projectId, payload);
+      const total = targets.length;
+      this.logger.info('runTranslate: phase 3 — translating chapters', { jobId: job.id, projectId, total });
+      this.logger.debug('runTranslate: translation targets', { jobId: job.id, targets });
+      let failed = 0;
+      for (const [i, chapter] of targets.entries()) {
+        await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'translating' });
+        const result = await this.workflowRunService.runChapterTranslation({ projectId, chapter, jobId: job.id });
+        this.logger.debug('runTranslate: chapter finished', { jobId: job.id, chapter, outcome: result.outcome, runId: result.runId });
+        // Flag-and-continue, like runRebrand: a failed chapter is recorded and the loop moves on.
+        if (result.outcome === 'failed') {
+          failed++;
+          await this.recordFailedTranslation(projectId, chapter, result.runId);
+        }
+      }
+
+      await this.jobService.progress(job.id, { done: total, total, current: 'done', phase: 'translating' });
+      await this.setTranslationPhase(projectId, 'done');
+      this.logger.info('runTranslate: complete', { jobId: job.id, projectId, total, translated: total - failed, failed });
+    } catch (err) {
+      this.logger.error('runTranslate: failed', { jobId: job.id, projectId, err });
+      await this.setTranslationPhase(projectId, 'failed', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+  }
+
+  /** payload.chapters wins; else `stale` rows; else every chapter with an original. Done rows are dropped only from the data-derived set, finalized ones always. */
+  private async selectTranslationChapters(projectId: bigint, payload: TranslatePayload): Promise<number[]> {
+    const rows = await this.db
+      .select({
+        chapter: schema.chapterTranslations.chapter,
+        status: schema.chapterTranslations.status,
+        glossaryStale: schema.chapterTranslations.glossaryStale,
+        sourceStale: schema.chapterTranslations.sourceStale,
+      })
+      .from(schema.chapterTranslations)
+      .where(eq(schema.chapterTranslations.projectId, projectId));
+    const byChapter = new Map(rows.map(r => [r.chapter, r]));
+
+    const explicit = payload.chapters && payload.chapters.length > 0;
+    let targets: number[];
+    if (explicit) {
+      targets = [...new Set(payload.chapters)].sort((a, b) => a - b);
+    } else if (payload.stale) {
+      targets = rows
+        .filter(r => r.glossaryStale || r.sourceStale)
+        .map(r => r.chapter)
+        .sort((a, b) => a - b);
+    } else {
+      const originals = await this.db
+        .select({ number: schema.chapters.number })
+        .from(schema.chapters)
+        .where(and(eq(schema.chapters.projectId, projectId), isNotNull(schema.chapters.originalContent)))
+        .orderBy(asc(schema.chapters.number));
+      targets = originals.map(r => r.number);
+    }
+
+    // The done-skip trims the data-derived set only: an explicit list is the caller naming chapters to
+    // re-run, and stale rows are already-produced rows that must not be skipped as done.
+    const skipDone = !payload.force && !explicit && !payload.stale;
+    targets = targets.filter(n => {
+      const status = byChapter.get(n)?.status;
+      if (status === 'finalized') return false;
+      return !(skipDone && (status === 'translated' || status === 'attention'));
+    });
+
+    return payload.limit ? targets.slice(0, payload.limit) : targets;
+  }
+
+  // A failed run must never make a good row look worse than it is: `status` gates finalize, so an
+  // existing translated/attention/finalized row only takes the error stamp and keeps its body and
+  // revision. Only an absent or already-failed row is written as `failed`.
+  private async recordFailedTranslation(projectId: bigint, chapter: number, runId: string): Promise<void> {
+    const lastError = `run ${runId} failed`;
+    const existing = await this.db.query.chapterTranslations.findFirst({
+      where: and(eq(schema.chapterTranslations.projectId, projectId), eq(schema.chapterTranslations.chapter, chapter)),
+      columns: { id: true, status: true },
+    });
+
+    if (existing && existing.status !== 'failed') {
+      await this.db
+        .update(schema.chapterTranslations)
+        .set({ lastError, lastFailedRunId: runId, updatedAt: new Date() })
+        .where(eq(schema.chapterTranslations.id, existing.id))
+        .catch(err => this.logger.error('failed to stamp translation failure', { err, chapter }));
+      return;
+    }
+
+    const issues: Translation.Issue[] = [{ source: 'run', type: 'run_failed', detail: `chapter ${chapter} translation failed (run ${runId})` }];
+    await this.db
+      .insert(schema.chapterTranslations)
+      .values({ projectId, chapter, body: '', status: 'failed', issues, runId, lastError, lastFailedRunId: runId })
+      .onConflictDoUpdate({
+        target: [schema.chapterTranslations.projectId, schema.chapterTranslations.chapter],
+        set: {
+          issues: sql`EXCLUDED.issues`,
+          runId: sql`EXCLUDED.run_id`,
+          lastError: sql`EXCLUDED.last_error`,
+          lastFailedRunId: sql`EXCLUDED.last_failed_run_id`,
+          revision: sql`${schema.chapterTranslations.revision} + 1`,
+          updatedAt: new Date(),
+        },
+        setWhere: eq(schema.chapterTranslations.status, 'failed'),
+      })
+      .catch(err => this.logger.error('failed to record failed translation', { err, chapter }));
+  }
+
+  private async setTranslationPhase(projectId: bigint, phase: Translation.Phase, lastError: string | null = null): Promise<void> {
+    await this.db
+      .update(schema.translations)
+      .set({ phase, lastError, updatedAt: new Date() })
+      .where(eq(schema.translations.projectId, projectId))
+      .catch(err => this.logger.warn('failed to update translation phase', { err, phase }));
   }
 }

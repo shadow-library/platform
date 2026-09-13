@@ -8,6 +8,7 @@ import { PublishingModule } from '../publishing/publishing.module';
 import { RebrandModule } from '../rebrand/rebrand.module';
 import { ReforgeModule } from '../reforge/reforge.module';
 import { SourceModule } from '../source/source.module';
+import { TranslationModule } from '../translation/translation.module';
 import { CheckpointJanitor } from './checkpoint.janitor';
 import { ConcurrencyController } from './concurrency.controller';
 import { JobExecutor } from './job.executor';
@@ -16,7 +17,7 @@ import { JobsController } from './jobs.controller';
 import { PublicationJanitor } from './publication.janitor';
 
 @Module({
-  imports: [DatabaseModule, AiModule, EventsModule, SourceModule, RebrandModule, ReforgeModule, PublishingModule, StorageModule, FastifyModule],
+  imports: [DatabaseModule, AiModule, EventsModule, SourceModule, RebrandModule, ReforgeModule, PublishingModule, TranslationModule, StorageModule, FastifyModule],
   controllers: [JobsController],
   providers: [JobService, ConcurrencyController, JobExecutor, CheckpointJanitor, PublicationJanitor],
   exports: [JobService, ConcurrencyController, JobExecutor],

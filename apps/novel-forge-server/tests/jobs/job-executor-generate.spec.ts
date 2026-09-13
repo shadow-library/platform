@@ -35,6 +35,7 @@ function makeExecutor(runChapterGeneration: (input: unknown) => Promise<Workflow
     publishRunner,
     storage,
     {} as never,
+    {} as never,
   );
   return { executor, progressCalls, runChapterGeneration: runChapterGenerationMock };
 }
