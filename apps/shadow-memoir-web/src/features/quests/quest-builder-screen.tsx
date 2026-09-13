@@ -65,7 +65,7 @@ export function QuestBuilderScreen(): ReactElement {
       consequences: [],
       moduleLink: null,
       notification: { enabled: startTimeMinutes !== null, leadMinutes: 10 },
-      healthThreshold: threshold ? { metric: 'steps', target: 8000, unit: 'steps' } : null,
+      healthThreshold: threshold ? { metricKey: 'steps', value: 8000, comparison: 'gte' } : null,
       preCommit,
       active: true,
     }),

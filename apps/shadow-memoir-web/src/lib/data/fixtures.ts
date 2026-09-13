@@ -85,7 +85,7 @@ const ACTIVE_SEEDS: QuestSeed[] = [
     days: EVERY_DAY,
     startTimeMinutes: null,
     durationMinutes: 40,
-    threshold: { metric: 'steps', target: 8000, unit: 'steps' },
+    threshold: { metricKey: 'steps', value: 8000, comparison: 'gte' },
     progress: progress({
       currentStreakDays: 5,
       longestStreakDays: 22,
@@ -239,7 +239,7 @@ const RECOVERY_SEEDS: QuestSeed[] = [
     days: EVERY_DAY,
     startTimeMinutes: null,
     durationMinutes: 0,
-    threshold: { metric: 'water', target: 2, unit: 'l' },
+    threshold: { metricKey: 'water', value: 2000, comparison: 'gte' },
     progress: progress({ currentStreakDays: 2, longestStreakDays: 14, adherence30d: 0.4, xpEarned: 260 }),
   },
 ];
@@ -340,6 +340,6 @@ export function seed(today: string, persona: Persona): SeedResult {
     progress: questProgress,
     hero: { ...HERO_BY_PERSONA[persona], crown: { ...HERO_BY_PERSONA[persona].crown } },
     activity: [...ACTIVITY_BY_PERSONA[persona]],
-    metrics: { steps: 6240, water: 1.4, sleep: 7.5, calories: 480 },
+    metrics: { steps: 6240, water: 1400, sleep: 7.5, calories: 480 },
   };
 }

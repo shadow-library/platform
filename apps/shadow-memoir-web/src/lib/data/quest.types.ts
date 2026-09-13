@@ -1,3 +1,5 @@
+import { type HealthMetricKey } from './quick-logs.types';
+
 export type StatAffinity = 'discipline' | 'body' | 'wealth' | 'mind';
 
 export type Strictness = 'anchor' | 'routine' | 'goal' | 'recovery' | 'optional';
@@ -51,10 +53,14 @@ interface QuestConsequence {
 
 export type ModuleLink = 'journal' | 'meal' | 'weight';
 
-interface HealthThreshold {
-  metric: string;
-  target: number;
-  unit: string;
+/** Comparisons the server's rule engine supports (`apps/shadow-memoir-server/src/modules/metrics/threshold-offer.ts`). */
+export type HealthComparison = 'gte' | 'lte';
+
+/** The server's wire shape (`{ metricId, value, comparison }`), with `metricId` resolved to the web's metric key at projection time. */
+export interface HealthThreshold {
+  metricKey: HealthMetricKey;
+  value: number;
+  comparison: HealthComparison;
 }
 
 interface QuestNotification {
@@ -107,9 +113,9 @@ export interface QuestSummary {
   scheduleSummary: string;
 }
 
-interface ThresholdReading {
-  metric: string;
-  unit: string;
+export interface ThresholdReading {
+  metricKey: HealthMetricKey;
+  comparison: HealthComparison;
   target: number;
   current: number;
 }

@@ -4,7 +4,7 @@ import { Badge, IconButton, Progress } from '@shadow-library/ui';
 import { MoreIcon } from '@/components/icons';
 import { type QuestOccurrence, STATE_LABELS } from '@/lib/data';
 
-import { isResolved, occurrenceCheckLabel, occurrenceMeta, outcomeTone, thresholdPercent } from './quest-presenters';
+import { isResolved, occurrenceCheckLabel, occurrenceMeta, outcomeTone, thresholdMetricName, thresholdPercent } from './quest-presenters';
 import styles from './quest-row.module.css';
 
 export interface QuestRowProps {
@@ -35,9 +35,9 @@ export function QuestRow({ occurrence, onComplete, onOpenActions }: QuestRowProp
       <div className={styles.body}>
         <p className={styles.title}>{occurrence.questName}</p>
         <p className={styles.meta}>{occurrenceMeta(occurrence)}</p>
-        {percent === null ? null : (
+        {percent === null || !occurrence.threshold ? null : (
           <div className={styles.threshold}>
-            <Progress value={percent} max={100} size="sm" label={`${occurrence.threshold?.metric} progress`} />
+            <Progress value={percent} max={100} size="sm" label={`${thresholdMetricName(occurrence.threshold.metricKey)} progress`} />
           </div>
         )}
       </div>

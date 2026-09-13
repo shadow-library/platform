@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { PlanningBoardScreen } from '@/features/planning';
 import { QuestBuilderScreen, QuestEditorScreen, QuestListScreen } from '@/features/quests';
 import { TodayScreen } from '@/features/today';
+import { MemoirEngine } from '@/lib/data';
+import { projectWorldState } from '@/lib/sync';
 
-import { renderScreen } from './harness';
+import { createMemoirTestData, renderScreen } from './harness';
 
 const TODAY = '2026-08-22';
 
@@ -27,6 +29,31 @@ describe('day group screens', () => {
     renderScreen(<TodayScreen />, { today: TODAY, persona: 'recovery' });
     expect(await screen.findByText(/Comeback week/)).toBeDefined();
     expect(await screen.findByText(/no HP at stake today/)).toBeDefined();
+  });
+
+  it('should render a threshold quest from the server shape', async () => {
+    const world = projectWorldState(
+      {
+        metrics: [{ id: '501', name: 'Steps', isHealth: true }],
+        quests: [
+          {
+            id: 'q-threshold',
+            name: 'Move 8,000 steps',
+            durationMin: 0,
+            recurrence: { frequency: 'daily' },
+            healthThreshold: { metricId: '501', value: 8000, comparison: 'gte' },
+            active: true,
+          },
+        ],
+      },
+      TODAY,
+    );
+    const data = createMemoirTestData({ today: TODAY });
+    data.provider = new MemoirEngine(world);
+
+    renderScreen(<TodayScreen />, { value: data });
+    expect((await screen.findAllByText('Move 8,000 steps')).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/0 of 8,000/)).toBeDefined();
   });
 
   it('should render the Planning Board with a week of days and its budgets', async () => {

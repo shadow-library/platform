@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { type SyncCommand, toWireCommand, type WireCommand } from '@/lib/sync';
+import { homeAmountOf } from '@/lib/data';
+import { projectFinanceRows, projectWorldState, type SyncCommand, toWireCommand, type WireCommand } from '@/lib/sync';
 
 import fixtures from './fixtures/wire-commands.json';
 
@@ -36,4 +37,43 @@ describe('command-wire fixtures (FE-4)', () => {
       expect(entityRef).toMatch(UUID_V7);
     });
   }
+});
+
+describe('projection (UI-004, UI-005)', () => {
+  it('should project the server health threshold shape', () => {
+    const world = projectWorldState(
+      {
+        metrics: [{ id: '501', name: 'Steps', isHealth: true }],
+        quests: [{ id: 'q1', name: 'Move 8,000 steps', healthThreshold: { metricId: '501', value: 8000, comparison: 'gte' } }],
+      },
+      '2026-09-10',
+    );
+
+    expect(world.quests[0]?.healthThreshold).toEqual({ metricKey: 'steps', value: 8000, comparison: 'gte' });
+  });
+
+  it('should skip a malformed or unresolvable health threshold instead of crashing', () => {
+    const world = projectWorldState(
+      {
+        metrics: [{ id: '501', name: 'Steps', isHealth: true }],
+        quests: [
+          { id: 'q1', name: 'Old shape', healthThreshold: { metric: 'steps', target: 8000, unit: 'steps' } },
+          { id: 'q2', name: 'Unknown metric', healthThreshold: { metricId: '999', value: 1, comparison: 'gte' } },
+          { id: 'q3', name: 'Bad comparison', healthThreshold: { metricId: '501', value: 8000, comparison: 'more-than' } },
+        ],
+      },
+      '2026-09-10',
+    );
+
+    expect(world.quests.map(quest => quest.healthThreshold)).toEqual([null, null, null]);
+  });
+
+  it('should treat a null home amount in the home currency as the amount', () => {
+    const { expenses } = projectFinanceRows({
+      expenses: [{ id: 'e1', amountMinor: 6415, currency: 'EUR', homeAmountMinor: null, fxRate: null, occurredOn: '2026-09-10', loggedAt: '2026-09-10T10:00:00Z' }],
+    });
+
+    expect(expenses).toHaveLength(1);
+    expect(homeAmountOf(expenses[0]!, 'EUR')).toBe(6415);
+  });
 });

@@ -5,7 +5,7 @@ import { type DataProvider, type PlanRange, type QuestFilter } from './data-prov
 import { getFinanceProvider } from './finance.provider';
 import { isCurrencyCode } from './finance.rules';
 import { getQuickLogProvider } from './quick-logs.provider';
-import { lbToKg } from './quick-logs.rules';
+import { lbToKg, toStoredMetricValue } from './quick-logs.rules';
 import { type Persona, seed } from './fixtures';
 import { formatDuration, formatMonth, formatRange, formatTime, shiftDate, startOfWeek, STATE_LABELS, STRICTNESS_LABELS, WEEKDAY_LABELS, weekdayOf, WEEKDAYS } from './labels';
 import {
@@ -217,10 +217,10 @@ export class MemoirEngine implements DataProvider {
       queued: this.queuedOccurrences.has(occurrenceKey(quest.id, date)),
       threshold: quest.healthThreshold
         ? {
-            metric: quest.healthThreshold.metric,
-            unit: quest.healthThreshold.unit,
-            target: quest.healthThreshold.target,
-            current: this.state.metrics[quest.healthThreshold.metric] ?? 0,
+            metricKey: quest.healthThreshold.metricKey,
+            comparison: quest.healthThreshold.comparison,
+            target: quest.healthThreshold.value,
+            current: this.state.metrics[quest.healthThreshold.metricKey] ?? 0,
           }
         : null,
       partialTarget: target ? { value: log?.progress ?? 0, target: target.fullValue, unit: target.unit ?? '' } : null,
@@ -630,7 +630,7 @@ export class MemoirEngine implements DataProvider {
           xp: 0,
         };
       case 'metric.record':
-        this.state.metrics[command.metric] = command.value;
+        this.state.metrics[command.metric] = toStoredMetricValue(command.metric, command.value);
         return { text: `${command.metric} ${command.value}`, message: 'Logged to today. It replaces the earlier value for the day.', xp: 0 };
       case 'weight.record':
         return { text: `Weight ${command.value} ${command.unit}`, message: 'Logged to today. The earlier value stays in History as corrected.', xp: 0 };
@@ -684,7 +684,7 @@ async function recordInOwningDomain(command: Command, today: string): Promise<vo
       await getQuickLogProvider().dispatchCommand({ type: 'sidequest.log', draft: { date: today, name: command.text, statAffinity: command.statAffinity } });
       return;
     case 'metric.record':
-      await getQuickLogProvider().dispatchCommand({ type: 'health.save', key: command.metric, date: today, value: command.value });
+      await getQuickLogProvider().dispatchCommand({ type: 'health.save', key: command.metric, date: today, value: toStoredMetricValue(command.metric, command.value) });
       return;
     default:
       return;

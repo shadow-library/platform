@@ -1,4 +1,4 @@
-import { convertMlToLitres } from '@/lib/format';
+import { convertMlToLitres, litresToMl } from '@/lib/format';
 
 import { type CurrencyCode, type Expense } from './finance.types';
 import { formatMinor } from './finance.rules';
@@ -28,6 +28,13 @@ export const HEALTH_METRICS: HealthMetricDefinition[] = [
 
 /** Every {@link HealthMetricEntry.value} and {@link HealthMetricDefinition.threshold} is stored the way the server stores it (water in millilitres); this converts to the unit shown. */
 const DISPLAY_CONVERT: Partial<Record<HealthMetricKey, (raw: number) => number>> = { water: convertMlToLitres };
+
+/** The inverse of {@link DISPLAY_CONVERT} — every write path converts what the owner typed back to storage units before it lands in state. */
+const STORAGE_CONVERT: Partial<Record<HealthMetricKey, (displayValue: number) => number>> = { water: litresToMl };
+
+export function toStoredMetricValue(key: HealthMetricKey, displayValue: number): number {
+  return (STORAGE_CONVERT[key] ?? ((value: number) => value))(displayValue);
+}
 
 export const SIDE_QUEST_DAILY_REWARD_LIMIT = 3;
 

@@ -2,7 +2,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { Badge, Button, Card, DescriptionList, EmptyState, Input, Skeleton, Tag, toast } from '@shadow-library/ui';
 
-import { categoryById, formatMinor, HOME_CURRENCY, todayISODate, useExpense, useFinanceCommand } from '@/lib/data';
+import { categoryById, formatMinor, HOME_CURRENCY, homeAmountOf, todayISODate, useExpense, useFinanceCommand } from '@/lib/data';
 
 import { ExpenseEntryPanel } from './expense-entry-panel';
 import styles from './finance.module.css';
@@ -31,7 +31,7 @@ export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): Re
 
   const category = categoryById(detail.categoryId);
   const foreign = detail.currency !== HOME_CURRENCY;
-  const home = detail.homeAmountMinor;
+  const home = homeAmountOf(detail, HOME_CURRENCY);
 
   const remove = (): void => {
     command.mutate(
@@ -53,7 +53,7 @@ export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): Re
             Expense
           </h1>
           <p className={styles.meta}>
-            {detail.occurredOnDate} · {detail.note ?? category.name}
+            {detail.occurredOnDate} · {detail.note ?? detail.merchant ?? category.name}
           </p>
         </div>
       </header>
@@ -99,7 +99,11 @@ export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): Re
                     {detail.amountText} {detail.currency}
                   </DescriptionList.Item>
                   <DescriptionList.Item term="Converted">
-                    {home === null ? 'Waiting for a rate — the entry saved without one.' : `${formatMinor(home, HOME_CURRENCY)} · locked to the transaction date`}
+                    {foreign
+                      ? home === null
+                        ? 'Waiting for a rate — the entry saved without one.'
+                        : `${formatMinor(home, HOME_CURRENCY)} · locked to the transaction date`
+                      : `${formatMinor(home ?? detail.amountMinor, HOME_CURRENCY)} · your base currency`}
                   </DescriptionList.Item>
                   {detail.linkedQuestNote && <DescriptionList.Item term="Linked quest">{detail.linkedQuestNote}</DescriptionList.Item>}
                 </DescriptionList>
@@ -148,15 +152,17 @@ export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): Re
         </div>
 
         <div className={styles.column}>
-          <Card padding="md">
-            <Card.Body>
-              <h2 className={styles.railTitle}>The rate does not move</h2>
-              <p className={styles.railProse}>
-                A foreign expense keeps the amount you entered and the rate captured when you entered it. Reports convert with that rate for good — a past month never re-prices
-                itself.
-              </p>
-            </Card.Body>
-          </Card>
+          {foreign && (
+            <Card padding="md">
+              <Card.Body>
+                <h2 className={styles.railTitle}>The rate does not move</h2>
+                <p className={styles.railProse}>
+                  A foreign expense keeps the amount you entered and the rate captured when you entered it. Reports convert with that rate for good — a past month never re-prices
+                  itself.
+                </p>
+              </Card.Body>
+            </Card>
+          )}
 
           <Card padding="md">
             <Card.Body>

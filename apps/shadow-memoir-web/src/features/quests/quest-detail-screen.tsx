@@ -5,7 +5,7 @@ import { Alert, Badge, Button, Card, DescriptionList, Skeleton, Statistic, Tag }
 import { formatShortDate, STAT_LABELS, STATE_LABELS, STRICTNESS_LABELS, STRICTNESS_RULES, useQuestDetail } from '@/lib/data';
 
 import { useQuestActions } from './quest-actions';
-import { adherenceLabel, outcomeTone } from './quest-presenters';
+import { adherenceLabel, outcomeTone, questThresholdLabel } from './quest-presenters';
 import styles from './quests.module.css';
 
 export interface QuestEditorScreenProps {
@@ -107,9 +107,7 @@ export function QuestEditorScreen({ questId }: QuestEditorScreenProps): ReactEle
                 </DescriptionList.Item>
                 <DescriptionList.Item term="Shields">{progress.shields} held · spent automatically on an unavoidable break</DescriptionList.Item>
                 <DescriptionList.Item term="Threshold">
-                  {quest.healthThreshold
-                    ? `${quest.healthThreshold.target.toLocaleString()} ${quest.healthThreshold.unit} — completion is offered, never automatic`
-                    : 'None — completion is manual'}
+                  {quest.healthThreshold ? `${questThresholdLabel(quest.healthThreshold)} — completion is offered, never automatic` : 'None — completion is manual'}
                 </DescriptionList.Item>
                 <DescriptionList.Item term="Editing">
                   {detail.data.scheduleLocked ? 'Schedule and strictness are locked while the plan is committed' : 'Open — changes apply to future occurrences'}

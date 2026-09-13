@@ -8,6 +8,7 @@ import {
   type ExpenseCategoryId,
   type ExpenseDetail,
   HEALTH_METRIC_NAMES,
+  type HealthComparison,
   type HealthMetricEntry,
   type HealthMetricKey,
   type JournalEntry,
@@ -96,8 +97,22 @@ function toRecurrence(value: unknown): Recurrence {
   };
 }
 
-function toQuest(row: DeltaRow): Quest {
-  const threshold = row['healthThreshold'] as Quest['healthThreshold'];
+const HEALTH_COMPARISONS: HealthComparison[] = ['gte', 'lte'];
+
+function metricKeyResolver(metricIds: Partial<Record<HealthMetricKey, string>>): (metricId: string) => HealthMetricKey | null {
+  return metricId => (Object.entries(metricIds).find(([, id]) => id === metricId)?.[0] as HealthMetricKey | undefined) ?? null;
+}
+
+/** Server wire shape is `{ metricId, value, comparison }` (opaque jsonb); anything unresolvable or malformed skips the threshold instead of crashing. */
+function toHealthThreshold(raw: unknown, keyOf: (metricId: string) => HealthMetricKey | null): Quest['healthThreshold'] {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const { metricId, value, comparison } = raw as Record<string, unknown>;
+  if (typeof metricId !== 'string' || typeof value !== 'number' || !HEALTH_COMPARISONS.includes(comparison as HealthComparison)) return null;
+  const metricKey = keyOf(metricId);
+  return metricKey ? { metricKey, value, comparison: comparison as HealthComparison } : null;
+}
+
+function toQuest(row: DeltaRow, keyOf: (metricId: string) => HealthMetricKey | null): Quest {
   return {
     id: String(row['id']),
     name: text(row, 'name') ?? 'Quest',
@@ -111,7 +126,7 @@ function toQuest(row: DeltaRow): Quest {
     consequences: [],
     moduleLink: (text(row, 'moduleLink') ?? null) as Quest['moduleLink'],
     notification: { enabled: bool(row, 'reminderEnabled'), leadMinutes: number(row, 'reminderLeadMin') },
-    healthThreshold: threshold ?? null,
+    healthThreshold: toHealthThreshold(row['healthThreshold'], keyOf),
     preCommit: false,
     active: bool(row, 'active', true),
     createdAt: text(row, 'createdAt') ?? '',
@@ -163,7 +178,8 @@ const EMPTY_PROGRESS: QuestProgress = {
  * flips from fixture-backed to live on its own without the projection learning about the others.
  */
 export function projectWorldState(rows: Partial<DomainRows>, today: string): MemoirWorldState {
-  const quests = (rows.quests ?? []).map(toQuest);
+  const keyOf = metricKeyResolver(healthMetricIds(rows.metrics ?? []));
+  const quests = (rows.quests ?? []).map(row => toQuest(row, keyOf));
   const account = rows.account?.[0];
 
   const progress: Record<string, QuestProgress> = {};
@@ -413,7 +429,7 @@ function toThresholdOffer(row: DeltaRow, keyOf: (metricId: string) => HealthMetr
 
 export function projectQuickLogRows(rows: Partial<DomainRows>): QuickLogRows {
   const metricIds = healthMetricIds(rows.metrics ?? []);
-  const keyOf = (metricId: string): HealthMetricKey | null => (Object.entries(metricIds).find(([, id]) => id === metricId)?.[0] as HealthMetricKey | undefined) ?? null;
+  const keyOf = metricKeyResolver(metricIds);
 
   return {
     journal: (rows.journal_entries ?? []).map(toJournalEntry),

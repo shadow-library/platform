@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { occurrenceMeta } from '@/features/quests';
 import { createFixtureProvider, getFinanceProvider, getQuickLogProvider } from '@/lib/data';
 
 const TODAY = '2026-08-22';
@@ -50,5 +51,19 @@ describe('quick capture routing', () => {
 
     const { metrics } = await getQuickLogProvider().health(TODAY);
     expect(metrics.find(metric => metric.definition.key === 'steps')?.entry?.value).toBe(9120);
+  });
+
+  it('should convert a captured water reading from litres to the millilitres storage unit', async () => {
+    const provider = createFixtureProvider({ today: TODAY, persona: 'recovery' });
+
+    await provider.dispatchCommand({ type: 'metric.record', metric: 'water', value: 2 });
+
+    const { metrics } = await getQuickLogProvider().health(TODAY);
+    expect(metrics.find(metric => metric.definition.key === 'water')?.entry?.value).toBe(2000);
+
+    const day = await provider.getDay(TODAY);
+    const occurrence = day.occurrences.find(item => item.questId === 'drink-water');
+    expect(occurrence?.threshold).toEqual({ metricKey: 'water', comparison: 'gte', target: 2000, current: 2000 });
+    expect(occurrenceMeta(occurrence!)).toContain('2.0 l of 2.0 l');
   });
 });

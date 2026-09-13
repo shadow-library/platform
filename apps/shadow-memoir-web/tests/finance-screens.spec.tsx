@@ -2,9 +2,9 @@ import { onlineManager } from '@tanstack/react-query';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { ExpenseEntryPanel, ExpensesScreen, SubscriptionsScreen } from '@/features/finance';
+import { ExpenseDetailScreen, ExpenseEntryPanel, ExpensesScreen, SubscriptionsScreen } from '@/features/finance';
 import { type ExpenseDetail, todayISODate } from '@/lib/data';
-import { SyncEngineProvider } from '@/lib/sync';
+import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen, renderWithQuery } from './harness';
 import { createSyncedTestData, createTestEngine } from './sync-harness';
@@ -110,5 +110,105 @@ describe('expenses screen', () => {
     expect(await screen.findByText('Queued')).toBeDefined();
     expect(screen.getByText('One expense is waiting to sync')).toBeDefined();
     expect(engine.getSnapshot()).toMatchObject({ state: 'offline', queuedCount: 1 });
+  });
+
+  it('should show the amount for a base-currency expense the server sent with no home amount', async () => {
+    const page: DeltaPage = {
+      cursor: '1',
+      hasMore: false,
+      tombstones: [],
+      domains: {
+        expenses: [
+          {
+            id: 'exp-home',
+            amountMinor: 1840,
+            currency: 'EUR',
+            homeAmountMinor: null,
+            fxRate: null,
+            categoryId: 'groceries',
+            note: 'Rema 1000',
+            occurredOn: todayISODate(),
+            loggedAt: `${todayISODate()}T09:12:00Z`,
+          },
+        ],
+      },
+    };
+    const { engine } = createTestEngine({ today: todayISODate(), pages: [page] });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <ExpensesScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    const row = await screen.findByRole('link', { name: /Rema 1000/ });
+    expect(row.textContent).toContain('€18.40');
+    expect(row.textContent).not.toContain('—');
+  });
+});
+
+describe('expense detail screen', () => {
+  function renderDetail(expenseId: string, page: DeltaPage): ReturnType<typeof createTestEngine> {
+    const test = createTestEngine({ today: todayISODate(), pages: [page] });
+    const data = createSyncedTestData(test.engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <ExpenseDetailScreen expenseId={expenseId} />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+    return test;
+  }
+
+  it('should show no rate warning for a base-currency expense', async () => {
+    renderDetail('exp-home', {
+      cursor: '1',
+      hasMore: false,
+      tombstones: [],
+      domains: {
+        expenses: [
+          {
+            id: 'exp-home',
+            amountMinor: 6415,
+            currency: 'EUR',
+            homeAmountMinor: null,
+            fxRate: null,
+            categoryId: 'groceries',
+            occurredOn: todayISODate(),
+            loggedAt: `${todayISODate()}T09:12:00Z`,
+          },
+        ],
+      },
+    });
+
+    expect(await screen.findByText('€64.15 · your base currency')).toBeDefined();
+    expect(screen.queryByText('Waiting for a rate — the entry saved without one.')).toBeNull();
+    expect(screen.queryByText('The rate does not move')).toBeNull();
+  });
+
+  it('should still warn about a missing rate for a foreign expense', async () => {
+    renderDetail('exp-foreign', {
+      cursor: '1',
+      hasMore: false,
+      tombstones: [],
+      domains: {
+        expenses: [
+          {
+            id: 'exp-foreign',
+            amountMinor: 21400,
+            currency: 'NOK',
+            homeAmountMinor: null,
+            fxRate: null,
+            categoryId: 'groceries',
+            occurredOn: todayISODate(),
+            loggedAt: `${todayISODate()}T09:12:00Z`,
+          },
+        ],
+      },
+    });
+
+    expect(await screen.findByText('Waiting for a rate — the entry saved without one.')).toBeDefined();
+    expect(screen.getByText('The rate does not move')).toBeDefined();
   });
 });

@@ -3,7 +3,18 @@ import { type ReactElement, useState } from 'react';
 import { Alert, Badge, Button, Card, EmptyState, Input, Progress, SegmentedControl, Skeleton, Statistic, Tag } from '@shadow-library/ui';
 
 import { SearchIcon } from '@/components/icons';
-import { categoryById, type CurrencyCode, type Expense, type FinanceRange, formatMinor, minorToMajor, todayISODate, useExpenses, useFinanceSummary } from '@/lib/data';
+import {
+  categoryById,
+  type CurrencyCode,
+  type Expense,
+  type FinanceRange,
+  formatMinor,
+  homeAmountOf,
+  minorToMajor,
+  todayISODate,
+  useExpenses,
+  useFinanceSummary,
+} from '@/lib/data';
 
 import { ExpenseEntryPanel } from './expense-entry-panel';
 import styles from './finance.module.css';
@@ -16,7 +27,7 @@ const RANGES: { value: FinanceRange; label: string }[] = [
 
 function ExpenseRow({ expense, homeCurrency }: { expense: Expense; homeCurrency: CurrencyCode }): ReactElement {
   const category = categoryById(expense.categoryId);
-  const home = expense.homeAmountMinor;
+  const home = homeAmountOf(expense, homeCurrency);
   const foreign = expense.currency !== homeCurrency;
 
   return (
