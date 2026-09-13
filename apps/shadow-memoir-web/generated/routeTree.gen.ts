@@ -9,7 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './../src/routes/__root'
-import { Route as WelcomeRouteImport } from './../src/routes/welcome'
+import { Route as LoginRouteImport } from './../src/routes/login'
 import { Route as AppRouteImport } from './../src/routes/_app'
 import { Route as AppIndexRouteImport } from './../src/routes/_app/index'
 import { Route as AppReviewRouteImport } from './../src/routes/_app/review'
@@ -40,9 +40,9 @@ import { Route as AppFinanceSubscriptionsRouteImport } from './../src/routes/_ap
 import { Route as AppFinanceCategoriesRouteImport } from './../src/routes/_app/finance.categories'
 import { Route as AppFinanceExpensesExpenseIdRouteImport } from './../src/routes/_app/finance.expenses.$expenseId'
 
-const WelcomeRoute = WelcomeRouteImport.update({
-  id: '/welcome',
-  path: '/welcome',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -194,7 +194,7 @@ const AppFinanceExpensesExpenseIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
-  '/welcome': typeof WelcomeRoute
+  '/login': typeof LoginRoute
   '/ai': typeof AppAiRoute
   '/history': typeof AppHistoryRoute
   '/insights': typeof AppInsightsRoute
@@ -224,7 +224,7 @@ export interface FileRoutesByFullPath {
   '/finance/expenses/$expenseId': typeof AppFinanceExpensesExpenseIdRoute
 }
 export interface FileRoutesByTo {
-  '/welcome': typeof WelcomeRoute
+  '/login': typeof LoginRoute
   '/ai': typeof AppAiRoute
   '/history': typeof AppHistoryRoute
   '/insights': typeof AppInsightsRoute
@@ -256,7 +256,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
-  '/welcome': typeof WelcomeRoute
+  '/login': typeof LoginRoute
   '/_app/ai': typeof AppAiRoute
   '/_app/history': typeof AppHistoryRoute
   '/_app/insights': typeof AppInsightsRoute
@@ -290,7 +290,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/welcome'
+    | '/login'
     | '/ai'
     | '/history'
     | '/insights'
@@ -320,7 +320,7 @@ export interface FileRouteTypes {
     | '/finance/expenses/$expenseId'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/welcome'
+    | '/login'
     | '/ai'
     | '/history'
     | '/insights'
@@ -351,7 +351,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
-    | '/welcome'
+    | '/login'
     | '/_app/ai'
     | '/_app/history'
     | '/_app/insights'
@@ -384,16 +384,16 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
-  WelcomeRoute: typeof WelcomeRoute
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/welcome': {
-      id: '/welcome'
-      path: '/welcome'
-      fullPath: '/welcome'
-      preLoaderRoute: typeof WelcomeRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -677,7 +677,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
-  WelcomeRoute: WelcomeRoute,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

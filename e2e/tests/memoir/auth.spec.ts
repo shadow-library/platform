@@ -29,11 +29,11 @@ test.describe('shadow memoir auth', () => {
     await ensureOnboarded(ctx);
 
     await page.goto(url);
-    await expect(page).not.toHaveURL(/\/welcome/);
+    await expect(page).not.toHaveURL(/\/login/);
     await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
 
     await page.reload();
-    await expect(page).not.toHaveURL(/\/welcome/);
+    await expect(page).not.toHaveURL(/\/login/);
     await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
   });
 });

@@ -21,13 +21,6 @@ import { apiContext, requireProductUrl } from '../../lib';
 test.describe('shadow memoir smoke', () => {
   test.beforeEach(() => requireProductUrl('memoir'));
 
-  test('should load the memoir web shell for a signed-out visitor', async ({ page }) => {
-    const url = requireProductUrl('memoir');
-    await page.goto(url);
-    await expect(page).toHaveURL(/\/welcome/);
-    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
-  });
-
   test('should 401 an unauthenticated sync delta pull', async () => {
     const ctx = await apiContext('memoir');
     const response = await ctx.get('/api/v1/sync/delta?since=0');

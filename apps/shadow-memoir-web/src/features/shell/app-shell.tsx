@@ -47,8 +47,8 @@ function ShellChrome({ children }: AppShellProps): ReactElement {
    * Ends the app session server-side, purges this device's local mirror, then hands the browser on. The purge
    * runs on every outcome — a signed-out device that keeps the owner's finance/journal/health data in
    * IndexedDB is the leak this closes. Where the deployment configures RP-initiated logout the reply carries
-   * identity's end-session URL, which must replace the local bounce — routing to the landing screen would
-   * leave the central session live and sign the owner straight back in. The store is closed first so the
+   * identity's end-session URL, which must replace the local bounce — routing to the login shim would leave
+   * the central session live and sign the owner straight back in. The store is closed first so the
    * database can be deleted rather than block on the engine's open connection.
    */
   const handleSignOut = async (): Promise<void> => {
@@ -61,7 +61,7 @@ function ShellChrome({ children }: AppShellProps): ReactElement {
     engine?.store.close();
     await purgeOfflineData({ databases: [MEMOIR_DB_NAME] });
     if (redirectTo) return window.location.assign(redirectTo);
-    await navigate({ to: '/welcome', search: { returnTo: '/' } });
+    await navigate({ to: '/login', search: { returnTo: '/' } });
   };
 
   return (

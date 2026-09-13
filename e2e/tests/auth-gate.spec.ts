@@ -16,7 +16,7 @@ import { getProductLabel, type ProductKey, requireProductUrl } from '../lib';
  * Declaring the constants
  *
  * The one path per product that's known, read-only from each app's route source, to sit behind a session
- * gate: identity's `/`, novel-forge's `/`, and pulse's `/` all redirect through `requireSession`
+ * gate: identity's `/`, memoir's `/`, novel-forge's `/`, and pulse's `/` all redirect through `requireSession`
  * unconditionally (identity's root even chains through `/account` first — see
  * `apps/identity-web/src/routes/index.tsx`), while web-novel is a public reader whose only gated route
  * among the ones checked here is `/library` (`apps/web-novel-web/src/routes/_shell/library.tsx`).
@@ -34,31 +34,21 @@ import { getProductLabel, type ProductKey, requireProductUrl } from '../lib';
  * SSR-safe) that then hands the browser to `/api/auth/login`, bouncing through the backend's OIDC
  * redirect to identity's hosted `/login` — cross-origin, but still a URL containing "/login". The longer
  * timeout accounts for that hydration + multi-hop redirect.
- *
- * Memoir's `/` is gated the same way (`_app.tsx`'s `beforeLoad: requireSession`, `apps/shadow-memoir-web`),
- * but it redirects client-side to its own `/welcome` landing screen rather than straight to `/login` — the
- * landing screen's "Sign in" button is the one that hands off to `/api/auth/login`. It is checked separately
- * below instead of forcing it into `LOGIN_REDIRECT_PATHS`'s single shared assertion.
  */
-const LOGIN_REDIRECT_PATHS: Record<Exclude<ProductKey, 'memoir'>, string> = {
+const LOGIN_REDIRECT_PATHS: Record<ProductKey, string> = {
   identity: '/',
+  memoir: '/',
   novelForge: '/',
   pulse: '/',
   webNovel: '/library',
 };
 
 test.describe('auth gate', () => {
-  for (const product of Object.keys(LOGIN_REDIRECT_PATHS) as Exclude<ProductKey, 'memoir'>[]) {
+  for (const product of Object.keys(LOGIN_REDIRECT_PATHS) as ProductKey[]) {
     test(`should send an unauthenticated visitor to a login surface for ${getProductLabel(product)}`, async ({ page }) => {
       const url = requireProductUrl(product);
       await page.goto(`${url}${LOGIN_REDIRECT_PATHS[product]}`);
       await expect(page).toHaveURL(/\/login/i, { timeout: 20_000 });
     });
   }
-
-  test(`should send an unauthenticated visitor to the welcome screen for ${getProductLabel('memoir')}`, async ({ page }) => {
-    const url = requireProductUrl('memoir');
-    await page.goto(url);
-    await expect(page).toHaveURL(/\/welcome/, { timeout: 20_000 });
-  });
 });

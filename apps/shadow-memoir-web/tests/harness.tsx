@@ -33,7 +33,7 @@ const PATHS = [
   '/settings/delete',
   '/settings/app',
   '/onboarding',
-  '/welcome',
+  '/login',
 ];
 
 export function testQueryClient(): QueryClient {

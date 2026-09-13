@@ -11,10 +11,9 @@ function renderAt(path: string) {
 }
 
 describe('app boot', () => {
-  it('should render the signed-out landing screen', async () => {
-    renderAt('/welcome');
-    expect(await screen.findByText('Shadow Memoir', undefined, { timeout: 10_000 })).toBeDefined();
-    expect(await screen.findByRole('button', { name: 'Sign in' })).toBeDefined();
+  it('should render the sign-in redirect for the login route', async () => {
+    renderAt('/login');
+    expect(await screen.findByLabelText('Redirecting to sign-in', undefined, { timeout: 10_000 })).toBeDefined();
   });
 
   it('should render the not-found screen for an unknown path', async () => {
