@@ -6,6 +6,7 @@ import { HeroScreen, RecoveryScreen } from '@/features/hero';
 import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen } from './harness';
+import { withTimeZone } from './setup';
 import { createSyncedTestData, createTestEngine } from './sync-harness';
 
 const TODAY = '2026-08-22';
@@ -52,10 +53,8 @@ describe('Hero screen', () => {
     expect(screen.getByText('Recent progression')).toBeDefined();
   });
 
-  it('should render an earned achievement and title with a local formatted date, not the raw ISO timestamp', async () => {
-    const zone = process.env.TZ;
-    process.env.TZ = 'Europe/Oslo';
-    try {
+  it('should render an earned achievement and title with a local formatted date, not the raw ISO timestamp', async () =>
+    withTimeZone('Europe/Oslo', async () => {
       renderSyncedHero();
       fireEvent.click(await screen.findByRole('tab', { name: 'Achievements' }));
       expect(await screen.findByText('Earned 17 May 2026')).toBeDefined();
@@ -64,10 +63,7 @@ describe('Hero screen', () => {
       fireEvent.click(screen.getByRole('tab', { name: 'Titles' }));
       expect(await screen.findByText(/earned 17 May 2026/)).toBeDefined();
       expect(screen.queryByText(/2026-05-17T/)).toBeNull();
-    } finally {
-      process.env.TZ = zone;
-    }
-  });
+    }));
 
   it('should show locked achievements as a teaser with no counter', async () => {
     renderScreen(<HeroScreen />, { today: TODAY });

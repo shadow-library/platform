@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type DeltaPage, SyncedReflectProvider } from '@/lib/sync';
 
+import { withTimeZone } from './setup';
 import { createTestEngine } from './sync-harness';
 
 const TODAY = '2026-08-24';
@@ -229,10 +230,8 @@ describe('Coaching results', () => {
 });
 
 describe('Coaching timestamps', () => {
-  it('should show the submitted/expected time, the result date and the history date in the local zone, not raw UTC', async () => {
-    const zone = process.env.TZ;
-    process.env.TZ = 'Europe/Oslo';
-    try {
+  it('should show the submitted/expected time, the result date and the history date in the local zone, not raw UTC', async () =>
+    withTimeZone('Europe/Oslo', async () => {
       httpFake({});
       const coach = await (
         await provider({
@@ -248,8 +247,5 @@ describe('Coaching timestamps', () => {
       expect(coach.latest?.meta).toBe('Ready 25 August, 08:02');
       expect(coach.history.find(item => item.id === 'task-2')?.when).toBe('24 Aug 2026');
       expect(coach.history.every(item => !/\d{4}-\d{2}-\d{2}T/.test(item.when))).toBe(true);
-    } finally {
-      process.env.TZ = zone;
-    }
-  });
+    }));
 });

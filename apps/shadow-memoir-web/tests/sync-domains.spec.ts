@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { type DeltaPage, SyncedAccountProvider, SyncedFinanceProvider, SyncedHeroProvider, SyncedQuickLogProvider, SyncedReflectProvider } from '@/lib/sync';
 
+import { withTimeZone } from './setup';
 import { createTestEngine, type TestEngine } from './sync-harness';
 
 const TODAY = '2026-08-24';
@@ -195,20 +196,15 @@ describe('FE-5 domain projection', () => {
     expect(steps?.offer).toMatchObject({ questId: '5', questTitle: 'Move 8,000 steps', thresholdValue: 8000, currentValue: 8310, met: true });
   });
 
-  it('should describe a metric entry’s logged time in the local zone, not raw UTC', async () => {
-    const zone = process.env.TZ;
-    process.env.TZ = 'Europe/Oslo';
-    try {
+  it('should describe a metric entry’s logged time in the local zone, not raw UTC', async () =>
+    withTimeZone('Europe/Oslo', async () => {
       const { engine } = await started();
       const health = await new SyncedQuickLogProvider(engine).health(TODAY);
 
       const steps = health.metrics.find(metric => metric.definition.key === 'steps');
       expect(steps?.meta).toBe('Logged 21:02');
       expect(steps?.meta).not.toContain('T19:02');
-    } finally {
-      process.env.TZ = zone;
-    }
-  });
+    }));
 
   it('should project the earned grants and the equipped cosmetic onto the hero deck', async () => {
     const { engine } = await started();

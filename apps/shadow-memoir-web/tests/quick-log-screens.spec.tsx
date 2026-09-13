@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { EntryCapNote } from '@/components/EntryCapNote';
 import { HealthMetricsScreen, MealsScreen, WeightScreen } from '@/features/quick-logs';
@@ -7,6 +7,7 @@ import { deriveCapAdvisory, FixtureQuickLogProvider, MONTHLY_ENTRY_CAP, setQuick
 import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen, renderWithQuery } from './harness';
+import { withTimeZone } from './setup';
 import { createSyncedTestData, createTestEngine } from './sync-harness';
 
 describe('weight screen', () => {
@@ -31,31 +32,36 @@ describe('weight screen', () => {
   });
 
   it('should show today’s logged time in the local zone, not raw UTC', async () => {
-    const zone = process.env.TZ;
-    process.env.TZ = 'Europe/Oslo';
     try {
-      const today = todayISODate();
-      const page: DeltaPage = {
-        cursor: '1',
-        hasMore: false,
-        tombstones: [],
-        domains: { weights: [{ date: today, kg: '78.40', rewarded: true, loggedAt: `${today}T07:05:00.000Z`, syncSeq: '1' }] },
-      };
-      const test = createTestEngine({ today, pages: [page] });
-      const data = createSyncedTestData(test.engine);
-      setQuickLogProvider(data.quickLogs);
+      await withTimeZone('Europe/Oslo', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-08-22T12:00:00.000Z'));
+        try {
+          const today = todayISODate();
+          const page: DeltaPage = {
+            cursor: '1',
+            hasMore: false,
+            tombstones: [],
+            domains: { weights: [{ date: today, kg: '78.40', rewarded: true, loggedAt: `${today}T07:05:00.000Z`, syncSeq: '1' }] },
+          };
+          const test = createTestEngine({ today, pages: [page] });
+          const data = createSyncedTestData(test.engine);
+          setQuickLogProvider(data.quickLogs);
 
-      renderScreen(
-        <SyncEngineProvider data={data}>
-          <WeightScreen />
-        </SyncEngineProvider>,
-        { value: data },
-      );
+          renderScreen(
+            <SyncEngineProvider data={data}>
+              <WeightScreen />
+            </SyncEngineProvider>,
+            { value: data },
+          );
 
-      expect(await screen.findByText(/^Logged 09:05/)).toBeDefined();
-      expect(screen.queryByText(/T07:05/)).toBeNull();
+          expect(await screen.findByText(/^Logged 09:05/)).toBeDefined();
+          expect(screen.queryByText(/T07:05/)).toBeNull();
+        } finally {
+          vi.useRealTimers();
+        }
+      });
     } finally {
-      process.env.TZ = zone;
       setQuickLogProvider(new FixtureQuickLogProvider());
     }
   });
@@ -83,46 +89,51 @@ describe('meals screen', () => {
   });
 
   it('should show a meal’s logged time in the local zone, not raw UTC', async () => {
-    const zone = process.env.TZ;
-    process.env.TZ = 'Europe/Oslo';
     try {
-      const today = todayISODate();
-      const page: DeltaPage = {
-        cursor: '1',
-        hasMore: false,
-        tombstones: [],
-        domains: {
-          meals: [
-            {
-              id: 'm1',
-              date: today,
-              name: 'Oats',
-              calories: 410,
-              mealType: 'cooked',
-              note: null,
-              presetId: null,
-              rewarded: true,
-              loggedAt: `${today}T07:20:00.000Z`,
-              syncSeq: '1',
+      await withTimeZone('Europe/Oslo', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-08-22T12:00:00.000Z'));
+        try {
+          const today = todayISODate();
+          const page: DeltaPage = {
+            cursor: '1',
+            hasMore: false,
+            tombstones: [],
+            domains: {
+              meals: [
+                {
+                  id: 'm1',
+                  date: today,
+                  name: 'Oats',
+                  calories: 410,
+                  mealType: 'cooked',
+                  note: null,
+                  presetId: null,
+                  rewarded: true,
+                  loggedAt: `${today}T07:20:00.000Z`,
+                  syncSeq: '1',
+                },
+              ],
             },
-          ],
-        },
-      };
-      const test = createTestEngine({ today, pages: [page] });
-      const data = createSyncedTestData(test.engine);
-      setQuickLogProvider(data.quickLogs);
+          };
+          const test = createTestEngine({ today, pages: [page] });
+          const data = createSyncedTestData(test.engine);
+          setQuickLogProvider(data.quickLogs);
 
-      renderScreen(
-        <SyncEngineProvider data={data}>
-          <MealsScreen />
-        </SyncEngineProvider>,
-        { value: data },
-      );
+          renderScreen(
+            <SyncEngineProvider data={data}>
+              <MealsScreen />
+            </SyncEngineProvider>,
+            { value: data },
+          );
 
-      expect(await screen.findByText('09:20')).toBeDefined();
-      expect(screen.queryByText(/T07:20/)).toBeNull();
+          expect(await screen.findByText('09:20')).toBeDefined();
+          expect(screen.queryByText(/T07:20/)).toBeNull();
+        } finally {
+          vi.useRealTimers();
+        }
+      });
     } finally {
-      process.env.TZ = zone;
       setQuickLogProvider(new FixtureQuickLogProvider());
     }
   });

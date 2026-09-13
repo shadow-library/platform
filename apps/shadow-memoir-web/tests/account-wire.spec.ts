@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type AccountResponseDto } from '@/lib/apis';
 import { type DeltaPage, SyncedAccountProvider } from '@/lib/sync';
 
+import { withTimeZone } from './setup';
 import { createTestEngine } from './sync-harness';
 
 const TODAY = '2026-08-24';
@@ -258,20 +259,15 @@ describe('Billing over the wire', () => {
     expect(fake.calls.at(-1)?.body).toEqual({ plan: 'yearly' });
   });
 
-  it('should read the plan from the mirrored entitlement rather than from the checkout call', async () => {
-    const zone = process.env.TZ;
-    process.env.TZ = 'Europe/Oslo';
-    try {
+  it('should read the plan from the mirrored entitlement rather than from the checkout call', async () =>
+    withTimeZone('Europe/Oslo', async () => {
       httpFake({});
       const billing = await (await provider({ entitlement: [{ tier: 'paid', state: 'active', expiresAt: '2026-09-23T00:00:00.000Z', trialUsed: true }] })).getBilling();
 
       expect(billing.plans.find(plan => plan.id === 'coach')?.current).toBe(true);
       expect(billing.status).toBe('Coach · Active until 23 Sep 2026');
       expect(billing.trialLine).toContain('has been used');
-    } finally {
-      process.env.TZ = zone;
-    }
-  });
+    }));
 });
 
 describe('Devices over the wire', () => {

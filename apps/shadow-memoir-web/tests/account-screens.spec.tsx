@@ -7,6 +7,7 @@ import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
 import { OnboardingGate } from '@/routes/_app';
 
 import { renderScreen } from './harness';
+import { withTimeZone } from './setup';
 import { createSyncedTestData, createTestEngine, type FakeServer, type TestEngineOptions } from './sync-harness';
 
 const TODAY = '2026-08-22';
@@ -255,24 +256,22 @@ describe('App and sync, synced', () => {
     expect(screen.queryByText('Retrying')).toBeNull();
   });
 
-  it('should show human command labels with local times', async () => {
-    const zone = process.env.TZ;
-    process.env.TZ = 'Asia/Dubai';
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-08-22T09:37:00.000Z'));
-    try {
-      setOnline(false);
-      const { engine } = renderSyncedAppSync();
-      await engine.enqueue({ type: 'expense.create', draft: { amountText: '4.20', currency: 'EUR', categoryId: 'food', occurredOnDate: TODAY, note: 'coffee' } }, TODAY);
+  it('should show human command labels with local times', async () =>
+    withTimeZone('Asia/Dubai', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-08-22T09:37:00.000Z'));
+      try {
+        setOnline(false);
+        const { engine } = renderSyncedAppSync();
+        await engine.enqueue({ type: 'expense.create', draft: { amountText: '4.20', currency: 'EUR', categoryId: 'food', occurredOnDate: TODAY, note: 'coffee' } }, TODAY);
 
-      expect(await screen.findByText('Expense')).toBeDefined();
-      expect(screen.getByText(/^Created (13:37|01:37\spm) · position 1$/i)).toBeDefined();
-      expect(screen.queryByText('expense.create')).toBeNull();
-    } finally {
-      vi.useRealTimers();
-      process.env.TZ = zone;
-    }
-  });
+        expect(await screen.findByText('Expense')).toBeDefined();
+        expect(screen.getByText(/^Created (13:37|01:37\spm) · position 1$/i)).toBeDefined();
+        expect(screen.queryByText('expense.create')).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    }));
 });
 
 describe('Onboarding', () => {
