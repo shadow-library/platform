@@ -200,6 +200,22 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly REF_010 = AppErrorCode.conflict('REF_010', 'Plan was superseded by a newer revision');
 
   /*!
+   * Translation Errors
+   */
+  static readonly TRN_001 = AppErrorCode.notFound('TRN_001', 'Translation is not configured for this project');
+  static readonly TRN_002 = AppErrorCode.notFound('TRN_002', 'Translated chapter not found');
+  static readonly TRN_003 = AppErrorCode.badRequest('TRN_003', 'Translation is only available for translation projects');
+  static readonly TRN_004 = AppErrorCode.conflict('TRN_004', 'Chapter is finalized — reopen it before changing the translation');
+  static readonly TRN_005 = AppErrorCode.badRequest('TRN_005', 'Finalize blocked: {count} glossary terms used by this chapter are still awaiting review');
+  static readonly TRN_006 = AppErrorCode.conflict('TRN_006', 'Finalize blocked: the glossary changed since this chapter was translated — re-run the chapter');
+  static readonly TRN_007 = AppErrorCode.notFound('TRN_007', 'Glossary term not found');
+  static readonly TRN_008 = AppErrorCode.badRequest('TRN_008', 'Chapter has no translation to edit or finalize');
+  static readonly TRN_009 = AppErrorCode.conflict('TRN_009', 'A glossary term with this source text already exists');
+  static readonly TRN_010 = AppErrorCode.conflict('TRN_010', 'Originals must be contiguous — add chapter N only after chapter N-1 exists');
+  static readonly TRN_011 = AppErrorCode.conflict('TRN_011', 'Finalize blocked: the original changed since this chapter was translated — re-run the chapter');
+  static readonly TRN_012 = AppErrorCode.notFound('TRN_012', 'Original chapter not found');
+
+  /*!
    * Context Errors
    */
   static readonly CTX_001 = AppErrorCode.notFound('CTX_001', 'No context pack is linked to this run');

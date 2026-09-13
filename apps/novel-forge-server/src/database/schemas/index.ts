@@ -10,6 +10,7 @@ export * from './ideation';
 export * from './rebrand';
 export * from './reforge';
 export * from './reforge-transform';
+export * from './translation';
 export * from './publishing';
 export * from './illustration';
 export * from './jobs';

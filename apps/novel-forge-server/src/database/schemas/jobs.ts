@@ -13,7 +13,7 @@ export namespace Job {
   export type ValidationScope = InferEnum<typeof validationScope>;
 }
 
-export const jobKind = pgEnum('job_kind', ['extract', 'generate', 'finalize', 'backfill', 'rebrand', 'reforge', 'publish', 'import']);
+export const jobKind = pgEnum('job_kind', ['extract', 'generate', 'finalize', 'backfill', 'rebrand', 'reforge', 'publish', 'import', 'translate']);
 export const jobStatus = pgEnum('job_status', ['pending', 'in_progress', 'done', 'failed']);
 export const validationScope = pgEnum('validation_scope', ['novel', 'chapter']);
 

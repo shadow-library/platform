@@ -35,6 +35,10 @@ export const chapters = pgTable(
     contentHash: varchar('content_hash', { length: 64 }),
     title: varchar('title', { length: 500 }),
     content: text('content'),
+    // The untranslated prose a translation project was supplied with. `content` stays "the English every
+    // pipeline reads", so a chapter awaiting translation has originals filled and `content` still null.
+    originalTitle: varchar('original_title', { length: 500 }),
+    originalContent: text('original_content'),
     summary: text('summary'),
     wordCount: integer('word_count'),
     status: chapterStatus('status').notNull(),

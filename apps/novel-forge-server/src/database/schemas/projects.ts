@@ -33,6 +33,7 @@ interface ProjectModelOverridesData {
   arc?: ProjectModelRefData;
   embedding?: ProjectModelRefData;
   image?: ProjectModelRefData;
+  translate?: ProjectModelRefData;
 }
 
 export interface ProjectConfigData {
@@ -64,7 +65,7 @@ export namespace Project {
   export type ContentGenerator = InferEnum<typeof contentGenerator>;
 }
 
-export const projectKind = pgEnum('project_kind', ['source', 'new_novel']);
+export const projectKind = pgEnum('project_kind', ['source', 'new_novel', 'translation', 'curated']);
 // A `seed` project is an idea under construction in the Ideation Studio: it owns chat, proposal and run
 // history like any project, but the generation, planning and publishing pipelines reject it until
 // graduation flips it to `active` (ideation-studio design §2.1).
@@ -83,6 +84,8 @@ export const projects = pgTable(
     title: varchar('title', { length: 500 }),
     coverImagePath: varchar('cover_image_path'),
     contentMode: contentMode('content_mode').notNull().default('standard'),
+    /** BCP-47 tag of the prose in `chapters.original_content`; null means the project has no original-language side. */
+    originalLanguage: varchar('original_language', { length: 16 }),
     config: jsonb('config').$type<ProjectConfigData>(),
     brief: text('brief'),
     premise: text('premise'),

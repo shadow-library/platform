@@ -76,6 +76,25 @@ describe('AppErrorCode', () => {
     expect(AppErrorCode.PLG_004.status).toBe(409);
   });
 
+  it('should define translation error codes', () => {
+    expect(AppErrorCode.TRN_001.status).toBe(404);
+    expect(AppErrorCode.TRN_002.status).toBe(404);
+    expect(AppErrorCode.TRN_003.status).toBe(400);
+    expect(AppErrorCode.TRN_004.status).toBe(409);
+    expect(AppErrorCode.TRN_005.status).toBe(400);
+    expect(AppErrorCode.TRN_006.status).toBe(409);
+    expect(AppErrorCode.TRN_007.status).toBe(404);
+    expect(AppErrorCode.TRN_008.status).toBe(400);
+    expect(AppErrorCode.TRN_009.status).toBe(409);
+    expect(AppErrorCode.TRN_010.status).toBe(409);
+    expect(AppErrorCode.TRN_011.status).toBe(409);
+    expect(AppErrorCode.TRN_012.status).toBe(404);
+  });
+
+  it('should interpolate the awaiting-review count into TRN_005', () => {
+    expect(AppErrorCode.TRN_005.create({ count: 3 }).message).toContain('3 glossary terms');
+  });
+
   it('should define transform reforge error codes', () => {
     expect(AppErrorCode.REF_004.status).toBe(404);
     expect(AppErrorCode.REF_005.status).toBe(400);
