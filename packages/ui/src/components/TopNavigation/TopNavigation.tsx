@@ -67,38 +67,40 @@ const TopNavigationRoot = forwardRef<HTMLElement, TopNavigationProps>(function T
   const mobileNav = useContext(ShellMobileNavContext);
 
   return (
-    <header ref={ref} className={cn(styles.bar, className)} {...props}>
-      {mobileNav?.hasSidebar ? (
-        <span className={styles.menuSlot}>
-          <IconButton
-            variant="ghost"
-            icon={<MenuIcon />}
-            aria-label="Open navigation"
-            aria-haspopup="dialog"
-            aria-expanded={mobileNav.open}
-            onClick={() => mobileNav.setOpen(true)}
-          />
-        </span>
-      ) : null}
-      {brand != null ? <div className={styles.brand}>{brand}</div> : null}
-      {/* A bar carrying only a brand and a utility cluster shouldn't publish an empty nav landmark. */}
-      {items.length > 0 ? (
-        <nav className={styles.links} aria-label={ariaLabel}>
-          {visible}
-          {overflow.length > 0 ? (
-            <Popover>
-              <Popover.Trigger asChild>
-                <button type="button" className={styles.link} data-active={overflowActive || undefined} aria-label="More links">
-                  More
-                </button>
-              </Popover.Trigger>
-              <Popover.Content className={styles.moreMenu} style={{ padding: 4, minWidth: 180 }} align="end" aria-label="More links">
-                <TopNavigationOverflowContext.Provider value={true}>{overflow}</TopNavigationOverflowContext.Provider>
-              </Popover.Content>
-            </Popover>
-          ) : null}
-        </nav>
-      ) : null}
+    <header ref={ref} className={cn(styles.bar, className)} data-layout={search != null && items.length === 0 ? 'centred' : undefined} {...props}>
+      <div className={styles.start}>
+        {mobileNav?.hasSidebar ? (
+          <span className={styles.menuSlot}>
+            <IconButton
+              variant="ghost"
+              icon={<MenuIcon />}
+              aria-label="Open navigation"
+              aria-haspopup="dialog"
+              aria-expanded={mobileNav.open}
+              onClick={() => mobileNav.setOpen(true)}
+            />
+          </span>
+        ) : null}
+        {brand != null ? <div className={styles.brand}>{brand}</div> : null}
+        {/* A bar carrying only a brand and a utility cluster shouldn't publish an empty nav landmark. */}
+        {items.length > 0 ? (
+          <nav className={styles.links} aria-label={ariaLabel}>
+            {visible}
+            {overflow.length > 0 ? (
+              <Popover>
+                <Popover.Trigger asChild>
+                  <button type="button" className={styles.link} data-active={overflowActive || undefined} aria-label="More links">
+                    More
+                  </button>
+                </Popover.Trigger>
+                <Popover.Content className={styles.moreMenu} style={{ padding: 4, minWidth: 180 }} align="end" aria-label="More links">
+                  <TopNavigationOverflowContext.Provider value={true}>{overflow}</TopNavigationOverflowContext.Provider>
+                </Popover.Content>
+              </Popover>
+            ) : null}
+          </nav>
+        ) : null}
+      </div>
       {search != null ? <div className={styles.search}>{search}</div> : null}
       {utility != null ? <div className={styles.utility}>{utility}</div> : null}
     </header>

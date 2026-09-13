@@ -91,6 +91,20 @@ describe('TopNavigation', () => {
     expect(screen.getByRole('navigation', { name: 'Top' })).not.toContainElement(search);
   });
 
+  it('centres the search slot when the bar carries no destinations', () => {
+    render(<TopNavigation brand="Shadow" search={<button type="button">Search</button>} utility={<button type="button">Account</button>} />);
+    expect(screen.getByRole('banner')).toHaveAttribute('data-layout', 'centred');
+  });
+
+  it('keeps the flowing layout when destinations share the bar with the search slot', () => {
+    render(
+      <TopNavigation brand="Shadow" search={<button type="button">Search</button>}>
+        <TopNavigation.Item href="/overview">Overview</TopNavigation.Item>
+      </TopNavigation>,
+    );
+    expect(screen.getByRole('banner')).not.toHaveAttribute('data-layout');
+  });
+
   it('omits the nav landmark when the bar carries no destinations', () => {
     render(<TopNavigation brand="Shadow" utility={<button type="button">Account</button>} />);
     expect(screen.getByRole('banner')).toBeInTheDocument();

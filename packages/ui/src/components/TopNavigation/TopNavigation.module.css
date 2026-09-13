@@ -34,6 +34,25 @@
   }
 }
 
+.start {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 100%;
+  min-width: 0;
+}
+
+/* With a search field and no destinations, the outer columns share the leftover width equally so the field sits at
+   the true centre of the bar; a flex row would centre it in whatever the brand leaves, moving it with the brand's width. */
+.bar[data-layout='centred'] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+.bar[data-layout='centred'] .brand {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -97,9 +116,11 @@
 .utility {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   margin-left: auto;
   flex-shrink: 0;
+  min-width: 0;
 }
 
 /* ── More menu (inside a Popover surface; padding/min-width set inline) ── */
