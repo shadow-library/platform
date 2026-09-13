@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   Button,
@@ -1465,7 +1465,7 @@ function AddTermDialog({ novelId, open, onOpenChange }: AddTermDialogProps): Rea
 function TranslationScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const search = Route.useSearch();
-  const navigate = useNavigate();
+  const navigate = Route.useNavigate();
   const statusQuery = useTranslationStatusQuery(novelId);
   const status = statusQuery.data;
   const active = translationJobActive(status);
