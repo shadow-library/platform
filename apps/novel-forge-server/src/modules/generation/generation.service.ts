@@ -1243,7 +1243,7 @@ export class GenerationService {
       summary: output.summary?.trim() || `Canon from chapter ${chapter}`,
       changeSet,
       allowedOps: ['entity.upsert', 'entity.remove', 'bible_document.upsert', 'bible_document.remove'],
-      model: this.modelRouter.resolveModel(promptModule.role ?? 'extraction', project as never, policy).model,
+      model: (await this.modelRouter.resolveFor(promptModule.role ?? 'extraction', project as never, projectId, policy)).model,
     });
   }
 

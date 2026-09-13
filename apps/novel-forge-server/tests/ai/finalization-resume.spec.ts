@@ -39,7 +39,7 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
   function buildGraph(
     options: { structured?: () => Promise<unknown>; failCursor?: boolean; beforeTransaction?: (index: number) => Promise<void> } = {},
   ): ReturnType<typeof createChapterFinalizationGraph> {
-    const modelRouter = { structured: options.structured ?? (async () => delta), resolveModel: () => ({ model: 'test-model' }) };
+    const modelRouter = { structured: options.structured ?? (async () => delta), resolveModel: () => ({ model: 'test-model' }), resolveFor: async () => ({ model: 'test-model' }) };
     const indexingService = { addProse: async () => undefined, addLore: async () => undefined };
 
     // advanceCursor is the only node that updates `projects` outside a transaction, so trapping that one table

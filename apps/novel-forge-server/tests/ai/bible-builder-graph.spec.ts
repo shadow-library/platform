@@ -26,7 +26,11 @@ const pgAvailable = await (async () => {
 })();
 
 function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, stageOutput: BibleStageOutput, indexingService: object = {}) {
-  const modelRouter = { structured: async () => stageOutput, resolveModel: () => ({ provider: 'test', model: 'test' }) };
+  const modelRouter = {
+    structured: async () => stageOutput,
+    resolveModel: () => ({ provider: 'test', model: 'test' }),
+    resolveFor: async () => ({ provider: 'test', model: 'test' }),
+  };
   const contextAssembler = { forChapter: async () => ({ id: null }) };
   const toolRegistry = { forNode: () => [], getRaw: () => [] };
 

@@ -44,6 +44,7 @@ function buildServices(db: PrimaryDatabase, judgeReply: unknown, seenMessages: B
       }),
     }),
     resolveModel: () => ({ provider: 'test', model: 'test' }),
+    resolveFor: async () => ({ provider: 'test', model: 'test' }),
   };
 
   const contextAssembler = { forChapter: async () => ({ id: null }) };

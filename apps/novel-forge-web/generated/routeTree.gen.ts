@@ -14,6 +14,7 @@ import { Route as AppRouteImport } from './../src/routes/_app'
 import { Route as AppIndexRouteImport } from './../src/routes/_app/index'
 import { Route as NovelsNovelIdRouteImport } from './../src/routes/novels/$novelId'
 import { Route as IdeasSeedIdRouteImport } from './../src/routes/ideas/$seedId'
+import { Route as AppSettingsRouteImport } from './../src/routes/_app/settings'
 import { Route as AppImportRouteImport } from './../src/routes/_app/import'
 import { Route as AppIdeasRouteImport } from './../src/routes/_app/ideas'
 import { Route as NovelsNovelIdIndexRouteImport } from './../src/routes/novels/$novelId/index'
@@ -58,6 +59,11 @@ const IdeasSeedIdRoute = IdeasSeedIdRouteImport.update({
   id: '/ideas/$seedId',
   path: '/ideas/$seedId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppImportRoute = AppImportRouteImport.update({
   id: '/import',
@@ -166,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/ideas': typeof AppIdeasRoute
   '/import': typeof AppImportRoute
+  '/settings': typeof AppSettingsRoute
   '/ideas/$seedId': typeof IdeasSeedIdRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
   '/novels/$novelId/canon-facts': typeof NovelsNovelIdCanonFactsRoute
@@ -191,6 +198,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/ideas': typeof AppIdeasRoute
   '/import': typeof AppImportRoute
+  '/settings': typeof AppSettingsRoute
   '/ideas/$seedId': typeof IdeasSeedIdRoute
   '/': typeof AppIndexRoute
   '/novels/$novelId/canon-facts': typeof NovelsNovelIdCanonFactsRoute
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_app/ideas': typeof AppIdeasRoute
   '/_app/import': typeof AppImportRoute
+  '/_app/settings': typeof AppSettingsRoute
   '/ideas/$seedId': typeof IdeasSeedIdRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
   '/_app/': typeof AppIndexRoute
@@ -247,6 +256,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/ideas'
     | '/import'
+    | '/settings'
     | '/ideas/$seedId'
     | '/novels/$novelId'
     | '/novels/$novelId/canon-facts'
@@ -272,6 +282,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/ideas'
     | '/import'
+    | '/settings'
     | '/ideas/$seedId'
     | '/'
     | '/novels/$novelId/canon-facts'
@@ -298,6 +309,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_app/ideas'
     | '/_app/import'
+    | '/_app/settings'
     | '/ideas/$seedId'
     | '/novels/$novelId'
     | '/_app/'
@@ -364,6 +376,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/ideas/$seedId'
       preLoaderRoute: typeof IdeasSeedIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/import': {
       id: '/_app/import'
@@ -511,12 +530,14 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppIdeasRoute: typeof AppIdeasRoute
   AppImportRoute: typeof AppImportRoute
+  AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppIdeasRoute: AppIdeasRoute,
   AppImportRoute: AppImportRoute,
+  AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
 }
 

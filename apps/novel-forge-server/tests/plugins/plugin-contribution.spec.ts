@@ -102,7 +102,7 @@ describe.if(pgAvailable)('plugin contributions', () => {
     const databaseService = { getPostgresClient: () => db } as never;
     policyService = new PluginPolicyService(databaseService, host, new ScopedPluginHostFactory(databaseService));
     assembler = new ContextAssembler(databaseService, { render: async () => '' } as unknown as CatalogService);
-    router = new ModelRouterService({} as never, databaseService, { enforce: async () => undefined } as never);
+    router = new ModelRouterService({} as never, databaseService, { enforce: async () => undefined } as never, { defaultsFor: async () => undefined } as never);
   });
 
   async function seedProject(): Promise<bigint> {

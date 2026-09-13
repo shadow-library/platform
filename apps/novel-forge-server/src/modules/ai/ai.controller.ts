@@ -1,13 +1,28 @@
 import { Authenticated } from '@shadow-library/auth/module';
-import { Get, HttpController, RespondFor } from '@shadow-library/fastify';
+import { Body, Get, HttpController, Put, RespondFor } from '@shadow-library/fastify';
 
-import { AiModelOption, AiModelsResponse } from './ai.dto';
+import { AccountSettingsService } from './account-settings.service';
+import { AccountSettingsResponse, AiModelOption, AiModelsResponse, UpdateAccountSettingsBody } from './ai.dto';
 import { getGroupDefaults, UNRESTRICTED_GROUP_DEFAULTS, UNRESTRICTED_IMAGE_ALLOWLIST, UNRESTRICTED_LLM_ALLOWLIST } from './defaults';
 import { MODEL_REGISTRY } from './models';
 
 @Authenticated()
 @HttpController('/api/v1/ai')
 export class AiController {
+  constructor(private readonly accountSettings: AccountSettingsService) {}
+
+  @Get('/settings')
+  @RespondFor(200, AccountSettingsResponse)
+  async getSettings(): Promise<AccountSettingsResponse> {
+    return { models: await this.accountSettings.getModels() };
+  }
+
+  @Put('/settings')
+  @RespondFor(200, AccountSettingsResponse)
+  async updateSettings(@Body() body: UpdateAccountSettingsBody): Promise<AccountSettingsResponse> {
+    return { models: await this.accountSettings.updateModels(body.models) };
+  }
+
   @Get('/models')
   @RespondFor(200, AiModelsResponse)
   listModels(): AiModelsResponse {

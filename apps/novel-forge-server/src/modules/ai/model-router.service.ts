@@ -19,12 +19,14 @@ import {
   type AiRole,
   getGroupDefaults,
   getProfileDefaults,
+  isRegisteredModel,
   isUnrestrictedAllowed,
   type ResolvedModel,
   resolveReasoningEffort,
   ROLE_GROUP,
   UNRESTRICTED_DEFAULTS,
 } from './defaults';
+import { type AccountModelGroup, AccountSettingsService } from './account-settings.service';
 import { AiQuotaService } from './ai-quota.service';
 import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
@@ -33,6 +35,7 @@ import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResu
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 
 export interface ProjectConfig {
+  ownerId?: bigint | null;
   contentMode?: string;
   config?: { models?: Partial<Record<AiRole, ResolvedModel>> } | null;
 }
@@ -148,18 +151,24 @@ export class ModelRouterService {
     private readonly telemetry: TelemetryHandler,
     private readonly databaseService: DatabaseService,
     private readonly quota: AiQuotaService,
+    private readonly accountSettings: AccountSettingsService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
   // `call.route`: a plugin may raise this call to the permissive class, and no policy can lower a project
   // whose own contentMode is already unrestricted — the raise-only rule is structural at the routing sink.
-  resolveModel(role: AiRole, project?: ProjectConfig, policy?: ForgeCallPolicy): ResolvedModel {
+  // `account` is the project owner's own defaults, which `resolveFor` loads; an unregistered one is skipped rather than
+  // failed, since the registry can drop a model long after the author picked it.
+  resolveModel(role: AiRole, project?: ProjectConfig, policy?: ForgeCallPolicy, account?: Partial<Record<AccountModelGroup, ResolvedModel>>): ResolvedModel {
+    const accountModel = account?.[ROLE_GROUP[role] as AccountModelGroup];
+    const accountDefault = accountModel && isRegisteredModel(accountModel) ? accountModel : undefined;
     if (project?.contentMode === 'unrestricted' || policy?.writerClass === 'permissive') {
       const unrestrictedDefault = UNRESTRICTED_DEFAULTS[role] ?? UNRESTRICTED_DEFAULTS.generation;
       const models = project?.config?.models as Record<string, ResolvedModel> | undefined;
       const projectModel = models?.[role] ?? (role === 'chat' && models?.['plan'] ? models['plan'] : undefined);
       if (projectModel && isUnrestrictedAllowed(role, projectModel)) return projectModel;
+      if (accountDefault && isUnrestrictedAllowed(role, accountDefault)) return accountDefault;
       return unrestrictedDefault;
     }
     // The settings UI writes one selection across every role in a group, so group members resolve identically.
@@ -171,7 +180,12 @@ export class ModelRouterService {
       if (!MODEL_MAP[projectModel.model]) throw AppErrorCode.AI_002.create();
       return projectModel;
     }
-    return getProfileDefaults()[role] ?? getGroupDefaults().writing;
+    return accountDefault ?? getProfileDefaults()[role] ?? getGroupDefaults().writing;
+  }
+
+  async resolveFor(role: AiRole, project?: ProjectConfig, projectId?: bigint, policy?: ForgeCallPolicy): Promise<ResolvedModel> {
+    const account = await this.accountSettings.defaultsFor(project, projectId);
+    return this.resolveModel(role, project, policy, account);
   }
 
   // Every hosted vendor is reached through OpenRouter's OpenAI-compatible endpoint, so one client
@@ -227,7 +241,7 @@ export class ModelRouterService {
   // every product caller passes it, which is what gates the judge/validation raw-client paths on quota.
   async chatFor(role: AiRole, project?: ProjectConfig, projectId?: bigint, policy?: ForgeCallPolicy): Promise<BaseChatModel> {
     if (projectId !== undefined) await this.quota.enforce(projectId);
-    const resolved = this.resolveModel(role, project, policy);
+    const resolved = await this.resolveFor(role, project, projectId, policy);
     this.logger.debug(`Routing role=${role} to provider=${resolved.provider} model=${resolved.model}`);
     return this.buildClient(resolved, { role });
   }
@@ -235,7 +249,7 @@ export class ModelRouterService {
   async structured<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, ctx: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<T> {
     await this.quota.enforce(ctx.projectId);
     const role = promptModule.role ?? (promptModule.key as AiRole);
-    const resolved = this.resolveModel(role, project, policy);
+    const resolved = await this.resolveFor(role, project, ctx.projectId, policy);
     const llm = this.buildClient(resolved, { format: toJsonSchemaFormat(promptModule.schema), role });
     const messages = await this.buildMessages(promptModule, input, resolved, policy);
     // Input carries the rendered context pack and user prose — sensitive/large, so it rides on debug
@@ -319,7 +333,7 @@ export class ModelRouterService {
    */
   async images(request: ImageRequest, ctx: TelemetryContext, project?: ProjectConfig): Promise<GeneratedImage[]> {
     await this.quota.enforce(ctx.projectId);
-    const resolved = this.resolveModel('image', project);
+    const resolved = await this.resolveFor('image', project, ctx.projectId);
     const apiKey = Config.get('ai.openrouter.api.key');
     if (!apiKey) throw AppErrorCode.AI_004.create();
     const url = `${Config.get('ai.openrouter.api.url')}/images`;

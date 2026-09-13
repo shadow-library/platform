@@ -48,6 +48,7 @@ function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, calls: 
       }),
     }),
     resolveModel: () => ({ provider: 'test', model: 'test' }),
+    resolveFor: async () => ({ provider: 'test', model: 'test' }),
   };
 
   const contextAssembler = { forChapter: async () => ({ id: null }) };

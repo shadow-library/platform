@@ -228,7 +228,12 @@ describe.if(pgAvailable)('plugin call policy', () => {
 
   describe('ModelRouterService.hashRequest', () => {
     function makeRouter(): ModelRouterService {
-      const router = new ModelRouterService({} as never, { getPostgresClient: () => db } as never, { enforce: async () => undefined } as never);
+      const router = new ModelRouterService(
+        {} as never,
+        { getPostgresClient: () => db } as never,
+        { enforce: async () => undefined } as never,
+        { defaultsFor: async () => undefined } as never,
+      );
       (router as unknown as Record<string, unknown>)['buildClient'] = () => ({ invoke: async () => ({ content: JSON.stringify({ verdict: 'consistent', findings: [] }) }) });
       return router;
     }
@@ -324,6 +329,7 @@ describe.if(pgAvailable)('plugin call policy', () => {
           }),
         }),
         resolveModel: () => ({ provider: 'test', model: 'test' }),
+        resolveFor: async () => ({ provider: 'test', model: 'test' }),
       };
 
       const pluginPolicy = {

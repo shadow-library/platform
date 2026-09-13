@@ -78,6 +78,7 @@ describe.if(pgAvailable)('continuity delta application', () => {
           return output;
         },
         resolveModel: () => ({ provider: 'test', model: 'test' }),
+        resolveFor: async () => ({ provider: 'test', model: 'test' }),
       },
       telemetry: {},
       toolRegistry: {},

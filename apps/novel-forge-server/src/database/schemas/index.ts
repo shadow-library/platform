@@ -18,3 +18,4 @@ export * from './ai';
 export * from './api-keys';
 export * from './ingest-audit';
 export * from './plugins';
+export * from './account-settings';

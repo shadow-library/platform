@@ -43,7 +43,12 @@ describe('Rung-3 Ollama integration', () => {
           insert: () => ({ values: () => ({ onConflictDoNothing: () => Promise.resolve() }) }),
         }),
       };
-      router = new ModelRouterService(new NoopCallbackHandler() as unknown as TelemetryHandler, stubDbService as never, { enforce: async () => undefined } as never);
+      router = new ModelRouterService(
+        new NoopCallbackHandler() as unknown as TelemetryHandler,
+        stubDbService as never,
+        { enforce: async () => undefined } as never,
+        { defaultsFor: async () => undefined } as never,
+      );
     });
 
     afterAll(() => {

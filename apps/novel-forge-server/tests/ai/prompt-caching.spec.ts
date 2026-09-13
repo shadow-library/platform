@@ -13,7 +13,12 @@ const bigText = 'the sect trials continue with rising stakes and sharper blades.
 const smallText = 'short volatile tail';
 
 function makeRouter(fakeLlm: { invoke: ReturnType<typeof mock> }): ModelRouterService {
-  const router = new ModelRouterService({} as never, { getPostgresClient: () => ({}) } as never, { enforce: async () => undefined } as never);
+  const router = new ModelRouterService(
+    {} as never,
+    { getPostgresClient: () => ({}) } as never,
+    { enforce: async () => undefined } as never,
+    { defaultsFor: async () => undefined } as never,
+  );
   (router as unknown as Record<string, unknown>)['buildClient'] = () => fakeLlm;
   return router;
 }

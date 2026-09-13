@@ -1,8 +1,10 @@
 import { Module } from '@shadow-library/app';
+import { FastifyModule } from '@shadow-library/fastify';
 import { DatabaseModule } from '@shadow-library/modules';
 
 import { EventsModule } from '../events/events.module';
 import { PluginsModule } from '../plugins/plugins.module';
+import { AccountSettingsService } from './account-settings.service';
 import { AiController } from './ai.controller';
 import { AiQuotaService } from './ai-quota.service';
 import { CatalogService } from './context/catalog.service';
@@ -16,9 +18,10 @@ import { TelemetryHandler } from './telemetry.handler';
 import { ToolRegistryService } from './tools/tool-registry.service';
 
 @Module({
-  imports: [DatabaseModule, EventsModule, PluginsModule],
+  imports: [DatabaseModule, EventsModule, FastifyModule, PluginsModule],
   controllers: [AiController],
   providers: [
+    AccountSettingsService,
     TelemetryHandler,
     ModelRouterService,
     AiQuotaService,
@@ -31,6 +34,7 @@ import { ToolRegistryService } from './tools/tool-registry.service';
     WorkflowRunService,
   ],
   exports: [
+    AccountSettingsService,
     ModelRouterService,
     AiQuotaService,
     TelemetryHandler,

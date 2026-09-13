@@ -22,7 +22,7 @@ import {
 import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle } from '@/lib/format';
 import { firstTitle } from '@/lib/idea-title';
 
-import { BookIcon, EditIcon, GridIcon, MoonIcon, SearchIcon, SparkIcon, SunIcon } from '../icons';
+import { BookIcon, EditIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SparkIcon, SunIcon } from '../icons';
 import styles from './AppShell.module.css';
 import { JobsTray } from './JobsTray';
 import { type NovelParams } from './routes';
@@ -118,6 +118,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
             hidden: projects.length === 0,
             items: projects.slice(0, 3).map(pinned => ({ to: '/novels/$novelId/overview', params: { novelId: pinned.id }, label: projectTitle(pinned), icon: <BookIcon /> })),
           },
+          { items: [{ to: '/settings', label: 'Settings', icon: <SettingsIcon /> }] },
         ],
       };
 
@@ -136,6 +137,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
     }
     items.push({ id: 'go-projects', group: 'Go to', label: 'All projects', icon: <GridIcon />, onRun: () => navigate({ to: '/' }) });
     items.push({ id: 'go-ideas', group: 'Go to', label: 'Ideas', icon: <SparkIcon />, onRun: () => navigate({ to: '/ideas' }) });
+    items.push({ id: 'go-settings', group: 'Go to', label: 'Settings', icon: <SettingsIcon />, keywords: ['models', 'defaults'], onRun: () => navigate({ to: '/settings' }) });
     for (const candidate of projects) {
       items.push({
         id: `project-${candidate.id}`,
@@ -166,7 +168,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
 
   const leafSegment = pathname.split('/').filter(Boolean).pop();
   const crumbLeaf = inProject && leafSegment != null ? SCREEN_LABEL.get(leafSegment) : undefined;
-  const crumbRoot = inProject && project ? projectTitle(project) : inIdeas ? 'Ideas' : 'Projects';
+  const crumbRoot = inProject && project ? projectTitle(project) : inIdeas ? 'Ideas' : pathname === '/settings' ? 'Settings' : 'Projects';
 
   const saveIdeaName = (next: string): void => {
     if (!seedId) return;
@@ -217,7 +219,10 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
       nav={nav}
       account={{
         name: userDisplayName(meQuery.data),
-        items: [{ id: 'projects', label: 'All projects', icon: <GridIcon />, onSelect: () => void navigate({ to: '/' }) }],
+        items: [
+          { id: 'projects', label: 'All projects', icon: <GridIcon />, onSelect: () => void navigate({ to: '/' }) },
+          { id: 'settings', label: 'Settings', icon: <SettingsIcon />, onSelect: () => void navigate({ to: '/settings' }) },
+        ],
         onSignOut: signOut,
       }}
       breadcrumb={breadcrumb}

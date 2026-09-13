@@ -38,7 +38,7 @@ function setConfig(key: string, value: unknown): void {
 describe('ModelRouterService.resolveModel', () => {
   // Create a minimal stub — we only need resolveModel which has no DB dependency
   const stubTelemetry = {} as never;
-  const router = new ModelRouterService(stubTelemetry, stubDatabaseService(), stubQuotaService());
+  const router = new ModelRouterService(stubTelemetry, stubDatabaseService(), stubQuotaService(), { defaultsFor: async () => undefined } as never);
 
   it('routes Unrestricted roles through the Unrestricted group map, not a single pin', () => {
     expect(router.resolveModel('generation', { contentMode: 'unrestricted' }).model).toBe(UNRESTRICTED_GROUP_DEFAULTS.writing.model);
@@ -119,10 +119,43 @@ describe('ModelRouterService.resolveModel', () => {
     const resolved = router.resolveModel('ideation', { contentMode: 'unrestricted' });
     expect(resolved).toEqual({ provider: 'openrouter', model: 'z-ai/glm-5.2' });
   });
+
+  describe('with the owner’s defaults', () => {
+    const sonnet = { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' };
+    const kimi = { provider: 'openrouter', model: 'moonshotai/kimi-k3' };
+
+    it('should use the owner’s default for a group the project leaves unset', () => {
+      expect(router.resolveModel('ideation', { contentMode: 'standard' }, undefined, { ideation: sonnet })).toEqual(sonnet);
+      expect(router.resolveModel('revision', { contentMode: 'standard' }, undefined, { writing: sonnet })).toEqual(sonnet);
+    });
+
+    it('should let a project override outrank the owner’s default', () => {
+      const project = { contentMode: 'standard', config: { models: { generation: kimi } } };
+      expect(router.resolveModel('generation', project, undefined, { writing: sonnet })).toEqual(kimi);
+    });
+
+    it('should skip an owner default the registry no longer lists', () => {
+      const resolved = router.resolveModel('ideation', { contentMode: 'standard' }, undefined, { ideation: { provider: 'openrouter', model: 'retired/model' } });
+      expect(resolved).toEqual({ provider: 'openrouter', model: 'anthropic/claude-opus-5' });
+    });
+
+    it('should only honour an owner default on an unrestricted project when the allowlist carries it', () => {
+      expect(router.resolveModel('generation', { contentMode: 'unrestricted' }, undefined, { writing: kimi })).toEqual(kimi);
+      expect(router.resolveModel('ideation', { contentMode: 'unrestricted' }, undefined, { ideation: sonnet }).model).toBe(UNRESTRICTED_GROUP_DEFAULTS.ideation.model);
+    });
+
+    it('should load the defaults for the project before resolving', async () => {
+      const defaultsFor = mock(async () => ({ helper: sonnet }));
+      const loaded = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService(), { defaultsFor } as never);
+
+      expect(await loaded.resolveFor('title', { contentMode: 'standard' }, 42n)).toEqual(sonnet);
+      expect(defaultsFor).toHaveBeenCalledWith({ contentMode: 'standard' }, 42n);
+    });
+  });
 });
 
 describe('ModelRouterService.buildClient', () => {
-  const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService());
+  const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService(), { defaultsFor: async () => undefined } as never);
 
   setConfig('ai.openrouter.api.key', 'test-openrouter-key');
   setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
@@ -248,7 +281,7 @@ describe('resolveReasoningEffort', () => {
 });
 
 describe('ModelRouterService.buildClient reasoning', () => {
-  const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService());
+  const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService(), { defaultsFor: async () => undefined } as never);
 
   setConfig('ai.openrouter.api.key', 'test-openrouter-key');
   setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
@@ -352,7 +385,7 @@ describe('PRODUCTION_DEFAULTS vs LOCAL_TEST_DEFAULTS', () => {
 describe('ModelRouterService.structured (repair ladder)', () => {
   function makeRouter(fakeChain: { invoke: ReturnType<typeof mock> }): ModelRouterService {
     const stubTelemetry = {} as never;
-    const router = new ModelRouterService(stubTelemetry, stubDatabaseService(), stubQuotaService());
+    const router = new ModelRouterService(stubTelemetry, stubDatabaseService(), stubQuotaService(), { defaultsFor: async () => undefined } as never);
     // Patch buildClient so no real provider is instantiated (no API keys needed in tests) — the router
     // invokes the returned client directly with the formatted messages.
     (router as unknown as Record<string, unknown>)['buildClient'] = () => fakeChain;

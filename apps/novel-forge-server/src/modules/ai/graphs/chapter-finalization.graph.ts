@@ -214,7 +214,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
       )) as ContinuityOutput;
 
       // Upsert continuity proposal.
-      const resolvedModel = modelRouter.resolveModel('continuity', projectRow as ProjectConfig | undefined);
+      const resolvedModel = await modelRouter.resolveFor('continuity', projectRow as ProjectConfig | undefined, projectId);
       await db.transaction(async tx => {
         await assertOwnsClaim(tx, projectId, state.chapter, state.runId, 'extractContinuity');
         await tx

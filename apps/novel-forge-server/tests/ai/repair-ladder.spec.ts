@@ -52,6 +52,7 @@ function buildServices(db: PrimaryDatabase, seenMessages: BaseMessage[][]) {
       }),
     }),
     resolveModel: () => ({ provider: 'test', model: 'test' }),
+    resolveFor: async () => ({ provider: 'test', model: 'test' }),
   };
 
   const contextAssembler = { forChapter: async () => ({ id: null }) };

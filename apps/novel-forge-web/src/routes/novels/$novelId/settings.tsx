@@ -1,15 +1,15 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Alert, Button, Dialog, FormField, Input, SegmentedControl, Select, Tabs, Textarea, toast } from '@shadow-library/ui';
+import { Alert, Button, Dialog, FormField, Input, SegmentedControl, Tabs, Textarea, toast } from '@shadow-library/ui';
 
-import { PageContainer, PageHeader, QueryState, SectionCard } from '@/components/nf';
+import { INHERIT_MODEL, type ModelKind, ModelPicker, PageContainer, PageHeader, QueryState, SectionCard } from '@/components/nf';
 import { PluginsTab } from '@/features/plugins/PluginsTab';
 import {
-  type AiModelOption,
   aiModelsQueryOptions,
   type ContentMode,
   type ProjectConfig,
   type ProjectModelOverrides,
+  useAccountSettingsQuery,
   useAiModelsQuery,
   useDeleteProjectMutation,
   useListPluginsQuery,
@@ -17,6 +17,7 @@ import {
   useUpdateProjectMutation,
 } from '@/lib/apis';
 import { decodeModelRef, encodeModelRef, projectTitle } from '@/lib/format';
+import { inheritedModel } from '@/lib/model-defaults';
 
 import styles from './settings.module.css';
 
@@ -24,8 +25,6 @@ export const Route = createFileRoute('/novels/$novelId/settings')({
   loader: ({ context }) => context.queryClient.prefetchQuery(aiModelsQueryOptions()),
   component: SettingsScreen,
 });
-
-type ModelKind = 'llm' | 'embedding' | 'image';
 
 type AiRole = keyof ProjectModelOverrides;
 
@@ -43,8 +42,6 @@ const GROUP_ROLES: Record<ModelGroup, AiRole[]> = {
   image: ['image'],
 };
 
-const INHERIT = 'inherit';
-
 interface RoleDef {
   key: ModelGroup;
   label: string;
@@ -55,11 +52,6 @@ interface RoleDef {
 interface RoleGroup {
   title: string;
   roles: RoleDef[];
-}
-
-interface ProviderGroup {
-  label: string;
-  providers: string[];
 }
 
 const ROLE_GROUPS: RoleGroup[] = [
@@ -81,45 +73,12 @@ const ROLE_GROUPS: RoleGroup[] = [
 
 const ALL_ROLES = ROLE_GROUPS.flatMap(g => g.roles);
 
-const PROVIDER_GROUPS: ProviderGroup[] = [
-  { label: 'OpenRouter · API key', providers: ['openrouter'] },
-  { label: 'Ollama · local', providers: ['ollama'] },
-];
-
-interface ModelPickerProps {
-  value: string;
-  onChange: (v: string) => void;
-  kind: ModelKind;
-  models: AiModelOption[];
-  loading: boolean;
-}
-
-function ModelPicker({ value, onChange, kind, models, loading }: ModelPickerProps): React.JSX.Element {
-  return (
-    <Select value={value} onValueChange={onChange} loading={loading} aria-label="Model">
-      <Select.Item value={INHERIT}>Inherit default</Select.Item>
-      {PROVIDER_GROUPS.map(group => {
-        const items = models.filter(m => m.kind === kind && group.providers.includes(m.provider));
-        if (items.length === 0) return null;
-        return (
-          <Select.Group key={group.label} label={group.label}>
-            {items.map(m => (
-              <Select.Item key={m.provider + m.id} value={encodeModelRef(m.provider, m.id)} disabled={!m.enabled} description={m.enabled ? undefined : 'enable on server'}>
-                {m.label}
-              </Select.Item>
-            ))}
-          </Select.Group>
-        );
-      })}
-    </Select>
-  );
-}
-
 function SettingsScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const navigate = useNavigate();
   const projectQuery = useProjectQuery(novelId);
   const modelsQuery = useAiModelsQuery();
+  const accountQuery = useAccountSettingsQuery();
   const pluginsQuery = useListPluginsQuery();
   const updateProject = useUpdateProjectMutation(novelId);
   const deleteProject = useDeleteProjectMutation();
@@ -147,7 +106,7 @@ function SettingsScreen(): React.JSX.Element {
     for (const group of ALL_ROLES) {
       const entry = GROUP_ROLES[group.key].map(role => overrides[role]).find(Boolean);
       const honour = Boolean(entry && (!unrestrictedMode || allowed.has(entry.model)));
-      next[group.key] = honour && entry ? encodeModelRef(entry.provider, entry.model) : INHERIT;
+      next[group.key] = honour && entry ? encodeModelRef(entry.provider, entry.model) : INHERIT_MODEL;
     }
     setModels(next);
   }
@@ -162,14 +121,14 @@ function SettingsScreen(): React.JSX.Element {
   };
 
   const saveModels = (): void => {
-    // A group's choice fans out across every role it owns; INHERIT groups are omitted so the router
+    // A group's choice fans out across every role it owns; INHERIT_MODEL groups are omitted so the router
     // falls back to the profile default. The locked embedding override (if any) is preserved untouched.
     const overrides: ProjectModelOverrides = {};
     const existingEmbedding = project?.config?.models?.embedding;
     if (existingEmbedding) overrides.embedding = existingEmbedding;
     for (const group of ALL_ROLES) {
       const value = models[group.key];
-      if (!value || value === INHERIT) continue;
+      if (!value || value === INHERIT_MODEL) continue;
       const ref = decodeModelRef(value);
       for (const role of GROUP_ROLES[group.key]) overrides[role] = ref;
     }
@@ -194,7 +153,6 @@ function SettingsScreen(): React.JSX.Element {
   const modelOptions = (modelsQuery.data?.models ?? []).filter(m => !unrestricted || allowlist.has(m.id) || m.kind === 'embedding');
   const profile = modelsQuery.data?.profile;
   const inheritedDefaults = unrestricted ? (modelsQuery.data?.unrestrictedDefaults ?? []) : (modelsQuery.data?.defaults ?? []);
-  const defaultsMap = new Map(inheritedDefaults.map(d => [d.role, d.model]));
 
   return (
     <PageContainer>
@@ -243,7 +201,8 @@ function SettingsScreen(): React.JSX.Element {
             <Tabs.Panel value="models" className={styles.tabPanel}>
               <div className={styles.alertWrap}>
                 <Alert intent="info" title="Model changes apply to new runs only">
-                  Each operation picks a provider and model together; the provider follows the model you choose. Operations set to “Inherit default” use the
+                  Each operation picks a provider and model together; the provider follows the model you choose. Operations set to “Inherit default” use your defaults from
+                  Settings, or else the
                   <strong>{profile ? ` ${profile}` : ''}</strong> server profile{unrestricted ? ' Unrestricted map' : ''}. In-flight jobs keep the model they started with.
                   {unrestricted ? ' Unrestricted only lists models on the unrestricted allowlist; other providers are hidden.' : ''}
                 </Alert>
@@ -259,23 +218,33 @@ function SettingsScreen(): React.JSX.Element {
                     <div key={section.title} className={styles.modelGroup}>
                       <div className={styles.modelGroupHead}>{section.title}</div>
                       {section.roles.map(role => {
-                        const inheritedDefault = defaultsMap.get(role.key);
+                        const inherited = inheritedModel(
+                          role.key,
+                          accountQuery.data?.models,
+                          inheritedDefaults,
+                          modelsQuery.data?.models ?? [],
+                          unrestricted ? allowlist : undefined,
+                        );
                         return (
                           <div key={role.key} className={styles.roleRow}>
                             <div className={styles.roleInfo}>
                               <div className={styles.roleLabel}>{role.label}</div>
                               <div className={styles.roleHint}>
                                 {role.hint}
-                                {models[role.key] === INHERIT && inheritedDefault ? ` · inherits ${inheritedDefault}` : ''}
+                                {models[role.key] === INHERIT_MODEL && inherited
+                                  ? ` · inherits ${inherited.model} from ${inherited.source === 'account' ? 'your defaults' : 'the platform'}`
+                                  : ''}
                               </div>
                             </div>
                             <div className={styles.rolePicker}>
                               <ModelPicker
-                                value={models[role.key] ?? INHERIT}
+                                value={models[role.key] ?? INHERIT_MODEL}
                                 onChange={v => setModel(role.key, v)}
                                 kind={role.kind}
                                 models={modelOptions}
                                 loading={modelsQuery.isLoading}
+                                inheritLabel="Inherit default"
+                                aria-label={`${role.label} model`}
                               />
                             </div>
                           </div>

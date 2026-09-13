@@ -8,6 +8,7 @@ import styles from './nf.module.css';
 export { ContentRatingPicker, RatingField, UNRATED } from './ContentRating';
 export { IdeaRename } from './IdeaRename';
 export { Markdown } from './Markdown';
+export { INHERIT_MODEL, type ModelKind, ModelPicker } from './ModelPicker';
 export { PageSkeleton } from './PageSkeleton';
 export { RouteNotFound } from './NotFound';
 export { TurnStatus } from './TurnStatus';

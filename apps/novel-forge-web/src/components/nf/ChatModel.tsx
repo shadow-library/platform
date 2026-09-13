@@ -3,6 +3,7 @@ import { DropdownMenu, toast } from '@shadow-library/ui';
 
 import { ChevronDownIcon } from '@/components/icons';
 import {
+  type AccountModelDefaults,
   type AiModelOption,
   type AiRoleDefault,
   type ChatMessageResponse,
@@ -10,11 +11,13 @@ import {
   type ChatSessionResponse,
   type ProjectConfig,
   type ProjectModelOverrides,
+  useAccountSettingsQuery,
   useAiModelsQuery,
   useProjectQuery,
   useUpdateSessionModelMutation,
 } from '@/lib/apis';
 import { decodeModelRef, encodeModelRef, messageTime } from '@/lib/format';
+import { type AccountModelGroup, inheritedModel } from '@/lib/model-defaults';
 
 import styles from './ChatModel.module.css';
 
@@ -23,7 +26,8 @@ import styles from './ChatModel.module.css';
  *  1. the chat's own override (picked inline in the composer),
  *  2. the project setting for the scope's role (an arc chat IS planning work, so it follows Planning),
  *  3. refinement chat with no explicit model follows the Planning selection,
- *  4. the active profile's default for the scope's model group.
+ *  4. the project owner's default for the scope's model group, from Settings,
+ *  5. the active profile's default for that group.
  * New chats always start on the resolved default; an override sticks to that chat alone.
  */
 
@@ -41,8 +45,8 @@ const SCOPE_CHAT_ROLE: Record<ChatScope, keyof ProjectModelOverrides> = {
   bible_document: 'bible',
 };
 
-// The model group each scope inherits its profile default from ('planning' for every structural scope).
-const SCOPE_GROUP: Record<ChatScope, string> = {
+// The model group each scope inherits its default from ('planning' for every structural scope).
+const SCOPE_GROUP: Record<ChatScope, AccountModelGroup> = {
   project: 'chat',
   ideation: 'ideation',
   novel: 'chat',
@@ -63,7 +67,11 @@ interface ResolvedDefault {
   provider: string;
   model: string;
   group: string;
+  source: 'project' | 'account' | 'platform';
 }
+
+const SOURCE_CAPTION: Record<Exclude<ResolvedDefault['source'], 'project'>, string> = { account: 'your default', platform: 'platform default' };
+const TRIGGER_SOURCE: Record<ResolvedDefault['source'], string> = { project: 'project default', ...SOURCE_CAPTION };
 
 function modelLabel(models: AiModelOption[], provider?: string | null, modelId?: string | null): string {
   if (!provider || !modelId) return 'default';
@@ -71,17 +79,25 @@ function modelLabel(models: AiModelOption[], provider?: string | null, modelId?:
   return match?.label ?? modelId;
 }
 
-function resolveDefault(scopeType: ChatScope, config: ProjectConfig | undefined, defaults: AiRoleDefault[], allowlist?: Set<string>): ResolvedDefault | undefined {
+interface DefaultSources {
+  config?: ProjectConfig;
+  account?: AccountModelDefaults;
+  platform: AiRoleDefault[];
+  registry: AiModelOption[];
+  allowlist?: Set<string>;
+}
+
+function resolveDefault(scopeType: ChatScope, { config, account, platform, registry, allowlist }: DefaultSources): ResolvedDefault | undefined {
   const scopeRole = SCOPE_CHAT_ROLE[scopeType];
   const group = SCOPE_GROUP[scopeType];
   const configured = config?.models ?? {};
   const honour = (ref?: { provider: string; model: string }): ref is { provider: string; model: string } => Boolean(ref && (!allowlist || allowlist.has(ref.model)));
   const scoped = configured[scopeRole];
-  if (honour(scoped)) return { ...scoped, group };
+  if (honour(scoped)) return { ...scoped, group, source: 'project' };
   const plan = configured.plan;
-  if (group === 'chat' && honour(plan)) return { ...plan, group: 'planning' };
-  const fromProfile = defaults.find(d => d.role === group);
-  return fromProfile ? { provider: fromProfile.provider, model: fromProfile.model, group } : undefined;
+  if (group === 'chat' && honour(plan)) return { ...plan, group: 'planning', source: 'project' };
+  const inherited = inheritedModel(group, account, platform, registry, allowlist);
+  return inherited && { provider: inherited.provider, model: inherited.model, group, source: inherited.source };
 }
 
 interface ChatModelMenuProps {
@@ -93,6 +109,7 @@ interface ChatModelMenuProps {
 
 export function ChatModelMenu({ novelId, session, scopeType, disabled }: ChatModelMenuProps): React.JSX.Element {
   const modelsQuery = useAiModelsQuery();
+  const accountQuery = useAccountSettingsQuery();
   const projectQuery = useProjectQuery(novelId);
   const updateModel = useUpdateSessionModelMutation(novelId);
   // The DS radio items call preventDefault on select, so Radix never auto-closes; drive the open state
@@ -103,21 +120,22 @@ export function ChatModelMenu({ novelId, session, scopeType, disabled }: ChatMod
   const allowlist = new Set(modelsQuery.data?.unrestrictedAllowlist ?? []);
   const models = modelsQuery.data?.models ?? [];
   const llmModels = models.filter(m => m.kind === 'llm' && m.enabled && (!unrestricted || allowlist.has(m.id)));
-  const resolvedDefault = resolveDefault(
-    scopeType,
-    projectQuery.data?.config,
-    unrestricted ? (modelsQuery.data?.unrestrictedDefaults ?? []) : (modelsQuery.data?.defaults ?? []),
-    unrestricted ? allowlist : undefined,
-  );
+  const resolvedDefault = resolveDefault(scopeType, {
+    config: projectQuery.data?.config,
+    account: accountQuery.data?.models,
+    platform: unrestricted ? (modelsQuery.data?.unrestrictedDefaults ?? []) : (modelsQuery.data?.defaults ?? []),
+    registry: models,
+    allowlist: unrestricted ? allowlist : undefined,
+  });
 
   const overridden = Boolean(session?.modelProvider && session?.modelId);
   const value = overridden ? encodeModelRef(session?.modelProvider ?? '', session?.modelId ?? '') : 'default';
   const triggerLabel = overridden ? modelLabel(models, session?.modelProvider, session?.modelId) : modelLabel(models, resolvedDefault?.provider, resolvedDefault?.model);
-  const defaultCaption = resolvedDefault
-    ? scopeType === 'ideation'
-      ? `${modelLabel(models, resolvedDefault.provider, resolvedDefault.model)} · studio default`
-      : `${modelLabel(models, resolvedDefault.provider, resolvedDefault.model)} · from ${GROUP_LABEL[resolvedDefault.group] ?? resolvedDefault.group} settings`
-    : undefined;
+  const defaultCaption =
+    resolvedDefault &&
+    `${modelLabel(models, resolvedDefault.provider, resolvedDefault.model)} · ${
+      resolvedDefault.source === 'project' ? `from ${GROUP_LABEL[resolvedDefault.group] ?? resolvedDefault.group} settings` : SOURCE_CAPTION[resolvedDefault.source]
+    }`;
 
   const onChange = (next: string): void => {
     if (!session || next === value) return;
@@ -133,7 +151,7 @@ export function ChatModelMenu({ novelId, session, scopeType, disabled }: ChatMod
       <DropdownMenu.Trigger asChild>
         <button type="button" disabled={disabled || !session} aria-label="Chat model" className={styles.trigger}>
           {triggerLabel}
-          {!overridden && <span className={styles.triggerDefault}>· default</span>}
+          {!overridden && <span className={styles.triggerDefault}>· {resolvedDefault ? TRIGGER_SOURCE[resolvedDefault.source] : 'default'}</span>}
           <ChevronDownIcon size={12} />
         </button>
       </DropdownMenu.Trigger>

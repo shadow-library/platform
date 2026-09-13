@@ -338,7 +338,7 @@ export class IdeationService {
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'chat' });
     const [pack, history] = await Promise.all([this.contextAssembler.forIdeationTurn(seed, round, { commitIds, policy }), this.compaction.buildHistory(session)]);
     const prompt = buildIdeationTurnPrompt(round);
-    const model = this.resolveSessionModel(session, ctx.project as ProjectConfig | undefined);
+    const model = await this.resolveSessionModel(session, projectId, ctx.project as ProjectConfig | undefined);
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'ideation-turn', `session:${session.id}`, { content }, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
@@ -390,7 +390,7 @@ export class IdeationService {
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'chat' });
     const pack = await this.contextAssembler.forIdeationConcepts(seed, { policy });
     const prompt = PROMPT_REGISTRY['ideation-concepts'];
-    const model = this.resolveSessionModel(session, ctx.project as ProjectConfig | undefined);
+    const model = await this.resolveSessionModel(session, projectId, ctx.project as ProjectConfig | undefined);
     const filters = matchPlaybooks(seed.constraints ?? []).matched.filter(match => match.playbook.conceptFilter);
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'ideation-concepts', `session:${session.id}`, { content }, async runId => {
@@ -654,13 +654,13 @@ export class IdeationService {
   }
 
   /** A pin the unrestricted allowlist refuses is ignored rather than recorded: the router would route around it, and the message would name a model that never ran. */
-  private resolveSessionModel(session: Refinement.ChatSession, project?: ProjectConfig): ResolvedModel {
+  private async resolveSessionModel(session: Refinement.ChatSession, projectId: bigint, project?: ProjectConfig): Promise<ResolvedModel> {
     const role = SCOPE_CHAT_ROLE[session.scopeType];
     if (session.modelProvider && session.modelId) {
       const pinned = { provider: session.modelProvider, model: session.modelId };
       if (project?.contentMode !== 'unrestricted' || isUnrestrictedAllowed(role, pinned)) return pinned;
     }
-    return this.modelRouter.resolveModel(role, project);
+    return this.modelRouter.resolveFor(role, project, projectId);
   }
 
   /** The resolved model reaches the router as the `config.models.chat` override it already reads. */

@@ -62,3 +62,51 @@ export class AiModelsResponse {
   @Field(() => [String], { description: 'Model ids that Unrestricted projects may select. Others are coerced to the Unrestricted group default.' })
   unrestrictedAllowlist: string[];
 }
+
+@Schema()
+export class AccountModelRef {
+  @Field()
+  provider: string;
+
+  @Field()
+  model: string;
+}
+
+// Enumerated per group, like `ProjectModelOverrides`, so client code generation sees a closed object.
+@Schema({ description: 'Your default model per group. A group left out uses the platform default.' })
+export class AccountModelDefaults {
+  @Field(() => AccountModelRef, { optional: true, description: 'Chapter prose: drafts, revisions and repairs.' })
+  writing?: AccountModelRef;
+
+  @Field(() => AccountModelRef, { optional: true, description: 'Premise, plan, arcs, outlines, bible and extraction.' })
+  planning?: AccountModelRef;
+
+  @Field(() => AccountModelRef, { optional: true, description: 'Continuity judge, validation and editorial review.' })
+  review?: AccountModelRef;
+
+  @Field(() => AccountModelRef, { optional: true, description: 'Refinement chat on a novel.' })
+  chat?: AccountModelRef;
+
+  @Field(() => AccountModelRef, { optional: true, description: 'Idea names, chapter titles and context compaction.' })
+  helper?: AccountModelRef;
+
+  @Field(() => AccountModelRef, { optional: true, description: 'Cover and scene art; must name an image model.' })
+  image?: AccountModelRef;
+
+  @Field(() => AccountModelRef, { optional: true, description: 'Ideation studio chats.' })
+  ideation?: AccountModelRef;
+}
+
+@Schema({ description: 'Settings that apply to every project and idea the signed-in author owns.' })
+export class AccountSettingsResponse {
+  @Field(() => AccountModelDefaults, {
+    description: 'Used when neither a chat pin nor the project names a model. Unrestricted projects only take a default on the unrestricted allowlist.',
+  })
+  models: AccountModelDefaults;
+}
+
+@Schema({ description: 'Replaces the signed-in author’s settings.' })
+export class UpdateAccountSettingsBody {
+  @Field(() => AccountModelDefaults, { description: 'The full set of defaults; a group left out goes back to the platform default.' })
+  models: AccountModelDefaults;
+}

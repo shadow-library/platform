@@ -36,7 +36,7 @@ describe('isRegisteredModel', () => {
 });
 
 describe('ModelRouterService.resolveModel fail-closed guard', () => {
-  const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService());
+  const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService(), { defaultsFor: async () => undefined } as never);
 
   it('should return a registry-backed override on a standard project', () => {
     const resolved = router.resolveModel('generation', {
@@ -73,7 +73,7 @@ describe('ModelRouterService.resolveModel fail-closed guard', () => {
 });
 
 describe('ModelRouterService.buildClient fail-closed backstop', () => {
-  const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService());
+  const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService(), { defaultsFor: async () => undefined } as never);
   setConfig('ai.openrouter.api.key', 'test-openrouter-key');
   setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
 

@@ -135,6 +135,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/ai/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Settings */
+    get: operations['get_api_v1_ai_settings'];
+    /** Update Settings */
+    put: operations['put_api_v1_ai_settings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/ai/models': {
     parameters: {
       query?: never;
@@ -2761,6 +2779,37 @@ export interface components {
     };
     SwitchOrganisationResponse: {
       organisationId: string;
+    };
+    /** @description Settings that apply to every project and idea the signed-in author owns. */
+    AccountSettingsResponse: {
+      /** @description Used when neither a chat pin nor the project names a model. Unrestricted projects only take a default on the unrestricted allowlist. */
+      models: components['schemas']['AccountModelDefaults'];
+    };
+    /** @description Your default model per group. A group left out uses the platform default. */
+    AccountModelDefaults: {
+      /** @description Chapter prose: drafts, revisions and repairs. */
+      writing?: components['schemas']['AccountModelRef'];
+      /** @description Premise, plan, arcs, outlines, bible and extraction. */
+      planning?: components['schemas']['AccountModelRef'];
+      /** @description Continuity judge, validation and editorial review. */
+      review?: components['schemas']['AccountModelRef'];
+      /** @description Refinement chat on a novel. */
+      chat?: components['schemas']['AccountModelRef'];
+      /** @description Idea names, chapter titles and context compaction. */
+      helper?: components['schemas']['AccountModelRef'];
+      /** @description Cover and scene art; must name an image model. */
+      image?: components['schemas']['AccountModelRef'];
+      /** @description Ideation studio chats. */
+      ideation?: components['schemas']['AccountModelRef'];
+    };
+    AccountModelRef: {
+      provider: string;
+      model: string;
+    };
+    /** @description Replaces the signed-in author’s settings. */
+    UpdateAccountSettingsBody: {
+      /** @description The full set of defaults; a group left out goes back to the platform default. */
+      models: components['schemas']['AccountModelDefaults'];
     };
     AiModelsResponse: {
       /** @description The active server profile. Roles without an override inherit this profile's defaults. */
@@ -5815,6 +5864,86 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_ai_settings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountSettingsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_ai_settings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateAccountSettingsBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountSettingsResponse'];
+        };
+      };
       /** @description Default Response */
       '4XX': {
         headers: {
@@ -13708,6 +13837,10 @@ export type AuthOrganisationsResponse = components['schemas']['AuthOrganisations
 export type AuthOrganisationItem = components['schemas']['AuthOrganisationItem'];
 export type SwitchOrganisationBody = components['schemas']['SwitchOrganisationBody'];
 export type SwitchOrganisationResponse = components['schemas']['SwitchOrganisationResponse'];
+export type AccountSettingsResponse = components['schemas']['AccountSettingsResponse'];
+export type AccountModelDefaults = components['schemas']['AccountModelDefaults'];
+export type AccountModelRef = components['schemas']['AccountModelRef'];
+export type UpdateAccountSettingsBody = components['schemas']['UpdateAccountSettingsBody'];
 export type AiModelsResponse = components['schemas']['AiModelsResponse'];
 export type AiModelOption = components['schemas']['AiModelOption'];
 export type AiRoleDefault = components['schemas']['AiRoleDefault'];

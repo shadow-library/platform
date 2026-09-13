@@ -161,7 +161,11 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
     const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop, new ProjectEventService());
-    const modelRouter = { structured: structuredMock, resolveModel: () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }) } as never;
+    const modelRouter = {
+      structured: structuredMock,
+      resolveModel: () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }),
+      resolveFor: async () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }),
+    } as never;
     proposals = new ProposalService(databaseService);
     applier = new ProposalApplyService(databaseService, new ActionExecutorRegistry());
     const compaction = new ChatCompactionService(databaseService, modelRouter, workflowRuns);

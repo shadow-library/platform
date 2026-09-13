@@ -362,7 +362,7 @@ export class ChatService {
 
     // Resolve which model this turn runs on, then inject it as the `config.models.chat` override the
     // router already reads — the turn keeps the `chat` role for prompts/telemetry either way.
-    const resolvedModel = this.resolveSessionModel(session, project as ProjectConfig | undefined);
+    const resolvedModel = await this.resolveSessionModel(session, projectId, project as ProjectConfig | undefined);
     const baseConfig = (project?.config as { models?: Record<string, unknown> } | null) ?? {};
     const effectiveProject = { ...project, config: { ...baseConfig, models: { ...(baseConfig.models ?? {}), chat: resolvedModel } } } as typeof project;
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'chat-turn', `session:${sessionId}`, { content }, async runId => {
@@ -485,14 +485,14 @@ export class ChatService {
    * The chat model resolution ladder, most specific first:
    *  1. the chat's own override (the author picked a model for this conversation),
    *  2. otherwise the model routed for the scope's role — the router folds in the project's group
-   *     selection and the chat → planning default (arc chat → the planning model, and so on).
+   *     selection, the chat → planning default (arc chat → the planning model, and so on), then the owner's defaults.
    */
-  private resolveSessionModel(session: Refinement.ChatSession, project?: ProjectConfig): ResolvedModel {
+  private async resolveSessionModel(session: Refinement.ChatSession, projectId: bigint, project?: ProjectConfig): Promise<ResolvedModel> {
     if (session.modelProvider && session.modelId) {
       const picked = { provider: session.modelProvider, model: session.modelId };
       if (project?.contentMode !== 'unrestricted' || isUnrestrictedAllowed(SCOPE_CHAT_ROLE[session.scopeType], picked)) return picked;
     }
-    return this.modelRouter.resolveModel(SCOPE_CHAT_ROLE[session.scopeType], project);
+    return this.modelRouter.resolveFor(SCOPE_CHAT_ROLE[session.scopeType], project, projectId);
   }
 
   private async persistUserMessage(projectId: bigint, session: Refinement.ChatSession, content: string, runId: string): Promise<Refinement.ChatMessage> {

@@ -37,7 +37,12 @@ class SmokeNoop extends BaseCallbackHandler {
 const stubDbService = {
   getPostgresClient: () => ({ query: { llmCache: { findFirst: async () => undefined } }, insert: () => ({ values: () => ({ onConflictDoNothing: () => Promise.resolve() }) }) }),
 };
-const router = new ModelRouterService(new SmokeNoop() as never, stubDbService as never, { enforce: async () => undefined } as never);
+const router = new ModelRouterService(
+  new SmokeNoop() as never,
+  stubDbService as never,
+  { enforce: async () => undefined } as never,
+  { defaultsFor: async () => undefined } as never,
+);
 
 logger.info('AI smoke test starting', { ollamaHost, profile: 'local-test' });
 

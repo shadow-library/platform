@@ -106,6 +106,7 @@ describe.if(pgAvailable)('chapter generation graph brief guidance', () => {
         }),
       }),
       resolveModel: () => ({ provider: 'test', model: 'test' }),
+      resolveFor: async () => ({ provider: 'test', model: 'test' }),
     };
 
     return {

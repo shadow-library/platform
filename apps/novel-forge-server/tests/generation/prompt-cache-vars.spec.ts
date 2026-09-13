@@ -94,6 +94,7 @@ describe.if(pgAvailable)('generation path prompt-cache vars', () => {
       },
       chatFor: () => ({ bindTools: () => ({ invoke: async () => new AIMessage(JSON.stringify({ verdict: 'consistent', findings: [] })) }) }),
       resolveModel: () => ({ provider: 'test', model: 'test' }),
+      resolveFor: async () => ({ provider: 'test', model: 'test' }),
     };
     const services = {
       db,

@@ -350,7 +350,11 @@ describe.if(pgAvailable)('GraduationService', () => {
       const graph = createBibleBuilderGraph({
         db,
         contextAssembler: { forChapter: async () => ({ id: null }) },
-        modelRouter: { structured: async () => ({ body: 'Stage prose built from the graduated premise.' }), resolveModel: () => ({ provider: 'test', model: 'test' }) },
+        modelRouter: {
+          structured: async () => ({ body: 'Stage prose built from the graduated premise.' }),
+          resolveModel: () => ({ provider: 'test', model: 'test' }),
+          resolveFor: async () => ({ provider: 'test', model: 'test' }),
+        },
         telemetry: {},
         toolRegistry: { forNode: () => [], getRaw: () => [] },
         indexingService: {},
