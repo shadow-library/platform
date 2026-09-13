@@ -38,30 +38,32 @@ export function CosmeticsPanel({ deck }: CosmeticsPanelProps): ReactElement {
           const actionable = cosmetic.state === 'owned' || cosmetic.state === 'affordable';
           return (
             <Card key={cosmetic.id} padding="md" selected={cosmetic.state === 'equipped'}>
-              <div className={styles.tile}>
-                <div className={styles.tileHead}>
-                  <span className={styles.glyph} data-owned={owned} aria-hidden>
-                    {cosmetic.glyph}
-                  </span>
-                  <span className={styles.tileName}>{cosmetic.name}</span>
-                  {cosmetic.state === 'equipped' ? (
-                    <Badge variant="soft" intent="info" size="sm">
-                      Equipped
-                    </Badge>
+              <Card.Body>
+                <div className={styles.tile}>
+                  <div className={styles.tileHead}>
+                    <span className={styles.glyph} data-owned={owned} aria-hidden>
+                      {cosmetic.glyph}
+                    </span>
+                    <span className={styles.tileName}>{cosmetic.name}</span>
+                    {cosmetic.state === 'equipped' ? (
+                      <Badge variant="soft" intent="info" size="sm">
+                        Equipped
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <span className={styles.tileMeta}>{cosmetic.note}</span>
+                  {cosmetic.state === 'short' ? (
+                    <span className={styles.tileMeta}>
+                      {cosmetic.priceCoins} coins, and you have {deck.hero.coins}. It waits here until the balance reaches it.
+                    </span>
                   ) : null}
+                  <div className={styles.tileAction}>
+                    <Button size="sm" variant={cosmetic.state === 'equipped' ? 'ghost' : 'secondary'} disabled={!actionable} onClick={() => act(cosmetic)}>
+                      {ACTION_LABELS[cosmetic.state](cosmetic)}
+                    </Button>
+                  </div>
                 </div>
-                <span className={styles.tileMeta}>{cosmetic.note}</span>
-                {cosmetic.state === 'short' ? (
-                  <span className={styles.tileMeta}>
-                    {cosmetic.priceCoins} coins, and you have {deck.hero.coins}. It waits here until the balance reaches it.
-                  </span>
-                ) : null}
-                <div className={styles.tileAction}>
-                  <Button size="sm" variant={cosmetic.state === 'equipped' ? 'ghost' : 'secondary'} disabled={!actionable} onClick={() => act(cosmetic)}>
-                    {ACTION_LABELS[cosmetic.state](cosmetic)}
-                  </Button>
-                </div>
-              </div>
+              </Card.Body>
             </Card>
           );
         })}

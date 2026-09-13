@@ -61,7 +61,7 @@ export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): Re
       <div className={styles.split}>
         <div className={styles.column}>
           <Card padding="lg">
-            <div className={styles.padLg}>
+            <Card.Body>
               <div className={styles.detailHead}>
                 <div className={styles.rowMain}>
                   <p className={styles.bigAmount}>{home === null ? formatMinor(detail.amountMinor, detail.currency) : formatMinor(home, HOME_CURRENCY)}</p>
@@ -104,14 +104,14 @@ export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): Re
                   {detail.linkedQuestNote && <DescriptionList.Item term="Linked quest">{detail.linkedQuestNote}</DescriptionList.Item>}
                 </DescriptionList>
               </div>
-            </div>
+            </Card.Body>
           </Card>
 
           {editing && <ExpenseEntryPanel today={todayISODate()} existing={detail} onClose={() => setEditing(false)} />}
 
           {detail.receipt && (
             <Card padding="lg">
-              <div className={styles.padLg}>
+              <Card.Body>
                 <div className={styles.cardHead}>
                   <h2 className={styles.cardTitle}>Receipt review</h2>
                   <Badge variant="soft" intent="info">
@@ -142,24 +142,24 @@ export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): Re
                     ))}
                   </div>
                 </div>
-              </div>
+              </Card.Body>
             </Card>
           )}
         </div>
 
         <div className={styles.column}>
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h2 className={styles.railTitle}>The rate does not move</h2>
               <p className={styles.railProse}>
                 A foreign expense keeps the amount you entered and the rate captured when you entered it. Reports convert with that rate for good — a past month never re-prices
                 itself.
               </p>
-            </div>
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h2 className={styles.railTitle}>Edit history</h2>
               <ul className={styles.audit}>
                 {detail.audit.map(entry => (
@@ -168,7 +168,7 @@ export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): Re
                   </li>
                 ))}
               </ul>
-            </div>
+            </Card.Body>
           </Card>
         </div>
       </div>

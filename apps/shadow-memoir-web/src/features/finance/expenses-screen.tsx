@@ -83,7 +83,7 @@ export function ExpensesScreen(): ReactElement {
         ) : (
           <>
             <Card padding="md">
-              <div className={styles.pad}>
+              <Card.Body>
                 <Statistic
                   label={`Spent ${summary.data.periodLabel.toLowerCase()}`}
                   value={minorToMajor(summary.data.spentMinor, home)}
@@ -92,37 +92,37 @@ export function ExpensesScreen(): ReactElement {
                   positiveIs="down"
                   comparison={summary.data.comparisonLabel || undefined}
                 />
-              </div>
+              </Card.Body>
             </Card>
             <Card padding="md">
-              <div className={styles.pad}>
+              <Card.Body>
                 <Statistic
                   label="Left of budget"
                   value={minorToMajor(summary.data.budgetLeftMinor ?? 0, home)}
                   format={{ style: 'currency', currency: home }}
                   comparison={summary.data.budgetMinor === null ? 'No budget set for this range' : `${summary.data.daysRemaining} days remaining`}
                 />
-              </div>
+              </Card.Body>
             </Card>
             <Card padding="md">
-              <div className={styles.pad}>
+              <Card.Body>
                 <Statistic
                   label="Subscriptions"
                   value={minorToMajor(summary.data.subscriptionsMonthlyMinor, home)}
                   format={{ style: 'currency', currency: home }}
                   comparison={`${summary.data.activeSubscriptions} active · ${summary.data.nextSubscriptionLabel}`}
                 />
-              </div>
+              </Card.Body>
             </Card>
             <Card padding="md">
-              <div className={styles.pad}>
+              <Card.Body>
                 <Statistic
                   label="Average day"
                   value={minorToMajor(summary.data.averageDayMinor, home)}
                   format={{ style: 'currency', currency: home }}
                   comparison={`${summary.data.daysLogged} days logged`}
                 />
-              </div>
+              </Card.Body>
             </Card>
           </>
         )}
@@ -131,7 +131,7 @@ export function ExpensesScreen(): ReactElement {
       <div className={styles.split}>
         <div className={styles.column}>
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>Expenses</h2>
                 <div className={styles.controls}>
@@ -183,13 +183,13 @@ export function ExpensesScreen(): ReactElement {
                   </Button>
                 </div>
               )}
-            </div>
+            </Card.Body>
           </Card>
 
           {entryOpen && <ExpenseEntryPanel today={today} onClose={() => setEntryOpen(false)} />}
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>Where it went</h2>
                 <Button size="sm" variant="ghost" asChild>
@@ -212,7 +212,7 @@ export function ExpensesScreen(): ReactElement {
                 ))}
                 {summary.data?.categories.length === 0 && <p className={styles.railProse}>Nothing logged in this range yet.</p>}
               </div>
-            </div>
+            </Card.Body>
           </Card>
         </div>
 
@@ -225,7 +225,7 @@ export function ExpensesScreen(): ReactElement {
           )}
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <div className={styles.cardHead}>
                 <h2 className={styles.railTitle}>Subscriptions</h2>
                 <Button size="sm" variant="ghost" asChild>
@@ -236,11 +236,11 @@ export function ExpensesScreen(): ReactElement {
                 {formatMinor(summary.data?.subscriptionsMonthlyMinor ?? 0, home)} a month across everything active. Nothing is ever charged for you — each cycle waits for your
                 confirmation.
               </p>
-            </div>
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h2 className={styles.railTitle}>Multi-currency</h2>
               <p className={styles.railProse}>
                 Your base currency is {home}. Foreign spend is stored in the original currency and converted at the rate on the day — the original is never overwritten.
@@ -255,11 +255,11 @@ export function ExpensesScreen(): ReactElement {
                   </li>
                 ))}
               </ul>
-            </div>
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h2 className={styles.railTitle}>Receipt scans today</h2>
               <div className={styles.quota}>
                 <span className={styles.quotaValue}>
@@ -269,7 +269,7 @@ export function ExpensesScreen(): ReactElement {
               </div>
               <Progress value={summary.data?.receiptScansUsed ?? 0} max={summary.data?.receiptScanLimit ?? 10} aria-label="Receipt scans used today" />
               <p className={styles.railProse}>Scanning is a convenience — expenses can always be typed. The count resets {summary.data?.receiptQuotaResetsOn ?? 'tomorrow'}.</p>
-            </div>
+            </Card.Body>
           </Card>
         </div>
       </div>

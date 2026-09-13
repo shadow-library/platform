@@ -99,6 +99,11 @@
   color: inherit;
 }
 
+.jumpItem:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+
 .jumpMeta {
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);

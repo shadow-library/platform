@@ -46,16 +46,6 @@
   min-width: 0;
 }
 
-.pad {
-  padding: 16px;
-  min-width: 0;
-}
-
-.padLg {
-  padding: 20px;
-  min-width: 0;
-}
-
 .cardHead {
   display: flex;
   align-items: center;

@@ -47,7 +47,7 @@ export function WeightScreen(): ReactElement {
       <div className={styles.split}>
         <div className={styles.column}>
           <Card padding="lg">
-            <div className={styles.padLg}>
+            <Card.Body>
               <div className={styles.weightHead}>
                 <div>
                   <p className={styles.eyebrow}>Today</p>
@@ -82,11 +82,11 @@ export function WeightScreen(): ReactElement {
 
               <EntryCapNote advisory={advisory} />
               <LinkageOfferNote offer={linkage} />
-            </div>
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h3 className={styles.cardTitle}>Trend</h3>
               <SparkBars values={view.trend.map(point => point.value)} label="Weight trend" height={150} highlightLast />
               <div className={styles.axis}>
@@ -94,11 +94,11 @@ export function WeightScreen(): ReactElement {
                 <span>{view.trendNote}</span>
                 <span>{view.trend[view.trend.length - 1]?.date}</span>
               </div>
-            </div>
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h3 className={styles.cardTitle}>Entries</h3>
               {view.entries.length === 0 && <EmptyState size="inline" title="No entries yet" description="Step on the scale when it suits you. Missing days are fine." />}
               {view.entries.map(entry => (
@@ -114,29 +114,29 @@ export function WeightScreen(): ReactElement {
                   </span>
                 </div>
               ))}
-            </div>
+            </Card.Body>
           </Card>
         </div>
 
         <div className={styles.column}>
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h3 className={styles.railTitle}>Context, not a target</h3>
               <p className={styles.prose}>
                 Shadow Memoir never sets a goal weight and never grants or removes XP for a number on a scale. Weight is here so you can see a trend, nothing more.
               </p>
-            </div>
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h3 className={styles.railTitle}>Alongside the trend</h3>
               <ul className={styles.list}>
                 {view.context.map(line => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>
-            </div>
+            </Card.Body>
           </Card>
         </div>
       </div>

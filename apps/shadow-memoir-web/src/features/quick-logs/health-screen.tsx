@@ -18,7 +18,7 @@ function MetricCard({ metric, date }: { metric: HealthMetricState; date: string 
 
   return (
     <Card padding="md">
-      <div className={styles.pad}>
+      <Card.Body>
         <div className={styles.metricHead}>
           <div>
             <h3 className={styles.cardTitle}>{metric.definition.name}</h3>
@@ -64,7 +64,7 @@ function MetricCard({ metric, date }: { metric: HealthMetricState; date: string 
           <span>14 days</span>
           <span>{metric.trendLabel}</span>
         </div>
-      </div>
+      </Card.Body>
     </Card>
   );
 }
@@ -122,7 +122,7 @@ export function HealthMetricsScreen(): ReactElement {
 
       <div className={styles.split}>
         <Card padding="md">
-          <div className={styles.pad}>
+          <Card.Body>
             <h3 className={styles.cardTitle}>Recent entries</h3>
             {view.history.map(row => (
               <div key={`${row.date}-${row.text}`} className={styles.row}>
@@ -139,29 +139,29 @@ export function HealthMetricsScreen(): ReactElement {
                 )}
               </div>
             ))}
-          </div>
+          </Card.Body>
         </Card>
 
         <div className={styles.column}>
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h3 className={styles.railTitle}>All of this is optional</h3>
               <p className={styles.prose}>
                 Every metric here is typed by you, by hand. Blank days are blank — they are not zeros, they do not break a streak, and they never cost HP. Only quests with an
                 explicit threshold read these numbers.
               </p>
-            </div>
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h3 className={styles.railTitle}>Quest thresholds</h3>
               <ul className={styles.list}>
                 {view.thresholds.map(threshold => (
                   <li key={threshold.label}>{threshold.label}</li>
                 ))}
               </ul>
-            </div>
+            </Card.Body>
           </Card>
         </div>
       </div>

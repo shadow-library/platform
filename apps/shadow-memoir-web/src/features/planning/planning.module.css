@@ -164,6 +164,11 @@
   color: inherit;
 }
 
+.dayItem:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+
 .dayItem[data-tone='kept'] {
   background: var(--sh-accent-soft);
   border-color: transparent;

@@ -39,70 +39,86 @@ export function InsightsScreen(): ReactElement {
           <div className={styles.kpis}>
             {insights.data.kpis.map(kpi => (
               <Card key={kpi.id} padding="md">
-                <Statistic
-                  label={kpi.label}
-                  value={kpi.value}
-                  unit={kpi.unit}
-                  delta={kpi.delta}
-                  positiveIs={kpi.positiveIs}
-                  comparison={kpi.comparison}
-                  format={kpi.format}
-                  size="md"
-                />
+                <Card.Body>
+                  <Statistic
+                    label={kpi.label}
+                    value={kpi.value}
+                    unit={kpi.unit}
+                    delta={kpi.delta}
+                    positiveIs={kpi.positiveIs}
+                    comparison={kpi.comparison}
+                    format={kpi.format}
+                    size="md"
+                  />
+                </Card.Body>
               </Card>
             ))}
           </div>
 
           <div className={styles.pair}>
             <Card padding="md">
-              <h2 className={screenStyles.cardTitle}>Adherence by quest</h2>
-              <p className={screenStyles.cardBody}>Share of scheduled occurrences kept. Partials count as half.</p>
-              <Meters bars={insights.data.adherenceByQuest} max={100} unitLabel="per cent kept" />
+              <Card.Body>
+                <h2 className={screenStyles.cardTitle}>Adherence by quest</h2>
+                <p className={screenStyles.cardBody}>Share of scheduled occurrences kept. Partials count as half.</p>
+                <Meters bars={insights.data.adherenceByQuest} max={100} unitLabel="per cent kept" />
+              </Card.Body>
             </Card>
 
             <Card padding="md">
-              <h2 className={screenStyles.cardTitle}>Adherence by weekday</h2>
-              <p className={screenStyles.cardBody}>{insights.data.weekdayNote}</p>
-              <Columns bars={insights.data.adherenceByWeekday} unitLabel="per cent kept" />
-            </Card>
-          </div>
-
-          <div className={styles.pair}>
-            <Card padding="md">
-              <h2 className={screenStyles.cardTitle}>Experience earned, by month</h2>
-              <Columns bars={insights.data.xpByMonth} unitLabel="XP" />
-              <p className={styles.note}>{insights.data.xpNote}</p>
-            </Card>
-
-            <Card padding="md">
-              <h2 className={screenStyles.cardTitle}>Reasons given on missed and partial days</h2>
-              <Meters bars={insights.data.reasons} max={Math.max(...insights.data.reasons.map(bar => bar.value))} unitLabel="times" />
-              <p className={styles.note}>{insights.data.reasonsNote}</p>
+              <Card.Body>
+                <h2 className={screenStyles.cardTitle}>Adherence by weekday</h2>
+                <p className={screenStyles.cardBody}>{insights.data.weekdayNote}</p>
+                <Columns bars={insights.data.adherenceByWeekday} unitLabel="per cent kept" />
+              </Card.Body>
             </Card>
           </div>
 
           <div className={styles.pair}>
             <Card padding="md">
-              <h2 className={screenStyles.cardTitle}>Spending by category</h2>
-              <Meters bars={insights.data.spend} max={Math.max(...insights.data.spend.map(bar => bar.value))} unitLabel="spent" />
-              <p className={styles.note}>{insights.data.spendNote}</p>
+              <Card.Body>
+                <h2 className={screenStyles.cardTitle}>Experience earned, by month</h2>
+                <Columns bars={insights.data.xpByMonth} unitLabel="XP" />
+                <p className={styles.note}>{insights.data.xpNote}</p>
+              </Card.Body>
             </Card>
 
             <Card padding="md">
-              <h2 className={screenStyles.cardTitle}>Body and health</h2>
-              <div className={styles.trends}>
-                {insights.data.trends.map(trend => (
-                  <Trend key={trend.id} trend={trend} />
-                ))}
-              </div>
+              <Card.Body>
+                <h2 className={screenStyles.cardTitle}>Reasons given on missed and partial days</h2>
+                <Meters bars={insights.data.reasons} max={Math.max(...insights.data.reasons.map(bar => bar.value))} unitLabel="times" />
+                <p className={styles.note}>{insights.data.reasonsNote}</p>
+              </Card.Body>
+            </Card>
+          </div>
+
+          <div className={styles.pair}>
+            <Card padding="md">
+              <Card.Body>
+                <h2 className={screenStyles.cardTitle}>Spending by category</h2>
+                <Meters bars={insights.data.spend} max={Math.max(...insights.data.spend.map(bar => bar.value))} unitLabel="spent" />
+                <p className={styles.note}>{insights.data.spendNote}</p>
+              </Card.Body>
+            </Card>
+
+            <Card padding="md">
+              <Card.Body>
+                <h2 className={screenStyles.cardTitle}>Body and health</h2>
+                <div className={styles.trends}>
+                  {insights.data.trends.map(trend => (
+                    <Trend key={trend.id} trend={trend} />
+                  ))}
+                </div>
+              </Card.Body>
             </Card>
           </div>
 
           <Card padding="md">
-            <h2 className={screenStyles.cardTitle}>These numbers are yours alone</h2>
-            <p className={screenStyles.cardBody}>
-              Every comparison here is you against your own history, and every one of them is optional to look at. Nothing on this screen is shared, published or ranked.
-            </p>
+            <Card.Body>
+              <h2 className={screenStyles.cardTitle}>These numbers are yours alone</h2>
+              <p className={screenStyles.cardBody}>
+                Every comparison here is you against your own history, and every one of them is optional to look at. Nothing on this screen is shared, published or ranked.
+              </p>
+            </Card.Body>
           </Card>
         </>
       ) : null}

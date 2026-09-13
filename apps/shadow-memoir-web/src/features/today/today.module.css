@@ -92,8 +92,11 @@
 }
 
 .listCard {
-  padding: 0;
   overflow: hidden;
+}
+
+.listCard .listBody {
+  padding: 0;
 }
 
 .list {

@@ -71,75 +71,83 @@ export function PlanningBoardScreen(): ReactElement {
             </div>
           ) : (
             <Card padding="md">
-              <div className={styles.month}>
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(head => (
-                  <span key={head} className={styles.monthHead}>
-                    {head}
+              <Card.Body>
+                <div className={styles.month}>
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(head => (
+                    <span key={head} className={styles.monthHead}>
+                      {head}
+                    </span>
+                  ))}
+                  {plan.data.month.map((cell, index) => (
+                    <div key={cell.date ?? `blank-${index}`} className={styles.monthCell} data-in-month={cell.inMonth} data-today={cell.isToday}>
+                      <div className={styles.monthCellHead}>
+                        <span className={styles.mono}>{cell.date ? Number(cell.date.slice(-2)) : ''}</span>
+                        {cell.locked ? (
+                          <span className={styles.lock} title="Plan locked">
+                            locked
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className={styles.dots} aria-hidden>
+                        {cell.outcomes.map((state, dotIndex) => (
+                          <span key={dotIndex} className={styles.dot} data-tone={outcomeTone(state)} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className={styles.legend}>
+                  <span>
+                    <span className={styles.dot} data-tone="kept" /> kept
                   </span>
-                ))}
-                {plan.data.month.map((cell, index) => (
-                  <div key={cell.date ?? `blank-${index}`} className={styles.monthCell} data-in-month={cell.inMonth} data-today={cell.isToday}>
-                    <div className={styles.monthCellHead}>
-                      <span className={styles.mono}>{cell.date ? Number(cell.date.slice(-2)) : ''}</span>
-                      {cell.locked ? (
-                        <span className={styles.lock} title="Plan locked">
-                          locked
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className={styles.dots} aria-hidden>
-                      {cell.outcomes.map((state, dotIndex) => (
-                        <span key={dotIndex} className={styles.dot} data-tone={outcomeTone(state)} />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className={styles.legend}>
-                <span>
-                  <span className={styles.dot} data-tone="kept" /> kept
-                </span>
-                <span>
-                  <span className={styles.dot} data-tone="partial" /> partial
-                </span>
-                <span>
-                  <span className={styles.dot} data-tone="closed" /> skipped or missed
-                </span>
-                <span>
-                  <span className={styles.dot} data-tone="open" /> still open
-                </span>
-              </div>
+                  <span>
+                    <span className={styles.dot} data-tone="partial" /> partial
+                  </span>
+                  <span>
+                    <span className={styles.dot} data-tone="closed" /> skipped or missed
+                  </span>
+                  <span>
+                    <span className={styles.dot} data-tone="open" /> still open
+                  </span>
+                </div>
+              </Card.Body>
             </Card>
           )}
 
           <div className={styles.summaries}>
             <Card padding="md">
-              <h2 className={styles.cardTitle}>Crown period · {plan.data.crown.label}</h2>
-              <Progress value={plan.data.crown.keptPercent} max={100} size="md" label="Crown period progress" />
-              <p className={styles.cardBody}>
-                Day {plan.data.crown.dayIndex} of {plan.data.crown.dayCount} · {plan.data.crown.keptPercent}% of scheduled occurrences kept. The crown is awarded on the period, not
-                on any single day.
-              </p>
+              <Card.Body>
+                <h2 className={styles.cardTitle}>Crown period · {plan.data.crown.label}</h2>
+                <Progress value={plan.data.crown.keptPercent} max={100} size="md" label="Crown period progress" />
+                <p className={styles.cardBody}>
+                  Day {plan.data.crown.dayIndex} of {plan.data.crown.dayCount} · {plan.data.crown.keptPercent}% of scheduled occurrences kept. The crown is awarded on the period,
+                  not on any single day.
+                </p>
+              </Card.Body>
             </Card>
             <Card padding="md">
-              <h2 className={styles.cardTitle}>Reschedule budget</h2>
-              <p className={styles.budget}>
-                <span className={styles.budgetValue}>
-                  {plan.data.rescheduleBudget.used} / {plan.data.rescheduleBudget.cap}
-                </span>
-                <span className={styles.cardBody}>used in the last 7 days</span>
-              </p>
-              <p className={styles.cardBody}>
-                Resets {formatShortDate(plan.data.rescheduleBudget.resetsOn)}. Past the cap, moves still happen — they are recorded as postpones with a reason instead.
-              </p>
+              <Card.Body>
+                <h2 className={styles.cardTitle}>Reschedule budget</h2>
+                <p className={styles.budget}>
+                  <span className={styles.budgetValue}>
+                    {plan.data.rescheduleBudget.used} / {plan.data.rescheduleBudget.cap}
+                  </span>
+                  <span className={styles.cardBody}>used in the last 7 days</span>
+                </p>
+                <p className={styles.cardBody}>
+                  Resets {formatShortDate(plan.data.rescheduleBudget.resetsOn)}. Past the cap, moves still happen — they are recorded as postpones with a reason instead.
+                </p>
+              </Card.Body>
             </Card>
             <Card padding="md">
-              <h2 className={styles.cardTitle}>This week at a glance</h2>
-              <ul className={styles.glance}>
-                {plan.data.glance.map(line => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
+              <Card.Body>
+                <h2 className={styles.cardTitle}>This week at a glance</h2>
+                <ul className={styles.glance}>
+                  {plan.data.glance.map(line => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </Card.Body>
             </Card>
           </div>
         </>
@@ -151,28 +159,30 @@ export function PlanningBoardScreen(): ReactElement {
 function PlanDayCard({ day }: { day: PlanDay }): ReactElement {
   return (
     <Card padding="sm" className={styles.dayCard} data-today={day.isToday}>
-      <div className={styles.dayHead}>
-        <div>
-          <div className={styles.dayName}>{formatShortDate(day.date)}</div>
-          <div className={styles.dayLoad}>{day.loadSummary}</div>
+      <Card.Body>
+        <div className={styles.dayHead}>
+          <div>
+            <div className={styles.dayName}>{formatShortDate(day.date)}</div>
+            <div className={styles.dayLoad}>{day.loadSummary}</div>
+          </div>
+          {day.locked ? <span className={styles.lock}>locked</span> : null}
         </div>
-        {day.locked ? <span className={styles.lock}>locked</span> : null}
-      </div>
-      <div className={styles.loadTrack}>
-        <span className={styles.loadFill} style={{ width: `${day.loadPercent}%` }} />
-        <span className={styles.capacityMark} aria-hidden />
-      </div>
-      <ul className={styles.dayItems}>
-        {day.items.map(item => (
-          <li key={item.occurrenceId}>
-            <Link to="/quests/$questId" params={{ questId: item.questId }} className={styles.dayItem} data-tone={outcomeTone(item.state)}>
-              <span className={styles.dayItemTitle}>{item.title}</span>
-              <span className={styles.dayItemMeta}>{item.shielded ? `${item.meta} · shield spent` : item.meta}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      {day.note ? <p className={styles.dayNote}>{day.note}</p> : null}
+        <div className={styles.loadTrack}>
+          <span className={styles.loadFill} style={{ width: `${day.loadPercent}%` }} />
+          <span className={styles.capacityMark} aria-hidden />
+        </div>
+        <ul className={styles.dayItems}>
+          {day.items.map(item => (
+            <li key={item.occurrenceId}>
+              <Link to="/quests/$questId" params={{ questId: item.questId }} className={styles.dayItem} data-tone={outcomeTone(item.state)}>
+                <span className={styles.dayItemTitle}>{item.title}</span>
+                <span className={styles.dayItemMeta}>{item.shielded ? `${item.meta} · shield spent` : item.meta}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+        {day.note ? <p className={styles.dayNote}>{day.note}</p> : null}
+      </Card.Body>
     </Card>
   );
 }

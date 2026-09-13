@@ -26,10 +26,12 @@ export function TitlesPanel({ deck }: TitlesPanelProps): ReactElement {
   if (earned.length === 0)
     return (
       <Card padding="lg">
-        <EmptyState
-          title="No titles yet"
-          description="Titles arrive by themselves, from patterns you keep rather than goals you set. There is nothing to unlock and nothing to aim at, so this stays quiet until the first one appears."
-        />
+        <Card.Body>
+          <EmptyState
+            title="No titles yet"
+            description="Titles arrive by themselves, from patterns you keep rather than goals you set. There is nothing to unlock and nothing to aim at, so this stays quiet until the first one appears."
+          />
+        </Card.Body>
       </Card>
     );
 
@@ -40,24 +42,26 @@ export function TitlesPanel({ deck }: TitlesPanelProps): ReactElement {
           const displayed = title.id === deck.displayedTitleId;
           return (
             <Card key={title.id} padding="md" selected={displayed}>
-              <div className={styles.tile}>
-                <div className={styles.tileHead}>
-                  <span className={styles.tileName}>{title.name}</span>
-                  {displayed ? (
-                    <Badge variant="soft" intent="info" size="sm">
-                      Displayed
-                    </Badge>
-                  ) : null}
+              <Card.Body>
+                <div className={styles.tile}>
+                  <div className={styles.tileHead}>
+                    <span className={styles.tileName}>{title.name}</span>
+                    {displayed ? (
+                      <Badge variant="soft" intent="info" size="sm">
+                        Displayed
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <span className={styles.tileMeta}>
+                    {title.earnedFrom} · earned {title.earnedOn}
+                  </span>
+                  <div className={styles.tileAction}>
+                    <Button size="sm" variant={displayed ? 'ghost' : 'secondary'} disabled={displayed} onClick={() => display(title.id)}>
+                      {displayed ? 'Displayed' : `Display ${title.name}`}
+                    </Button>
+                  </div>
                 </div>
-                <span className={styles.tileMeta}>
-                  {title.earnedFrom} · earned {title.earnedOn}
-                </span>
-                <div className={styles.tileAction}>
-                  <Button size="sm" variant={displayed ? 'ghost' : 'secondary'} disabled={displayed} onClick={() => display(title.id)}>
-                    {displayed ? 'Displayed' : `Display ${title.name}`}
-                  </Button>
-                </div>
-              </div>
+              </Card.Body>
             </Card>
           );
         })}

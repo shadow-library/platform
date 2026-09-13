@@ -48,37 +48,39 @@ export function SideQuestsScreen(): ReactElement {
       <div className={styles.split}>
         <div className={styles.column}>
           <Card padding="lg">
-            <form className={styles.padLg} onSubmit={submit}>
-              <h3 className={styles.cardTitle}>Log a side quest</h3>
-              <p className={styles.prose} style={{ margin: '5px 0 16px' }}>
-                Something you did that no quest asked for. It earns XP once, has no schedule and no streak to protect.
-              </p>
+            <Card.Body>
+              <form onSubmit={submit}>
+                <h3 className={styles.cardTitle}>Log a side quest</h3>
+                <p className={styles.prose} style={{ margin: '5px 0 16px' }}>
+                  Something you did that no quest asked for. It earns XP once, has no schedule and no streak to protect.
+                </p>
 
-              <Input size="md" value={name} onValueChange={setName} placeholder="Fixed the bike light" aria-label="What you did" autoComplete="off" />
+                <Input size="md" value={name} onValueChange={setName} placeholder="Fixed the bike light" aria-label="What you did" autoComplete="off" />
 
-              <div className={styles.formRow}>
-                <Select size="md" value={affinity} onValueChange={value => setAffinity(value as StatAffinity)} aria-label="Stat">
-                  {(Object.keys(STAT_LABELS) as StatAffinity[]).map(key => (
-                    <Select.Item key={key} value={key}>
-                      {STAT_LABELS[key]}
-                    </Select.Item>
-                  ))}
-                </Select>
-                <Button type="submit" variant="primary" loading={command.isPending} disabled={!name.trim()}>
-                  Log it
-                </Button>
-                <span className={styles.hint}>
-                  {view.loggedThisWeek} logged this week ·{' '}
-                  {remaining > 0 ? `${remaining} rewarded ${remaining === 1 ? 'entry' : 'entries'} left today` : 'today’s rewards are used; logging still works'}
-                </span>
-              </div>
+                <div className={styles.formRow}>
+                  <Select size="md" value={affinity} onValueChange={value => setAffinity(value as StatAffinity)} aria-label="Stat">
+                    {(Object.keys(STAT_LABELS) as StatAffinity[]).map(key => (
+                      <Select.Item key={key} value={key}>
+                        {STAT_LABELS[key]}
+                      </Select.Item>
+                    ))}
+                  </Select>
+                  <Button type="submit" variant="primary" loading={command.isPending} disabled={!name.trim()}>
+                    Log it
+                  </Button>
+                  <span className={styles.hint}>
+                    {view.loggedThisWeek} logged this week ·{' '}
+                    {remaining > 0 ? `${remaining} rewarded ${remaining === 1 ? 'entry' : 'entries'} left today` : 'today’s rewards are used; logging still works'}
+                  </span>
+                </div>
 
-              <EntryCapNote advisory={advisory} />
-            </form>
+                <EntryCapNote advisory={advisory} />
+              </form>
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <div className={styles.cardHead}>
                 <h3 className={styles.cardTitle}>{view.totalLogged} side quests</h3>
                 <Input size="sm" placeholder="Search" aria-label="Search side quests" prefix={<SearchIcon size={14} />} value={search} onValueChange={setSearch} clearable />
@@ -97,24 +99,24 @@ export function SideQuestsScreen(): ReactElement {
                   <IconButton variant="ghost" size="sm" aria-label={`Edit ${item.name}`} icon={<span aria-hidden>✎</span>} />
                 </div>
               ))}
-            </div>
+            </Card.Body>
           </Card>
         </div>
 
         <div className={styles.column}>
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h3 className={styles.railTitle}>This month</h3>
               <Statistic label="XP from side quests" value={view.xpThisMonth} size="sm" comparison={`${view.loggedThisMonth} logged`} />
               <p className={styles.prose} style={{ marginTop: 10 }}>
                 The first {SIDE_QUEST_DAILY_REWARD_LIMIT} a day carry the reward. Anything after them still records — the log is the point, not the XP.
               </p>
-            </div>
+            </Card.Body>
           </Card>
 
           {view.patternHint && (
             <Card padding="md">
-              <div className={styles.pad}>
+              <Card.Body>
                 <h3 className={styles.railTitle}>Turn a pattern into a quest?</h3>
                 <p className={styles.prose}>
                   You have logged “{view.patternHint.name}” {view.patternHint.occurrences} times this month. It might be worth a weekly quest.
@@ -124,7 +126,7 @@ export function SideQuestsScreen(): ReactElement {
                     <Link to="/quests/new">Create quest from this</Link>
                   </Button>
                 </div>
-              </div>
+              </Card.Body>
             </Card>
           )}
         </div>

@@ -45,75 +45,83 @@ export function DeleteAccountScreen(): ReactElement {
         <ScreenColumns
           aside={
             <Card padding="md">
-              <h2 className={screenStyles.cardTitle}>Lighter options</h2>
-              {deletion.data.alternatives.map(alternative => (
-                <div key={alternative.title}>
-                  <p className={styles.settingLabel}>{alternative.title}</p>
-                  <p className={styles.settingHelp}>{alternative.body}</p>
-                </div>
-              ))}
+              <Card.Body>
+                <h2 className={screenStyles.cardTitle}>Lighter options</h2>
+                {deletion.data.alternatives.map(alternative => (
+                  <div key={alternative.title}>
+                    <p className={styles.settingLabel}>{alternative.title}</p>
+                    <p className={styles.settingHelp}>{alternative.body}</p>
+                  </div>
+                ))}
+              </Card.Body>
             </Card>
           }
         >
           {deletion.data.stage === 'scheduled' ? (
             <Card padding="lg">
-              <h2 className={styles.sectionTitle}>The erasure has started</h2>
-              <p className={styles.sectionNote}>{deletion.data.stateNote}</p>
-              <p className={styles.sectionNote}>{deletion.data.gracePeriodNote}</p>
+              <Card.Body>
+                <h2 className={styles.sectionTitle}>The erasure has started</h2>
+                <p className={styles.sectionNote}>{deletion.data.stateNote}</p>
+                <p className={styles.sectionNote}>{deletion.data.gracePeriodNote}</p>
+              </Card.Body>
             </Card>
           ) : deletion.data.stage === 'awaiting-reauth' ? (
             <Card padding="lg">
-              <h2 className={styles.sectionTitle}>{deletion.data.reauth.title}</h2>
-              <p className={styles.sectionNote}>{deletion.data.reauth.body}</p>
-              <div className={styles.actions}>
-                <Button variant="primary" asChild>
-                  <a href={deletion.data.reauth.continueTo}>{deletion.data.reauth.continueLabel}</a>
-                </Button>
-                <Button variant="ghost" onClick={() => command.mutate({ type: 'deletion.abandon' })}>
-                  Stop here
-                </Button>
-              </div>
+              <Card.Body>
+                <h2 className={styles.sectionTitle}>{deletion.data.reauth.title}</h2>
+                <p className={styles.sectionNote}>{deletion.data.reauth.body}</p>
+                <div className={styles.actions}>
+                  <Button variant="primary" asChild>
+                    <a href={deletion.data.reauth.continueTo}>{deletion.data.reauth.continueLabel}</a>
+                  </Button>
+                  <Button variant="ghost" onClick={() => command.mutate({ type: 'deletion.abandon' })}>
+                    Stop here
+                  </Button>
+                </div>
+              </Card.Body>
             </Card>
           ) : (
             <Card padding="lg">
-              <h2 className={styles.sectionTitle}>What would be erased</h2>
-              <div className={styles.sets}>
-                {deletion.data.sets.map(set => (
-                  <div key={set.name} className={styles.set}>
-                    <div className={styles.setName}>{set.name}</div>
-                    <p className={styles.setMeta}>{set.meta}</p>
-                  </div>
-                ))}
-              </div>
+              <Card.Body>
+                <h2 className={styles.sectionTitle}>What would be erased</h2>
+                <div className={styles.sets}>
+                  {deletion.data.sets.map(set => (
+                    <div key={set.name} className={styles.set}>
+                      <div className={styles.setName}>{set.name}</div>
+                      <p className={styles.setMeta}>{set.meta}</p>
+                    </div>
+                  ))}
+                </div>
 
-              <h2 className={screenStyles.cardTitle}>How it works</h2>
-              <p className={styles.sectionNote}>{deletion.data.gracePeriodNote}</p>
+                <h2 className={screenStyles.cardTitle}>How it works</h2>
+                <p className={styles.sectionNote}>{deletion.data.gracePeriodNote}</p>
 
-              <div className={styles.acknowledgements}>
-                {deletion.data.acknowledgements.map(item => (
-                  <Checkbox
-                    key={item.id}
-                    checked={acknowledged.includes(item.id)}
-                    label={item.text}
-                    onCheckedChange={checked => command.mutate({ type: 'deletion.acknowledge', acknowledgementId: item.id, acknowledged: checked === true })}
-                  />
-                ))}
-              </div>
+                <div className={styles.acknowledgements}>
+                  {deletion.data.acknowledgements.map(item => (
+                    <Checkbox
+                      key={item.id}
+                      checked={acknowledged.includes(item.id)}
+                      label={item.text}
+                      onCheckedChange={checked => command.mutate({ type: 'deletion.acknowledge', acknowledgementId: item.id, acknowledged: checked === true })}
+                    />
+                  ))}
+                </div>
 
-              {refusal ? (
-                <Alert intent="info" title="Not yet">
-                  {refusal}
-                </Alert>
-              ) : null}
+                {refusal ? (
+                  <Alert intent="info" title="Not yet">
+                    {refusal}
+                  </Alert>
+                ) : null}
 
-              <div className={styles.actions}>
-                <Button variant="danger" disabled={!allAcknowledged} onClick={begin}>
-                  Continue to confirmation
-                </Button>
-                <Button variant="ghost" asChild>
-                  <Link to="/settings/export">Export first</Link>
-                </Button>
-              </div>
+                <div className={styles.actions}>
+                  <Button variant="danger" disabled={!allAcknowledged} onClick={begin}>
+                    Continue to confirmation
+                  </Button>
+                  <Button variant="ghost" asChild>
+                    <Link to="/settings/export">Export first</Link>
+                  </Button>
+                </div>
+              </Card.Body>
             </Card>
           )}
         </ScreenColumns>

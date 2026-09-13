@@ -41,21 +41,23 @@ export function AchievementsPanel({ achievements }: AchievementsPanelProps): Rea
 
       {selected ? (
         <Card padding="lg">
-          <h2 className={screenStyles.cardTitle}>{selected.earnedOn === null ? 'Locked' : 'Earned'}</h2>
-          <div className={styles.detailCrest} aria-hidden>
-            {selected.earnedOn === null ? '◆' : selected.crest}
-          </div>
-          <div className={styles.name}>{selected.earnedOn === null ? 'Locked achievement' : selected.name}</div>
-          <p className={screenStyles.cardBody}>{selected.earnedOn === null ? selected.teaser : selected.description}</p>
-          <DescriptionList layout="row" termWidth={140}>
-            <DescriptionList.Item term="Earned">{selected.earnedOn ?? 'Not yet'}</DescriptionList.Item>
-            <DescriptionList.Item term="Reward">{selected.earnedOn === null ? 'Unknown until it happens' : selected.reward}</DescriptionList.Item>
-          </DescriptionList>
-          <p className={screenStyles.cardBody}>
-            {selected.earnedOn === null
-              ? 'Locked achievements show no counter and no progress bar. A number here would turn this into a chore, and you will know when it happens.'
-              : `${earnedCount} of the catalogue is yours so far. They arrive on their own — there is nothing to claim.`}
-          </p>
+          <Card.Body>
+            <h2 className={screenStyles.cardTitle}>{selected.earnedOn === null ? 'Locked' : 'Earned'}</h2>
+            <div className={styles.detailCrest} aria-hidden>
+              {selected.earnedOn === null ? '◆' : selected.crest}
+            </div>
+            <div className={styles.name}>{selected.earnedOn === null ? 'Locked achievement' : selected.name}</div>
+            <p className={screenStyles.cardBody}>{selected.earnedOn === null ? selected.teaser : selected.description}</p>
+            <DescriptionList layout="row" termWidth={140}>
+              <DescriptionList.Item term="Earned">{selected.earnedOn ?? 'Not yet'}</DescriptionList.Item>
+              <DescriptionList.Item term="Reward">{selected.earnedOn === null ? 'Unknown until it happens' : selected.reward}</DescriptionList.Item>
+            </DescriptionList>
+            <p className={screenStyles.cardBody}>
+              {selected.earnedOn === null
+                ? 'Locked achievements show no counter and no progress bar. A number here would turn this into a chore, and you will know when it happens.'
+                : `${earnedCount} of the catalogue is yours so far. They arrive on their own — there is nothing to claim.`}
+            </p>
+          </Card.Body>
         </Card>
       ) : null}
     </div>

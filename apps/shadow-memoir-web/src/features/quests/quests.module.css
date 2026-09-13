@@ -75,8 +75,11 @@
 }
 
 .listCard {
-  padding: 0;
   overflow: hidden;
+}
+
+.listCard .listBody {
+  padding: 0;
 }
 
 .list {
@@ -106,6 +109,11 @@
 
 .questRow[data-inactive='true'] {
   background: var(--sh-surface-well);
+}
+
+.questRow:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
 }
 
 .questBody {
@@ -375,6 +383,11 @@
   border-color: var(--sh-accent);
 }
 
+.strictnessCard:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+
 .strictnessName {
   font-size: var(--sh-text-body-sm);
   font-weight: 600;
@@ -417,6 +430,11 @@
   background: var(--sh-accent);
   color: var(--sh-on-accent);
   border-color: var(--sh-accent);
+}
+
+.dayToggle:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
 }
 
 .switches {

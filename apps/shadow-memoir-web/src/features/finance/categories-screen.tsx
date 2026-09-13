@@ -30,7 +30,7 @@ export function CategoriesScreen(): ReactElement {
 
       <div className={styles.split}>
         <Card padding="md">
-          <div className={styles.pad}>
+          <Card.Body>
             <div className={styles.cardHead}>
               <h2 className={styles.cardTitle}>Every category</h2>
             </div>
@@ -59,21 +59,21 @@ export function CategoriesScreen(): ReactElement {
                 </DropdownMenu>
               </div>
             ))}
-          </div>
+          </Card.Body>
         </Card>
 
         <div className={styles.column}>
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h2 className={styles.railTitle}>Rename and archive safely</h2>
               <p className={styles.railProse}>
                 Renaming a category updates every past expense — the amounts never change. Archiving hides it from new entries and keeps its history in Insights.
               </p>
-            </div>
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h2 className={styles.railTitle}>Uncategorised</h2>
               <p className={styles.railProse}>
                 {view?.uncategorised.count ?? 0} expenses, {formatMinor(view?.uncategorised.totalMinor ?? 0, home)} this month. Categorising them takes about twenty seconds and
@@ -82,7 +82,7 @@ export function CategoriesScreen(): ReactElement {
               <Button size="sm" variant="secondary" asChild>
                 <Link to="/finance">Categorise now</Link>
               </Button>
-            </div>
+            </Card.Body>
           </Card>
         </div>
       </div>

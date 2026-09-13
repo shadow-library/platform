@@ -53,58 +53,60 @@ export function MealEntryPanel({ date, presets, onClose }: MealEntryPanelProps):
 
   return (
     <Card padding="lg" aria-labelledby="meal-entry-title">
-      <form className={styles.padLg} onSubmit={submit}>
-        <div className={styles.cardHead}>
-          <h3 className={styles.cardTitle} id="meal-entry-title">
-            Add meal
-          </h3>
-          <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-
-        <FormField label="What was it" required>
-          <Input size="md" value={name} onValueChange={setName} placeholder="Oats, berries, skyr" autoComplete="off" />
-        </FormField>
-
-        <div className={styles.formRow}>
-          <FormField label="Calories" helper="Your estimate. Zero is a valid answer.">
-            <NumberStepper value={calories} onValueChange={setCalories} min={0} step={10} unit="kcal" aria-label="Calories" />
-          </FormField>
-
-          <FormField label="Kind">
-            <Select size="md" value={mealType} onValueChange={value => setMealType(value as MealType)} aria-label="Meal kind">
-              {(Object.keys(MEAL_TYPE_LABELS) as MealType[]).map(type => (
-                <Select.Item key={type} value={type}>
-                  {MEAL_TYPE_LABELS[type]}
-                </Select.Item>
-              ))}
-            </Select>
-          </FormField>
-        </div>
-
-        <EntryCapNote advisory={advisory} />
-
-        <div className={styles.actions}>
-          <Button type="submit" variant="primary" loading={command.isPending} disabled={!name.trim()}>
-            Save meal
-          </Button>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
-
-        <div style={{ marginTop: 16 }}>
-          <h4 className={styles.railTitle}>Your presets</h4>
-          <div className={styles.presetChips}>
-            {presets.map(preset => (
-              <Button key={preset.id} type="button" size="sm" variant="secondary" onClick={() => logPreset(preset)}>
-                {preset.name} · {preset.calories} kcal
-              </Button>
-            ))}
+      <Card.Body>
+        <form onSubmit={submit}>
+          <div className={styles.cardHead}>
+            <h3 className={styles.cardTitle} id="meal-entry-title">
+              Add meal
+            </h3>
+            <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+              Close
+            </Button>
           </div>
-        </div>
-      </form>
+
+          <FormField label="What was it" required>
+            <Input size="md" value={name} onValueChange={setName} placeholder="Oats, berries, skyr" autoComplete="off" />
+          </FormField>
+
+          <div className={styles.formRow}>
+            <FormField label="Calories" helper="Your estimate. Zero is a valid answer.">
+              <NumberStepper value={calories} onValueChange={setCalories} min={0} step={10} unit="kcal" aria-label="Calories" />
+            </FormField>
+
+            <FormField label="Kind">
+              <Select size="md" value={mealType} onValueChange={value => setMealType(value as MealType)} aria-label="Meal kind">
+                {(Object.keys(MEAL_TYPE_LABELS) as MealType[]).map(type => (
+                  <Select.Item key={type} value={type}>
+                    {MEAL_TYPE_LABELS[type]}
+                  </Select.Item>
+                ))}
+              </Select>
+            </FormField>
+          </div>
+
+          <EntryCapNote advisory={advisory} />
+
+          <div className={styles.actions}>
+            <Button type="submit" variant="primary" loading={command.isPending} disabled={!name.trim()}>
+              Save meal
+            </Button>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <h4 className={styles.railTitle}>Your presets</h4>
+            <div className={styles.presetChips}>
+              {presets.map(preset => (
+                <Button key={preset.id} type="button" size="sm" variant="secondary" onClick={() => logPreset(preset)}>
+                  {preset.name} · {preset.calories} kcal
+                </Button>
+              ))}
+            </div>
+          </div>
+        </form>
+      </Card.Body>
     </Card>
   );
 }

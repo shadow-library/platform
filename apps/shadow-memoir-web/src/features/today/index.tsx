@@ -57,23 +57,27 @@ export function TodayScreen(): ReactElement {
             {day.data.occurrences.length === 0 ? (
               <>
                 <Card padding="lg">
-                  <EmptyState
-                    title="Your first day is empty on purpose"
-                    description="A quest is a promise you keep to yourself, not a task. Start with one that takes ten minutes — it is easier to keep a small promise every day than a large one twice."
-                    action={{ label: 'Create your first quest', onClick: () => void navigate({ to: '/quests/new' }) }}
-                  />
+                  <Card.Body>
+                    <EmptyState
+                      title="Your first day is empty on purpose"
+                      description="A quest is a promise you keep to yourself, not a task. Start with one that takes ten minutes — it is easier to keep a small promise every day than a large one twice."
+                      action={{ label: 'Create your first quest', onClick: () => void navigate({ to: '/quests/new' }) }}
+                    />
+                  </Card.Body>
                 </Card>
                 <Card padding="md">
-                  <h2 className={styles.cardTitle}>While you decide, anything you log still counts</h2>
-                  <p className={styles.cardBody}>Expenses, meals, weight and journal entries all work before your first quest exists. Side quests earn XP on their own.</p>
-                  <div className={styles.actionRow}>
-                    <Button size="sm" variant="secondary" asChild>
-                      <Link to="/log">Quick log</Link>
-                    </Button>
-                    <Button size="sm" variant="ghost" asChild>
-                      <Link to="/log">Log a side quest</Link>
-                    </Button>
-                  </div>
+                  <Card.Body>
+                    <h2 className={styles.cardTitle}>While you decide, anything you log still counts</h2>
+                    <p className={styles.cardBody}>Expenses, meals, weight and journal entries all work before your first quest exists. Side quests earn XP on their own.</p>
+                    <div className={styles.actionRow}>
+                      <Button size="sm" variant="secondary" asChild>
+                        <Link to="/log">Quick log</Link>
+                      </Button>
+                      <Button size="sm" variant="ghost" asChild>
+                        <Link to="/log">Log a side quest</Link>
+                      </Button>
+                    </div>
+                  </Card.Body>
                 </Card>
               </>
             ) : (
@@ -87,27 +91,31 @@ export function TodayScreen(): ReactElement {
                   <p className={styles.listTail}>{day.data.wakeWindowNote}</p>
                 </div>
                 <Card padding="sm" className={styles.listCard}>
-                  <ul className={styles.list}>
-                    {day.data.occurrences.map(occurrence => (
-                      <QuestRow key={occurrence.id} occurrence={occurrence} onComplete={complete} onOpenActions={actions.open} />
-                    ))}
-                  </ul>
+                  <Card.Body className={styles.listBody}>
+                    <ul className={styles.list}>
+                      {day.data.occurrences.map(occurrence => (
+                        <QuestRow key={occurrence.id} occurrence={occurrence} onComplete={complete} onOpenActions={actions.open} />
+                      ))}
+                    </ul>
+                  </Card.Body>
                 </Card>
               </div>
             )}
 
             {day.data.summary ? (
               <Card padding="md">
-                <h2 className={styles.cardTitle}>{day.data.summary.headline}</h2>
-                <p className={styles.cardBody}>{day.data.summary.detail}</p>
-                <div className={styles.actionRow}>
-                  <Button size="sm" variant="secondary" asChild>
-                    <Link to="/log">Write a line about today</Link>
-                  </Button>
-                  <Button size="sm" variant="ghost" asChild>
-                    <Link to="/plan">Plan tomorrow</Link>
-                  </Button>
-                </div>
+                <Card.Body>
+                  <h2 className={styles.cardTitle}>{day.data.summary.headline}</h2>
+                  <p className={styles.cardBody}>{day.data.summary.detail}</p>
+                  <div className={styles.actionRow}>
+                    <Button size="sm" variant="secondary" asChild>
+                      <Link to="/log">Write a line about today</Link>
+                    </Button>
+                    <Button size="sm" variant="ghost" asChild>
+                      <Link to="/plan">Plan tomorrow</Link>
+                    </Button>
+                  </div>
+                </Card.Body>
               </Card>
             ) : null}
           </div>

@@ -58,7 +58,7 @@ export function SubscriptionsScreen(): ReactElement {
 
       <div className={styles.split}>
         <Card padding="md">
-          <div className={styles.pad}>
+          <Card.Body>
             <div className={styles.cardHead}>
               <h2 className={styles.cardTitle}>Recurring charges</h2>
             </div>
@@ -115,12 +115,12 @@ export function SubscriptionsScreen(): ReactElement {
                 </div>
               );
             })}
-          </div>
+          </Card.Body>
         </Card>
 
         <div className={styles.column}>
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h2 className={styles.railTitle}>Next 30 days</h2>
               <ul className={styles.railList}>
                 {view?.upcoming.map(charge => (
@@ -133,7 +133,7 @@ export function SubscriptionsScreen(): ReactElement {
                 ))}
               </ul>
               {view?.upcoming.length === 0 && <p className={styles.railProse}>Nothing renews in the next month.</p>}
-            </div>
+            </Card.Body>
           </Card>
 
           {view?.collisions.map(collision => (
@@ -144,12 +144,12 @@ export function SubscriptionsScreen(): ReactElement {
           ))}
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h2 className={styles.railTitle}>Nothing is charged for you</h2>
               <p className={styles.railProse}>
                 When a cycle comes due, Memoir prepares the expense and waits. Confirming writes it once for that cycle, however many devices you confirm from.
               </p>
-            </div>
+            </Card.Body>
           </Card>
         </div>
       </div>

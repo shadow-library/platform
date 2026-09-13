@@ -51,11 +51,13 @@ export function QuestListScreen(): ReactElement {
 
       {quests.data ? (
         <Card padding="sm" className={styles.listCard}>
-          <ul className={styles.list}>
-            {shown.map(summary => (
-              <QuestListRow key={summary.quest.id} summary={summary} />
-            ))}
-          </ul>
+          <Card.Body className={styles.listBody}>
+            <ul className={styles.list}>
+              {shown.map(summary => (
+                <QuestListRow key={summary.quest.id} summary={summary} />
+              ))}
+            </ul>
+          </Card.Body>
         </Card>
       ) : null}
 

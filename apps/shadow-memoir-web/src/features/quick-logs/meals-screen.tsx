@@ -43,7 +43,7 @@ export function MealsScreen(): ReactElement {
       <div className={styles.split}>
         <div className={styles.column}>
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <div className={styles.cardHead}>
                 <h3 className={styles.cardTitle}>Today · {view.totalCalories.toLocaleString('en-US')} kcal</h3>
                 <Button size="sm" variant="primary" onClick={() => setFormOpen(true)}>
@@ -82,13 +82,13 @@ export function MealsScreen(): ReactElement {
 
               <EntryCapNote advisory={advisory} />
               <LinkageOfferNote offer={linkage} />
-            </div>
+            </Card.Body>
           </Card>
 
           {formOpen && <MealEntryPanel date={date} presets={view.presets} onClose={() => setFormOpen(false)} />}
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h3 className={styles.cardTitle}>Last 14 days</h3>
               <SparkBars values={view.last14Days.map(day => day.value)} label="Calories over the last 14 days" height={72} highlightLast />
               <div className={styles.axis}>
@@ -108,7 +108,7 @@ export function MealsScreen(): ReactElement {
                   <span className={styles.mono}>{day.calories === null ? '—' : day.calories.toLocaleString('en-US')}</span>
                 </div>
               ))}
-            </div>
+            </Card.Body>
           </Card>
         </div>
 
@@ -120,7 +120,7 @@ export function MealsScreen(): ReactElement {
           )}
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h3 className={styles.railTitle}>Presets</h3>
               <ul className={styles.list}>
                 {view.presets.map(preset => (
@@ -142,7 +142,7 @@ export function MealsScreen(): ReactElement {
               <p className={styles.hint} style={{ marginTop: 10 }}>
                 A logged meal keeps the numbers it was logged with. Editing a preset later never changes a past meal.
               </p>
-            </div>
+            </Card.Body>
           </Card>
         </div>
       </div>

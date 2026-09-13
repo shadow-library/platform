@@ -36,113 +36,125 @@ export function AppSyncScreen(): ReactElement {
           aside={
             <>
               <Card padding="md">
-                <h2 className={screenStyles.cardTitle}>What works offline</h2>
-                <ul className={screenStyles.list}>
-                  {sync.data.offlineCapabilities.map(line => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-                <p className={screenStyles.cardBody}>{sync.data.onlineOnly}</p>
+                <Card.Body>
+                  <h2 className={screenStyles.cardTitle}>What works offline</h2>
+                  <ul className={screenStyles.list}>
+                    {sync.data.offlineCapabilities.map(line => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                  <p className={screenStyles.cardBody}>{sync.data.onlineOnly}</p>
+                </Card.Body>
               </Card>
 
               <Card padding="md">
-                <h2 className={screenStyles.cardTitle}>Session</h2>
-                <p className={screenStyles.cardBody}>{sync.data.sessionNote}</p>
-                <div className={styles.actions}>
-                  <Button size="sm" variant="ghost" onClick={() => overlays.open('session-expired')}>
-                    See that state
-                  </Button>
-                </div>
+                <Card.Body>
+                  <h2 className={screenStyles.cardTitle}>Session</h2>
+                  <p className={screenStyles.cardBody}>{sync.data.sessionNote}</p>
+                  <div className={styles.actions}>
+                    <Button size="sm" variant="ghost" onClick={() => overlays.open('session-expired')}>
+                      See that state
+                    </Button>
+                  </div>
+                </Card.Body>
               </Card>
             </>
           }
         >
           <Card padding="lg">
-            <div className={styles.statusHead}>
-              <span className={styles.statusGlyph} aria-hidden>
-                {STATUS_GLYPHS[sync.data.status]}
-              </span>
-              <div>
-                <h2 className={styles.sectionTitle}>{sync.data.title}</h2>
-                <p className={styles.sectionNote}>{sync.data.body}</p>
+            <Card.Body>
+              <div className={styles.statusHead}>
+                <span className={styles.statusGlyph} aria-hidden>
+                  {STATUS_GLYPHS[sync.data.status]}
+                </span>
+                <div>
+                  <h2 className={styles.sectionTitle}>{sync.data.title}</h2>
+                  <p className={styles.sectionNote}>{sync.data.body}</p>
+                </div>
+                <div className={styles.actions}>
+                  <Button size="sm" variant="secondary" onClick={() => void engine?.sync()}>
+                    Sync now
+                  </Button>
+                </div>
               </div>
-              <div className={styles.actions}>
-                <Button size="sm" variant="secondary" onClick={() => void engine?.sync()}>
-                  Sync now
-                </Button>
+              <div className={styles.stats}>
+                <Statistic label="Queued changes" value={sync.data.queuedCount} size="sm" />
+                <Statistic label="Registered devices" value={sync.data.devices.length} size="sm" />
               </div>
-            </div>
-            <div className={styles.stats}>
-              <Statistic label="Queued changes" value={sync.data.queuedCount} size="sm" />
-              <Statistic label="Registered devices" value={sync.data.devices.length} size="sm" />
-            </div>
-            <p className={screenStyles.cardBody}>
-              {sync.data.lastSyncedAt ? `Last synced ${new Date(sync.data.lastSyncedAt).toLocaleString()}.` : 'This device has not completed a sync yet.'}
-            </p>
+              <p className={screenStyles.cardBody}>
+                {sync.data.lastSyncedAt ? `Last synced ${new Date(sync.data.lastSyncedAt).toLocaleString()}.` : 'This device has not completed a sync yet.'}
+              </p>
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <h2 className={screenStyles.cardTitle}>Queue</h2>
-            {sync.data.queue.length === 0 ? (
-              <EmptyState size="inline" title="Nothing is waiting" description="Everything you have logged has reached the server." />
-            ) : (
-              <>
-                <ul className={styles.queueRows}>
-                  {sync.data.queue.map(entry => (
-                    <li key={entry.id} className={styles.queueRow}>
-                      <Badge variant="outline" size="sm">
-                        {QUEUE_LABELS[entry.state]}
-                      </Badge>
-                      <span className={styles.queueText}>
-                        <span className={styles.rowTitle}>{entry.text}</span>
-                        <span className={styles.rowMeta}>{entry.meta}</span>
+            <Card.Body>
+              <h2 className={screenStyles.cardTitle}>Queue</h2>
+              {sync.data.queue.length === 0 ? (
+                <EmptyState size="inline" title="Nothing is waiting" description="Everything you have logged has reached the server." />
+              ) : (
+                <>
+                  <ul className={styles.queueRows}>
+                    {sync.data.queue.map(entry => (
+                      <li key={entry.id} className={styles.queueRow}>
+                        <Badge variant="outline" size="sm">
+                          {QUEUE_LABELS[entry.state]}
+                        </Badge>
+                        <span className={styles.queueText}>
+                          <span className={styles.rowTitle}>{entry.text}</span>
+                          <span className={styles.rowMeta}>{entry.meta}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className={screenStyles.cardBody}>
+                    Queued actions apply in the order you made them. Nothing in this list can be lost by closing the app, restarting the device or losing the session.
+                  </p>
+                </>
+              )}
+            </Card.Body>
+          </Card>
+
+          <Card padding="md">
+            <Card.Body>
+              <h2 className={screenStyles.cardTitle}>Devices</h2>
+              {sync.data.devices.length === 0 ? (
+                <EmptyState size="inline" title="No devices yet" description="A device registers itself the first time it syncs." />
+              ) : (
+                <ul className={styles.deviceRows}>
+                  {sync.data.devices.map(device => (
+                    <li key={device.id} className={styles.deviceRow}>
+                      <span>
+                        <span className={styles.rowTitle}>{device.name}</span>
+                        <span className={styles.rowMeta}>{device.current ? `This device · ${device.meta.toLowerCase()}` : device.meta}</span>
                       </span>
+                      <Button size="sm" variant="ghost" disabled={device.current} onClick={() => command.mutate({ type: 'device.remove', deviceId: device.id })}>
+                        {device.current ? 'In use' : 'Remove'}
+                      </Button>
                     </li>
                   ))}
                 </ul>
-                <p className={screenStyles.cardBody}>
-                  Queued actions apply in the order you made them. Nothing in this list can be lost by closing the app, restarting the device or losing the session.
-                </p>
-              </>
-            )}
+              )}
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <h2 className={screenStyles.cardTitle}>Devices</h2>
-            {sync.data.devices.length === 0 ? (
-              <EmptyState size="inline" title="No devices yet" description="A device registers itself the first time it syncs." />
-            ) : (
-              <ul className={styles.deviceRows}>
-                {sync.data.devices.map(device => (
-                  <li key={device.id} className={styles.deviceRow}>
-                    <span>
-                      <span className={styles.rowTitle}>{device.name}</span>
-                      <span className={styles.rowMeta}>{device.current ? `This device · ${device.meta.toLowerCase()}` : device.meta}</span>
-                    </span>
-                    <Button size="sm" variant="ghost" disabled={device.current} onClick={() => command.mutate({ type: 'device.remove', deviceId: device.id })}>
-                      {device.current ? 'In use' : 'Remove'}
+            <Card.Body>
+              <h2 className={screenStyles.cardTitle}>Installation and updates</h2>
+              <div className={styles.settingRows}>
+                {sync.data.installRows.map(row => (
+                  <div key={row.id} className={styles.settingRow}>
+                    <div>
+                      <div className={styles.settingLabel}>{row.label}</div>
+                      <p className={styles.settingHelp}>{row.help}</p>
+                    </div>
+                    <Button size="sm" variant={row.overlay === 'update' ? 'primary' : 'ghost'} disabled={row.done} onClick={() => row.overlay && overlays.open(row.overlay)}>
+                      {row.action}
                     </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          <Card padding="md">
-            <h2 className={screenStyles.cardTitle}>Installation and updates</h2>
-            <div className={styles.settingRows}>
-              {sync.data.installRows.map(row => (
-                <div key={row.id} className={styles.settingRow}>
-                  <div>
-                    <div className={styles.settingLabel}>{row.label}</div>
-                    <p className={styles.settingHelp}>{row.help}</p>
                   </div>
-                  <Button size="sm" variant={row.overlay === 'update' ? 'primary' : 'ghost'} disabled={row.done} onClick={() => row.overlay && overlays.open(row.overlay)}>
-                    {row.action}
-                  </Button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </Card.Body>
           </Card>
         </ScreenColumns>
       ) : null}

@@ -24,60 +24,62 @@ export function HeroCard({ hero, mode }: HeroCardProps): ReactElement {
 
   return (
     <Card padding="md">
-      <div className={styles.heroTop}>
-        <div className={styles.crest}>
-          <span className={styles.crestLevel}>{hero.level}</span>
-          <span className={styles.crestLabel}>lvl</span>
+      <Card.Body>
+        <div className={styles.heroTop}>
+          <div className={styles.crest}>
+            <span className={styles.crestLevel}>{hero.level}</span>
+            <span className={styles.crestLabel}>lvl</span>
+          </div>
+          <div className={styles.heroMain}>
+            <div className={styles.heroTitleRow}>
+              <span className={styles.heroTitle}>{hero.title}</span>
+              <span className={styles.coins}>◈ {hero.coins.toLocaleString()}</span>
+            </div>
+            <div className={styles.heroProgress}>
+              <Progress value={hero.xpIntoLevel} max={hero.xpForNextLevel} size="md" label={`Experience towards level ${hero.level + 1}`} />
+            </div>
+            <div className={styles.heroFooter}>
+              <span>
+                <span className={styles.mono}>
+                  {hero.xpIntoLevel.toLocaleString()} / {hero.xpForNextLevel.toLocaleString()}
+                </span>{' '}
+                XP
+              </span>
+              <span>
+                {toNext.toLocaleString()} XP to level {hero.level + 1}
+              </span>
+            </div>
+          </div>
         </div>
-        <div className={styles.heroMain}>
-          <div className={styles.heroTitleRow}>
-            <span className={styles.heroTitle}>{hero.title}</span>
-            <span className={styles.coins}>◈ {hero.coins.toLocaleString()}</span>
-          </div>
-          <div className={styles.heroProgress}>
-            <Progress value={hero.xpIntoLevel} max={hero.xpForNextLevel} size="md" label={`Experience towards level ${hero.level + 1}`} />
-          </div>
-          <div className={styles.heroFooter}>
-            <span>
-              <span className={styles.mono}>
-                {hero.xpIntoLevel.toLocaleString()} / {hero.xpForNextLevel.toLocaleString()}
-              </span>{' '}
-              XP
+        <div className={styles.heroStats}>
+          <span className={styles.hp} role="img" aria-label={`HP ${hero.hp} of ${hero.hpMax}`}>
+            <span className={styles.pips} aria-hidden>
+              {Array.from({ length: hero.hpMax }, (_, index) => (
+                <span key={index} className={styles.pip} data-filled={index < hero.hp} />
+              ))}
             </span>
-            <span>
-              {toNext.toLocaleString()} XP to level {hero.level + 1}
+            <span className={styles.heroMeta}>
+              HP {hero.hp} of {hero.hpMax}
             </span>
-          </div>
-        </div>
-      </div>
-      <div className={styles.heroStats}>
-        <span className={styles.hp} role="img" aria-label={`HP ${hero.hp} of ${hero.hpMax}`}>
-          <span className={styles.pips} aria-hidden>
-            {Array.from({ length: hero.hpMax }, (_, index) => (
-              <span key={index} className={styles.pip} data-filled={index < hero.hp} />
-            ))}
           </span>
+          <span className={styles.divider} aria-hidden />
           <span className={styles.heroMeta}>
-            HP {hero.hp} of {hero.hpMax}
+            Crown · {hero.crown.label}{' '}
+            <span className={styles.heroMetaSoft}>
+              day {hero.crown.dayIndex} of {hero.crown.dayCount} · {hero.crown.keptPercent}% kept
+            </span>
           </span>
-        </span>
-        <span className={styles.divider} aria-hidden />
-        <span className={styles.heroMeta}>
-          Crown · {hero.crown.label}{' '}
-          <span className={styles.heroMetaSoft}>
-            day {hero.crown.dayIndex} of {hero.crown.dayCount} · {hero.crown.keptPercent}% kept
+          <span className={styles.divider} aria-hidden />
+          <span className={styles.heroMeta}>
+            Momentum <strong>{momentumLabel(hero, mode)}</strong>
           </span>
-        </span>
-        <span className={styles.divider} aria-hidden />
-        <span className={styles.heroMeta}>
-          Momentum <strong>{momentumLabel(hero, mode)}</strong>
-        </span>
-        <span className={styles.heroAction}>
-          <Button size="sm" variant="ghost" asChild>
-            <Link to="/hero">Hero</Link>
-          </Button>
-        </span>
-      </div>
+          <span className={styles.heroAction}>
+            <Button size="sm" variant="ghost" asChild>
+              <Link to="/hero">Hero</Link>
+            </Button>
+          </span>
+        </div>
+      </Card.Body>
     </Card>
   );
 }

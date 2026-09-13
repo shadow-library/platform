@@ -79,7 +79,7 @@ export function JournalScreen(): ReactElement {
         <div className={styles.column}>
           {view.prompt && (
             <Card padding="md">
-              <div className={styles.pad}>
+              <Card.Body>
                 <p className={styles.eyebrow}>Today’s prompt · optional</p>
                 <p className={styles.promptQuestion}>{view.prompt.question}</p>
                 <div className={styles.actions}>
@@ -90,12 +90,12 @@ export function JournalScreen(): ReactElement {
                     Not today
                   </Button>
                 </div>
-              </div>
+              </Card.Body>
             </Card>
           )}
 
           <Card padding="lg">
-            <div className={styles.padLg}>
+            <Card.Body>
               <div className={styles.cardHead}>
                 <div>
                   <h3 className={styles.cardTitle}>{todayISODate()}</h3>
@@ -132,11 +132,11 @@ export function JournalScreen(): ReactElement {
 
               <EntryCapNote advisory={advisory} />
               <LinkageOfferNote offer={linkage} />
-            </div>
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <div className={styles.cardHead}>
                 <h3 className={styles.cardTitle}>{view.totalEntries} entries</h3>
                 <Input
@@ -172,36 +172,36 @@ export function JournalScreen(): ReactElement {
                   </div>
                 </article>
               ))}
-            </div>
+            </Card.Body>
           </Card>
         </div>
 
         <div className={styles.column}>
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h3 className={styles.railTitle}>Writing</h3>
               <Statistic label="Current streak" value={view.writingStreakDays} unit="days" size="sm" />
               <SparkBars values={view.last28Days.map(day => day.value)} label={`Last 28 days of writing`} height={16} />
               <p className={styles.hint}>Last 28 days · {view.last28Days.filter(day => day.value !== null).length} written</p>
-            </div>
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <div className={styles.pad}>
+            <Card.Body>
               <h3 className={styles.railTitle}>Mood over the month</h3>
               <SparkBars values={view.moodTrend.map(day => day.value)} label="Mood over the month" height={60} />
               <p className={styles.prose}>{view.moodNote}</p>
-            </div>
+            </Card.Body>
           </Card>
 
           {view.onThisDay && (
             <Card padding="md">
-              <div className={styles.pad}>
+              <Card.Body>
                 <h3 className={styles.railTitle}>On this day</h3>
                 <p className={styles.prose}>
                   {view.onThisDay.year}: “{view.onThisDay.excerpt}”
                 </p>
-              </div>
+              </Card.Body>
             </Card>
           )}
         </div>

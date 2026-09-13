@@ -155,164 +155,174 @@ export function OnboardingScreen(): ReactElement {
 
         {step === 0 ? (
           <Card padding="lg">
-            <p className={styles.lead}>
-              A day in Shadow Memoir runs from when you wake to when you sleep, not from midnight. Two times and a currency, and you never have to think about this again.
-            </p>
-            <div className={styles.fields}>
-              <FormField label="Wake time" helper="Quests scheduled before this are not counted late.">
-                <TimePicker value={wakeTime} onValueChange={value => setWakeTime(value ?? wakeTime)} />
-              </FormField>
-              <FormField label="Sleep time" helper="Your day closes here — logs after it still belong to today.">
-                <TimePicker value={sleepTime} onValueChange={value => setSleepTime(value ?? sleepTime)} />
-              </FormField>
-              <FormField label="Timezone" helper="Detected from your browser. Travel will not move your day unless you change it.">
-                <Select value={timezone} aria-label="Timezone" onValueChange={setTimezone}>
-                  {TIMEZONES.map(zone => (
-                    <Select.Item key={zone} value={zone}>
-                      {zone}
-                    </Select.Item>
-                  ))}
-                </Select>
-              </FormField>
-              <FormField
-                label="Home currency"
-                helper={
-                  currencyLocked
-                    ? 'Already set, and fixed from here so your totals stay comparable.'
-                    : 'Chosen once. Spend in another currency keeps its own and converts to this one, and this stays fixed afterwards.'
-                }
-                disabled={currencyLocked}
-              >
-                <Select value={currency} aria-label="Home currency" disabled={currencyLocked} onValueChange={setCurrency}>
-                  {CURRENCIES.map(option => (
-                    <Select.Item key={option.value} value={option.value}>
-                      {option.label}
-                    </Select.Item>
-                  ))}
-                </Select>
-              </FormField>
-            </div>
-            <p className={styles.note}>Everything else here can be changed in Settings, including after a year of history. Changing your wake window never rewrites past days.</p>
+            <Card.Body>
+              <p className={styles.lead}>
+                A day in Shadow Memoir runs from when you wake to when you sleep, not from midnight. Two times and a currency, and you never have to think about this again.
+              </p>
+              <div className={styles.fields}>
+                <FormField label="Wake time" helper="Quests scheduled before this are not counted late.">
+                  <TimePicker value={wakeTime} onValueChange={value => setWakeTime(value ?? wakeTime)} />
+                </FormField>
+                <FormField label="Sleep time" helper="Your day closes here — logs after it still belong to today.">
+                  <TimePicker value={sleepTime} onValueChange={value => setSleepTime(value ?? sleepTime)} />
+                </FormField>
+                <FormField label="Timezone" helper="Detected from your browser. Travel will not move your day unless you change it.">
+                  <Select value={timezone} aria-label="Timezone" onValueChange={setTimezone}>
+                    {TIMEZONES.map(zone => (
+                      <Select.Item key={zone} value={zone}>
+                        {zone}
+                      </Select.Item>
+                    ))}
+                  </Select>
+                </FormField>
+                <FormField
+                  label="Home currency"
+                  helper={
+                    currencyLocked
+                      ? 'Already set, and fixed from here so your totals stay comparable.'
+                      : 'Chosen once. Spend in another currency keeps its own and converts to this one, and this stays fixed afterwards.'
+                  }
+                  disabled={currencyLocked}
+                >
+                  <Select value={currency} aria-label="Home currency" disabled={currencyLocked} onValueChange={setCurrency}>
+                    {CURRENCIES.map(option => (
+                      <Select.Item key={option.value} value={option.value}>
+                        {option.label}
+                      </Select.Item>
+                    ))}
+                  </Select>
+                </FormField>
+              </div>
+              <p className={styles.note}>Everything else here can be changed in Settings, including after a year of history. Changing your wake window never rewrites past days.</p>
+            </Card.Body>
           </Card>
         ) : null}
 
         {step === 1 ? (
           <Card padding="lg">
-            <p className={styles.lead}>One quest is enough to start. Pick something you could do today even on a bad day — the point is the promise, not the size of it.</p>
-            <FormField label="What is the promise?" required helper="Concrete beats ambitious: read ten pages keeps better than read more.">
-              <Input value={name} onValueChange={setName} placeholder="Read 10 pages" size="lg" />
-            </FormField>
-            <div className={styles.examples}>
-              {EXAMPLES.map(example => (
-                <Button key={example} size="sm" variant="ghost" onClick={() => setName(example)}>
-                  {example}
-                </Button>
-              ))}
-            </div>
-            <p className={styles.groupLabel}>Which part of you does it grow?</p>
-            <div className={styles.choices} role="group" aria-label="Stat">
-              {STATS.map(option => (
-                <button key={option.stat} type="button" className={styles.choice} aria-pressed={stat === option.stat} onClick={() => setStat(option.stat)}>
-                  <span className={styles.choiceName}>{STAT_LABELS[option.stat]}</span>
-                  <span className={styles.choiceDesc}>{option.description}</span>
-                </button>
-              ))}
-            </div>
+            <Card.Body>
+              <p className={styles.lead}>One quest is enough to start. Pick something you could do today even on a bad day — the point is the promise, not the size of it.</p>
+              <FormField label="What is the promise?" required helper="Concrete beats ambitious: read ten pages keeps better than read more.">
+                <Input value={name} onValueChange={setName} placeholder="Read 10 pages" size="lg" />
+              </FormField>
+              <div className={styles.examples}>
+                {EXAMPLES.map(example => (
+                  <Button key={example} size="sm" variant="ghost" onClick={() => setName(example)}>
+                    {example}
+                  </Button>
+                ))}
+              </div>
+              <p className={styles.groupLabel}>Which part of you does it grow?</p>
+              <div className={styles.choices} role="group" aria-label="Stat">
+                {STATS.map(option => (
+                  <button key={option.stat} type="button" className={styles.choice} aria-pressed={stat === option.stat} onClick={() => setStat(option.stat)}>
+                    <span className={styles.choiceName}>{STAT_LABELS[option.stat]}</span>
+                    <span className={styles.choiceDesc}>{option.description}</span>
+                  </button>
+                ))}
+              </div>
+            </Card.Body>
           </Card>
         ) : null}
 
         {step === 2 ? (
           <Card padding="lg">
-            <p className={styles.lead}>When should {questName} come round? Most people start with fewer days than they expect to keep.</p>
-            <SegmentedControl value={recurrence} onValueChange={value => setRecurrence(value as Recurrence)} fullWidth>
-              <SegmentedControl.Item value="daily">Every day</SegmentedControl.Item>
-              <SegmentedControl.Item value="chosen">Chosen days</SegmentedControl.Item>
-              <SegmentedControl.Item value="count">Times a week</SegmentedControl.Item>
-            </SegmentedControl>
+            <Card.Body>
+              <p className={styles.lead}>When should {questName} come round? Most people start with fewer days than they expect to keep.</p>
+              <SegmentedControl value={recurrence} onValueChange={value => setRecurrence(value as Recurrence)} fullWidth>
+                <SegmentedControl.Item value="daily">Every day</SegmentedControl.Item>
+                <SegmentedControl.Item value="chosen">Chosen days</SegmentedControl.Item>
+                <SegmentedControl.Item value="count">Times a week</SegmentedControl.Item>
+              </SegmentedControl>
 
-            {recurrence === 'chosen' ? (
-              <div className={styles.weekdays} role="group" aria-label="Days of the week">
-                {WEEKDAYS.map(weekday => (
-                  <button key={weekday} type="button" className={styles.weekday} aria-pressed={days.includes(weekday)} onClick={() => toggleDay(weekday)}>
-                    {WEEKDAY_LABELS[weekday]}
-                  </button>
-                ))}
+              {recurrence === 'chosen' ? (
+                <div className={styles.weekdays} role="group" aria-label="Days of the week">
+                  {WEEKDAYS.map(weekday => (
+                    <button key={weekday} type="button" className={styles.weekday} aria-pressed={days.includes(weekday)} onClick={() => toggleDay(weekday)}>
+                      {WEEKDAY_LABELS[weekday]}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {recurrence === 'count' ? (
+                <FormField label="How many days a week?" helper="Any days you like — the quest just needs this many by Sunday.">
+                  <Slider value={timesPerWeek} min={1} max={7} step={1} showValue onValueChange={value => setTimesPerWeek(Array.isArray(value) ? (value[0] ?? 1) : value)} />
+                </FormField>
+              ) : null}
+
+              <div className={styles.preview}>
+                <p className={styles.groupLabel}>Your week would look like this</p>
+                <div className={styles.previewDays}>
+                  {WEEKDAYS.map((weekday, index) => (
+                    <div key={weekday} className={styles.previewDay}>
+                      <div>{WEEKDAY_LABELS[weekday]}</div>
+                      <div
+                        className={styles.previewMark}
+                        data-on={recurrence === 'daily' || (recurrence === 'chosen' && days.includes(weekday)) || (recurrence === 'count' && index < timesPerWeek)}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className={styles.note}>
+                  {dayCount} days a week · about {dayCount * 15} minutes of promises. Light enough to keep on a bad week.
+                </p>
               </div>
-            ) : null}
-
-            {recurrence === 'count' ? (
-              <FormField label="How many days a week?" helper="Any days you like — the quest just needs this many by Sunday.">
-                <Slider value={timesPerWeek} min={1} max={7} step={1} showValue onValueChange={value => setTimesPerWeek(Array.isArray(value) ? (value[0] ?? 1) : value)} />
-              </FormField>
-            ) : null}
-
-            <div className={styles.preview}>
-              <p className={styles.groupLabel}>Your week would look like this</p>
-              <div className={styles.previewDays}>
-                {WEEKDAYS.map((weekday, index) => (
-                  <div key={weekday} className={styles.previewDay}>
-                    <div>{WEEKDAY_LABELS[weekday]}</div>
-                    <div
-                      className={styles.previewMark}
-                      data-on={recurrence === 'daily' || (recurrence === 'chosen' && days.includes(weekday)) || (recurrence === 'count' && index < timesPerWeek)}
-                    />
-                  </div>
-                ))}
-              </div>
-              <p className={styles.note}>
-                {dayCount} days a week · about {dayCount * 15} minutes of promises. Light enough to keep on a bad week.
-              </p>
-            </div>
+            </Card.Body>
           </Card>
         ) : null}
 
         {step === 3 ? (
           <Card padding="lg">
-            <p className={styles.lead}>
-              How much should a missed day cost? This is the one setting that changes how the app feels. You can lower it at any time, and raising it takes effect next week.
-            </p>
-            <p className={styles.note}>Whatever you choose, a miss never removes experience or a level.</p>
-            <div className={styles.strictness} role="group" aria-label="Strictness">
-              {STRICTNESS_ORDER.map(option => (
-                <button key={option} type="button" className={styles.strictRow} aria-pressed={strictness === option} onClick={() => setStrictness(option)}>
-                  <span className={styles.strictDot} aria-hidden />
-                  <span>
-                    <span className={styles.strictHead}>
-                      <span className={styles.strictName}>{STRICTNESS_LABELS[option]}</span>
-                      <span className={styles.strictCost}>{STRICTNESS_COSTS[option]}</span>
+            <Card.Body>
+              <p className={styles.lead}>
+                How much should a missed day cost? This is the one setting that changes how the app feels. You can lower it at any time, and raising it takes effect next week.
+              </p>
+              <p className={styles.note}>Whatever you choose, a miss never removes experience or a level.</p>
+              <div className={styles.strictness} role="group" aria-label="Strictness">
+                {STRICTNESS_ORDER.map(option => (
+                  <button key={option} type="button" className={styles.strictRow} aria-pressed={strictness === option} onClick={() => setStrictness(option)}>
+                    <span className={styles.strictDot} aria-hidden />
+                    <span>
+                      <span className={styles.strictHead}>
+                        <span className={styles.strictName}>{STRICTNESS_LABELS[option]}</span>
+                        <span className={styles.strictCost}>{STRICTNESS_COSTS[option]}</span>
+                      </span>
+                      <span className={styles.strictDesc}>{STRICTNESS_RULES[option]}</span>
                     </span>
-                    <span className={styles.strictDesc}>{STRICTNESS_RULES[option]}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-            <Alert intent="info" title="Shields cover the days you could not help">
-              You earn one shield for each kept week, up to three. A shield protects a streak on an unavoidable miss, with no explanation required from you.
-            </Alert>
+                  </button>
+                ))}
+              </div>
+              <Alert intent="info" title="Shields cover the days you could not help">
+                You earn one shield for each kept week, up to three. A shield protects a streak on an unavoidable miss, with no explanation required from you.
+              </Alert>
+            </Card.Body>
           </Card>
         ) : null}
 
         {step === 4 ? (
           <Card padding="lg">
-            <p className={styles.groupLabel}>Your first quest</p>
-            <div className={styles.summaryName}>{questName}</div>
-            <div className={styles.tags}>
-              <Tag>{STAT_LABELS[stat]}</Tag>
-              <Badge variant="outline">{STRICTNESS_LABELS[strictness]}</Badge>
-              <Badge variant="soft" intent="neutral">
-                {dayCount === 7 ? 'Every day' : `${dayCount} days a week`}
-              </Badge>
-            </div>
-            <DescriptionList layout="row" termWidth={150}>
-              <DescriptionList.Item term="First occurrence">Today · it is already on your Today screen</DescriptionList.Item>
-              <DescriptionList.Item term="Reward">Experience when kept · {STAT_LABELS[stat]} up one</DescriptionList.Item>
-              <DescriptionList.Item term="If you miss it">{STRICTNESS_RULES[strictness]}</DescriptionList.Item>
-              <DescriptionList.Item term="Home currency">{currency} · fixed from here, so your totals stay comparable</DescriptionList.Item>
-            </DescriptionList>
-            <p className={styles.note}>
-              Next is your Today screen with this quest on it. Nothing else is set up, and nothing else needs to be — expenses, meals, weight and journal all work whenever you
-              first reach for them.
-            </p>
+            <Card.Body>
+              <p className={styles.groupLabel}>Your first quest</p>
+              <div className={styles.summaryName}>{questName}</div>
+              <div className={styles.tags}>
+                <Tag>{STAT_LABELS[stat]}</Tag>
+                <Badge variant="outline">{STRICTNESS_LABELS[strictness]}</Badge>
+                <Badge variant="soft" intent="neutral">
+                  {dayCount === 7 ? 'Every day' : `${dayCount} days a week`}
+                </Badge>
+              </div>
+              <DescriptionList layout="row" termWidth={150}>
+                <DescriptionList.Item term="First occurrence">Today · it is already on your Today screen</DescriptionList.Item>
+                <DescriptionList.Item term="Reward">Experience when kept · {STAT_LABELS[stat]} up one</DescriptionList.Item>
+                <DescriptionList.Item term="If you miss it">{STRICTNESS_RULES[strictness]}</DescriptionList.Item>
+                <DescriptionList.Item term="Home currency">{currency} · fixed from here, so your totals stay comparable</DescriptionList.Item>
+              </DescriptionList>
+              <p className={styles.note}>
+                Next is your Today screen with this quest on it. Nothing else is set up, and nothing else needs to be — expenses, meals, weight and journal all work whenever you
+                first reach for them.
+              </p>
+            </Card.Body>
           </Card>
         ) : null}
 

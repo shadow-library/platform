@@ -38,81 +38,99 @@ export function RecoveryScreen(): ReactElement {
               ) : null}
 
               <Card padding="md">
-                <h2 className={screenStyles.cardTitle}>While you were away</h2>
-                <ul className={styles.rows}>
-                  {recovery.data.missed.map(entry => (
-                    <li key={entry.id} className={styles.row}>
-                      <span>
-                        <span className={styles.rowTitle}>{entry.title}</span>
-                        <span className={styles.rowMeta}>{entry.meta}</span>
-                      </span>
-                      <Badge variant="outline" size="sm">
-                        {entry.state}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
+                <Card.Body>
+                  <h2 className={screenStyles.cardTitle}>While you were away</h2>
+                  <ul className={styles.rows}>
+                    {recovery.data.missed.map(entry => (
+                      <li key={entry.id} className={styles.row}>
+                        <span>
+                          <span className={styles.rowTitle}>{entry.title}</span>
+                          <span className={styles.rowMeta}>{entry.meta}</span>
+                        </span>
+                        <Badge variant="outline" size="sm">
+                          {entry.state}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                </Card.Body>
               </Card>
 
               <Card padding="md">
-                <h2 className={screenStyles.cardTitle}>Comeback progress</h2>
-                <Progress value={recovery.data.progressPercent} max={100} size="md" label="Comeback progress" />
-                <p className={screenStyles.cardBody}>{recovery.data.progressNote}</p>
+                <Card.Body>
+                  <h2 className={screenStyles.cardTitle}>Comeback progress</h2>
+                  <Progress value={recovery.data.progressPercent} max={100} size="md" label="Comeback progress" />
+                  <p className={screenStyles.cardBody}>{recovery.data.progressNote}</p>
+                </Card.Body>
               </Card>
 
               <Card padding="md">
-                <h2 className={screenStyles.cardTitle}>How shields work</h2>
-                <p className={screenStyles.cardBody}>{recovery.data.shieldNote}</p>
+                <Card.Body>
+                  <h2 className={screenStyles.cardTitle}>How shields work</h2>
+                  <p className={screenStyles.cardBody}>{recovery.data.shieldNote}</p>
+                </Card.Body>
               </Card>
             </>
           }
         >
           <Card padding="lg">
-            <h2 className={styles.name}>{recovery.data.headline}</h2>
-            <p className={screenStyles.cardBody}>{recovery.data.body}</p>
-            <div className={styles.facts}>
-              {recovery.data.stats.map(stat => (
-                <Statistic key={stat.label} label={stat.label} value={stat.value} unit={stat.unit} size="sm" />
-              ))}
-            </div>
-          </Card>
-
-          <Card padding="md">
-            <h2 className={screenStyles.cardTitle}>Open choices</h2>
-            <p className={screenStyles.cardBody}>Each of these is optional and reversible.</p>
-            {recovery.data.choices.map(choice => (
-              <div key={choice.id} className={styles.choice}>
-                <p className={styles.choiceTitle}>{choice.title}</p>
-                <p className={screenStyles.cardBody}>{choice.body}</p>
-                <p className={styles.choiceEffect}>Effect: {choice.effect}</p>
-                <div className={styles.choiceActions}>
-                  <Button size="sm" variant="secondary" asChild>
-                    <Link to={choice.to}>{choice.actionLabel}</Link>
-                  </Button>
-                  <Button size="sm" variant="ghost">
-                    Not now
-                  </Button>
-                </div>
+            <Card.Body>
+              <h2 className={styles.name}>{recovery.data.headline}</h2>
+              <p className={screenStyles.cardBody}>{recovery.data.body}</p>
+              <div className={styles.facts}>
+                {recovery.data.stats.map(stat => (
+                  <Statistic key={stat.label} label={stat.label} value={stat.value} unit={stat.unit} size="sm" />
+                ))}
               </div>
-            ))}
+            </Card.Body>
           </Card>
 
           <Card padding="md">
-            <h2 className={screenStyles.cardTitle}>Intensity</h2>
-            <p className={screenStyles.cardBody}>
-              How much the app should ask of you. This changes load and strictness across every quest at once, and it never changes experience already earned.
-            </p>
-            <div className={styles.options} role="group" aria-label="Intensity">
-              {recovery.data.intensityOptions.map(option => (
-                <button key={option.mode} type="button" className={styles.option} aria-pressed={recovery.data.intensity === option.mode} onClick={() => setIntensity(option.mode)}>
-                  <span className={styles.optionDot} aria-hidden />
-                  <span>
-                    <span className={styles.optionName}>{option.name}</span>
-                    <span className={styles.optionDesc}>{option.description}</span>
-                  </span>
-                </button>
+            <Card.Body>
+              <h2 className={screenStyles.cardTitle}>Open choices</h2>
+              <p className={screenStyles.cardBody}>Each of these is optional and reversible.</p>
+              {recovery.data.choices.map(choice => (
+                <div key={choice.id} className={styles.choice}>
+                  <p className={styles.choiceTitle}>{choice.title}</p>
+                  <p className={screenStyles.cardBody}>{choice.body}</p>
+                  <p className={styles.choiceEffect}>Effect: {choice.effect}</p>
+                  <div className={styles.choiceActions}>
+                    <Button size="sm" variant="secondary" asChild>
+                      <Link to={choice.to}>{choice.actionLabel}</Link>
+                    </Button>
+                    <Button size="sm" variant="ghost">
+                      Not now
+                    </Button>
+                  </div>
+                </div>
               ))}
-            </div>
+            </Card.Body>
+          </Card>
+
+          <Card padding="md">
+            <Card.Body>
+              <h2 className={screenStyles.cardTitle}>Intensity</h2>
+              <p className={screenStyles.cardBody}>
+                How much the app should ask of you. This changes load and strictness across every quest at once, and it never changes experience already earned.
+              </p>
+              <div className={styles.options} role="group" aria-label="Intensity">
+                {recovery.data.intensityOptions.map(option => (
+                  <button
+                    key={option.mode}
+                    type="button"
+                    className={styles.option}
+                    aria-pressed={recovery.data.intensity === option.mode}
+                    onClick={() => setIntensity(option.mode)}
+                  >
+                    <span className={styles.optionDot} aria-hidden />
+                    <span>
+                      <span className={styles.optionName}>{option.name}</span>
+                      <span className={styles.optionDesc}>{option.description}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </Card.Body>
           </Card>
         </ScreenColumns>
       ) : null}
