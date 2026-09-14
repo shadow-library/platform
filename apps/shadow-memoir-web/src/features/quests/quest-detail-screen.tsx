@@ -28,6 +28,8 @@ export function QuestEditorScreen({ questId }: QuestEditorScreenProps): ReactEle
     );
 
   const { quest, progress } = detail.data;
+  const streakUnit = quest.recurrence.frequency === 'daily' && quest.recurrence.interval === 1 ? 'days' : 'occurrences';
+  const hasHistory = progress.adherence30d !== null;
 
   return (
     <section className={styles.screen} aria-labelledby="quest-title">
@@ -62,10 +64,14 @@ export function QuestEditorScreen({ questId }: QuestEditorScreenProps): ReactEle
                 ) : null}
               </div>
               <div className={styles.stats}>
-                <Statistic label="Current streak" value={progress.currentStreakDays} unit="days" size="sm" />
-                <Statistic label="Kept, 30 days" value={progress.adherence30d ?? 0} size="sm" format={{ style: 'percent', maximumFractionDigits: 0 }} />
+                <Statistic label="Current streak" value={progress.currentStreakDays} unit={streakUnit} size="sm" />
+                {hasHistory ? (
+                  <Statistic label="Kept, 30 days" value={progress.adherence30d ?? 0} size="sm" format={{ style: 'percent', maximumFractionDigits: 0 }} />
+                ) : (
+                  <span className={styles.questMeta}>Kept, 30 days — not enough history yet</span>
+                )}
                 <Statistic label="XP from this quest" value={progress.xpEarned} size="sm" />
-                <Statistic label="Longest streak" value={progress.longestStreakDays} unit="days" size="sm" />
+                <Statistic label="Longest streak" value={progress.longestStreakDays} unit={streakUnit} size="sm" />
               </div>
             </Card.Body>
           </Card>
@@ -74,13 +80,17 @@ export function QuestEditorScreen({ questId }: QuestEditorScreenProps): ReactEle
             <Card.Body>
               <div className={styles.railHeader}>
                 <h2 className={styles.cardTitle}>Last 30 days</h2>
-                <span className={styles.questMeta}>{adherenceLabel(progress.adherence30d)} kept</span>
+                <span className={styles.questMeta}>{hasHistory ? `${adherenceLabel(progress.adherence30d)} kept` : 'Not enough history yet'}</span>
               </div>
-              <div className={styles.monthBars} aria-hidden>
-                {progress.recentOutcomes.map((state, index) => (
-                  <span key={index} className={styles.monthBar} data-tone={outcomeTone(state)} />
-                ))}
-              </div>
+              {hasHistory ? (
+                <div className={styles.monthBars} aria-hidden>
+                  {progress.recentOutcomes.map((state, index) => (
+                    <span key={index} className={styles.monthBar} data-tone={outcomeTone(state)} />
+                  ))}
+                </div>
+              ) : (
+                <p className={styles.cardBody}>Complete or skip this quest a few times and its 30-day chart fills in.</p>
+              )}
               <ul className={styles.history}>
                 {detail.data.history.map(entry => (
                   <li key={entry.date} className={styles.historyRow}>

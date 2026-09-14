@@ -139,7 +139,7 @@ const HOLD_WEIGHT: Record<QuestLogState, number> = {
 };
 
 /** A moved occurrence resolves on the day it moved to; counting it where it was planned would charge the owner twice. */
-const CARRIED_STATES: QuestLogState[] = ['postponed', 'rescheduled'];
+export const CARRIED_STATES: QuestLogState[] = ['postponed', 'rescheduled'];
 
 const PERIOD_DAYS: Record<InsightPeriod, number> = { '30': 30, '90': 90, '365': 365 };
 

@@ -1,6 +1,9 @@
 import {
   ACHIEVEMENTS,
+  type ActivityEntry,
+  adherenceOf,
   BUILT_IN_CATEGORIES,
+  CARRIED_STATES,
   type CosmeticKind,
   COSMETICS,
   type CurrencyCode,
@@ -31,6 +34,7 @@ import {
   type ReflectQuestLog,
   type ReflectSource,
   type ReminderLead,
+  shiftDate,
   type SideQuest,
   type StatAffinity,
   type Strictness,
@@ -43,6 +47,7 @@ import {
   type Weekday,
   type WeightEntry,
 } from '@/lib/data';
+import { formatLocalTime } from '@/lib/format';
 
 import { type DeltaRow, type SyncDomain } from './sync.types';
 
@@ -143,34 +148,60 @@ function toLogRecord(row: DeltaRow): LogRecord {
     reasonNote: text(row, 'reasonNote'),
     rescheduledToMin: row['rescheduledToMin'] === null || row['rescheduledToMin'] === undefined ? null : number(row, 'rescheduledToMin'),
     postponedTo: text(row, 'postponedToDate'),
-    shielded: false,
+    shielded: bool(row, 'shielded'),
     progress: null,
   };
 }
 
-function toProgress(row: DeltaRow): QuestProgress {
+const ADHERENCE_WINDOW_DAYS = 30;
+const RESCHEDULE_WINDOW_DAYS = 7;
+const MIN_COUNTED_OCCURRENCES = 3;
+
+function questLogState(row: DeltaRow): QuestLogState {
+  return QUEST_LOG_STATES.find(candidate => candidate === text(row, 'state')) ?? 'completed';
+}
+
+function logDate(row: DeltaRow): string {
+  return String(row['date']);
+}
+
+function activityTimestamp(row: DeltaRow): string {
+  return text(row, 'performedAt') ?? text(row, 'updatedAt') ?? text(row, 'createdAt') ?? '';
+}
+
+function toProgress(row: DeltaRow | undefined, logs: DeltaRow[], today: string, questNames: Map<string, string>): QuestProgress {
+  const adherenceSince = shiftDate(today, -(ADHERENCE_WINDOW_DAYS - 1));
+  const rescheduleSince = shiftDate(today, -(RESCHEDULE_WINDOW_DAYS - 1));
+  const windowed = logs
+    .filter(log => logDate(log) >= adherenceSince && logDate(log) <= today)
+    .sort((a, b) => logDate(a).localeCompare(logDate(b)))
+    .map(log => toReflectQuestLog(log, questNames));
+
+  const adherence = adherenceOf(windowed);
+  const xpEarned = logs.reduce((total, log) => total + number(log, 'xpAwarded'), 0);
+  const reschedulesUsed = logs.filter(log => text(log, 'state') === 'rescheduled' && logDate(log) >= rescheduleSince).length;
+
   return {
-    currentStreakDays: number(row, 'currentRunDays'),
-    longestStreakDays: number(row, 'bestRunDays'),
-    shields: number(row, 'shieldsAvailable'),
-    adherence30d: null,
-    xpEarned: 0,
-    reschedulesUsed: 0,
+    currentStreakDays: row ? number(row, 'currentRunDays') : 0,
+    longestStreakDays: row ? number(row, 'bestRunDays') : 0,
+    shields: row ? number(row, 'shieldsAvailable') : 0,
+    adherence30d: adherence.occurrences >= MIN_COUNTED_OCCURRENCES ? adherence.ratio : null,
+    xpEarned,
+    reschedulesUsed,
     rescheduleCap: 2,
-    recentOutcomes: [],
+    recentOutcomes: windowed.filter(log => !CARRIED_STATES.includes(log.state)).map(log => log.state),
   };
 }
 
-const EMPTY_PROGRESS: QuestProgress = {
-  currentStreakDays: 0,
-  longestStreakDays: 0,
-  shields: 0,
-  adherence30d: null,
-  xpEarned: 0,
-  reschedulesUsed: 0,
-  rescheduleCap: 2,
-  recentOutcomes: [],
-};
+function toActivityEntry(row: DeltaRow, questName: string): ActivityEntry {
+  const xpAwarded = number(row, 'xpAwarded');
+  return {
+    id: String(row['id']),
+    text: `${questName} ${questLogState(row)}${xpAwarded > 0 ? ` · +${xpAwarded} XP` : ''}`,
+    when: formatLocalTime(activityTimestamp(row)) || 'today',
+    rewarded: xpAwarded > 0,
+  };
+}
 
 /**
  * Rebuilds the engine's world from the rows the delta pull has left in IndexedDB. It is deliberately total:
@@ -181,20 +212,39 @@ export function projectWorldState(rows: Partial<DomainRows>, today: string): Mem
   const keyOf = metricKeyResolver(healthMetricIds(rows.metrics ?? []));
   const quests = (rows.quests ?? []).map(row => toQuest(row, keyOf));
   const account = rows.account?.[0];
+  const questNames = new Map(quests.map(quest => [quest.id, quest.name]));
+
+  const questLogRows = rows.quest_logs ?? [];
+  const logsByQuest = new Map<string, DeltaRow[]>();
+  for (const row of questLogRows) {
+    const questId = String(row['questId']);
+    const existing = logsByQuest.get(questId);
+    if (existing) existing.push(row);
+    else logsByQuest.set(questId, [row]);
+  }
+
+  const streaksByQuest = new Map<string, DeltaRow>();
+  for (const row of rows.quest_streaks ?? []) streaksByQuest.set(String(row['questId']), row);
 
   const progress: Record<string, QuestProgress> = {};
-  for (const quest of quests) progress[quest.id] = EMPTY_PROGRESS;
-  for (const row of rows.quest_streaks ?? []) progress[String(row['questId'])] = toProgress(row);
+  for (const quest of quests) progress[quest.id] = toProgress(streaksByQuest.get(quest.id), logsByQuest.get(quest.id) ?? [], today, questNames);
 
   const logs = new Map<string, LogRecord>();
-  for (const row of rows.quest_logs ?? []) logs.set(`${String(row['questId'])}:${String(row['date'])}`, toLogRecord(row));
+  for (const row of questLogRows) logs.set(`${String(row['questId'])}:${logDate(row)}`, toLogRecord(row));
+
+  const activity = questLogRows
+    .filter(row => logDate(row) === today && text(row, 'state') !== 'missed')
+    .sort((a, b) => activityTimestamp(b).localeCompare(activityTimestamp(a)))
+    .slice(0, 8)
+    .map(row => toActivityEntry(row, questNames.get(String(row['questId'])) ?? 'Quest'));
 
   const locks = new Set<string>();
-  const lockedQuestIds = new Set<string>();
+  const lockedQuestIdsByDate = new Map<string, Set<string>>();
   for (const row of rows.daily_states ?? []) {
     if (row['committedAt'] === null || row['committedAt'] === undefined) continue;
-    locks.add(String(row['date']));
-    for (const questId of (row['lockedQuestIds'] as unknown[] | undefined) ?? []) lockedQuestIds.add(String(questId));
+    const date = String(row['date']);
+    locks.add(date);
+    lockedQuestIdsByDate.set(date, new Set(((row['lockedQuestIds'] as unknown[] | undefined) ?? []).map(String)));
   }
 
   const totalXp = account ? number(account, 'totalXp') : 0;
@@ -203,7 +253,7 @@ export function projectWorldState(rows: Partial<DomainRows>, today: string): Mem
   return {
     today,
     persona: 'active',
-    quests: quests.map(quest => ({ ...quest, preCommit: lockedQuestIds.has(quest.id) })),
+    quests,
     progress,
     logs,
     hero: {
@@ -218,10 +268,11 @@ export function projectWorldState(rows: Partial<DomainRows>, today: string): Mem
       momentum: toMomentum(account ? text(account, 'warmthState') : null),
       crown: { label: '', dayIndex: 0, dayCount: 7, keptPercent: 0 },
     },
-    activity: [],
+    activity,
     scheduleEndMinutes: account ? number(account, 'scheduleEndMin', 1380) : null,
     metrics: {},
     locks,
+    lockedQuestIdsByDate,
   };
 }
 
@@ -594,7 +645,7 @@ function toReflectQuestLog(row: DeltaRow, questNames: Map<string, string>): Refl
     questId,
     questName: questNames.get(questId) ?? 'Quest',
     date: String(row['date']),
-    state: QUEST_LOG_STATES.find(candidate => candidate === text(row, 'state')) ?? 'completed',
+    state: questLogState(row),
     xpAwarded: number(row, 'xpAwarded'),
     coinsAwarded: number(row, 'coinsAwarded'),
     reasonTag: (REASON_TAGS.find(candidate => candidate === text(row, 'reasonTag')) ?? null) as ReasonTag | null,

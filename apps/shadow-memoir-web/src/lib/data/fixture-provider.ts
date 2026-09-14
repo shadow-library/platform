@@ -71,6 +71,7 @@ export interface MemoirWorldState {
   scheduleEndMinutes: number | null;
   metrics: Record<string, number>;
   locks: Set<string>;
+  lockedQuestIdsByDate: Map<string, Set<string>>;
 }
 
 export interface FixtureProviderOptions {
@@ -152,10 +153,16 @@ function seedHistory(state: MemoirWorldState): void {
   if (run && isScheduled(run, state.today)) state.logs.set(occurrenceKey(run.id, state.today), recordFor(run, 'completed'));
 }
 
+function lockedQuestIdsFor(quests: Quest[]): Set<string> {
+  return new Set(quests.filter(quest => quest.preCommit).map(quest => quest.id));
+}
+
 function seedWorldState(options: FixtureProviderOptions = {}): MemoirWorldState {
   const today = options.today ?? toISODate(new Date());
   const persona = options.persona ?? 'active';
   const seeded = seed(today, persona);
+  const locks = persona === 'active' ? new Set([today, shiftDate(today, 1)]) : new Set<string>();
+  const lockedIds = lockedQuestIdsFor(seeded.quests);
   const state: MemoirWorldState = {
     today,
     persona,
@@ -166,7 +173,8 @@ function seedWorldState(options: FixtureProviderOptions = {}): MemoirWorldState 
     activity: seeded.activity,
     scheduleEndMinutes: null,
     metrics: seeded.metrics,
-    locks: persona === 'active' ? new Set([today, shiftDate(today, 1)]) : new Set(),
+    locks,
+    lockedQuestIdsByDate: new Map([...locks].map(date => [date, new Set(lockedIds)])),
   };
   seedHistory(state);
   return state;
@@ -213,7 +221,7 @@ export class MemoirEngine implements DataProvider {
       postponedTo: log?.postponedTo ?? null,
       streakDays: progress.currentStreakDays,
       shields: progress.shields,
-      locked: quest.preCommit && this.state.locks.has(date),
+      locked: this.state.lockedQuestIdsByDate.get(date)?.has(quest.id) ?? false,
       queued: this.queuedOccurrences.has(occurrenceKey(quest.id, date)),
       threshold: quest.healthThreshold
         ? {
@@ -394,7 +402,7 @@ export class MemoirEngine implements DataProvider {
     return {
       quest,
       progress: this.state.progress[quest.id] as QuestProgress,
-      scheduleLocked: quest.preCommit && this.state.locks.has(this.state.today),
+      scheduleLocked: this.state.lockedQuestIdsByDate.get(this.state.today)?.has(quest.id) ?? false,
       scheduleSummary: scheduleSummary(quest),
     };
   }
@@ -571,6 +579,17 @@ export class MemoirEngine implements DataProvider {
     return { status: 'applied', message: `${quest.name} moved to ${toTime}. The streak is untouched.`, xpAwarded: 0, coinsAwarded: 0 };
   }
 
+  /** Past dates keep their commitment as it was made. */
+  private syncQuestLock(questId: string, preCommit: boolean): void {
+    for (const [date, ids] of this.state.lockedQuestIdsByDate) {
+      if (date < this.state.today) continue;
+      const next = new Set(ids);
+      if (preCommit) next.add(questId);
+      else next.delete(questId);
+      this.state.lockedQuestIdsByDate.set(date, next);
+    }
+  }
+
   private createQuest(draft: QuestDraft): CommandResult {
     const id = `${
       draft.name
@@ -590,6 +609,7 @@ export class MemoirEngine implements DataProvider {
       rescheduleCap: 2,
       recentOutcomes: [],
     };
+    this.syncQuestLock(id, draft.preCommit);
     return { status: 'applied', message: `${draft.name} is in your plan.`, xpAwarded: 0, coinsAwarded: 0 };
   }
 
@@ -597,6 +617,7 @@ export class MemoirEngine implements DataProvider {
     const quest = this.questById(questId);
     if (!quest) return { status: 'rejected', message: 'That quest is no longer in your plan.' };
     this.state.quests = this.state.quests.map(item => (item.id === questId ? { ...item, ...patch, updatedAt: this.state.today } : item));
+    if (patch.preCommit !== undefined) this.syncQuestLock(questId, patch.preCommit);
     return { status: 'applied', message: `${patch.name ?? quest.name} is saved. Changes apply to future occurrences.`, xpAwarded: 0, coinsAwarded: 0 };
   }
 
@@ -606,9 +627,15 @@ export class MemoirEngine implements DataProvider {
   }
 
   private setLock(from: string, to: string, locked: boolean): CommandResult {
+    const lockedIds = lockedQuestIdsFor(this.state.quests);
     for (let date = from; date <= to; date = shiftDate(date, 1)) {
-      if (locked) this.state.locks.add(date);
-      else this.state.locks.delete(date);
+      if (locked) {
+        this.state.locks.add(date);
+        this.state.lockedQuestIdsByDate.set(date, new Set(lockedIds));
+      } else {
+        this.state.locks.delete(date);
+        this.state.lockedQuestIdsByDate.delete(date);
+      }
     }
     return { status: 'applied', message: locked ? 'The plan is committed for this week.' : 'The plan is open again.', xpAwarded: 0, coinsAwarded: 0 };
   }

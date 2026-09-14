@@ -91,15 +91,21 @@ function QuestListRow({ summary }: { summary: QuestSummary }): ReactElement {
           <span className={styles.questMeta}>{questMeta(summary)}</span>
         </span>
         <span className={styles.questTrailing}>
-          <span className={styles.adherence}>
-            <span className={styles.mono}>{adherenceLabel(summary.progress.adherence30d)}</span>
-            <span className={styles.questMeta}>30-day kept</span>
-          </span>
-          <span className={styles.spark} aria-hidden>
-            {summary.progress.recentOutcomes.slice(-14).map((state, index) => (
-              <span key={index} className={styles.sparkBar} data-tone={outcomeTone(state)} />
-            ))}
-          </span>
+          {summary.progress.adherence30d === null ? (
+            <span className={styles.questMeta}>Not enough history yet</span>
+          ) : (
+            <>
+              <span className={styles.adherence}>
+                <span className={styles.mono}>{adherenceLabel(summary.progress.adherence30d)}</span>
+                <span className={styles.questMeta}>30-day kept</span>
+              </span>
+              <span className={styles.spark} aria-hidden>
+                {summary.progress.recentOutcomes.slice(-14).map((state, index) => (
+                  <span key={index} className={styles.sparkBar} data-tone={outcomeTone(state)} />
+                ))}
+              </span>
+            </>
+          )}
           <ChevronRightIcon size={16} />
         </span>
       </Link>

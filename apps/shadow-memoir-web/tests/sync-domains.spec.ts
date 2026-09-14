@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { type DeltaPage, SyncedAccountProvider, SyncedFinanceProvider, SyncedHeroProvider, SyncedQuickLogProvider, SyncedReflectProvider } from '@/lib/sync';
+import { type DeltaPage, SyncedAccountProvider, SyncedDataProvider, SyncedFinanceProvider, SyncedHeroProvider, SyncedQuickLogProvider, SyncedReflectProvider } from '@/lib/sync';
 
 import { withTimeZone } from './setup';
 import { createTestEngine, type TestEngine } from './sync-harness';
@@ -443,5 +443,331 @@ describe('FE-7 reflection derivation', () => {
     expect(server.batches).toHaveLength(0);
 
     expect((await new SyncedReflectProvider(engine).getReview()).completion).not.toBeNull();
+  });
+});
+
+const ADHERENCE_QUEST_ROW = { id: '26', name: 'Plunge pool', statAffinity: 'body', strictness: 'routine', durationMin: 5, active: true, recurrence: {}, syncSeq: '80' };
+
+const ADHERENCE_LOG_ROWS = [
+  { id: '700', questId: '26', date: '2026-06-01', state: 'completed', xpAwarded: 999, coinsAwarded: 0, statAffinity: 'body', strictness: 'routine', syncSeq: '81' },
+  { id: '701', questId: '26', date: '2026-08-17', state: 'completed', xpAwarded: 10, coinsAwarded: 1, statAffinity: 'body', strictness: 'routine', syncSeq: '82' },
+  { id: '702', questId: '26', date: '2026-08-18', state: 'completed', xpAwarded: 10, coinsAwarded: 1, statAffinity: 'body', strictness: 'routine', syncSeq: '83' },
+  { id: '703', questId: '26', date: '2026-08-19', state: 'missed', xpAwarded: 0, coinsAwarded: 0, statAffinity: 'body', strictness: 'routine', syncSeq: '84' },
+  { id: '704', questId: '26', date: '2026-08-20', state: 'partial', xpAwarded: 5, coinsAwarded: 0, statAffinity: 'body', strictness: 'routine', syncSeq: '85' },
+];
+
+function adherencePage(): DeltaPage {
+  const page = fullPage();
+  page.domains['quests'] = [ADHERENCE_QUEST_ROW];
+  page.domains['quest_logs'] = ADHERENCE_LOG_ROWS;
+  return page;
+}
+
+const NO_STREAK_QUEST_ROW = { id: '27', name: 'Cold shower', statAffinity: 'body', strictness: 'recovery', durationMin: 5, active: true, recurrence: {}, syncSeq: '90' };
+
+const NO_STREAK_LOG_ROWS = [
+  { id: '800', questId: '27', date: '2026-08-20', state: 'completed', xpAwarded: 8, coinsAwarded: 1, statAffinity: 'body', strictness: 'recovery', syncSeq: '91' },
+  { id: '801', questId: '27', date: '2026-08-21', state: 'completed', xpAwarded: 8, coinsAwarded: 1, statAffinity: 'body', strictness: 'recovery', syncSeq: '92' },
+  { id: '802', questId: '27', date: '2026-08-22', state: 'missed', xpAwarded: 0, coinsAwarded: 0, statAffinity: 'body', strictness: 'recovery', syncSeq: '93' },
+];
+
+function noStreakPage(): DeltaPage {
+  const page = fullPage();
+  page.domains['quests'] = [NO_STREAK_QUEST_ROW];
+  page.domains['quest_logs'] = NO_STREAK_LOG_ROWS;
+  return page;
+}
+
+const RESCHEDULE_QUEST_ROW = { id: '21', name: 'Read pages', statAffinity: 'mind', strictness: 'goal', durationMin: 20, active: true, recurrence: {}, syncSeq: '40' };
+
+const RESCHEDULE_LOG_ROWS = [
+  {
+    id: '400',
+    questId: '21',
+    date: '2026-08-10',
+    state: 'rescheduled',
+    xpAwarded: 0,
+    coinsAwarded: 0,
+    statAffinity: 'mind',
+    strictness: 'goal',
+    rescheduledToMin: 1200,
+    syncSeq: '41',
+  },
+  {
+    id: '401',
+    questId: '21',
+    date: '2026-08-19',
+    state: 'rescheduled',
+    xpAwarded: 0,
+    coinsAwarded: 0,
+    statAffinity: 'mind',
+    strictness: 'goal',
+    rescheduledToMin: 1200,
+    syncSeq: '42',
+  },
+  { id: '402', questId: '21', date: TODAY, state: 'rescheduled', xpAwarded: 0, coinsAwarded: 0, statAffinity: 'mind', strictness: 'goal', rescheduledToMin: 1300, syncSeq: '43' },
+  {
+    id: '403',
+    questId: '21',
+    date: '2026-08-26',
+    state: 'rescheduled',
+    xpAwarded: 0,
+    coinsAwarded: 0,
+    statAffinity: 'mind',
+    strictness: 'goal',
+    rescheduledToMin: 900,
+    syncSeq: '45',
+  },
+];
+
+const RESCHEDULE_STREAK_ROW = { questId: '21', currentRunDays: 0, bestRunDays: 0, shieldsAvailable: 0, syncSeq: '44' };
+
+function reschedulePage(): DeltaPage {
+  const page = fullPage();
+  page.domains['quests'] = [RESCHEDULE_QUEST_ROW];
+  page.domains['quest_logs'] = RESCHEDULE_LOG_ROWS;
+  page.domains['quest_streaks'] = [RESCHEDULE_STREAK_ROW];
+  return page;
+}
+
+const LOCK_QUEST_ROW = { id: '28', name: 'Journal check-in', statAffinity: 'mind', strictness: 'anchor', durationMin: 10, active: true, recurrence: {}, syncSeq: '100' };
+const LOCK_QUEST_ROW_TODAY = { id: '29', name: 'Evening review', statAffinity: 'mind', strictness: 'anchor', durationMin: 10, active: true, recurrence: {}, syncSeq: '101' };
+
+function pastLockPage(): DeltaPage {
+  const page = fullPage();
+  page.domains['quests'] = [LOCK_QUEST_ROW, LOCK_QUEST_ROW_TODAY];
+  page.domains['daily_states'] = [
+    { date: '2026-08-17', committedAt: '2026-08-16T20:00:00.000Z', lockedQuestIds: ['28'] },
+    { date: TODAY, committedAt: '2026-08-23T20:00:00.000Z', lockedQuestIds: ['29'] },
+  ];
+  return page;
+}
+
+const CARRIED_QUEST_ROW = { id: '30', name: 'Stretch break', statAffinity: 'body', strictness: 'goal', durationMin: 5, active: true, recurrence: {}, syncSeq: '110' };
+
+const CARRIED_LOG_ROWS = [
+  {
+    id: '900',
+    questId: '30',
+    date: '2026-08-18',
+    state: 'postponed',
+    xpAwarded: 0,
+    coinsAwarded: 0,
+    statAffinity: 'body',
+    strictness: 'goal',
+    postponedToDate: '2026-08-19',
+    syncSeq: '111',
+  },
+  {
+    id: '901',
+    questId: '30',
+    date: '2026-08-20',
+    state: 'rescheduled',
+    xpAwarded: 0,
+    coinsAwarded: 0,
+    statAffinity: 'body',
+    strictness: 'goal',
+    rescheduledToMin: 900,
+    syncSeq: '112',
+  },
+  {
+    id: '902',
+    questId: '30',
+    date: '2026-08-22',
+    state: 'rescheduled',
+    xpAwarded: 0,
+    coinsAwarded: 0,
+    statAffinity: 'body',
+    strictness: 'goal',
+    rescheduledToMin: 1000,
+    syncSeq: '113',
+  },
+];
+
+function carriedOnlyPage(): DeltaPage {
+  const page = fullPage();
+  page.domains['quests'] = [CARRIED_QUEST_ROW];
+  page.domains['quest_logs'] = CARRIED_LOG_ROWS;
+  return page;
+}
+
+const MANY_ACTIVITY_QUESTS = Array.from({ length: 9 }, (_, index) => ({
+  id: `q-many-${index + 1}`,
+  name: `Quest ${index + 1}`,
+  statAffinity: 'discipline',
+  strictness: 'routine',
+  durationMin: 5,
+  active: true,
+  recurrence: {},
+  syncSeq: String(120 + index),
+}));
+
+const MANY_ACTIVITY_LOG_ROWS = MANY_ACTIVITY_QUESTS.map((quest, index) => ({
+  id: `q-many-log-${index + 1}`,
+  questId: quest.id,
+  date: TODAY,
+  state: 'completed',
+  xpAwarded: 0,
+  coinsAwarded: 0,
+  statAffinity: 'discipline',
+  strictness: 'routine',
+  performedAt: `${TODAY}T${String(6 + index).padStart(2, '0')}:00:00.000Z`,
+  syncSeq: String(130 + index),
+}));
+
+function manyActivityPage(): DeltaPage {
+  const page = fullPage();
+  page.domains['quests'] = MANY_ACTIVITY_QUESTS;
+  page.domains['quest_logs'] = MANY_ACTIVITY_LOG_ROWS;
+  return page;
+}
+
+const SHIELD_QUEST_ROW = { id: '22', name: 'Cold plunge', statAffinity: 'body', strictness: 'anchor', durationMin: 10, active: true, recurrence: {}, syncSeq: '50' };
+const SHIELD_LOG_ROW = {
+  id: '500',
+  questId: '22',
+  date: TODAY,
+  state: 'missed',
+  xpAwarded: 0,
+  coinsAwarded: 0,
+  statAffinity: 'body',
+  strictness: 'anchor',
+  shielded: true,
+  syncSeq: '51',
+};
+const SHIELD_STREAK_ROW = { questId: '22', currentRunDays: 5, bestRunDays: 5, shieldsAvailable: 1, syncSeq: '52' };
+
+function shieldPage(): DeltaPage {
+  const page = fullPage();
+  page.domains['quests'] = [SHIELD_QUEST_ROW];
+  page.domains['quest_logs'] = [SHIELD_LOG_ROW];
+  page.domains['quest_streaks'] = [SHIELD_STREAK_ROW];
+  return page;
+}
+
+const ACTIVITY_QUEST_A = { id: '23', name: 'Morning pages', statAffinity: 'mind', strictness: 'routine', durationMin: 15, active: true, recurrence: {}, syncSeq: '60' };
+const ACTIVITY_QUEST_B = { id: '24', name: 'Evening walk', statAffinity: 'body', strictness: 'routine', durationMin: 20, active: true, recurrence: {}, syncSeq: '61' };
+const ACTIVITY_QUEST_C = { id: '25', name: 'Stretch', statAffinity: 'body', strictness: 'goal', durationMin: 10, active: true, recurrence: {}, syncSeq: '62' };
+
+const ACTIVITY_LOG_ROWS = [
+  {
+    id: '600',
+    questId: '23',
+    date: TODAY,
+    state: 'completed',
+    xpAwarded: 10,
+    coinsAwarded: 1,
+    statAffinity: 'mind',
+    strictness: 'routine',
+    performedAt: `${TODAY}T07:00:00.000Z`,
+    syncSeq: '63',
+  },
+  {
+    id: '601',
+    questId: '24',
+    date: TODAY,
+    state: 'skipped',
+    xpAwarded: 0,
+    coinsAwarded: 0,
+    statAffinity: 'body',
+    strictness: 'routine',
+    reasonTag: 'forgot',
+    performedAt: null,
+    updatedAt: `${TODAY}T18:30:00.000Z`,
+    syncSeq: '64',
+  },
+  {
+    id: '602',
+    questId: '24',
+    date: '2026-08-23',
+    state: 'completed',
+    xpAwarded: 10,
+    coinsAwarded: 1,
+    statAffinity: 'body',
+    strictness: 'routine',
+    performedAt: '2026-08-23T09:00:00.000Z',
+    syncSeq: '65',
+  },
+  { id: '603', questId: '25', date: TODAY, state: 'missed', xpAwarded: 0, coinsAwarded: 0, statAffinity: 'body', strictness: 'goal', syncSeq: '66' },
+];
+
+function activityPage(): DeltaPage {
+  const page = fullPage();
+  page.domains['quests'] = [ACTIVITY_QUEST_A, ACTIVITY_QUEST_B, ACTIVITY_QUEST_C];
+  page.domains['quest_logs'] = ACTIVITY_LOG_ROWS;
+  return page;
+}
+
+describe('FE-8 quest statistics', () => {
+  beforeEach(() => setOnline(true));
+
+  it('should compute 30-day adherence from quest logs', async () => {
+    const { engine } = await started(adherencePage());
+    const detail = await new SyncedDataProvider(engine).getQuest('26');
+
+    expect(detail.progress.adherence30d).toBeCloseTo(0.625);
+  });
+
+  it('should sum xp earned per quest', async () => {
+    const { engine } = await started(adherencePage());
+    const detail = await new SyncedDataProvider(engine).getQuest('26');
+
+    expect(detail.progress.xpEarned).toBe(1024);
+  });
+
+  it('should compute progress for a quest with logs and no streak row', async () => {
+    const { engine } = await started(noStreakPage());
+    const detail = await new SyncedDataProvider(engine).getQuest('27');
+
+    expect(detail.progress.currentStreakDays).toBe(0);
+    expect(detail.progress.xpEarned).toBe(16);
+    expect(detail.progress.adherence30d).toBeCloseTo(2 / 3);
+  });
+
+  it('should count reschedules in the rolling seven days', async () => {
+    const { engine } = await started(reschedulePage());
+    const detail = await new SyncedDataProvider(engine).getQuest('21');
+
+    expect(detail.progress.reschedulesUsed).toBe(3);
+  });
+
+  it('should mark shielded logs', async () => {
+    const { engine } = await started(shieldPage());
+    const plan = await new SyncedDataProvider(engine).getPlan({ scope: 'week', anchor: TODAY });
+
+    const item = plan.days.find(day => day.date === TODAY)?.items.find(entry => entry.questId === '22');
+    expect(item?.shielded).toBe(true);
+    expect(item?.meta).toContain('missed');
+  });
+
+  it('should list recent activity newest first', async () => {
+    const { engine } = await started(activityPage());
+    const day = await new SyncedDataProvider(engine).getDay(TODAY);
+
+    expect(day.activity.map(entry => entry.text)).toEqual(['Evening walk skipped', 'Morning pages completed · +10 XP']);
+  });
+
+  it('should not badge a quest locked on a past day only as locked today', async () => {
+    const { engine } = await started(pastLockPage());
+    const provider = new SyncedDataProvider(engine);
+
+    expect((await provider.getQuest('28')).scheduleLocked).toBe(false);
+    expect((await provider.getQuest('29')).scheduleLocked).toBe(true);
+  });
+
+  it('should not report adherence when only postponed or rescheduled logs are in the window', async () => {
+    const { engine } = await started(carriedOnlyPage());
+    const detail = await new SyncedDataProvider(engine).getQuest('30');
+
+    expect(detail.progress.adherence30d).toBeNull();
+  });
+
+  it('should keep only the eight latest activity entries', async () => {
+    const { engine } = await started(manyActivityPage());
+    const day = await new SyncedDataProvider(engine).getDay(TODAY);
+
+    expect(day.activity).toHaveLength(8);
+    expect(day.activity[0]?.text).toBe('Quest 9 completed');
+    expect(day.activity.at(-1)?.text).toBe('Quest 2 completed');
   });
 });

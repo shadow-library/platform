@@ -78,16 +78,20 @@ export function DayRail({ quickLogs, streaks, upcoming, activity }: DayRailProps
       <Card padding="md">
         <Card.Body>
           <h2 className={styles.railTitle}>Recent activity</h2>
-          <ul className={styles.activityList}>
-            {activity.map(entry => (
-              <li key={entry.id} className={styles.activityRow}>
-                <span className={styles.dot} data-rewarded={entry.rewarded} aria-hidden />
-                <span className={styles.activityText}>
-                  {entry.text} <span className={styles.activityWhen}>· {entry.when}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+          {activity.length === 0 ? (
+            <p className={styles.railNote}>Nothing yet today.</p>
+          ) : (
+            <ul className={styles.activityList}>
+              {activity.map(entry => (
+                <li key={entry.id} className={styles.activityRow}>
+                  <span className={styles.dot} data-rewarded={entry.rewarded} aria-hidden />
+                  <span className={styles.activityText}>
+                    {entry.text} <span className={styles.activityWhen}>· {entry.when}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className={styles.railFooter}>
             <Button size="sm" variant="ghost" asChild>
               <Link to="/history">Full history</Link>

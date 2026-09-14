@@ -98,4 +98,22 @@ describe('day group screens', () => {
     expect(await screen.findByText('Rules on this quest')).toBeDefined();
     expect(await screen.findByText(/2 of 2 used in the last 7 days|0 of 2 used in the last 7 days/)).toBeDefined();
   });
+
+  it('should show not enough history for a quest with no logs', async () => {
+    const world = projectWorldState({ quests: [{ id: 'q-new', name: 'Fresh start', durationMin: 10, recurrence: { frequency: 'daily' }, active: true }] }, TODAY);
+    const data = createMemoirTestData({ today: TODAY });
+    data.provider = new MemoirEngine(world);
+
+    renderScreen(<QuestEditorScreen questId="q-new" />, { value: data });
+    expect(await screen.findByText('Not enough history yet')).toBeDefined();
+  });
+
+  it('should show nothing yet today when no action was logged', async () => {
+    const world = projectWorldState({ quests: [{ id: 'q-1', name: 'Morning walk', durationMin: 10, recurrence: { frequency: 'daily' }, active: true }] }, TODAY);
+    const data = createMemoirTestData({ today: TODAY });
+    data.provider = new MemoirEngine(world);
+
+    renderScreen(<TodayScreen />, { value: data });
+    expect(await screen.findByText('Nothing yet today.')).toBeDefined();
+  });
 });
