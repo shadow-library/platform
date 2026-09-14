@@ -509,7 +509,7 @@
   opacity: 0.85;
 }
 
-.capacityMark {
+.loadList .capacityMark {
   position: absolute;
   top: 0;
   bottom: 0;

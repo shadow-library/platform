@@ -297,12 +297,12 @@ export class SyncedReflectProvider implements ReflectProvider {
   private async cancel(requestId: string): Promise<SettledCommandResult> {
     try {
       await aiApi.cancelTask(requestId);
-      await this.sync.sync();
+      await this.sync.sync({ fresh: true });
       return applied('Cancelled, and the request went back to your quota.');
     } catch (error) {
       const refusal = commandRefusal(error, 'That request could not be cancelled.');
       if (refusal.error?.code !== 'AI_004') return refusal;
-      await this.sync.sync();
+      await this.sync.sync({ fresh: true });
       const task = projectAiRows(this.sync.domains()).tasks.find(candidate => candidate.id === requestId);
       const copy = task ? CANCEL_CONFLICT_COPY[TASK_STATES[task.status]] : undefined;
       return copy ? { ...refusal, message: copy } : refusal;
@@ -320,22 +320,17 @@ export class SyncedReflectProvider implements ReflectProvider {
         ],
         onlyIfUndecided,
       });
-      await this.sync.sync();
+      await this.sync.sync({ fresh: true });
       return applied(CONSENT_SAVED);
     } catch (error) {
       const refusal = commandRefusal(error, 'That consent could not be saved.');
       if (refusal.error?.code !== 'AI_011') return refusal;
-      await this.sync.sync();
-      if (this.storedConsentIs(consent)) return applied(CONSENT_SAVED);
-      await this.sync.sync();
+      await this.sync.sync({ fresh: true });
       return this.storedConsentIs(consent) ? applied(CONSENT_SAVED) : refusal;
     }
   }
 
-  /**
-   * A refused first decision can be this device's own earlier save whose response was lost; only a different stored choice was made elsewhere.
-   * The first `sync()` after a refusal may join a pass that pulled before the decision landed, hence the second check.
-   */
+  /** A refused first decision can be this device's own earlier save whose response was lost; only a different stored choice was made elsewhere. */
   private storedConsentIs(consent: AiConsentGrants): boolean {
     const { decidedClasses, grantedClasses } = projectAiRows(this.sync.domains());
     return (Object.keys(CONSENT_CLASSES) as (keyof AiConsentGrants)[]).every(
@@ -360,7 +355,7 @@ export class SyncedReflectProvider implements ReflectProvider {
     try {
       await aiApi.submitTask({ id, queryText });
       this.submission = null;
-      await this.sync.sync();
+      await this.sync.sync({ fresh: true });
       return applied('Queued. The answer will be here within a few hours.');
     } catch (error) {
       const refusal = commandRefusal(error, 'That request could not be queued.');

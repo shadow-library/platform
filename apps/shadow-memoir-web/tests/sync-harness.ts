@@ -168,6 +168,47 @@ export function createTestEngine(options: TestEngineOptions = {}): TestEngine {
   return { engine, store, server };
 }
 
+export interface LiveTestEngine extends TestEngine {
+  /** What the server holds; each pull returns the rows as they stood when that pull was requested. */
+  rows: DeltaPage['domains'];
+  /** Starts a pass whose pull has already read the rows but does not answer until released; release resolves once that pass settles. */
+  holdPass: () => Promise<() => Promise<void>>;
+}
+
+/** A server that changes between pulls, for proving a caller reads rows written after it asked rather than joining a pass that pulled before. */
+export function createLiveTestEngine(options: Omit<TestEngineOptions, 'fetchImpl' | 'pages'> = {}): LiveTestEngine {
+  let held: { pulled: () => void; released: Promise<void> } | null = null;
+  const live = createTestEngine({
+    ...options,
+    fetchImpl: server => async (input, init) => {
+      if (!String(input).includes('/sync/delta') || (options.status?.() ?? 200) !== 200) return server.fetchImpl(input, init);
+      server.deltaRequests.push(String(input));
+      const domains = { ...subject.rows };
+      const hold = held;
+      held = null;
+      hold?.pulled();
+      await hold?.released;
+      return deltaResponse(input, { cursor: String(server.deltaRequests.length), hasMore: false, domains, tombstones: [] }, server.epoch, options.serves);
+    },
+  });
+
+  const holdPass = async (): Promise<() => Promise<void>> => {
+    let release = (): void => undefined;
+    let pulled = (): void => undefined;
+    const reading = new Promise<void>(resolve => (pulled = resolve));
+    held = { pulled, released: new Promise<void>(resolve => (release = resolve)) };
+    const pass = live.engine.sync({ background: true });
+    await reading;
+    return () => {
+      release();
+      return pass;
+    };
+  };
+
+  const subject: LiveTestEngine = { ...live, rows: {}, holdPass };
+  return subject;
+}
+
 /** The same composition `createSyncedMemoirData` builds in the app, over a test engine — for a screen that has to read and write through the sync layer rather than the fixtures. */
 export function createSyncedTestData(engine: SyncEngine, principal?: () => Promise<string>): SyncedMemoirData {
   const account = new SyncedAccountProvider(engine, principal);

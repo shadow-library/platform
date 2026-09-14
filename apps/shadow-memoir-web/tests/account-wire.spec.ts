@@ -12,11 +12,11 @@ import {
   DELETION_UNEXPECTED,
   DELETION_WRONG_ACCOUNT,
 } from '@/lib/data';
-import { type DeltaPage, type KeyValueBacking, MissingSessionProbeError, SYNC_META_KEYS, SyncedAccountProvider } from '@/lib/sync';
+import { type DeltaPage, type KeyValueBacking, MissingSessionProbeError, projectFinanceRows, SYNC_META_KEYS, SyncedAccountProvider } from '@/lib/sync';
 
 import { httpFake } from './http-fake';
 import { withTimeZone } from './setup';
-import { createTestEngine, sharedBacking, sharedMarker } from './sync-harness';
+import { createLiveTestEngine, createTestEngine, sharedBacking, sharedMarker } from './sync-harness';
 
 const TODAY = '2026-08-24';
 
@@ -129,6 +129,27 @@ describe('Account settings over the wire', () => {
     const cleared = await accountApi.patch({ monthlyBudgetMinor: null });
     expect(fake.calls.at(-1)?.body).toEqual({ monthlyBudgetMinor: null });
     expect(cleared.monthlyBudgetMinor).toBeNull();
+  });
+
+  it('should pull a saved monthly budget with a pass that starts after the save', async () => {
+    const live = createLiveTestEngine({ today: TODAY });
+    live.rows = { account: [{ ...account({ monthlyBudgetMinor: null }) }] };
+    await live.engine.start();
+
+    const release = await live.holdPass();
+    httpFake({
+      'PATCH /api/v1/account': call => {
+        const saved = account({ monthlyBudgetMinor: call.body?.['monthlyBudgetMinor'] as number });
+        live.rows = { account: [{ ...saved }] };
+        return { body: saved };
+      },
+    });
+
+    const result = await new SyncedAccountProvider(live.engine).dispatchCommand({ type: 'day.set', patch: { monthlyBudgetMinor: 160000 } });
+    await release();
+
+    expect(result.status).toBe('applied');
+    await vi.waitFor(() => expect(projectFinanceRows(live.engine.domains()).settings.monthlyBudgetMinor).toBe(160000));
   });
 
   it('should patch one notification category without touching the others', async () => {
@@ -536,6 +557,28 @@ describe('Devices over the wire', () => {
       expect(view.devices).toHaveLength(1);
       expect(view.devices[0]).toMatchObject({ name: 'Chrome · Macintosh', meta: 'Last seen 24 Aug 2026 at 10:00' });
     }));
+
+  it('should drop a removed device with a pass that starts after the removal', async () => {
+    const live = createLiveTestEngine({ today: TODAY });
+    live.rows = { devices: [{ id: 'device-b', userAgent: 'Mozilla/5.0 (Windows) Firefox/1', lastSeenAt: '2026-08-20T08:00:00.000Z' }] };
+    await live.engine.start();
+    const subject = new SyncedAccountProvider(live.engine);
+    expect((await subject.getAppSync()).devices).toHaveLength(1);
+
+    const release = await live.holdPass();
+    httpFake({
+      'DELETE /api/v1/account/devices/device-b': () => {
+        live.rows = { devices: [] };
+        return { status: 200 };
+      },
+    });
+
+    const result = await subject.dispatchCommand({ type: 'device.remove', deviceId: 'device-b' });
+    await release();
+
+    expect(result.status).toBe('applied');
+    await vi.waitFor(async () => expect((await subject.getAppSync()).devices).toEqual([]));
+  });
 });
 
 describe('Account deletion against the signed-in session', () => {

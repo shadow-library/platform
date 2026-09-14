@@ -4,7 +4,7 @@ import { type DeltaPage, SyncedReflectProvider, type SyncEngine } from '@/lib/sy
 
 import { httpFake } from './http-fake';
 import { withTimeZone } from './setup';
-import { createTestEngine, deltaResponse } from './sync-harness';
+import { createLiveTestEngine, createTestEngine } from './sync-harness';
 
 const TODAY = '2026-08-24';
 
@@ -118,38 +118,63 @@ describe('Coaching consent', () => {
     expect((await reflect.getCoach()).consent).toEqual({ journal: false, health: false, decided: true });
   });
 
-  it('should re-check the stored consent after a sync that started before the refusal', async () => {
-    const serverRows: Record<string, unknown>[] = [];
-    let releaseStalePull = (): void => undefined;
-    let stalePull: Promise<void> | null = null;
-    let pulls = 0;
-    const { engine } = createTestEngine({
-      today: TODAY,
-      fetchImpl: server => async (input, init) => {
-        if (!String(input).includes('/sync/delta')) return server.fetchImpl(input, init);
-        pulls += 1;
-        const rows = [...serverRows];
-        if (stalePull) await stalePull;
-        return deltaResponse(input, { ...page({ ai_consents: rows }), cursor: String(pulls) }, server.epoch);
-      },
-    });
-    await engine.start();
-    const reflect = new SyncedReflectProvider(engine);
+  it('should re-check stored consent with a fresh pass after a refused first decision', async () => {
+    const live = createLiveTestEngine({ today: TODAY });
+    await live.engine.start();
+    const reflect = new SyncedReflectProvider(live.engine);
+    const pulls = live.server.deltaRequests.length;
 
-    stalePull = new Promise<void>(resolve => (releaseStalePull = resolve));
-    const background = engine.sync({ background: true });
-    await new Promise(resolve => setTimeout(resolve, 20));
-    serverRows.push(DECLINED('journal_reflection_reason'), DECLINED('health'));
+    const release = await live.holdPass();
+    live.rows = { ai_consents: [DECLINED('journal_reflection_reason'), DECLINED('health')] };
     httpFake({ 'PUT /api/v1/ai/consents': () => ({ status: 409, body: DECIDED_ELSEWHERE }) });
+    const sync = vi.spyOn(live.engine, 'sync');
 
     const pending = reflect.dispatchCommand({ type: 'ai.setConsent', consent: { journal: false, health: false } });
-    await new Promise(resolve => setTimeout(resolve, 20));
-    stalePull = null;
-    releaseStalePull();
-    await background;
+    await vi.waitFor(() => expect(sync).toHaveBeenCalled());
+    await release();
 
     expect((await pending).status).toBe('applied');
     expect((await reflect.getCoach()).consent).toEqual({ journal: false, health: false, decided: true });
+    expect(live.server.deltaRequests).toHaveLength(pulls + 2);
+  });
+
+  it('should keep the refusal when the pass after a refused first decision fails', async () => {
+    let status = 200;
+    const { engine } = createTestEngine({
+      pages: [page({}), page({ ai_consents: [DECLINED('journal_reflection_reason'), DECLINED('health')] })],
+      status: () => status,
+      today: TODAY,
+    });
+    await engine.start();
+    status = 503;
+    httpFake({ 'PUT /api/v1/ai/consents': () => ({ status: 409, body: DECIDED_ELSEWHERE }) });
+
+    const result = await new SyncedReflectProvider(engine).dispatchCommand({ type: 'ai.setConsent', consent: { journal: false, health: false } });
+
+    expect(result).toMatchObject({ status: 'rejected', error: { code: 'AI_011' } });
+    expect(engine.getSnapshot().state).not.toBe('online');
+  });
+
+  it('should lift the consent gate with a pass that starts after the decision is saved', async () => {
+    const live = createLiveTestEngine({ today: TODAY });
+    await live.engine.start();
+    const reflect = new SyncedReflectProvider(live.engine);
+
+    const release = await live.holdPass();
+    httpFake({
+      'PUT /api/v1/ai/consents': () => {
+        live.rows = { ai_consents: [DECLINED('journal_reflection_reason'), DECLINED('health')] };
+        return { body: { consents: [] } };
+      },
+    });
+    const sync = vi.spyOn(live.engine, 'sync');
+
+    const pending = reflect.dispatchCommand({ type: 'ai.setConsent', consent: { journal: false, health: false } });
+    await vi.waitFor(() => expect(sync).toHaveBeenCalled());
+    await release();
+
+    expect((await pending).status).toBe('applied');
+    expect((await reflect.getCoach()).consent.decided).toBe(true);
   });
 });
 
@@ -176,6 +201,28 @@ describe('Coaching requests', () => {
     const ids = calls.filter(call => call.path === '/api/v1/ai/tasks').map(call => call.body?.['id']);
     expect(ids).toHaveLength(2);
     expect(ids[1]).toBe(ids[0]);
+  });
+
+  it('should resync with a pass that starts after the question is submitted', async () => {
+    const live = createLiveTestEngine({ today: TODAY });
+    await live.engine.start();
+    const reflect = new SyncedReflectProvider(live.engine);
+
+    const release = await live.holdPass();
+    httpFake({
+      'POST /api/v1/ai/tasks': call => {
+        live.rows = { ai_tasks: [{ ...TASK, id: String(call.body?.['id']), status: 'pending' }] };
+        return { status: 201, body: { ...TASK, status: 'pending' } };
+      },
+    });
+    const sync = vi.spyOn(live.engine, 'sync');
+
+    const pending = reflect.dispatchCommand({ type: 'ai.submit', question: TASK.queryText });
+    await vi.waitFor(() => expect(sync).toHaveBeenCalled());
+    await release();
+
+    expect((await pending).status).toBe('applied');
+    expect((await reflect.getCoach()).active).toMatchObject({ question: TASK.queryText, state: 'queued' });
   });
 
   it('should reuse the idempotency key for a repeated submit', async () => {
@@ -304,6 +351,32 @@ describe('Coaching requests', () => {
     const coach = await reflect.getCoach();
     expect(coach.active).toBeNull();
     expect(coach.results[0]?.id).toBe('77');
+  });
+
+  it('should explain a cancel conflict from a pass that starts after the refusal', async () => {
+    const live = createLiveTestEngine({ today: TODAY });
+    live.rows = { ai_tasks: [{ ...TASK, status: 'pending' }] };
+    await live.engine.start();
+    const reflect = new SyncedReflectProvider(live.engine);
+
+    const release = await live.holdPass();
+    httpFake({
+      'POST /api/v1/ai/tasks/task-1/cancel': () => {
+        live.rows = { ai_tasks: [TASK], ai_results: [RESULT] };
+        return { status: 409, body: { code: 'AI_004', type: 'Conflict', message: 'This task is no longer pending and cannot be cancelled' } };
+      },
+    });
+    const sync = vi.spyOn(live.engine, 'sync');
+
+    const pending = reflect.dispatchCommand({ type: 'ai.cancel', requestId: 'task-1' });
+    await vi.waitFor(() => expect(sync).toHaveBeenCalled());
+    await release();
+
+    expect(await pending).toMatchObject({
+      status: 'rejected',
+      message: 'It had already finished, so there was nothing to cancel. The answer is below.',
+      error: { code: 'AI_004' },
+    });
   });
 
   it('should keep the worker’s error text out of a failed request', async () => {

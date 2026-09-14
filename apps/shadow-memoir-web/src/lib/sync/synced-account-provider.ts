@@ -261,7 +261,7 @@ export class SyncedAccountProvider implements AccountProvider {
       case 'device.remove':
         try {
           await accountApi.removeDevice(command.deviceId);
-          void this.sync.sync();
+          void this.sync.sync({ fresh: true });
           return applied(DEVICE_REMOVED);
         } catch (error) {
           return commandRefusal(error, 'That device could not be removed.');
@@ -308,7 +308,7 @@ export class SyncedAccountProvider implements AccountProvider {
         ...(patch.intensity === undefined ? {} : { intensityMode: INTENSITY_WIRE[patch.intensity] }),
         ...(patch.monthlyBudgetMinor === undefined ? {} : { monthlyBudgetMinor: patch.monthlyBudgetMinor }),
       });
-      if (patch.monthlyBudgetMinor !== undefined) void this.sync.sync();
+      if (patch.monthlyBudgetMinor !== undefined) void this.sync.sync({ fresh: true });
       return applied(this.dayMessage(patch, account));
     } catch (error) {
       return commandRefusal(error, 'That setting could not be saved.');
