@@ -228,7 +228,7 @@ describe('onboarding gate', () => {
     const getOnboarding = vi.fn<() => Promise<OnboardingStatus>>().mockRejectedValueOnce(serverError()).mockResolvedValue({ completed: true });
     statusFrom(getOnboarding);
 
-    expect(await screen.findByRole('heading', { name: "We couldn't load your account" })).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'We couldn’t load your account' })).toBeDefined();
     expect(screen.queryByText('Money screen')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
@@ -242,8 +242,8 @@ describe('onboarding gate', () => {
     vi.spyOn(data.account, 'getOnboarding').mockRejectedValueOnce(serverError()).mockResolvedValue({ completed: true });
     renderGateUnderHead(data);
 
-    await screen.findByRole('heading', { name: "We couldn't load your account" });
-    await waitFor(() => expect(document.title).toBe("Couldn't load your account · Shadow Memoir"));
+    await screen.findByRole('heading', { name: 'We couldn’t load your account' });
+    await waitFor(() => expect(document.title).toBe('Couldn’t load your account · Shadow Memoir'));
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 

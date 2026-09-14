@@ -235,7 +235,7 @@ describe('parseCapture', () => {
 
     expect(parse.question).toBe('Today already has 1.4 l of water. Add 250 ml to it, or set it to 250 ml? Nothing is saved until you pick.');
     expect(parse.choices.map(choice => choice.status === 'available' && [choice.draft.fields[0]?.value, choice.draft.action.command])).toEqual([
-      ['Add 250 ml → 1.65 l', { type: 'health.save', key: 'water', date: DATE, value: 1650 }],
+      ['Add 250 ml → 1.65 l', { type: 'health.save', key: 'water', date: DATE, value: 1650, added: 250 }],
       ['Set today to 250 ml (replaces 1.4 l)', { type: 'health.save', key: 'water', date: DATE, value: 250 }],
     ]);
   });

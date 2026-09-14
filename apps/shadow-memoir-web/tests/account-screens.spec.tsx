@@ -348,7 +348,7 @@ describe('Settings screen, synced', () => {
     renderSyncedSettings(<SettingsScreen />, { status: () => 403, errorCode: 'ACC_002' });
 
     expect(await screen.findByText('Devices aren’t listed during deletion')).toBeDefined();
-    expect(screen.queryByText("Devices haven't loaded yet")).toBeNull();
+    expect(screen.queryByText('Devices haven’t loaded yet')).toBeNull();
     expect(screen.queryByText(/devices? registered/)).toBeNull();
   });
 

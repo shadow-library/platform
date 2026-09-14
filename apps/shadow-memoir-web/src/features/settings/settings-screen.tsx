@@ -93,7 +93,7 @@ function pendingHelp(pendingLabel: string, activeLabel: string): string {
 }
 
 function devicesLine(readiness: SyncReadiness, count: number | undefined): string {
-  if (readiness.kind === 'failed') return readiness.reason === 'deletion-pending' ? 'Devices aren’t listed during deletion' : "Devices haven't loaded yet";
+  if (readiness.kind === 'failed') return readiness.reason === 'deletion-pending' ? 'Devices aren’t listed during deletion' : 'Devices haven’t loaded yet';
   if (readiness.kind === 'loading' || count === undefined) return 'Looking for registered devices';
   return `${count} device${count === 1 ? '' : 's'} registered`;
 }

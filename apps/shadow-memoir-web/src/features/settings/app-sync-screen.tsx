@@ -207,7 +207,7 @@ export function AppSyncScreen(): ReactElement {
               {readiness.kind === 'loading' ? (
                 <Skeleton.List rows={2} />
               ) : readiness.kind === 'failed' ? (
-                <EmptyState size="inline" title="Devices haven't loaded yet" description="They appear once this device completes a sync." />
+                <EmptyState size="inline" title="Devices haven’t loaded yet" description="They appear once this device completes a sync." />
               ) : sync.data.devices.length === 0 ? (
                 <EmptyState size="inline" title="No devices yet" description="A device registers itself the first time it syncs." />
               ) : (

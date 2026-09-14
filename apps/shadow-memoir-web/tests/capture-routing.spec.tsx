@@ -173,6 +173,37 @@ describe('quick capture routing', () => {
     expect(view.metrics.find(item => item.definition.key === 'water')?.entry?.value).toBe(1650);
   });
 
+  it('should say water was added when quick capture adds to today’s value', async () => {
+    const success = vi.spyOn(toast, 'success');
+    renderScreen(<OpenCapture />, { value: createMemoirTestData() });
+
+    await type('250 ml');
+    fireEvent.click(await screen.findByRole('button', { name: /Add 250 ml → 1\.65 l/ }));
+
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Added 250 ml — 1.65 l today.', undefined));
+    expect(success).not.toHaveBeenCalledWith(expect.stringContaining('Replaced'), undefined);
+  });
+
+  it('should say water was replaced when quick capture sets today’s value', async () => {
+    const success = vi.spyOn(toast, 'success');
+    renderScreen(<OpenCapture />, { value: createMemoirTestData() });
+
+    await type('250 ml');
+    fireEvent.click(await screen.findByRole('button', { name: /Set today to 250 ml \(replaces 1\.4 l\)/ }));
+
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Replaced 1.4 l with 250 ml.', undefined));
+  });
+
+  it('should name the metric and its value when a health save is the day’s first', async () => {
+    const data = createMemoirTestData();
+    const yesterday = new Date(`${todayISODate()}T12:00:00Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
+    const result = await data.quickLogs.dispatchCommand({ type: 'health.save', key: 'water', date: yesterday.toISOString().slice(0, 10), value: 250 });
+
+    expect(result.message).toBe('Water logged: 250 ml.');
+  });
+
   it('should not save water on Enter before a choice is made', async () => {
     const data = createMemoirTestData();
     const dispatch = vi.spyOn(data.quickLogs, 'dispatchCommand');

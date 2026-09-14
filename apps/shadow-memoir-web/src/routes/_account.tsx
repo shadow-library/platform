@@ -147,13 +147,13 @@ interface AccountFailureCopy {
 
 const ACCOUNT_FAILURE_COPY: Record<AccountLoadFailedProps['reason'], AccountFailureCopy> = {
   server: {
-    screen: "Couldn't load your account",
-    title: "We couldn't load your account",
-    description: "Shadow Memoir didn't respond, so it can't tell which screens are ready for you yet. Anything on this device is kept.",
+    screen: 'Couldn’t load your account',
+    title: 'We couldn’t load your account',
+    description: 'Shadow Memoir didn’t respond, so it can’t tell which screens are ready for you yet. Anything on this device is kept.',
   },
   offline: {
     screen: 'Offline',
-    title: "You're offline",
+    title: 'You’re offline',
     description: 'Shadow Memoir needs a connection to open your account on this device for the first time. It will as soon as you reconnect.',
   },
   'signed-out': {

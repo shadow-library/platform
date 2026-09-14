@@ -276,8 +276,11 @@ export type QuickLogCommand =
   | { type: 'meal.savePreset'; preset: Omit<MealPreset, 'id' | 'usageCount'> }
   | { type: 'weight.save'; date: string; kg: number; confirmedReplacement: boolean }
   | { type: 'sidequest.log'; draft: SideQuestDraft }
-  /** `metricId` is the server's catalogue id for `key`, resolved at dispatch; without it the save is refused because no `metric.register` can address the metric. */
-  | { type: 'health.save'; key: HealthMetricKey; date: string; value: number; metricId?: string }
+  /**
+   * `metricId` is the server's catalogue id for `key`, resolved at dispatch; without it the save is refused because no `metric.register` can address the metric.
+   * `added` is set only when quick capture's Add was picked: the stored amount put on top of today's value, which `value` already totals.
+   */
+  | { type: 'health.save'; key: HealthMetricKey; date: string; value: number; metricId?: string; added?: number }
   | { type: 'health.acceptOffer'; key: HealthMetricKey; date: string };
 
 export interface QuickLogCommandResult {

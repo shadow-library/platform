@@ -299,10 +299,12 @@ interface MetricSave {
   stored: number;
   fields: CaptureField[];
   warning: string | null;
+  added?: number;
 }
 
-function metricDraft({ key, label, hint }: MetricReading, date: string, { stored, fields, warning }: MetricSave): CaptureDraft {
-  return { kind: 'metric', kindLabel: label, hint, warning, fields, action: { domain: 'quick-log', command: { type: 'health.save', key, date, value: stored } } };
+function metricDraft({ key, label, hint }: MetricReading, date: string, { stored, fields, warning, added }: MetricSave): CaptureDraft {
+  const command: QuickLogCommand = { type: 'health.save', key, date, value: stored, ...(added === undefined ? {} : { added }) };
+  return { kind: 'metric', kindLabel: label, hint, warning, fields, action: { domain: 'quick-log', command } };
 }
 
 /** `health.save` stores the day's value, the same as the Body & health screen, so a line never adds to what is already logged unless the owner picks Add. */
@@ -339,18 +341,18 @@ function waterParse(amount: string, unit: string, context: CaptureContext): Capt
 
   const was = storedAmount('water', earlier.value, 'l');
   const total = earlier.value + millilitres;
-  const choice = (value: string, stored: number): CaptureChoice => ({
+  const choice = (value: string, save: Omit<MetricSave, 'fields' | 'warning'>): CaptureChoice => ({
     status: 'available',
-    draft: metricDraft(reading, context.date, { stored, fields: [{ label: 'Water', value }], warning: null }),
+    draft: metricDraft(reading, context.date, { ...save, fields: [{ label: 'Water', value }], warning: null }),
   });
   const add: CaptureChoice =
     total > CAPTURE_WATER_MAX_LITRES * 1000
       ? { status: 'unavailable', kind: 'metric', kindLabel: 'Water', summary: `Add ${shown} would pass ${CAPTURE_WATER_MAX_LITRES} l` }
-      : choice(`Add ${shown} → ${storedAmount('water', total, 'l')}`, total);
+      : choice(`Add ${shown} → ${storedAmount('water', total, 'l')}`, { stored: total, added: millilitres });
   return {
     status: 'ambiguous',
     question: `Today already has ${was} of water. Add ${shown} to it, or set it to ${shown}? Nothing is saved until you pick.`,
-    choices: [add, choice(`Set today to ${shown} (replaces ${was})`, millilitres)],
+    choices: [add, choice(`Set today to ${shown} (replaces ${was})`, { stored: millilitres })],
   };
 }
 

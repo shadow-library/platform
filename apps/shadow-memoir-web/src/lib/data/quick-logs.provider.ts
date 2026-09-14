@@ -514,13 +514,20 @@ function logSideQuest(state: QuickLogState, draft: SideQuestDraft): QuickLogComm
   return { id: entry.id, message: `${entry.name} logged.`, reward, advisory: deriveCapAdvisory('sidequests', state.monthlyCounts.sidequests) };
 }
 
-function saveMetric(state: QuickLogState, key: HealthMetricKey, date: string, value: number): QuickLogCommandResult {
+function metricSavedMessage(definition: HealthMetricDefinition, value: number, existing: HealthMetricEntry | null, added: number | undefined): string {
+  const format = (stored: number): string => formatMetricValue(stored, definition);
+  if (!existing) return `${definition.name} logged: ${format(value)}.`;
+  if (added !== undefined) return `Added ${format(added)} — ${format(value)} today.`;
+  return `Replaced ${format(existing.value)} with ${format(value)}.`;
+}
+
+function saveMetric(state: QuickLogState, command: Extract<QuickLogCommand, { type: 'health.save' }>): QuickLogCommandResult {
+  const { key, date, value, added } = command;
   const existing = state.metrics.find(item => item.key === key && item.date === date) ?? null;
   const entry: HealthMetricEntry = { key, date, value, loggedAt: new Date().toISOString(), replacedValue: existing?.value ?? null, source: 'manual' };
   state.metrics = existing ? state.metrics.map(item => (item === existing ? entry : item)) : [entry, ...state.metrics];
   const definition = HEALTH_METRICS.find(item => item.key === key) as HealthMetricDefinition;
-  const message = existing ? `Replaced ${formatMetricValue(existing.value, definition)} with ${formatMetricValue(value, definition)}.` : 'Saved.';
-  return { id: `${key}-${date}`, message };
+  return { id: `${key}-${date}`, message: metricSavedMessage(definition, value, existing, added) };
 }
 
 /** The optimistic apply, shared by the fixtures and by the sync layer's replay of what is still queued. */
@@ -542,7 +549,7 @@ export function applyQuickLogCommand(state: QuickLogState, command: QuickLogComm
     case 'sidequest.log':
       return logSideQuest(state, command.draft);
     case 'health.save':
-      return saveMetric(state, command.key, command.date, command.value);
+      return saveMetric(state, command);
     case 'health.acceptOffer':
       return { id: `${command.key}-${command.date}`, message: 'Quest completed. The reward is the quest’s own, not the log’s.' };
   }
