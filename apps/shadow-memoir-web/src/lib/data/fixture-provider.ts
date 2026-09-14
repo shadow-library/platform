@@ -2,12 +2,9 @@ import { buildMonthMatrix, parseISODate, toISODate } from '@shadow-library/ui';
 
 import { formatCount } from '@/lib/format';
 
+import { matchQuestName } from './capture-parser';
 import { type Command, type CommandResult } from './command.types';
 import { type DataProvider, type PlanRange, type QuestFilter } from './data-provider';
-import { getFinanceProvider } from './finance.provider';
-import { isCurrencyCode } from './finance.rules';
-import { getQuickLogProvider } from './quick-logs.provider';
-import { lbToKg, toStoredMetricValue } from './quick-logs.rules';
 import { type Persona, seed } from './fixtures';
 import {
   COMING_BACK_NOTICES,
@@ -619,10 +616,8 @@ export class MemoirEngine implements DataProvider {
   }
 
   async findOccurrences(query: string, date: string): Promise<CaptureTarget[]> {
-    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-    if (terms.length === 0) return [];
     return this.scheduledOn(date)
-      .filter(item => terms.every(term => item.questName.toLowerCase().includes(term)))
+      .filter(item => matchQuestName(query, item.questName) !== null)
       .map(item => ({ occurrenceId: item.id, questId: item.questId, questName: item.questName, statAffinity: item.statAffinity }));
   }
 
@@ -648,8 +643,6 @@ export class MemoirEngine implements DataProvider {
         return this.setQuestActive(command.questId, command.active);
       case 'plan.setLock':
         return this.setLock(command.date, command.locked, command.questIds);
-      default:
-        return this.logCapture(command);
     }
   }
 
@@ -818,81 +811,8 @@ export class MemoirEngine implements DataProvider {
     return { status: 'applied', message: locked ? "Today's plan is locked in." : "Today's plan is open again.", xpAwarded: 0, coinsAwarded: 0 };
   }
 
-  private async logCapture(command: Command): Promise<CommandResult> {
-    await recordInOwningDomain(command, this.state.today);
-    const described = this.describeCapture(command);
-    this.pushActivity(described.text, described.xp > 0);
-    this.state.hero = { ...this.state.hero, xp: this.state.hero.xp + described.xp, xpIntoLevel: this.state.hero.xpIntoLevel + described.xp };
-    return { status: 'applied', message: described.message, xpAwarded: described.xp, coinsAwarded: 0 };
-  }
-
-  private describeCapture(command: Command): { text: string; message: string; xp: number } {
-    switch (command.type) {
-      case 'expense.record':
-        return {
-          text: `${(command.amountMinor / 100).toFixed(2)} ${command.currency} · ${command.note || 'uncategorised'}`,
-          message: 'Logged to today. It appears in Money and in History.',
-          xp: 0,
-        };
-      case 'metric.record':
-        this.state.metrics[command.metric] = toStoredMetricValue(command.metric, command.value);
-        return { text: `${command.metric} ${command.value}`, message: 'Logged to today. It replaces the earlier value for the day.', xp: 0 };
-      case 'weight.record':
-        return { text: `Weight ${command.value} ${command.unit}`, message: 'Logged to today. The earlier value stays in History as corrected.', xp: 0 };
-      case 'journal.record':
-        return { text: `Journal entry · ${command.text.split(/\s+/).length} words`, message: 'Saved to today’s journal.', xp: 5 };
-      case 'sideQuest.record':
-        return { text: `Side quest: ${command.text} · +5 XP`, message: 'Logged as a side quest. +5 XP.', xp: 5 };
-      default:
-        return { text: 'Entry recorded', message: 'Logged to today.', xp: 0 };
-    }
-  }
-
   private pushActivity(text: string, rewarded: boolean): void {
     this.state.activity = [{ id: `act-${this.state.activity.length + 1}`, text, when: 'just now', rewarded }, ...this.state.activity].slice(0, 8);
-  }
-}
-
-/**
- * Quick Capture parses into one Command union, but the record it produces belongs to whichever domain owns
- * it — Money keeps expenses, the quick-log surfaces keep journal, weight, metrics and side quests. Without
- * this hop a captured entry would reach the day's feed and never its own screen. The XP the palette reports
- * stays this provider's, so forwarding cannot grant a second time.
- */
-async function recordInOwningDomain(command: Command, today: string): Promise<void> {
-  switch (command.type) {
-    case 'expense.record':
-      await getFinanceProvider().dispatchCommand({
-        type: 'expense.create',
-        draft: {
-          amountText: (command.amountMinor / 100).toFixed(2),
-          currency: isCurrencyCode(command.currency) ? command.currency : 'EUR',
-          categoryId: 'uncat',
-          occurredOnDate: today,
-          note: command.note,
-        },
-      });
-      return;
-    case 'journal.record':
-      await getQuickLogProvider().dispatchCommand({ type: 'journal.save', draft: { date: today, text: command.text, mood: null } });
-      return;
-    case 'weight.record':
-      // The palette has nowhere to ask, and its own copy already promises the earlier value is kept.
-      await getQuickLogProvider().dispatchCommand({
-        type: 'weight.save',
-        date: today,
-        kg: command.unit === 'lb' ? lbToKg(command.value) : command.value,
-        confirmedReplacement: true,
-      });
-      return;
-    case 'sideQuest.record':
-      await getQuickLogProvider().dispatchCommand({ type: 'sidequest.log', draft: { date: today, name: command.text, statAffinity: command.statAffinity } });
-      return;
-    case 'metric.record':
-      await getQuickLogProvider().dispatchCommand({ type: 'health.save', key: command.metric, date: today, value: toStoredMetricValue(command.metric, command.value) });
-      return;
-    default:
-      return;
   }
 }
 

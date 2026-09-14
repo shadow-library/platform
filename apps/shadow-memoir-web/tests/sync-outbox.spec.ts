@@ -48,7 +48,7 @@ describe('Outbox', () => {
 
   it('should keep a command with no server handler out of the queue', async () => {
     const outbox = new Outbox(new MemoirStore(sharedBacking()));
-    expect(await outbox.enqueue({ type: 'journal.record', text: 'a thought' }, TODAY)).toBeNull();
+    expect(await outbox.enqueue({ type: 'quest.setActive', questId: 'read-pages', active: false }, TODAY)).toBeNull();
     expect(await outbox.size()).toBe(0);
   });
 

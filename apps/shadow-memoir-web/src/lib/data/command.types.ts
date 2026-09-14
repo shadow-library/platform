@@ -1,5 +1,4 @@
-import { type QuestDraft, type ReasonTag, type StatAffinity } from './quest.types';
-import { type MetricKind } from './view.types';
+import { type QuestDraft, type ReasonTag } from './quest.types';
 
 export type Command =
   | { type: 'quest.complete'; occurrenceId: string }
@@ -11,12 +10,7 @@ export type Command =
   | { type: 'quest.create'; draft: QuestDraft }
   | { type: 'quest.update'; questId: string; patch: Partial<QuestDraft> }
   | { type: 'quest.setActive'; questId: string; active: boolean }
-  | { type: 'plan.setLock'; date: string; locked: boolean; questIds: string[] }
-  | { type: 'expense.record'; amountMinor: number; currency: string; note: string }
-  | { type: 'metric.record'; metric: MetricKind; value: number }
-  | { type: 'weight.record'; value: number; unit: 'kg' | 'lb' }
-  | { type: 'journal.record'; text: string }
-  | { type: 'sideQuest.record'; text: string; statAffinity: StatAffinity };
+  | { type: 'plan.setLock'; date: string; locked: boolean; questIds: string[] };
 
 export type CommandBoundary = 'closed' | 'owner-changed' | 'principal-changed';
 

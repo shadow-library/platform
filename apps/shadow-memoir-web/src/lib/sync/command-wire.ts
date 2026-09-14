@@ -68,11 +68,6 @@ const QUEST_TYPES = new Set<Command['type']>([
   'quest.update',
   'quest.setActive',
   'plan.setLock',
-  'expense.record',
-  'metric.record',
-  'weight.record',
-  'journal.record',
-  'sideQuest.record',
 ]);
 
 const FINANCE_TYPES = new Set<FinanceCommand['type']>([

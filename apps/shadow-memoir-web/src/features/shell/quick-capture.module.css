@@ -14,15 +14,23 @@
   font-size: var(--sh-text-caption);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--sh-text-tertiary);
+  color: var(--sh-text-secondary);
   font-weight: 600;
+}
+
+.message {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.5;
+  color: var(--sh-text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .parse {
   padding: 14px;
   border-radius: var(--sh-radius-lg);
   background: var(--sh-surface-well);
-  border: 1px solid var(--sh-border-subtle);
+  border: 1px solid var(--sh-border-strong);
 }
 
 .parseHead {
@@ -33,14 +41,19 @@
 }
 
 .parseHint {
+  min-width: 0;
   font-size: var(--sh-text-caption);
-  color: var(--sh-text-tertiary);
+  color: var(--sh-text-secondary);
 }
 
 .parseFields {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.field {
+  min-width: 0;
 }
 
 @media (max-width: 639px) {
@@ -62,6 +75,7 @@
   margin: 3px 0 0;
   font-size: var(--sh-text-body);
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .fieldValue[data-mono='true'] {
@@ -79,8 +93,8 @@
   padding: 8px 9px;
   font-size: var(--sh-text-caption);
   line-height: 1.45;
-  color: var(--sm-money-overdue-text);
-  background: var(--sm-money-overdue-bg);
+  color: var(--sh-warning-text-on-subtle);
+  background: var(--sh-warning-bg-subtle);
   border: 1px solid var(--sh-warning-border);
   border-radius: var(--sh-radius-md);
 }
@@ -105,21 +119,27 @@
   padding: 12px 13px;
   min-height: var(--sh-tap-target);
   border-radius: var(--sh-radius-lg);
-  border: 1px solid var(--sh-border-subtle);
+  border: 1px solid var(--sh-border-strong);
   background: var(--sh-surface-well);
   cursor: pointer;
   color: inherit;
   text-align: left;
 }
 
-.candidate:hover {
-  border-color: var(--sh-border-strong);
+.candidate:hover:not(:disabled) {
+  border-color: var(--sh-border-interactive);
+}
+
+.candidate:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .candidateText {
   flex: 1;
   min-width: 0;
   font-size: var(--sh-text-body-sm);
+  overflow-wrap: anywhere;
 }
 
 .destinations {
@@ -148,6 +168,12 @@
 
 .destination:hover {
   background: var(--sh-surface-well);
+}
+
+.destination:focus-visible,
+.candidate:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
 }
 
 .destinationIcon {

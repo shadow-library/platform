@@ -148,8 +148,6 @@ export interface QuestDraftPreview {
   overloadNote: string | null;
 }
 
-export type MetricKind = 'steps' | 'calories' | 'sleep' | 'water';
-
 export interface CaptureTarget {
   occurrenceId: string;
   questId: string;

@@ -1,10 +1,31 @@
-import { useNavigate } from '@tanstack/react-router';
-import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
-import { Badge, Button, Input, Kbd, toast, useMediaQuery } from '@shadow-library/ui';
+import { Link, useNavigate } from '@tanstack/react-router';
+import { type KeyboardEvent, type ReactElement, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
+import { Badge, Button, Input, Kbd, useMediaQuery } from '@shadow-library/ui';
 
 import { OverlaySurface } from '@/components/OverlaySurface';
 import { AiIcon, LogIcon, MoneyIcon, PlanIcon, QuestIcon, TodayIcon } from '@/components/icons';
-import { type CaptureDraft, parseCapture, useCommand, useMemoirData, useOccurrenceSearch } from '@/lib/data';
+import {
+  CAPTURE_SLEEP_MAX_HOURS,
+  type CaptureAction,
+  type CaptureDraft,
+  type CaptureMoney,
+  type CaptureProblem,
+  captureQuestQuery,
+  type CaptureWeight,
+  notifyOutcome,
+  parseCapture,
+  type SettledOutcome,
+  useCommand,
+  useFinanceCommand,
+  useFinanceSummary,
+  useMemoirData,
+  useOccurrenceSearch,
+  useQuickLogCommand,
+  useWeight,
+  WEIGHT_RANGE_KG,
+  type WeightEntry,
+} from '@/lib/data';
+import { useDataReadiness } from '@/lib/sync';
 
 import styles from './quick-capture.module.css';
 
@@ -20,6 +41,8 @@ interface Destination {
   keywords: string[];
 }
 
+type CaptureOutcome = SettledOutcome<{ message: string }> | { status: 'needs-confirmation'; existingWeight: WeightEntry | null };
+
 const DESTINATIONS: Destination[] = [
   { to: '/', label: 'Today', icon: <TodayIcon size={16} />, keywords: ['day', 'quests'] },
   { to: '/plan', label: 'Planning Board', icon: <PlanIcon size={16} />, keywords: ['week', 'calendar', 'schedule'] },
@@ -30,21 +53,34 @@ const DESTINATIONS: Destination[] = [
   { to: '/ai', label: 'Ask', icon: <AiIcon size={16} />, keywords: ['coach', 'insight'] },
 ];
 
-/**
- * Parsing is local-first heuristics and nothing else (PRODUCT.md §6.2) — the palette must stay usable with no
- * connection, so a line that matches nothing becomes a journal draft rather than waiting on anything remote.
- */
+const SUBJECT_MAX_CHARS = 40;
+
+const IME_COMPOSITION_KEY_CODE = 229;
+
+function subjectOf(text: string): string {
+  const trimmed = text.trim();
+  return trimmed.length > SUBJECT_MAX_CHARS ? `${trimmed.slice(0, SUBJECT_MAX_CHARS)}…` : trimmed;
+}
+
+/** The command hooks live here rather than in the body: closing the palette unmounts the body, and a save must keep settling (and keep blocking a second save) after it does. */
 export function QuickCapture({ open, onOpenChange }: QuickCaptureProps): ReactElement {
-  const navigate = useNavigate();
-  const { today, currency } = useMemoirData();
-  const command = useCommand();
   const [text, setText] = useState('');
+  const [replacing, setReplacing] = useState<WeightEntry | null>(null);
+  const shownText = useRef(text);
   const field = useRef<HTMLInputElement>(null);
-  const occurrences = useOccurrenceSearch(text);
+  const saving = useRef(false);
   const isTouchLayout = useMediaQuery('(max-width: 639px)');
+  const questCommand = useCommand();
+  const financeCommand = useFinanceCommand();
+  const quickLogCommand = useQuickLogCommand();
+  const pending = questCommand.isPending || financeCommand.isPending || quickLogCommand.isPending;
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent): void => {
+    shownText.current = text;
+  }, [text]);
+
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
       if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey)) return;
       event.preventDefault();
       onOpenChange(true);
@@ -56,7 +92,10 @@ export function QuickCapture({ open, onOpenChange }: QuickCaptureProps): ReactEl
   const [wasOpen, setWasOpen] = useState(open);
   if (wasOpen !== open) {
     setWasOpen(open);
-    if (!open) setText('');
+    if (!open) {
+      setText('');
+      setReplacing(null);
+    }
   }
 
   useEffect(() => {
@@ -67,23 +106,30 @@ export function QuickCapture({ open, onOpenChange }: QuickCaptureProps): ReactEl
     return () => clearTimeout(timer);
   }, [open, isTouchLayout]);
 
-  const parse = useMemo(() => parseCapture(text, { date: today, currency, occurrences: occurrences.data ?? [] }), [text, today, currency, occurrences.data]);
+  const runAction = async (action: CaptureAction): Promise<CaptureOutcome> => {
+    if (action.domain === 'finance') return financeCommand.run(action.command);
+    if (action.domain === 'quest') {
+      const outcome = await questCommand.run(action.command);
+      return outcome.status === 'needs-confirmation' ? { status: 'needs-confirmation', existingWeight: null } : outcome;
+    }
+    const outcome = await quickLogCommand.run(action.command);
+    return outcome.status === 'needs-confirmation' ? { status: 'needs-confirmation', existingWeight: outcome.confirmation.needsConfirmation?.existing ?? null } : outcome;
+  };
 
-  const destinations = DESTINATIONS.filter(item => {
-    const query = text.trim().toLowerCase();
-    if (query.length === 0) return true;
-    return item.label.toLowerCase().includes(query) || item.keywords.some(keyword => keyword.includes(query));
-  });
-
-  const commit = (draft: CaptureDraft): void => {
-    command.mutate(draft.command, {
-      onSuccess: result => {
-        if (result.status === 'needs-confirmation') return;
-        toast.neutral(result.message);
-        setText('');
-        onOpenChange(false);
-      },
-    });
+  const commit = async (draft: CaptureDraft, line: string): Promise<void> => {
+    if (saving.current) return;
+    saving.current = true;
+    try {
+      const outcome = await runAction(draft.action);
+      if (outcome.status === 'needs-confirmation') return setReplacing(outcome.existingWeight);
+      const saved = outcome.status === 'applied' || outcome.status === 'queued-offline';
+      notifyOutcome(outcome, { success: saved ? outcome.local.message : '', action: 'save', subject: subjectOf(line) });
+      if (!saved || shownText.current !== line) return;
+      setText('');
+      onOpenChange(false);
+    } finally {
+      saving.current = false;
+    }
   };
 
   return (
@@ -106,81 +152,234 @@ export function QuickCapture({ open, onOpenChange }: QuickCaptureProps): ReactEl
         ) : undefined
       }
     >
-      <div className={styles.body}>
-        <Input value={text} onValueChange={setText} placeholder="coffee 4.20 · 8000 steps · 78.4 kg" aria-label="Log something, or jump to a screen" ref={field} clearable />
-
-        {parse.status === 'draft' ? <ParseBand draft={parse.draft} onCommit={commit} /> : null}
-
-        {parse.status === 'ambiguous' ? (
-          <div className={styles.candidates}>
-            <p className={styles.sectionLabel}>That could be two things. Pick one — nothing is saved until you do.</p>
-            {parse.candidates.map(candidate => (
-              <button key={candidate.kind} type="button" className={styles.candidate} onClick={() => commit(candidate)}>
-                <Badge variant="outline" size="sm">
-                  {candidate.kindLabel}
-                </Badge>
-                <span className={styles.candidateText}>{candidate.fields.map(field => field.value).join(' · ')}</span>
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {parse.status === 'unrecognised' ? <p className={styles.sectionLabel}>Nothing in that line matched a quest. Type a number with a unit, or pick a screen below.</p> : null}
-
-        {destinations.length === 0 ? null : (
-          <div>
-            <p className={styles.sectionLabel}>Go to</p>
-            <ul className={styles.destinations}>
-              {destinations.map(item => (
-                <li key={item.to}>
-                  <button
-                    type="button"
-                    className={styles.destination}
-                    onClick={() => {
-                      onOpenChange(false);
-                      void navigate({ to: item.to });
-                    }}
-                  >
-                    <span className={styles.destinationIcon}>{item.icon}</span>
-                    <span>{item.label}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <p className={styles.footerHint}>
-          <Kbd>Esc</Kbd> closes this. <Kbd keys="mod+K" /> reopens it from anywhere.
-        </p>
-      </div>
+      <CaptureBody
+        text={text}
+        onTextChange={setText}
+        field={field}
+        pending={pending}
+        replacing={replacing}
+        onCommit={draft => void commit(draft, text)}
+        onClose={() => onOpenChange(false)}
+      />
     </OverlaySurface>
   );
 }
 
-function ParseBand({ draft, onCommit }: { draft: CaptureDraft; onCommit: (draft: CaptureDraft) => void }): ReactElement {
+interface CaptureBodyProps {
+  text: string;
+  onTextChange: (text: string) => void;
+  field: RefObject<HTMLInputElement | null>;
+  pending: boolean;
+  /** Today's weight as the save itself reported it, for when the weight read had not caught up yet. */
+  replacing: WeightEntry | null;
+  onCommit: (draft: CaptureDraft) => void;
+  onClose: () => void;
+}
+
+function CaptureBody({ text, onTextChange, field, pending, replacing, onCommit, onClose }: CaptureBodyProps): ReactElement {
+  const navigate = useNavigate();
+  const { today } = useMemoirData();
+  const summary = useFinanceSummary();
+  const moneyReady = useDataReadiness({ query: summary }).readiness.kind === 'ready';
+  const weight = useWeight();
+  const occurrences = useOccurrenceSearch(captureQuestQuery(text));
+  const [notice, setNotice] = useState<{ text: string; message: string } | null>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const candidates = useRef<HTMLDivElement>(null);
+
+  const money = useMemo<CaptureMoney | null>(() => {
+    if (!moneyReady || !summary.data) return null;
+    const { settings, categories } = summary.data;
+    return { homeCurrency: settings.homeCurrency, currencies: settings.currencies, categories };
+  }, [moneyReady, summary.data]);
+
+  const parse = useMemo(() => {
+    const captureWeight: CaptureWeight = weight.data === undefined ? { status: 'loading' } : { status: 'known', today: weight.data.today ?? replacing };
+    return parseCapture(text, { date: today, money, occurrences: occurrences.data ?? [], weight: captureWeight });
+  }, [text, today, money, occurrences.data, weight.data, replacing]);
+
+  const query = text.trim().toLowerCase();
+  const destinations = DESTINATIONS.filter(item => query.length === 0 || item.label.toLowerCase().includes(query) || item.keywords.some(keyword => keyword.includes(query)));
+  const shownNotice = notice?.text === text ? notice.message : null;
+
+  const save = (draft: CaptureDraft): void => {
+    if (occurrences.isLoading) return setNotice({ text, message: 'Still checking today’s quests. Try again in a moment.' });
+    onCommit(draft);
+  };
+
+  const go = (destination: Destination): void => {
+    onClose();
+    void navigate({ to: destination.to });
+  };
+
+  const submit = (): void => {
+    if (parse.status === 'waiting') return;
+    if (parse.status === 'ambiguous') return candidates.current?.querySelector<HTMLButtonElement>('[data-capture-option]:not(:disabled)')?.focus();
+    const [first] = destinations;
+    const navigationIntended = parse.status === 'draft' && parse.draft.kind === 'journal' && first !== undefined;
+    if (parse.status === 'draft' && !navigationIntended) return save(parse.draft);
+    if (first) go(first);
+  };
+
+  const moveFocus = (event: KeyboardEvent<HTMLElement>): void => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const options = Array.from(body.current?.querySelectorAll<HTMLButtonElement>('[data-capture-option]:not(:disabled)') ?? []);
+    const stops: HTMLElement[] = field.current ? [field.current, ...options] : options;
+    const index = stops.findIndex(stop => stop === document.activeElement);
+    if (index === -1) return;
+    event.preventDefault();
+    const next = event.key === 'ArrowDown' ? Math.min(index + 1, stops.length - 1) : Math.max(index - 1, 0);
+    stops[next]?.focus();
+  };
+
+  const onFieldKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key !== 'Enter') return moveFocus(event);
+    if (event.nativeEvent.isComposing || event.keyCode === IME_COMPOSITION_KEY_CODE) return;
+    event.preventDefault();
+    submit();
+  };
+
+  return (
+    <div className={styles.body} ref={body}>
+      <Input
+        value={text}
+        onValueChange={onTextChange}
+        onKeyDown={onFieldKeyDown}
+        placeholder="coffee 4.20 · 8000 steps · 78.4 kg"
+        aria-label="Log something, or jump to a screen"
+        ref={field}
+        clearable
+      />
+
+      {shownNotice ? (
+        <p className={styles.message} role="status">
+          {shownNotice}
+        </p>
+      ) : null}
+
+      {parse.status === 'draft' ? <ParseBand draft={parse.draft} pending={pending} onCommit={save} /> : null}
+
+      {parse.status === 'waiting' ? (
+        <p className={styles.message} role="status">
+          Checking today’s weight…
+        </p>
+      ) : null}
+
+      {parse.status === 'ambiguous' ? (
+        <div className={styles.candidates} ref={candidates}>
+          <p className={styles.message} role="status">
+            That could be two things. Pick one — nothing is saved until you do.
+          </p>
+          {parse.candidates.map(candidate => (
+            <button key={candidate.kind} type="button" className={styles.candidate} data-capture-option disabled={pending} onKeyDown={moveFocus} onClick={() => save(candidate)}>
+              <Badge variant="outline" size="sm">
+                {candidate.kindLabel}
+              </Badge>
+              <span className={styles.candidateText}>{candidate.fields.map(item => item.value).join(' · ')}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {parse.status === 'unrecognised' ? <ProblemMessage problem={parse.problem} query={captureQuestQuery(text)} onNavigate={onClose} /> : null}
+
+      {destinations.length === 0 ? null : (
+        <div>
+          <p className={styles.sectionLabel}>Go to</p>
+          <ul className={styles.destinations}>
+            {destinations.map(item => (
+              <li key={item.to}>
+                <button type="button" className={styles.destination} data-capture-option onKeyDown={moveFocus} onClick={() => go(item)}>
+                  <span className={styles.destinationIcon}>{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className={styles.footerHint}>
+        <Kbd>Enter</Kbd> saves, or opens the first screen. <Kbd>↑</Kbd> <Kbd>↓</Kbd> move through the list. <Kbd>Esc</Kbd> closes this. <Kbd keys="mod+K" /> reopens it from
+        anywhere.
+      </p>
+    </div>
+  );
+}
+
+function ProblemMessage({ problem, query, onNavigate }: { problem: CaptureProblem; query: string; onNavigate: () => void }): ReactElement {
+  const link = (to: string, label: string): ReactNode => (
+    <Link to={to} onClick={onNavigate}>
+      {label}
+    </Link>
+  );
+
+  const message = (children: ReactNode): ReactElement => (
+    <p className={styles.message} role="status">
+      {children}
+    </p>
+  );
+
+  switch (problem.kind) {
+    case 'no-quest':
+      return message(
+        <>
+          Nothing scheduled today is called “{query}”. Check the name on {link('/', 'Today')} or in {link('/quests', 'Quests')}.
+        </>,
+      );
+    case 'weight-out-of-range':
+      return message(
+        <>
+          A weight has to be between {WEIGHT_RANGE_KG.min} and {WEIGHT_RANGE_KG.max} kg, so nothing is saved from this line. Log it on {link('/log/weight', 'Weight')}.
+        </>,
+      );
+    case 'sleep-out-of-range':
+      return message(
+        <>
+          Sleep can be at most {CAPTURE_SLEEP_MAX_HOURS} hours, so nothing is saved from this line. Log it on {link('/log/health', 'Health')}.
+        </>,
+      );
+    case 'money-unavailable':
+      return message(
+        <>
+          Your Money settings haven’t loaded on this device yet, so this amount can’t be saved in the right currency. Try again in a moment, or add it in{' '}
+          {link('/finance', 'Money')}.
+        </>,
+      );
+    case 'currency-not-enabled':
+      return message(
+        <>
+          {problem.symbol} isn’t one of the currencies on this account, so nothing is saved from this line. Type the amount without the symbol to log it in {problem.homeCurrency}.
+        </>,
+      );
+  }
+}
+
+function ParseBand({ draft, pending, onCommit }: { draft: CaptureDraft; pending: boolean; onCommit: (draft: CaptureDraft) => void }): ReactElement {
   return (
     <div className={styles.parse}>
       <div className={styles.parseHead}>
         <Badge variant="soft" intent="info">
           {draft.kindLabel}
         </Badge>
-        <span className={styles.parseHint}>{draft.hint}</span>
+        <span className={styles.parseHint} role="status">
+          {draft.hint}
+        </span>
       </div>
       <div className={styles.parseFields}>
-        {draft.fields.map(field => (
-          <div key={field.label}>
-            <p className={styles.fieldLabel}>{field.label}</p>
-            <p className={styles.fieldValue} data-mono={field.mono === true}>
-              {field.value}
+        {draft.fields.map(item => (
+          <div key={item.label} className={styles.field}>
+            <p className={styles.fieldLabel}>{item.label}</p>
+            <p className={styles.fieldValue} data-mono={item.mono === true}>
+              {item.value}
             </p>
-            {field.guessed ? <p className={styles.fieldGuess}>assumed — edit after saving</p> : null}
+            {item.guessed ? <p className={styles.fieldGuess}>assumed</p> : null}
           </div>
         ))}
       </div>
       {draft.warning ? <p className={styles.parseWarning}>{draft.warning}</p> : null}
       <div className={styles.parseActions}>
-        <Button size="sm" variant="primary" onClick={() => onCommit(draft)}>
+        <Button size="sm" variant="primary" loading={pending} loadingText="Saving…" disabled={pending} onClick={() => onCommit(draft)}>
           Save
         </Button>
       </div>
