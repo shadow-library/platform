@@ -33,6 +33,7 @@ const ONLINE_SNAPSHOT: SyncSnapshot = {
   initError: null,
   readiness: { kind: 'ready' },
   readySince: 0,
+  readyWorldAt: 0,
   sending: [],
 };
 

@@ -189,8 +189,13 @@ export interface SyncSnapshot {
   /** Set when the local mirror could not be opened at all. There is no data to render and no pass to retry into, so the shell says so instead of showing an empty day. */
   initError: string | null;
   readiness: SyncReadiness;
-  /** Epoch ms when `readiness` last became `ready`; a mirror query whose data is older is still showing its pre-pull answer. */
+  /** Identifies the current ready epoch: set when `readiness` last became `ready` (0 if never) and strictly increasing, so it is a token rather than a clock. */
   readySince: number;
+  /**
+   * Epoch ms the mirror was last published before `readiness` last became `ready`. Mirror data fetched earlier may be the empty or partial mirror's answer;
+   * data fetched at or after it read the rows that made the mirror ready.
+   */
+  readyWorldAt: number;
   /** Command ids of the batch on the wire right now. */
   sending: string[];
 }

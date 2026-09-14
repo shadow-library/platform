@@ -17,6 +17,8 @@ export interface DataQuery<T> {
   dataUpdatedAt: number;
   error: unknown;
   refetch: () => Promise<unknown>;
+  /** Set while `data` is the previous key's result standing in for this one (`placeholderData: keepPreviousData`). */
+  isPlaceholderData?: boolean;
 }
 
 export interface DataReadinessOptions<T> {
@@ -27,9 +29,9 @@ export interface DataReadinessOptions<T> {
 
 export interface ReadinessContext {
   sync: SyncReadiness;
-  readySince: number;
+  readyWorldAt: number;
   online: boolean;
-  /** The caller has already shown content since `readySince`, so a refetch must never take it back to loading. */
+  /** The caller has already shown this data in the current ready epoch, so a refetch must never take it back to loading. */
   shown?: boolean;
 }
 
@@ -42,6 +44,12 @@ export interface DataReadinessResult {
 
 type FailedReadiness = Extract<DataReadiness, { kind: 'failed' }>;
 
+interface ShownLatch {
+  readySince: number;
+  /** The `dataUpdatedAt` of revealed data older than `readyWorldAt`; `null` when everything revealed was newer. */
+  predatesWorldAt: number | null;
+}
+
 const LOADING: DataReadiness = { kind: 'loading' };
 const EMPTY: DataReadiness = { kind: 'empty' };
 const READY: DataReadiness = { kind: 'ready' };
@@ -51,27 +59,34 @@ export function useSyncReadiness(): SyncReadiness {
 }
 
 export function resolveDataReadiness<T>(
-  { sync, readySince, online, shown = false }: ReadinessContext,
+  { sync, readyWorldAt, online, shown = false }: ReadinessContext,
   { query, source = 'mirror', isEmpty }: DataReadinessOptions<T>,
 ): DataReadiness {
   if (source === 'mirror' && sync.kind !== 'ready') return sync;
   if (!query) return READY;
   if (query.data === undefined) return query.isError ? { kind: 'failed', reason: toSyncFailureReason(query.error, online) } : LOADING;
-  // Until content has been shown, data from before `ready` may still be the empty mirror's answer the pull's refetch is replacing.
-  if (source === 'mirror' && !shown && query.isFetching && query.dataUpdatedAt <= readySince) return LOADING;
+  // A fetch that lands in the publish's own millisecond is almost always the refetch it started, so only strictly older data is suspect.
+  if (source === 'mirror' && !shown && query.isFetching && query.dataUpdatedAt < readyWorldAt) return LOADING;
   return isEmpty?.(query.data) ? EMPTY : READY;
+}
+
+/** A TanStack result re-renders its owner only for the fields some render has read, so every field the rules might skip is read up front. */
+function observe<T>({ data, isError, isFetching, dataUpdatedAt, error, refetch, isPlaceholderData }: DataQuery<T>): DataQuery<T> {
+  return { data, isError, isFetching, dataUpdatedAt, error, refetch, isPlaceholderData };
 }
 
 export function useDataReadiness<T>(options: DataReadinessOptions<T> = {}): DataReadinessResult {
   const engine = useSyncEngine();
-  const { readiness: sync, readySince } = useSyncStatus();
+  const { readiness: sync, readySince, readyWorldAt } = useSyncStatus();
   const [retryingFrom, setRetryingFrom] = useState<FailedReadiness | null>(null);
-  const [shownSince, setShownSince] = useState<number | null>(null);
+  const [latch, setLatch] = useState<ShownLatch | null>(null);
   const online = typeof navigator === 'undefined' || navigator.onLine !== false;
-  const shown = sync.kind === 'ready' && shownSince === readySince;
-  const resolved = resolveDataReadiness({ sync, readySince, online, shown }, options);
-  const { query, source = 'mirror' } = options;
-  if (!shown && sync.kind === 'ready' && (resolved.kind === 'ready' || resolved.kind === 'empty')) setShownSince(readySince);
+  const { source = 'mirror' } = options;
+  const query = options.query && observe(options.query);
+  const predatesWorldAt = query && !query.isPlaceholderData && query.dataUpdatedAt < readyWorldAt ? query.dataUpdatedAt : null;
+  const shown = sync.kind === 'ready' && latch?.readySince === readySince && (predatesWorldAt === null || latch.predatesWorldAt === predatesWorldAt);
+  const resolved = resolveDataReadiness({ sync, readyWorldAt, online, shown }, { ...options, query });
+  if (!shown && sync.kind === 'ready' && (resolved.kind === 'ready' || resolved.kind === 'empty')) setLatch({ readySince, predatesWorldAt });
 
   const retry = (): void => {
     if (resolved.kind !== 'failed' || retryingFrom) return;

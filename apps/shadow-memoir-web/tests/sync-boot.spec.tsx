@@ -708,6 +708,145 @@ describe('DataState over a refetching mirror', () => {
     expect(screen.getByTestId('day')).toBe(content);
     expect(probe.mounts()).toBe(mounts);
   });
+
+  it('should not show the skeleton when a DataState remounts after the first pull', async () => {
+    const held = holdMirrorReady();
+    const { engine } = createTestEngine({ backing: held.backing, today: TODAY, pages });
+    const data = createSyncedTestData(engine);
+    const probe = skeletonProbe();
+    function Today(): ReactElement {
+      return (
+        <DataState query={useDay()} skeleton={probe.skeleton}>
+          {day => <section data-testid="day">{day.occurrences.length} quests</section>}
+        </DataState>
+      );
+    }
+    function Screen(): ReactElement {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          {open && <Today />}
+          <button onClick={() => setOpen(!open)}>Toggle</button>
+        </>
+      );
+    }
+    renderMirrorScreen(data, <Screen />);
+    await waitFor(() => expect(data.queryClient.getQueryState<DayView>(memoirKeys.day(TODAY))).toMatchObject({ fetchStatus: 'idle', data: { occurrences: [expect.anything()] } }));
+    held.release();
+    await screen.findByTestId('day');
+    expect(data.queryClient.getQueryState(memoirKeys.day(TODAY))?.dataUpdatedAt).toBeLessThan(engine.getSnapshot().readySince);
+
+    act(() => screen.getByRole('button', { name: 'Toggle' }).click());
+    expect(screen.queryByTestId('day')).toBeNull();
+    const mounts = probe.mounts();
+    slowDay(data);
+    act(() => screen.getByRole('button', { name: 'Toggle' }).click());
+
+    expect(screen.getByTestId('day').textContent).toBe('1 quests');
+    expect(data.queryClient.getQueryState(memoirKeys.day(TODAY))?.fetchStatus).toBe('fetching');
+    await waitFor(() => expect(data.queryClient.getQueryState(memoirKeys.day(TODAY))?.fetchStatus).toBe('idle'));
+    expect(probe.mounts()).toBe(mounts);
+  });
+
+  it('should not show the skeleton for a keyed query cached during the first pull once ready', async () => {
+    const tomorrow = '2026-08-25';
+    const held = holdMirrorReady();
+    const { engine } = createTestEngine({ backing: held.backing, today: TODAY, pages });
+    const data = createSyncedTestData(engine);
+    const probe = skeletonProbe();
+    function Tomorrow(): null {
+      useDay(tomorrow);
+      return null;
+    }
+    function Days(): ReactElement {
+      const [date, setDate] = useState(TODAY);
+      return (
+        <DataState query={useDay(date)} skeleton={probe.skeleton}>
+          {view => (
+            <section data-testid="day">
+              {view.date} {view.occurrences.length} quests
+              <button onClick={() => setDate(tomorrow)}>Next day</button>
+            </section>
+          )}
+        </DataState>
+      );
+    }
+    function Screen(): ReactElement {
+      const [peeking, setPeeking] = useState(true);
+      return (
+        <>
+          <Days />
+          {peeking && <Tomorrow />}
+          <button onClick={() => setPeeking(false)}>Stop peeking</button>
+        </>
+      );
+    }
+    renderMirrorScreen(data, <Screen />);
+    await waitFor(() =>
+      expect(data.queryClient.getQueryState<DayView>(memoirKeys.day(tomorrow))).toMatchObject({ fetchStatus: 'idle', data: { occurrences: [expect.anything()] } }),
+    );
+    held.release();
+    const content = await screen.findByTestId('day');
+    act(() => screen.getByRole('button', { name: 'Stop peeking' }).click());
+
+    const mounts = probe.mounts();
+    slowDay(data);
+    act(() => screen.getByRole('button', { name: 'Next day' }).click());
+
+    expect(screen.getByTestId('day').textContent).toContain(`${tomorrow} 1 quests`);
+    await waitFor(() => expect(data.queryClient.getQueryState(memoirKeys.day(tomorrow))?.fetchStatus).toBe('idle'));
+    expect(screen.getByTestId('day')).toBe(content);
+    expect(probe.mounts()).toBe(mounts);
+  });
+
+  it('should hold a key cached before the first pull landed behind the skeleton when a ready DataState switches to it', async () => {
+    const tomorrow = '2026-08-25';
+    const { engine, open } = gatedEngine(pages);
+    const data = createSyncedTestData(engine);
+    const shownTomorrow: number[] = [];
+    function Tomorrow(): null {
+      useDay(tomorrow);
+      return null;
+    }
+    function Days(): ReactElement {
+      const [date, setDate] = useState(TODAY);
+      return (
+        <DataState query={useDay(date)} skeleton={<span>skeleton</span>}>
+          {view => {
+            if (view.date === tomorrow) shownTomorrow.push(view.occurrences.length);
+            return (
+              <section data-testid="day">
+                {view.date} {view.occurrences.length} quests
+                <button onClick={() => setDate(tomorrow)}>Next day</button>
+              </section>
+            );
+          }}
+        </DataState>
+      );
+    }
+    function Screen(): ReactElement {
+      const [peeking, setPeeking] = useState(true);
+      return (
+        <>
+          <Days />
+          {peeking && <Tomorrow />}
+          <button onClick={() => setPeeking(false)}>Stop peeking</button>
+        </>
+      );
+    }
+    renderMirrorScreen(data, <Screen />);
+    await waitFor(() => expect(data.queryClient.getQueryState<DayView>(memoirKeys.day(tomorrow))?.data?.occurrences).toEqual([]));
+    act(() => screen.getByRole('button', { name: 'Stop peeking' }).click());
+    open();
+    await screen.findByTestId('day');
+
+    slowDay(data);
+    act(() => screen.getByRole('button', { name: 'Next day' }).click());
+
+    expect(screen.getByText('skeleton')).toBeDefined();
+    await waitFor(() => expect(screen.getByTestId('day').textContent).toContain(`${tomorrow} 1 quests`));
+    expect(shownTomorrow).not.toContain(0);
+  });
 });
 
 describe('NetStrip first sync', () => {

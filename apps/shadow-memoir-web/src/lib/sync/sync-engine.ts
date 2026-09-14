@@ -123,8 +123,10 @@ export class SyncEngine {
     initError: null,
     readiness: LOADING,
     readySince: 0,
+    readyWorldAt: 0,
     sending: [],
   };
+  private worldPublishedAt = 0;
   private deviceId: string | undefined;
   private mirrorReady = false;
   private deletionPending = false;
@@ -602,6 +604,8 @@ export class SyncEngine {
   /** Also runs after an ack, so a queued badge clears even when the pull that follows fails. */
   private async publishProjection(): Promise<void> {
     await Promise.all([...this.projectionListeners].map(listener => listener()));
+    // After the providers settle and before a world listener starts a refetch, so data fetched from this instant on reads these rows.
+    this.worldPublishedAt = Date.now();
     for (const listener of this.worldListeners) listener();
   }
 
@@ -634,7 +638,8 @@ export class SyncEngine {
     const entersReady = next.readiness === READY && this.snapshot.readiness !== READY;
     // Strictly increasing so the per-instance readiness latch sees each ready epoch as new.
     const readySince = entersReady ? Math.max(Date.now(), this.snapshot.readySince + 1) : this.snapshot.readySince;
-    this.snapshot = { ...this.snapshot, ...next, readySince };
+    const readyWorldAt = entersReady ? this.worldPublishedAt : this.snapshot.readyWorldAt;
+    this.snapshot = { ...this.snapshot, ...next, readySince, readyWorldAt };
     for (const listener of this.listeners) listener();
   }
 }
