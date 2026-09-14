@@ -135,7 +135,7 @@ function AuthModeRow({ mode, require, onConfigure, onRemove }: { mode: AuthModeI
             Remove
           </Button>
         )}
-        <Switch checked={mode.enabled} pending={setMode.isPending} onCheckedChange={next => toggle(next === true)} />
+        <Switch aria-label={mode.label} checked={mode.enabled} pending={setMode.isPending} onCheckedChange={next => toggle(next === true)} />
       </div>
     </div>
   );

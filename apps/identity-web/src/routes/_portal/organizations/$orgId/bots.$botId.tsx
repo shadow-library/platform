@@ -679,7 +679,7 @@ function ActivityTab({ orgId, botId }: ActivityTabProps): React.JSX.Element {
       </div>
 
       <div className={styles.toolbar}>
-        <Select size="sm" value={action} onValueChange={value => setAction(value as 'all' | BotActivityAction)}>
+        <Select size="sm" aria-label="Filter activity by event" value={action} onValueChange={value => setAction(value as 'all' | BotActivityAction)}>
           <Select.Item value="all">All events</Select.Item>
           {(Object.keys(ACTION_LABEL) as BotActivityAction[]).map(key => (
             <Select.Item key={key} value={key}>
@@ -687,7 +687,7 @@ function ActivityTab({ orgId, botId }: ActivityTabProps): React.JSX.Element {
             </Select.Item>
           ))}
         </Select>
-        <Select size="sm" value={outcome} onValueChange={value => setOutcome(value as 'all' | BotActivityOutcome)}>
+        <Select size="sm" aria-label="Filter activity by outcome" value={outcome} onValueChange={value => setOutcome(value as 'all' | BotActivityOutcome)}>
           <Select.Item value="all">All outcomes</Select.Item>
           {(Object.keys(OUTCOME_META) as BotActivityOutcome[]).map(key => (
             <Select.Item key={key} value={key}>

@@ -161,9 +161,9 @@ function BotsListPage(): React.JSX.Element {
 
       <div className={styles.toolbar}>
         <div className={styles.search}>
-          <Input size="sm" placeholder="Search bots…" prefix={<SearchIcon size={15} />} value={search} onValueChange={setSearch} />
+          <Input size="sm" placeholder="Search bots…" aria-label="Search bots" prefix={<SearchIcon size={15} />} value={search} onValueChange={setSearch} />
         </div>
-        <Select size="sm" value={status} onValueChange={value => setStatus(value as 'all' | BotStatus)}>
+        <Select size="sm" aria-label="Filter bots by status" value={status} onValueChange={value => setStatus(value as 'all' | BotStatus)}>
           <Select.Item value="all">All statuses</Select.Item>
           <Select.Item value="ACTIVE">Active</Select.Item>
           <Select.Item value="SUSPENDED">Suspended</Select.Item>

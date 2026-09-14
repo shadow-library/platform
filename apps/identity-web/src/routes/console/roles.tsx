@@ -219,7 +219,12 @@ function RolesPage(): React.JSX.Element {
       />
 
       <div className={styles.toolbar}>
-        <Select placeholder="Select an application" value={effectiveAppId} onValueChange={value => navigate({ search: { app: value }, replace: true })}>
+        <Select
+          placeholder="Select an application"
+          aria-label="Filter roles by application"
+          value={effectiveAppId}
+          onValueChange={value => navigate({ search: { app: value }, replace: true })}
+        >
           {(apps.data?.items ?? []).map(item => (
             <Select.Item key={item.id} value={String(item.id)}>
               {item.displayName ?? item.name}

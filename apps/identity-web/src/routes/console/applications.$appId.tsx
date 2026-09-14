@@ -332,11 +332,13 @@ function ApplicationDetailPage(): React.JSX.Element {
           <div className={styles.detailCard}>
             <div className={styles.tabHead}>
               <div className={styles.tabHeadMain}>
-                <h2 className={styles.tabTitle}>Visibility</h2>
+                <h2 id="app-visibility-heading" className={styles.tabTitle}>
+                  Visibility
+                </h2>
                 <p className={styles.tabDesc}>{visibility.description}</p>
               </div>
               <div style={{ minWidth: 200 }}>
-                <Select value={data.visibility} onValueChange={changeVisibility}>
+                <Select aria-labelledby="app-visibility-heading" value={data.visibility} onValueChange={changeVisibility}>
                   <Select.Item value="PUBLIC" description={VISIBILITY.PUBLIC.description}>
                     {VISIBILITY.PUBLIC.label}
                   </Select.Item>
@@ -406,6 +408,7 @@ function ApplicationDetailPage(): React.JSX.Element {
               <Input
                 size="sm"
                 placeholder="Search members by email or username…"
+                aria-label="Search members by email or username"
                 value={memberSearch}
                 onValueChange={value => {
                   setMemberSearch(value);
@@ -581,7 +584,7 @@ function OrganisationsTab(props: { appId: string; require: Require }): React.JSX
 
       <div className={styles.toolbar}>
         <div className={styles.search}>
-          <Input size="sm" placeholder="Organisation ID to release…" value={orgIdInput} onValueChange={setOrgIdInput} />
+          <Input size="sm" placeholder="Organisation ID to release…" aria-label="Organisation ID to release" value={orgIdInput} onValueChange={setOrgIdInput} />
         </div>
         <Button variant="primary" size="sm" loading={release.isPending} onClick={doRelease}>
           Release
@@ -921,7 +924,7 @@ function ApiScopesTab(props: { appName: string; resource?: ResourceItem; resourc
         )}
         {client && grantable.length > 0 && (
           <div className={styles.scopeGrant} style={{ marginTop: 12 }}>
-            <Select placeholder="Grant a scope…" value={grantScopeId} onValueChange={grantScope}>
+            <Select placeholder="Grant a scope…" aria-label="Grant a scope" value={grantScopeId} onValueChange={grantScope}>
               {grantable.map(scope => (
                 <Select.Item key={scope.id} value={scope.id}>
                   {scope.name} · {scope.resource}

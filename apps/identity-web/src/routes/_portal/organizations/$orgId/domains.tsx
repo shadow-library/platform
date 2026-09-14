@@ -46,7 +46,7 @@ function DomainsPage(): React.JSX.Element {
     <div className={styles.page}>
       {canManage && (
         <div className={styles.addRow}>
-          <Input placeholder="example.com" value={value} onValueChange={setValue} onKeyDown={event => event.key === 'Enter' && add()} />
+          <Input placeholder="example.com" aria-label="Domain to add" value={value} onValueChange={setValue} onKeyDown={event => event.key === 'Enter' && add()} />
           <Button variant="secondary" prefix={<PlusIcon size={15} />} loading={register.isPending} onClick={add}>
             Add domain
           </Button>

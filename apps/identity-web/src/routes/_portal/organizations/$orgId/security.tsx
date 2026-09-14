@@ -99,10 +99,11 @@ function PolicyRow({ orgId, policy, require }: { orgId: string; policy: PolicyIt
       </div>
       <div className={styles.rowControl}>
         {isBoolean ? (
-          <Switch checked={policy.effectiveEnabled ?? false} onCheckedChange={next => applyValue({ enabled: next === true })} />
+          <Switch aria-label={policy.label} checked={policy.effectiveEnabled ?? false} onCheckedChange={next => applyValue({ enabled: next === true })} />
         ) : (
           <DurationField
             key={policy.effectiveValue}
+            label={policy.label}
             seconds={policy.effectiveValue ?? policy.defaultValue ?? 0}
             min={policy.min}
             max={policy.max}
@@ -120,7 +121,21 @@ function PolicyRow({ orgId, policy, require }: { orgId: string; policy: PolicyIt
   );
 }
 
-function DurationField({ seconds, min, max, busy, onSave }: { seconds: number; min?: number; max?: number; busy: boolean; onSave: (seconds: number) => void }): React.JSX.Element {
+function DurationField({
+  label,
+  seconds,
+  min,
+  max,
+  busy,
+  onSave,
+}: {
+  label: string;
+  seconds: number;
+  min?: number;
+  max?: number;
+  busy: boolean;
+  onSave: (seconds: number) => void;
+}): React.JSX.Element {
   const unit = pickUnit(seconds);
   const [unitSeconds, setUnitSeconds] = useState(unit);
   const [amount, setAmount] = useState(String(seconds / unit));
@@ -134,8 +149,8 @@ function DurationField({ seconds, min, max, busy, onSave }: { seconds: number; m
   return (
     <div className={styles.duration}>
       <div className={styles.durationInputs}>
-        <Input className={styles.durationAmount} size="sm" value={amount} onValueChange={setAmount} invalid={amount.trim() !== '' && !valid} />
-        <Select className={styles.durationUnit} size="sm" value={String(unitSeconds)} onValueChange={value => setUnitSeconds(Number(value))}>
+        <Input className={styles.durationAmount} size="sm" aria-label={`${label} amount`} value={amount} onValueChange={setAmount} invalid={amount.trim() !== '' && !valid} />
+        <Select className={styles.durationUnit} size="sm" aria-label={`${label} unit`} value={String(unitSeconds)} onValueChange={value => setUnitSeconds(Number(value))}>
           {DURATION_UNITS.map(item => (
             <Select.Item key={item.seconds} value={String(item.seconds)}>
               {item.label}

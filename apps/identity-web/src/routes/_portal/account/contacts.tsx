@@ -112,6 +112,7 @@ function ContactCard({ title, kind, placeholder, items, isLoading, error, addPen
         <Input
           type={kind === 'email' ? 'email' : 'tel'}
           placeholder={placeholder}
+          aria-label={kind === 'email' ? 'Email address to add' : 'Phone number to add'}
           value={value}
           onValueChange={setValue}
           onKeyDown={event => event.key === 'Enter' && begin(value).then(() => setValue(''))}

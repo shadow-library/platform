@@ -49,6 +49,7 @@ function UsersPage(): React.JSX.Element {
           <Input
             size="sm"
             placeholder="Search by email…"
+            aria-label="Search users by email"
             prefix={<SearchIcon size={15} />}
             value={search}
             onValueChange={value => {
@@ -59,6 +60,7 @@ function UsersPage(): React.JSX.Element {
         </div>
         <Select
           size="sm"
+          aria-label="Filter users by status"
           value={status}
           onValueChange={value => {
             setStatus(value);

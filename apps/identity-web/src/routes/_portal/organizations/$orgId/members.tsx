@@ -139,9 +139,9 @@ function MembersPage(): React.JSX.Element {
     <div className={styles.page}>
       <div className={styles.toolbar}>
         <div className={styles.search}>
-          <Input size="sm" placeholder="Search members…" prefix={<SearchIcon size={15} />} value={search} onValueChange={setSearch} />
+          <Input size="sm" placeholder="Search members…" aria-label="Search members" prefix={<SearchIcon size={15} />} value={search} onValueChange={setSearch} />
         </div>
-        <Select size="sm" value={roleFilter} onValueChange={setRoleFilter}>
+        <Select size="sm" aria-label="Filter members by role" value={roleFilter} onValueChange={setRoleFilter}>
           <Select.Item value="all">All roles</Select.Item>
           <Select.Item value="OWNER">Owner</Select.Item>
           <Select.Item value="ADMIN">Admin</Select.Item>
