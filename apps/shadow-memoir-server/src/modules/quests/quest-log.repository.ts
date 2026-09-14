@@ -1,13 +1,14 @@
 /**
  * Importing npm packages
  */
-import { and, eq, gte, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns, gt, gte, inArray, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
  */
 import { OwnerScopedRepository } from '@modules/auth';
+import { type DeltaRecord, serializeDeltaRow } from '@modules/sync';
 import { type Account, type DatabaseTransaction, type Quest, type QuestLog, schema, syncStamped } from '@server/database';
 
 /**
@@ -42,6 +43,26 @@ const YIELDING_STATES: readonly QuestLog.State[] = ['missed', 'rescheduled'];
 
 @Injectable()
 export class QuestLogRepository extends OwnerScopedRepository {
+  /** Every `shield_consumptions` insert commits with a write that re-stamps its log, so a log a cursor has already passed never turns shielded behind it. */
+  async fetchDeltaSince(since: bigint, limit: number): Promise<DeltaRecord[]> {
+    const accountId = this.requireAccountId();
+    const rows = await this.db
+      .select({ ...getTableColumns(schema.questLogs), shielded: sql<boolean>`${schema.shieldConsumptions.id} IS NOT NULL` })
+      .from(schema.questLogs)
+      .leftJoin(
+        schema.shieldConsumptions,
+        and(
+          eq(schema.shieldConsumptions.accountId, schema.questLogs.accountId),
+          eq(schema.shieldConsumptions.questId, schema.questLogs.questId),
+          eq(schema.shieldConsumptions.date, schema.questLogs.date),
+        ),
+      )
+      .where(and(eq(schema.questLogs.accountId, accountId), gt(schema.questLogs.syncSeq, since)))
+      .orderBy(asc(schema.questLogs.syncSeq))
+      .limit(limit);
+    return rows.map(row => ({ syncSeq: row.syncSeq, row: serializeDeltaRow(row) }));
+  }
+
   async findByOccurrence(questId: bigint, date: string): Promise<QuestLog.Row | null> {
     const rows = (await this.scoped(schema.questLogs, eq(schema.questLogs.questId, questId), eq(schema.questLogs.date, date))) as QuestLog.Row[];
     return rows[0] ?? null;

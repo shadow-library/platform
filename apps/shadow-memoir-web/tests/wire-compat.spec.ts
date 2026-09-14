@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { homeAmountOf } from '@/lib/data';
-import { projectFinanceRows, projectWorldState, type SyncCommand, toWireCommand, type WireCommand } from '@/lib/sync';
+import { type DeltaPage, projectFinanceRows, projectWorldState, SNAPSHOT_DOMAINS, SYNC_DOMAINS, type SyncCommand, toWireCommand, type WireCommand } from '@/lib/sync';
 
 import fixtures from './fixtures/wire-commands.json';
+import { createTestEngine, sharedBacking } from './sync-harness';
 
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -75,5 +76,70 @@ describe('projection (UI-004, UI-005)', () => {
 
     expect(expenses).toHaveLength(1);
     expect(homeAmountOf(expenses[0]!, 'EUR')).toBe(6415);
+  });
+});
+
+describe('progression contract (P1-17)', () => {
+  const ACCOUNT = {
+    level: 5,
+    totalXp: '1703',
+    xpIntoLevel: 0,
+    xpForNextLevel: 1118,
+    hpToday: 4,
+    hpMax: 5,
+    coins: 12,
+    warmthState: 'warm',
+    displayedTitleId: 'quiet_climber',
+    shieldsAvailable: 3,
+    shieldCap: 6,
+    crown: { label: 'this week', cadence: 'weekly', periodStart: '2026-08-24', closesOn: '2026-08-30', dayIndex: 1, dayCount: 7, keptPercent: 100 },
+    persona: 'returner',
+    comeback: null,
+  };
+
+  function page(cursor: string, domains: DeltaPage['domains']): DeltaPage {
+    return { cursor, hasMore: false, domains, tombstones: [] };
+  }
+
+  it('should accept the progression fields and domains', async () => {
+    expect(SYNC_DOMAINS).toEqual(expect.arrayContaining(['hero_events', 'progress_counters']));
+    expect(SNAPSHOT_DOMAINS).toContain('progress_counters');
+    expect(SNAPSHOT_DOMAINS).not.toContain('hero_events');
+
+    const backing = sharedBacking();
+    const first = createTestEngine({
+      backing,
+      pages: [
+        page('10', {
+          account: [ACCOUNT],
+          quest_logs: [{ id: '71', questId: '7', date: '2026-08-23', state: 'missed', shielded: true }],
+          hero_events: [
+            { id: '1', type: 'crown_init', date: '2026-08-24', xpDelta: 0, syncSeq: '9' },
+            { id: '2', type: 'quest_complete', date: '2026-08-24', xpDelta: 12, syncSeq: '10' },
+          ],
+          progress_counters: [{ questsCompleted: 4, crownsBanked: 1 }],
+        }),
+      ],
+    });
+    await first.engine.start();
+
+    const second = createTestEngine({
+      backing,
+      pages: [
+        page('11', {
+          hero_events: [{ id: '3', type: 'level_up', date: '2026-08-24', levelAfter: 6, syncSeq: '11' }],
+          progress_counters: [{ questsCompleted: 5, crownsBanked: 1 }],
+        }),
+      ],
+    });
+    await second.engine.start();
+
+    expect((await second.store.readDomain('hero_events')).map(row => row['id']).sort()).toEqual(['1', '2', '3']);
+    expect(await second.store.readDomain('progress_counters')).toEqual([{ questsCompleted: 5, crownsBanked: 1 }]);
+    expect((await second.store.readDomain('quest_logs'))[0]).toMatchObject({ shielded: true });
+
+    const rows = second.engine.domains();
+    expect(rows.account?.[0]).toMatchObject({ persona: 'returner', shieldsAvailable: 3, crown: { dayCount: 7 } });
+    expect(() => projectWorldState(rows, '2026-08-24')).not.toThrow();
   });
 });

@@ -8,6 +8,7 @@ import { AppError, ValidationError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { AccountContext, AccountRepository } from '@modules/auth';
+import { type HeroStanding, HeroStandingService } from '@modules/progression';
 import { type DeltaRow, DeltaSourceRegistry, type SnapshotDeltaSource } from '@modules/sync';
 import { AppErrorCode } from '@server/classes';
 import { type Account, schema } from '@server/database';
@@ -55,7 +56,7 @@ function assertNoImmutableFields(body: AccountPatchDto): void {
   if (field) throw AppErrorCode.ACC_004.create({ field });
 }
 
-function toDeltaRow(account: Account.Row): DeltaRow {
+function toDeltaRow(account: Account.Row, standing: HeroStanding): DeltaRow {
   return {
     email: account.email,
     displayName: account.displayName,
@@ -74,6 +75,8 @@ function toDeltaRow(account: Account.Row): DeltaRow {
     returnerThresholdDays: account.returnerThresholdDays,
     level: account.level,
     totalXp: String(account.totalXp),
+    xpIntoLevel: standing.xpIntoLevel,
+    xpForNextLevel: standing.xpForNextLevel,
     coins: account.coins,
     statDiscipline: account.statDiscipline,
     statBody: account.statBody,
@@ -89,6 +92,11 @@ function toDeltaRow(account: Account.Row): DeltaRow {
     crownPeriodStart: account.crownPeriodStart,
     crownRemaining: account.crownRemaining,
     crownCoinsRemaining: account.crownCoinsRemaining,
+    crown: standing.crown,
+    shieldsAvailable: standing.shieldsAvailable,
+    shieldCap: standing.shieldCap,
+    persona: standing.persona,
+    comeback: standing.comeback,
     displayedTitleId: account.displayedTitleId,
     featureFlags: account.featureFlags,
     notificationPrefs: withDefaultNotificationPrefs(account.notificationPrefs),
@@ -110,6 +118,7 @@ export class AccountService implements OnModuleInit {
     private readonly accountContext: AccountContext,
     private readonly accountRepository: AccountRepository,
     private readonly registry: DeltaSourceRegistry,
+    private readonly heroStanding: HeroStandingService,
   ) {}
 
   /** Moved from `SyncDeltaSources` (T-16's note): the account snapshot domain is this module's own concern now, mirroring `DeviceService`'s self-registration. */
@@ -122,7 +131,8 @@ export class AccountService implements OnModuleInit {
     const accountId = this.accountContext.getAccountId();
     if (accountId === null) return [];
     const account = await this.accountRepository.findById(accountId);
-    return account ? [toDeltaRow(account)] : [];
+    if (!account) return [];
+    return [toDeltaRow(account, await this.heroStanding.forAccount(account))];
   }
 
   async get(): Promise<AccountView> {

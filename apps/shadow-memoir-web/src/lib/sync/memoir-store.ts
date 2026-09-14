@@ -47,6 +47,8 @@ const DOMAIN_KEYS: Record<SyncDomain, (row: DeltaRow) => string> = {
   achievements_earned: row => String(row['achievementId']),
   titles_earned: row => String(row['titleId']),
   cosmetic_unlocks: row => String(row['cosmeticId']),
+  progress_counters: () => 'self',
+  hero_events: row => String(row['id']),
   entitlement: () => 'self',
   ai_tasks: row => String(row['id']),
   ai_results: row => String(row['id']),

@@ -23,6 +23,8 @@ export type SyncDomain =
   | 'achievements_earned'
   | 'titles_earned'
   | 'cosmetic_unlocks'
+  | 'progress_counters'
+  | 'hero_events'
   | 'entitlement'
   | 'ai_tasks'
   | 'ai_results'
@@ -50,12 +52,47 @@ export const SYNC_DOMAINS: SyncDomain[] = [
   'achievements_earned',
   'titles_earned',
   'cosmetic_unlocks',
+  'progress_counters',
+  'hero_events',
   'entitlement',
   'ai_tasks',
   'ai_results',
   'ai_scheduled_queries',
   'ai_consents',
 ];
+
+/** Domains a server released before them refuses; one that refuses without naming the domain loses all of these for the session. */
+export const NEWER_DOMAINS: SyncDomain[] = ['progress_counters', 'hero_events'];
+
+/**
+ * The keyset domains a mirror pulled before coverage was recorded already holds, at row version 1. Every later
+ * domain, and every version bump below, is backfilled from zero on its own rather than trusted to a cursor that
+ * may already have passed its rows.
+ */
+export const PRE_COVERAGE_KEYSET_DOMAINS: SyncDomain[] = [
+  'quests',
+  'quest_logs',
+  'daily_states',
+  'quest_streaks',
+  'expenses',
+  'subscriptions',
+  'journal_entries',
+  'meals',
+  'weights',
+  'side_quests',
+  'metric_entries',
+  'ai_tasks',
+  'ai_results',
+  'ai_scheduled_queries',
+  'ai_consents',
+];
+
+/** Bumped when the server adds a field to a keyset domain's rows, so rows mirrored before it are pulled again. */
+export const KEYSET_ROW_VERSIONS: Partial<Record<SyncDomain, number>> = { quest_logs: 2 };
+
+export function coverageKey(domain: SyncDomain): string {
+  return `${domain}@${KEYSET_ROW_VERSIONS[domain] ?? 1}`;
+}
 
 /** Domains the server answers with the authoritative full set rather than a watermark — the local set is replaced, never merged. */
 export const SNAPSHOT_DOMAINS: SyncDomain[] = [
@@ -68,6 +105,7 @@ export const SNAPSHOT_DOMAINS: SyncDomain[] = [
   'achievements_earned',
   'titles_earned',
   'cosmetic_unlocks',
+  'progress_counters',
   'entitlement',
 ];
 
@@ -165,4 +203,6 @@ export const SYNC_META_KEYS = {
   deletionFlow: 'deletion-flow',
   weeklyReview: 'weekly-review',
   deadLetters: 'dead-letters',
+  coveredDomains: 'covered-domains',
+  backfillCursor: 'backfill-cursor',
 } as const;

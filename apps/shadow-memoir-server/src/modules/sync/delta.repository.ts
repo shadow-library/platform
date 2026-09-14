@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { asc, gt } from 'drizzle-orm';
+import { asc, gt, inArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
 /**
@@ -23,7 +23,7 @@ export type SyncableTable = OwnedTable & SyncSeqTable;
  */
 
 /** Values Postgres hands back that JSON cannot carry; every delta row passes through here before it reaches the wire. */
-function toDeltaRow(row: Record<string, unknown>): DeltaRow {
+export function serializeDeltaRow(row: Record<string, unknown>): DeltaRow {
   const serialized: DeltaRow = {};
   for (const [key, value] of Object.entries(row)) {
     if (typeof value === 'bigint') serialized[key] = String(value);
@@ -42,11 +42,14 @@ function toDeltaRow(row: Record<string, unknown>): DeltaRow {
 export class DeltaRepository extends OwnerScopedRepository {
   async fetchSince(table: SyncableTable, since: bigint, limit: number): Promise<DeltaRecord[]> {
     const rows = await this.scoped(table, gt(table.syncSeq, since)).orderBy(asc(table.syncSeq)).limit(limit);
-    return (rows as Record<string, unknown>[]).map(row => ({ syncSeq: row['syncSeq'] as bigint, row: toDeltaRow(row) }));
+    return (rows as Record<string, unknown>[]).map(row => ({ syncSeq: row['syncSeq'] as bigint, row: serializeDeltaRow(row) }));
   }
 
-  async tombstonesSince(since: bigint, limit: number): Promise<DeltaTombstone[]> {
-    const rows = await this.scoped(schema.deletedRecords, gt(schema.deletedRecords.syncSeq, since)).orderBy(asc(schema.deletedRecords.syncSeq)).limit(limit);
+  /** `domains` narrows the stream to a pull that named its domains, so another domain's deletes can neither reach it nor hold its `hasMore` open. */
+  async tombstonesSince(since: bigint, limit: number, domains?: string[]): Promise<DeltaTombstone[]> {
+    if (domains?.length === 0) return [];
+    const inDomains = domains ? inArray(schema.deletedRecords.tableName, domains) : undefined;
+    const rows = await this.scoped(schema.deletedRecords, gt(schema.deletedRecords.syncSeq, since), inDomains).orderBy(asc(schema.deletedRecords.syncSeq)).limit(limit);
     return (rows as (typeof schema.deletedRecords.$inferSelect)[]).map(row => ({ domain: row.tableName, recordId: row.recordId, syncSeq: row.syncSeq }));
   }
 }

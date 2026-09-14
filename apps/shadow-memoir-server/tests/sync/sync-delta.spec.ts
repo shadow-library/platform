@@ -189,6 +189,8 @@ describe('GET /api/v1/sync/delta and the device registry (T-16)', () => {
         'cosmetic_unlocks',
         'daily_states',
         'devices',
+        'hero_events',
+        'progress_counters',
         'quest_logs',
         'quest_streaks',
         'quests',
@@ -210,10 +212,9 @@ describe('GET /api/v1/sync/delta and the device registry (T-16)', () => {
       expect(Object.keys(body.domains).sort()).toEqual(['devices', 'quests']);
     });
 
-    it('should reject an unregistered domain with 400', async () => {
-      const response = await pullDelta({ since: '0', domains: 'expenses' });
-      expect(response.statusCode).toBe(400);
-      expect(response.json()).toMatchObject({ code: 'SYN_001' });
+    it('should omit unregistered domains', async () => {
+      const body = await delta({ since: '0', domains: 'quests,a_domain_from_a_newer_web' });
+      expect(Object.keys(body.domains)).toEqual(['quests']);
     });
   });
 
@@ -351,6 +352,19 @@ describe('GET /api/v1/sync/delta and the device registry (T-16)', () => {
       const body = await delta({ since: drained.cursor });
       expect(body.tombstones).toContainEqual(expect.objectContaining({ domain: 'devices', recordId: deviceId }));
       expect(body.domains['devices']!.map(row => row['id'])).not.toContain(deviceId);
+    });
+
+    it('should deliver only the tombstones of the requested domains', async () => {
+      const deviceId = crypto.randomUUID();
+      await putDevice(deviceId);
+      const drained = await delta();
+      await deleteDevice(deviceId);
+
+      const unrelated = await delta({ since: drained.cursor, domains: 'quests,quest_logs' });
+      expect(unrelated.tombstones.map(tombstone => tombstone.recordId)).not.toContain(deviceId);
+
+      const related = await delta({ since: drained.cursor, domains: 'devices' });
+      expect(related.tombstones).toContainEqual(expect.objectContaining({ domain: 'devices', recordId: deviceId }));
     });
 
     it('should answer 404 for a device that does not exist', async () => {

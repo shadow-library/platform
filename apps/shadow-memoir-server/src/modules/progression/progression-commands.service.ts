@@ -10,12 +10,13 @@ import { ValidationError } from '@shadow-library/common';
  */
 import { AccountContext } from '@modules/auth';
 import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
-import { type DeltaRow, DeltaSourceRegistry, type SnapshotDeltaSource } from '@modules/sync';
+import { DeltaRepository, DeltaSourceRegistry, serializeDeltaRow, type SnapshotDeltaSource } from '@modules/sync';
 import { AppErrorCode } from '@server/classes';
 import { schema } from '@server/database';
 
 import { findCosmetic } from './cosmetic.catalogue';
 import { GrantsRepository } from './grants.repository';
+import { ProgressCountersRepository } from './progress-counters.repository';
 
 /**
  * Defining types
@@ -35,16 +36,6 @@ function requireCosmeticId(payload: Record<string, unknown>): string {
   return value;
 }
 
-function toDeltaRow(row: Record<string, unknown>): DeltaRow {
-  const serialized: DeltaRow = {};
-  for (const [key, value] of Object.entries(row)) {
-    if (typeof value === 'bigint') serialized[key] = String(value);
-    else if (value instanceof Date) serialized[key] = value.toISOString();
-    else serialized[key] = value;
-  }
-  return serialized;
-}
-
 /**
  * Registers the `title.display` / `cosmetic.purchase` / `cosmetic.equip` command handlers (T-21, command
  * names aligned with `apps/shadow-memoir-web/src/lib/data/hero.types.ts -> HeroCommand`) and the
@@ -52,6 +43,8 @@ function toDeltaRow(row: Record<string, unknown>): DeltaRow {
  * keyset (ARCHITECTURE §12.3): none of the three tables carries `sync_seq`, and each account's set is
  * bounded by the fixed catalogue sizes (17/17/9), so the authoritative full read is cheaper than a
  * watermark column three append-only, grant-frozen tables would otherwise need only for this.
+ * `progress_counters` is one row per account and snapshots too; `hero_events` grows without bound, so it
+ * alone is keyset-paged on its own `sync_seq`.
  */
 @Injectable()
 export class ProgressionCommandsService implements OnModuleInit {
@@ -59,8 +52,10 @@ export class ProgressionCommandsService implements OnModuleInit {
     private readonly commandBus: CommandBus,
     private readonly heroLedger: HeroLedger,
     private readonly grants: GrantsRepository,
+    private readonly counters: ProgressCountersRepository,
     private readonly accountContext: AccountContext,
     private readonly deltaRegistry: DeltaSourceRegistry,
+    private readonly deltaRepository: DeltaRepository,
   ) {}
 
   onModuleInit(): void {
@@ -71,6 +66,8 @@ export class ProgressionCommandsService implements OnModuleInit {
     this.deltaRegistry.register(this.snapshotSource('achievements_earned', accountId => this.grants.snapshotAchievements(accountId)));
     this.deltaRegistry.register(this.snapshotSource('titles_earned', accountId => this.grants.snapshotTitles(accountId)));
     this.deltaRegistry.register(this.snapshotSource('cosmetic_unlocks', accountId => this.grants.snapshotCosmetics(accountId)));
+    this.deltaRegistry.register(this.snapshotSource('progress_counters', accountId => this.counters.read(accountId).then(envelope => [{ ...envelope.counters }])));
+    this.deltaRegistry.register({ domain: 'hero_events', kind: 'keyset', fetch: ({ since, limit }) => this.deltaRepository.fetchSince(schema.heroEvents, since, limit) });
   }
 
   private snapshotSource(domain: string, fetch: (accountId: bigint) => Promise<Record<string, unknown>[]>): SnapshotDeltaSource {
@@ -81,7 +78,7 @@ export class ProgressionCommandsService implements OnModuleInit {
         const accountId = this.accountContext.getAccountId();
         if (accountId === null) return [];
         const rows = await fetch(accountId);
-        return rows.map(toDeltaRow);
+        return rows.map(serializeDeltaRow);
       },
     };
   }

@@ -37,7 +37,7 @@ import {
   type TimingBand,
   zonedFieldsAt,
 } from '@modules/rules';
-import { RolloverRepository } from '@modules/rollover';
+import { RolloverRepository, RolloverService } from '@modules/rollover';
 import { DeltaRepository, DeltaSourceRegistry, type KeysetDeltaSource } from '@modules/sync';
 import { AppErrorCode } from '@server/classes';
 import { type DailyState, type DatabaseTransaction, type HeroEvent, type Quest, type QuestLog, schema } from '@server/database';
@@ -108,6 +108,7 @@ export class QuestCommandsService implements OnModuleInit {
     private readonly questLogRepository: QuestLogRepository,
     private readonly questStreakRepository: QuestStreakRepository,
     private readonly rolloverRepository: RolloverRepository,
+    private readonly rolloverService: RolloverService,
     private readonly deltaRegistry: DeltaSourceRegistry,
     private readonly deltaRepository: DeltaRepository,
   ) {}
@@ -126,7 +127,7 @@ export class QuestCommandsService implements OnModuleInit {
     this.commandBus.registerHandler('quest.deleteLog', ctx => this.deleteQuestLog(ctx));
 
     this.deltaRegistry.register(this.keysetSource('quests', schema.quests));
-    this.deltaRegistry.register(this.keysetSource('quest_logs', schema.questLogs));
+    this.deltaRegistry.register({ domain: 'quest_logs', kind: 'keyset', fetch: ({ since, limit }) => this.questLogRepository.fetchDeltaSince(since, limit) });
     this.deltaRegistry.register(this.keysetSource('quest_streaks', schema.questStreaks));
   }
 
@@ -321,6 +322,7 @@ export class QuestCommandsService implements OnModuleInit {
       () => this.questStreakRepository.insertShieldConsumption(ctx.tx, occurrence.quest.id, occurrence.ref.date),
     );
     if (reasonTag !== null || reasonNote !== null) await this.progressionService.onReasonTagged(ctx.tx, ctx.accountId, occurrence.ref.date);
+    await this.rolloverService.resettleOpenDayCrown(ctx.tx, ctx.accountId, occurrence.ref.date);
 
     if (state === 'postponed' && this.isLockActive(dailyState, occurrence.quest.id)) {
       await this.rolloverRepository.updateDailyStateIfOpen(ctx.tx, ctx.accountId, occurrence.ref.date, { lockBrokenAt: new Date() });
@@ -445,6 +447,7 @@ export class QuestCommandsService implements OnModuleInit {
     if (!log) throw AppErrorCode.QST_007.create();
     const removed = await this.questLogRepository.remove(ctx.tx, log.id);
     if (!removed) throw AppErrorCode.QST_007.create();
+    await this.rolloverService.resettleOpenDayCrown(ctx.tx, ctx.accountId, log.date);
     return { status: 'applied', result: { logId: String(log.id), deleted: true } };
   }
 

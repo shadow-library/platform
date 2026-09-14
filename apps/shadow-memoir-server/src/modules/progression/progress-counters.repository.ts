@@ -49,8 +49,13 @@ const EMPTY_ENVELOPE: CountersEnvelope = { counters: EMPTY_INCREMENTAL_COUNTERS,
 function normalize(raw: unknown): CountersEnvelope {
   if (raw === null || typeof raw !== 'object') return EMPTY_ENVELOPE;
   const value = raw as Partial<CountersEnvelope>;
+  const counters = (value.counters ?? {}) as Partial<IncrementalCounters>;
   return {
-    counters: { ...EMPTY_INCREMENTAL_COUNTERS, ...(value.counters as Partial<IncrementalCounters> | undefined) },
+    counters: {
+      ...EMPTY_INCREMENTAL_COUNTERS,
+      ...counters,
+      completionsByStrictness: { ...EMPTY_INCREMENTAL_COUNTERS.completionsByStrictness, ...counters.completionsByStrictness },
+    },
     lastActiveCountedDate: value.lastActiveCountedDate ?? null,
     returnerPending: value.returnerPending ?? false,
   };
@@ -61,10 +66,10 @@ function normalize(raw: unknown): CountersEnvelope {
  */
 
 /**
- * One row per account (ARCHITECTURE §26's incremental Title/Achievement projection). Every read/write
- * here takes the caller's own transaction and `accountId` explicitly — the same shape as `HeroLedger`
- * — because every call site is already inside a command's per-account-serialized transaction, so there
- * is no independent race to guard against beyond what that serialization already provides.
+ * One row per account (ARCHITECTURE §26's incremental Title/Achievement projection). Every call takes
+ * `accountId` explicitly, like `HeroLedger`. Writes and `readForUpdate` also take the caller's command
+ * transaction, whose per-account serialization is the only race guard they need; `read` is the lock-free
+ * snapshot the `progress_counters` delta domain serves.
  */
 @Injectable()
 export class ProgressCountersRepository {
@@ -77,6 +82,11 @@ export class ProgressCountersRepository {
   /** The one call site outside a command transaction (OCR scanning, ARCHITECTURE §14.3) that still needs to write through this projection. */
   transaction<T>(operation: (tx: DatabaseTransaction) => Promise<T>): Promise<T> {
     return this.db.transaction(operation);
+  }
+
+  async read(accountId: bigint): Promise<CountersEnvelope> {
+    const [row] = await this.db.select().from(schema.progressCounters).where(eq(schema.progressCounters.accountId, accountId));
+    return normalize(row?.counters);
   }
 
   async readForUpdate(tx: DatabaseTransaction, accountId: bigint): Promise<CountersEnvelope> {

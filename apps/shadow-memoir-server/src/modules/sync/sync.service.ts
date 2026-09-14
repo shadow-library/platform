@@ -131,7 +131,7 @@ export class SyncService {
       if (records.length >= limit) truncatedAt.push(last.syncSeq);
     }
 
-    const tombstones = await this.deltaRepository.tombstonesSince(request.since, limit);
+    const tombstones = await this.deltaRepository.tombstonesSince(request.since, limit, request.domains?.length ? sources.map(source => source.domain) : undefined);
     const lastTombstone = tombstones.at(-1);
     if (lastTombstone) {
       if (lastTombstone.syncSeq > observedMax) observedMax = lastTombstone.syncSeq;

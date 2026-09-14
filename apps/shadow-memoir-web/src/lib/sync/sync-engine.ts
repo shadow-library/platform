@@ -4,16 +4,22 @@ import { isServerBacked } from './command-wire';
 import { AccountBoundaryError, ignoreAccountBoundary, type MemoirStore, type StoreBoundary } from './memoir-store';
 import { type DomainRows, projectWorldState } from './projection';
 import { type AckedCommand, Outbox } from './outbox';
-import { SyncClient, toSyncFailureReason } from './sync-client';
+import { SyncClient, SyncTransportError, toSyncFailureReason } from './sync-client';
 import {
   type CommandEnvelope,
+  coverageKey,
   type DeltaPage,
+  type DeltaResponse,
+  KEYSET_ROW_VERSIONS,
   type NetState,
+  NEWER_DOMAINS,
   type OutboxEntry,
+  PRE_COVERAGE_KEYSET_DOMAINS,
   SNAPSHOT_DOMAINS,
   SYNC_DOMAINS,
   SYNC_META_KEYS,
   type SyncCommand,
+  type SyncDomain,
   type SyncFailureReason,
   type SyncNotice,
   type SyncReadiness,
@@ -51,6 +57,12 @@ const DEFAULT_MAX_PAGES = 50;
 const DEFAULT_OUTCOME_TIMEOUT_MS = 8_000;
 const MAX_PULL_ROUNDS = 20;
 
+const UNKNOWN_DOMAIN_CODE = 'SYN_001';
+/** A refused domain is asked for again after this many passes, so a server upgraded under an open tab is noticed without a reload. */
+const REFUSAL_RETRY_PASSES = 20;
+/** The refusal of a server released before a domain existed; it names only the first domain it did not know. */
+const UNKNOWN_DOMAIN_MESSAGE = /Unknown sync domain '([a-z_]+)'/;
+
 const LOADING: SyncReadiness = { kind: 'loading' };
 const READY: SyncReadiness = { kind: 'ready' };
 const DELETION_PENDING: SyncReadiness = { kind: 'failed', reason: 'deletion-pending' };
@@ -59,6 +71,23 @@ const DELETION_PENDING: SyncReadiness = { kind: 'failed', reason: 'deletion-pend
 const UNSENDABLE: Record<SyncFailureReason, UnconfirmedReason | null> = { server: null, offline: 'offline', 'deletion-pending': 'deletion', 'signed-out': 'held' };
 
 const FAILURE_STATES: Record<SyncFailureReason, NetState> = { server: 'failed', offline: 'offline', 'deletion-pending': 'failed', 'signed-out': 'signed-out' };
+
+interface BackfillCursor {
+  domains: SyncDomain[];
+  since: string;
+}
+
+function isKeyset(domain: SyncDomain): boolean {
+  return !SNAPSHOT_DOMAINS.includes(domain);
+}
+
+function isVersionBumped(domain: SyncDomain): boolean {
+  return KEYSET_ROW_VERSIONS[domain] !== undefined;
+}
+
+function sameDomains(left: SyncDomain[], right: SyncDomain[]): boolean {
+  return left.length === right.length && left.every((domain, index) => domain === right[index]);
+}
 
 function isOnline(): boolean {
   return typeof navigator === 'undefined' || navigator.onLine !== false;
@@ -103,6 +132,10 @@ export class SyncEngine {
   private inFlight: Promise<void> | null = null;
   private passRequested = false;
   private readonly claims = new Map<string, OutcomeClaim>();
+  /** Domains the server refused this session; they are neither requested again nor ever recorded as covered. */
+  private readonly unserved = new Set<SyncDomain>();
+  private passesSinceRefusal = 0;
+  private drain = { fromZero: false, served: new Set<SyncDomain>() };
 
   constructor(private readonly options: SyncEngineOptions) {
     this.store = options.store;
@@ -299,12 +332,13 @@ export class SyncEngine {
 
     this.coldFailure = null;
     this.patch({ state: 'syncing', readiness: this.readiness() });
+    this.retryRefusedDomains();
     try {
       await this.confirmPrincipal();
       await this.store.sweepForeign();
       await this.ensureDeviceRegistered();
       const interrupted = await this.flush();
-      const complete = await this.pullUntilStalled();
+      const complete = (await this.pullUntilStalled()) && (await this.backfill());
       const lastSyncedAt = new Date().toISOString();
       await this.recordPull(complete, lastSyncedAt);
       await this.store.writeMeta(SYNC_META_KEYS.lastSyncedAt, lastSyncedAt);
@@ -413,9 +447,13 @@ export class SyncEngine {
 
   /** Keeps draining past the page budget for as long as the cursor moves; the budget only stops a server that makes no progress. */
   private async pullUntilStalled(): Promise<boolean> {
+    this.drain = { fromZero: false, served: new Set() };
     for (let round = 0; round < MAX_PULL_ROUNDS; round += 1) {
       const before = await this.store.readMeta<string>(SYNC_META_KEYS.cursor);
-      if (await this.pull()) return true;
+      if (await this.pull()) {
+        if (this.drain.fromZero) await this.markCovered([...this.drain.served], new Set());
+        return true;
+      }
       if ((await this.store.readMeta<string>(SYNC_META_KEYS.cursor)) === before) return false;
     }
     return false;
@@ -424,12 +462,14 @@ export class SyncEngine {
   private async pull(): Promise<boolean> {
     for (let page = 0; page < this.maxPages; page += 1) {
       const since = (await this.store.readMeta<string>(SYNC_META_KEYS.cursor)) ?? '0';
-      const response = await this.client.pullDelta({ since, domains: SYNC_DOMAINS });
+      if (since === '0') this.drain.fromZero = true;
+      const response = await this.pullPage(since, this.requestedDomains());
       // Checked after the response: a cookie that changed hands mid-drain has already answered this page as the other account.
       await this.confirmPrincipal();
       const reset = await this.reconcileEpoch(response.epoch);
       if (reset) continue;
 
+      for (const domain of this.requestedDomains()) if (response.page.domains[domain]) this.drain.served.add(domain);
       await this.ingest(response.page);
       await this.store.writeMeta(SYNC_META_KEYS.cursor, response.page.cursor);
       if (!response.page.hasMore) return true;
@@ -437,15 +477,120 @@ export class SyncEngine {
     return false;
   }
 
-  private async ingest(page: DeltaPage): Promise<void> {
-    for (const domain of SYNC_DOMAINS) {
+  /**
+   * The cursor is one number for every domain, so a keyset domain the mirror has never pulled from zero — new to
+   * this release, or re-versioned — has rows the cursor already passed. Those are drawn down on their own from
+   * zero, leaving the main cursor where it is, and resuming from a saved cursor when a pass stops part way.
+   */
+  private async backfill(): Promise<boolean> {
+    const covered = await this.readCovered();
+    const pending = [...this.drain.served].filter(domain => this.recordable(domain) && !covered.has(coverageKey(domain))).sort();
+    if (pending.length === 0) return true;
+
+    const saved = await this.store.readMeta<BackfillCursor>(SYNC_META_KEYS.backfillCursor);
+    let since = saved && sameDomains(saved.domains, pending) ? saved.since : '0';
+    const answered = new Set<SyncDomain>();
+    for (let page = 0; page < this.maxPages; page += 1) {
+      const response = await this.pullPage(since, pending);
+      await this.confirmPrincipal();
+      if (await this.reconcileEpoch(response.epoch)) return this.pullUntilStalled();
+      if (pending.some(domain => this.unserved.has(domain))) return this.backfill();
+
+      for (const domain of pending) if (response.page.domains[domain]) answered.add(domain);
+      await this.ingest(response.page, pending);
+      since = response.page.cursor;
+      if (!response.page.hasMore) {
+        await this.store.writeMeta(SYNC_META_KEYS.backfillCursor, null);
+        await this.markCovered([...answered], await this.readCovered());
+        return true;
+      }
+      await this.store.writeMeta(SYNC_META_KEYS.backfillCursor, { domains: pending, since } satisfies BackfillCursor);
+    }
+    return false;
+  }
+
+  private requestedDomains(): SyncDomain[] {
+    return SYNC_DOMAINS.filter(domain => !this.unserved.has(domain));
+  }
+
+  /**
+   * Only a served domain can be covered, and a re-versioned row shape is taken as served only while every domain
+   * that shipped with it is — a server refusing those is older than the shape, and its rows lack the new fields.
+   */
+  private recordable(domain: SyncDomain): boolean {
+    if (!isKeyset(domain) || this.unserved.has(domain)) return false;
+    return !isVersionBumped(domain) || !NEWER_DOMAINS.some(newer => this.unserved.has(newer));
+  }
+
+  private retryRefusedDomains(): void {
+    if (this.unserved.size === 0) return;
+    this.passesSinceRefusal += 1;
+    if (this.passesSinceRefusal < REFUSAL_RETRY_PASSES) return;
+    this.unserved.clear();
+    this.passesSinceRefusal = 0;
+  }
+
+  /** A server older than this release refuses a domain it does not know; the domain is dropped for the session and the page asked again. */
+  private async pullPage(since: string, domains: SyncDomain[]): Promise<DeltaResponse> {
+    for (;;) {
+      const requested = domains.filter(domain => !this.unserved.has(domain));
+      try {
+        return await this.client.pullDelta({ since, domains: requested });
+      } catch (error) {
+        if (!(error instanceof SyncTransportError) || error.code !== UNKNOWN_DOMAIN_CODE) throw error;
+        const named = UNKNOWN_DOMAIN_MESSAGE.exec(error.message)?.[1];
+        const refused = requested.filter(domain => (named ? domain === named : NEWER_DOMAINS.includes(domain)));
+        if (refused.length === 0) throw error;
+        for (const domain of refused) this.unserved.add(domain);
+        this.passesSinceRefusal = 0;
+        this.drain.served = new Set([...this.drain.served].filter(domain => !this.unserved.has(domain)));
+        await this.forgetNewerCoverage();
+      }
+    }
+  }
+
+  /**
+   * A refusal proves the server is older than this release — possibly a rollback that has since re-served rows
+   * without the new fields, or written events below the cursor — so whatever this release added has to be
+   * pulled again from zero once the server serves it.
+   */
+  private async forgetNewerCoverage(): Promise<void> {
+    const covered = await this.readCovered();
+    for (const key of [...covered]) {
+      const domain = key.slice(0, key.indexOf('@')) as SyncDomain;
+      if (NEWER_DOMAINS.includes(domain) || isVersionBumped(domain)) covered.delete(key);
+    }
+    await this.store.writeMeta(SYNC_META_KEYS.coveredDomains, [...covered].sort());
+    await this.store.writeMeta(SYNC_META_KEYS.backfillCursor, null);
+  }
+
+  /** A mirror that predates the record still holds every keyset domain it pulled back then; an empty mirror holds none. */
+  private async readCovered(): Promise<Set<string>> {
+    const stored = await this.store.readMeta<string[]>(SYNC_META_KEYS.coveredDomains);
+    if (stored) return new Set(stored);
+    const cursor = (await this.store.readMeta<string>(SYNC_META_KEYS.cursor)) ?? '0';
+    return new Set(cursor === '0' ? [] : PRE_COVERAGE_KEYSET_DOMAINS.map(domain => `${domain}@1`));
+  }
+
+  private async markCovered(domains: SyncDomain[], covered: Set<string>): Promise<void> {
+    for (const domain of domains) {
+      if (!this.recordable(domain)) continue;
+      for (const key of covered) if (key.startsWith(`${domain}@`)) covered.delete(key);
+      covered.add(coverageKey(domain));
+    }
+    await this.store.writeMeta(SYNC_META_KEYS.coveredDomains, [...covered].sort());
+  }
+
+  /** A server that does not filter tombstones by domain sends a backfill page every domain's deletes since zero; another domain's old delete could remove a row since re-created under the same key. */
+  private async ingest(page: DeltaPage, only?: SyncDomain[]): Promise<void> {
+    for (const domain of only ?? SYNC_DOMAINS) {
       const rows = page.domains[domain];
       if (!rows) continue;
       if (SNAPSHOT_DOMAINS.includes(domain)) await this.store.replaceRows(domain, rows);
       else await this.store.upsertRows(domain, rows);
     }
 
-    for (const tombstone of page.tombstones) await this.store.deleteRow(tombstone.domain, tombstone.recordId);
+    for (const tombstone of page.tombstones) if (!only || only.some(domain => domain === tombstone.domain)) await this.store.deleteRow(tombstone.domain, tombstone.recordId);
     await this.hydrateRows();
   }
 
@@ -477,6 +622,10 @@ export class SyncEngine {
     this.mirrorReady = false;
     this.patch({ readiness: this.readiness() });
     await this.store.clearMirror();
+    await this.store.writeMeta(SYNC_META_KEYS.coveredDomains, []);
+    await this.store.writeMeta(SYNC_META_KEYS.backfillCursor, null);
+    this.unserved.clear();
+    this.passesSinceRefusal = 0;
     await this.hydrateRows();
     return true;
   }

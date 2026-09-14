@@ -47,13 +47,6 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly DEV_001 = AppErrorCode.notFound('DEV_001', 'Device not found');
 
   /*!
-   * Sync Errors
-   */
-
-  /** The delta request names a domain no module has registered a `DeltaSource` for */
-  static readonly SYN_001 = AppErrorCode.badRequest('SYN_001', "Unknown sync domain '{domain}'");
-
-  /*!
    * Hero Errors
    */
 

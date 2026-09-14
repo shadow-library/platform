@@ -117,6 +117,7 @@ export interface TestEngineOptions extends FakeServerOptions {
   marker?: AccountMarker;
   fetchImpl?: (server: FakeServer) => typeof fetch;
   outcomeTimeoutMs?: number;
+  maxPages?: number;
 }
 
 /** One browser's last-account record, shared by every tab's store the way localStorage is. */
@@ -136,6 +137,7 @@ export function createTestEngine(options: TestEngineOptions = {}): TestEngine {
     principal: options.principal,
     onAccountChanged: options.onAccountChanged,
     outcomeTimeoutMs: options.outcomeTimeoutMs,
+    maxPages: options.maxPages,
   });
   return { engine, store, server };
 }

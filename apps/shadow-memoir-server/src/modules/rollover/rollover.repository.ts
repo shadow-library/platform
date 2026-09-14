@@ -106,6 +106,14 @@ export class RolloverRepository {
       .where(eq(schema.accounts.id, accountId));
   }
 
+  /** The account's Crown mirror describes its current day only, so a re-settle of any other still-open day leaves it alone. */
+  async updateOpenDayCrownMirror(tx: DatabaseTransaction, accountId: bigint, date: string, crownRemaining: number, crownCoinsRemaining: number): Promise<void> {
+    await tx
+      .update(schema.accounts)
+      .set({ crownRemaining, crownCoinsRemaining, updatedAt: new Date() })
+      .where(and(eq(schema.accounts.id, accountId), eq(schema.accounts.lastHpDate, date)));
+  }
+
   async lockDailyState(tx: DatabaseTransaction, accountId: bigint, date: string): Promise<DailyState.Row | null> {
     const [state] = await tx
       .select()

@@ -21,6 +21,7 @@ export class SyncTransportError extends Error {
     readonly kind: SyncFailureKind,
     readonly status: number,
     message: string,
+    readonly code: string | null = null,
   ) {
     super(message);
     this.name = 'SyncTransportError';
@@ -115,7 +116,7 @@ export class SyncClient {
 
     if (!response.ok) {
       const failure = await readFailure(response);
-      throw new SyncTransportError(classify(response.status, failure.code), response.status, failure.message);
+      throw new SyncTransportError(classify(response.status, failure.code), response.status, failure.message, failure.code);
     }
     return response;
   }

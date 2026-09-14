@@ -7,8 +7,6 @@ import { AppError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { AppErrorCode } from '@server/classes';
-
 import { type DeltaSource } from './sync.types';
 
 /**
@@ -38,12 +36,9 @@ export class DeltaSourceRegistry {
     return [...this.sources.keys()];
   }
 
+  /** A domain this server does not know is left out rather than refused, so a web release that names a newer domain keeps syncing against an older server. */
   resolve(domains?: string[]): DeltaSource[] {
     if (!domains?.length) return [...this.sources.values()];
-    return domains.map(domain => {
-      const source = this.sources.get(domain);
-      if (!source) throw AppErrorCode.SYN_001.create({ domain });
-      return source;
-    });
+    return domains.flatMap(domain => this.sources.get(domain) ?? []);
   }
 }

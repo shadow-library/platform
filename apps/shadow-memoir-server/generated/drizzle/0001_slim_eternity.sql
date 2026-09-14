@@ -1,0 +1,2 @@
+ALTER TABLE "hero_events" ADD COLUMN "sync_seq" bigint DEFAULT nextval('sync_seq') NOT NULL;--> statement-breakpoint
+CREATE INDEX "hero_events_account_id_sync_seq_idx" ON "hero_events" USING btree ("account_id","sync_seq");

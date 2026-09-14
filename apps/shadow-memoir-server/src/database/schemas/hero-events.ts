@@ -56,12 +56,16 @@ export const heroEvents = pgTable(
     note: text('note'),
     rulesetVersion: smallint('ruleset_version').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    syncSeq: bigint('sync_seq', { mode: 'bigint' })
+      .notNull()
+      .default(sql`nextval('sync_seq')`),
   },
   t => [
     unique('hero_events_account_id_dedupe_key_unique').on(t.accountId, t.dedupeKey),
     index('hero_events_account_id_date_idx').on(t.accountId, t.date),
     index('hero_events_account_id_created_at_idx').on(t.accountId, t.createdAt),
     index('hero_events_account_id_type_idx').on(t.accountId, t.type),
+    index('hero_events_account_id_sync_seq_idx').on(t.accountId, t.syncSeq),
     check('hero_events_xp_delta_check', sql`${t.xpDelta} >= 0`),
     check('hero_events_coins_delta_check', sql`${t.coinsDelta} >= 0 OR ${t.type} = 'coin_spend'`),
   ],

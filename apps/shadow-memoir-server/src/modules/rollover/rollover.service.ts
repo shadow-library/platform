@@ -398,7 +398,7 @@ export class RolloverService implements OnModuleInit {
     await this.spawnRecovery(tx, promoted, quests, history, returner);
 
     const hp = await this.computeHp(tx, promoted, todayLogs);
-    const crown = this.settleCrownForOpenDay(promoted, scheduled, todayLogs);
+    const crown = this.settleCrownForOpenDay(ruleset, promoted.intensityMode, day, scheduled, todayLogs);
 
     await this.repository.upsertDailyState(tx, {
       accountId: account.id,
@@ -577,10 +577,25 @@ export class RolloverService implements OnModuleInit {
     await this.heroLedger.grant(tx, account.id, [{ dedupeKey: `recovery_spawned_${date}`, type: 'recovery_spawned', date, questId: sourceQuest?.id, questLogId: source.id }]);
   }
 
+  /** A break written into the still-open day forfeits its Crown slice at once, so the open day's remainder never waits for the close to reflect it. */
+  async resettleOpenDayCrown(tx: DatabaseTransaction, accountId: bigint, date: string): Promise<void> {
+    const state = await this.repository.findDailyState(tx, accountId, date);
+    if (!state || state.rolloverAt !== null) return;
+
+    const ruleset = currentRuleset();
+    const day = this.dateOf(date);
+    const quests = await this.repository.listActiveQuests(tx, accountId);
+    const logs = await this.repository.listQuestLogs(tx, accountId, date, date);
+    const crown = this.settleCrownForOpenDay(ruleset, state.intensityMode, day, this.scheduledOn(quests, day), logs);
+
+    const values = { crownXpGranted: crown.grantedXp, crownXpRemaining: crown.remainingXp, crownCoinsGranted: crown.grantedCoins, crownCoinsRemaining: crown.remainingCoins };
+    if (!(await this.repository.updateDailyStateIfOpen(tx, accountId, date, values))) return;
+    await this.repository.updateOpenDayCrownMirror(tx, accountId, date, crown.remainingXp, crown.remainingCoins);
+  }
+
   /** Today's Crown is recomputed, never granted: the endowment audit event and the bank both belong to the day's close, which has not happened yet. */
-  private settleCrownForOpenDay(context: DayContext, scheduled: Quest.Row[], todayLogs: QuestLog.Row[]): CrownDayOutcome {
-    const { ruleset, day } = context;
-    const period = crownPeriodOf(ruleset, crownCadenceFor(ruleset, context.intensityMode), day);
+  private settleCrownForOpenDay(ruleset: Ruleset, intensityMode: IntensityMode, day: LocalDate, scheduled: Quest.Row[], todayLogs: QuestLog.Row[]): CrownDayOutcome {
+    const period = crownPeriodOf(ruleset, crownCadenceFor(ruleset, intensityMode), day);
     const crownDay = recomputeCrownDay(
       ruleset,
       scheduled.map(quest => crownWeightFor(ruleset, quest.strictness)),
