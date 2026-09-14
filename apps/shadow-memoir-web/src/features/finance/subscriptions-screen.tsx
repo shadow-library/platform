@@ -6,13 +6,14 @@ import {
   convertToHomeMinor,
   deriveDueState,
   DUE_STATE_LABELS,
+  type ExpenseCategory,
   formatMinor,
   notifyOutcome,
   rateFromSnapshots,
   type Subscription,
-  SUBSCRIPTION_CATEGORIES,
   type SubscriptionDueState,
   todayISODate,
+  UNCATEGORISED,
   unconvertedSubscriptionsNote,
   useFinanceCommand,
   useSubscriptions,
@@ -43,6 +44,10 @@ function dueLabel(subscription: Subscription, dueState: SubscriptionDueState): s
   if (!subscription.active) return 'Paused — no renewals';
   if (dueState === 'overdue') return `Was due ${formatLocalDate(subscription.nextDueDate)}`;
   return `Renews ${formatLocalDate(subscription.nextDueDate)}`;
+}
+
+function categoryName(subscription: Subscription, categories: ExpenseCategory[]): string {
+  return categories.find(category => category.id === subscription.expenseCategoryId)?.name ?? UNCATEGORISED.name;
 }
 
 export function SubscriptionsScreen(): ReactElement {
@@ -117,7 +122,6 @@ export function SubscriptionsScreen(): ReactElement {
 
                 {view?.items.map(subscription => {
                   const dueState = deriveDueState(subscription, today);
-                  const category = SUBSCRIPTION_CATEGORIES[subscription.categoryId];
                   const equivalentMinor = convertToHomeMinor(
                     subscription.monthlyEquivalentMinor,
                     subscription.currency,
@@ -136,7 +140,7 @@ export function SubscriptionsScreen(): ReactElement {
                       <span className={styles.rowMain}>
                         <span className={styles.rowTitleLine}>
                           <span className={styles.rowName}>{subscription.name}</span>
-                          <Tag size="sm">{category.name}</Tag>
+                          <Tag size="sm">{categoryName(subscription, view?.categories ?? [])}</Tag>
                           {dueState !== 'none' && (
                             <Badge variant="soft" size="sm" intent={DUE_INTENT[dueState]}>
                               {DUE_STATE_LABELS[dueState]}

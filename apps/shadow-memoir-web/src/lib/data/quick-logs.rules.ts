@@ -176,7 +176,7 @@ export function firstOfDayReward(kind: 'journal' | 'meal' | 'weight', alreadyLog
   return { xp, coins, statTicked, rewarded: true, reason: 'First of the day' };
 }
 
-export function deriveThresholdOffer(definition: HealthMetricDefinition, value: number | null): ThresholdOffer | null {
+export function deriveThresholdOffer(definition: HealthMetricDefinition, date: string, value: number | null): ThresholdOffer | null {
   const { threshold } = definition;
   if (!threshold || threshold.questTitle === null || value === null) return null;
 
@@ -185,6 +185,7 @@ export function deriveThresholdOffer(definition: HealthMetricDefinition, value: 
   const shortfall = Math.max(threshold.value - value, 0);
   return {
     metricKey: definition.key,
+    date,
     questId: null,
     questTitle: threshold.questTitle,
     thresholdValue: threshold.value,

@@ -26,6 +26,8 @@ type Recurrence = 'daily' | 'chosen' | 'count';
 
 type OnboardingStrictness = Exclude<Strictness, 'recovery'>;
 
+type SetupState = 'unsaved' | 'saved-here' | 'saved-elsewhere';
+
 interface SubmitError {
   title: string;
   message: string;
@@ -133,20 +135,25 @@ export function OnboardingScreen(): ReactElement {
   const [timesPerWeek, setTimesPerWeek] = useState(4);
   const [startTime, setStartTime] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<SubmitError | null>(null);
-  const [setupSaved, setSetupSaved] = useState(false);
+  const [setup, setSetup] = useState<SetupState>('unsaved');
   const onboardedRef = useRef(false);
   const submittingRef = useRef(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const zoneOptions = useMemo(() => timeZoneOptions(browserZone), [browserZone]);
 
-  const today = accountDay(timezone);
+  const setupSaved = setup !== 'unsaved';
+  const savedDay = day.data?.currencyLocked ? day.data : null;
+  const shownDay = setupSaved && savedDay ? savedDay : { wakeTime, sleepTime, timezone, currency };
+  const shownCurrency = savedDay?.currency ?? currency;
+  const savedDayUnread = setup === 'saved-elsewhere' && savedDay === null;
+  const zoneOptions = useMemo(() => timeZoneOptions(shownDay.timezone), [shownDay.timezone]);
+  const today = accountDay(shownDay.timezone);
   const questName = name.trim();
   const schedule = scheduledDays(recurrence, days, timesPerWeek);
   const dayCount = schedule.length;
   const startsOn = firstDay(schedule, today);
   const startsToday = startsOn === weekdayOf(today);
   const startsLabel = startsOn ? WEEKDAY_NAMES[startsOn] : null;
-  const currencyLocked = setupSaved || (day.data?.currencyLocked ?? false);
+  const currencyLocked = setupSaved || savedDay !== null;
   const startTimeMinutes = strictness === 'anchor' && startTime ? parseMinuteOfDay(startTime) : null;
   const anchorNeedsTime = strictness === 'anchor' && startTimeMinutes === null;
   const isSubmitting = command.isPending || questCommand.isPending;
@@ -227,7 +234,7 @@ export function OnboardingScreen(): ReactElement {
           return;
         }
         onboardedRef.current = true;
-        setSetupSaved(true);
+        setSetup(alreadyOnboarded ? 'saved-elsewhere' : 'saved-here');
       }
 
       const questOutcome = await questCommand.run({ type: 'quest.create', draft: draft() });
@@ -300,21 +307,21 @@ export function OnboardingScreen(): ReactElement {
               </p>
               <div className={styles.fields}>
                 <FormField label="Wake time" helper="Quests scheduled before this are not counted late." disabled={setupSaved}>
-                  <TimePicker value={wakeTime} onValueChange={value => setWakeTime(value ?? wakeTime)} hour12={false} disabled={setupSaved} />
+                  <TimePicker value={shownDay.wakeTime} onValueChange={value => setWakeTime(value ?? wakeTime)} hour12={false} disabled={setupSaved} />
                 </FormField>
                 <FormField label="Sleep time" helper="Your day closes here — logs after it still belong to today." disabled={setupSaved}>
-                  <TimePicker value={sleepTime} onValueChange={value => setSleepTime(value ?? sleepTime)} hour12={false} disabled={setupSaved} />
+                  <TimePicker value={shownDay.sleepTime} onValueChange={value => setSleepTime(value ?? sleepTime)} hour12={false} disabled={setupSaved} />
                 </FormField>
                 <FormField
                   label="Timezone"
                   helper={
-                    timezone === browserZone
+                    shownDay.timezone === browserZone
                       ? 'Detected from your browser. Travel will not move your day unless you change it.'
                       : `Your browser is set to ${browserZone.replace(/_/g, ' ')}. Travel will not move your day unless you change it.`
                   }
                   disabled={setupSaved}
                 >
-                  <Select value={timezone} aria-label="Timezone" disabled={setupSaved} onValueChange={setTimezone}>
+                  <Select value={shownDay.timezone} aria-label="Timezone" disabled={setupSaved} onValueChange={setTimezone}>
                     {zoneOptions.map(zone => (
                       <Select.Item key={zone.value} value={zone.value}>
                         {zone.label}
@@ -331,7 +338,7 @@ export function OnboardingScreen(): ReactElement {
                   }
                   disabled={currencyLocked}
                 >
-                  <Select value={currency} aria-label="Home currency" disabled={currencyLocked} onValueChange={setCurrency}>
+                  <Select value={shownCurrency} aria-label="Home currency" disabled={currencyLocked} onValueChange={setCurrency}>
                     {CURRENCIES.map(option => (
                       <Select.Item key={option.value} value={option.value}>
                         {option.label}
@@ -341,9 +348,11 @@ export function OnboardingScreen(): ReactElement {
                 </FormField>
               </div>
               <p className={styles.note}>
-                {setupSaved
-                  ? 'These are already saved, so they can’t be changed here. Wake, sleep and time zone can be changed in Settings once your first quest is created.'
-                  : 'Everything else here can be changed in Settings, including after a year of history. Changing your wake window never rewrites past days.'}
+                {savedDayUnread
+                  ? 'Setup was already finished for this account, and its saved day and currency couldn’t be loaded on this device yet, so what is shown here may not match. Check them in Settings once your first quest is created.'
+                  : setupSaved
+                    ? 'These are already saved, so they can’t be changed here. Wake, sleep and time zone can be changed in Settings once your first quest is created.'
+                    : 'Everything else here can be changed in Settings, including after a year of history. Changing your wake window never rewrites past days.'}
               </p>
             </Card.Body>
           </Card>
@@ -526,7 +535,7 @@ export function OnboardingScreen(): ReactElement {
                 </DescriptionList.Item>
                 <DescriptionList.Item term="Reward">Experience when kept · {STAT_LABELS[stat]} up one</DescriptionList.Item>
                 <DescriptionList.Item term="If you miss it">{STRICTNESS_RULES[strictness]}</DescriptionList.Item>
-                <DescriptionList.Item term="Home currency">{currency} · fixed from here, so your totals stay comparable</DescriptionList.Item>
+                <DescriptionList.Item term="Home currency">{shownCurrency} · fixed from here, so your totals stay comparable</DescriptionList.Item>
               </DescriptionList>
               <p className={styles.note}>
                 {startsToday ? 'Next is your Today screen with this quest on it.' : `Next is your Today screen. This quest starts ${startsLabel}, so today stays clear until then.`}{' '}

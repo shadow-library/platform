@@ -1,6 +1,7 @@
 import { RECEIPT_MAX_BYTES, receiptApi, receiptContentType, ReceiptUploadError, toReceiptUploadError } from '@/lib/apis';
 import {
   applyFinanceCommand,
+  capAdvisoryForTier,
   type CategoriesView,
   type DispatchOptions,
   type ExpensePage,
@@ -24,7 +25,7 @@ import {
 
 import { isFinanceCommand, isServerBacked, mintCommandIds } from './command-wire';
 import { ignoreAccountBoundary } from './memoir-store';
-import { type FinanceRows, projectFinanceRows } from './projection';
+import { type FinanceRows, mirroredTier, projectFinanceRows } from './projection';
 import { type SyncEngine } from './sync-engine';
 
 function monthOf(date: string): string {
@@ -126,7 +127,8 @@ export class SyncedFinanceProvider implements FinanceProvider {
   dispatchCommand(command: FinanceCommand, options?: DispatchOptions): Promise<FinanceCommandResult> {
     return this.serialize(async () => {
       const minted = mintCommandIds(command) as FinanceCommand;
-      const result = applyFinanceCommand(this.state, minted, isServerBacked(minted) ? 'queued' : 'synced');
+      const applied = applyFinanceCommand(this.state, minted, isServerBacked(minted) ? 'queued' : 'synced');
+      const result = { ...applied, advisory: capAdvisoryForTier(applied.advisory, mirroredTier(this.sync.domains())) };
       const delivery = await this.sync.enqueue(minted, this.sync.today, options);
       if (delivery.status === 'refused') await this.reproject().catch(ignoreAccountBoundary);
       return { ...result, delivery };

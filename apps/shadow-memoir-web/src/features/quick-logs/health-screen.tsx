@@ -146,12 +146,16 @@ function HealthContent({ view, date }: { view: HealthView; date: string }): Reac
   const accept = async (offer: ThresholdOffer): Promise<void> => {
     if (offer.questId === null) {
       if (command.isPending) return;
-      await runQuickLog(command, { type: 'health.acceptOffer', key: offer.metricKey, date }, { action: 'complete', subject: offer.questTitle, success: result => result.message });
+      await runQuickLog(
+        command,
+        { type: 'health.acceptOffer', key: offer.metricKey, date: offer.date },
+        { action: 'complete', subject: offer.questTitle, success: result => result.message },
+      );
       return;
     }
 
     if (questCommand.isPending) return;
-    const outcome = await questCommand.run({ type: 'quest.complete', occurrenceId: `${offer.questId}:${date}` }).catch(() => null);
+    const outcome = await questCommand.run({ type: 'quest.complete', occurrenceId: `${offer.questId}:${offer.date}` }).catch(() => null);
     if (!outcome) return notifyOutcome({ status: 'failed', message: failureCopy(null), code: null, undone: false }, { action: 'complete', subject: offer.questTitle, success: '' });
     if (outcome.status === 'needs-confirmation') return;
     const completed = outcome.status === 'applied' || outcome.status === 'queued-offline';

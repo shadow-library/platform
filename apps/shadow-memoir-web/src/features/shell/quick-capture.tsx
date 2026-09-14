@@ -15,10 +15,10 @@ import {
   notifyOutcome,
   parseCapture,
   type SettledOutcome,
+  todayISODate,
   useCommand,
   useFinanceCommand,
   useFinanceSummary,
-  useMemoirData,
   useOccurrenceSearch,
   useQuickLogCommand,
   useWeight,
@@ -56,6 +56,15 @@ const DESTINATIONS: Destination[] = [
 const SUBJECT_MAX_CHARS = 40;
 
 const IME_COMPOSITION_KEY_CODE = 229;
+
+const DAY_ROLLOVER_MARGIN_MS = 1_000;
+
+const NEW_DAY_NOTICE = 'It’s a new day, so this line now saves to today. Check it and save again.';
+
+function msUntilNextLocalDay(): number {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime() + DAY_ROLLOVER_MARGIN_MS;
+}
 
 function subjectOf(text: string): string {
   const trimmed = text.trim();
@@ -178,14 +187,29 @@ interface CaptureBodyProps {
 
 function CaptureBody({ text, onTextChange, field, pending, replacing, onCommit, onClose }: CaptureBodyProps): ReactElement {
   const navigate = useNavigate();
-  const { today } = useMemoirData();
+  const [clock, setClock] = useState(() => ({ today: todayISODate(), tick: 0 }));
+  const [dayChangedFor, setDayChangedFor] = useState<string | null>(null);
+  const today = clock.today;
   const summary = useFinanceSummary();
   const moneyReady = useDataReadiness({ query: summary }).readiness.kind === 'ready';
   const weight = useWeight();
-  const occurrences = useOccurrenceSearch(captureQuestQuery(text));
+  const occurrences = useOccurrenceSearch(captureQuestQuery(text), today);
   const [notice, setNotice] = useState<{ text: string; message: string } | null>(null);
   const body = useRef<HTMLDivElement>(null);
   const candidates = useRef<HTMLDivElement>(null);
+
+  // The engine's `today` is fixed at start, so this reads the device clock: `tick` re-arms a timer that fired early, and the save re-checks for a device that slept through it.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const next = todayISODate();
+      if (next !== clock.today && text.trim() !== '') {
+        setDayChangedFor(text);
+        setNotice({ text, message: NEW_DAY_NOTICE });
+      }
+      setClock(current => ({ today: next, tick: current.tick + 1 }));
+    }, msUntilNextLocalDay());
+    return () => clearTimeout(timer);
+  }, [clock, text]);
 
   const money = useMemo<CaptureMoney | null>(() => {
     if (!moneyReady || !summary.data) return null;
@@ -194,7 +218,8 @@ function CaptureBody({ text, onTextChange, field, pending, replacing, onCommit, 
   }, [moneyReady, summary.data]);
 
   const parse = useMemo(() => {
-    const captureWeight: CaptureWeight = weight.data === undefined ? { status: 'loading' } : { status: 'known', today: weight.data.today ?? replacing };
+    const todaysWeight = [weight.data?.today, replacing].find(entry => entry?.date === today) ?? null;
+    const captureWeight: CaptureWeight = weight.data === undefined ? { status: 'loading' } : { status: 'known', today: todaysWeight };
     return parseCapture(text, { date: today, money, occurrences: occurrences.data ?? [], weight: captureWeight });
   }, [text, today, money, occurrences.data, weight.data, replacing]);
 
@@ -203,6 +228,12 @@ function CaptureBody({ text, onTextChange, field, pending, replacing, onCommit, 
   const shownNotice = notice?.text === text ? notice.message : null;
 
   const save = (draft: CaptureDraft): void => {
+    const liveToday = todayISODate();
+    if (liveToday !== today || dayChangedFor === text) {
+      setClock(current => ({ today: liveToday, tick: current.tick + 1 }));
+      setDayChangedFor(null);
+      return setNotice({ text, message: NEW_DAY_NOTICE });
+    }
     if (occurrences.isLoading) return setNotice({ text, message: 'Still checking today’s quests. Try again in a moment.' });
     onCommit(draft);
   };

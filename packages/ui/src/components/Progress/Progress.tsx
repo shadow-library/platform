@@ -17,7 +17,7 @@ import { type ProgressProps } from './Progress.types';
  * label). The fill only moves forward — corrections settle at the next real value.
  */
 export const Progress = forwardRef<HTMLDivElement, ProgressProps>(function Progress(
-  { value = 0, max = 100, indeterminate = false, label, intent = 'accent', size = 'sm', className, ...props },
+  { value = 0, max = 100, indeterminate = false, label, intent = 'accent', size = 'sm', className, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...props },
   ref,
 ) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
@@ -35,7 +35,8 @@ export const Progress = forwardRef<HTMLDivElement, ProgressProps>(function Progr
         className={styles.track}
         data-size={size}
         role="progressbar"
-        aria-label={labelText}
+        aria-label={ariaLabel ?? labelText}
+        aria-labelledby={ariaLabelledBy}
         aria-valuemin={0}
         aria-valuemax={indeterminate ? undefined : max}
         aria-valuenow={indeterminate ? undefined : value}

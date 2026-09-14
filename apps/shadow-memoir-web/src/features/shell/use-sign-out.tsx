@@ -34,8 +34,11 @@ export function useSignOut({ fallbackFocusSelector }: SignOutOptions = {}): Sign
 
   // `ConfirmDialog` exposes no `onCloseAutoFocus`, so this restores focus itself on cancel.
   const confirmOpenerRef = useRef<HTMLElement | null>(null);
+  const confirmWasOpenRef = useRef(false);
   useEffect(() => {
-    if (confirmOpen) return undefined;
+    const justClosed = confirmWasOpenRef.current && !confirmOpen;
+    confirmWasOpenRef.current = confirmOpen;
+    if (!justClosed) return undefined;
     const target = confirmOpenerRef.current;
     const fallback = fallbackFocusSelector ? document.querySelector<HTMLElement>(fallbackFocusSelector) : null;
     const restoreTarget = isFocusable(target) ? target : fallback;

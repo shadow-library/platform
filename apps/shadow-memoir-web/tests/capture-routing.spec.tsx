@@ -5,11 +5,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { JournalScreen } from '@/features/quick-logs';
 import { QuickCapture } from '@/features/shell';
-import { FixtureQuickLogProvider, type MemoirData, setQuickLogProvider } from '@/lib/data';
+import { FixtureQuickLogProvider, type MemoirData, setQuickLogProvider, todayISODate } from '@/lib/data';
 import { type DeltaPage, SYNC_META_KEYS, SyncEngineProvider } from '@/lib/sync';
 
 import { createMemoirTestData, renderScreen } from './harness';
 import { createSyncedTestData, createTestEngine, rejected, sharedBacking, type TestEngineOptions } from './sync-harness';
+
+const NEW_DAY_NOTICE = 'It’s a new day, so this line now saves to today. Check it and save again.';
 
 interface PostedCommand {
   commandId: string;
@@ -145,7 +147,7 @@ describe('quick capture routing', () => {
 
   it('should show the replace warning when the save finds a weight the palette had not read yet', async () => {
     const data = createMemoirTestData();
-    await data.quickLogs.dispatchCommand({ type: 'weight.save', date: data.today, kg: 80, confirmedReplacement: true });
+    await data.quickLogs.dispatchCommand({ type: 'weight.save', date: todayISODate(), kg: 80, confirmedReplacement: true });
     const view = await data.quickLogs.weight();
     vi.spyOn(data.quickLogs, 'weight').mockResolvedValue({ ...view, today: null });
     const dispatch = vi.spyOn(data.quickLogs, 'dispatchCommand');
@@ -160,6 +162,76 @@ describe('quick capture routing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(dispatch).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'weight.save', kg: 78.4, confirmedReplacement: true }), expect.anything()));
+  });
+
+  it('should date a line saved after midnight to the new day when the palette was opened the day before', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 7, 22, 23, 59, 50));
+    try {
+      const data = createMemoirTestData({ today: '2026-08-22' });
+      const dispatch = vi.spyOn(data.quickLogs, 'dispatchCommand');
+      renderScreen(<OpenCapture />, { value: data });
+
+      await type('8000 steps');
+      const save = await screen.findByRole('button', { name: 'Save' });
+      vi.setSystemTime(new Date(2026, 7, 23, 0, 0, 5));
+      fireEvent.click(save);
+
+      expect(await screen.findByText(NEW_DAY_NOTICE)).toBeDefined();
+      expect(dispatch).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'health.save', key: 'steps', date: '2026-08-23' }), expect.anything()));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should refuse once when the day changes while a line is typed and the device stays awake', { timeout: 10_000 }, async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 7, 22, 23, 59, 59, 900));
+    try {
+      const data = createMemoirTestData({ today: '2026-08-22' });
+      const dispatch = vi.spyOn(data.quickLogs, 'dispatchCommand');
+      renderScreen(<OpenCapture />, { value: data });
+
+      await type('8000 steps');
+      await screen.findByRole('button', { name: 'Save' });
+      vi.setSystemTime(new Date(2026, 7, 23, 0, 0, 5));
+
+      expect(await screen.findByText(NEW_DAY_NOTICE, undefined, { timeout: 3_000 })).toBeDefined();
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(screen.getByText(NEW_DAY_NOTICE)).toBeDefined();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'health.save', key: 'steps', date: '2026-08-23' }), expect.anything()));
+      expect(dispatch).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should re-arm the midnight timer when it fires before the date changes', { timeout: 10_000 }, async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 7, 22, 23, 59, 59, 900));
+    try {
+      const data = createMemoirTestData({ today: '2026-08-22' });
+      const dispatch = vi.spyOn(data.quickLogs, 'dispatchCommand');
+      renderScreen(<OpenCapture />, { value: data });
+
+      await type('8000 steps');
+      await screen.findByRole('button', { name: 'Save' });
+      await new Promise(resolve => setTimeout(resolve, 1_500));
+      expect(screen.queryByText(NEW_DAY_NOTICE)).toBeNull();
+
+      vi.setSystemTime(new Date(2026, 7, 23, 0, 0, 5));
+      expect(await screen.findByText(NEW_DAY_NOTICE, undefined, { timeout: 3_000 })).toBeDefined();
+      expect(dispatch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('should move focus to the first reading on Enter when the line could be two things', async () => {

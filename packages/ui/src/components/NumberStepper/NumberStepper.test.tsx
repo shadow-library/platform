@@ -103,6 +103,58 @@ describe('NumberStepper', () => {
     expect(screen.getByRole('button', { name: 'Increase' })).toBeDisabled();
   });
 
+  it('should not step toward a bound the held value already violates when clampOnBlur is false', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<NumberStepper defaultValue={70} min={30} max={250} precision={1} clampOnBlur={false} itemLabel="weight" onValueChange={onValueChange} aria-label="Weight" />);
+    const field = screen.getByRole('spinbutton');
+
+    await user.clear(field);
+    await user.type(field, '10');
+    await user.tab();
+    onValueChange.mockClear();
+
+    await user.click(field);
+    await user.keyboard('{ArrowDown}');
+    expect(field).toHaveValue('10');
+    expect(screen.getByRole('button', { name: 'Decrease weight' })).toBeDisabled();
+
+    await user.clear(field);
+    await user.type(field, '300');
+    await user.keyboard('{ArrowUp}');
+    expect(field).toHaveValue('300');
+    expect(onValueChange.mock.calls.at(-1)).toEqual([300]);
+  });
+
+  it('should step a held out-of-range value back into range when clampOnBlur is false', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<NumberStepper defaultValue={70} min={30} max={250} precision={1} clampOnBlur={false} onValueChange={onValueChange} aria-label="Weight" />);
+    const field = screen.getByRole('spinbutton');
+
+    await user.clear(field);
+    await user.type(field, '10');
+    await user.keyboard('{ArrowUp}');
+    expect(field).toHaveValue('30.0');
+    expect(onValueChange).toHaveBeenLastCalledWith(30);
+  });
+
+  it('should not repeat a held step button toward a violated bound', () => {
+    vi.useFakeTimers();
+    try {
+      const onValueChange = vi.fn();
+      render(<NumberStepper value={10} min={30} max={250} clampOnBlur={false} itemLabel="weight" onValueChange={onValueChange} aria-label="Weight" />);
+
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Decrease weight' }));
+      act(() => vi.advanceTimersByTime(400));
+      for (let tick = 0; tick < 3; tick += 1) act(() => vi.advanceTimersByTime(100));
+
+      expect(onValueChange).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('should round a typed value to the precision on blur', async () => {
     const user = userEvent.setup();
     render(<NumberStepper defaultValue={70} min={30} max={250} precision={1} aria-label="Weight" />);

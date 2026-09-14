@@ -101,6 +101,16 @@ describe('Settings screen', () => {
     expect(screen.getByText('Data and privacy')).toBeDefined();
   });
 
+  it('should describe email notifications as the account has them set', async () => {
+    const data = createMemoirTestData({ today: TODAY });
+    const shipped = await data.account.getNotifications();
+    data.account.getNotifications = async () => ({ preferences: shipped.preferences.map((preference, index) => ({ ...preference, email: index === 0 })) });
+    renderScreen(<SettingsScreen />, { value: data });
+
+    expect(await screen.findByText(`Email per category, 1 of ${shipped.preferences.length} on right now. Push is coming soon.`)).toBeDefined();
+    expect(screen.queryByText(/all off until you turn them on/)).toBeNull();
+  });
+
   it('should show the home currency read-only', async () => {
     renderScreen(<SettingsScreen />, { today: TODAY });
     const currency = (await screen.findByLabelText('Home currency')) as HTMLInputElement;

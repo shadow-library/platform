@@ -61,6 +61,11 @@ describe('card layout', () => {
     expect(settings).toMatch(/\.jumpItem:focus-visible\s*{[^}]*outline:[^}]*var\(--sh-focus-ring\)/);
   });
 
+  it('should keep wrapped screen header actions on the right edge instead of indenting them under the title', () => {
+    const layout = readCss('../src/components/ScreenLayout.module.css');
+    expect(layout).toMatch(/\.actions\s*{[^}]*margin-inline-start:\s*auto;/);
+  });
+
   it('should keep the list card overflow clip from reaching the row focus ring', () => {
     const quests = readCss('../src/features/quests/quests.module.css');
     expect(quests).toMatch(/\.questRow:focus-visible\s*{[^}]*outline-offset:\s*-\d+px/);

@@ -2,7 +2,6 @@ import { addDays, toISODate } from '@shadow-library/ui';
 
 import { type DispatchOptions } from './command.types';
 import { deriveCapAdvisory } from './entry-caps';
-import { type CurrencyCode } from './finance.types';
 import { type QuickLogTile } from './view.types';
 import {
   averageOf,
@@ -44,7 +43,7 @@ import {
 
 export interface QuickLogProvider {
   /** The Today rail's counters for `date`, in the account's home currency. */
-  tiles(date: string, currency: CurrencyCode): Promise<QuickLogTile[]>;
+  tiles(date: string): Promise<QuickLogTile[]>;
   journal(): Promise<JournalView>;
   meals(date: string): Promise<MealsView>;
   weight(): Promise<WeightView>;
@@ -261,8 +260,8 @@ export class FixtureQuickLogProvider implements QuickLogProvider {
   private state = createState();
   private draft: { date: string; text: string; mood: MoodValence | null } | null = null;
 
-  async tiles(date: string, currency: CurrencyCode): Promise<QuickLogTile[]> {
-    return quickLogTiles({ date, currency, expenses: [], meals: this.state.meals, metrics: this.state.metrics, weights: this.state.weights, journal: this.state.journal });
+  async tiles(date: string): Promise<QuickLogTile[]> {
+    return quickLogTiles({ date, currency: 'EUR', expenses: [], meals: this.state.meals, metrics: this.state.metrics, weights: this.state.weights, journal: this.state.journal });
   }
 
   async journal(): Promise<JournalView> {
@@ -332,7 +331,7 @@ export class FixtureQuickLogProvider implements QuickLogProvider {
         meta: entry ? metricMeta(entry) : 'Nothing logged today — blank, not zero',
         trendLabel: METRIC_TRENDS[definition.key],
         last14Days: METRIC_SERIES[definition.key],
-        offer: deriveThresholdOffer(definition, entry?.value ?? null),
+        offer: deriveThresholdOffer(definition, date, entry?.value ?? null),
         completedQuest: null,
       };
     });
@@ -343,7 +342,7 @@ export class FixtureQuickLogProvider implements QuickLogProvider {
       .flatMap(entry => {
         const definition = HEALTH_METRICS.find(item => item.key === entry.key);
         if (!definition) return [];
-        const offer = deriveThresholdOffer(definition, entry.value);
+        const offer = deriveThresholdOffer(definition, entry.date, entry.value);
         return [
           {
             date: entry.date,

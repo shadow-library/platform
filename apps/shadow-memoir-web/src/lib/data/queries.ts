@@ -27,9 +27,9 @@ export function useDay(date?: string): UseQueryResult<DayView> {
 
 /** Keyed under `memoirKeys` rather than `quickLogKeys` so a delta pull refreshes the rail with everything else it changed. */
 export function useQuickLogTiles(date?: string): UseQueryResult<QuickLogTile[]> {
-  const { quickLogs, queryClient, today, currency } = useMemoirData();
+  const { quickLogs, queryClient, today } = useMemoirData();
   const day = date ?? today;
-  return useQuery({ queryKey: memoirKeys.quickLogTiles(day), queryFn: () => quickLogs.tiles(day, currency) }, queryClient);
+  return useQuery({ queryKey: memoirKeys.quickLogTiles(day), queryFn: () => quickLogs.tiles(day) }, queryClient);
 }
 
 export function usePlan(range: PlanRange): UseQueryResult<PlanView> {
@@ -52,9 +52,10 @@ export function useDraftPreview(draft: QuestDraft): UseQueryResult<QuestDraftPre
   return useQuery({ queryKey: memoirKeys.draftPreview(draft), queryFn: () => provider.previewDraft(draft) }, queryClient);
 }
 
-export function useOccurrenceSearch(query: string): UseQueryResult<CaptureTarget[]> {
+export function useOccurrenceSearch(query: string, date?: string): UseQueryResult<CaptureTarget[]> {
   const { provider, queryClient, today } = useMemoirData();
-  return useQuery({ queryKey: memoirKeys.occurrences(query, today), queryFn: () => provider.findOccurrences(query, today), enabled: query.trim().length > 0 }, queryClient);
+  const day = date ?? today;
+  return useQuery({ queryKey: memoirKeys.occurrences(query, day), queryFn: () => provider.findOccurrences(query, day), enabled: query.trim().length > 0 }, queryClient);
 }
 
 export type QuestCommandHook = CommandHook<Command, CommandResult, CommandOutcome, CommandConfirmation>;

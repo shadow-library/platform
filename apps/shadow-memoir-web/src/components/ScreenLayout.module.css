@@ -34,10 +34,12 @@
   max-width: 68ch;
 }
 
+/* A wrapped header keeps its actions on the right edge: flush left, a ghost button's padding reads as an indent. */
 .actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  margin-inline-start: auto;
 }
 
 .columns {

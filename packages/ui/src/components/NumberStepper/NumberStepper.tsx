@@ -95,6 +95,9 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
     if (!editing) setText(current != null ? format(current) : '');
   }
 
+  const atMin = min != null && current != null && current <= min;
+  const atMax = max != null && current != null && current >= max;
+
   function clampRound(input: number): number {
     let next = input;
     if (min != null) next = Math.max(min, next);
@@ -113,6 +116,7 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
 
   function stepBy(direction: 1 | -1): void {
     if (disabled || readOnly) return stopHold();
+    if (direction < 0 ? atMin : atMax) return stopHold();
     const base = current ?? min ?? 0;
     const decimals = precision ?? Math.max(decimalsOf(step), decimalsOf(base));
     const next = current == null && startValue != null ? clampRound(startValue) : clampRound(Number((base + direction * step).toFixed(decimals)));
@@ -169,8 +173,6 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
     };
   }, []);
 
-  const atMin = min != null && current != null && current <= min;
-  const atMax = max != null && current != null && current >= max;
   const decLabel = `Decrease${itemLabel != null ? ` ${itemLabel}` : ''}`;
   const incLabel = `Increase${itemLabel != null ? ` ${itemLabel}` : ''}`;
 

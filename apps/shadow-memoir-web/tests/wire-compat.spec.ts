@@ -6,6 +6,7 @@ import {
   isServerBacked,
   NEWER_DOMAINS,
   projectFinanceRows,
+  projectQuickLogRows,
   projectWorldState,
   SNAPSHOT_DOMAINS,
   SYNC_DOMAINS,
@@ -107,6 +108,48 @@ describe('projection (UI-004, UI-005)', () => {
 
     expect(expenses).toHaveLength(1);
     expect(homeAmountOf(expenses[0]!, 'EUR')).toBe(6415);
+  });
+});
+
+describe('threshold offers (P3-01c)', () => {
+  const offerRow = (overrides: Record<string, unknown>): Record<string, unknown> => ({
+    questId: '7',
+    questName: 'Keep it under 2,000 kcal',
+    metricId: '502',
+    date: '2026-09-10',
+    thresholdValue: 2000,
+    currentValue: 2000,
+    comparison: 'lte',
+    ...overrides,
+  });
+  const offersOf = (rows: Record<string, unknown>[]) => projectQuickLogRows({ metrics: [{ id: '502', name: 'Calories burned', isHealth: true }], health_offers: rows }).offers;
+
+  it('should treat a value at or below an lte target as met and a value above it as short', () => {
+    const [atTarget, below, above] = offersOf([offerRow({}), offerRow({ currentValue: 1500 }), offerRow({ currentValue: 2500 })]);
+
+    expect(atTarget).toMatchObject({ met: true, ratio: 1 });
+    expect(below).toMatchObject({ met: true, ratio: 1 });
+    expect(above).toMatchObject({ met: false, ratio: 0.8 });
+  });
+
+  it('should keep measuring a gte target as a share of the threshold', () => {
+    const [short, met] = offersOf([offerRow({ comparison: 'gte', currentValue: 1500 }), offerRow({ comparison: 'gte', currentValue: 2500 })]);
+
+    expect(short).toMatchObject({ met: false, ratio: 0.75 });
+    expect(met).toMatchObject({ met: true, ratio: 1 });
+  });
+
+  it('should keep the date of each offer for the same value on different days', () => {
+    const offers = offersOf([offerRow({ date: '2026-09-09' }), offerRow({ date: '2026-09-10' })]);
+
+    expect(offers.map(offer => [offer.date, offer.currentValue])).toEqual([
+      ['2026-09-09', 2000],
+      ['2026-09-10', 2000],
+    ]);
+  });
+
+  it('should skip an offer without a date or with an unknown comparison', () => {
+    expect(offersOf([offerRow({ date: null }), offerRow({ comparison: 'more-than' })])).toEqual([]);
   });
 });
 

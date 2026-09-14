@@ -6,7 +6,6 @@ import {
   applyQuickLogCommand,
   averageOf,
   capAdvisoryForTier,
-  type CurrencyCode,
   type DayValue,
   type DispatchOptions,
   formatMetricValue,
@@ -40,7 +39,7 @@ import {
 
 import { isQuickLogCommand, mintCommandIds } from './command-wire';
 import { ignoreAccountBoundary } from './memoir-store';
-import { projectEntitlement, projectFinanceRows, projectQuickLogRows, type QuickLogRows } from './projection';
+import { mirroredTier, projectFinanceRows, projectQuickLogRows, type QuickLogRows } from './projection';
 import { type SyncEngine } from './sync-engine';
 import { SYNC_META_KEYS } from './sync.types';
 
@@ -161,7 +160,7 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
     });
   }
 
-  async tiles(date: string, _currency: CurrencyCode): Promise<QuickLogTile[]> {
+  async tiles(date: string): Promise<QuickLogTile[]> {
     const { expenses, settings } = projectFinanceRows(this.sync.domains());
     const { meals, metrics, weights, journal } = this.state;
     return quickLogTiles({ date, currency: settings.homeCurrency, expenses, meals, metrics, weights, journal });
@@ -260,7 +259,7 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
     const metrics = HEALTH_METRICS.map(definition => {
       const entry = latestMetricEntry(this.state.metrics, definition.key, date);
       const offer = this.state.offers.find(
-        item => item.metricKey === definition.key && item.currentValue === entry?.value && (item.questId === null || !completedQuestIds.has(item.questId)),
+        item => item.metricKey === definition.key && item.date === date && item.currentValue === entry?.value && (item.questId === null || !completedQuestIds.has(item.questId)),
       );
       return {
         definition,
@@ -345,7 +344,7 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
 
     const applied = applyQuickLogCommand(this.state, minted, { linkage });
     if (applied.needsConfirmation) return applied;
-    const result = { ...applied, advisory: capAdvisoryForTier(applied.advisory, projectEntitlement(this.sync.domains()).tier) };
+    const result = { ...applied, advisory: capAdvisoryForTier(applied.advisory, mirroredTier(this.sync.domains())) };
 
     const delivery = await this.sync.enqueue(minted, this.sync.today, options);
     if (delivery.status === 'refused') await this.reproject().catch(ignoreAccountBoundary);

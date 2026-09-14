@@ -31,6 +31,28 @@ describe('Progress', () => {
     expect(screen.queryByText(/%/)).not.toBeInTheDocument();
   });
 
+  it('should name the progressbar from aria-label rather than the wrapper', () => {
+    const { container } = render(<Progress value={3} max={10} aria-label="Receipt scans used today" />);
+    expect(screen.getByRole('progressbar', { name: 'Receipt scans used today' })).toBeInTheDocument();
+    expect(container.firstElementChild).not.toHaveAttribute('aria-label');
+  });
+
+  it('should name the progressbar from aria-labelledby', () => {
+    render(
+      <>
+        <span id="upload-name">Uploading receipt.jpg</span>
+        <Progress value={40} aria-labelledby="upload-name" />
+      </>,
+    );
+    expect(screen.getByRole('progressbar', { name: 'Uploading receipt.jpg' })).toBeInTheDocument();
+  });
+
+  it('should prefer aria-label over the visible label for the accessible name', () => {
+    render(<Progress value={60} label="Experience" aria-label="Experience towards level 15" />);
+    expect(screen.getByRole('progressbar', { name: 'Experience towards level 15' })).toBeInTheDocument();
+    expect(screen.getByText('Experience')).toBeInTheDocument();
+  });
+
   it('clamps the percentage to 0–100', () => {
     render(<Progress value={150} max={100} label="Full" />);
     expect(screen.getByText('100%')).toBeInTheDocument();

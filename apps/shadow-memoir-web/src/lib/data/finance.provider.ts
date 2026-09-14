@@ -41,6 +41,7 @@ import {
   type ReceiptScanQuota,
   type ReceiptUploadProgress,
   type Subscription,
+  SUBSCRIPTION_CATEGORIES,
   type SubscriptionCollision,
   type SubscriptionDraft,
   type SubscriptionsView,
@@ -268,9 +269,12 @@ function seedExpenses(): ExpenseDetail[] {
   }));
 }
 
-function subscription(input: Omit<Subscription, 'monthlyEquivalentMinor' | 'amountText' | 'billingDay' | 'createdAt'> & { createdAt?: string }): Subscription {
+function subscription(
+  input: Omit<Subscription, 'monthlyEquivalentMinor' | 'amountText' | 'billingDay' | 'createdAt' | 'expenseCategoryId'> & { createdAt?: string },
+): Subscription {
   return {
     ...input,
+    expenseCategoryId: SUBSCRIPTION_CATEGORIES[input.categoryId].expenseCategoryId,
     amountText: (input.amountMinor / 100).toFixed(2),
     billingDay: Number(input.nextDueDate.slice(8, 10)),
     createdAt: input.createdAt ?? shiftDays(-400),
@@ -540,6 +544,7 @@ export function financeSubscriptionsView(state: FinanceState): SubscriptionsView
 
   return {
     items,
+    categories: state.categories,
     homeCurrency: home,
     settings: state.settings,
     activeCount: active.length,

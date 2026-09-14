@@ -3,6 +3,7 @@ import {
   type ActivityEntry,
   adherenceOf,
   BUILT_IN_CATEGORIES,
+  type CapAdvisoryTier,
   CARRIED_STATES,
   type CosmeticKind,
   COSMETICS,
@@ -464,6 +465,7 @@ function toSubscription(row: DeltaRow): Subscription {
     nextDueDate,
     lastConfirmedDate: text(row, 'lastConfirmedDate'),
     categoryId: SUBSCRIPTION_CATEGORY_LOCAL[text(row, 'categoryId') ?? ''] ?? 'tools',
+    expenseCategoryId: (text(row, 'categoryId') ?? 'uncat') as ExpenseCategoryId,
     reminderEnabled: bool(row, 'reminderEnabled'),
     reminderLead: REMINDER_LEAD_LOCAL[text(row, 'reminderLead') ?? ''] ?? 'on-day',
     monthlyEquivalentMinor: number(row, 'monthlyEquivalentMinor'),
@@ -564,21 +566,32 @@ function healthMetricIds(rows: DeltaRow[]): Partial<Record<HealthMetricKey, stri
   return ids;
 }
 
+function thresholdRatio(comparison: HealthComparison, thresholdValue: number, currentValue: number): number {
+  if (comparison === 'gte') return thresholdValue > 0 ? Math.min(currentValue / thresholdValue, 1) : 1;
+  return currentValue > thresholdValue && currentValue > 0 ? thresholdValue / currentValue : 1;
+}
+
 function toThresholdOffer(row: DeltaRow, keyOf: (metricId: string) => HealthMetricKey | null): ThresholdOffer | null {
   const metricKey = keyOf(String(row['metricId']));
   if (!metricKey) return null;
 
+  const date = text(row, 'date');
+  const comparison = text(row, 'comparison');
+  if (!date || (comparison !== 'gte' && comparison !== 'lte')) return null;
+
   const thresholdValue = number(row, 'thresholdValue');
   const currentValue = number(row, 'currentValue');
+  const met = comparison === 'gte' ? currentValue >= thresholdValue : currentValue <= thresholdValue;
   const questTitle = text(row, 'questName') ?? 'the quest';
   return {
     metricKey,
+    date,
     questId: String(row['questId']),
     questTitle,
     thresholdValue,
     currentValue,
-    ratio: thresholdValue > 0 ? Math.min(currentValue / thresholdValue, 1) : 1,
-    met: true,
+    ratio: thresholdRatio(comparison, thresholdValue, currentValue),
+    met,
     xp: 0,
     note: `Threshold ${thresholdValue} reached — the quest is waiting for you.`,
   };
@@ -713,6 +726,11 @@ export function projectEntitlement(rows: Partial<DomainRows>): EntitlementRow {
   const row = rows.entitlement?.[0];
   if (!row) return { tier: 'free', state: 'free', expiresAt: null, trialUsed: false };
   return { tier: text(row, 'tier') === 'paid' ? 'paid' : 'free', state: text(row, 'state') ?? 'free', expiresAt: text(row, 'expiresAt'), trialUsed: bool(row, 'trialUsed') };
+}
+
+/** The server always sends one entitlement row, so an empty domain means the plan has not reached this device yet — not that the account is free. */
+export function mirroredTier(rows: Partial<DomainRows>): CapAdvisoryTier {
+  return rows.entitlement?.length ? projectEntitlement(rows).tier : 'unknown';
 }
 
 /** Counts per delta domain, for the export and deletion screens' "what this covers" list — the only honest source, since neither endpoint enumerates them. */

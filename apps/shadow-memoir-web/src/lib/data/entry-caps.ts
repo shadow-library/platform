@@ -39,6 +39,9 @@ function capMessage(level: EntryCapLevel, used: number, limit: number, noun: str
   return `You have logged ${used} ${noun} this month${position} the free monthly allowance of ${limit}. Everything still saves; a Memoir subscription lifts the count.`;
 }
 
-export function capAdvisoryForTier(advisory: EntryCapAdvisory | undefined, tier: 'free' | 'paid'): EntryCapAdvisory | undefined {
-  return tier === 'paid' ? undefined : advisory;
+/** `unknown` is an entitlement not yet on this device: the allowance is a free-plan notice, so it waits until the plan is known rather than warning a paid owner. */
+export type CapAdvisoryTier = 'free' | 'paid' | 'unknown';
+
+export function capAdvisoryForTier(advisory: EntryCapAdvisory | undefined, tier: CapAdvisoryTier): EntryCapAdvisory | undefined {
+  return tier === 'free' ? advisory : undefined;
 }

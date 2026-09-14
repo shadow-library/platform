@@ -269,6 +269,60 @@ describe('OnboardingScreen', () => {
     expect(screen.getByText(/These are already saved/)).toBeDefined();
   });
 
+  it('should read back the saved day and currency when setup was already finished elsewhere', async () => {
+    const data = createMemoirTestData({ today: TODAY, persona: 'new' });
+    const shippedDay = await data.account.getDay();
+    let finishedElsewhere = false;
+    data.account.getDay = async () =>
+      finishedElsewhere ? { ...shippedDay, wakeTime: '05:45', sleepTime: '21:15', timezone: 'Asia/Tokyo', currency: 'NOK', currencyLocked: true } : shippedDay;
+    data.account.dispatchCommand = async (): Promise<SettledCommandResult> => {
+      finishedElsewhere = true;
+      return { status: 'rejected', message: 'Setup was already finished for this account.', error: { code: 'ACC_003', kind: 'refusal' } };
+    };
+    data.provider.dispatchCommand = async (): Promise<CommandResult> => ({ status: 'rejected', message: 'Anchor quests need a start time.' });
+
+    renderScreen(<OnboardingScreen />, { value: data });
+    await goToReview();
+    fireEvent.click(screen.getByRole('button', { name: 'Create it and start' }));
+    await screen.findByText('Anchor quests need a start time.');
+    expect(screen.getByText('NOK · fixed from here, so your totals stay comparable')).toBeDefined();
+
+    for (let step = 0; step < 4; step++) fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(await screen.findByText('Step 1 of 5')).toBeDefined();
+    expect((screen.getByRole('combobox', { name: 'Wake time' }) as HTMLInputElement).value).toBe('05:45');
+    expect((screen.getByRole('combobox', { name: 'Sleep time' }) as HTMLInputElement).value).toBe('21:15');
+    expect(screen.getByRole('combobox', { name: 'Timezone' }).textContent).toMatch(/Tokyo/);
+    expect(screen.getByRole('combobox', { name: 'Home currency' }).textContent).toContain('NOK');
+    expect(screen.getByText(/These are already saved/)).toBeDefined();
+  });
+
+  it('should say the saved day could not be read back rather than present this device’s values as saved', async () => {
+    const data = createMemoirTestData({ today: TODAY, persona: 'new' });
+    const shippedDay = await data.account.getDay();
+    let finishedElsewhere = false;
+    data.account.getDay = async () => {
+      if (finishedElsewhere) throw new ApiError(-1, { code: 'API_REQUEST_NETWORK_ERROR', type: 'NetworkError', message: 'Network error' });
+      return shippedDay;
+    };
+    data.account.dispatchCommand = async (): Promise<SettledCommandResult> => {
+      finishedElsewhere = true;
+      return { status: 'rejected', message: 'Setup was already finished for this account.', error: { code: 'ACC_003', kind: 'refusal' } };
+    };
+    data.provider.dispatchCommand = async (): Promise<CommandResult> => ({ status: 'rejected', message: 'Anchor quests need a start time.' });
+
+    renderScreen(<OnboardingScreen />, { value: data });
+    await goToReview();
+    fireEvent.click(screen.getByRole('button', { name: 'Create it and start' }));
+    await screen.findByText('Anchor quests need a start time.');
+
+    for (let step = 0; step < 4; step++) fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(await screen.findByText(/couldn’t be loaded on this device yet/)).toBeDefined();
+    expect(screen.queryByText(/These are already saved/)).toBeNull();
+    expect((screen.getByRole('combobox', { name: 'Home currency' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('should show owner copy with a retry when setup cannot be saved', async () => {
     const data = createMemoirTestData({ today: TODAY, persona: 'new' });
     const dispatchAccount = data.account.dispatchCommand;

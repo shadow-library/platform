@@ -111,22 +111,22 @@ describe('side quest rewards', () => {
 
 describe('health threshold offer', () => {
   it('should offer the quest once the threshold is met', () => {
-    const offer = deriveThresholdOffer(steps, 8310);
+    const offer = deriveThresholdOffer(steps, '2026-08-22', 8310);
     expect(offer).toMatchObject({ met: true, questTitle: 'Move 8,000 steps', xp: 30 });
   });
 
   it('should report progress without offering while short of the threshold', () => {
-    const offer = deriveThresholdOffer(steps, 4000);
+    const offer = deriveThresholdOffer(steps, '2026-08-22', 4000);
     expect(offer?.met).toBe(false);
     expect(offer?.ratio).toBeCloseTo(0.5);
   });
 
   it('should offer nothing for a metric no quest reads', () => {
-    expect(deriveThresholdOffer(sleep, 8)).toBeNull();
+    expect(deriveThresholdOffer(sleep, '2026-08-22', 8)).toBeNull();
   });
 
   it('should offer nothing on a blank day', () => {
-    expect(deriveThresholdOffer(steps, null)).toBeNull();
+    expect(deriveThresholdOffer(steps, '2026-08-22', null)).toBeNull();
   });
 });
 
@@ -170,6 +170,10 @@ describe('entry cap advisory', () => {
     const advisory = deriveCapAdvisory('meals', MONTHLY_ENTRY_CAP);
     expect(capAdvisoryForTier(advisory, 'paid')).toBeUndefined();
     expect(capAdvisoryForTier(advisory, 'free')).toBe(advisory);
+  });
+
+  it('should hold the advisory back while the plan is still unknown', () => {
+    expect(capAdvisoryForTier(deriveCapAdvisory('meals', MONTHLY_ENTRY_CAP), 'unknown')).toBeUndefined();
   });
 
   it('should never block a save at any level', () => {

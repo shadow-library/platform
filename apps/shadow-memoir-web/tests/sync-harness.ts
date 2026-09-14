@@ -157,7 +157,6 @@ export function createSyncedTestData(engine: SyncEngine, principal?: () => Promi
     quickLogs,
     queryClient: memoirQueryClient(),
     today: engine.today,
-    currency: 'EUR',
     persona: 'active',
   };
 }

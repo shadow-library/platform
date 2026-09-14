@@ -48,7 +48,7 @@ const DATA_ROWS: { id: string; label: string; help: string; action: string; to: 
   {
     id: 'notifications',
     label: 'Notification preferences',
-    help: 'Email per category, all off until you turn them on. Push is coming soon.',
+    help: 'Email per category. Push is coming soon.',
     action: 'Open',
     to: '/settings/notifications',
   },
@@ -92,6 +92,8 @@ export function SettingsScreen(): ReactElement {
   const deck = useHeroDeck();
   const appSync = useAppSync();
   const notifications = useNotificationSettings();
+  const emailPreferences = notifications.data?.preferences;
+  const emailMeta = emailPreferences ? notificationsMeta(emailPreferences.filter(preference => preference.email).length, emailPreferences.length) : null;
   const exportView = useExportView();
   const command = useAccountCommand();
   const heroCommand = useHeroCommand();
@@ -114,9 +116,7 @@ export function SettingsScreen(): ReactElement {
                 <nav className={styles.jump}>
                   <Link to="/settings/notifications" className={styles.jumpItem}>
                     <span>Notifications</span>
-                    <span className={styles.jumpMeta}>
-                      {notifications.data ? notificationsMeta(notifications.data.preferences.filter(p => p.email).length, notifications.data.preferences.length) : ''}
-                    </span>
+                    <span className={styles.jumpMeta}>{emailMeta ?? ''}</span>
                   </Link>
                   <Link to="/settings/billing" className={styles.jumpItem}>
                     <span>Plan and billing</span>
@@ -250,7 +250,7 @@ export function SettingsScreen(): ReactElement {
                 <SettingRow
                   key={row.id}
                   label={row.label}
-                  help={row.help}
+                  help={row.id === 'notifications' && emailMeta ? `Email per category, ${emailMeta} right now. Push is coming soon.` : row.help}
                   control={
                     <Button size="sm" variant="secondary" asChild>
                       <Link to={row.to}>{row.action}</Link>

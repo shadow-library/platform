@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactElement } from 'react';
 import { toast } from '@shadow-library/ui';
@@ -855,6 +855,35 @@ describe('health metrics screen', () => {
     });
   });
 
+  it('should not offer a quest from another day’s offer for the same value', async () => {
+    const offer = (date: string): Record<string, unknown> => ({
+      questId: 'q-steps',
+      questName: 'Move 8,000 steps',
+      metricId: '501',
+      date,
+      thresholdValue: 8000,
+      currentValue: 8310,
+      comparison: 'gte',
+    });
+    const domains = (offerDate: string): DeltaPage['domains'] => ({
+      metrics: [{ id: '501', name: 'Steps', isHealth: true }],
+      metric_entries: [{ id: '1', metricId: '501', date: LOG_TODAY, value: '8310', source: 'manual', createdAt: `${LOG_TODAY}T19:02:00.000Z` }],
+      health_offers: [offer(offerDate)],
+    });
+
+    await withSyncedScreen(<HealthMetricsScreen />, { pages: [deltaPage(domains('2026-08-21'))] }, async () => {
+      expect(await screen.findByText(/^Logged \d/)).toBeDefined();
+      expect(screen.queryByRole('button', { name: /Complete the quest/ })).toBeNull();
+      expect(screen.queryByRole('progressbar', { name: 'Steps against its quest threshold' })).toBeNull();
+    });
+    cleanup();
+
+    await withSyncedScreen(<HealthMetricsScreen />, { pages: [deltaPage(domains(LOG_TODAY))] }, async () => {
+      expect(await screen.findByRole('button', { name: /Complete the quest/ })).toBeDefined();
+      expect(screen.getByRole('progressbar', { name: 'Steps against its quest threshold' })).toBeDefined();
+    });
+  });
+
   it('should show empty states instead of blank health cards', async () => {
     await withSyncedScreen(<HealthMetricsScreen />, { pages: [deltaPage({})] }, async () => {
       expect(await screen.findByText('Nothing logged yet')).toBeDefined();
@@ -882,7 +911,7 @@ describe('synced quick-log provider', () => {
     const { engine } = createTestEngine({ today: LOG_TODAY, pages: [deltaPage(domains)] });
     await engine.start();
 
-    const tiles = await createSyncedTestData(engine).quickLogs.tiles(LOG_TODAY, 'EUR');
+    const tiles = await createSyncedTestData(engine).quickLogs.tiles(LOG_TODAY);
     expect(tiles.find(tile => tile.id === 'expense')?.value).toBe(new Intl.NumberFormat('en-US', { style: 'currency', currency: 'NOK' }).format(125));
   });
 

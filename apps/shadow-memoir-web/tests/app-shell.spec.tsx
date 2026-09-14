@@ -2,12 +2,12 @@ import { toast, TooltipProvider } from '@shadow-library/ui';
 import { ApiError, userInfoQueryKey } from '@shadow-library/web';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, RouterProvider } from '@tanstack/react-router';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SetupLayout } from '@/features/onboarding';
-import { AppShell } from '@/features/shell';
+import { AppShell, useSignOut } from '@/features/shell';
 import shellStyles from '@/features/shell/app-shell.module.css';
 import { loginUrl, logout } from '@/lib/apis';
 import { MemoirDataProvider } from '@/lib/data';
@@ -390,6 +390,27 @@ describe('AppShell phone drawer', () => {
     await user.keyboard('{Escape}');
 
     await waitFor(() => expect(document.activeElement).toBe(hamburger));
+  });
+});
+
+describe('useSignOut', () => {
+  afterEach(() => {
+    vi.mocked(useSyncStatus).mockReset();
+    document.body.replaceChildren();
+  });
+
+  it('should leave focus where it is when it mounts', async () => {
+    vi.mocked(useSyncStatus).mockReturnValue(ONLINE_SNAPSHOT);
+    const fallback = document.createElement('button');
+    fallback.id = 'sign-out-fallback';
+    const field = document.createElement('input');
+    document.body.append(fallback, field);
+    field.focus();
+
+    renderHook(() => useSignOut({ fallbackFocusSelector: '#sign-out-fallback' }));
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    expect(document.activeElement).toBe(field);
   });
 });
 

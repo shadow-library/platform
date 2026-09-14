@@ -29,6 +29,7 @@ function subscription(overrides: Partial<Subscription> = {}): Subscription {
     nextDueDate: '2026-08-24',
     lastConfirmedDate: '2026-07-24',
     categoryId: 'music',
+    expenseCategoryId: 'subs',
     reminderEnabled: true,
     reminderLead: '3-day',
     monthlyEquivalentMinor: 1099,

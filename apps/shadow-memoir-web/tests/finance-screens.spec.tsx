@@ -331,6 +331,39 @@ describe('subscriptions screen', () => {
     expect(totals.textContent).not.toContain('not converted');
   });
 
+  it('should tag each subscription with the current name of the expense category it is filed under', async () => {
+    const { engine } = createTestEngine({
+      today: todayISODate(),
+      pages: [
+        page({
+          subscriptions: [
+            subscriptionRow({ id: 'sub-power', name: 'Electricity', categoryId: 'bills', nextDueDate: '2027-06-01' }),
+            subscriptionRow({ id: 'sub-box', name: 'Meal box', categoryId: 'food', nextDueDate: '2027-06-02' }),
+            subscriptionRow({ id: 'sub-books', name: 'Book club', categoryId: 'shopping', nextDueDate: '2027-06-03' }),
+          ],
+          expense_categories: [
+            categoryRow({ id: 'cat-bills', key: 'bills', label: 'Utilities' }),
+            categoryRow({ id: 'cat-food', key: 'food', label: 'Food' }),
+            categoryRow({ id: 'cat-shopping', key: 'shopping', label: 'Shopping', archivedAt: '2026-08-01T00:00:00.000Z' }),
+          ],
+        }),
+      ],
+    });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <SubscriptionsScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    const titleLine = async (name: string): Promise<HTMLElement> => (await screen.findByText(name)).parentElement as HTMLElement;
+    expect(within(await titleLine('Electricity')).getByText('Utilities')).toBeDefined();
+    expect(within(await titleLine('Meal box')).getByText('Food')).toBeDefined();
+    expect(within(await titleLine('Book club')).getByText('Shopping')).toBeDefined();
+    expect(within(await titleLine('Electricity')).queryByText('Subscriptions')).toBeNull();
+  });
+
   it('should send a pause the server accepts', async () => {
     const posted: PostedCommand[] = [];
     const success = vi.spyOn(toast, 'success');
@@ -863,5 +896,35 @@ describe('expense detail screen', () => {
 
     await waitFor(() => expect(success).toHaveBeenCalledWith('Expense deleted.', expect.objectContaining({ action: undefined })));
     vi.restoreAllMocks();
+  });
+});
+
+describe('synced finance cap advisory', () => {
+  const nearlyAllowance = Array.from({ length: 85 }, (_, index) => expenseRow({ id: `exp-${index}` }));
+
+  async function advisoryAfterSaving(domains: DeltaPage['domains']): Promise<string | null | undefined> {
+    const { engine } = createTestEngine({ today: todayISODate(), pages: [page(domains)] });
+    await engine.start();
+    try {
+      const result = await createSyncedTestData(engine).finance.dispatchCommand({
+        type: 'expense.create',
+        draft: { amountText: '4.20', currency: 'EUR', categoryId: 'food', occurredOnDate: todayISODate() },
+      });
+      return result.advisory === undefined ? undefined : result.advisory.message;
+    } finally {
+      engine.stop();
+    }
+  }
+
+  it('should advise a free owner nearing the monthly allowance', async () => {
+    expect(await advisoryAfterSaving({ expenses: nearlyAllowance, entitlement: [{ tier: 'free', state: 'free', trialUsed: false }] })).toContain('86 of 100 expenses');
+  });
+
+  it('should not advise a paid owner about the free allowance', async () => {
+    expect(await advisoryAfterSaving({ expenses: nearlyAllowance, entitlement: [{ tier: 'paid', state: 'active', trialUsed: true }] })).toBeUndefined();
+  });
+
+  it('should not advise before the plan has reached this device', async () => {
+    expect(await advisoryAfterSaving({ expenses: nearlyAllowance })).toBeUndefined();
   });
 });

@@ -180,6 +180,8 @@ export interface Subscription {
   nextDueDate: string;
   lastConfirmedDate: string | null;
   categoryId: SubscriptionCategoryId;
+  /** The expense category key the server stores, which `categoryId` maps lossily; confirmed cycles are filed under it, so its current name is the subscription's tag. */
+  expenseCategoryId: ExpenseCategoryId;
   reminderEnabled: boolean;
   reminderLead: ReminderLead;
   monthlyEquivalentMinor: number;
@@ -320,6 +322,7 @@ export interface SubscriptionCollision {
 
 export interface SubscriptionsView {
   items: Subscription[];
+  categories: ExpenseCategory[];
   homeCurrency: CurrencyCode;
   settings: FinanceSettings;
   activeCount: number;

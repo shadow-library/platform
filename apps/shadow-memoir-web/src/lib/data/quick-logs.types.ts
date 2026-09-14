@@ -212,6 +212,8 @@ export interface HealthMetricEntry {
  */
 export interface ThresholdOffer {
   metricKey: HealthMetricKey;
+  /** The day whose logged value crossed the threshold — an offer belongs to that day's occurrence, never to the same value logged on another day. */
+  date: string;
   /** The quest the offer would complete. Null while the offer is derived from the local metric catalogue rather than from a server-side threshold. */
   questId: string | null;
   questTitle: string;

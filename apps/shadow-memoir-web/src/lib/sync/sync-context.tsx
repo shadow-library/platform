@@ -95,7 +95,6 @@ export interface SyncedMemoirOptions {
  */
 export function createSyncedMemoirData(options: SyncedMemoirOptions): SyncedMemoirData {
   const today = options.today ?? toISODate(new Date());
-  const currency = 'EUR';
   const store = new MemoirStore(undefined, { accountId: options.accountId, marker: LAST_ACCOUNT_MARKER });
   const engine = new SyncEngine({ store, today, principal: options.principal, onAccountChanged: options.onAccountChanged });
   const account = new SyncedAccountProvider(engine, options.principal);
@@ -114,7 +113,6 @@ export function createSyncedMemoirData(options: SyncedMemoirOptions): SyncedMemo
     quickLogs,
     queryClient: memoirQueryClient(),
     today,
-    currency,
     persona: 'active',
   };
 }

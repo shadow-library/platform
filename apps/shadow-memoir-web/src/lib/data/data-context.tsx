@@ -4,7 +4,6 @@ import { toISODate } from '@shadow-library/ui';
 
 import { type AccountProvider, createAccountProvider } from './account.provider';
 import { type DataProvider } from './data-provider';
-import { type CurrencyCode } from './finance.types';
 import { type FinanceProvider, FixtureFinanceProvider, setFinanceProvider } from './finance.provider';
 import { createFixtureProvider, type FixtureProviderOptions } from './fixture-provider';
 import { type Persona, seed } from './fixtures';
@@ -21,7 +20,6 @@ export interface MemoirData {
   quickLogs: QuickLogProvider;
   queryClient: QueryClient;
   today: string;
-  currency: CurrencyCode;
   persona: Persona;
 }
 
@@ -43,7 +41,6 @@ export function memoirQueryClient(): QueryClient {
 export function createMemoirData(options: FixtureProviderOptions = {}): MemoirData {
   const today = options.today ?? toISODate(new Date());
   const persona = options.persona ?? 'active';
-  const currency = 'EUR';
   const finance = new FixtureFinanceProvider();
   const quickLogs = new FixtureQuickLogProvider();
   setFinanceProvider(finance);
@@ -53,12 +50,11 @@ export function createMemoirData(options: FixtureProviderOptions = {}): MemoirDa
     provider: createFixtureProvider(options),
     hero: createHeroProvider({ persona, hero: seed(today, persona).hero }),
     reflect: createReflectProvider({ today, persona }),
-    account: createAccountProvider({ persona, currency }),
+    account: createAccountProvider({ persona, currency: 'EUR' }),
     finance,
     quickLogs,
     queryClient: memoirQueryClient(),
     today,
-    currency,
     persona,
   };
 }
