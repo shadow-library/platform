@@ -12,6 +12,7 @@ import {
   type QuestOccurrence,
   type QuestProgress,
   type QuestSummary,
+  type Recurrence,
   RESCHEDULE_WINDOW_DAYS,
   reschedulesCountedFor,
   shiftDate,
@@ -19,7 +20,11 @@ import {
   STATE_LABELS,
   type Strictness,
   STRICTNESS_LABELS,
+  type Weekday,
+  WEEKDAY_LABELS,
+  WEEKDAYS,
 } from '@/lib/data';
+import { formatCount } from '@/lib/format';
 
 /** Only `strict_time`/`time_window` quests (anchor, routine) can be rescheduled — day-level strictness fails server-side `QST_008`. */
 const RESCHEDULABLE_STRICTNESSES: readonly Strictness[] = ['anchor', 'routine'];
@@ -30,7 +35,11 @@ const HP_COSTING_STRICTNESSES: readonly Strictness[] = ['anchor', 'routine'];
 /** Mirrors the server's Silver streak tier (`ruleset.streaks.tiers`, minDays 7) that raises high-intensity's break cost. */
 const LONG_STREAK_MIN_DAYS = 7;
 
+const WEEKDAY_RANGE_MIN = 3;
+
 export type OutcomeTone = 'kept' | 'partial' | 'open' | 'closed';
+
+export type StreakUnit = 'days' | 'occurrences';
 
 const COMPARISON_SYMBOL: Record<HealthComparison, string> = { gte: '≥', lte: '≤' };
 
@@ -92,13 +101,60 @@ export function thresholdPercent(occurrence: QuestOccurrence): number | null {
   return target > 0 ? Math.min(100, Math.round((current / target) * 100)) : null;
 }
 
+export function weekdaySpan(days: readonly Weekday[]): string {
+  const picked = WEEKDAYS.filter(day => days.includes(day));
+  if (picked.length === WEEKDAYS.length) return 'Every day';
+  const runs: Weekday[][] = [];
+  for (const day of picked) {
+    const run = runs[runs.length - 1];
+    const previous = run?.[run.length - 1];
+    if (run && previous && WEEKDAYS.indexOf(day) === WEEKDAYS.indexOf(previous) + 1) run.push(day);
+    else runs.push([day]);
+  }
+  return runs
+    .map(run =>
+      run.length >= WEEKDAY_RANGE_MIN ? `${WEEKDAY_LABELS[run[0] as Weekday]}–${WEEKDAY_LABELS[run[run.length - 1] as Weekday]}` : run.map(day => WEEKDAY_LABELS[day]).join(', '),
+    )
+    .join(', ');
+}
+
+export function recurrenceSummary(recurrence: Recurrence): string {
+  const { frequency, interval } = recurrence;
+  if (frequency === 'daily') return interval > 1 ? `Every ${interval} days` : 'Every day';
+  if (frequency === 'weekly') {
+    const span = recurrence.daysOfWeek.length > 0 ? weekdaySpan(recurrence.daysOfWeek) : 'No days set';
+    return interval > 1 ? `Every ${interval} weeks · ${span}` : span;
+  }
+  if (frequency === 'monthly') {
+    const dayOfMonth = recurrence.dayOfMonth ?? Number(recurrence.startDate.slice(8));
+    const cadence = interval > 1 ? `Every ${interval} months` : 'Monthly';
+    return dayOfMonth > 0 ? `${cadence} on day ${dayOfMonth}` : cadence;
+  }
+  return interval > 1 ? `Every ${interval} years` : 'Every year';
+}
+
+export function scheduleSummary(quest: Pick<Quest, 'recurrence' | 'startTimeMinutes'>): string {
+  return `${recurrenceSummary(quest.recurrence)} · ${formatTime(quest.startTimeMinutes) ?? 'all day'}`;
+}
+
+export function streakUnit(recurrence: Recurrence): StreakUnit {
+  return recurrence.frequency === 'daily' && recurrence.interval === 1 ? 'days' : 'occurrences';
+}
+
+function streakLabel(length: number, unit: StreakUnit): string {
+  return unit === 'days' ? `${length}-day streak` : `${length}-occurrence streak`;
+}
+
 export function questMeta(summary: QuestSummary): string {
-  const parts = [
-    summary.scheduleSummary,
-    summary.progress.currentStreakDays > 0 ? `${summary.progress.currentStreakDays}-day streak` : `longest ${summary.progress.longestStreakDays}`,
-    summary.progress.shields > 0 ? `${summary.progress.shields} shields` : null,
-    summary.quest.active ? null : 'kept as history',
-  ];
+  const { quest, progress } = summary;
+  const unit = streakUnit(quest.recurrence);
+  const streak =
+    progress.currentStreakDays > 0
+      ? streakLabel(progress.currentStreakDays, unit)
+      : progress.longestStreakDays > 0
+        ? `longest ${streakLabel(progress.longestStreakDays, unit)}`
+        : null;
+  const parts = [scheduleSummary(quest), streak, progress.shields > 0 ? formatCount(progress.shields, 'shield', 'shields') : null, quest.active ? null : 'kept as history'];
   return parts.filter(Boolean).join(' · ');
 }
 

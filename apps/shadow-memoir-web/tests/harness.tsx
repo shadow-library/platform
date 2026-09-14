@@ -11,6 +11,7 @@ const PATHS = [
   '/quests',
   '/quests/new',
   '/quests/$questId',
+  '/quests/$questId/edit',
   '/log',
   '/log/meals',
   '/log/weight',

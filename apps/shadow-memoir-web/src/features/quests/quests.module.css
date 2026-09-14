@@ -107,8 +107,13 @@
   color: inherit;
 }
 
-.questRow[data-inactive='true'] {
-  background: var(--sh-surface-well);
+.questRow[data-inactive='true'] .questName {
+  color: var(--sh-text-secondary);
+  font-weight: 500;
+}
+
+.questRow[data-inactive='true'] .questHead > :not(.questName) {
+  opacity: 0.7;
 }
 
 .questRow:focus-visible {
@@ -129,6 +134,13 @@
 }
 
 .questName {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   font-size: var(--sh-text-body);
   font-weight: 600;
 }
@@ -333,6 +345,7 @@
 }
 
 .form {
+  container: quest-form / inline-size;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -349,7 +362,18 @@
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+  align-items: center;
   flex-wrap: wrap;
+}
+
+.formHint {
+  margin: 0 auto 0 0;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-secondary);
+}
+
+.formRow .timeField {
+  width: 100%;
 }
 
 .fieldLabel {
@@ -360,8 +384,14 @@
 
 .strictnessGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
+}
+
+@container quest-form (min-width: 420px) {
+  .strictnessGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .strictnessCard {
@@ -381,6 +411,12 @@
 .strictnessCard[data-selected='true'] {
   background: var(--sh-accent-soft);
   border-color: var(--sh-accent);
+}
+
+.strictnessCard:disabled,
+.dayToggle:disabled {
+  cursor: not-allowed;
+  opacity: var(--sh-disabled-opacity);
 }
 
 .strictnessCard:focus-visible {

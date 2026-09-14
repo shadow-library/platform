@@ -4,9 +4,10 @@ import { Alert, Badge, Button, Card, DescriptionList, EmptyState, Skeleton, Stat
 
 import { DataState } from '@/components/DataState';
 import { formatShortDate, STAT_LABELS, STATE_LABELS, STRICTNESS_LABELS, STRICTNESS_RULES, useMemoirData, useQuestDetail } from '@/lib/data';
+import { formatCount } from '@/lib/format';
 
 import { useQuestActions } from './quest-actions';
-import { adherenceLabel, canReschedule, outcomeTone, questThresholdLabel, rescheduleSummary } from './quest-presenters';
+import { adherenceLabel, canReschedule, outcomeTone, questThresholdLabel, rescheduleSummary, scheduleSummary, streakUnit } from './quest-presenters';
 import styles from './quests.module.css';
 
 const DEFAULT_HEALTH_THRESHOLD = { metricKey: 'steps' as const, comparison: 'gte' as const, value: 8000 };
@@ -68,7 +69,7 @@ function QuestDetailBody({ data, actions }: QuestDetailBodyProps): ReactElement 
   const { today } = useMemoirData();
   const { quest, progress } = data;
   const occurrence = data.todayOccurrence ?? null;
-  const streakUnit = quest.recurrence.frequency === 'daily' && quest.recurrence.interval === 1 ? 'days' : 'occurrences';
+  const unit = streakUnit(quest.recurrence);
   const hasHistory = progress.adherence30d !== null;
   const heading = useRef<HTMLHeadingElement>(null);
   const threshold = quest.healthThreshold;
@@ -96,11 +97,11 @@ function QuestDetailBody({ data, actions }: QuestDetailBodyProps): ReactElement 
                   <Tag>{STAT_LABELS[quest.statAffinity]}</Tag>
                   <Badge variant="outline">{STRICTNESS_LABELS[quest.strictness]}</Badge>
                   <Badge variant="soft" intent="neutral">
-                    {data.scheduleSummary}
+                    {scheduleSummary(quest)}
                   </Badge>
                   {progress.shields > 0 ? (
                     <Badge variant="soft" intent="neutral">
-                      {progress.shields} shields
+                      {formatCount(progress.shields, 'shield', 'shields')}
                     </Badge>
                   ) : null}
                 </div>
@@ -114,14 +115,14 @@ function QuestDetailBody({ data, actions }: QuestDetailBodyProps): ReactElement 
               ) : null}
             </div>
             <div className={styles.stats}>
-              <Statistic label="Current streak" value={progress.currentStreakDays} unit={streakUnit} size="sm" />
+              <Statistic label="Current streak" value={progress.currentStreakDays} unit={unit} size="sm" />
               {hasHistory ? (
                 <Statistic label="Kept, 30 days" value={progress.adherence30d ?? 0} size="sm" format={{ style: 'percent', maximumFractionDigits: 0 }} />
               ) : (
                 <span className={styles.questMeta}>Kept, 30 days — not enough history yet</span>
               )}
               <Statistic label="XP from this quest" value={progress.xpEarned} size="sm" />
-              <Statistic label="Longest streak" value={progress.longestStreakDays} unit={streakUnit} size="sm" />
+              <Statistic label="Longest streak" value={progress.longestStreakDays} unit={unit} size="sm" />
             </div>
           </Card.Body>
         </Card>
@@ -172,6 +173,11 @@ function QuestDetailBody({ data, actions }: QuestDetailBodyProps): ReactElement 
               </DescriptionList.Item>
             </DescriptionList>
             <div className={styles.actionRow}>
+              <Button size="sm" variant="secondary" asChild>
+                <Link to="/quests/$questId/edit" params={{ questId: quest.id }}>
+                  Edit quest
+                </Link>
+              </Button>
               <Button size="sm" variant="secondary" asChild>
                 <Link
                   to="/quests/new"

@@ -39,6 +39,7 @@ import { Route as AppLogHealthRouteImport } from './../src/routes/_app/log.healt
 import { Route as AppHeroRecoveryRouteImport } from './../src/routes/_app/hero.recovery'
 import { Route as AppFinanceSubscriptionsRouteImport } from './../src/routes/_app/finance.subscriptions'
 import { Route as AppFinanceCategoriesRouteImport } from './../src/routes/_app/finance.categories'
+import { Route as AppQuestsQuestIdEditRouteImport } from './../src/routes/_app/quests.$questId_.edit'
 import { Route as AppFinanceExpensesExpenseIdRouteImport } from './../src/routes/_app/finance.expenses.$expenseId'
 
 const LoginRoute = LoginRouteImport.update({
@@ -191,6 +192,11 @@ const AppFinanceCategoriesRoute = AppFinanceCategoriesRouteImport.update({
   path: '/finance/categories',
   getParentRoute: () => AppRoute,
 } as any)
+const AppQuestsQuestIdEditRoute = AppQuestsQuestIdEditRouteImport.update({
+  id: '/quests/$questId_/edit',
+  path: '/quests/$questId/edit',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppFinanceExpensesExpenseIdRoute =
   AppFinanceExpensesExpenseIdRouteImport.update({
     id: '/finance/expenses/$expenseId',
@@ -229,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/quests/': typeof AppQuestsIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/finance/expenses/$expenseId': typeof AppFinanceExpensesExpenseIdRoute
+  '/quests/$questId/edit': typeof AppQuestsQuestIdEditRoute
 }
 export interface FileRoutesByTo {
   '/erasure': typeof ErasureRoute
@@ -260,6 +267,7 @@ export interface FileRoutesByTo {
   '/quests': typeof AppQuestsIndexRoute
   '/settings': typeof AppSettingsIndexRoute
   '/finance/expenses/$expenseId': typeof AppFinanceExpensesExpenseIdRoute
+  '/quests/$questId/edit': typeof AppQuestsQuestIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -294,6 +302,7 @@ export interface FileRoutesById {
   '/_app/quests/': typeof AppQuestsIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/finance/expenses/$expenseId': typeof AppFinanceExpensesExpenseIdRoute
+  '/_app/quests/$questId_/edit': typeof AppQuestsQuestIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -328,6 +337,7 @@ export interface FileRouteTypes {
     | '/quests/'
     | '/settings/'
     | '/finance/expenses/$expenseId'
+    | '/quests/$questId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/erasure'
@@ -359,6 +369,7 @@ export interface FileRouteTypes {
     | '/quests'
     | '/settings'
     | '/finance/expenses/$expenseId'
+    | '/quests/$questId/edit'
   id:
     | '__root__'
     | '/_app'
@@ -392,6 +403,7 @@ export interface FileRouteTypes {
     | '/_app/quests/'
     | '/_app/settings/'
     | '/_app/finance/expenses/$expenseId'
+    | '/_app/quests/$questId_/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -612,6 +624,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFinanceCategoriesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/quests/$questId_/edit': {
+      id: '/_app/quests/$questId_/edit'
+      path: '/quests/$questId/edit'
+      fullPath: '/quests/$questId/edit'
+      preLoaderRoute: typeof AppQuestsQuestIdEditRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/finance/expenses/$expenseId': {
       id: '/_app/finance/expenses/$expenseId'
       path: '/finance/expenses/$expenseId'
@@ -665,6 +684,7 @@ interface AppRouteChildren {
   AppQuestsIndexRoute: typeof AppQuestsIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppFinanceExpensesExpenseIdRoute: typeof AppFinanceExpensesExpenseIdRoute
+  AppQuestsQuestIdEditRoute: typeof AppQuestsQuestIdEditRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -691,6 +711,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppQuestsIndexRoute: AppQuestsIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppFinanceExpensesExpenseIdRoute: AppFinanceExpensesExpenseIdRoute,
+  AppQuestsQuestIdEditRoute: AppQuestsQuestIdEditRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

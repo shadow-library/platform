@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { breakCostNote, breakStreakNote, rescheduleSummary } from '@/features/quests';
-import { formatShortDate, type QuestProgress } from '@/lib/data';
+import { breakCostNote, breakStreakNote, questMeta, rescheduleSummary, scheduleSummary } from '@/features/quests';
+import { formatShortDate, type Quest, type QuestProgress, type QuestSummary, type Recurrence } from '@/lib/data';
 
 const TODAY = '2026-08-22';
 
@@ -84,5 +84,73 @@ describe('breakStreakNote', () => {
 
   it('should say the streak breaks without a shield', () => {
     expect(breakStreakNote('routine', 0)).toBe('Breaks the streak.');
+  });
+});
+
+function recurrence(partial: Partial<Recurrence>): Recurrence {
+  return { frequency: 'weekly', interval: 1, daysOfWeek: [], dayOfMonth: null, startDate: '2026-01-01', end: { kind: 'never' }, exceptions: [], ...partial };
+}
+
+function summary(questPatch: Partial<Quest>, progressPatch: Partial<QuestProgress> = {}): QuestSummary {
+  const quest: Quest = {
+    id: 'q1',
+    name: 'Quest',
+    notes: null,
+    startTimeMinutes: null,
+    durationMinutes: 30,
+    statAffinity: 'body',
+    strictness: 'routine',
+    optionalStreakOptIn: false,
+    recurrence: recurrence({ frequency: 'daily', daysOfWeek: [] }),
+    consequences: [],
+    moduleLink: null,
+    notification: { enabled: false, leadMinutes: 10 },
+    healthThreshold: null,
+    preCommit: false,
+    active: true,
+    createdAt: '2026-01-01',
+    updatedAt: '2026-01-01',
+    ...questPatch,
+  };
+  return { quest, progress: { ...progress([]), ...progressPatch }, scheduleLocked: false, scheduleSummary: '' };
+}
+
+describe('scheduleSummary', () => {
+  it('should name a daily quest without weekdays as every day', () => {
+    expect(scheduleSummary({ recurrence: recurrence({ frequency: 'daily' }), startTimeMinutes: null })).toBe('Every day · all day');
+  });
+
+  it('should show the interval of an every-N-days quest', () => {
+    expect(scheduleSummary({ recurrence: recurrence({ frequency: 'daily', interval: 3 }), startTimeMinutes: 420 })).toBe('Every 3 days · 07:00');
+  });
+
+  it('should collapse consecutive weekdays into a range and list the rest', () => {
+    expect(scheduleSummary({ recurrence: recurrence({ daysOfWeek: ['fri', 'mon', 'tue', 'wed', 'thu'] }), startTimeMinutes: null })).toBe('Mon–Fri · all day');
+    expect(scheduleSummary({ recurrence: recurrence({ daysOfWeek: ['tue', 'thu', 'sat'] }), startTimeMinutes: 1080 })).toBe('Tue, Thu, Sat · 18:00');
+    expect(scheduleSummary({ recurrence: recurrence({ daysOfWeek: ['mon', 'tue', 'wed', 'sat', 'sun'] }), startTimeMinutes: null })).toBe('Mon–Wed, Sat, Sun · all day');
+  });
+
+  it('should describe a monthly quest by its day of the month', () => {
+    expect(scheduleSummary({ recurrence: recurrence({ frequency: 'monthly', dayOfMonth: 15 }), startTimeMinutes: null })).toBe('Monthly on day 15 · all day');
+  });
+});
+
+describe('questMeta', () => {
+  it('should start a daily quest with its schedule and pluralise a single shield', () => {
+    expect(questMeta(summary({}, { currentStreakDays: 8, shields: 1 }))).toBe('Every day · all day · 8-day streak · 1 shield');
+  });
+
+  it('should count the streak of a non-daily quest in occurrences', () => {
+    const weekly = summary({ recurrence: recurrence({ daysOfWeek: ['mon', 'tue', 'wed', 'thu', 'fri'] }) }, { currentStreakDays: 4, shields: 2 });
+    expect(questMeta(weekly)).toBe('Mon–Fri · all day · 4-occurrence streak · 2 shields');
+  });
+
+  it('should fall back to the longest streak and omit it for a fresh quest', () => {
+    expect(questMeta(summary({}, { longestStreakDays: 12 }))).toBe('Every day · all day · longest 12-day streak');
+    expect(questMeta(summary({}))).toBe('Every day · all day');
+  });
+
+  it('should mark an inactive quest as kept as history', () => {
+    expect(questMeta(summary({ active: false }))).toBe('Every day · all day · kept as history');
   });
 });

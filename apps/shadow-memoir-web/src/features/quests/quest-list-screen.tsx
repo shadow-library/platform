@@ -1,26 +1,44 @@
 import { Link, useNavigate } from '@tanstack/react-router';
-import { type ReactElement, useState } from 'react';
-import { Alert, Badge, Button, Card, Input, SegmentedControl, Skeleton, Tag } from '@shadow-library/ui';
+import { type ReactElement, useRef, useState } from 'react';
+import { Alert, Badge, Button, Card, EmptyState, Input, SegmentedControl, Skeleton, Tag } from '@shadow-library/ui';
 
+import { DataState } from '@/components/DataState';
 import { ChevronRightIcon } from '@/components/icons';
 import { type QuestFilter, type QuestSummary, STAT_LABELS, STRICTNESS_LABELS, useQuestList } from '@/lib/data';
+import { formatCount } from '@/lib/format';
 
 import { adherenceLabel, outcomeTone, questMeta } from './quest-presenters';
 import styles from './quests.module.css';
 
-const FILTER_NOTES: Record<QuestFilter, (count: number) => string> = {
-  active: count => `${count} active quests`,
-  inactive: count => `${count} paused or archived quests · history intact`,
-  all: count => `${count} quests in total`,
+const FILTER_NOUNS: Record<QuestFilter, [singular: string, plural: string]> = {
+  active: ['active quest', 'active quests'],
+  inactive: ['paused or archived quest', 'paused or archived quests'],
+  all: ['quest', 'quests'],
 };
+
+const FILTER_EMPTY: Record<QuestFilter, { title: string; description: string }> = {
+  active: { title: 'No active quests', description: 'Every quest is paused or archived. Reactivate one from Inactive, or make a new promise.' },
+  inactive: { title: 'No paused or archived quests', description: 'Quests you pause or archive land here with their history intact.' },
+  all: { title: 'No quests yet', description: 'A quest is a promise you make to yourself, kept one day at a time.' },
+};
+
+function matchesFilter(summary: QuestSummary, filter: QuestFilter): boolean {
+  if (filter === 'all') return true;
+  return filter === 'active' ? summary.quest.active : !summary.quest.active;
+}
+
+function filterNote(filter: QuestFilter, total: number, shown: number, searching: boolean): string {
+  const [singular, plural] = FILTER_NOUNS[filter];
+  if (searching) return `${shown} of ${formatCount(total, singular, plural)}`;
+  const note = formatCount(total, singular, plural);
+  if (filter === 'inactive') return `${note} · history intact`;
+  return filter === 'all' ? `${note} in total` : note;
+}
 
 export function QuestListScreen(): ReactElement {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState<QuestFilter>('active');
-  const [search, setSearch] = useState('');
-  const quests = useQuestList(filter);
-
-  const shown = (quests.data ?? []).filter(item => item.quest.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const quests = useQuestList('all');
+  const createQuest = (): void => void navigate({ to: '/quests/new' });
 
   return (
     <section className={styles.screen} aria-labelledby="quests-title">
@@ -31,25 +49,53 @@ export function QuestListScreen(): ReactElement {
         <p className={styles.subtitle}>Every promise you have made to yourself, active or kept as history.</p>
       </header>
 
+      <DataState
+        query={quests}
+        isEmpty={data => data.length === 0}
+        skeleton={<Skeleton.List rows={6} />}
+        empty={<EmptyState title={FILTER_EMPTY.all.title} description={FILTER_EMPTY.all.description} action={{ label: 'Create your first quest', onClick: createQuest }} />}
+      >
+        {data => <QuestLibrary quests={data} onCreate={createQuest} />}
+      </DataState>
+    </section>
+  );
+}
+
+interface QuestLibraryProps {
+  quests: QuestSummary[];
+  onCreate: () => void;
+}
+
+function QuestLibrary({ quests, onCreate }: QuestLibraryProps): ReactElement {
+  const [filter, setFilter] = useState<QuestFilter>('active');
+  const [search, setSearch] = useState('');
+  const searchInput = useRef<HTMLInputElement>(null);
+
+  const query = search.trim();
+  const inFilter = quests.filter(summary => matchesFilter(summary, filter));
+  const shown = inFilter.filter(summary => summary.quest.name.toLowerCase().includes(query.toLowerCase()));
+
+  return (
+    <>
       <div className={styles.toolbar}>
-        <Input value={search} onValueChange={setSearch} placeholder="Search quests" clearable aria-label="Search quests" className={styles.search} />
+        <Input ref={searchInput} value={search} onValueChange={setSearch} placeholder="Search quests" clearable aria-label="Search quests" className={styles.search} />
         <SegmentedControl value={filter} onValueChange={value => setFilter(value as QuestFilter)}>
           <SegmentedControl.Item value="active">Active</SegmentedControl.Item>
           <SegmentedControl.Item value="all">All</SegmentedControl.Item>
           <SegmentedControl.Item value="inactive">Inactive</SegmentedControl.Item>
         </SegmentedControl>
         <span className={styles.toolbarEnd}>
-          <Button variant="primary" onClick={() => void navigate({ to: '/quests/new' })}>
+          <Button variant="primary" onClick={onCreate}>
             New quest
           </Button>
         </span>
       </div>
 
-      <p className={styles.filterNote}>{FILTER_NOTES[filter](shown.length)}</p>
+      <p className={styles.filterNote} aria-live="polite">
+        {filterNote(filter, inFilter.length, shown.length, query.length > 0)}
+      </p>
 
-      {quests.isPending ? <Skeleton.List rows={6} /> : null}
-
-      {quests.data ? (
+      {shown.length > 0 ? (
         <Card padding="sm" className={styles.listCard}>
           <Card.Body className={styles.listBody}>
             <ul className={styles.list}>
@@ -59,7 +105,22 @@ export function QuestListScreen(): ReactElement {
             </ul>
           </Card.Body>
         </Card>
-      ) : null}
+      ) : query.length > 0 ? (
+        <EmptyState
+          size="inline"
+          title={`No quests match “${query}”`}
+          description="Try a different word, or clear the search to see every quest in this view."
+          action={{
+            label: 'Clear search',
+            onClick: () => {
+              setSearch('');
+              searchInput.current?.focus();
+            },
+          }}
+        />
+      ) : (
+        <EmptyState size="inline" title={FILTER_EMPTY[filter].title} description={FILTER_EMPTY[filter].description} />
+      )}
 
       {filter === 'active' ? null : (
         <Alert intent="info" title="Inactive quests keep their history">
@@ -67,7 +128,7 @@ export function QuestListScreen(): ReactElement {
           record.
         </Alert>
       )}
-    </section>
+    </>
   );
 }
 
