@@ -1,49 +1,80 @@
 /**
  * Importing npm packages
  */
-import { eq } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, TransactionRollbackError } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
 import { OwnerScopedRepository } from '@modules/auth';
-import { type AiConsent, schema } from '@server/database';
+import { type AiConsent, nextSyncSeq, schema } from '@server/database';
 
 /**
  * Defining types
  */
 
+export interface AiConsentDecision {
+  dataClass: AiConsent.DataClass;
+  granted: boolean;
+}
+
 /**
  * Declaring the constants
  */
 
+const CONSENT_KEY = [schema.aiConsents.accountId, schema.aiConsents.dataClass];
+
+/** A declined class is a row withdrawn at the moment it was recorded: `withdrawn_at IS NULL` stays the only "granted" test, so a decision never needs a nullable `granted_at`. */
 @Injectable()
 export class AiConsentRepository extends OwnerScopedRepository {
   async list(): Promise<AiConsent.Row[]> {
     return (await this.scoped(schema.aiConsents)) as AiConsent.Row[];
   }
 
-  /** Re-grant upserts the same row (§10.3): grant/withdraw history is the latest transition, never a growing log. */
-  async grant(dataClass: AiConsent.DataClass): Promise<AiConsent.Row> {
+  async grant(dataClass: AiConsent.DataClass): Promise<void> {
     const accountId = this.requireAccountId();
     const now = new Date();
-    const [row] = await this.db
+    await this.db
       .insert(schema.aiConsents)
       .values({ accountId, dataClass, grantedAt: now, withdrawnAt: null })
       .onConflictDoUpdate({
-        target: [schema.aiConsents.accountId, schema.aiConsents.dataClass],
-        set: { grantedAt: now, withdrawnAt: null },
-        setWhere: eq(schema.aiConsents.accountId, accountId),
-      })
-      .returning();
-    if (!row) throw AppError.internal('ai_consents upsert returned no row');
-    return row;
+        target: CONSENT_KEY,
+        set: { grantedAt: now, withdrawnAt: null, syncSeq: nextSyncSeq() },
+        setWhere: and(eq(schema.aiConsents.accountId, accountId), isNotNull(schema.aiConsents.withdrawnAt)),
+      });
   }
 
-  /** No-op when the class was never granted — nothing to withdraw, and no row is created for the sake of one. */
   async withdraw(dataClass: AiConsent.DataClass): Promise<void> {
-    await this.scopedUpdate(schema.aiConsents, { withdrawnAt: new Date() }, eq(schema.aiConsents.dataClass, dataClass));
+    const accountId = this.requireAccountId();
+    const now = new Date();
+    await this.db
+      .insert(schema.aiConsents)
+      .values({ accountId, dataClass, grantedAt: now, withdrawnAt: now })
+      .onConflictDoUpdate({
+        target: CONSENT_KEY,
+        set: { withdrawnAt: now, syncSeq: nextSyncSeq() },
+        setWhere: and(eq(schema.aiConsents.accountId, accountId), isNull(schema.aiConsents.withdrawnAt)),
+      });
+  }
+
+  /**
+   * The unique `(account_id, data_class)` key is the guard: a concurrent first decision waits on the winner's rows and then inserts none, and
+   * any partial insert is rolled back. Callers pass every class in one fixed order, so two racing decisions cannot deadlock on each other's keys.
+   */
+  async recordFirstDecision(decisions: AiConsentDecision[]): Promise<boolean> {
+    const accountId = this.requireAccountId();
+    const now = new Date();
+    const values = decisions.map(({ dataClass, granted }) => ({ accountId, dataClass, grantedAt: now, withdrawnAt: granted ? null : now }));
+    try {
+      await this.transaction(async tx => {
+        const recorded = await tx.insert(schema.aiConsents).values(values).onConflictDoNothing({ target: CONSENT_KEY }).returning({ dataClass: schema.aiConsents.dataClass });
+        if (recorded.length < values.length) tx.rollback();
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof TransactionRollbackError) return false;
+      throw error;
+    }
   }
 }

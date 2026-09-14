@@ -70,7 +70,7 @@ export class AiController {
   @RequireScope('memoir:account')
   @RespondFor(200, AiConsentListResponseDto)
   async putConsents(@Body() body: AiConsentUpdateDto): Promise<{ consents: AiConsentView[] }> {
-    return { consents: await this.aiConsentService.update(body.grants) };
+    return { consents: await this.aiConsentService.update(body) };
   }
 
   @Put('/scheduled-query')

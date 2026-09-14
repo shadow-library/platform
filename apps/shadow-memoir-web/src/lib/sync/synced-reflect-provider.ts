@@ -1,8 +1,9 @@
 import { toISODate } from '@shadow-library/ui';
 
-import { aiApi, type AiConsentResponseDto } from '@/lib/apis';
+import { aiApi } from '@/lib/apis';
 import {
   type AiConsent,
+  type AiConsentGrants,
   type AiRequest,
   type AiRequestState,
   type AiResult,
@@ -66,7 +67,9 @@ const CANCEL_CONFLICT_COPY: Partial<Record<AiRequestState, string>> = {
 
 const WAITING_STATES: AiRequestState[] = ['queued', 'processing', 'held'];
 
-const CONSENT_DECIDED_ELSEWHERE = 'Your consents were already decided on another device, so nothing was changed. They are shown now.';
+const CONSENT_SAVED = 'Saved. Either consent can be withdrawn on its own, and withdrawing one excludes it from future reads.';
+
+const CONSENT_CLASSES = { journal: 'journal_reflection_reason', health: 'health' } as const;
 
 function applied(message: string): SettledCommandResult {
   return { status: 'applied', message, xpAwarded: 0, coinsAwarded: 0 };
@@ -97,10 +100,6 @@ function activeTask(tasks: AiTaskRow[]): AiTaskRow | undefined {
   if (waiting) return waiting;
   const newest = tasks[0];
   return newest && TASK_STATES[newest.status] === 'failed' ? newest : undefined;
-}
-
-function isDecided(consent: AiConsentResponseDto): boolean {
-  return Boolean(consent.grantedAt ?? consent.withdrawnAt);
 }
 
 function toResult(row: AiResultRow, task: AiTaskRow | undefined): AiResult {
@@ -310,30 +309,38 @@ export class SyncedReflectProvider implements ReflectProvider {
     }
   }
 
-  private async setConsent(consent: { journal: boolean; health: boolean }): Promise<SettledCommandResult> {
+  /** An undecided mirror may be stale, so its save is a first decision the server refuses once any device has decided. */
+  private async setConsent(consent: AiConsentGrants): Promise<SettledCommandResult> {
+    const onlyIfUndecided = projectAiRows(this.sync.domains()).decidedClasses.size === 0;
     try {
-      if (await this.consentDecidedElsewhere()) {
-        await this.sync.sync();
-        return { status: 'rejected', message: CONSENT_DECIDED_ELSEWHERE };
-      }
       await aiApi.putConsents({
         grants: [
-          { dataClass: 'journal_reflection_reason', granted: consent.journal },
-          { dataClass: 'health', granted: consent.health },
+          { dataClass: CONSENT_CLASSES.journal, granted: consent.journal },
+          { dataClass: CONSENT_CLASSES.health, granted: consent.health },
         ],
+        onlyIfUndecided,
       });
       await this.sync.sync();
-      return applied('Saved. Either consent can be withdrawn on its own, and withdrawing one excludes it from future reads.');
+      return applied(CONSENT_SAVED);
     } catch (error) {
-      return commandRefusal(error, 'That consent could not be saved.');
+      const refusal = commandRefusal(error, 'That consent could not be saved.');
+      if (refusal.error?.code !== 'AI_011') return refusal;
+      await this.sync.sync();
+      if (this.storedConsentIs(consent)) return applied(CONSENT_SAVED);
+      await this.sync.sync();
+      return this.storedConsentIs(consent) ? applied(CONSENT_SAVED) : refusal;
     }
   }
 
-  /** A mirror that has not pulled since another device decided must not overwrite that decision. */
-  private async consentDecidedElsewhere(): Promise<boolean> {
-    if (projectAiRows(this.sync.domains()).decidedClasses.size > 0) return false;
-    const { consents } = await aiApi.getConsents();
-    return consents.some(isDecided);
+  /**
+   * A refused first decision can be this device's own earlier save whose response was lost; only a different stored choice was made elsewhere.
+   * The first `sync()` after a refusal may join a pass that pulled before the decision landed, hence the second check.
+   */
+  private storedConsentIs(consent: AiConsentGrants): boolean {
+    const { decidedClasses, grantedClasses } = projectAiRows(this.sync.domains());
+    return (Object.keys(CONSENT_CLASSES) as (keyof AiConsentGrants)[]).every(
+      key => decidedClasses.has(CONSENT_CLASSES[key]) && grantedClasses.has(CONSENT_CLASSES[key]) === consent[key],
+    );
   }
 
   private submit(question: string): Promise<SettledCommandResult> {

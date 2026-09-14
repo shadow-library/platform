@@ -40,10 +40,9 @@ const RESULT = {
   createdAt: '2026-08-25T06:02:00.000Z',
 };
 
-const UNDECIDED_CONSENTS = [
-  { dataClass: 'journal_reflection_reason', granted: false, grantedAt: null, withdrawnAt: null },
-  { dataClass: 'health', granted: false, grantedAt: null, withdrawnAt: null },
-];
+const DECLINED = (dataClass: string): Record<string, unknown> => ({ dataClass, grantedAt: '2026-08-20T00:00:00.000Z', withdrawnAt: '2026-08-20T00:00:00.000Z' });
+
+const DECIDED_ELSEWHERE = { code: 'AI_011', type: 'Conflict', message: 'AI consent has already been decided for this account' };
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -68,30 +67,92 @@ describe('Coaching consent', () => {
     expect(coach.consent).toEqual({ journal: true, health: false, decided: true });
   });
 
-  it('should not overwrite consents another device decided since the last pull', async () => {
-    const { calls } = httpFake({
-      'GET /api/v1/ai/consents': () => ({ body: { consents: [{ ...UNDECIDED_CONSENTS[0], granted: true, grantedAt: '2026-08-20T00:00:00.000Z' }, UNDECIDED_CONSENTS[1]] } }),
-    });
-
-    const result = await (await provider()).dispatchCommand({ type: 'ai.setConsent', consent: { journal: false, health: false } });
-    expect(result).toMatchObject({ status: 'rejected', message: expect.stringContaining('already decided on another device') });
-    expect(calls.some(call => call.method === 'PUT')).toBe(false);
-  });
-
-  it('should send both classes as one grant list', async () => {
-    const { calls } = httpFake({
-      'GET /api/v1/ai/consents': () => ({ body: { consents: UNDECIDED_CONSENTS } }),
-      'PUT /api/v1/ai/consents': () => ({ body: { consents: [] } }),
-    });
+  it('should send a first decision as a write the server records only if undecided', async () => {
+    const { calls } = httpFake({ 'PUT /api/v1/ai/consents': () => ({ body: { consents: [] } }) });
 
     const result = await (await provider()).dispatchCommand({ type: 'ai.setConsent', consent: { journal: true, health: false } });
     expect(result.status).toBe('applied');
+    expect(calls.some(call => call.method === 'GET')).toBe(false);
     expect(calls.at(-1)?.body).toEqual({
       grants: [
         { dataClass: 'journal_reflection_reason', granted: true },
         { dataClass: 'health', granted: false },
       ],
+      onlyIfUndecided: true,
     });
+  });
+
+  it('should change an already decided consent with the normal write', async () => {
+    const { calls } = httpFake({ 'PUT /api/v1/ai/consents': () => ({ body: { consents: [] } }) });
+
+    const reflect = await provider({ ai_consents: [DECLINED('journal_reflection_reason'), DECLINED('health')] });
+    const result = await reflect.dispatchCommand({ type: 'ai.setConsent', consent: { journal: false, health: true } });
+    expect(result.status).toBe('applied');
+    expect(calls.at(-1)?.body).toMatchObject({ onlyIfUndecided: false });
+  });
+
+  it('should say the choice was made on another device when a first decision is refused', async () => {
+    httpFake({ 'PUT /api/v1/ai/consents': () => ({ status: 409, body: DECIDED_ELSEWHERE }) });
+    const decidedElsewhere = page({ ai_consents: [{ dataClass: 'journal_reflection_reason', grantedAt: '2026-08-20T00:00:00.000Z', withdrawnAt: null }, DECLINED('health')] });
+    const { engine } = createTestEngine({ pages: [page({}), decidedElsewhere], today: TODAY });
+    await engine.start();
+    const reflect = new SyncedReflectProvider(engine);
+
+    const result = await reflect.dispatchCommand({ type: 'ai.setConsent', consent: { journal: false, health: false } });
+    expect(result).toMatchObject({
+      status: 'rejected',
+      message: 'Your consent choice was already made on another device, so nothing was changed here.',
+      error: { code: 'AI_011' },
+    });
+    expect((await reflect.getCoach()).consent).toEqual({ journal: true, health: false, decided: true });
+  });
+
+  it('should count a refused first decision that matches the stored choice as saved', async () => {
+    httpFake({ 'PUT /api/v1/ai/consents': () => ({ status: 409, body: DECIDED_ELSEWHERE }) });
+    const { engine } = createTestEngine({ pages: [page({}), page({ ai_consents: [DECLINED('journal_reflection_reason'), DECLINED('health')] })], today: TODAY });
+    await engine.start();
+    const reflect = new SyncedReflectProvider(engine);
+
+    const result = await reflect.dispatchCommand({ type: 'ai.setConsent', consent: { journal: false, health: false } });
+    expect(result.status).toBe('applied');
+    expect((await reflect.getCoach()).consent).toEqual({ journal: false, health: false, decided: true });
+  });
+
+  it('should re-check the stored consent after a sync that started before the refusal', async () => {
+    const serverRows: Record<string, unknown>[] = [];
+    let releaseStalePull = (): void => undefined;
+    let stalePull: Promise<void> | null = null;
+    let pulls = 0;
+    const { engine } = createTestEngine({
+      today: TODAY,
+      fetchImpl: server => async (input, init) => {
+        if (!String(input).includes('/sync/delta')) return server.fetchImpl(input, init);
+        pulls += 1;
+        const rows = [...serverRows];
+        if (stalePull) await stalePull;
+        return new Response(JSON.stringify({ ...page({ ai_consents: rows }), cursor: String(pulls) }), {
+          status: 200,
+          headers: { 'x-sync-epoch': server.epoch, 'content-type': 'application/json' },
+        });
+      },
+    });
+    await engine.start();
+    const reflect = new SyncedReflectProvider(engine);
+
+    stalePull = new Promise<void>(resolve => (releaseStalePull = resolve));
+    const background = engine.sync({ background: true });
+    await new Promise(resolve => setTimeout(resolve, 20));
+    serverRows.push(DECLINED('journal_reflection_reason'), DECLINED('health'));
+    httpFake({ 'PUT /api/v1/ai/consents': () => ({ status: 409, body: DECIDED_ELSEWHERE }) });
+
+    const pending = reflect.dispatchCommand({ type: 'ai.setConsent', consent: { journal: false, health: false } });
+    await new Promise(resolve => setTimeout(resolve, 20));
+    stalePull = null;
+    releaseStalePull();
+    await background;
+
+    expect((await pending).status).toBe('applied');
+    expect((await reflect.getCoach()).consent).toEqual({ journal: false, health: false, decided: true });
   });
 });
 

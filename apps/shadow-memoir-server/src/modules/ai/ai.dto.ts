@@ -81,6 +81,13 @@ export class AiConsentGrantDto {
 export class AiConsentUpdateDto {
   @Field(() => [AiConsentGrantDto], { minItems: 1 })
   grants: AiConsentGrantDto[];
+
+  @Field({
+    optional: true,
+    description:
+      "true records the account's first decision only: `grants` must name every data class exactly once (AI_012), and the whole write is refused with AI_011 when any class has already been decided",
+  })
+  onlyIfUndecided?: boolean;
 }
 
 @Schema()
@@ -91,7 +98,12 @@ export class AiConsentResponseDto {
   @Field()
   granted: boolean;
 
-  @Field({ optional: true, nullable: true, format: 'date-time', description: 'Absent when this data class has never been granted' })
+  @Field({
+    optional: true,
+    nullable: true,
+    format: 'date-time',
+    description: 'Absent when this data class has never been decided; equals `withdrawnAt` when the class was declined without ever being granted',
+  })
   grantedAt?: string | null;
 
   @Field({ optional: true, nullable: true, format: 'date-time' })

@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from '@shadow-library/ui';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AiScreen } from '@/features/ai';
@@ -12,7 +13,7 @@ import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen } from './harness';
 import { httpFake } from './http-fake';
-import { createSyncedTestData, createTestEngine, sharedBacking, type TestEngineOptions } from './sync-harness';
+import { createSyncedTestData, createTestEngine, type FakeServer, sharedBacking, type TestEngineOptions } from './sync-harness';
 
 const TODAY = '2026-08-22';
 
@@ -377,7 +378,10 @@ describe('Coach screen', () => {
   });
 
   describe('when synced', () => {
-    afterEach(() => vi.unstubAllGlobals());
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
 
     function renderSyncedAsk(options: TestEngineOptions = {}): ReturnType<typeof createTestEngine> {
       const test = createTestEngine({ today: TODAY, ...options });
@@ -426,7 +430,6 @@ describe('Coach screen', () => {
         { dataClass: 'health', granted: false, grantedAt: null, withdrawnAt: null },
       ];
       const fake = httpFake({
-        'GET /api/v1/ai/consents': () => ({ body: { consents: undecided } }),
         'PUT /api/v1/ai/consents': async () => {
           await held;
           return { body: { consents: undecided } };
@@ -445,6 +448,57 @@ describe('Coach screen', () => {
       release();
       await waitFor(() => expect(screen.queryByRole('button', { name: /Saving/ })).toBeNull());
       expect(fake.count('PUT', '/api/v1/ai/consents')).toBe(1);
+    });
+
+    function consentServer(): { stored: Map<string, Record<string, unknown>>; fetchImpl: (server: FakeServer) => typeof fetch } {
+      const stored = new Map<string, Record<string, unknown>>();
+      httpFake({
+        'PUT /api/v1/ai/consents': call => {
+          const body = call.body as { grants: { dataClass: string; granted: boolean }[]; onlyIfUndecided?: boolean };
+          if (body.onlyIfUndecided && stored.size > 0)
+            return { status: 409, body: { code: 'AI_011', type: 'Conflict', message: 'AI consent has already been decided for this account' } };
+          const now = new Date().toISOString();
+          for (const grant of body.grants) stored.set(grant.dataClass, { dataClass: grant.dataClass, grantedAt: now, withdrawnAt: grant.granted ? null : now });
+          return { body: { consents: [] } };
+        },
+      });
+      const fetchImpl =
+        (server: FakeServer): typeof fetch =>
+        async (input, init) => {
+          if (!String(input).includes('/sync/delta')) return server.fetchImpl(input, init);
+          const page: DeltaPage = { cursor: '1', hasMore: false, domains: { ai_consents: [...stored.values()] }, tombstones: [] };
+          return new Response(JSON.stringify(page), { status: 200, headers: { 'x-sync-epoch': server.epoch, 'content-type': 'application/json' } });
+        };
+      return { stored, fetchImpl };
+    }
+
+    it('should resolve the consent gate after declining both classes', async () => {
+      const success = vi.spyOn(toast, 'success');
+      const { stored, fetchImpl } = consentServer();
+      renderSyncedAsk({ fetchImpl });
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Save and continue' }));
+
+      expect(await screen.findByRole('button', { name: 'Submit request' })).toBeDefined();
+      expect(screen.queryByText('Before the coach reads anything')).toBeNull();
+      expect([...stored.values()].map(row => row['withdrawnAt'] !== null)).toEqual([true, true]);
+      await waitFor(() => expect(success).toHaveBeenCalledWith(expect.stringContaining('Saved.'), undefined));
+    });
+
+    it('should explain and show the stored decision when another device decided first', async () => {
+      const warning = vi.spyOn(toast, 'warning');
+      const { stored, fetchImpl } = consentServer();
+      renderSyncedAsk({ fetchImpl });
+
+      fireEvent.click(await screen.findByRole('switch', { name: /Journal reflections and reasons/ }));
+      stored.set('health', { dataClass: 'health', grantedAt: '2026-08-22T08:00:00.000Z', withdrawnAt: null });
+      stored.set('journal_reflection_reason', { dataClass: 'journal_reflection_reason', grantedAt: '2026-08-22T08:00:00.000Z', withdrawnAt: '2026-08-22T08:00:00.000Z' });
+      fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+
+      expect(await screen.findByRole('button', { name: 'Submit request' })).toBeDefined();
+      expect(screen.queryByText('Before the coach reads anything')).toBeNull();
+      await waitFor(() => expect(warning).toHaveBeenCalledWith(expect.stringContaining('already made on another device'), undefined));
+      expect(stored.get('journal_reflection_reason')?.['withdrawnAt']).not.toBeNull();
     });
 
     const CONSENTS = [{ dataClass: 'journal_reflection_reason', grantedAt: '2026-08-01T00:00:00.000Z', withdrawnAt: null }];

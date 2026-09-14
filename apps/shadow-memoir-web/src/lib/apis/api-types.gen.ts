@@ -848,7 +848,7 @@ export interface components {
       granted: boolean;
       /**
        * Format: date-time
-       * @description Absent when this data class has never been granted
+       * @description Absent when this data class has never been decided; equals `withdrawnAt` when the class was declined without ever being granted
        */
       grantedAt?: null | string;
       /** Format: date-time */
@@ -856,6 +856,8 @@ export interface components {
     };
     AiConsentUpdateDto: {
       grants: components['schemas']['AiConsentGrantDto'][];
+      /** @description true records the account's first decision only: `grants` must name every data class exactly once (AI_012), and the whole write is refused with AI_011 when any class has already been decided */
+      onlyIfUndecided?: boolean;
     };
     AiConsentGrantDto: {
       /** @enum {string} */

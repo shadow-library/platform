@@ -131,7 +131,7 @@ export interface ReviewView {
   carried: string;
 }
 
-interface AiConsentGrants {
+export interface AiConsentGrants {
   /** Reflection text and the reasons attached to a miss (PRD §6.7). */
   journal: boolean;
   /** Weight, sleep, steps, water and meals — a separate decision, revocable on its own (PRD §3.10). */

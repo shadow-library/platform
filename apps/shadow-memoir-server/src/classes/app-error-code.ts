@@ -238,6 +238,12 @@ export class AppErrorCode extends ServerErrorCode {
   /** The §6.6 post-filter refused the model output; the task fails and its quota is refunded rather than shipping an answer that breaks a guardrail */
   static readonly AI_010 = AppErrorCode.unavailable('AI_010', 'The generated answer was refused by the output guardrails');
 
+  /** A first-decision consent write (`onlyIfUndecided`) found a data class already decided, by another device or by an earlier attempt whose response was lost; nothing was written */
+  static readonly AI_011 = AppErrorCode.conflict('AI_011', 'AI consent has already been decided for this account');
+
+  /** A first-decision consent write must name every consent data class exactly once */
+  static readonly AI_012 = AppErrorCode.badRequest('AI_012', 'A first consent decision must name every data class exactly once');
+
   /*!
    * Account Export Errors
    */

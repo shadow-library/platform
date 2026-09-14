@@ -4,7 +4,17 @@ import { Alert, Badge, Button, Card, Progress, Skeleton, Spinner, Switch, Textar
 
 import { DataState } from '@/components/DataState';
 import { Screen, ScreenColumns, screenStyles, useRevealOnSelect } from '@/components/ScreenLayout';
-import { type AiRequest, type AiRequestState, type AiResult, type AiSuggestion, type CoachView, notifyOutcome, useCoach, useReflectCommand } from '@/lib/data';
+import {
+  type AiRequest,
+  type AiRequestState,
+  type AiResult,
+  type AiSuggestion,
+  type CoachView,
+  notifyOutcome,
+  type ReflectCommandHook,
+  useCoach,
+  useReflectCommand,
+} from '@/lib/data';
 import { formatCount } from '@/lib/format';
 import { useSyncReadiness } from '@/lib/sync';
 
@@ -69,6 +79,7 @@ function AskSkeleton(): ReactElement {
 }
 
 function CoachLayout({ coach }: { coach: CoachView }): ReactElement {
+  const consentCommand = useReflectCommand();
   const [selectedResultId, setSelectedResultId] = useState('');
   const result = coach.results.find(candidate => candidate.id === selectedResultId) ?? coach.results[0] ?? null;
   const resultRef = useRevealOnSelect<HTMLDivElement>(selectedResultId, result !== null);
@@ -90,7 +101,7 @@ function CoachLayout({ coach }: { coach: CoachView }): ReactElement {
           {result ? <ResultCard result={result} targetRef={resultRef} /> : null}
         </>
       ) : (
-        <ConsentGate coach={coach} />
+        <ConsentGate coach={coach} command={consentCommand} />
       )}
     </ScreenColumns>
   );
@@ -217,8 +228,8 @@ function GuidanceCards(): ReactElement {
   );
 }
 
-function ConsentGate({ coach }: { coach: CoachView }): ReactElement {
-  const command = useReflectCommand();
+/** The command lives in the layout because a saved decision replaces the gate before the save settles, and an unmounted caller never hears its outcome. */
+function ConsentGate({ coach, command }: { coach: CoachView; command: ReflectCommandHook }): ReactElement {
   const [journal, setJournal] = useState(coach.consent.journal);
   const [health, setHealth] = useState(coach.consent.health);
 

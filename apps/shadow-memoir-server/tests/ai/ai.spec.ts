@@ -56,12 +56,32 @@ describe('AI: schema & user surface (T-32)', () => {
       .headers({ authorization: `Bearer ${token}` });
   }
 
-  function putConsents(token: string, grants: { dataClass: string; granted: boolean }[]) {
+  function putConsents(token: string, grants: { dataClass: string; granted: boolean }[], onlyIfUndecided?: boolean) {
     return router
       .mockRequest()
       .put('/api/v1/ai/consents')
       .headers({ authorization: `Bearer ${token}` })
-      .body({ grants });
+      .body(onlyIfUndecided === undefined ? { grants } : { grants, onlyIfUndecided });
+  }
+
+  function decideConsents(token: string, journal: boolean, health: boolean) {
+    const grants = [
+      { dataClass: 'journal_reflection_reason', granted: journal },
+      { dataClass: 'health', granted: health },
+    ];
+    return putConsents(token, grants, true);
+  }
+
+  function consentRows(accountId: bigint) {
+    return db.select().from(schema.aiConsents).where(eq(schema.aiConsents.accountId, accountId)).orderBy(schema.aiConsents.dataClass);
+  }
+
+  function consentRow(accountId: bigint, dataClass: 'journal_reflection_reason' | 'health') {
+    return db
+      .select()
+      .from(schema.aiConsents)
+      .where(and(eq(schema.aiConsents.accountId, accountId), eq(schema.aiConsents.dataClass, dataClass)))
+      .then(([row]) => row!);
   }
 
   function putScheduledQuery(token: string, queryText = 'how am I trending this month?') {
@@ -259,6 +279,111 @@ describe('AI: schema & user surface (T-32)', () => {
       const read = await getConsents(token);
       const readEntry = read.json().consents.find((entry: { dataClass: string }) => entry.dataClass === 'journal_reflection_reason');
       expect(readEntry.granted).toBe(false);
+    });
+
+    it('should record a declined consent class', async () => {
+      const { token, accountId } = await freshUser('ai-consent-declined');
+
+      const response = await putConsents(token, [{ dataClass: 'health', granted: false }]);
+      expect(response.statusCode).toBe(200);
+      const entry = response.json().consents.find((candidate: { dataClass: string }) => candidate.dataClass === 'health');
+      expect(entry.granted).toBe(false);
+      expect(entry.grantedAt).not.toBeNull();
+      expect(entry.withdrawnAt).toBe(entry.grantedAt);
+
+      const row = await consentRow(accountId, 'health');
+      expect(row.withdrawnAt).toEqual(row.grantedAt);
+    });
+
+    it('should keep the first withdrawal time when a withdrawn class is withdrawn again', async () => {
+      const { token, accountId } = await freshUser('ai-consent-rewithdraw');
+      await putConsents(token, [{ dataClass: 'journal_reflection_reason', granted: false }]);
+      const before = await consentRow(accountId, 'journal_reflection_reason');
+
+      await putConsents(token, [{ dataClass: 'journal_reflection_reason', granted: false }]);
+      const after = await consentRow(accountId, 'journal_reflection_reason');
+      expect(after.withdrawnAt).toEqual(before.withdrawnAt);
+      expect(after.syncSeq).toBe(before.syncSeq);
+    });
+
+    it('should re-stamp the sync sequence when a declined class is granted and withdrawn again', async () => {
+      const { token, accountId } = await freshUser('ai-consent-regrant');
+      await decideConsents(token, false, false);
+      const declined = await consentRow(accountId, 'health');
+
+      const granted = await putConsents(token, [{ dataClass: 'health', granted: true }]);
+      expect(granted.json().consents.find((entry: { dataClass: string }) => entry.dataClass === 'health').granted).toBe(true);
+      const regranted = await consentRow(accountId, 'health');
+      expect(regranted.withdrawnAt).toBeNull();
+      expect(regranted.syncSeq > declined.syncSeq).toBe(true);
+
+      await putConsents(token, [{ dataClass: 'health', granted: false }]);
+      const withdrawn = await consentRow(accountId, 'health');
+      expect(withdrawn.withdrawnAt).not.toBeNull();
+      expect(withdrawn.grantedAt).toEqual(regranted.grantedAt);
+      expect(withdrawn.syncSeq > regranted.syncSeq).toBe(true);
+    });
+
+    it('should record a first decision that declines both classes', async () => {
+      const { token, accountId } = await freshUser('ai-consent-decline-both');
+
+      const response = await decideConsents(token, false, false);
+      expect(response.statusCode).toBe(200);
+      expect(response.json().consents.every((entry: { granted: boolean; withdrawnAt: string | null }) => !entry.granted && entry.withdrawnAt !== null)).toBe(true);
+
+      const rows = await consentRows(accountId);
+      expect(rows.map(row => row.dataClass)).toEqual(['journal_reflection_reason', 'health']);
+      expect(rows.every(row => row.withdrawnAt !== null)).toBe(true);
+    });
+
+    it('should refuse a first-decision write when already decided', async () => {
+      const { token, accountId } = await freshUser('ai-consent-decided');
+      expect((await decideConsents(token, true, false)).statusCode).toBe(200);
+      const decided = await consentRows(accountId);
+
+      const refused = await decideConsents(token, false, true);
+      expect(refused.statusCode).toBe(409);
+      expect(refused.json().code).toBe('AI_011');
+      expect(await consentRows(accountId)).toEqual(decided);
+    });
+
+    it('should refuse a first-decision write when only one class was decided before', async () => {
+      const { token, accountId } = await freshUser('ai-consent-half-decided');
+      await putConsents(token, [{ dataClass: 'journal_reflection_reason', granted: true }]);
+
+      const refused = await decideConsents(token, false, true);
+      expect(refused.statusCode).toBe(409);
+      expect(refused.json().code).toBe('AI_011');
+      const rows = await consentRows(accountId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.withdrawnAt).toBeNull();
+    });
+
+    it('should let exactly one of two concurrent first decisions win', async () => {
+      const { token, accountId } = await freshUser('ai-consent-race');
+
+      const responses = await Promise.all([decideConsents(token, true, false), decideConsents(token, false, true)]);
+      const statuses = responses.map(response => response.statusCode).sort();
+      expect(statuses).toEqual([200, 409]);
+
+      const winner = responses.find(response => response.statusCode === 200)!.json().consents;
+      const rows = await consentRows(accountId);
+      expect(rows.map(row => ({ dataClass: row.dataClass, granted: row.withdrawnAt === null }))).toEqual(
+        winner.map((entry: { dataClass: string; granted: boolean }) => ({ dataClass: entry.dataClass, granted: entry.granted })),
+      );
+    });
+
+    it('should refuse a first decision that does not name every class exactly once', async () => {
+      const { token, accountId } = await freshUser('ai-consent-incomplete');
+      const grants = [
+        { dataClass: 'health', granted: false },
+        { dataClass: 'health', granted: true },
+      ];
+
+      const refused = await putConsents(token, grants, true);
+      expect(refused.statusCode).toBe(400);
+      expect(refused.json().code).toBe('AI_012');
+      expect(await consentRows(accountId)).toHaveLength(0);
     });
 
     it('should report every known data class as ungranted before any PUT', async () => {

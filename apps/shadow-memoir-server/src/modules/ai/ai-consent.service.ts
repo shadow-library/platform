@@ -6,10 +6,11 @@ import { Injectable } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
+import { AppErrorCode } from '@server/classes';
 import { type AiConsent } from '@server/database';
 
-import { AiConsentRepository } from './ai-consent.repository';
-import { type AiConsentGrantDto } from './ai.dto';
+import { type AiConsentDecision, AiConsentRepository } from './ai-consent.repository';
+import { type AiConsentGrantDto, type AiConsentUpdateDto } from './ai.dto';
 
 /**
  * Defining types
@@ -42,13 +43,25 @@ export class AiConsentService {
     return this.toView(rows);
   }
 
-  /** Withdrawal is reflected in the very next read (PRD §6.7 acceptance) because it is a plain committed UPDATE with no cache layer in front of it. */
-  async update(grants: AiConsentGrantDto[]): Promise<AiConsentView[]> {
+  async update(update: AiConsentUpdateDto): Promise<AiConsentView[]> {
+    if (update.onlyIfUndecided) await this.recordFirstDecision(update.grants);
+    else await this.apply(update.grants);
+    return this.list();
+  }
+
+  private async apply(grants: AiConsentGrantDto[]): Promise<void> {
     for (const grant of grants) {
       if (grant.granted) await this.consentRepository.grant(grant.dataClass as AiConsent.DataClass);
       else await this.consentRepository.withdraw(grant.dataClass as AiConsent.DataClass);
     }
-    return this.list();
+  }
+
+  private async recordFirstDecision(grants: AiConsentGrantDto[]): Promise<void> {
+    const perClass = CONSENT_DATA_CLASSES.map(dataClass => grants.filter(grant => grant.dataClass === dataClass));
+    if (grants.length !== CONSENT_DATA_CLASSES.length || perClass.some(matches => matches.length !== 1)) throw AppErrorCode.AI_012.create();
+    const decisions = perClass.flat().map<AiConsentDecision>(grant => ({ dataClass: grant.dataClass as AiConsent.DataClass, granted: grant.granted }));
+    const recorded = await this.consentRepository.recordFirstDecision(decisions);
+    if (!recorded) throw AppErrorCode.AI_011.create();
   }
 
   private toView(rows: AiConsent.Row[]): AiConsentView[] {

@@ -66,6 +66,7 @@ const ERROR_CATALOGUE: Record<string, ErrorEntry> = {
   AI_008: { kind: 'refusal', copy: 'The quest that suggestion points to no longer exists.' },
   AI_009: { kind: 'unavailable', copy: 'Coaching isn’t available right now.' },
   AI_010: { kind: 'unavailable', copy: 'Coaching isn’t available right now.' },
+  AI_011: { kind: 'refusal', copy: 'Your consent choice was already made on another device, so nothing was changed here.' },
   EXP_001: { kind: 'refusal', copy: 'That export is no longer available.' },
   EXP_002: { kind: 'refusal', copy: 'You’ve already asked for an export today. Try again tomorrow.' },
   VALIDATION_ERROR: { kind: 'refusal', copy: 'Some of the details weren’t valid.' },
