@@ -11,25 +11,36 @@ import {
   KEPT_STATES,
   type QuestOccurrence,
   type QuickLogTile,
-  type UpcomingEntry,
+  shiftDate,
   useComingBack,
   useDay,
   useMemoirData,
   useQuickLogTiles,
+  WEEKDAY_LONG_LABELS,
+  weekdayOf,
 } from '@/lib/data';
+import { formatLocalDate } from '@/lib/format';
 
 import { DayRail } from './day-rail';
 import { HeroCard } from './hero-card';
 import styles from './today.module.css';
 
-const CROWN_ENTRY_ID = 'crown';
+const WEEKDAY_NAME_WITHIN_DAYS = 6;
 
-function NothingDueToday({ next }: { next: UpcomingEntry | null }): ReactElement {
+function nextDayLabel(date: string, today: string): string {
+  if (date === shiftDate(today, 1)) return 'Tomorrow';
+  if (date <= shiftDate(today, WEEKDAY_NAME_WITHIN_DAYS)) return WEEKDAY_LONG_LABELS[weekdayOf(date)];
+  return formatLocalDate(date, { year: date.slice(0, 4) !== today.slice(0, 4) });
+}
+
+function NothingDueToday({ next, today }: { next: DayView['nextScheduled']; today: string }): ReactElement {
   return (
     <Card padding="md">
       <Card.Body>
         <h2 className={styles.cardTitle}>Nothing is due today</h2>
-        <p className={styles.cardBody}>{next ? `${next.title} is next · ${next.when}.` : 'Your quests are scheduled on other days.'}</p>
+        <p className={styles.cardBody}>
+          {next ? `${next.questName} is next · ${nextDayLabel(next.date, today)}.` : 'None of your active quests is scheduled again in the next year.'}
+        </p>
         <div className={styles.actionRow}>
           <Button size="sm" variant="ghost" asChild>
             <Link to="/plan">See the week</Link>
@@ -102,7 +113,7 @@ function TodayGrid({ day, tiles, actions }: TodayGridProps): ReactElement {
         ) : null}
 
         {day.occurrences.length === 0 && day.hasActiveQuests ? (
-          <NothingDueToday next={day.upcoming.find(entry => entry.id !== CROWN_ENTRY_ID) ?? null} />
+          <NothingDueToday next={day.nextScheduled} today={day.date} />
         ) : day.occurrences.length === 0 ? (
           <>
             <Card padding="lg">

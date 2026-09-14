@@ -76,6 +76,8 @@ export interface DayView {
   hero: HeroState;
   hasActiveQuests: boolean;
   occurrences: QuestOccurrence[];
+  /** The soonest later day an active quest falls on, within a year; only filled when nothing is scheduled on this day. */
+  nextScheduled: { questName: string; date: string } | null;
   recovery: RecoveryNotice | null;
   wakeWindowNote: string;
   streaks: StreakBoardEntry[];

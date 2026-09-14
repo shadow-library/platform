@@ -214,6 +214,66 @@ describe('TodayScreen quest actions', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/quests/strength-session'));
   });
 
+  it('should warn that postponing a locked quest breaks today’s plan', async () => {
+    renderScreen(<TodayScreen />, { value: data });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Strength session' }));
+
+    expect((await screen.findByRole('button', { name: 'Postpone to tomorrow' })).textContent).toContain('Postponing breaks today’s locked plan');
+    expect(screen.getByRole('button', { name: 'Skip with a reason' }).textContent).not.toContain('locked plan');
+  });
+
+  it('should price a break from the day’s synced intensity rather than the account’s', async () => {
+    const world = projectWorldState(
+      {
+        account: [{ level: 2, hpToday: 5, hpMax: 8, intensityMode: 'high_intensity' }],
+        quests: [{ id: 'q1', name: 'Evening stretch', durationMin: 10, startTimeMin: 1200, recurrence: { frequency: 'daily' }, strictness: 'routine', active: true }],
+        quest_streaks: [{ questId: 'q1', currentRunDays: 9, bestRunDays: 9, shieldsAvailable: 1 }],
+        daily_states: [{ date: TODAY, intensityMode: 'low_intensity' }],
+      },
+      TODAY,
+    );
+    data.provider = new MemoirEngine(world);
+    renderScreen(<TodayScreen />, { value: data });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Evening stretch' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Postpone to tomorrow' }));
+
+    expect(screen.getAllByText(/A held shield bridges the break/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('No HP is spent — gentle intensity.').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Spends \d HP/)).toBeNull();
+  });
+
+  it('should still charge HP for a shielded break on a standard day', async () => {
+    const world = projectWorldState(
+      {
+        quests: [{ id: 'q1', name: 'Evening stretch', durationMin: 10, startTimeMin: 1200, recurrence: { frequency: 'daily' }, strictness: 'anchor', active: true }],
+        quest_streaks: [{ questId: 'q1', currentRunDays: 9, bestRunDays: 9, shieldsAvailable: 1 }],
+        daily_states: [{ date: TODAY, intensityMode: 'standard' }],
+      },
+      TODAY,
+    );
+    data.provider = new MemoirEngine(world);
+    renderScreen(<TodayScreen />, { value: data });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Evening stretch' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip with a reason' }));
+
+    expect(screen.getAllByText(/A held shield bridges the break/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Spends 1 HP when the day closes.').length).toBeGreaterThan(0);
+  });
+
+  it('should hedge the break cost offline when no day snapshot or account has synced', async () => {
+    data.provider = new MemoirEngine(
+      projectWorldState({ quests: [{ id: 'q1', name: 'Evening stretch', durationMin: 10, recurrence: { frequency: 'daily' }, active: true }] }, TODAY),
+    );
+    renderScreen(<TodayScreen />, { value: data });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Evening stretch' }));
+
+    expect((await screen.findByRole('button', { name: 'Skip with a reason' })).textContent).toContain('May spend HP when the day closes, depending on your intensity.');
+  });
+
   it('should ask for a confirmation once the reschedule cap is reached', async () => {
     await withTimeZone('Europe/Oslo', async () => {
       vi.useFakeTimers({ toFake: ['Date'] });

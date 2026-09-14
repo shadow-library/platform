@@ -17,7 +17,7 @@ interface QuestSeed {
   startTimeMinutes: number | null;
   durationMinutes: number;
   active?: boolean;
-  preCommit?: boolean;
+  locked?: boolean;
   notes?: string;
   moduleLink?: Quest['moduleLink'];
   threshold?: Quest['healthThreshold'];
@@ -104,7 +104,7 @@ const ACTIVE_SEEDS: QuestSeed[] = [
     days: ['tue', 'thu', 'sat'],
     startTimeMinutes: 1080,
     durationMinutes: 50,
-    preCommit: true,
+    locked: true,
     progress: progress({
       currentStreakDays: 7,
       longestStreakDays: 19,
@@ -260,7 +260,6 @@ function toQuest(seed: QuestSeed, today: string): Quest {
     moduleLink: seed.moduleLink ?? null,
     notification: { enabled: seed.startTimeMinutes !== null, leadMinutes: 10 },
     healthThreshold: seed.threshold ?? null,
-    preCommit: seed.preCommit ?? false,
     active: seed.active ?? true,
     createdAt: shiftDate(today, -120),
     updatedAt: shiftDate(today, -7),
@@ -273,6 +272,7 @@ export interface SeedResult {
   hero: HeroState;
   activity: ActivityEntry[];
   metrics: Record<string, number>;
+  lockedQuestIds: string[];
 }
 
 const HERO_BY_PERSONA: Record<Persona, Omit<HeroState, 'crown'> & { crownKeptPercent: number }> = {
@@ -355,5 +355,6 @@ export function seed(today: string, persona: Persona): SeedResult {
     hero: heroFor(today, persona),
     activity: [...ACTIVITY_BY_PERSONA[persona]],
     metrics: { steps: 6240, water: 1400, sleep: 7.5, calories: 480 },
+    lockedQuestIds: seeds.filter(item => item.locked).map(item => item.id),
   };
 }

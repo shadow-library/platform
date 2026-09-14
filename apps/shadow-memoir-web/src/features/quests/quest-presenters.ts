@@ -7,6 +7,7 @@ import {
   type HealthMetricDefinition,
   type HealthMetricKey,
   type HeroIntensityMode,
+  type NthWeekdayOrdinal,
   type OccurrenceState,
   type Quest,
   type QuestOccurrence,
@@ -22,6 +23,7 @@ import {
   STRICTNESS_LABELS,
   type Weekday,
   WEEKDAY_LABELS,
+  WEEKDAY_LONG_LABELS,
   WEEKDAYS,
 } from '@/lib/data';
 import { formatCount } from '@/lib/format';
@@ -29,11 +31,9 @@ import { formatCount } from '@/lib/format';
 /** Only `strict_time`/`time_window` quests (anchor, routine) can be rescheduled — day-level strictness fails server-side `QST_008`. */
 const RESCHEDULABLE_STRICTNESSES: readonly Strictness[] = ['anchor', 'routine'];
 
-/** `hpCostFor` (server `rules/hp.ts`) charges HP for these strictnesses regardless of shielding. */
 const HP_COSTING_STRICTNESSES: readonly Strictness[] = ['anchor', 'routine'];
 
-/** Mirrors the server's Silver streak tier (`ruleset.streaks.tiers`, minDays 7) that raises high-intensity's break cost. */
-const LONG_STREAK_MIN_DAYS = 7;
+const ORDINAL_LABELS: Record<NthWeekdayOrdinal, string> = { 1: 'first', 2: 'second', 3: 'third', 4: 'fourth', last: 'last' };
 
 const WEEKDAY_RANGE_MIN = 3;
 
@@ -126,8 +126,10 @@ export function recurrenceSummary(recurrence: Recurrence): string {
     return interval > 1 ? `Every ${interval} weeks · ${span}` : span;
   }
   if (frequency === 'monthly') {
-    const dayOfMonth = recurrence.dayOfMonth ?? Number(recurrence.startDate.slice(8));
     const cadence = interval > 1 ? `Every ${interval} months` : 'Monthly';
+    const { nthWeekday } = recurrence;
+    if (nthWeekday) return `${cadence} on the ${ORDINAL_LABELS[nthWeekday.ordinal]} ${WEEKDAY_LONG_LABELS[nthWeekday.weekday]}`;
+    const dayOfMonth = recurrence.dayOfMonth ?? Number(recurrence.startDate.slice(8));
     return dayOfMonth > 0 ? `${cadence} on day ${dayOfMonth}` : cadence;
   }
   return interval > 1 ? `Every ${interval} years` : 'Every year';
@@ -189,16 +191,20 @@ export function breakStreakNote(strictness: Strictness, shields: number, optInIf
 }
 
 /**
- * Server `rules/hp.ts#hpCostFor`: `goal`/`recovery`/`optional` never cost HP; `anchor`/`routine` cost is set by intensity
- * (`gentle` 0, `standard` 1, `demanding` 1, or 2 when an unshielded streak of 7+ days ends) — shielding only avoids the
- * `demanding` 2 HP tier, never the base charge.
+ * What server rollover charges at day close (`computeHp` → `rules/hp.ts#hpCostFor`): `anchor`/`routine` breaks only, 0 HP at gentle and
+ * 1 HP otherwise, shield or not. Rollover passes `streakDaysBefore: 0`, so the ruleset's 2 HP for a demanding break ending a 7+ day
+ * streak is never charged.
  */
-export function breakCostNote(strictness: Strictness, intensity: HeroIntensityMode | undefined, streakDays: number, shielded: boolean): string {
+export function breakCostNote(strictness: Strictness, intensity: HeroIntensityMode | null): string {
   if (!HP_COSTING_STRICTNESSES.includes(strictness)) return 'No HP is spent.';
-  if (intensity === undefined) return 'May spend HP when the day closes, depending on your intensity.';
+  if (intensity === null) return 'May spend HP when the day closes, depending on your intensity.';
   if (intensity === 'gentle') return 'No HP is spent — gentle intensity.';
-  if (intensity === 'demanding' && !shielded && streakDays >= LONG_STREAK_MIN_DAYS) return 'Spends 2 HP when the day closes — this ends a streak of 7 days or more.';
   return 'Spends 1 HP when the day closes.';
+}
+
+/** The server breaks a lock only on the open day, so a postpone on any other date leaves its plan as it is. */
+export function lockBreakNote(occurrence: QuestOccurrence, today: string): string | null {
+  return occurrence.locked && occurrence.date === today ? 'Postponing breaks today’s locked plan, so its lock bonus stops for every quest in it.' : null;
 }
 
 /** Reuses the server's counting formula (`quest.rules.ts#reschedulesCountedFor`) rather than re-deriving the cap window. */

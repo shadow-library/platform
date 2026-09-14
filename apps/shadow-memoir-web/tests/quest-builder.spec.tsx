@@ -1,8 +1,9 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { toast } from '@shadow-library/ui';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { QuestBuilderScreen, QuestEditorScreen, QuestEditScreen } from '@/features/quests';
+import { QuestBuilderScreen, QuestDetailScreen, QuestEditScreen } from '@/features/quests';
 import { type Command, type CommandResult, type DispatchOptions, type MemoirData } from '@/lib/data';
 
 import { createMemoirTestData, renderScreen } from './harness';
@@ -40,8 +41,27 @@ describe('QuestBuilderScreen', () => {
 
     fireEvent.change(interval, { target: { value: '99' } });
     fireEvent.blur(interval);
-    expect(interval).toHaveProperty('value', '30');
-    expect(await screen.findByText('Every 30 days — 1 time in the next 7 days.')).toBeDefined();
+    expect(interval).toHaveProperty('value', '99');
+    expect(screen.getAllByText('Repeat every 1 to 30 days.').length).toBeGreaterThan(0);
+  });
+
+  it('should refuse a typed repeat interval outside the range when Save is clicked', async () => {
+    const user = userEvent.setup();
+    const data = createMemoirTestData({ today: TODAY });
+    const commands = recordCommands(data);
+    renderScreen(<QuestBuilderScreen />, { value: data });
+
+    await user.type(await screen.findByLabelText('Quest name'), 'Stretch');
+    await user.click(screen.getByRole('radio', { name: 'Every N days' }));
+    const interval = screen.getByRole('spinbutton', { name: 'Repeat every N days' }) as HTMLInputElement;
+    await user.clear(interval);
+    await user.type(interval, '99');
+    await user.click(createButton());
+
+    expect(screen.getAllByText('Repeat every 1 to 30 days.').length).toBeGreaterThan(0);
+    expect(interval.value).toBe('99');
+    expect(createButton().disabled).toBe(true);
+    expect(commands).toEqual([]);
   });
 
   it('should leave the preview without a cadence note for weekday drafts', async () => {
@@ -140,7 +160,7 @@ describe('QuestBuilderScreen', () => {
 
 describe('QuestEditScreen', () => {
   it('should link to the edit form from the quest details', async () => {
-    renderScreen(<QuestEditorScreen questId="morning-run" />, { today: TODAY });
+    renderScreen(<QuestDetailScreen questId="morning-run" />, { today: TODAY });
 
     expect((await screen.findByRole('link', { name: 'Edit quest' })).getAttribute('href')).toBe('/quests/morning-run/edit');
   });
@@ -181,13 +201,34 @@ describe('QuestEditScreen', () => {
     expect(screen.getByRole('combobox', { name: 'Time of day' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('radio', { name: 'Every N days' }).hasAttribute('disabled')).toBe(true);
     expect(name.hasAttribute('disabled')).toBe(false);
-    expect(screen.queryByRole('switch', { name: /health threshold/ })).toBeNull();
 
     fireEvent.change(name, { target: { value: 'Strength session — heavy' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => expect(commands).toHaveLength(1));
     expect(commands[0]).toEqual({ type: 'quest.update', questId: 'strength-session', patch: { name: 'Strength session — heavy' } });
+  });
+
+  it('should switch a health threshold on and off from the edit form', async () => {
+    const data = createMemoirTestData({ today: TODAY });
+    const commands = recordCommands(data);
+    const { router } = renderScreen(<QuestEditScreen questId="read-pages" />, { value: data, initialPath: '/quests/read-pages/edit' });
+
+    const threshold = await screen.findByRole('switch', { name: /health threshold/ });
+    expect(threshold.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(threshold);
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/quests/read-pages'));
+    expect(commands).toEqual([{ type: 'quest.update', questId: 'read-pages', patch: { healthThreshold: { metricKey: 'steps', value: 8000, comparison: 'gte' } } }]);
+  });
+
+  it('should not offer a pre-commit switch the server has no field for', async () => {
+    renderScreen(<QuestBuilderScreen />, { today: TODAY });
+
+    await screen.findByLabelText('Quest name');
+    expect(screen.queryByRole('switch', { name: /Pre-commit/ })).toBeNull();
+    expect(screen.getByRole('switch', { name: /health threshold/ })).toBeDefined();
   });
 
   it('should keep schedule and strictness editable when the plan is not locked', async () => {

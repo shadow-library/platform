@@ -2,8 +2,8 @@ import { type Command } from '@/lib/data/command.types';
 import { parseAmountToMinor } from '@/lib/data/finance.rules';
 import { type ExpenseDraft, type FinanceCommand, type ReminderLead, SUBSCRIPTION_CATEGORIES, type SubscriptionCategoryId } from '@/lib/data/finance.types';
 import { type HeroCommand } from '@/lib/data/hero.types';
-import { type QuestDraft, type Recurrence, type Weekday } from '@/lib/data/quest.types';
-import { type QuickLogCommand } from '@/lib/data/quick-logs.types';
+import { type HealthThreshold, type QuestDraft, type Recurrence, type Weekday } from '@/lib/data/quest.types';
+import { type HealthMetricKey, type QuickLogCommand } from '@/lib/data/quick-logs.types';
 
 import { type SyncCommand } from './sync.types';
 import { uuidv7 } from './uuid';
@@ -127,17 +127,37 @@ const WEEKDAY_WIRE: Record<Weekday, number> = { mon: 1, tue: 2, wed: 3, thu: 4, 
 function toRecurrenceRule(recurrence: Recurrence): Record<string, unknown> {
   const base = { frequency: recurrence.frequency, interval: recurrence.interval, startDate: recurrence.startDate, end: recurrence.end, exceptions: recurrence.exceptions };
   if (recurrence.frequency === 'weekly') return { ...base, daysOfWeek: recurrence.daysOfWeek.map(day => WEEKDAY_WIRE[day]) };
-  if (recurrence.frequency === 'monthly') return { ...base, pattern: { kind: 'day_of_month', dayOfMonth: recurrence.dayOfMonth ?? Number(recurrence.startDate.slice(-2)) } };
-  return base;
+  if (recurrence.frequency !== 'monthly') return base;
+  const { nthWeekday } = recurrence;
+  if (nthWeekday) return { ...base, pattern: { kind: 'nth_weekday', weekday: WEEKDAY_WIRE[nthWeekday.weekday], ordinal: nthWeekday.ordinal } };
+  return { ...base, pattern: { kind: 'day_of_month', dayOfMonth: recurrence.dayOfMonth ?? Number(recurrence.startDate.slice(-2)) } };
+}
+
+function toThresholdWire(threshold: HealthThreshold | null): Record<string, unknown> | null {
+  return threshold === null ? null : { metricId: threshold.metricId, value: threshold.value, comparison: threshold.comparison };
 }
 
 function toDraftWire(draft: QuestDraft): Record<string, unknown> {
-  return { ...draft, recurrence: toRecurrenceRule(draft.recurrence) };
+  return { ...draft, recurrence: toRecurrenceRule(draft.recurrence), healthThreshold: toThresholdWire(draft.healthThreshold) };
 }
 
 function toPatchWire(patch: Partial<QuestDraft>): Record<string, unknown> {
-  if (patch.recurrence === undefined) return patch;
-  return { ...patch, recurrence: toRecurrenceRule(patch.recurrence) };
+  return {
+    ...patch,
+    ...(patch.recurrence === undefined ? {} : { recurrence: toRecurrenceRule(patch.recurrence) }),
+    ...(patch.healthThreshold === undefined ? {} : { healthThreshold: toThresholdWire(patch.healthThreshold) }),
+  };
+}
+
+/** Null when the mirrored `metrics` catalogue has no id for the threshold's key: the server matches thresholds by id, so a key alone would never offer a completion. */
+export function resolveThresholdMetric(command: Command, metricIds: Partial<Record<HealthMetricKey, string>>): Command | null {
+  if (command.type !== 'quest.create' && command.type !== 'quest.update') return command;
+  const threshold = command.type === 'quest.create' ? command.draft.healthThreshold : command.patch.healthThreshold;
+  if (!threshold) return command;
+  const metricId = metricIds[threshold.metricKey];
+  if (metricId === undefined) return null;
+  const healthThreshold = { ...threshold, metricId };
+  return command.type === 'quest.create' ? { ...command, draft: { ...command.draft, healthThreshold } } : { ...command, patch: { ...command.patch, healthThreshold } };
 }
 
 const REMINDER_LEAD_WIRE: Record<ReminderLead, string> = { 'on-day': 'on_day', '1-day': '1_day', '2-day': '2_day', '3-day': '3_day', '1-week': '1_week' };

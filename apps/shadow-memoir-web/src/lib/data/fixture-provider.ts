@@ -6,6 +6,7 @@ import { matchQuestName } from './capture-parser';
 import { type Command, type CommandResult } from './command.types';
 import { type DataProvider, type PlanRange, type QuestFilter } from './data-provider';
 import { type Persona, seed } from './fixtures';
+import { type HeroIntensityMode } from './hero.types';
 import {
   COMING_BACK_NOTICES,
   formatDuration,
@@ -37,6 +38,8 @@ import {
   type Strictness,
   type Weekday,
 } from './quest.types';
+import { type HealthMetricKey } from './quick-logs.types';
+import { nextOccurrenceAfter, occursOn } from './recurrence.rules';
 import {
   type ActivityEntry,
   type CaptureTarget,
@@ -92,8 +95,12 @@ export interface MemoirWorldState {
   /** Minute of the local day the wake window closes, from the account row; null when no account has been mirrored yet. */
   scheduleEndMinutes: number | null;
   metrics: Record<string, number>;
+  metricIds: Partial<Record<HealthMetricKey, string>>;
   locks: Set<string>;
   lockedQuestIdsByDate: Map<string, Set<string>>;
+  intensityByDate: Map<string, HeroIntensityMode>;
+  /** The intensity the next day the server opens will snapshot: a staged change, else the current one; null when no account has been mirrored. */
+  openingIntensity: HeroIntensityMode | null;
 }
 
 export interface FixtureProviderOptions {
@@ -112,22 +119,8 @@ function occurrenceKey(questId: string, date: string): string {
   return `${questId}:${date}`;
 }
 
-/** `daysOfWeek` is a weekly-only field on the wire (`toRecurrenceRule`), so a daily or monthly quest carries none and must be matched on its frequency instead. */
 function isScheduled(quest: Quest, date: string): boolean {
-  const { recurrence } = quest;
-  if (recurrence.exceptions.includes(date)) return false;
-  if (recurrence.startDate !== '' && date < recurrence.startDate) return false;
-  if (recurrence.end.kind === 'until' && date > recurrence.end.date) return false;
-  if (recurrence.frequency === 'daily') return true;
-  if (recurrence.frequency === 'monthly') return Number(date.slice(8)) === (recurrence.dayOfMonth ?? Number(recurrence.startDate.slice(8)));
-  return recurrence.daysOfWeek.includes(weekdayOf(date));
-}
-
-function scheduleSummary(quest: Quest): string {
-  const days = quest.recurrence.daysOfWeek;
-  const span = days.length === 7 ? 'Every day' : days.length === 6 && !days.includes('sun') ? 'Mon–Sat' : days.map(day => WEEKDAY_LABELS[day]).join(' / ');
-  const time = formatTime(quest.startTimeMinutes);
-  return time ? `${span} · ${time}` : `${span} · all day`;
+  return occursOn(quest.recurrence, date);
 }
 
 function everyNDaysNote(interval: number, occurrences: number): string {
@@ -188,16 +181,11 @@ function seedHistory(state: MemoirWorldState): void {
   if (run && isScheduled(run, state.today)) state.logs.set(occurrenceKey(run.id, state.today), recordFor(run, 'completed'));
 }
 
-function lockedQuestIdsFor(quests: Quest[]): Set<string> {
-  return new Set(quests.filter(quest => quest.preCommit).map(quest => quest.id));
-}
-
 function seedWorldState(options: FixtureProviderOptions = {}): MemoirWorldState {
   const today = options.today ?? toISODate(new Date());
   const persona = options.persona ?? 'active';
   const seeded = seed(today, persona);
   const locks = persona === 'active' ? new Set([today, shiftDate(today, 1)]) : new Set<string>();
-  const lockedIds = lockedQuestIdsFor(seeded.quests);
   const state: MemoirWorldState = {
     today,
     persona,
@@ -208,8 +196,11 @@ function seedWorldState(options: FixtureProviderOptions = {}): MemoirWorldState 
     activity: seeded.activity,
     scheduleEndMinutes: null,
     metrics: seeded.metrics,
+    metricIds: {},
     locks,
-    lockedQuestIdsByDate: new Map([...locks].map(date => [date, new Set(lockedIds)])),
+    lockedQuestIdsByDate: new Map([...locks].map(date => [date, new Set(seeded.lockedQuestIds)])),
+    intensityByDate: new Map(),
+    openingIntensity: persona === 'recovery' ? 'gentle' : 'standard',
   };
   seedHistory(state);
   return state;
@@ -257,6 +248,7 @@ export class MemoirEngine implements DataProvider {
       streakDays: progress.currentStreakDays,
       shields: progress.shields,
       locked: this.state.lockedQuestIdsByDate.get(date)?.has(quest.id) ?? false,
+      dayIntensity: this.state.intensityByDate.get(date) ?? (date >= this.state.today ? this.state.openingIntensity : null),
       queued: this.queuedOccurrences.has(occurrenceKey(quest.id, date)),
       threshold: quest.healthThreshold
         ? {
@@ -313,13 +305,15 @@ export class MemoirEngine implements DataProvider {
 
   async getDay(date: string): Promise<DayView> {
     const occurrences = this.scheduledOn(date);
+    const hasActiveQuests = this.hasActiveQuests();
 
     return {
       date,
       mode: this.state.persona,
       hero: { ...this.state.hero, crown: { ...this.state.hero.crown } },
-      hasActiveQuests: this.hasActiveQuests(),
+      hasActiveQuests,
       occurrences,
+      nextScheduled: occurrences.length === 0 && hasActiveQuests ? this.nextScheduled(date) : null,
       recovery: this.state.persona === 'recovery' || this.state.persona === 'returner' ? COMING_BACK_NOTICES[this.state.persona] : null,
       wakeWindowNote: this.wakeWindowNote(date),
       streaks: this.streakBoard(date),
@@ -327,6 +321,14 @@ export class MemoirEngine implements DataProvider {
       activity: this.state.activity,
       summary: this.daySummary(date, occurrences),
     };
+  }
+
+  private nextScheduled(date: string): DayView['nextScheduled'] {
+    return this.state.quests
+      .filter(quest => quest.active)
+      .map(quest => ({ questName: quest.name, date: nextOccurrenceAfter(quest.recurrence, date) }))
+      .filter((entry): entry is { questName: string; date: string } => entry.date !== null)
+      .reduce<DayView['nextScheduled']>((soonest, entry) => (soonest === null || entry.date < soonest.date ? entry : soonest), null);
   }
 
   private streakBoard(date: string): StreakBoardEntry[] {
@@ -556,7 +558,6 @@ export class MemoirEngine implements DataProvider {
       quest,
       progress: this.state.progress[quest.id] as QuestProgress,
       scheduleLocked: this.state.lockedQuestIdsByDate.get(this.state.today)?.has(quest.id) ?? false,
-      scheduleSummary: scheduleSummary(quest),
     };
   }
 
@@ -687,9 +688,17 @@ export class MemoirEngine implements DataProvider {
       xpIntoLevel: this.state.hero.xpIntoLevel + xpAwarded,
       coins: this.state.hero.coins + coinsAwarded,
     };
+    if (state === 'postponed') this.breakLock(questId, date);
     this.pushActivity(`${quest.name} ${state}${xpAwarded > 0 ? ` · +${xpAwarded} XP` : ''}`, xpAwarded > 0);
 
     return { status: 'applied', message: this.messageFor(state, quest.name, xpAwarded), xpAwarded, coinsAwarded };
+  }
+
+  /** Server `resolveBreak` stamps `lockBrokenAt` on the open day only (`updateDailyStateIfOpen`), retiring that day's whole lock; a skip leaves it standing. */
+  private breakLock(questId: string, date: string): void {
+    if (date !== this.state.today || !this.state.lockedQuestIdsByDate.get(date)?.has(questId)) return;
+    this.state.locks.delete(date);
+    this.state.lockedQuestIdsByDate.delete(date);
   }
 
   /** Mirrors server `quest.deleteLog`: only the log goes; XP, coins, streak and shields already applied stay as they are. */
@@ -749,17 +758,6 @@ export class MemoirEngine implements DataProvider {
     return { status: 'applied', message: `${quest.name} moved to ${toTime}. The streak is untouched.`, xpAwarded: 0, coinsAwarded: 0 };
   }
 
-  /** Past dates keep their commitment as it was made. */
-  private syncQuestLock(questId: string, preCommit: boolean): void {
-    for (const [date, ids] of this.state.lockedQuestIdsByDate) {
-      if (date < this.state.today) continue;
-      const next = new Set(ids);
-      if (preCommit) next.add(questId);
-      else next.delete(questId);
-      this.state.lockedQuestIdsByDate.set(date, next);
-    }
-  }
-
   private createQuest(draft: QuestDraft): CommandResult {
     const id = `${
       draft.name
@@ -780,7 +778,6 @@ export class MemoirEngine implements DataProvider {
       rescheduledDates: [],
       recentOutcomes: [],
     };
-    this.syncQuestLock(id, draft.preCommit);
     return { status: 'applied', message: `${draft.name} is in your plan.`, xpAwarded: 0, coinsAwarded: 0 };
   }
 
@@ -788,7 +785,6 @@ export class MemoirEngine implements DataProvider {
     const quest = this.questById(questId);
     if (!quest) return { status: 'rejected', message: 'That quest is no longer in your plan.' };
     this.state.quests = this.state.quests.map(item => (item.id === questId ? { ...item, ...patch, updatedAt: this.state.today } : item));
-    if (patch.preCommit !== undefined) this.syncQuestLock(questId, patch.preCommit);
     return { status: 'applied', message: `${patch.name ?? quest.name} is saved. Changes apply to future occurrences.`, xpAwarded: 0, coinsAwarded: 0 };
   }
 

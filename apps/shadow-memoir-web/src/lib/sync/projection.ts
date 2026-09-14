@@ -23,6 +23,7 @@ import {
   type HealthComparison,
   type HealthMetricEntry,
   type HealthMetricKey,
+  type HeroIntensityMode,
   type HeroState,
   isCurrencyCode,
   type JournalEntry,
@@ -35,6 +36,8 @@ import {
   type MemoirWorldState,
   type Momentum,
   type MoodValence,
+  type NthWeekday,
+  type NthWeekdayOrdinal,
   type Quest,
   type QuestLogState,
   type QuestProgress,
@@ -135,16 +138,26 @@ function toHeroState(account: DeltaRow | undefined, today: string): HeroState {
 
 const WEEKDAY_LOCAL: Record<number, Weekday> = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat', 7: 'sun' };
 
+const NTH_WEEKDAY_ORDINALS: readonly NthWeekdayOrdinal[] = [1, 2, 3, 4, 'last'];
+
+function toNthWeekday(pattern: Record<string, unknown>): NthWeekday | undefined {
+  const weekday = WEEKDAY_LOCAL[pattern['weekday'] as number];
+  const ordinal = NTH_WEEKDAY_ORDINALS.find(candidate => candidate === pattern['ordinal']);
+  return weekday && ordinal !== undefined ? { weekday, ordinal } : undefined;
+}
+
 /** The server persists the rules module's `RecurrenceRule` (numeric 1–7 weekdays, a monthly `pattern` discriminant); this reverses `toRecurrenceRule` in `command-wire.ts` back to the web's flatter `Recurrence` draft shape. */
 function toRecurrence(value: unknown): Recurrence {
   const rule = (value ?? {}) as Record<string, unknown>;
   const daysOfWeek = Array.isArray(rule['daysOfWeek']) ? (rule['daysOfWeek'] as number[]).map(day => WEEKDAY_LOCAL[day] ?? 'mon') : [];
-  const pattern = rule['pattern'] as { kind?: string; dayOfMonth?: number } | undefined;
+  const pattern = (rule['pattern'] ?? {}) as Record<string, unknown>;
+  const nthWeekday = pattern['kind'] === 'nth_weekday' ? toNthWeekday(pattern) : undefined;
   return {
     frequency: (rule['frequency'] as Recurrence['frequency']) ?? 'daily',
     interval: typeof rule['interval'] === 'number' ? rule['interval'] : 1,
     daysOfWeek,
-    dayOfMonth: pattern?.kind === 'day_of_month' && typeof pattern.dayOfMonth === 'number' ? pattern.dayOfMonth : null,
+    dayOfMonth: pattern['kind'] === 'day_of_month' && typeof pattern['dayOfMonth'] === 'number' ? pattern['dayOfMonth'] : null,
+    ...(nthWeekday ? { nthWeekday } : {}),
     startDate: typeof rule['startDate'] === 'string' ? rule['startDate'] : '',
     end: (rule['end'] as Recurrence['end']) ?? { kind: 'never' },
     exceptions: Array.isArray(rule['exceptions']) ? (rule['exceptions'] as string[]) : [],
@@ -181,7 +194,6 @@ function toQuest(row: DeltaRow, keyOf: (metricId: string) => HealthMetricKey | n
     moduleLink: (text(row, 'moduleLink') ?? null) as Quest['moduleLink'],
     notification: { enabled: bool(row, 'reminderEnabled'), leadMinutes: number(row, 'reminderLeadMin') },
     healthThreshold: toHealthThreshold(row['healthThreshold'], keyOf),
-    preCommit: false,
     active: bool(row, 'active', true),
     createdAt: text(row, 'createdAt') ?? '',
     updatedAt: text(row, 'updatedAt') ?? '',
@@ -262,13 +274,21 @@ function metricValuesOn(rows: DeltaRow[], keyOf: (metricId: string) => HealthMet
   return Object.fromEntries([...latest].map(([key, row]) => [key, number(row, 'value')]));
 }
 
+const INTENSITY_LOCAL: Partial<Record<string, HeroIntensityMode>> = { low_intensity: 'gentle', standard: 'standard', high_intensity: 'demanding' };
+
+/** Server `isLockActive`: a postpone of a locked quest stamps `lockBrokenAt`, and a broken lock no longer binds the day. */
+function isActiveLock(row: DeltaRow): boolean {
+  return row['committedAt'] !== null && row['committedAt'] !== undefined && (row['lockBrokenAt'] === null || row['lockBrokenAt'] === undefined);
+}
+
 /**
  * Rebuilds the engine's world from the rows the delta pull has left in IndexedDB. It is deliberately total:
  * a domain the server has not yet populated projects to an empty set rather than to a hole, so each domain
  * flips from fixture-backed to live on its own without the projection learning about the others.
  */
 export function projectWorldState(rows: Partial<DomainRows>, today: string): MemoirWorldState {
-  const keyOf = metricKeyResolver(healthMetricIds(rows.metrics ?? []));
+  const metricIds = healthMetricIds(rows.metrics ?? []);
+  const keyOf = metricKeyResolver(metricIds);
   const quests = (rows.quests ?? []).map(row => toQuest(row, keyOf));
   const account = rows.account?.[0];
   const questNames = new Map(quests.map(quest => [quest.id, quest.name]));
@@ -306,9 +326,12 @@ export function projectWorldState(rows: Partial<DomainRows>, today: string): Mem
 
   const locks = new Set<string>();
   const lockedQuestIdsByDate = new Map<string, Set<string>>();
+  const intensityByDate = new Map<string, HeroIntensityMode>();
   for (const row of rows.daily_states ?? []) {
-    if (row['committedAt'] === null || row['committedAt'] === undefined) continue;
     const date = String(row['date']);
+    const intensity = INTENSITY_LOCAL[text(row, 'intensityMode') ?? ''];
+    if (intensity) intensityByDate.set(date, intensity);
+    if (!isActiveLock(row)) continue;
     locks.add(date);
     lockedQuestIdsByDate.set(date, new Set(((row['lockedQuestIds'] as unknown[] | undefined) ?? []).map(String)));
   }
@@ -323,8 +346,11 @@ export function projectWorldState(rows: Partial<DomainRows>, today: string): Mem
     activity,
     scheduleEndMinutes: account ? number(account, 'scheduleEndMin', 1380) : null,
     metrics: metricValuesOn(rows.metric_entries ?? [], keyOf, today),
+    metricIds,
     locks,
     lockedQuestIdsByDate,
+    intensityByDate,
+    openingIntensity: account ? (INTENSITY_LOCAL[text(account, 'pendingIntensityMode') ?? ''] ?? INTENSITY_LOCAL[text(account, 'intensityMode') ?? ''] ?? null) : null,
   };
 }
 

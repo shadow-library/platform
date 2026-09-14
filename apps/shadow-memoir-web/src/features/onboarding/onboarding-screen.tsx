@@ -204,7 +204,6 @@ export function OnboardingScreen(): ReactElement {
     moduleLink: null,
     notification: { enabled: false, leadMinutes: 0 },
     healthThreshold: null,
-    preCommit: false,
     active: true,
   });
 

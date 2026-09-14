@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { breakCostNote, breakStreakNote, questMeta, rescheduleSummary, scheduleSummary } from '@/features/quests';
-import { formatShortDate, type Quest, type QuestProgress, type QuestSummary, type Recurrence } from '@/lib/data';
+import { breakCostNote, breakStreakNote, lockBreakNote, questMeta, rescheduleSummary, scheduleSummary } from '@/features/quests';
+import { formatShortDate, type Quest, type QuestOccurrence, type QuestProgress, type QuestSummary, type Recurrence } from '@/lib/data';
 
 const TODAY = '2026-08-22';
 
@@ -40,28 +40,29 @@ describe('rescheduleSummary', () => {
 });
 
 describe('breakCostNote', () => {
-  it('should never cost HP for a goal quest', () => {
-    expect(breakCostNote('goal', 'standard', 10, false)).toBe('No HP is spent.');
+  it('should never cost HP for a goal, recovery or optional quest', () => {
+    for (const strictness of ['goal', 'recovery', 'optional'] as const) expect(breakCostNote(strictness, 'demanding')).toBe('No HP is spent.');
   });
 
-  it('should hedge when the intensity is unknown', () => {
-    expect(breakCostNote('anchor', undefined, 10, false)).toBe('May spend HP when the day closes, depending on your intensity.');
+  it('should hedge when the day’s intensity is unknown', () => {
+    expect(breakCostNote('anchor', null)).toBe('May spend HP when the day closes, depending on your intensity.');
   });
 
   it('should never cost HP at gentle intensity', () => {
-    expect(breakCostNote('anchor', 'gentle', 10, false)).toBe('No HP is spent — gentle intensity.');
+    expect(breakCostNote('anchor', 'gentle')).toBe('No HP is spent — gentle intensity.');
   });
 
-  it('should cost 1 HP at standard intensity', () => {
-    expect(breakCostNote('routine', 'standard', 10, false)).toBe('Spends 1 HP when the day closes.');
+  it('should cost 1 HP at the day close under standard and demanding intensity, as rollover charges', () => {
+    expect(breakCostNote('routine', 'standard')).toBe('Spends 1 HP when the day closes.');
+    expect(breakCostNote('anchor', 'demanding')).toBe('Spends 1 HP when the day closes.');
   });
+});
 
-  it('should cost 1 HP at demanding intensity when a shield covers a long streak', () => {
-    expect(breakCostNote('anchor', 'demanding', 10, true)).toBe('Spends 1 HP when the day closes.');
-  });
-
-  it('should cost 2 HP at demanding intensity when an unshielded streak of 7+ days ends', () => {
-    expect(breakCostNote('anchor', 'demanding', 7, false)).toBe('Spends 2 HP when the day closes — this ends a streak of 7 days or more.');
+describe('lockBreakNote', () => {
+  it('should warn only for a locked occurrence on the open day', () => {
+    expect(lockBreakNote({ locked: true, date: TODAY } as QuestOccurrence, TODAY)).toBe('Postponing breaks today’s locked plan, so its lock bonus stops for every quest in it.');
+    expect(lockBreakNote({ locked: true, date: '2026-08-23' } as QuestOccurrence, TODAY)).toBeNull();
+    expect(lockBreakNote({ locked: false, date: TODAY } as QuestOccurrence, TODAY)).toBeNull();
   });
 });
 
@@ -106,13 +107,12 @@ function summary(questPatch: Partial<Quest>, progressPatch: Partial<QuestProgres
     moduleLink: null,
     notification: { enabled: false, leadMinutes: 10 },
     healthThreshold: null,
-    preCommit: false,
     active: true,
     createdAt: '2026-01-01',
     updatedAt: '2026-01-01',
     ...questPatch,
   };
-  return { quest, progress: { ...progress([]), ...progressPatch }, scheduleLocked: false, scheduleSummary: '' };
+  return { quest, progress: { ...progress([]), ...progressPatch }, scheduleLocked: false };
 }
 
 describe('scheduleSummary', () => {
@@ -132,6 +132,14 @@ describe('scheduleSummary', () => {
 
   it('should describe a monthly quest by its day of the month', () => {
     expect(scheduleSummary({ recurrence: recurrence({ frequency: 'monthly', dayOfMonth: 15 }), startTimeMinutes: null })).toBe('Monthly on day 15 · all day');
+  });
+
+  it('should describe a monthly quest on a weekday of the month', () => {
+    const lastFriday = recurrence({ frequency: 'monthly', nthWeekday: { weekday: 'fri', ordinal: 'last' } });
+    const secondTuesday = recurrence({ frequency: 'monthly', interval: 2, nthWeekday: { weekday: 'tue', ordinal: 2 } });
+
+    expect(scheduleSummary({ recurrence: lastFriday, startTimeMinutes: null })).toBe('Monthly on the last Friday · all day');
+    expect(scheduleSummary({ recurrence: secondTuesday, startTimeMinutes: 1080 })).toBe('Every 2 months on the second Tuesday · 18:00');
   });
 });
 

@@ -8,7 +8,6 @@ import {
   type CommandConfirmation,
   failureCopy,
   formatTime,
-  type HeroIntensityMode,
   notifyOutcome,
   outcomeToast,
   type QuestOccurrence,
@@ -20,11 +19,10 @@ import {
   STRICTNESS_LABELS,
   STRICTNESS_RULES,
   useCommand,
-  useDayPreferences,
   useMemoirData,
 } from '@/lib/data';
 
-import { alreadyRecordedReason, breakCostNote, breakStreakNote, rescheduleDisabledReason } from './quest-presenters';
+import { alreadyRecordedReason, breakCostNote, breakStreakNote, lockBreakNote, rescheduleDisabledReason } from './quest-presenters';
 import styles from './quest-actions.module.css';
 
 type Step = 'actions' | 'partial' | 'reschedule' | 'skip' | 'postpone' | null;
@@ -73,7 +71,6 @@ interface QuestActionDefinition {
 export function useQuestActions(): QuestActions {
   const navigate = useNavigate();
   const command = useCommand();
-  const intensity = useDayPreferences().data?.intensity;
   const [occurrence, setOccurrence] = useState<QuestOccurrence | null>(null);
   const [step, setStep] = useState<Step>(null);
   const [confirmation, setConfirmation] = useState<CommandConfirmation | null>(null);
@@ -141,7 +138,6 @@ export function useQuestActions(): QuestActions {
             }}
             dispatch={dispatch}
             pending={busy}
-            intensity={intensity}
           />
           <PartialOverlay
             key={`partial-${occurrence.id}`}
@@ -160,7 +156,6 @@ export function useQuestActions(): QuestActions {
             onClose={close}
             dispatch={dispatch}
             pending={busy}
-            intensity={intensity}
           />
           <PostponeOverlay
             key={`postpone-${occurrence.id}`}
@@ -170,7 +165,6 @@ export function useQuestActions(): QuestActions {
             onClose={close}
             dispatch={dispatch}
             pending={busy}
-            intensity={intensity}
           />
           <RescheduleOverlay
             key={`reschedule-${occurrence.id}`}
@@ -223,7 +217,6 @@ interface OverlayProps {
   onClose: () => void;
   dispatch: (command: Command, andClose?: boolean, successNote?: string) => void;
   pending: boolean;
-  intensity?: HeroIntensityMode;
 }
 
 function summaryLine(occurrence: QuestOccurrence): string {
@@ -250,13 +243,11 @@ function ActionListOverlay({
   onEdit,
   dispatch,
   pending,
-  intensity,
 }: OverlayProps & { onPartial: () => void; onReschedule: () => void; onSkip: () => void; onPostpone: () => void; onEdit: () => void }): ReactElement {
   const matchRoute = useMatchRoute();
   const onOwnDetailPage = Boolean(matchRoute({ to: '/quests/$questId', params: { questId: occurrence.questId } }));
-  const shielded = occurrence.shields > 0;
-  const cost = breakCostNote(occurrence.strictness, intensity, occurrence.streakDays, shielded);
-  const streakNote = breakStreakNote(occurrence.strictness, occurrence.shields);
+  const { today } = useMemoirData();
+  const { streakNote, costNote } = breakNotesFor(occurrence);
 
   const actions: QuestActionDefinition[] = [
     {
@@ -276,7 +267,7 @@ function ActionListOverlay({
     {
       id: 'postpone',
       label: 'Postpone to tomorrow',
-      rule: `${streakNote} ${cost}`,
+      rule: [streakNote, costNote, lockBreakNote(occurrence, today)].filter(Boolean).join(' '),
       disabledReason:
         occurrence.strictness === 'recovery' || occurrence.strictness === 'optional' ? 'Postpone does not apply to this strictness.' : alreadyRecordedReason(occurrence),
       run: onPostpone,
@@ -291,7 +282,7 @@ function ActionListOverlay({
     {
       id: 'skip',
       label: 'Skip with a reason',
-      rule: `${streakNote} ${cost} The reason is only ever shown to you.`,
+      rule: [streakNote, costNote, 'The reason is only ever shown to you.'].join(' '),
       disabledReason: alreadyRecordedReason(occurrence),
       run: onSkip,
     },
@@ -415,17 +406,14 @@ function PartialOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, p
   );
 }
 
-function breakNotesFor(occurrence: QuestOccurrence, intensity: HeroIntensityMode | undefined): { streakNote: string; costNote: string } {
-  return {
-    streakNote: breakStreakNote(occurrence.strictness, occurrence.shields),
-    costNote: breakCostNote(occurrence.strictness, intensity, occurrence.streakDays, occurrence.shields > 0),
-  };
+function breakNotesFor(occurrence: QuestOccurrence): { streakNote: string; costNote: string } {
+  return { streakNote: breakStreakNote(occurrence.strictness, occurrence.shields), costNote: breakCostNote(occurrence.strictness, occurrence.dayIntensity) };
 }
 
-function SkipOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pending, intensity }: OverlayProps): ReactElement {
+function SkipOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pending }: OverlayProps): ReactElement {
   const [reason, setReason] = useState<ReasonTag | null>(null);
   const [note, setNote] = useState('');
-  const { streakNote, costNote } = breakNotesFor(occurrence, intensity);
+  const { streakNote, costNote } = breakNotesFor(occurrence);
 
   return (
     <OverlaySurface
@@ -471,8 +459,10 @@ function SkipOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pend
   );
 }
 
-function PostponeOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pending, intensity }: OverlayProps): ReactElement {
-  const { streakNote, costNote } = breakNotesFor(occurrence, intensity);
+function PostponeOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pending }: OverlayProps): ReactElement {
+  const { today } = useMemoirData();
+  const { streakNote, costNote } = breakNotesFor(occurrence);
+  const lockNote = lockBreakNote(occurrence, today);
 
   return (
     <OverlaySurface
@@ -496,6 +486,7 @@ function PostponeOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, 
         <DescriptionList layout="row" termWidth={150}>
           <DescriptionList.Item term="Streak">{streakNote}</DescriptionList.Item>
           <DescriptionList.Item term="Cost">{costNote}</DescriptionList.Item>
+          {lockNote ? <DescriptionList.Item term="Locked plan">{lockNote}</DescriptionList.Item> : null}
         </DescriptionList>
       </div>
     </OverlaySurface>

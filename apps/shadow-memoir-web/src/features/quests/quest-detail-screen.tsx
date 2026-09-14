@@ -12,11 +12,11 @@ import styles from './quests.module.css';
 
 const DEFAULT_HEALTH_THRESHOLD = { metricKey: 'steps' as const, comparison: 'gte' as const, value: 8000 };
 
-export interface QuestEditorScreenProps {
+export interface QuestDetailScreenProps {
   questId: string;
 }
 
-export function QuestEditorScreen({ questId }: QuestEditorScreenProps): ReactElement {
+export function QuestDetailScreen({ questId }: QuestDetailScreenProps): ReactElement {
   const navigate = useNavigate();
   const detail = useQuestDetail(questId);
   const actions = useQuestActions();
@@ -164,12 +164,12 @@ function QuestDetailBody({ data, actions }: QuestDetailBodyProps): ReactElement 
             <DescriptionList layout="row" termWidth={150}>
               <DescriptionList.Item term="Strictness">{STRICTNESS_RULES[quest.strictness]}</DescriptionList.Item>
               <DescriptionList.Item term="Reschedules">{rescheduleSummary(progress, today)}</DescriptionList.Item>
-              <DescriptionList.Item term="Shields">{progress.shields} held · spent automatically on an unavoidable break</DescriptionList.Item>
+              <DescriptionList.Item term="Shields">{progress.shields} held · a miss, skip or postpone spends one to keep the streak</DescriptionList.Item>
               <DescriptionList.Item term="Threshold">
                 {threshold ? `${questThresholdLabel(threshold)} — completion is offered, never automatic` : 'None — completion is manual'}
               </DescriptionList.Item>
               <DescriptionList.Item term="Editing">
-                {data.scheduleLocked ? 'Schedule and strictness are locked today' : 'Schedule and strictness aren’t locked yet'}
+                {data.scheduleLocked ? 'Schedule and strictness are locked today' : 'Schedule and strictness can change today'}
               </DescriptionList.Item>
             </DescriptionList>
             <div className={styles.actionRow}>

@@ -1,3 +1,4 @@
+import { type HeroIntensityMode } from './hero.types';
 import { type HealthMetricKey } from './quick-logs.types';
 
 export type StatAffinity = 'discipline' | 'body' | 'wealth' | 'mind';
@@ -30,6 +31,13 @@ export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 type RecurrenceEnd = { kind: 'never' } | { kind: 'count'; count: number } | { kind: 'until'; date: string };
 
+export type NthWeekdayOrdinal = 1 | 2 | 3 | 4 | 'last';
+
+export interface NthWeekday {
+  weekday: Weekday;
+  ordinal: NthWeekdayOrdinal;
+}
+
 export interface Recurrence {
   frequency: RecurrenceFrequency;
   /** Every N units of `frequency`; weekly intervals count Monday-anchored calendar weeks. */
@@ -37,6 +45,8 @@ export interface Recurrence {
   daysOfWeek: Weekday[];
   /** Clamped to the month length, so "the 31st" lands on the last day of shorter months. */
   dayOfMonth: number | null;
+  /** Monthly only: when set, the quest falls on this weekday of the month (e.g. the last Friday) instead of `dayOfMonth`. */
+  nthWeekday?: NthWeekday;
   startDate: string;
   end: RecurrenceEnd;
   exceptions: string[];
@@ -56,9 +66,11 @@ export type ModuleLink = 'journal' | 'meal' | 'weight';
 /** Comparisons the server's rule engine supports (`apps/shadow-memoir-server/src/modules/metrics/threshold-offer.ts`). */
 export type HealthComparison = 'gte' | 'lte';
 
-/** The server's wire shape (`{ metricId, value, comparison }`), with `metricId` resolved to the web's metric key at projection time. */
+/** The server stores `{ metricId, value, comparison }`: projection maps its `metricId` to `metricKey`, and dispatch resolves the key back to `metricId` for the wire. */
 export interface HealthThreshold {
   metricKey: HealthMetricKey;
+  /** Set only on a dispatched command; the wire carries this id, never the key. */
+  metricId?: string;
   value: number;
   comparison: HealthComparison;
 }
@@ -83,7 +95,6 @@ export interface Quest {
   moduleLink: ModuleLink | null;
   notification: QuestNotification;
   healthThreshold: HealthThreshold | null;
-  preCommit: boolean;
   /** Deletion is soft — historical logs reference the quest, so it is only ever deactivated. */
   active: boolean;
   createdAt: string;
@@ -110,9 +121,8 @@ export interface QuestProgress {
 export interface QuestSummary {
   quest: Quest;
   progress: QuestProgress;
-  /** The plan is committed for the current week, so schedule and strictness are read-only. */
+  /** Today's plan is locked with this quest in it and no postpone has broken the lock, so schedule and strictness are read-only until tomorrow. */
   scheduleLocked: boolean;
-  scheduleSummary: string;
 }
 
 export interface ThresholdReading {
@@ -147,6 +157,8 @@ export interface QuestOccurrence {
   streakDays: number;
   shields: number;
   locked: boolean;
+  /** The intensity this day's breaks are charged under at day close: the day's synced snapshot, else the account's staged-or-current mode from today on; null when unknown. */
+  dayIntensity: HeroIntensityMode | null;
   queued: boolean;
   threshold: ThresholdReading | null;
   /** The scale a partial is measured on, in the quest's own units — pages, kilometres, minutes. */

@@ -29,7 +29,7 @@ import {
 import { parseMinuteOfDay } from '@/lib/format';
 
 import { type QuestDuplicateSearch } from './quest-duplicate.search';
-import { recurrenceSummary } from './quest-presenters';
+import { questThresholdLabel, recurrenceSummary } from './quest-presenters';
 import styles from './quests.module.css';
 
 const STRICTNESS_ORDER: Strictness[] = ['anchor', 'routine', 'goal', 'optional'];
@@ -37,6 +37,8 @@ const STAT_ORDER: StatAffinity[] = ['body', 'mind', 'wealth', 'discipline'];
 const DEFAULT_DAYS: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const BUILDER_FREQUENCIES: readonly RecurrenceFrequency[] = ['daily', 'weekly'];
 const DEFAULT_INTERVAL = 2;
+const INTERVAL_MIN = 1;
+const INTERVAL_MAX = 30;
 const DURATION_MIN = 0;
 const DURATION_MAX = 240;
 const DEFAULT_HEALTH_THRESHOLD: HealthThreshold = { metricKey: 'steps', value: 8000, comparison: 'gte' };
@@ -51,7 +53,6 @@ interface QuestFormValues {
   interval: number;
   days: Weekday[];
   threshold: boolean;
-  preCommit: boolean;
 }
 
 type QuestFormMode = { kind: 'create'; initial: QuestFormValues } | { kind: 'edit'; quest: Quest; scheduleLocked: boolean };
@@ -67,7 +68,6 @@ function duplicateValues(duplicate: Partial<QuestDuplicateSearch>): QuestFormVal
     interval: duplicate.duplicateInterval ?? DEFAULT_INTERVAL,
     days: duplicate.duplicateDays ?? DEFAULT_DAYS,
     threshold: duplicate.duplicateThreshold ?? false,
-    preCommit: true,
   };
 }
 
@@ -83,7 +83,6 @@ function questValues(quest: Quest): QuestFormValues {
     interval: recurrence.frequency === 'daily' ? recurrence.interval : DEFAULT_INTERVAL,
     days: recurrence.frequency === 'weekly' ? recurrence.daysOfWeek : DEFAULT_DAYS,
     threshold: quest.healthThreshold !== null,
-    preCommit: quest.preCommit,
   };
 }
 
@@ -120,7 +119,6 @@ function draftFrom(values: QuestFormValues, today: string): QuestDraft {
     moduleLink: null,
     notification: { enabled: startTimeMinutes !== null, leadMinutes: 10 },
     healthThreshold: values.threshold ? DEFAULT_HEALTH_THRESHOLD : null,
-    preCommit: values.preCommit,
     active: true,
   };
 }
@@ -131,6 +129,7 @@ function questPatch(quest: Quest, values: QuestFormValues, scheduleLocked: boole
   if (name !== quest.name) patch.name = name;
   if (values.statAffinity !== quest.statAffinity) patch.statAffinity = values.statAffinity;
   if (values.durationMinutes !== quest.durationMinutes) patch.durationMinutes = values.durationMinutes;
+  if (values.threshold !== (quest.healthThreshold !== null)) patch.healthThreshold = values.threshold ? DEFAULT_HEALTH_THRESHOLD : null;
   if (scheduleLocked) return patch;
 
   const startTimeMinutes = startTimeOf(values);
@@ -153,9 +152,14 @@ function lockedValues(values: QuestFormValues, quest: Quest): QuestFormValues {
   return { ...values, strictness: original.strictness, time: original.time, frequency: original.frequency, interval: original.interval, days: original.days };
 }
 
+function intervalOutOfRange(values: QuestFormValues): boolean {
+  return values.frequency === 'daily' && (values.interval < INTERVAL_MIN || values.interval > INTERVAL_MAX);
+}
+
 function blockedReason(values: QuestFormValues, scheduleEditable: boolean, unchanged: boolean): string | null {
   if (values.name.trim().length === 0) return 'Give the quest a name.';
   if (scheduleEditable && values.frequency === 'weekly' && values.days.length === 0) return 'Pick at least one day.';
+  if (scheduleEditable && intervalOutOfRange(values)) return `Repeat every ${INTERVAL_MIN} to ${INTERVAL_MAX} days.`;
   if (values.strictness === 'anchor' && startTimeOf(values) === null) return 'An Anchor quest needs a start time.';
   if (values.durationMinutes < DURATION_MIN || values.durationMinutes > DURATION_MAX) return `Usual length must be between ${DURATION_MIN} and ${DURATION_MAX} minutes.`;
   return unchanged ? 'Nothing has changed yet.' : null;
@@ -166,8 +170,8 @@ function repeatsHelper(mode: QuestFormMode, values: QuestFormValues, scheduleLoc
   if (mode.kind === 'edit' && !BUILDER_FREQUENCIES.includes(mode.quest.recurrence.frequency))
     return `${recurrenceSummary(mode.quest.recurrence)} — this schedule can’t be changed here.`;
   if (values.frequency !== 'daily') return 'Six days a week is the pattern most people keep.';
-  if (mode.kind === 'create' || mode.quest.recurrence.startDate === '') return 'Counted from today, every 1 to 30 days.';
-  return `Counted from ${formatShortDate(mode.quest.recurrence.startDate)}, every 1 to 30 days.`;
+  if (mode.kind === 'create' || mode.quest.recurrence.startDate === '') return `Counted from today, every ${INTERVAL_MIN} to ${INTERVAL_MAX} days.`;
+  return `Counted from ${formatShortDate(mode.quest.recurrence.startDate)}, every ${INTERVAL_MIN} to ${INTERVAL_MAX} days.`;
 }
 
 export function QuestBuilderScreen(): ReactElement {
@@ -389,7 +393,13 @@ function QuestForm({ mode }: { mode: QuestFormMode }): ReactElement {
               <FormField
                 label="Repeats"
                 helper={repeatsHelper(mode, values, scheduleLocked)}
-                error={scheduleEditable && daysMissing ? 'Pick at least one day.' : undefined}
+                error={
+                  scheduleEditable && daysMissing
+                    ? 'Pick at least one day.'
+                    : scheduleEditable && intervalOutOfRange(values)
+                      ? `Repeat every ${INTERVAL_MIN} to ${INTERVAL_MAX} days.`
+                      : undefined
+                }
                 disabled={scheduleLocked}
               >
                 <FieldGroup aria-label="Repeats" className={styles.repeats}>
@@ -403,9 +413,11 @@ function QuestForm({ mode }: { mode: QuestFormMode }): ReactElement {
                         <NumberStepper
                           value={values.interval}
                           onValueChange={value => update('interval', value ?? 1)}
-                          min={1}
-                          max={30}
+                          min={INTERVAL_MIN}
+                          max={INTERVAL_MAX}
                           precision={0}
+                          clampOnBlur={false}
+                          invalid={intervalOutOfRange(values)}
                           disabled={!scheduleEditable}
                           aria-label="Repeat every N days"
                         />
@@ -431,22 +443,14 @@ function QuestForm({ mode }: { mode: QuestFormMode }): ReactElement {
                 </FieldGroup>
               </FormField>
 
-              {editing ? null : (
-                <div className={styles.switches}>
-                  <Switch
-                    checked={values.threshold}
-                    onCheckedChange={value => update('threshold', value)}
-                    label="Complete from a health threshold"
-                    description="When a logged metric passes a target, Shadow Memoir offers to complete this quest. It never completes it for you."
-                  />
-                  <Switch
-                    checked={values.preCommit}
-                    onCheckedChange={value => update('preCommit', value)}
-                    label="Pre-commit this quest each week"
-                    description="A committed quest can still be skipped or rescheduled — the lock only stops the promise being edited after the fact."
-                  />
-                </div>
-              )}
+              <div className={styles.switches}>
+                <Switch
+                  checked={values.threshold}
+                  onCheckedChange={value => update('threshold', value)}
+                  label="Complete from a health threshold"
+                  description={`${questThresholdLabel(mode.kind === 'edit' && mode.quest.healthThreshold ? mode.quest.healthThreshold : DEFAULT_HEALTH_THRESHOLD)}. When a logged metric passes it, Shadow Memoir offers to complete this quest. It never completes it for you.`}
+                />
+              </div>
             </div>
           </Card.Body>
         </Card>

@@ -56,11 +56,11 @@ export const STAT_LABELS: Record<StatAffinity, string> = { discipline: 'Discipli
 export const STRICTNESS_LABELS: Record<Strictness, string> = { anchor: 'Anchor', routine: 'Routine', goal: 'Goal', recovery: 'Recovery', optional: 'Optional' };
 
 export const STRICTNESS_RULES: Record<Strictness, string> = {
-  anchor: 'A fixed time, with thirty minutes of grace. A break spends 1 HP.',
-  routine: 'A window the length of the quest. A break spends 1 HP.',
-  goal: 'Judged on the day, not the hour. A break costs no HP.',
-  recovery: 'Offered the day after a miss. It can never trigger another.',
-  optional: 'Reward only. It can never cost HP or end a streak.',
+  anchor: 'A fixed time, with thirty minutes of grace. A break spends HP when the day closes, unless your intensity is gentle.',
+  routine: 'A window the length of the quest. A break spends HP when the day closes, unless your intensity is gentle.',
+  goal: 'Judged on the day, not the hour. A break never costs HP.',
+  recovery: 'Offered the day after a miss. It never costs HP, keeps no streak and can never trigger another.',
+  optional: 'Reward only. A break never costs HP, and ends a streak only if you keep one for it.',
 };
 
 export const STATE_LABELS: Record<OccurrenceState, string> = {

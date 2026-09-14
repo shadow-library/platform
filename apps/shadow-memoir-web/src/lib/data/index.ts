@@ -26,6 +26,7 @@ export * from './quick-logs.provider';
 export * from './quick-logs.queries';
 export * from './quick-logs.rules';
 export * from './quick-logs.types';
+export * from './recurrence.rules';
 export * from './reflect.derive';
 export * from './reflect.fixtures';
 export * from './reflect.provider';

@@ -17,9 +17,11 @@ import {
   type QuestSummary,
 } from '@/lib/data';
 
-import { isQuestCommand, isServerBacked } from './command-wire';
+import { isQuestCommand, isServerBacked, resolveThresholdMetric } from './command-wire';
 import { ignoreAccountBoundary } from './memoir-store';
 import { type SyncEngine } from './sync-engine';
+
+const THRESHOLD_UNSYNCED_MESSAGE = 'Health metrics haven’t synced to this device yet, so the threshold can’t be saved. Turn it off to save the quest.';
 
 function occurrenceOf(command: Command): string | null {
   return 'occurrenceId' in command ? command.occurrenceId : null;
@@ -104,11 +106,13 @@ export class SyncedDataProvider implements DataProvider {
   }
 
   private async dispatchNow(command: Command, options?: DispatchOptions): Promise<CommandResult> {
-    const result = await this.engine.dispatchCommand(command);
+    const resolved = resolveThresholdMetric(command, this.world.metricIds);
+    if (!resolved) return { status: 'rejected', message: THRESHOLD_UNSYNCED_MESSAGE };
+    const result = await this.engine.dispatchCommand(resolved);
     if (needsConfirmation(result) || result.status === 'rejected') return result;
-    const occurrenceId = occurrenceOf(command);
-    if (occurrenceId && isServerBacked(command)) this.queued.add(occurrenceId);
-    const delivery = await this.sync.enqueue(command, this.world.today, options);
+    const occurrenceId = occurrenceOf(resolved);
+    if (occurrenceId && isServerBacked(resolved)) this.queued.add(occurrenceId);
+    const delivery = await this.sync.enqueue(resolved, this.world.today, options);
     if (delivery.status === 'refused') await this.reproject().catch(ignoreAccountBoundary);
     return { ...result, delivery };
   }

@@ -340,8 +340,12 @@ const RECOVERY_CHOICES: RecoveryView['choices'] = [
 
 export const INTENSITY_OPTIONS: RecoveryView['intensityOptions'] = [
   { mode: 'gentle', name: 'Gentle', description: 'A miss never costs HP, HP refills faster overnight, and the crown is counted over the whole week.' },
-  { mode: 'standard', name: 'Standard', description: 'A missed anchor or routine quest costs one HP, and the crown is counted day by day.' },
-  { mode: 'demanding', name: 'Demanding', description: 'Fewer HP that refill more slowly, a higher cost when a long streak ends, and the crown counted day by day.' },
+  {
+    mode: 'standard',
+    name: 'Standard',
+    description: 'A missed, skipped or postponed anchor or routine quest costs one HP when the day closes, and the crown is counted day by day.',
+  },
+  { mode: 'demanding', name: 'Demanding', description: 'Fewer HP that refill more slowly, and the crown counted day by day.' },
 ];
 
 const MOMENTUM_COPY: Record<Persona, { label: string; note: string }> = {
@@ -474,7 +478,7 @@ export function createHeroProvider({ persona = 'active', hero }: HeroFixtureOpti
       body: 'Reactivating everything at once would put 41 occurrences and about 14 hours into next week, above the 26 you have kept in your best week. Comeback keeps it at 21 until Sunday.',
     },
     shieldNote:
-      'A shield covers one unavoidable miss on one quest: the streak survives, no HP is spent, and the day is marked shielded in History. You earn one per kept week, up to three.',
+      'A shield keeps one quest’s streak alive through a miss, skip or postpone, and the day is marked shielded in History. It doesn’t save HP: a break that costs HP still does when the day closes. A quest earns one every 7 on-time or partial completions at standard intensity (5 gentle, 10 demanding), and holds up to two.',
   });
 
   return {

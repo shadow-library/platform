@@ -2,9 +2,10 @@ import { fireEvent, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PlanningBoardScreen } from '@/features/planning';
-import { QuestBuilderScreen, QuestEditorScreen, QuestListScreen } from '@/features/quests';
+import { QuestBuilderScreen, QuestDetailScreen, QuestListScreen } from '@/features/quests';
 import { TodayScreen } from '@/features/today';
 import { formatShortDate, MemoirEngine } from '@/lib/data';
+import { formatLocalDate } from '@/lib/format';
 import { type DeltaPage, projectWorldState, SyncEngineProvider } from '@/lib/sync';
 
 import { createMemoirTestData, renderScreen } from './harness';
@@ -67,7 +68,6 @@ describe('day group screens', () => {
         moduleLink: null,
         notification: { enabled: false, leadMinutes: 0 },
         healthThreshold: null,
-        preCommit: false,
         active: true,
       },
     });
@@ -78,6 +78,31 @@ describe('day group screens', () => {
     expect(screen.getByText('Walk 20 minutes is next · Tomorrow.')).toBeDefined();
     expect(screen.queryByText('Your first day is empty on purpose')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Create your first quest' })).toBeNull();
+  });
+
+  it('should name the next scheduled day when nothing is due until next week or later', async () => {
+    renderTodayOver(
+      engineOver({ quests: [questRow('q1', 'Pay rent', { recurrence: { frequency: 'monthly', startDate: '2026-01-01', pattern: { kind: 'day_of_month', dayOfMonth: 15 } } })] }),
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Nothing is due today' })).toBeDefined();
+    expect(screen.getByText(`Pay rent is next · ${formatLocalDate('2026-09-15', { year: false })}.`)).toBeDefined();
+  });
+
+  it('should name the weekday when the next quest falls later this week', async () => {
+    renderTodayOver(engineOver({ quests: [questRow('q1', 'Review week', { recurrence: { frequency: 'weekly', startDate: '2026-08-01', daysOfWeek: [3] } })] }));
+
+    expect(await screen.findByText('Review week is next · Wednesday.')).toBeDefined();
+  });
+
+  it('should say no active quest is scheduled again when every series has ended', async () => {
+    renderTodayOver(
+      engineOver({ quests: [questRow('q1', 'Spring cleaning', { recurrence: { frequency: 'daily', startDate: '2026-08-01', end: { kind: 'until', date: '2026-08-21' } } })] }),
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Nothing is due today' })).toBeDefined();
+    expect(screen.getByText('None of your active quests is scheduled again in the next year.')).toBeDefined();
+    expect(screen.queryByText('Your first day is empty on purpose')).toBeNull();
   });
 
   it('should invite a first quest when the day has no occurrences', async () => {
@@ -210,7 +235,7 @@ describe('day group screens', () => {
   });
 
   it('should render a quest with its rules and history', async () => {
-    renderScreen(<QuestEditorScreen questId="morning-run" />, { today: TODAY });
+    renderScreen(<QuestDetailScreen questId="morning-run" />, { today: TODAY });
     expect(await screen.findByRole('heading', { name: 'Morning run — 5 km' })).toBeDefined();
     expect(await screen.findByText('Rules on this quest')).toBeDefined();
     expect(await screen.findByText('0 of 2 used in the last 7 days')).toBeDefined();
@@ -218,7 +243,7 @@ describe('day group screens', () => {
   });
 
   it('should offer a direct reschedule button for an eligible occurrence', async () => {
-    renderScreen(<QuestEditorScreen questId="strength-session" />, { today: TODAY });
+    renderScreen(<QuestDetailScreen questId="strength-session" />, { today: TODAY });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Reschedule' }));
 
@@ -226,7 +251,7 @@ describe('day group screens', () => {
   });
 
   it('should not offer to navigate to the quest details page it is already showing', async () => {
-    renderScreen(<QuestEditorScreen questId="morning-run" />, { today: TODAY, initialPath: '/quests/morning-run' });
+    renderScreen(<QuestDetailScreen questId="morning-run" />, { today: TODAY, initialPath: '/quests/morning-run' });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Today’s actions' }));
 
@@ -234,7 +259,7 @@ describe('day group screens', () => {
   });
 
   it('should show not found for an unknown quest id', async () => {
-    renderScreen(<QuestEditorScreen questId="does-not-exist" />, { today: TODAY });
+    renderScreen(<QuestDetailScreen questId="does-not-exist" />, { today: TODAY });
     expect(await screen.findByText('This quest isn’t here')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Back to Quests' })).toBeDefined();
   });
@@ -258,7 +283,7 @@ describe('day group screens', () => {
     const data = createMemoirTestData({ today: TODAY });
     data.provider = new MemoirEngine(world);
 
-    renderScreen(<QuestEditorScreen questId="q-new" />, { value: data });
+    renderScreen(<QuestDetailScreen questId="q-new" />, { value: data });
     expect(await screen.findByText('Not enough history yet')).toBeDefined();
   });
 
