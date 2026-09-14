@@ -2,6 +2,7 @@ import { describe, expect, it, spyOn } from 'bun:test';
 import { randomBytes } from 'node:crypto';
 
 import { BotKeyExchangeService, formatBotKey } from '@server/modules/identity/bot';
+import { LogSamplerService } from '@server/modules/infrastructure/security';
 
 interface KeyRecordStub {
   secretHash: string;
@@ -10,7 +11,7 @@ interface KeyRecordStub {
 const serviceWith = (redis: { set: (slot: string) => Promise<unknown> }, records: KeyRecordStub[] = []): BotKeyExchangeService => {
   const query = { from: () => query, innerJoin: () => query, where: () => query, limit: () => Promise.resolve(records) };
   const databaseService = { getPostgresClient: () => ({ select: () => query }), getRedisClient: () => redis };
-  return new BotKeyExchangeService(databaseService as never, {} as never, {} as never);
+  return new BotKeyExchangeService(databaseService as never, {} as never, {} as never, new LogSamplerService(databaseService as never));
 };
 
 describe('BotKeyExchangeService log sampling', () => {

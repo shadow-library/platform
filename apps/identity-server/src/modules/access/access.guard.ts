@@ -1,6 +1,6 @@
-import { type FastifyRequest } from 'fastify';
+import { type FastifyReply, type FastifyRequest } from 'fastify';
 import { type HandlerMetadata } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
+import { type AppError, Config, Logger } from '@shadow-library/common';
 import { AsyncRouteHandler, Middleware, MiddlewareGenerator } from '@shadow-library/fastify';
 
 import { AppErrorCode } from '@server/classes';
@@ -9,7 +9,7 @@ import { AdminAccessService } from '@server/modules/admin';
 import { type JwtClaims, KeyService } from '@server/modules/auth/keys';
 import { SessionAuthService, SessionService } from '@server/modules/auth/session';
 import { PolicyDecisionService } from '@server/modules/authz';
-import { BOT_KEY_PREFIX, BotKeyExchangeService } from '@server/modules/identity/bot';
+import { BOT_KEY_PREFIX, BotKeyExchangeService, parseBotKey } from '@server/modules/identity/bot';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { ApplicationService } from '@server/modules/system/application';
 
@@ -44,12 +44,12 @@ export class AccessGuard implements MiddlewareGenerator {
     const options = metadata[ACCESS_METADATA] as AuthOptions | undefined;
     if (!options || options.public) return undefined;
 
-    return async (request: FastifyRequest): Promise<void> => {
+    return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const context: AuthContext = { clientInfo: clientInfoOf(request as AuthenticatedRequest) };
 
       const botKey = this.botKeyOf(request);
       if (botKey !== null) {
-        await this.authenticateBot(request, options, botKey, context, String(metadata.path));
+        await this.authenticateBot(request, reply, options, botKey, context, String(metadata.path));
         (request as AuthenticatedRequest).auth = context;
         return;
       }
@@ -83,18 +83,26 @@ export class AccessGuard implements MiddlewareGenerator {
     return typeof header === 'string' && header.startsWith(BOT_BEARER_PREFIX) ? header.slice('Bearer '.length) : null;
   }
 
-  private async authenticateBot(request: FastifyRequest, options: AuthOptions, key: string, context: AuthContext, route: string): Promise<void> {
-    const authentication = await this.botKeyExchangeService.authenticate(key, context.clientInfo.ip, 'direct');
-    if (authentication.status === 'rate_limited') throw AppErrorCode.SEC_001.create();
+  /**
+   * Route eligibility is decided before the key is authenticated, as `@shadow-library/auth`'s own guard
+   * does: authenticating first would spend the bot's per-minute quota, stamp `lastUsedAt` and audit a
+   * `bot.key.used` SUCCESS for a request that is about to be refused. The refusal is the same whether or
+   * not the key is valid, so it tells an attacker nothing about the credential either.
+   */
+  private async authenticateBot(request: FastifyRequest, reply: FastifyReply, options: AuthOptions, key: string, context: AuthContext, route: string): Promise<void> {
+    const ip = context.clientInfo.ip;
+    if (!options.bot || options.elevated || options.permission || options.service) {
+      /** The key id and address are caller-supplied and carry no secret, and without them nobody can tell who is probing closed routes, or how fast */
+      this.logger.warn('bot refused: the route does not admit bots', { securityEvent: 'bot.access_denied', route, keyId: parseBotKey(key)?.keyId, ip });
+      throw AppErrorCode.ORG_007.create();
+    }
+
+    const authentication = await this.botKeyExchangeService.authenticate(key, ip, 'direct');
+    if (authentication.status === 'rate_limited') throw this.tooManyRequests(reply, authentication.retryAfterSeconds);
     if (authentication.status === 'denied') throw AppErrorCode.AUTH_005.create();
 
     const { bot } = authentication;
     const denial = { securityEvent: 'bot.access_denied', botId: bot.id.toString(), clientId: bot.clientId, route };
-    if (!options.bot || options.elevated || options.permission || options.service) {
-      this.logger.warn('bot refused: the route does not admit bots', denial);
-      throw AppErrorCode.ORG_007.create();
-    }
-
     const organisationId = this.organisationIdOf(request, options.orgParam);
     if (organisationId !== bot.organisationId) {
       this.logger.warn("bot refused: the route names another organisation than the bot's own", denial);
@@ -114,6 +122,11 @@ export class AccessGuard implements MiddlewareGenerator {
 
     context.bot = bot;
     context.organisation = organisation;
+  }
+
+  private tooManyRequests(reply: FastifyReply, retryAfterSeconds: number): AppError {
+    reply.header('retry-after', String(retryAfterSeconds));
+    return AppErrorCode.SEC_001.create();
   }
 
   private organisationIdOf(request: FastifyRequest, orgParam = 'organisationId'): bigint {

@@ -415,7 +415,7 @@ export class OAuthService {
     await this.assertIpBudget(chargedIp);
 
     const authentication = await this.botKeyExchangeService.authenticate(params.subjectToken, callerIp, 'exchange');
-    if (authentication.status === 'rate_limited') throw AppErrorCode.SEC_001.create();
+    if (authentication.status === 'rate_limited') throw this.tooManyRequests(authentication.retryAfterSeconds);
     if (authentication.status === 'denied') {
       await this.chargeIp(chargedIp);
       throw AppErrorCode.OAU_003.create();
@@ -449,7 +449,13 @@ export class OAuthService {
   private async assertIpBudget(ip: string): Promise<void> {
     if (this.rateLimiterService.isAllowlisted(ip)) return;
     const decision = await this.rateLimiterService.peek(IP_GENERAL_BUCKET, ip, GENERAL_LIMIT, GENERAL_WINDOW_SECONDS);
-    if (!decision.allowed) throw AppErrorCode.SEC_001.create();
+    if (!decision.allowed) throw this.tooManyRequests(decision.retryAfterSeconds);
+  }
+
+  /** The reply is reached through the ambient context: a throttle raised in the service layer would otherwise answer 429 with no way to act on it. A caller with no reply still gets the 429. */
+  private tooManyRequests(retryAfterSeconds: number): AppError {
+    Context.getResponse()?.header('retry-after', String(retryAfterSeconds));
+    return AppErrorCode.SEC_001.create();
   }
 
   private async chargeIp(ip: string): Promise<void> {

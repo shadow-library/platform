@@ -8,7 +8,7 @@ import { Logger } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, type PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
-import { RateLimiterService } from '@server/modules/infrastructure/security';
+import { LogSamplerService, RateLimiterService } from '@server/modules/infrastructure/security';
 
 import { hashBotKeySecret, parseBotKey } from './bot-key.util';
 import { BOT_KEY_EXCHANGE_LIMIT_PER_MINUTE } from './bot.constants';
@@ -26,7 +26,11 @@ export type BotKeyPurpose = 'exchange' | 'direct';
 
 export type BotKeyDenialReason = 'revoked' | 'expired' | 'ip_not_allowed' | 'rate_limited' | 'bot_suspended' | 'org_inactive';
 
-export type BotKeyAuthentication = { status: 'authenticated'; bot: AuthenticatedBot } | { status: 'denied' } | { status: 'rate_limited' };
+export type BotKeyAuthentication =
+  | { status: 'authenticated'; bot: AuthenticatedBot }
+  | { status: 'denied' }
+  /** Carries the limiter's own window so the caller can answer `Retry-After` rather than a bare 429 */
+  | { status: 'rate_limited'; retryAfterSeconds: number };
 
 type UnknownKeyReason = 'malformed' | 'not_found' | 'secret_mismatch';
 
@@ -62,6 +66,7 @@ export class BotKeyExchangeService {
     databaseService: DatabaseService,
     private readonly rateLimiterService: RateLimiterService,
     private readonly auditService: AuditService,
+    private readonly logSamplerService: LogSamplerService,
   ) {
     this.db = databaseService.getPostgresClient();
     this.redis = databaseService.getRedisClient();
@@ -94,7 +99,7 @@ export class BotKeyExchangeService {
         : await this.rateLimiterService.enforce('bot-api', bot.id.toString(), bot.rateLimitPerMinute, RATE_WINDOW_SECONDS);
     if (!decision.allowed) {
       await this.deny(bot, 'rate_limited', ip);
-      return { status: 'rate_limited' };
+      return { status: 'rate_limited', retryAfterSeconds: decision.retryAfterSeconds };
     }
 
     await this.touch(bot.keyId, ip);
@@ -136,14 +141,14 @@ export class BotKeyExchangeService {
   }
 
   private async unknown(reason: UnknownKeyReason, ip: string | null, keyId?: string): Promise<BotKeyAuthentication> {
-    if (await this.claimLogSlot(`bot:log:unknown:${ip ?? 'invalid'}:${reason}`)) {
+    if (await this.logSamplerService.claim(`bot:log:unknown:${ip ?? 'invalid'}:${reason}`, LOG_WINDOW_SECONDS)) {
       this.logger.warn('bot key refused: no key matches the presented credential', { securityEvent: 'bot.key.unknown', reason, keyId, ip });
     }
     return DENIED;
   }
 
   private async deny(bot: AuthenticatedBot, reason: BotKeyDenialReason, ip: string | null): Promise<BotKeyAuthentication> {
-    if (await this.claimLogSlot(`bot:log:denied:${bot.keyId}:${reason}`)) {
+    if (await this.logSamplerService.claim(`bot:log:denied:${bot.keyId}:${reason}`, LOG_WINDOW_SECONDS)) {
       this.logger.warn('bot key refused', {
         securityEvent: 'bot.key.exchange_denied',
         reason,
@@ -168,17 +173,17 @@ export class BotKeyExchangeService {
   /**
    * Every audit write takes the organisation's hash-chain advisory lock, so recording each exchange would serialise all of an
    * organisation's bot traffic on it; one event per window is kept instead, claimed atomically so replicas do not duplicate it.
+   *
+   * Neither the claim nor the write may change the caller's outcome, so both are swallowed: a denial stays its 4xx and an
+   * authentication stays a success. Releasing the slot lets the next request in the window retry the write, while an
+   * unreachable Redis skips it rather than letting every request take the lock the sampling exists to protect.
    */
   private async sampleAudit(slot: string, windowSeconds: number, write: () => Promise<unknown>): Promise<void> {
-    if (!(await this.claimSlot(slot, windowSeconds))) return;
+    if (!(await this.claimSlot(slot, windowSeconds).catch(() => false))) return;
     await write().catch(async (error: unknown) => {
-      await this.redis.del(slot);
-      throw error;
+      await this.redis.del(slot).catch(() => undefined);
+      this.logger.error('bot key audit write failed; the request outcome is unchanged', { slot, error });
     });
-  }
-
-  private async claimLogSlot(slot: string): Promise<boolean> {
-    return this.claimSlot(slot, LOG_WINDOW_SECONDS).catch(() => true);
   }
 
   private async claimSlot(slot: string, windowSeconds: number): Promise<boolean> {

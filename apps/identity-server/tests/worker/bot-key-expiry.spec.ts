@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 
 import { eq, inArray } from 'drizzle-orm';
 
@@ -8,6 +8,7 @@ import { UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
+import { LogSamplerService } from '@server/modules/infrastructure/security';
 import { BotKeyExpiryService } from '@server/modules/worker';
 
 import { TestEnvironment } from '../test-environment';
@@ -50,6 +51,13 @@ describe('BotKeyExpiryService', () => {
     return { organisationId, ownerId, ownerEmail, adminId, adminEmail, memberId };
   };
 
+  const unverifyAdmins = async (org: { ownerId: bigint; adminId: bigint }): Promise<void> => {
+    await db
+      .update(schema.userEmails)
+      .set({ verifiedAt: null })
+      .where(inArray(schema.userEmails.userId, [org.ownerId, org.adminId]));
+  };
+
   const createBotKey = async (organisationId: bigint, actorUserId: bigint, expiresInDays: number): Promise<{ id: string; botId: bigint; botHandle: string }> => {
     const bot = await botService.createBot({ userId: actorUserId }, organisationId, { handle: `bot-${seq++}`, displayName: 'Release Bot' });
     const key = await botKeyService.createKey({ userId: actorUserId }, organisationId, bot.id, { name: `key-${seq++}`, expiresAt: expiryIn(90) });
@@ -62,7 +70,7 @@ describe('BotKeyExpiryService', () => {
 
   beforeEach(() => {
     db = env.getPostgresClient();
-    service = new BotKeyExpiryService(env.getDatabaseService(), env.getService(NotificationService), env.getService(AuditService));
+    service = new BotKeyExpiryService(env.getDatabaseService(), env.getService(NotificationService), env.getService(AuditService), env.getService(LogSamplerService));
     userService = env.getService(UserService);
     organisationService = env.getService(OrganisationService);
     botService = env.getService(BotService);
@@ -172,20 +180,46 @@ describe('BotKeyExpiryService', () => {
       expect(reminded).toBe(1);
     });
 
-    it('should not count a key as reminded when no recipient has a verified email', async () => {
+    it('should leave a key remindable when no recipient has a verified email', async () => {
       const org = await createOrganisation();
       const key = await createBotKey(org.organisationId, org.ownerId, 3);
-      await db
-        .update(schema.userEmails)
-        .set({ verifiedAt: null })
-        .where(inArray(schema.userEmails.userId, [org.ownerId, org.adminId]));
+      await unverifyAdmins(org);
 
       const reminded = await service.remindExpiringKeys();
 
       expect(reminded).toBe(0);
       expect(await db.select().from(schema.notificationOutbox)).toHaveLength(0);
       const row = await db.query.botKeys.findFirst({ where: eq(schema.botKeys.id, key.id) });
+      expect(row?.expiryRemindedAt).toBeNull();
+    });
+
+    it('should remind a key on a later tick once an owner verifies their email', async () => {
+      const org = await createOrganisation();
+      const key = await createBotKey(org.organisationId, org.ownerId, 3);
+      await unverifyAdmins(org);
+      expect(await service.remindExpiringKeys()).toBe(0);
+
+      await db.update(schema.userEmails).set({ verifiedAt: new Date() }).where(eq(schema.userEmails.userId, org.ownerId));
+
+      expect(await service.remindExpiringKeys()).toBe(1);
+      const outbox = await db.select().from(schema.notificationOutbox);
+      expect(outbox.map(row => (row.recipients as { email?: string }).email)).toEqual([org.ownerEmail]);
+      const row = await db.query.botKeys.findFirst({ where: eq(schema.botKeys.id, key.id) });
       expect(row?.expiryRemindedAt).not.toBeNull();
+    });
+
+    it('should warn at most once a day about an organisation with no notifiable recipient', async () => {
+      const org = await createOrganisation();
+      await createBotKey(org.organisationId, org.ownerId, 3);
+      await unverifyAdmins(org);
+      const warn = spyOn(service['logger'], 'warn');
+
+      await service.remindExpiringKeys();
+      await service.remindExpiringKeys();
+
+      expect(warn.mock.calls).toHaveLength(1);
+      expect(warn.mock.calls[0]?.[1]).toMatchObject({ organisationId: org.organisationId.toString(), keyCount: 1 });
+      warn.mockRestore();
     });
 
     it('should not double-send if the claim is re-attempted for an already-claimed key', async () => {

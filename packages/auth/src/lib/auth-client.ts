@@ -44,7 +44,7 @@ import { PdpClient } from './pdp-client';
 import { assertValidRoleCatalog } from './role-catalog';
 import { ServiceAccessClient } from './service-access';
 import { ServiceTokenManager } from './token-manager';
-import { assertValidTimeout, withTimeout } from './transport';
+import { assertValidTimeout, retryAfterSecondsOf, withTimeout } from './transport';
 
 /**
  * Defining types
@@ -106,8 +106,11 @@ const BOT_KEY_TOKEN_TYPE = 'urn:shadow:token-type:bot-key';
 
 const readString = (value: unknown): string | undefined => (typeof value === 'string' && value.length > 0 ? value : undefined);
 
-/** A 401 is identity refusing this application's own credential, not the key, so it is an outage from the bot's point of view */
-const isBotKeyRejection = (status: number): boolean => status >= 400 && status < 500 && status !== 401;
+const UNAUTHORIZED = 401;
+const TOO_MANY_REQUESTS = 429;
+
+/** A 401 is identity refusing this application's own credential, not the key, so it is an outage from the bot's point of view; a 429 never reaches here */
+const isBotKeyRejection = (status: number): boolean => status >= 400 && status < 500 && status !== UNAUTHORIZED;
 
 /**
  * The consumer-facing auth client: offline token verification, PDP checks, M2M tokens, role
@@ -293,7 +296,8 @@ export class AuthClient {
   /**
    * Identity forces the audience to this client's own resource, so the key can never be replayed into
    * another application. A credential rejection is `BOT_KEY_INVALID`; anything else — transport, 5xx,
-   * identity refusing this application's own credential, a malformed answer — is `TOKEN_EXCHANGE_FAILED`.
+   * a throttled exchange, identity refusing this application's own credential, a malformed answer — is
+   * `TOKEN_EXCHANGE_FAILED`, whose 503 keeps the exchanger from negative-caching a key that is fine.
    */
   private async exchangeBotKey(botKey: string, clientIp: string | undefined): Promise<string> {
     const endpoint = (await this.discovery.get()).token_endpoint;
@@ -301,6 +305,11 @@ export class AuthClient {
     if (clientIp) body.client_ip = clientIp;
 
     const response = await this.dispatchToOAuthEndpoint(endpoint, body, AuthErrorCode.TOKEN_EXCHANGE_FAILED, 'bot key exchange');
+    if (response.status === TOO_MANY_REQUESTS) {
+      const retryAfterSeconds = retryAfterSecondsOf(response);
+      this.logger.warn('identity throttled the bot key exchange', { retryAfterSeconds });
+      throw AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: 'identity throttled the bot key exchange', throttled: true, retryAfterSeconds });
+    }
     if (isBotKeyRejection(response.status)) throw AuthErrorCode.BOT_KEY_INVALID.create({ reason: `identity refused the key with http ${response.status}` });
     if (!response.ok) throw this.logged(AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: `bot key exchange endpoint returned http ${response.status}` }));
 

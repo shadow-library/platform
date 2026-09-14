@@ -126,6 +126,50 @@ describe('BotKeyExchanger', () => {
     expect(calls).toHaveLength(2);
   });
 
+  it('should hold a throttled key for the retry-after identity sent, then exchange again', async () => {
+    const key = botKey();
+    exchangeFailure = AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: 'identity throttled the bot key exchange', throttled: true, retryAfterSeconds: 30 });
+    expect(AppError.is(await exchanger.resolve(key, IP).catch((error: unknown) => error), AuthErrorCode.TOKEN_EXCHANGE_FAILED)).toBe(true);
+
+    exchangeFailure = undefined;
+    now += 29_999;
+    const held = await exchanger.resolve(key, IP).catch((error: unknown) => error);
+    expect(AppError.is(held, AuthErrorCode.TOKEN_EXCHANGE_FAILED)).toBe(true);
+    expect(calls).toHaveLength(1);
+
+    now += 1;
+    expect(await exchanger.resolve(key, IP)).toMatchObject({ kind: 'bot', botId: '42' });
+    expect(calls).toHaveLength(2);
+  });
+
+  it('should back off for a default window when a throttle carries no retry-after, and never longer than a minute', async () => {
+    const unhinted = botKey();
+    exchangeFailure = AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: 'identity throttled the bot key exchange', throttled: true });
+    await exchanger.resolve(unhinted, IP).catch(() => undefined);
+    now += 5_000;
+    exchangeFailure = undefined;
+    expect(await exchanger.resolve(unhinted, IP)).toMatchObject({ kind: 'bot' });
+
+    const clamped = botKey();
+    exchangeFailure = AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: 'identity throttled the bot key exchange', throttled: true, retryAfterSeconds: 3_600 });
+    await exchanger.resolve(clamped, IP).catch(() => undefined);
+    now += 60_000;
+    exchangeFailure = undefined;
+    expect(await exchanger.resolve(clamped, IP)).toMatchObject({ kind: 'bot' });
+  });
+
+  it('should never turn a throttle into a refused key', async () => {
+    const key = botKey();
+    exchangeFailure = AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: 'identity throttled the bot key exchange', throttled: true, retryAfterSeconds: 2 });
+
+    for (const attempt of [0, 1]) {
+      now += attempt;
+      const error = await exchanger.resolve(key, IP).catch((caught: unknown) => caught);
+      expect(AppError.is(error, AuthErrorCode.BOT_KEY_INVALID)).toBe(false);
+      expect(AppError.is(error, AuthErrorCode.TOKEN_EXCHANGE_FAILED)).toBe(true);
+    }
+  });
+
   it('should not cache an outage, so the first request after identity recovers is exchanged', async () => {
     const key = botKey();
     exchangeFailure = AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: 'http 503' });

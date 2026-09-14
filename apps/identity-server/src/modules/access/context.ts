@@ -1,6 +1,6 @@
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
-import { ContextService } from '@shadow-library/fastify';
+import { ContextService, type HttpResponse } from '@shadow-library/fastify';
 
 import { AppErrorCode } from '@server/classes';
 import { type AdminActor } from '@server/modules/admin';
@@ -83,6 +83,8 @@ export const Context = {
   getClientInfo: (): ClientInfo => current().getClientInfo(),
   getBot: (): AuthenticatedBot => current().getBot(),
   getCaller: (): Caller => current().getCaller(),
+  /** Only for response headers a service must set itself, such as `Retry-After` on a throttle it raises; null when the caller is not an HTTP request */
+  getResponse: (): HttpResponse | null => current().getResponse(false),
 };
 
 @Injectable()

@@ -14,6 +14,7 @@ import { AuthPrincipal, BotPrincipal } from '../interfaces';
 import { AuthClient } from '../lib/auth-client';
 import { BOT_KEY_PREFIX, parseBotKey } from '../lib/bot-key';
 import { BotRateLimiter } from '../lib/bot-rate-limiter';
+import { retryAfterHint } from '../lib/transport';
 import { AppSessionService } from './app-session.service';
 import { AUTH_ROUTE_METADATA } from './constants';
 import { AUTH_PRINCIPAL } from './context';
@@ -125,8 +126,9 @@ export class AuthGuard {
    * is public, so a well-formed key proves nothing, and exchanging one on a route no bot may use would
    * turn every guarded route into a free amplifier against identity's token endpoint.
    *
-   * An exchange that failed for want of identity — transport, 5xx, a malformed answer — is answered 503
-   * rather than collapsed into 401, so a bot can tell an outage from a revoked key. It still fails closed.
+   * An exchange that failed for want of identity — transport, 5xx, a throttle, a malformed answer — is
+   * answered 503 rather than collapsed into 401, so a bot can tell an outage from a revoked key. It still
+   * fails closed.
    */
   private async authenticateBot(botKey: string, clientIp: string | undefined, auth: AuthRouteMetadata, method: string, path: string): Promise<BotPrincipal> {
     if (!parseBotKey(botKey)) throw this.unauthenticated(AuthErrorCode.BOT_KEY_INVALID.create({ reason: 'the key is malformed or fails its checksum' }));
@@ -136,7 +138,7 @@ export class AuthGuard {
     return this.client.resolveBotKey(botKey, clientIp).catch((error: unknown) => {
       if (!AppError.is(error) || error.status < 500) throw this.unauthenticated(error instanceof Error ? error : new Error(String(error)));
       this.logger.warn('bot key exchange unavailable', { reason: error.message, method, path });
-      throw AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: 'identity could not exchange the bot key' });
+      throw AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: 'identity could not exchange the bot key', retryAfterSeconds: retryAfterHint(error) });
     });
   }
 
@@ -220,12 +222,19 @@ export class AuthGuard {
       return this.bounce(response, sessions.stepUpUrl(returnTo));
     }
 
+    /** Identity throttled the exchange and said when to come back; the 503 carries that forward rather than leaving the bot to guess */
+    if (AppError.is(error, AuthErrorCode.TOKEN_EXCHANGE_FAILED)) {
+      const retryAfterSeconds = retryAfterHint(error);
+      if (retryAfterSeconds !== undefined) response?.header('retry-after', String(retryAfterSeconds));
+      throw error;
+    }
+
     /**
      * Everything else collapses back to the generic pair. The cookie path can fail with the SDK's own
      * codes — a broken scope grant, an unreachable identity — and none of that is the browser's
      * business; leaking it would tell an unauthenticated caller how this service is configured.
      */
-    if (AppError.is(error, AuthGuardErrorCode) || AppError.is(error, ServerErrorCode.S007) || AppError.is(error, AuthErrorCode.TOKEN_EXCHANGE_FAILED)) throw error;
+    if (AppError.is(error, AuthGuardErrorCode) || AppError.is(error, ServerErrorCode.S007)) throw error;
     throw this.unauthenticated(error instanceof Error ? error : new Error(String(error)));
   }
 

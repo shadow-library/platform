@@ -296,6 +296,29 @@ describe('AccessGuard bot mode', () => {
       expect((await env.getService(OrganisationService).getMembership(memberId, orgId))?.role).toBe('MEMBER');
     });
 
+    it('should refuse a route that admits no bot without spending the quota, stamping the key or auditing a use', async () => {
+      await env.getService(BotService).updateBot({ userId: adminId }, orgId, botId, { rateLimitPerMinute: 2 });
+      const closed: Route = { method: 'get', path: `${base()}/bots` };
+
+      for (let attempt = 0; attempt < 4; attempt++) expect((await asBot(closed)).statusCode).toBe(403);
+
+      expect(await db.query.botKeys.findFirst({ where: eq(schema.botKeys.id, keyId) }).then(row => row?.lastUsedAt)).toBeNull();
+      expect(await db.select().from(schema.auditEvents).where(eq(schema.auditEvents.action, 'bot.key.used'))).toHaveLength(0);
+
+      expect((await asBot({ method: 'get', path: `${base()}/members` })).statusCode).toBe(200);
+      expect((await asBot({ method: 'get', path: `${base()}/members` })).statusCode).toBe(200);
+      expect((await asBot({ method: 'get', path: `${base()}/members` })).statusCode).toBe(429);
+    });
+
+    it('should answer a route that admits no bot the same way whether or not the key is valid', async () => {
+      const closed: Route = { method: 'get', path: `${base()}/bots` };
+      const valid = await asBot(closed);
+      const invalid = await asBot(closed, 'sl_bot_garbage');
+
+      expect({ status: valid.statusCode, code: codeOf(valid) }).toEqual({ status: 403, code: 'ORG_007' });
+      expect({ status: invalid.statusCode, code: codeOf(invalid) }).toEqual({ status: 403, code: 'ORG_007' });
+    });
+
     it('should refuse elevated routes', async () => {
       const routes: Route[] = [
         { method: 'post', path: `${base()}/bots`, body: { handle: 'spawned', displayName: 'Spawned' } },
@@ -342,7 +365,11 @@ describe('AccessGuard bot mode', () => {
 
       expect((await asBot({ method: 'get', path: `${base()}/members` })).statusCode).toBe(200);
       expect((await asBot({ method: 'get', path: `${base()}/members` })).statusCode).toBe(200);
-      expect((await asBot({ method: 'get', path: `${base()}/members` })).statusCode).toBe(429);
+
+      const limited = await asBot({ method: 'get', path: `${base()}/members` });
+      expect(limited.statusCode).toBe(429);
+      expect(Number(limited.headers['retry-after'])).toBeGreaterThan(0);
+      expect(Number(limited.headers['retry-after'])).toBeLessThanOrEqual(60);
     });
   });
 

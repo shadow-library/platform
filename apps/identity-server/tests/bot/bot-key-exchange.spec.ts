@@ -8,8 +8,9 @@ import { ACCESS_TOKEN_TYPE, AccessTokenService, BOT_KEY_TOKEN_TYPE, OAuthClientS
 import { BotKeyExchangeService, BotKeyService, BotService, formatBotKey, parseBotKey } from '@server/modules/identity/bot';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
+import { AuditService } from '@server/modules/infrastructure/audit';
 import { PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
-import { IP_GENERAL_BUCKET, RateLimiterService } from '@server/modules/infrastructure/security';
+import { GENERAL_LIMIT, GENERAL_WINDOW_SECONDS, IP_GENERAL_BUCKET, RateLimiterService } from '@server/modules/infrastructure/security';
 import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
@@ -213,10 +214,25 @@ describe('Bot key exchange', () => {
       const limited = await exchange();
       expect(limited.statusCode).toBe(429);
       expect(errorOf(limited)).toBe('RATE_LIMITED');
+      expect(Number(limited.headers['retry-after'])).toBeGreaterThan(0);
+      expect(Number(limited.headers['retry-after'])).toBeLessThanOrEqual(60);
 
       const [denied] = await auditEvents('bot.key.exchange_denied');
       expect(denied?.detail).toMatchObject({ reason: 'rate_limited' });
     }, 60_000);
+
+    it('should answer 429 with a retry-after when the forwarded caller address has spent its IP budget', async () => {
+      const limiter = env.getService(RateLimiterService);
+      limiter.enabled = true;
+      await env.getRedisClient().set(`rl:${IP_GENERAL_BUCKET}:203.0.113.9`, String(GENERAL_LIMIT), 'EX', GENERAL_WINDOW_SECONDS);
+
+      const limited = await exchange({ client_ip: '203.0.113.9' }, exchanger, '10.0.0.5');
+
+      expect(limited.statusCode).toBe(429);
+      expect(errorOf(limited)).toBe('RATE_LIMITED');
+      expect(Number(limited.headers['retry-after'])).toBeGreaterThan(0);
+      expect(Number(limited.headers['retry-after'])).toBeLessThanOrEqual(GENERAL_WINDOW_SECONDS);
+    });
 
     it('should reserve 401 for the exchanging client failing its own authentication', async () => {
       const response = await tokenRequest({ grant_type: TOKEN_EXCHANGE_GRANT, subject_token: key, subject_token_type: BOT_KEY_TOKEN_TYPE }, basic(exchanger, 'wrong-secret'));
@@ -371,6 +387,42 @@ describe('Bot key exchange', () => {
         expect(audited).not.toContain(material);
       }
       write.mockRestore();
+    });
+  });
+
+  describe('audit resilience', () => {
+    const restores: (() => void)[] = [];
+    afterEach(() => {
+      for (const undo of restores.splice(0)) undo();
+    });
+
+    const failAudit = () => {
+      const record = spyOn(env.getService(AuditService), 'record').mockImplementation(() => Promise.reject(new Error('audit chain lock timeout')));
+      restores.push(() => record.mockRestore());
+      return record;
+    };
+
+    it('should keep a denial a 4xx when the audit write fails, and still log the security event', async () => {
+      await env.getService(BotService).suspendBot({ userId: adminId }, orgId, botId);
+      const warn = spyOn(env.getService(BotKeyExchangeService)['logger'], 'warn');
+      restores.push(() => warn.mockRestore());
+      failAudit();
+
+      const response = await exchange();
+
+      expect({ statusCode: response.statusCode, code: errorOf(response) }).toEqual({ statusCode: 400, code: 'invalid_grant' });
+      expect(warn).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ securityEvent: 'bot.key.exchange_denied', reason: 'bot_suspended' }));
+    });
+
+    it('should keep an authentication successful when the audit write fails, and audit the next use instead', async () => {
+      const record = failAudit();
+      expect((await exchange()).statusCode).toBe(200);
+      expect(await auditEvents('bot.key.used')).toHaveLength(0);
+      expect(await env.getRedisClient().get(`bot:audit:used:${keyId}`)).toBeNull();
+
+      record.mockRestore();
+      expect((await exchange()).statusCode).toBe(200);
+      expect(await auditEvents('bot.key.used')).toHaveLength(1);
     });
   });
 

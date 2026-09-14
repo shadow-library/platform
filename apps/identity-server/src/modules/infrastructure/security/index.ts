@@ -1,3 +1,5 @@
+export * from './log-sampler.module';
+export * from './log-sampler.service';
 export * from './m2m-budget.decorator';
 export * from './m2m-rate-limit.middleware';
 export * from './rate-limit.decorator';

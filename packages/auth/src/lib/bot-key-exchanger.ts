@@ -12,6 +12,7 @@ import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { AuthPrincipal, BotPrincipal } from '../interfaces';
 import { botKeyIdToUuid, parseBotKey } from './bot-key';
+import { isThrottled, retryAfterHint } from './transport';
 
 /**
  * Defining types
@@ -38,6 +39,14 @@ interface CachedBotPrincipal {
  * credential rejection) is cached for 10 s so a revoked key hammering the service costs identity one
  * exchange per window; an outage is not, so the first request after identity recovers succeeds.
  *
+ * A throttle is neither. The key is valid, so it must not be negative-cached into a 401, but identity
+ * said "stop" and nothing else on this path applies backpressure — the bot rate limiter only runs once
+ * an exchange has succeeded, and identity charges nothing for the refusal. So the back-off is held
+ * separately and still rethrown as an outage. Identity's own `Retry-After` is taken verbatim up to the
+ * maximum, however short: it is what remains of *its* window, so a floor would only delay a bot that
+ * identity is already willing to serve again. `THROTTLE_DEFAULT_MS` is the guess for a missing hint,
+ * not a minimum.
+ *
  * Entries are keyed by a hash of the key *and* the caller's IP: identity enforces the bot's IP
  * allowlist during the exchange, so a principal verified for one address must never answer a request
  * from another.
@@ -46,6 +55,8 @@ const DEFAULT_MAX_ENTRIES = 1_000;
 const MAX_CACHE_MS = 60_000;
 const EXPIRY_MARGIN_MS = 30_000;
 const REFUSAL_CACHE_MS = 10_000;
+const THROTTLE_DEFAULT_MS = 5_000;
+const THROTTLE_MAX_MS = 60_000;
 
 function deepFreeze<T>(value: T): T {
   if (typeof value !== 'object' || value === null || Object.isFrozen(value)) return value;
@@ -57,6 +68,7 @@ export class BotKeyExchanger {
   private readonly logger = Logger.getLogger(NAMESPACE, BotKeyExchanger.name);
   private readonly verified: LRUCache;
   private readonly refused: LRUCache;
+  private readonly throttled: LRUCache;
   private readonly inflight = new Map<string, Promise<BotPrincipal>>();
   private readonly now: () => number;
 
@@ -64,6 +76,7 @@ export class BotKeyExchanger {
     const maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
     this.verified = new LRUCache(maxEntries);
     this.refused = new LRUCache(maxEntries);
+    this.throttled = new LRUCache(maxEntries);
     this.now = options.now ?? Date.now;
   }
 
@@ -83,6 +96,13 @@ export class BotKeyExchanger {
     if (refusedUntil !== undefined && refusedUntil > now) throw AuthErrorCode.BOT_KEY_INVALID.create({ reason: 'the key was recently refused' });
     if (refusedUntil !== undefined) this.refused.remove(cacheKey);
 
+    const throttledUntil = this.throttled.get<number>(cacheKey);
+    if (throttledUntil !== undefined && throttledUntil > now) {
+      const retryAfterSeconds = Math.ceil((throttledUntil - now) / 1000);
+      throw AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: 'identity throttled this key and the back-off has not elapsed', throttled: true, retryAfterSeconds });
+    }
+    if (throttledUntil !== undefined) this.throttled.remove(cacheKey);
+
     const pending = this.inflight.get(cacheKey);
     if (pending) return pending;
 
@@ -101,6 +121,13 @@ export class BotKeyExchanger {
       return principal;
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
+      if (isThrottled(error)) {
+        const hint = retryAfterHint(error);
+        const backOffMs = Math.min(THROTTLE_MAX_MS, hint !== undefined && hint > 0 ? hint * 1000 : THROTTLE_DEFAULT_MS);
+        this.throttled.set(cacheKey, this.now() + backOffMs);
+        this.logger.warn('bot key exchange throttled; holding off before asking identity again', { reason, backOffMs });
+        throw error;
+      }
       if (!AppError.is(error) || error.status >= 500) {
         this.logger.warn('bot key exchange unavailable', { reason });
         throw error;
