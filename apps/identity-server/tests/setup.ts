@@ -15,8 +15,9 @@ async function flushTestRedisDb(): Promise<void> {
   await redis.quit();
 }
 
+/** Bun's `spawnSync` does not inherit `process.env` mutations made after startup unless `env` is passed explicitly. */
 function createTemplateDatabase(): void {
-  const result = spawnSync('bun', ['scripts/db.ts', 'apps/identity-server', 'create-template'], { cwd: REPO_ROOT, stdio: 'inherit' });
+  const result = spawnSync('bun', ['scripts/db.ts', 'apps/identity-server', 'create-template'], { cwd: REPO_ROOT, stdio: 'inherit', env: { ...process.env } });
   if (result.status !== 0) throw new Error(`scripts/db.ts create-template failed (exit code ${result.status})`);
 }
 

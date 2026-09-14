@@ -4,7 +4,9 @@ import { Logger } from '@shadow-library/common';
 const logger = Logger.getLogger('Tests', 'TemplateDBCloner');
 const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost:7070/shadow_identity';
 const baseUrl = baseConnectionString.replace(/\/[^/]*$/, '');
-const templateDbName = process.env.POSTGRES_TEMPLATE_DB_NAME ?? 'shadow_identity_template';
+const databaseName = baseConnectionString.split('/').pop() as string;
+/** Mirrors scripts/db.ts's own `${dbName}_template` convention, so a worktree overriding only DATABASE_POSTGRES_URL gets its own template, not the shared one. */
+const templateDbName = process.env.POSTGRES_TEMPLATE_DB_NAME ?? `${databaseName}_template`;
 
 export async function dropDatabase(dbName: string, sql?: SQL): Promise<void> {
   const isProvidedSQL = Boolean(sql);
