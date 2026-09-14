@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { convertToHomeMinor, deriveDueState, formatMinor, monthlyEquivalentMinor, parseAmountToMinor, type Subscription, type SubscriptionFrequency } from '@/lib/data';
+import {
+  BUILT_IN_CATEGORIES,
+  convertToHomeMinor,
+  deriveDueState,
+  type ExpenseDetail,
+  financeExpensePage,
+  type FinanceSettings,
+  type FinanceState,
+  financeSummary,
+  formatMinor,
+  monthlyEquivalentMinor,
+  parseAmountToMinor,
+  type Subscription,
+  type SubscriptionFrequency,
+} from '@/lib/data';
 
 function subscription(overrides: Partial<Subscription> = {}): Subscription {
   return {
@@ -117,5 +131,102 @@ describe('deriveDueState', () => {
 
   it('should say nothing about a paused subscription', () => {
     expect(deriveDueState(subscription({ active: false }), '2026-08-27')).toBe('none');
+  });
+});
+
+const SETTINGS: FinanceSettings = { homeCurrency: 'EUR', currencies: ['EUR'], weekStartsOn: 1, monthlyBudgetMinor: null };
+
+function expense(id: string, occurredOnDate: string, amountMinor: number, overrides: Partial<ExpenseDetail> = {}): ExpenseDetail {
+  return {
+    id,
+    amountMinor,
+    amountText: (amountMinor / 100).toFixed(2),
+    currency: 'EUR',
+    fxRate: null,
+    homeAmountMinor: null,
+    categoryId: 'food',
+    note: id,
+    occurredOnDate,
+    loggedAt: `${occurredOnDate}T12:00:00Z`,
+    source: 'manual',
+    syncState: 'synced',
+    audit: [],
+    ...overrides,
+  };
+}
+
+function financeState(today: string, expenses: ExpenseDetail[], settings: Partial<FinanceSettings> = {}): FinanceState {
+  return { today, settings: { ...SETTINGS, ...settings }, expenses, subscriptions: [], categories: [...BUILT_IN_CATEGORIES], monthlyExpenseCount: expenses.length };
+}
+
+describe('financeSummary', () => {
+  it('should use the calendar month for this month', () => {
+    const state = financeState('2026-09-14', [expense('late-august', '2026-08-31', 1000), expense('first', '2026-09-01', 500), expense('later', '2026-09-20', 250)]);
+
+    const { month } = financeSummary(state).ranges;
+    expect(month.spentMinor).toBe(750);
+    expect(financeExpensePage(state, { range: 'month' }).items.map(item => item.id)).toEqual(['later', 'first']);
+  });
+
+  it('should start Money weeks on Monday whatever the account week start', () => {
+    const state = financeState('2026-09-16', [expense('sunday', '2026-09-13', 100), expense('monday', '2026-09-14', 200)]);
+
+    expect(financeSummary(state).ranges.week.spentMinor).toBe(200);
+    expect(financeSummary({ ...state, settings: { ...SETTINGS, weekStartsOn: 0 } }).ranges.week.spentMinor).toBe(200);
+  });
+
+  it('should report no budget when none is set', () => {
+    expect(financeSummary(financeState('2026-09-14', [expense('coffee', '2026-09-02', 420)])).budget).toEqual({ kind: 'unset' });
+  });
+
+  it('should compute budget left for the calendar month', () => {
+    const state = financeState('2026-09-14', [expense('august', '2026-08-30', 90_000), expense('rent', '2026-09-01', 76_000), expense('fuel', '2026-09-12', 8_000)], {
+      monthlyBudgetMinor: 160_000,
+    });
+
+    expect(financeSummary(state).budget).toEqual({ kind: 'set', budgetMinor: 160_000, spentMinor: 84_000, leftMinor: 76_000, daysLeft: 17 });
+  });
+
+  it('should compute the month delta from previous spend', () => {
+    const state = financeState('2026-09-14', [
+      expense('last-month-early', '2026-08-10', 1000),
+      expense('last-month-late', '2026-08-20', 5000),
+      expense('this-month', '2026-09-05', 800),
+    ]);
+
+    expect(financeSummary(state).ranges.month.spentDeltaFraction).toBeCloseTo(-0.2);
+    expect(financeSummary(financeState('2026-09-14', [expense('this-month', '2026-09-05', 800)])).ranges.month.spentDeltaFraction).toBeNull();
+  });
+
+  it('should list only the rates the expenses in range used', () => {
+    const state = financeState('2026-09-14', [
+      expense('nok', '2026-09-10', 21400, { currency: 'NOK', fxRate: 0.0856, homeAmountMinor: 1832 }),
+      expense('usd-last-month', '2026-08-10', 1000, { currency: 'USD', fxRate: 0.9213, homeAmountMinor: 921 }),
+    ]);
+
+    const summary = financeSummary(state);
+    expect(summary.ranges.month.fxRates).toEqual([{ from: 'NOK', to: 'EUR', rate: 0.0856, date: '2026-09-10' }]);
+    expect(summary.ranges.week.fxRates).toEqual([]);
+  });
+
+  it('should total a non-euro account in its own currency', () => {
+    const state = financeState('2026-09-14', [expense('ramen', '2026-09-03', 1200, { currency: 'JPY', amountText: '1200' })], { homeCurrency: 'JPY', monthlyBudgetMinor: 50_000 });
+
+    const summary = financeSummary(state);
+    expect(summary.ranges.month.spentMinor).toBe(1200);
+    expect(summary.budget).toMatchObject({ kind: 'set', leftMinor: 48_800 });
+    expect(formatMinor(summary.budget.kind === 'set' ? summary.budget.leftMinor : 0, summary.settings.homeCurrency)).toBe('¥48,800');
+  });
+});
+
+describe('financeExpensePage', () => {
+  it('should sort expenses by date', () => {
+    const state = financeState('2026-09-14', [
+      expense('confirmed-later', '2026-09-11', 999, { loggedAt: '2026-09-14T08:00:00Z' }),
+      expense('morning', '2026-09-13', 420, { loggedAt: '2026-09-13T08:00:00Z' }),
+      expense('evening', '2026-09-13', 4450, { loggedAt: '2026-09-13T20:00:00Z' }),
+    ]);
+
+    expect(financeExpensePage(state, { range: 'month' }).items.map(item => item.id)).toEqual(['evening', 'morning', 'confirmed-later']);
   });
 });

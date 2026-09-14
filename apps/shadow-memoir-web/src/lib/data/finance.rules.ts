@@ -1,12 +1,21 @@
 import { DEFAULT_LOCALE } from '@shadow-library/ui';
 
+import { formatLocalDate } from '@/lib/format';
+
 import {
+  type BudgetStanding,
   BUILT_IN_CATEGORIES,
   type CategorySlice,
   CURRENCIES,
   type CurrencyCode,
   type Expense,
+  type ExpenseAuditChange,
+  type ExpenseAuditEntry,
+  type ExpenseAuditField,
   type ExpenseCategory,
+  type FinanceRange,
+  type FinanceSettings,
+  type FxRateSnapshot,
   type ReminderLead,
   type Subscription,
   type SubscriptionDueState,
@@ -153,4 +162,186 @@ export function categoryBreakdown(expenses: Expense[], categories: ExpenseCatego
 
 export function sumHomeMinor(expenses: Expense[], homeCurrency: CurrencyCode): number {
   return expenses.reduce((total, expense) => total + (homeAmountOf(expense, homeCurrency) ?? 0), 0);
+}
+
+export function expenseTitle(expense: Pick<Expense, 'note' | 'merchant' | 'categoryId'>, categories: ExpenseCategory[] = BUILT_IN_CATEGORIES): string {
+  return expense.note || expense.merchant || categoryById(expense.categoryId, categories).name;
+}
+
+export function compareExpensesByDate(a: Expense, b: Expense): number {
+  if (a.occurredOnDate !== b.occurredOnDate) return a.occurredOnDate < b.occurredOnDate ? 1 : -1;
+  if (a.loggedAt === b.loggedAt) return 0;
+  return a.loggedAt < b.loggedAt ? 1 : -1;
+}
+
+export interface DateSpan {
+  start: string;
+  end: string;
+}
+
+const DAY_MS = 86_400_000;
+
+function utcOf(isoDate: string): number {
+  return Date.parse(`${isoDate}T00:00:00Z`);
+}
+
+function shiftISODate(isoDate: string, days: number): string {
+  return new Date(utcOf(isoDate) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+function isoDate(year: number, month: number, day: number): string {
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function partsOf(today: string): { year: number; month: number; day: number } {
+  const [year = 1970, month = 1, day = 1] = today.split('-').map(Number);
+  return { year, month, day };
+}
+
+/** Weeks start on Monday, as Planning, Review and the crown count them; the account's week start only shapes the date picker until it applies app-wide. */
+export function financePeriod(range: FinanceRange, today: string): DateSpan {
+  const { year, month } = partsOf(today);
+  if (range === 'year') return { start: isoDate(year, 1, 1), end: isoDate(year, 12, 31) };
+  if (range === 'month') return { start: isoDate(year, month, 1), end: isoDate(year, month, daysInMonth(year, month)) };
+  const offset = (new Date(utcOf(today)).getUTCDay() + 6) % 7;
+  const start = shiftISODate(today, -offset);
+  return { start, end: shiftISODate(start, 6) };
+}
+
+/** The same stretch of the previous period up to the same point — the 1st to the 14th of last month when today is the 14th. */
+export function previousStretch(range: FinanceRange, today: string): DateSpan {
+  const { year, month, day } = partsOf(today);
+  if (range === 'week') return { start: shiftISODate(financePeriod('week', today).start, -7), end: shiftISODate(today, -7) };
+  if (range === 'year') return { start: isoDate(year - 1, 1, 1), end: isoDate(year - 1, month, Math.min(day, daysInMonth(year - 1, month))) };
+  const previousYear = month === 1 ? year - 1 : year;
+  const previousMonth = month === 1 ? 12 : month - 1;
+  return { start: isoDate(previousYear, previousMonth, 1), end: isoDate(previousYear, previousMonth, Math.min(day, daysInMonth(previousYear, previousMonth))) };
+}
+
+export function withinSpan(isoDateValue: string, span: DateSpan): boolean {
+  return isoDateValue >= span.start && isoDateValue <= span.end;
+}
+
+export function spendDelta(currentMinor: number, previousMinor: number): number | null {
+  if (previousMinor <= 0) return null;
+  return (currentMinor - previousMinor) / previousMinor;
+}
+
+export function budgetStanding(expenses: Expense[], settings: FinanceSettings, today: string): BudgetStanding {
+  if (settings.monthlyBudgetMinor === null) return { kind: 'unset' };
+  const month = financePeriod('month', today);
+  const spentMinor = sumHomeMinor(
+    expenses.filter(expense => withinSpan(expense.occurredOnDate, month)),
+    settings.homeCurrency,
+  );
+  const { year, month: monthNumber, day } = partsOf(today);
+  return {
+    kind: 'set',
+    budgetMinor: settings.monthlyBudgetMinor,
+    spentMinor,
+    leftMinor: settings.monthlyBudgetMinor - spentMinor,
+    daysLeft: daysInMonth(year, monthNumber) - day + 1,
+  };
+}
+
+function rateSnapshots(expenses: Expense[], homeCurrency: CurrencyCode): FxRateSnapshot[] {
+  return expenses
+    .filter(expense => expense.currency !== homeCurrency && expense.fxRate !== null)
+    .map(expense => ({ from: expense.currency, to: homeCurrency, rate: expense.fxRate ?? 0, date: expense.occurredOnDate }));
+}
+
+export function ratesUsed(expenses: Expense[], homeCurrency: CurrencyCode): FxRateSnapshot[] {
+  const unique = new Map<string, FxRateSnapshot>();
+  for (const snapshot of rateSnapshots(expenses, homeCurrency)) unique.set(`${snapshot.from}:${snapshot.rate}`, snapshot);
+  return [...unique.values()].sort((a, b) => a.from.localeCompare(b.from) || b.date.localeCompare(a.date));
+}
+
+export function latestRates(expenses: Expense[], homeCurrency: CurrencyCode): FxRateSnapshot[] {
+  const newest = new Map<CurrencyCode, FxRateSnapshot>();
+  for (const snapshot of rateSnapshots(expenses, homeCurrency)) {
+    const current = newest.get(snapshot.from);
+    if (!current || snapshot.date > current.date) newest.set(snapshot.from, snapshot);
+  }
+  return [...newest.values()].sort((a, b) => a.from.localeCompare(b.from));
+}
+
+const AUDIT_FIELD_LABELS: Record<ExpenseAuditField, string> = {
+  amountMinor: 'Amount',
+  currency: 'Currency',
+  occurredOn: 'Date',
+  categoryId: 'Category',
+  note: 'Note',
+  merchant: 'Merchant',
+};
+
+function auditValue(field: ExpenseAuditField, value: string, currency: CurrencyCode, categories: ExpenseCategory[]): string {
+  switch (field) {
+    case 'amountMinor':
+      return /^-?\d+$/.test(value) ? formatMinor(Number(value), currency) : value;
+    case 'occurredOn':
+      return formatLocalDate(value) || value;
+    case 'categoryId':
+      return categories.find(category => category.id === value)?.name ?? value;
+    case 'note':
+    case 'merchant':
+      return `“${value}”`;
+    case 'currency':
+      return value;
+  }
+}
+
+export function describeAuditChange(change: ExpenseAuditChange, currency: CurrencyCode, categories: ExpenseCategory[]): string {
+  const label = AUDIT_FIELD_LABELS[change.field];
+  if (change.from === null && change.to === null) return `${label} changed`;
+  if (change.from === null) return `${label} added: ${auditValue(change.field, change.to ?? '', currency, categories)}`;
+  if (change.to === null) return `${label} removed (was ${auditValue(change.field, change.from, currency, categories)})`;
+  return `${label} ${auditValue(change.field, change.from, currency, categories)} → ${auditValue(change.field, change.to, currency, categories)}`;
+}
+
+export function describeAuditEntry(entry: ExpenseAuditEntry, currency: CurrencyCode, categories: ExpenseCategory[]): string[] {
+  switch (entry.action) {
+    case 'created':
+      return ['Created'];
+    case 'receipt_confirmed':
+      return ['Receipt attached'];
+    case 'deleted':
+      return ['Deleted'];
+    case 'updated':
+      return entry.changes.length > 0 ? entry.changes.map(change => describeAuditChange(change, currency, categories)) : ['Edited'];
+  }
+}
+
+function auditSequence(id: string): bigint | null {
+  return /^\d+$/.test(id) ? BigInt(id) : null;
+}
+
+/** Newest first by server time, then by row id; a local entry that has no server id yet sorts above its peers. */
+export function sortAuditNewestFirst(entries: ExpenseAuditEntry[]): ExpenseAuditEntry[] {
+  return [...entries].sort((a, b) => {
+    if (a.at !== b.at) return a.at < b.at ? 1 : -1;
+    const left = auditSequence(a.id);
+    const right = auditSequence(b.id);
+    if (left === null || right === null) return left === right ? 0 : left === null ? -1 : 1;
+    return left === right ? 0 : left < right ? 1 : -1;
+  });
+}
+
+function auditText(value: string | undefined): string | null {
+  return value ? value : null;
+}
+
+export function expenseChanges(before: Expense, after: Expense): ExpenseAuditChange[] {
+  const pairs: [ExpenseAuditField, string | null, string | null][] = [
+    ['amountMinor', String(before.amountMinor), String(after.amountMinor)],
+    ['currency', before.currency, after.currency],
+    ['occurredOn', before.occurredOnDate, after.occurredOnDate],
+    ['categoryId', before.categoryId, after.categoryId],
+    ['note', auditText(before.note), auditText(after.note)],
+    ['merchant', auditText(before.merchant), auditText(after.merchant)],
+  ];
+  return pairs.filter(([, from, to]) => from !== to).map(([field, from, to]) => ({ field, from, to }));
 }

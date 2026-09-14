@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { formatShortDate } from '@/lib/data';
 import { type DeltaPage, SyncedAccountProvider, SyncedDataProvider, SyncedFinanceProvider, SyncedHeroProvider, SyncedQuickLogProvider, SyncedReflectProvider } from '@/lib/sync';
@@ -141,6 +141,12 @@ function fullPage(): DeltaPage {
   };
 }
 
+/** Money periods read the live clock, so the finance reads here run on the fixture day. */
+function onTheFixtureDay(): void {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(`${TODAY}T12:00:00`));
+}
+
 function setOnline(online: boolean): void {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: online });
 }
@@ -152,7 +158,11 @@ async function started(page: DeltaPage = fullPage()): Promise<TestEngine> {
 }
 
 describe('FE-5 domain projection', () => {
-  beforeEach(() => setOnline(true));
+  beforeEach(() => {
+    setOnline(true);
+    onTheFixtureDay();
+  });
+  afterEach(() => vi.useRealTimers());
 
   it('should ingest every new domain by the field names the server sends', async () => {
     const { engine } = await started();
@@ -219,7 +229,11 @@ describe('FE-5 domain projection', () => {
 });
 
 describe('FE-5 optimistic apply', () => {
-  beforeEach(() => setOnline(true));
+  beforeEach(() => {
+    setOnline(true);
+    onTheFixtureDay();
+  });
+  afterEach(() => vi.useRealTimers());
 
   it('should show a created expense before the server has answered and post it as expense.create', async () => {
     const { engine, server } = await started();
@@ -306,7 +320,11 @@ describe('FE-5 optimistic apply', () => {
 });
 
 describe('FE-5 replay convergence', () => {
-  beforeEach(() => setOnline(true));
+  beforeEach(() => {
+    setOnline(true);
+    onTheFixtureDay();
+  });
+  afterEach(() => vi.useRealTimers());
 
   it('should replay a queued command over a fresh projection exactly once per domain', async () => {
     setOnline(false);

@@ -36,11 +36,14 @@ export const SUPPORTED_CURRENCIES = Object.keys(CURRENCIES) as CurrencyCode[];
 
 export type ExpenseCategoryId = 'food' | 'groceries' | 'transport' | 'bills' | 'health' | 'shopping' | 'home' | 'subs' | 'uncat';
 
+export type CategoryTone = 'accent' | 'success' | 'warning' | 'neutral';
+
 export interface ExpenseCategory {
   id: ExpenseCategoryId;
   name: string;
   glyph: string;
   hint: string;
+  tone: CategoryTone;
   swatch: string;
   archived: boolean;
 }
@@ -48,21 +51,22 @@ export interface ExpenseCategory {
 export const UNCATEGORISED: ExpenseCategory = {
   id: 'uncat',
   name: 'Uncategorised',
-  glyph: '◌',
+  glyph: '?',
   hint: 'Waiting for a category',
-  swatch: 'var(--sh-border-strong)',
+  tone: 'neutral',
+  swatch: 'var(--sh-neutral-solid)',
   archived: false,
 };
 
 export const BUILT_IN_CATEGORIES: ExpenseCategory[] = [
-  { id: 'food', name: 'Food', glyph: '◍', hint: 'Coffee, eating out, takeaway', swatch: 'var(--sh-accent)', archived: false },
-  { id: 'groceries', name: 'Groceries', glyph: '⌾', hint: 'The weekly shop', swatch: 'var(--sh-accent)', archived: false },
-  { id: 'transport', name: 'Transport', glyph: '⛁', hint: 'Tram, fuel, parking', swatch: 'var(--sh-info-solid)', archived: false },
-  { id: 'bills', name: 'Bills', glyph: '▤', hint: 'Power, water, phone', swatch: 'var(--sh-info-solid)', archived: false },
-  { id: 'health', name: 'Health', glyph: '✚', hint: 'Gym, physio, kit', swatch: 'var(--sh-success-solid)', archived: false },
-  { id: 'shopping', name: 'Shopping', glyph: '✦', hint: 'Clothes, books, gifts', swatch: 'var(--sh-success-solid)', archived: false },
-  { id: 'home', name: 'Home', glyph: '⌂', hint: 'Rent, repairs, furniture', swatch: 'var(--sh-accent)', archived: false },
-  { id: 'subs', name: 'Subscriptions', glyph: '♪', hint: 'Managed on the Subscriptions screen', swatch: 'var(--sh-warning-solid)', archived: false },
+  { id: 'food', name: 'Food', glyph: '◍', hint: 'Coffee, eating out, takeaway', tone: 'warning', swatch: 'var(--sh-warning-solid)', archived: false },
+  { id: 'groceries', name: 'Groceries', glyph: '⌾', hint: 'The weekly shop', tone: 'success', swatch: 'var(--sh-success-solid)', archived: false },
+  { id: 'transport', name: 'Transport', glyph: '⛁', hint: 'Tram, fuel, parking', tone: 'accent', swatch: 'var(--sh-accent)', archived: false },
+  { id: 'bills', name: 'Bills', glyph: '▤', hint: 'Power, water, phone', tone: 'neutral', swatch: 'var(--sh-neutral-solid)', archived: false },
+  { id: 'health', name: 'Health', glyph: '✚', hint: 'Gym, physio, kit', tone: 'success', swatch: 'var(--sh-success-solid)', archived: false },
+  { id: 'shopping', name: 'Shopping', glyph: '✦', hint: 'Clothes, books, gifts', tone: 'accent', swatch: 'var(--sh-accent)', archived: false },
+  { id: 'home', name: 'Home', glyph: '⌂', hint: 'Rent, repairs, furniture', tone: 'warning', swatch: 'var(--sh-warning-solid)', archived: false },
+  { id: 'subs', name: 'Subscriptions', glyph: '♪', hint: 'Managed on the Subscriptions screen', tone: 'accent', swatch: 'var(--sh-accent)', archived: false },
   UNCATEGORISED,
 ];
 
@@ -101,12 +105,29 @@ export interface Expense {
   linkedQuestTitle?: string;
   linkedQuestNote?: string;
   linkedSubscriptionId?: string;
+  linkedQuestId?: string;
+  /** Line items read from a scanned receipt; the web cannot write them back, so an expense carrying them cannot be re-created. */
+  hasLineItems?: boolean;
+  receiptRef?: string;
   receipt?: ExpenseReceipt;
 }
 
-interface ExpenseAuditEntry {
-  text: string;
-  when: string;
+export type ExpenseAuditAction = 'created' | 'updated' | 'deleted' | 'receipt_confirmed';
+
+export type ExpenseAuditField = 'amountMinor' | 'currency' | 'occurredOn' | 'categoryId' | 'note' | 'merchant';
+
+export interface ExpenseAuditChange {
+  field: ExpenseAuditField;
+  from: string | null;
+  to: string | null;
+}
+
+export interface ExpenseAuditEntry {
+  id: string;
+  action: ExpenseAuditAction;
+  changes: ExpenseAuditChange[];
+  /** ISO timestamp of when the change reached the server; a queued local edit carries the time it was made. */
+  at: string;
 }
 
 export interface ExpenseDetail extends Expense {
@@ -123,6 +144,8 @@ export interface ExpenseDraft {
   merchant?: string;
   note?: string;
   source?: ExpenseSource;
+  /** A receipt already uploaded and confirmed; only an expense being created can carry one. */
+  receiptRef?: string;
 }
 
 export type SubscriptionFrequency = 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom';
@@ -185,34 +208,72 @@ export interface CategorySlice {
   percentOfLargest: number;
 }
 
-interface FxRateSnapshot {
+export interface FxRateSnapshot {
   from: CurrencyCode;
   to: CurrencyCode;
   rate: number;
+  /** The expense date the rate was captured for. */
+  date: string;
+}
+
+export interface FinanceSettings {
+  homeCurrency: CurrencyCode;
+  /** The account's enabled currencies, home first; the entry form offers only these. */
+  currencies: CurrencyCode[];
+  weekStartsOn: 0 | 1;
+  /** Minor units of `homeCurrency`; null when the owner has not set a budget. */
+  monthlyBudgetMinor: number | null;
+}
+
+export type BudgetStanding = { kind: 'unset' } | { kind: 'set'; budgetMinor: number; spentMinor: number; leftMinor: number; daysLeft: number };
+
+export interface RangeSpend {
+  range: FinanceRange;
+  periodLabel: string;
+  spentMinor: number;
+  /** Change against the same stretch of the previous period; null when that stretch holds no spending to compare with. */
+  spentDeltaFraction: number | null;
+  /** The stretch the delta compares against, phrased to follow "more than" or "less than". */
+  comparisonLabel: string;
+  averageDayMinor: number;
+  daysLogged: number;
+  categories: CategorySlice[];
+  /** Rates the expenses in range were converted at. */
+  fxRates: FxRateSnapshot[];
 }
 
 export interface FinanceSummary {
-  range: FinanceRange;
-  periodLabel: string;
-  homeCurrency: CurrencyCode;
-  spentMinor: number;
-  spentDeltaFraction: number | null;
-  comparisonLabel: string;
-  budgetMinor: number | null;
-  budgetLeftMinor: number | null;
-  daysRemaining: number;
+  settings: FinanceSettings;
+  categories: ExpenseCategory[];
+  ranges: Record<FinanceRange, RangeSpend>;
+  /** Always the calendar month, whatever range is on screen: the budget is monthly. */
+  budget: BudgetStanding;
   subscriptionsMonthlyMinor: number;
   activeSubscriptions: number;
-  nextSubscriptionLabel: string;
-  averageDayMinor: number;
-  daysLogged: number;
+  nextSubscription: { name: string; dueDate: string } | null;
   totalExpenses: number;
-  categories: CategorySlice[];
-  fxRates: FxRateSnapshot[];
-  receiptScansUsed: number;
-  receiptScanLimit: number;
-  receiptQuotaResetsOn: string;
+  /** The newest locked rate per foreign currency, for the entry form's conversion estimate. */
+  latestRates: FxRateSnapshot[];
   queuedExpense: Expense | null;
+}
+
+export interface ExpenseView {
+  expense: ExpenseDetail | null;
+  settings: FinanceSettings;
+  categories: ExpenseCategory[];
+  /** The newest locked rate per foreign currency, for the entry form's conversion estimate. */
+  rates: FxRateSnapshot[];
+}
+
+export interface ReceiptScanQuota {
+  cap: number;
+  used: number;
+  resetAt: string;
+}
+
+export interface ReceiptUploadProgress {
+  onProgress: (percent: number) => void;
+  signal: AbortSignal;
 }
 
 export interface ExpenseQuery {

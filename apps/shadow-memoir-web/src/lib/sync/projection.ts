@@ -10,14 +10,20 @@ import {
   type CrownPeriod,
   type CurrencyCode,
   type DayMode,
+  type ExpenseAuditAction,
+  type ExpenseAuditChange,
+  type ExpenseAuditEntry,
+  type ExpenseAuditField,
   type ExpenseCategory,
   type ExpenseCategoryId,
   type ExpenseDetail,
+  type FinanceSettings,
   HEALTH_METRIC_NAMES,
   type HealthComparison,
   type HealthMetricEntry,
   type HealthMetricKey,
   type HeroState,
+  isCurrencyCode,
   type JournalEntry,
   journalExcerpt,
   journalWordCount,
@@ -310,6 +316,7 @@ export function projectWorldState(rows: Partial<DomainRows>, today: string): Mem
 }
 
 export interface FinanceRows {
+  settings: FinanceSettings;
   expenses: ExpenseDetail[];
   subscriptions: Subscription[];
   categories: ExpenseCategory[];
@@ -347,10 +354,41 @@ function numberOrNull(row: DeltaRow, key: string): number | null {
   return null;
 }
 
-function toExpense(row: DeltaRow): ExpenseDetail {
+const AUDIT_ACTIONS: ExpenseAuditAction[] = ['created', 'updated', 'deleted', 'receipt_confirmed'];
+
+const AUDIT_FIELDS: ExpenseAuditField[] = ['amountMinor', 'currency', 'occurredOn', 'categoryId', 'note', 'merchant'];
+
+function toAuditChange(raw: unknown): ExpenseAuditChange | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const change = raw as DeltaRow;
+  const field = AUDIT_FIELDS.find(candidate => candidate === text(change, 'field'));
+  if (!field) return null;
+  return { field, from: text(change, 'from'), to: text(change, 'to') };
+}
+
+function toAuditEntry(row: DeltaRow): ExpenseAuditEntry | null {
+  const action = AUDIT_ACTIONS.find(candidate => candidate === text(row, 'action'));
+  if (!action || action === 'deleted') return null;
+  const changes = Array.isArray(row['changes']) ? row['changes'].map(toAuditChange).filter((change): change is ExpenseAuditChange => change !== null) : [];
+  return { id: String(row['id']), action, changes, at: text(row, 'createdAt') ?? '' };
+}
+
+function auditsByExpense(rows: DeltaRow[]): Map<string, ExpenseAuditEntry[]> {
+  const grouped = new Map<string, ExpenseAuditEntry[]>();
+  for (const row of rows) {
+    const entry = toAuditEntry(row);
+    if (!entry) continue;
+    const expenseId = String(row['expenseId']);
+    grouped.set(expenseId, [...(grouped.get(expenseId) ?? []), entry]);
+  }
+  return grouped;
+}
+
+function toExpense(row: DeltaRow, audits: Map<string, ExpenseAuditEntry[]>): ExpenseDetail {
   const amountMinor = number(row, 'amountMinor');
+  const id = String(row['id']);
   return {
-    id: String(row['id']),
+    id,
     amountMinor,
     amountText: text(row, 'amountText') ?? String(amountMinor / 100),
     currency: (text(row, 'currency') ?? 'EUR') as CurrencyCode,
@@ -364,7 +402,26 @@ function toExpense(row: DeltaRow): ExpenseDetail {
     source: (text(row, 'source') ?? 'manual') as ExpenseDetail['source'],
     syncState: 'synced',
     linkedSubscriptionId: nullableText(row, 'linkedSubscriptionId'),
-    audit: [],
+    linkedQuestId: row['linkedQuestId'] === null || row['linkedQuestId'] === undefined ? undefined : String(row['linkedQuestId']),
+    hasLineItems: Array.isArray(row['lineItems']) && row['lineItems'].length > 0,
+    receiptRef: nullableText(row, 'receiptRef'),
+    audit: audits.get(id) ?? [],
+  };
+}
+
+const FALLBACK_HOME_CURRENCY: CurrencyCode = 'EUR';
+
+/** The account row is absent only before the first pull lands, and readiness keeps every Money screen on its skeleton until then. */
+function toFinanceSettings(account: DeltaRow | undefined): FinanceSettings {
+  const home = account ? text(account, 'defaultCurrency') : null;
+  const homeCurrency = home && isCurrencyCode(home) ? home : FALLBACK_HOME_CURRENCY;
+  const enabled = account && Array.isArray(account['enabledCurrencies']) ? account['enabledCurrencies'] : [];
+  const currencies = enabled.filter((code): code is CurrencyCode => typeof code === 'string' && isCurrencyCode(code) && code !== homeCurrency);
+  return {
+    homeCurrency,
+    currencies: [homeCurrency, ...new Set(currencies)],
+    weekStartsOn: account && number(account, 'weekStart', 1) === 0 ? 0 : 1,
+    monthlyBudgetMinor: account ? numberOrNull(account, 'monthlyBudgetMinor') : null,
   };
 }
 
@@ -404,8 +461,10 @@ function toSubscription(row: DeltaRow): Subscription {
 
 export function projectFinanceRows(rows: Partial<DomainRows>): FinanceRows {
   const categories = (rows.expense_categories ?? []).map(toExpenseCategory);
+  const audits = auditsByExpense(rows.expense_audits ?? []);
   return {
-    expenses: (rows.expenses ?? []).map(toExpense),
+    settings: toFinanceSettings(rows.account?.[0]),
+    expenses: (rows.expenses ?? []).map(row => toExpense(row, audits)),
     subscriptions: (rows.subscriptions ?? []).map(toSubscription),
     categories: categories.length > 0 ? categories : [...BUILT_IN_CATEGORIES],
   };

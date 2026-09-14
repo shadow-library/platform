@@ -156,6 +156,7 @@ function expenseWire(id: string, draft: ExpenseDraft): Record<string, unknown> {
     merchant: draft.merchant,
     note: draft.note,
     source: draft.source ?? 'manual',
+    ...(draft.receiptRef ? { receiptRef: draft.receiptRef } : {}),
   };
 }
 

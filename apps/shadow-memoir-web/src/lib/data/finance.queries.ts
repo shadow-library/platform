@@ -1,40 +1,41 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { CommandRefusedError } from './command-feedback';
 import { type CommandHook, type LocalReading, useDomainCommand } from './command-runner';
 import { useMemoirData } from './data-context';
 import {
   type CategoriesView,
-  type ExpenseDetail,
   type ExpensePage,
   type ExpenseQuery,
+  type ExpenseView,
   type FinanceCommand,
   type FinanceCommandResult,
-  type FinanceRange,
   type FinanceSummary,
+  type ReceiptScanQuota,
   type SubscriptionsView,
 } from './finance.types';
 
 const financeKeys = {
   all: ['memoir', 'finance'] as const,
-  summary: (range: FinanceRange) => ['memoir', 'finance', 'summary', range] as const,
+  summary: () => ['memoir', 'finance', 'summary'] as const,
   expenses: (query: ExpenseQuery) => ['memoir', 'finance', 'expenses', query] as const,
   expense: (id: string) => ['memoir', 'finance', 'expense', id] as const,
   subscriptions: () => ['memoir', 'finance', 'subscriptions'] as const,
   categories: () => ['memoir', 'finance', 'categories'] as const,
+  receiptScanQuota: () => ['memoir', 'receipt-scan-quota'] as const,
 };
 
-export function useFinanceSummary(range: FinanceRange): UseQueryResult<FinanceSummary> {
+export function useFinanceSummary(): UseQueryResult<FinanceSummary> {
   const { finance, queryClient } = useMemoirData();
-  return useQuery({ queryKey: financeKeys.summary(range), queryFn: () => finance.summary(range) }, queryClient);
+  return useQuery({ queryKey: financeKeys.summary(), queryFn: () => finance.summary() }, queryClient);
 }
 
 export function useExpenses(query: ExpenseQuery): UseQueryResult<ExpensePage> {
   const { finance, queryClient } = useMemoirData();
-  return useQuery({ queryKey: financeKeys.expenses(query), queryFn: () => finance.expenses(query) }, queryClient);
+  return useQuery({ queryKey: financeKeys.expenses(query), queryFn: () => finance.expenses(query), placeholderData: keepPreviousData }, queryClient);
 }
 
-export function useExpense(id: string): UseQueryResult<ExpenseDetail | null> {
+export function useExpense(id: string): UseQueryResult<ExpenseView> {
   const { finance, queryClient } = useMemoirData();
   return useQuery({ queryKey: financeKeys.expense(id), queryFn: () => finance.expense(id) }, queryClient);
 }
@@ -47,6 +48,11 @@ export function useSubscriptions(): UseQueryResult<SubscriptionsView> {
 export function useExpenseCategories(): UseQueryResult<CategoriesView> {
   const { finance, queryClient } = useMemoirData();
   return useQuery({ queryKey: financeKeys.categories(), queryFn: () => finance.categories() }, queryClient);
+}
+
+export function useReceiptScanQuota(): UseQueryResult<ReceiptScanQuota> {
+  const { finance, queryClient } = useMemoirData();
+  return useQuery({ queryKey: financeKeys.receiptScanQuota(), queryFn: () => finance.receiptScanQuota() }, queryClient);
 }
 
 export type FinanceCommandHook = CommandHook<FinanceCommand, FinanceCommandResult, FinanceCommandResult>;

@@ -1,8 +1,24 @@
 import { useNavigate } from '@tanstack/react-router';
-import { type ReactElement, useState } from 'react';
-import { Badge, Button, Card, DescriptionList, EmptyState, Input, Skeleton, Tag, toast } from '@shadow-library/ui';
+import { type ReactElement, useRef, useState } from 'react';
+import { Badge, Button, Card, ConfirmDialog, DescriptionList, EmptyState, Input, Skeleton, Tag, toast } from '@shadow-library/ui';
 
-import { categoryById, formatMinor, HOME_CURRENCY, homeAmountOf, todayISODate, useExpense, useFinanceCommand } from '@/lib/data';
+import { DataState } from '@/components/DataState';
+import {
+  categoryById,
+  describeAuditEntry,
+  type ExpenseDetail,
+  expenseTitle,
+  type ExpenseView,
+  formatMinor,
+  homeAmountOf,
+  outcomeToast,
+  sortAuditNewestFirst,
+  todayISODate,
+  useExpense,
+  useFinanceCommand,
+} from '@/lib/data';
+import { formatLocalDate, formatLocalTime } from '@/lib/format';
+import { useDataReadiness, uuidv7 } from '@/lib/sync';
 
 import { ExpenseEntryPanel } from './expense-entry-panel';
 import styles from './finance.module.css';
@@ -11,16 +27,78 @@ export interface ExpenseDetailScreenProps {
   expenseId: string;
 }
 
-export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): ReactElement {
+function auditTime(at: string, today: string): string {
+  const date = formatLocalDate(at, { year: at.slice(0, 4) !== today.slice(0, 4) });
+  return date ? `${date}, ${formatLocalTime(at)}` : '';
+}
+
+interface EditHistoryProps {
+  detail: ExpenseDetail;
+  view: ExpenseView;
+  today: string;
+}
+
+function EditHistory({ detail, view, today }: EditHistoryProps): ReactElement {
+  const lines = sortAuditNewestFirst(detail.audit).flatMap(entry =>
+    describeAuditEntry(entry, detail.currency, view.categories).map((text, index) => ({ key: `${entry.id}-${index}`, text, when: auditTime(entry.at, today) })),
+  );
+
+  return (
+    <Card padding="md">
+      <Card.Body>
+        <h2 className={styles.railTitle}>Edit history</h2>
+        {lines.length === 0 ? (
+          <p className={styles.railProse}>No changes recorded yet. An expense saved before edit history began shows its changes from the next edit.</p>
+        ) : (
+          <ul className={styles.audit}>
+            {lines.map(line => (
+              <li key={line.key} className={styles.auditItem} title={line.text}>
+                {line.text} {line.when && <span className={styles.auditWhen}>· {line.when}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card.Body>
+    </Card>
+  );
+}
+
+function isRestorable(expense: ExpenseDetail): boolean {
+  return !expense.receiptRef && !expense.linkedSubscriptionId && !expense.linkedQuestId && !expense.linkedQuestTitle && !expense.hasLineItems;
+}
+
+function rateLine(detail: ExpenseDetail, amountLabel: string): string {
+  if (detail.fxRate !== null) return `${amountLabel} at ${detail.fxRate.toFixed(4)} — the rate on ${formatLocalDate(detail.occurredOnDate)}`;
+  if (detail.syncState === 'queued') return `${amountLabel} — its rate is locked once it syncs.`;
+  return `${amountLabel} — the rate could not be fetched, so this reconciles later. Nothing was blocked.`;
+}
+
+function deleteDescription(detail: ExpenseDetail, amountLabel: string, title: string): string {
+  const removed = `${amountLabel} · ${title} on ${formatLocalDate(detail.occurredOnDate)} leaves Money, History and Insights, and its edit history goes with it.`;
+  return detail.receiptRef ? `${removed} Its receipt photo is deleted too.` : removed;
+}
+
+interface ExpenseDetailContentProps {
+  view: ExpenseView;
+  expenseId: string;
+}
+
+function ExpenseDetailContent({ view, expenseId }: ExpenseDetailContentProps): ReactElement {
   const navigate = useNavigate();
-  const [editing, setEditing] = useState(false);
-  const expense = useExpense(expenseId);
   const command = useFinanceCommand();
+  const editButton = useRef<HTMLButtonElement>(null);
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const today = todayISODate();
+  const detail = view.expense;
 
-  if (expense.isLoading) return <Skeleton.Card />;
-
-  const detail = expense.data;
-  if (!detail)
+  if (!detail) {
+    if (command.isPendingFor(pending => pending.type === 'expense.delete' && pending.id === expenseId))
+      return (
+        <div role="status" aria-busy="true" aria-label="Deleting this expense">
+          <Skeleton.Card />
+        </div>
+      );
     return (
       <EmptyState
         title="That expense is no longer here"
@@ -28,63 +106,67 @@ export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): Re
         action={{ label: 'Back to Money', onClick: () => void navigate({ to: '/finance' }) }}
       />
     );
+  }
 
-  const category = categoryById(detail.categoryId);
-  const foreign = detail.currency !== HOME_CURRENCY;
-  const home = homeAmountOf(detail, HOME_CURRENCY);
+  const home = view.settings.homeCurrency;
+  const category = categoryById(detail.categoryId, view.categories);
+  const title = expenseTitle(detail, view.categories);
+  const foreign = detail.currency !== home;
+  const homeMinor = homeAmountOf(detail, home);
+  const amountLabel = formatMinor(detail.amountMinor, detail.currency);
 
-  const remove = (): void => {
-    command.mutate(
-      { type: 'expense.delete', id: detail.id },
-      {
-        onSuccess: result => {
-          toast.success(result.message);
-          void navigate({ to: '/finance' });
-        },
+  /** A fresh id: the server keeps the deleted id's tombstone, and a later pull that re-serves it would delete a row re-created under the same id. */
+  const restore = (snapshot: ExpenseDetail): void => {
+    const id = uuidv7();
+    void command.run({
+      type: 'expense.create',
+      draft: {
+        id,
+        amountText: snapshot.amountText,
+        currency: snapshot.currency,
+        categoryId: snapshot.categoryId,
+        occurredOnDate: snapshot.occurredOnDate,
+        merchant: snapshot.merchant,
+        note: snapshot.note,
+        source: snapshot.source,
       },
-    );
+    });
+    void navigate({ to: '/finance/expenses/$expenseId', params: { expenseId: id } });
+  };
+
+  const remove = async (): Promise<void> => {
+    const outcome = await command.run({ type: 'expense.delete', id: detail.id });
+    const feedback = outcomeToast(outcome, { success: 'Expense deleted.', action: 'delete', subject: title });
+    const deleted = outcome.status === 'applied' || outcome.status === 'queued-offline';
+    const action = deleted && isRestorable(detail) ? { label: 'Undo', onClick: () => restore(detail) } : undefined;
+    if (feedback) toast[feedback.intent](feedback.title, { body: feedback.body, action });
+    if (deleted) void navigate({ to: '/finance' });
   };
 
   return (
-    <section className={styles.screen} aria-labelledby="expense-title">
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title} id="expense-title">
-            Expense
-          </h1>
-          <p className={styles.meta}>
-            {detail.occurredOnDate} · {detail.note ?? detail.merchant ?? category.name}
-          </p>
-        </div>
-      </header>
-
+    <>
       <div className={styles.split}>
         <div className={styles.column}>
           <Card padding="lg">
             <Card.Body>
               <div className={styles.detailHead}>
                 <div className={styles.rowMain}>
-                  <p className={styles.bigAmount}>{home === null ? formatMinor(detail.amountMinor, detail.currency) : formatMinor(home, HOME_CURRENCY)}</p>
-                  <p className={styles.bigAmountSub}>
-                    {foreign
-                      ? detail.fxRate === null
-                        ? `${formatMinor(detail.amountMinor, detail.currency)} — the rate could not be fetched, so this reconciles later. Nothing was blocked.`
-                        : `${formatMinor(detail.amountMinor, detail.currency)} at ${detail.fxRate.toFixed(4)} — the rate on ${detail.occurredOnDate}`
-                      : 'Entered in your base currency.'}
-                  </p>
+                  <p className={styles.bigAmount}>{homeMinor === null ? amountLabel : formatMinor(homeMinor, home)}</p>
+                  <p className={styles.bigAmountSub}>{foreign ? rateLine(detail, amountLabel) : 'Entered in your base currency.'}</p>
                   <div className={styles.detailTags}>
                     <Tag>{category.name}</Tag>
                     {detail.source === 'ocr' && <Badge variant="outline">Receipt scanned</Badge>}
+                    {detail.receiptRef && detail.source !== 'ocr' && <Badge variant="outline">Receipt attached</Badge>}
                     <Badge variant="soft" intent="neutral">
                       {detail.syncState === 'queued' ? 'Queued' : 'Synced'}
                     </Badge>
                   </div>
                 </div>
                 <div className={styles.detailActions}>
-                  <Button size="sm" variant="secondary" onClick={() => setEditing(current => !current)}>
+                  <Button ref={editButton} size="sm" variant="secondary" aria-expanded={editing} onClick={() => setEditing(current => !current)}>
                     {editing ? 'Stop editing' : 'Edit'}
                   </Button>
-                  <Button size="sm" variant="ghost" loading={command.isPending} onClick={remove}>
+                  <Button size="sm" variant="danger" loading={command.isPendingFor({ type: 'expense.delete', id: detail.id })} onClick={() => setConfirming(true)}>
                     Delete
                   </Button>
                 </div>
@@ -92,18 +174,24 @@ export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): Re
 
               <div className={styles.formWide}>
                 <DescriptionList layout="row" termWidth={160}>
-                  <DescriptionList.Item term="Note">{detail.note ?? '—'}</DescriptionList.Item>
-                  <DescriptionList.Item term="Merchant">{detail.merchant ?? '—'}</DescriptionList.Item>
-                  <DescriptionList.Item term="Date">{detail.occurredOnDate}</DescriptionList.Item>
+                  <DescriptionList.Item term="Note">
+                    <span className={styles.longText}>{detail.note ?? '—'}</span>
+                  </DescriptionList.Item>
+                  <DescriptionList.Item term="Merchant">
+                    <span className={styles.longText}>{detail.merchant ?? '—'}</span>
+                  </DescriptionList.Item>
+                  <DescriptionList.Item term="Date">{formatLocalDate(detail.occurredOnDate)}</DescriptionList.Item>
                   <DescriptionList.Item term="Amount as entered" mono>
                     {detail.amountText} {detail.currency}
                   </DescriptionList.Item>
                   <DescriptionList.Item term="Converted">
                     {foreign
-                      ? home === null
-                        ? 'Waiting for a rate — the entry saved without one.'
-                        : `${formatMinor(home, HOME_CURRENCY)} · locked to the transaction date`
-                      : `${formatMinor(home ?? detail.amountMinor, HOME_CURRENCY)} · your base currency`}
+                      ? homeMinor === null
+                        ? detail.syncState === 'queued'
+                          ? 'Converted once it syncs and the rate is locked.'
+                          : 'Waiting for a rate — the entry saved without one.'
+                        : `${formatMinor(homeMinor, home)} · locked to the transaction date`
+                      : `${formatMinor(homeMinor ?? detail.amountMinor, home)} · your base currency`}
                   </DescriptionList.Item>
                   {detail.linkedQuestNote && <DescriptionList.Item term="Linked quest">{detail.linkedQuestNote}</DescriptionList.Item>}
                 </DescriptionList>
@@ -111,7 +199,19 @@ export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): Re
             </Card.Body>
           </Card>
 
-          {editing && <ExpenseEntryPanel today={todayISODate()} existing={detail} onClose={() => setEditing(false)} />}
+          {editing && (
+            <ExpenseEntryPanel
+              today={today}
+              settings={view.settings}
+              rates={view.rates}
+              categories={view.categories}
+              existing={detail}
+              onClose={() => {
+                setEditing(false);
+                editButton.current?.focus();
+              }}
+            />
+          )}
 
           {detail.receipt && (
             <Card padding="lg">
@@ -164,20 +264,60 @@ export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): Re
             </Card>
           )}
 
-          <Card padding="md">
-            <Card.Body>
-              <h2 className={styles.railTitle}>Edit history</h2>
-              <ul className={styles.audit}>
-                {detail.audit.map(entry => (
-                  <li key={`${entry.text}-${entry.when}`} className={styles.auditItem}>
-                    {entry.text} <span className={styles.auditWhen}>· {entry.when}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card.Body>
-          </Card>
+          <EditHistory detail={detail} view={view} today={today} />
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        intent="danger"
+        title="Delete this expense?"
+        description={deleteDescription(detail, amountLabel, title)}
+        confirmLabel="Delete expense"
+        onConfirm={() => void remove()}
+      />
+    </>
+  );
+}
+
+function DetailSkeleton(): ReactElement {
+  return (
+    <div className={styles.split}>
+      <Skeleton.Card />
+      <Skeleton.Card />
+    </div>
+  );
+}
+
+function headerMeta(view: ExpenseView): string | null {
+  const { expense } = view;
+  return expense ? `${formatLocalDate(expense.occurredOnDate)} · ${expenseTitle(expense, view.categories)}` : null;
+}
+
+export function ExpenseDetailScreen({ expenseId }: ExpenseDetailScreenProps): ReactElement {
+  const view = useExpense(expenseId);
+  const { readiness } = useDataReadiness({ query: view });
+  const meta = readiness.kind === 'ready' && view.data ? headerMeta(view.data) : null;
+
+  return (
+    <section className={styles.screen} aria-labelledby="expense-title">
+      <header className={styles.header}>
+        <div className={styles.headerText}>
+          <h1 className={styles.title} id="expense-title">
+            Expense
+          </h1>
+          {meta && (
+            <p className={styles.meta} title={meta}>
+              {meta}
+            </p>
+          )}
+        </div>
+      </header>
+
+      <DataState query={view} skeleton={<DetailSkeleton />}>
+        {data => <ExpenseDetailContent view={data} expenseId={expenseId} />}
+      </DataState>
     </section>
   );
 }

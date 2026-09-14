@@ -52,6 +52,15 @@ describe('command-wire fixtures (FE-4)', () => {
   }
 });
 
+describe('expense receipts (UI-076)', () => {
+  it('should send the receipt ref on expense.create only when the draft carries one', () => {
+    const draft = { id: '0193c2a0-0000-7000-8000-000000000001', amountText: '18.40', currency: 'EUR', categoryId: 'food', occurredOnDate: '2026-09-14' } as const;
+
+    expect(toWireCommand({ type: 'expense.create', draft: { ...draft, receiptRef: 'r/1/receipt.jpg' } }).payload).toMatchObject({ receiptRef: 'r/1/receipt.jpg' });
+    expect(toWireCommand({ type: 'expense.create', draft }).payload).not.toHaveProperty('receiptRef');
+  });
+});
+
 describe('projection (UI-004, UI-005)', () => {
   it('should project the server health threshold shape', () => {
     const world = projectWorldState(
@@ -190,6 +199,15 @@ describe('category archive (P1-18)', () => {
   });
 });
 
+describe('monthly budget contract (P1-18)', () => {
+  it('should project the budget, home currency and enabled currencies from the account row', () => {
+    const { settings } = projectFinanceRows({ account: [{ defaultCurrency: 'NOK', enabledCurrencies: ['EUR', 'NOK', 'XXX'], weekStart: 0, monthlyBudgetMinor: '160000' }] });
+
+    expect(settings).toEqual({ homeCurrency: 'NOK', currencies: ['NOK', 'EUR'], weekStartsOn: 0, monthlyBudgetMinor: 160000 });
+    expect(projectFinanceRows({ account: [{ defaultCurrency: 'EUR', monthlyBudgetMinor: null }] }).settings.monthlyBudgetMinor).toBeNull();
+  });
+});
+
 describe('expense audit contract (P1-19)', () => {
   const EXPENSE_ID = '0192f1a2-7b3c-7d4e-8f50-1a2b3c4d5e6f';
   const EXPENSE = { id: EXPENSE_ID, amountMinor: '520', amountText: '5.20', currency: 'EUR', categoryId: 'transport', occurredOn: '2026-08-24', note: null, merchant: null };
@@ -233,6 +251,25 @@ describe('expense audit contract (P1-19)', () => {
     expect(await second.store.readDomain('expense_audits')).toEqual([expect.objectContaining({ id: '14', action: 'deleted', changes: [] })]);
     expect(await second.store.readDomain('expenses')).toEqual([]);
     expect(() => projectFinanceRows(second.engine.domains())).not.toThrow();
+  });
+
+  it('should attach audit rows to their expense and leave out deleted rows', () => {
+    const { expenses } = projectFinanceRows({
+      expenses: [EXPENSE],
+      expense_audits: [
+        audit('10', 'created'),
+        audit('11', 'updated', [
+          { field: 'amountMinor', from: '420', to: '520' },
+          { field: 'lineItems', from: null, to: '[]' },
+        ]),
+        { ...audit('12', 'deleted'), expenseId: 'another-expense' },
+      ],
+    });
+
+    expect(expenses[0]?.audit).toEqual([
+      { id: '10', action: 'created', changes: [], at: '2026-08-24T09:00:00.000Z' },
+      { id: '11', action: 'updated', changes: [{ field: 'amountMinor', from: '420', to: '520' }], at: '2026-08-24T09:00:00.000Z' },
+    ]);
   });
 
   it('should backfill expense audits from zero once a server starts serving them', async () => {

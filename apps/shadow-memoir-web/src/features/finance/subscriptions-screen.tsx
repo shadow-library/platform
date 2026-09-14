@@ -1,6 +1,7 @@
 import { type ReactElement } from 'react';
 import { Alert, Badge, Button, Card, EmptyState, Skeleton, Tag, toast } from '@shadow-library/ui';
 
+import { DataState } from '@/components/DataState';
 import {
   deriveDueState,
   DUE_STATE_LABELS,
@@ -12,6 +13,7 @@ import {
   useFinanceCommand,
   useSubscriptions,
 } from '@/lib/data';
+import { useDataReadiness } from '@/lib/sync';
 
 import styles from './finance.module.css';
 
@@ -40,6 +42,7 @@ export function SubscriptionsScreen(): ReactElement {
     command.mutate({ type: 'subscription.confirmCycle', id: subscription.id, billingDate: subscription.nextDueDate }, { onSuccess: result => toast.success(result.message) });
   };
 
+  const ready = useDataReadiness({ query: subscriptions }).readiness.kind === 'ready';
   const view = subscriptions.data;
   const home = view?.homeCurrency ?? 'EUR';
 
@@ -51,108 +54,108 @@ export function SubscriptionsScreen(): ReactElement {
             Subscriptions
           </h1>
           <p className={styles.meta}>
-            {view ? `${view.activeCount} active · ${formatMinor(view.monthlyTotalMinor, home)} a month · ${formatMinor(view.yearlyTotalMinor, home)} a year` : 'Loading'}
+            {ready && view ? `${view.activeCount} active · ${formatMinor(view.monthlyTotalMinor, home)} a month · ${formatMinor(view.yearlyTotalMinor, home)} a year` : 'Loading'}
           </p>
         </div>
       </header>
 
-      <div className={styles.split}>
-        <Card padding="md">
-          <Card.Body>
-            <div className={styles.cardHead}>
-              <h2 className={styles.cardTitle}>Recurring charges</h2>
-            </div>
+      <DataState query={subscriptions} skeleton={<Skeleton.List rows={6} />}>
+        <div className={styles.split}>
+          <Card padding="md">
+            <Card.Body>
+              <div className={styles.cardHead}>
+                <h2 className={styles.cardTitle}>Recurring charges</h2>
+              </div>
 
-            {subscriptions.isLoading && <Skeleton.List rows={6} />}
+              {view?.items.length === 0 && (
+                <EmptyState size="inline" title="No subscriptions yet" description="Add one and Memoir will prepare its expense for you to confirm when the cycle comes due." />
+              )}
 
-            {view?.items.length === 0 && (
-              <EmptyState size="inline" title="No subscriptions yet" description="Add one and Memoir will prepare its expense for you to confirm when the cycle comes due." />
-            )}
-
-            {view?.items.map(subscription => {
-              const dueState = deriveDueState(subscription, today);
-              const category = SUBSCRIPTION_CATEGORIES[subscription.categoryId];
-              return (
-                <div key={subscription.id} className={styles.staticRow}>
-                  <span className={styles.rowMain}>
-                    <span className={styles.rowTitleLine}>
-                      <span className={styles.rowName}>{subscription.name}</span>
-                      <Tag size="sm">{category.name}</Tag>
-                      {dueState !== 'none' && (
-                        <Badge variant="soft" size="sm" intent={DUE_INTENT[dueState]}>
-                          {DUE_STATE_LABELS[dueState]}
-                        </Badge>
-                      )}
-                      {subscription.trialEndsOn && (
-                        <Badge variant="outline" size="sm">
-                          Trial ends {subscription.trialEndsOn}
-                        </Badge>
-                      )}
-                      {!subscription.active && (
-                        <Badge variant="outline" size="sm">
-                          Paused
-                        </Badge>
-                      )}
+              {view?.items.map(subscription => {
+                const dueState = deriveDueState(subscription, today);
+                const category = SUBSCRIPTION_CATEGORIES[subscription.categoryId];
+                return (
+                  <div key={subscription.id} className={styles.staticRow}>
+                    <span className={styles.rowMain}>
+                      <span className={styles.rowTitleLine}>
+                        <span className={styles.rowName}>{subscription.name}</span>
+                        <Tag size="sm">{category.name}</Tag>
+                        {dueState !== 'none' && (
+                          <Badge variant="soft" size="sm" intent={DUE_INTENT[dueState]}>
+                            {DUE_STATE_LABELS[dueState]}
+                          </Badge>
+                        )}
+                        {subscription.trialEndsOn && (
+                          <Badge variant="outline" size="sm">
+                            Trial ends {subscription.trialEndsOn}
+                          </Badge>
+                        )}
+                        {!subscription.active && (
+                          <Badge variant="outline" size="sm">
+                            Paused
+                          </Badge>
+                        )}
+                      </span>
+                      <span className={styles.rowMeta}>
+                        Renews {subscription.nextDueDate}
+                        {subscription.linkedQuestTitle ? ` · linked to ${subscription.linkedQuestTitle}` : ''}
+                        {` · ${formatMinor(subscription.monthlyEquivalentMinor, home)} a month`}
+                      </span>
                     </span>
-                    <span className={styles.rowMeta}>
-                      Renews {subscription.nextDueDate}
-                      {subscription.linkedQuestTitle ? ` · linked to ${subscription.linkedQuestTitle}` : ''}
-                      {` · ${formatMinor(subscription.monthlyEquivalentMinor, home)} a month`}
+                    <span className={styles.rowAmount}>
+                      <span className={styles.amount}>{formatMinor(subscription.amountMinor, subscription.currency)}</span>
+                      <span className={styles.amountSub}>{FREQUENCY_LABELS[subscription.frequency]}</span>
                     </span>
-                  </span>
-                  <span className={styles.rowAmount}>
-                    <span className={styles.amount}>{formatMinor(subscription.amountMinor, subscription.currency)}</span>
-                    <span className={styles.amountSub}>{FREQUENCY_LABELS[subscription.frequency]}</span>
-                  </span>
-                  {(dueState === 'due' || dueState === 'overdue') && (
-                    <Button size="sm" variant="secondary" loading={command.isPending} onClick={() => confirm(subscription)}>
-                      Confirm charge
+                    {(dueState === 'due' || dueState === 'overdue') && (
+                      <Button size="sm" variant="secondary" loading={command.isPending} onClick={() => confirm(subscription)}>
+                        Confirm charge
+                      </Button>
+                    )}
+                    <Button size="sm" variant="ghost" onClick={() => command.mutate({ type: 'subscription.setActive', id: subscription.id, active: !subscription.active })}>
+                      {subscription.active ? 'Pause' : 'Resume'}
                     </Button>
-                  )}
-                  <Button size="sm" variant="ghost" onClick={() => command.mutate({ type: 'subscription.setActive', id: subscription.id, active: !subscription.active })}>
-                    {subscription.active ? 'Pause' : 'Resume'}
-                  </Button>
-                </div>
-              );
-            })}
-          </Card.Body>
-        </Card>
-
-        <div className={styles.column}>
-          <Card padding="md">
-            <Card.Body>
-              <h2 className={styles.railTitle}>Next 30 days</h2>
-              <ul className={styles.railList}>
-                {view?.upcoming.map(charge => (
-                  <li key={`${charge.subscriptionId}-${charge.dueDate}`} className={styles.railRow}>
-                    <span className={styles.railRowName}>
-                      {charge.name} <span className={styles.railRowWhen}>· {charge.dueDate}</span>
-                    </span>
-                    <span className={styles.mono}>{formatMinor(charge.amountMinor, charge.currency)}</span>
-                  </li>
-                ))}
-              </ul>
-              {view?.upcoming.length === 0 && <p className={styles.railProse}>Nothing renews in the next month.</p>}
+                  </div>
+                );
+              })}
             </Card.Body>
           </Card>
 
-          {view?.collisions.map(collision => (
-            <Alert key={collision.date} intent="info" title="Two renewals land on the same day">
-              {collision.names.join(' and ')} both renew on {collision.date}, {formatMinor(collision.totalMinor, home)} together. Nothing is wrong — it is worth knowing before the
-              day.
-            </Alert>
-          ))}
+          <div className={styles.column}>
+            <Card padding="md">
+              <Card.Body>
+                <h2 className={styles.railTitle}>Next 30 days</h2>
+                <ul className={styles.railList}>
+                  {view?.upcoming.map(charge => (
+                    <li key={`${charge.subscriptionId}-${charge.dueDate}`} className={styles.railRow}>
+                      <span className={styles.railRowName}>
+                        {charge.name} <span className={styles.railRowWhen}>· {charge.dueDate}</span>
+                      </span>
+                      <span className={styles.mono}>{formatMinor(charge.amountMinor, charge.currency)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {view?.upcoming.length === 0 && <p className={styles.railProse}>Nothing renews in the next month.</p>}
+              </Card.Body>
+            </Card>
 
-          <Card padding="md">
-            <Card.Body>
-              <h2 className={styles.railTitle}>Nothing is charged for you</h2>
-              <p className={styles.railProse}>
-                When a cycle comes due, Memoir prepares the expense and waits. Confirming writes it once for that cycle, however many devices you confirm from.
-              </p>
-            </Card.Body>
-          </Card>
+            {view?.collisions.map(collision => (
+              <Alert key={collision.date} intent="info" title="Two renewals land on the same day">
+                {collision.names.join(' and ')} both renew on {collision.date}, {formatMinor(collision.totalMinor, home)} together. Nothing is wrong — it is worth knowing before
+                the day.
+              </Alert>
+            ))}
+
+            <Card padding="md">
+              <Card.Body>
+                <h2 className={styles.railTitle}>Nothing is charged for you</h2>
+                <p className={styles.railProse}>
+                  When a cycle comes due, Memoir prepares the expense and waits. Confirming writes it once for that cycle, however many devices you confirm from.
+                </p>
+              </Card.Body>
+            </Card>
+          </div>
         </div>
-      </div>
+      </DataState>
     </section>
   );
 }

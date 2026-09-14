@@ -2,7 +2,23 @@ import { addDays, toISODate } from '@shadow-library/ui';
 
 import { type DispatchOptions } from './command.types';
 import { deriveCapAdvisory } from './entry-caps';
-import { categoryBreakdown, convertToHomeMinor, daysBetween, monthlyEquivalentMinor, parseAmountToMinor, sumHomeMinor } from './finance.rules';
+import {
+  budgetStanding,
+  categoryBreakdown,
+  compareExpensesByDate,
+  convertToHomeMinor,
+  daysBetween,
+  expenseChanges,
+  financePeriod,
+  latestRates,
+  monthlyEquivalentMinor,
+  parseAmountToMinor,
+  previousStretch,
+  ratesUsed,
+  spendDelta,
+  sumHomeMinor,
+  withinSpan,
+} from './finance.rules';
 import {
   BUILT_IN_CATEGORIES,
   type CategoriesView,
@@ -13,10 +29,15 @@ import {
   type ExpenseDraft,
   type ExpensePage,
   type ExpenseQuery,
+  type ExpenseView,
   type FinanceCommand,
   type FinanceCommandResult,
   type FinanceRange,
+  type FinanceSettings,
   type FinanceSummary,
+  type RangeSpend,
+  type ReceiptScanQuota,
+  type ReceiptUploadProgress,
   type Subscription,
   type SubscriptionDraft,
   type SubscriptionsView,
@@ -24,15 +45,20 @@ import {
 } from './finance.types';
 
 export interface FinanceProvider {
-  summary(range: FinanceRange): Promise<FinanceSummary>;
+  summary(): Promise<FinanceSummary>;
   expenses(query: ExpenseQuery): Promise<ExpensePage>;
-  expense(id: string): Promise<ExpenseDetail | null>;
+  expense(id: string): Promise<ExpenseView>;
   subscriptions(): Promise<SubscriptionsView>;
   categories(): Promise<CategoriesView>;
+  receiptScanQuota(): Promise<ReceiptScanQuota>;
+  /** Uploads a receipt photo without confirming it, resolving with its ref. */
+  uploadReceipt(file: File, progress: ReceiptUploadProgress): Promise<string>;
+  /** Marks an uploaded receipt as kept; called only once the owner saves the expense that carries it. */
+  confirmReceipt(ref: string): Promise<void>;
   dispatchCommand(command: FinanceCommand, options?: DispatchOptions): Promise<FinanceCommandResult>;
 }
 
-const HOME_CURRENCY: CurrencyCode = 'EUR';
+const FIXTURE_HOME_CURRENCY: CurrencyCode = 'EUR';
 
 const FX_NOK_EUR = 0.086;
 const FX_USD_EUR = 0.921;
@@ -40,8 +66,8 @@ const FX_GBP_EUR = 1.174;
 
 const FX_RATES: Partial<Record<CurrencyCode, number>> = { NOK: FX_NOK_EUR, USD: FX_USD_EUR, GBP: FX_GBP_EUR };
 
-function lockedRate(currency: CurrencyCode): number | null {
-  return currency === HOME_CURRENCY ? null : (FX_RATES[currency] ?? null);
+function fixtureRate(currency: CurrencyCode): number | null {
+  return currency === FIXTURE_HOME_CURRENCY ? null : (FX_RATES[currency] ?? null);
 }
 
 function today(): string {
@@ -58,10 +84,11 @@ function at(days: number, time: string): string {
 
 /** The whole of what a finance provider holds. The fixtures seed it; the sync layer projects it from delta rows — the readers and the command applier below are shared by both. */
 export interface FinanceState {
+  today: string;
+  settings: FinanceSettings;
   expenses: ExpenseDetail[];
   subscriptions: Subscription[];
   categories: ExpenseCategory[];
-  receiptScansUsed: number;
   monthlyExpenseCount: number;
 }
 
@@ -92,9 +119,9 @@ function seedExpenses(): ExpenseDetail[] {
         ],
       },
       audit: [
-        { text: 'Created from quick capture · kr 214.00', when: 'today 09:12' },
-        { text: 'Category changed from Uncategorised to Groceries', when: 'today 09:13' },
-        { text: 'Receipt attached · 5 lines read', when: 'today 09:14' },
+        { id: 'exp-groceries-1', action: 'created', changes: [], at: at(0, '09:12') },
+        { id: 'exp-groceries-2', action: 'updated', changes: [{ field: 'categoryId', from: 'uncat', to: 'groceries' }], at: at(0, '09:13') },
+        { id: 'exp-groceries-3', action: 'receipt_confirmed', changes: [], at: at(0, '09:14') },
       ],
     },
     {
@@ -109,7 +136,7 @@ function seedExpenses(): ExpenseDetail[] {
       loggedAt: at(0, '08:04'),
       source: 'manual',
       syncState: 'synced',
-      audit: [{ text: 'Created from quick capture · €4.20', when: 'today 08:04' }],
+      audit: [],
     },
     {
       id: 'exp-tram',
@@ -123,7 +150,7 @@ function seedExpenses(): ExpenseDetail[] {
       loggedAt: at(-1, '17:41'),
       source: 'manual',
       syncState: 'synced',
-      audit: [{ text: 'Created · €3.60', when: 'yesterday 17:41' }],
+      audit: [],
     },
     {
       id: 'exp-rent',
@@ -137,7 +164,7 @@ function seedExpenses(): ExpenseDetail[] {
       loggedAt: at(-2, '10:00'),
       source: 'manual',
       syncState: 'synced',
-      audit: [{ text: 'Created · €760.00', when: '2 days ago 10:00' }],
+      audit: [],
     },
     {
       id: 'exp-shoes',
@@ -153,7 +180,7 @@ function seedExpenses(): ExpenseDetail[] {
       syncState: 'synced',
       linkedQuestTitle: 'Morning run',
       linkedQuestNote: 'Linked to Morning run — buying kit does not complete a quest.',
-      audit: [{ text: 'Created · €119.00', when: '3 days ago 15:20' }],
+      audit: [],
     },
     {
       id: 'exp-dinner',
@@ -169,7 +196,7 @@ function seedExpenses(): ExpenseDetail[] {
       syncState: 'synced',
       linkedQuestTitle: 'No takeaway today',
       linkedQuestNote: 'Logged against No takeaway today. The quest records the day as missed; nothing else changes.',
-      audit: [{ text: 'Created · €44.50', when: '4 days ago 20:10' }],
+      audit: [],
     },
     {
       id: 'exp-spotify',
@@ -184,7 +211,7 @@ function seedExpenses(): ExpenseDetail[] {
       source: 'manual',
       syncState: 'synced',
       linkedSubscriptionId: 'sub-spotify',
-      audit: [{ text: 'Confirmed from the Spotify subscription · €10.99', when: '5 days ago 07:00' }],
+      audit: [],
     },
     {
       id: 'exp-fuel',
@@ -198,7 +225,7 @@ function seedExpenses(): ExpenseDetail[] {
       loggedAt: at(-6, '12:35'),
       source: 'manual',
       syncState: 'synced',
-      audit: [{ text: 'Created · kr 725.00', when: '6 days ago 12:35' }],
+      audit: [],
     },
     {
       id: 'exp-power',
@@ -212,7 +239,7 @@ function seedExpenses(): ExpenseDetail[] {
       loggedAt: at(-8, '09:00'),
       source: 'manual',
       syncState: 'synced',
-      audit: [{ text: 'Created · €84.20', when: '8 days ago 09:00' }],
+      audit: [],
     },
     {
       id: 'exp-uncat',
@@ -226,11 +253,15 @@ function seedExpenses(): ExpenseDetail[] {
       loggedAt: at(-9, '18:15'),
       source: 'manual',
       syncState: 'synced',
-      audit: [{ text: 'Created · €41.20', when: '9 days ago 18:15' }],
+      audit: [],
     },
   ];
 
-  return draft.map(expense => ({ ...expense, homeAmountMinor: convertToHomeMinor(expense.amountMinor, expense.currency, expense.fxRate, HOME_CURRENCY) }));
+  return draft.map(expense => ({
+    ...expense,
+    homeAmountMinor: convertToHomeMinor(expense.amountMinor, expense.currency, expense.fxRate, FIXTURE_HOME_CURRENCY),
+    audit: expense.audit.length > 0 ? expense.audit : [{ id: `${expense.id}-created`, action: 'created', changes: [], at: expense.loggedAt }],
+  }));
 }
 
 function subscription(input: Omit<Subscription, 'monthlyEquivalentMinor' | 'amountText' | 'billingDay' | 'createdAt'> & { createdAt?: string }): Subscription {
@@ -240,7 +271,7 @@ function subscription(input: Omit<Subscription, 'monthlyEquivalentMinor' | 'amou
     billingDay: Number(input.nextDueDate.slice(8, 10)),
     createdAt: input.createdAt ?? shiftDays(-400),
     monthlyEquivalentMinor: monthlyEquivalentMinor(
-      convertToHomeMinor(input.amountMinor, input.currency, lockedRate(input.currency), HOME_CURRENCY) ?? input.amountMinor,
+      convertToHomeMinor(input.amountMinor, input.currency, fixtureRate(input.currency), FIXTURE_HOME_CURRENCY) ?? input.amountMinor,
       input.frequency,
       input.customIntervalDays,
     ),
@@ -347,15 +378,23 @@ function seedSubscriptions(): Subscription[] {
 }
 
 function createState(): FinanceState {
-  return { expenses: seedExpenses(), subscriptions: seedSubscriptions(), categories: [...BUILT_IN_CATEGORIES], receiptScansUsed: 3, monthlyExpenseCount: 78 };
+  return {
+    today: today(),
+    settings: { homeCurrency: FIXTURE_HOME_CURRENCY, currencies: ['EUR', 'NOK', 'USD'], weekStartsOn: 1, monthlyBudgetMinor: 160_000 },
+    expenses: seedExpenses(),
+    subscriptions: seedSubscriptions(),
+    categories: [...BUILT_IN_CATEGORIES],
+    monthlyExpenseCount: 78,
+  };
 }
-
-const RANGE_DAYS: Record<FinanceRange, number> = { week: 7, month: 30, year: 365 };
 
 const RANGE_LABELS: Record<FinanceRange, string> = { week: 'This week', month: 'This month', year: 'This year' };
 
-function withinRange(expense: Expense, range: FinanceRange): boolean {
-  return daysBetween(expense.occurredOnDate, today()) < RANGE_DAYS[range];
+const COMPARISON_LABELS: Record<FinanceRange, string> = { week: 'the same days last week', month: 'the same days last month', year: 'the same stretch last year' };
+
+function inPeriod(state: FinanceState, range: FinanceRange): Expense[] {
+  const period = financePeriod(range, state.today);
+  return state.expenses.filter(expense => withinSpan(expense.occurredOnDate, period));
 }
 
 function matchesSearch(expense: Expense, search: string): boolean {
@@ -364,69 +403,89 @@ function matchesSearch(expense: Expense, search: string): boolean {
   return `${expense.note ?? ''} ${expense.merchant ?? ''}`.toLowerCase().includes(needle);
 }
 
-function byRecency(a: Expense, b: Expense): number {
-  return a.loggedAt < b.loggedAt ? 1 : -1;
-}
-
 function nextExpenseId(): string {
   return `exp-${Date.now().toString(36)}`;
 }
 
-export function financeSummary(state: FinanceState, range: FinanceRange): FinanceSummary {
-  const inRange = state.expenses.filter(expense => withinRange(expense, range));
-  const spentMinor = sumHomeMinor(inRange, HOME_CURRENCY);
-  const budgetMinor = range === 'month' ? 160_000 : null;
+function rateFor(state: FinanceState, currency: CurrencyCode): number | null {
+  if (currency === state.settings.homeCurrency) return null;
+  return latestRates(state.expenses, state.settings.homeCurrency).find(snapshot => snapshot.from === currency)?.rate ?? null;
+}
+
+function rangeSpend(state: FinanceState, range: FinanceRange): RangeSpend {
+  const { settings } = state;
+  const home = settings.homeCurrency;
+  const inRange = inPeriod(state, range);
+  const spentMinor = sumHomeMinor(inRange, home);
+  const soFarMinor = sumHomeMinor(
+    inRange.filter(expense => expense.occurredOnDate <= state.today),
+    home,
+  );
+  const previous = previousStretch(range, state.today);
+  const previousMinor = sumHomeMinor(
+    state.expenses.filter(expense => withinSpan(expense.occurredOnDate, previous)),
+    home,
+  );
   const daysLogged = new Set(inRange.map(expense => expense.occurredOnDate)).size;
-  const activeSubscriptions = state.subscriptions.filter(item => item.active);
-  const nextDue = [...activeSubscriptions].sort((a, b) => (a.nextDueDate < b.nextDueDate ? -1 : 1))[0];
 
   return {
     range,
     periodLabel: RANGE_LABELS[range],
-    homeCurrency: HOME_CURRENCY,
     spentMinor,
-    spentDeltaFraction: range === 'month' ? -0.08 : null,
-    comparisonLabel: range === 'month' ? 'vs the month before' : '',
-    budgetMinor,
-    budgetLeftMinor: budgetMinor === null ? null : budgetMinor - spentMinor,
-    daysRemaining: 30 - Math.min(daysLogged, 30),
-    subscriptionsMonthlyMinor: activeSubscriptions.reduce((total, item) => total + item.monthlyEquivalentMinor, 0),
-    activeSubscriptions: activeSubscriptions.length,
-    nextSubscriptionLabel: nextDue ? `next ${nextDue.name} on ${nextDue.nextDueDate}` : 'none scheduled',
+    spentDeltaFraction: spendDelta(soFarMinor, previousMinor),
+    comparisonLabel: COMPARISON_LABELS[range],
     averageDayMinor: daysLogged > 0 ? Math.round(spentMinor / daysLogged) : 0,
     daysLogged,
+    categories: categoryBreakdown(inRange, state.categories, home).filter(slice => slice.count > 0),
+    fxRates: ratesUsed(inRange, home),
+  };
+}
+
+export function financeSummary(state: FinanceState): FinanceSummary {
+  const activeSubscriptions = state.subscriptions.filter(item => item.active);
+  const nextDue = [...activeSubscriptions].sort((a, b) => (a.nextDueDate < b.nextDueDate ? -1 : 1))[0];
+
+  return {
+    settings: state.settings,
+    categories: state.categories,
+    ranges: { week: rangeSpend(state, 'week'), month: rangeSpend(state, 'month'), year: rangeSpend(state, 'year') },
+    budget: budgetStanding(state.expenses, state.settings, state.today),
+    subscriptionsMonthlyMinor: activeSubscriptions.reduce((total, item) => total + item.monthlyEquivalentMinor, 0),
+    activeSubscriptions: activeSubscriptions.length,
+    nextSubscription: nextDue ? { name: nextDue.name, dueDate: nextDue.nextDueDate } : null,
     totalExpenses: state.monthlyExpenseCount,
-    categories: categoryBreakdown(inRange, state.categories, HOME_CURRENCY).filter(slice => slice.count > 0),
-    fxRates: [
-      { from: 'NOK', to: 'EUR', rate: FX_NOK_EUR },
-      { from: 'USD', to: 'EUR', rate: FX_USD_EUR },
-      { from: 'GBP', to: 'EUR', rate: FX_GBP_EUR },
-    ],
-    receiptScansUsed: state.receiptScansUsed,
-    receiptScanLimit: 10,
-    receiptQuotaResetsOn: 'tomorrow',
+    latestRates: latestRates(state.expenses, state.settings.homeCurrency),
     queuedExpense: state.expenses.find(expense => expense.syncState === 'queued') ?? null,
   };
 }
 
 export function financeExpensePage(state: FinanceState, query: ExpenseQuery): ExpensePage {
-  const matched = state.expenses
-    .filter(expense => withinRange(expense, query.range))
+  const matched = inPeriod(state, query.range)
     .filter(expense => matchesSearch(expense, query.search ?? ''))
     .filter(expense => !query.categoryId || expense.categoryId === query.categoryId)
-    .sort(byRecency);
+    .sort(compareExpensesByDate);
 
   const items = query.limit ? matched.slice(0, query.limit) : matched;
-  return { items, shown: items.length, total: matched.length, periodLabel: RANGE_LABELS[query.range], homeCurrency: HOME_CURRENCY };
+  return { items, shown: items.length, total: matched.length, periodLabel: RANGE_LABELS[query.range], homeCurrency: state.settings.homeCurrency };
+}
+
+export function financeExpenseView(state: FinanceState, id: string): ExpenseView {
+  return {
+    expense: state.expenses.find(expense => expense.id === id) ?? null,
+    settings: state.settings,
+    categories: state.categories,
+    rates: latestRates(state.expenses, state.settings.homeCurrency),
+  };
 }
 
 export function financeSubscriptionsView(state: FinanceState): SubscriptionsView {
+  const home = state.settings.homeCurrency;
   const items = [...state.subscriptions].sort((a, b) => (a.nextDueDate < b.nextDueDate ? -1 : 1));
   const active = items.filter(item => item.active);
   const monthlyTotalMinor = active.reduce((total, item) => total + item.monthlyEquivalentMinor, 0);
 
   const upcoming: UpcomingCharge[] = active
-    .filter(item => daysBetween(today(), item.nextDueDate) <= 30)
+    .filter(item => daysBetween(state.today, item.nextDueDate) <= 30)
     .map(item => ({ subscriptionId: item.id, name: item.name, dueDate: item.nextDueDate, amountMinor: item.amountMinor, currency: item.currency }));
 
   const byDate = new Map<string, UpcomingCharge[]>();
@@ -437,52 +496,81 @@ export function financeSubscriptionsView(state: FinanceState): SubscriptionsView
     .map(([date, charges]) => ({
       date,
       names: charges.map(charge => charge.name),
-      totalMinor: charges.reduce((total, charge) => total + (convertToHomeMinor(charge.amountMinor, charge.currency, lockedRate(charge.currency), HOME_CURRENCY) ?? 0), 0),
+      totalMinor: charges.reduce((total, charge) => total + (convertToHomeMinor(charge.amountMinor, charge.currency, rateFor(state, charge.currency), home) ?? 0), 0),
     }));
 
-  return { items, homeCurrency: HOME_CURRENCY, activeCount: active.length, monthlyTotalMinor, yearlyTotalMinor: monthlyTotalMinor * 12, upcoming, collisions };
+  return { items, homeCurrency: home, activeCount: active.length, monthlyTotalMinor, yearlyTotalMinor: monthlyTotalMinor * 12, upcoming, collisions };
 }
 
 export function financeCategoriesView(state: FinanceState): CategoriesView {
-  const inRange = state.expenses.filter(expense => withinRange(expense, 'month'));
-  const items = categoryBreakdown(inRange, state.categories, HOME_CURRENCY);
+  const home = state.settings.homeCurrency;
+  const items = categoryBreakdown(inPeriod(state, 'month'), state.categories, home);
   const uncategorised = items.find(slice => slice.category.id === 'uncat');
-  return { items, homeCurrency: HOME_CURRENCY, uncategorised: { count: uncategorised?.count ?? 0, totalMinor: uncategorised?.totalMinor ?? 0 } };
+  return { items, homeCurrency: home, uncategorised: { count: uncategorised?.count ?? 0, totalMinor: uncategorised?.totalMinor ?? 0 } };
 }
 
-function buildExpense(id: string, draft: ExpenseDraft, syncState: ExpenseDetail['syncState']): ExpenseDetail {
+function optionalText(value: string | undefined): string | undefined {
+  return value ? value : undefined;
+}
+
+/** As on the server: a field the draft leaves out keeps its value, and an empty one clears it. */
+function editedText(draftValue: string | undefined, current: string | undefined): string | undefined {
+  return draftValue === undefined ? current : optionalText(draftValue);
+}
+
+function buildExpense(state: FinanceState, id: string, draft: ExpenseDraft, syncState: ExpenseDetail['syncState']): ExpenseDetail {
   const amountMinor = parseAmountToMinor(draft.amountText, draft.currency) ?? 0;
-  const fxRate = lockedRate(draft.currency);
+  const loggedAt = new Date().toISOString();
   return {
     id,
     amountMinor,
     amountText: draft.amountText,
     currency: draft.currency,
-    fxRate,
-    homeAmountMinor: convertToHomeMinor(amountMinor, draft.currency, fxRate, HOME_CURRENCY),
+    fxRate: null,
+    homeAmountMinor: convertToHomeMinor(amountMinor, draft.currency, null, state.settings.homeCurrency),
     categoryId: draft.categoryId,
-    merchant: draft.merchant,
-    note: draft.note,
+    merchant: optionalText(draft.merchant),
+    note: optionalText(draft.note),
     occurredOnDate: draft.occurredOnDate,
-    loggedAt: new Date().toISOString(),
+    loggedAt,
     source: draft.source ?? 'manual',
     syncState,
-    audit: [{ text: 'Created', when: 'just now' }],
+    receiptRef: draft.receiptRef,
+    audit: [
+      { id: `${id}-local-created`, action: 'created', changes: [], at: loggedAt },
+      ...(draft.receiptRef ? [{ id: `${id}-local-receipt`, action: 'receipt_confirmed' as const, changes: [], at: loggedAt }] : []),
+    ],
   };
 }
 
 function createExpense(state: FinanceState, draft: ExpenseDraft, syncState: ExpenseDetail['syncState']): FinanceCommandResult {
-  const expense = buildExpense(draft.id ?? nextExpenseId(), draft, syncState);
+  const expense = buildExpense(state, draft.id ?? nextExpenseId(), draft, syncState);
   state.expenses = [expense, ...state.expenses];
   state.monthlyExpenseCount += 1;
-  if (draft.source === 'ocr') state.receiptScansUsed += 1;
   return { id: expense.id, message: 'Expense saved.', advisory: deriveCapAdvisory('expenses', state.monthlyExpenseCount) };
 }
 
+/** Mirrors the server's `expense.update`: currency, source, receipt and links never change on an edit, and only the owner-visible fields that moved are recorded. */
 function updateExpense(state: FinanceState, id: string, draft: ExpenseDraft, syncState: ExpenseDetail['syncState']): FinanceCommandResult {
-  state.expenses = state.expenses.map(expense =>
-    expense.id === id ? { ...buildExpense(id, draft, syncState), audit: [...expense.audit, { text: 'Edited', when: 'just now' }], loggedAt: expense.loggedAt } : expense,
-  );
+  state.expenses = state.expenses.map(expense => {
+    if (expense.id !== id) return expense;
+    const rebuilt = buildExpense(state, id, { ...draft, currency: expense.currency }, syncState);
+    const fxRate = expense.fxRate;
+    const updated: ExpenseDetail = {
+      ...expense,
+      amountMinor: rebuilt.amountMinor,
+      amountText: rebuilt.amountText,
+      homeAmountMinor: convertToHomeMinor(rebuilt.amountMinor, expense.currency, fxRate, state.settings.homeCurrency),
+      categoryId: rebuilt.categoryId,
+      merchant: editedText(draft.merchant, expense.merchant),
+      note: editedText(draft.note, expense.note),
+      occurredOnDate: rebuilt.occurredOnDate,
+      syncState,
+    };
+    const changes = expenseChanges(expense, updated);
+    if (changes.length === 0) return updated;
+    return { ...updated, audit: [...expense.audit, { id: `${id}-local-${rebuilt.loggedAt}`, action: 'updated', changes, at: rebuilt.loggedAt }] };
+  });
   return { id, message: 'Expense updated.' };
 }
 
@@ -519,6 +607,7 @@ function confirmCycle(state: FinanceState, id: string, billingDate: string, sync
   if (existing) return { id: existing.id, message: 'Already confirmed for this cycle.' };
 
   const expense = buildExpense(
+    state,
     nextExpenseId(),
     {
       amountText: target.amountText,
@@ -563,24 +652,41 @@ export function applyFinanceCommand(state: FinanceState, command: FinanceCommand
 export class FixtureFinanceProvider implements FinanceProvider {
   private readonly state = createState();
 
-  async summary(range: FinanceRange): Promise<FinanceSummary> {
-    return financeSummary(this.state, range);
+  private current(): FinanceState {
+    return { ...this.state, today: today() };
+  }
+
+  async summary(): Promise<FinanceSummary> {
+    return financeSummary(this.current());
   }
 
   async expenses(query: ExpenseQuery): Promise<ExpensePage> {
-    return financeExpensePage(this.state, query);
+    return financeExpensePage(this.current(), query);
   }
 
-  async expense(id: string): Promise<ExpenseDetail | null> {
-    return this.state.expenses.find(expense => expense.id === id) ?? null;
+  async expense(id: string): Promise<ExpenseView> {
+    return financeExpenseView(this.current(), id);
   }
 
   async subscriptions(): Promise<SubscriptionsView> {
-    return financeSubscriptionsView(this.state);
+    return financeSubscriptionsView(this.current());
   }
 
   async categories(): Promise<CategoriesView> {
-    return financeCategoriesView(this.state);
+    return financeCategoriesView(this.current());
+  }
+
+  async receiptScanQuota(): Promise<ReceiptScanQuota> {
+    return { cap: 5, used: 1, resetAt: `${shiftDays(1)}T00:00:00` };
+  }
+
+  async uploadReceipt(file: File, progress: ReceiptUploadProgress): Promise<string> {
+    progress.onProgress(100);
+    return `fixture/${file.name}`;
+  }
+
+  confirmReceipt(): Promise<void> {
+    return Promise.resolve();
   }
 
   async dispatchCommand(command: FinanceCommand): Promise<FinanceCommandResult> {
@@ -597,5 +703,3 @@ export function setFinanceProvider(next: FinanceProvider): void {
 export function getFinanceProvider(): FinanceProvider {
   return provider;
 }
-
-export { HOME_CURRENCY };
