@@ -679,20 +679,41 @@ describe('Recovery screen', () => {
     }
   });
 
-  it('should render context asides before the main column on narrow layouts', async () => {
+  it('should put the headline and choices before the context cards on narrow layouts', async () => {
     stubNarrowViewport();
     renderScreen(<RecoveryScreen />, { today: TODAY, persona: 'recovery' });
 
-    const warning = await screen.findByText('Next week reads heavy');
-    const openChoices = screen.getByText('Open choices');
-    expect(warning.compareDocumentPosition(openChoices) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const headline = await screen.findByRole('heading', { name: 'What happened, and what you can do' });
+    const [choices, missed, shields] = [screen.getByText('Open choices'), screen.getByText('Recently missed'), screen.getByText('How shields work')];
+    expect(headline.compareDocumentPosition(choices) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(choices.compareDocumentPosition(missed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(missed.compareDocumentPosition(shields) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('should keep the aside after the main column at desktop width', async () => {
+  it('should show the heavy-week warning after the headline and before the choices it informs', async () => {
+    stubNarrowViewport();
     renderScreen(<RecoveryScreen />, { today: TODAY, persona: 'recovery' });
 
-    const openChoices = await screen.findByText('Open choices');
+    const headline = await screen.findByRole('heading', { name: 'What happened, and what you can do' });
     const warning = screen.getByText('Next week reads heavy');
-    expect(openChoices.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(headline.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(warning.compareDocumentPosition(screen.getByText('Open choices')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('should show "No HP yet" on coming back when the account has no HP pool, like the hero crest', async () => {
+    stubAccountApi();
+    renderSynced(<RecoveryScreen />, [progressionPage({ persona: 'returner', hpToday: 0, hpMax: 0 })]);
+
+    expect(await screen.findByText('No HP yet')).toBeDefined();
+    expect(screen.getByText('Arrives with your first quest kept.')).toBeDefined();
+    expect(screen.queryByText(/^HP: 0 of 0$/)).toBeNull();
+  });
+
+  it('should show HP as a count on coming back when the account has an HP pool', async () => {
+    stubAccountApi();
+    renderSynced(<RecoveryScreen />, [progressionPage({ persona: 'returner', hpToday: 1, hpMax: 5 })]);
+
+    expect(await screen.findByText('HP: 1 of 5')).toBeDefined();
+    expect(screen.queryByText('No HP yet')).toBeNull();
   });
 });

@@ -31,44 +31,17 @@ export function Screen({ title, subtitle, actions, children }: ScreenProps): Rea
   );
 }
 
-export type AsideVariant = 'detail' | 'context';
-
 export interface ScreenColumnsProps {
   children: ReactNode;
+  /** Stacks after the main column below 1000px, so it holds secondary content; pair a selection's detail with `useRevealOnSelect`. */
   aside: ReactNode;
-  /**
-   * 'detail' (default): the aside is a selection's consequence (an achievement, a history record) — it
-   * stays after the main column at every width; pair it with `useRevealOnSelect` to scroll and focus it.
-   * 'context': the aside informs the main column (a warning, background info) — it moves before the main
-   * column below 1000px, so it is read before the choices it explains.
-   */
-  asideVariant?: AsideVariant;
 }
 
-export function ScreenColumns({ children, aside, asideVariant = 'detail' }: ScreenColumnsProps): ReactElement {
-  const isNarrow = useMediaQuery('(max-width: 999px)');
-  const showAsideFirst = asideVariant === 'context' && isNarrow;
-
-  if (showAsideFirst)
-    return (
-      <div className={styles.columns}>
-        <div key="aside" className={styles.column}>
-          {aside}
-        </div>
-        <div key="main" className={styles.column}>
-          {children}
-        </div>
-      </div>
-    );
-
+export function ScreenColumns({ children, aside }: ScreenColumnsProps): ReactElement {
   return (
     <div className={styles.columns}>
-      <div key="main" className={styles.column}>
-        {children}
-      </div>
-      <div key="aside" className={styles.column}>
-        {aside}
-      </div>
+      <div className={styles.column}>{children}</div>
+      <div className={styles.column}>{aside}</div>
     </div>
   );
 }

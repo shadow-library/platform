@@ -65,15 +65,8 @@ function RecoveryContent({ view, dismissing, focusDismissed, onDismiss }: Recove
 
   return (
     <ScreenColumns
-      asideVariant="context"
       aside={
         <>
-          {view.overload ? (
-            <Alert intent="warning" title={view.overload.title}>
-              {view.overload.body}
-            </Alert>
-          ) : null}
-
           {view.missed.length > 0 ? (
             <Card padding="md">
               <Card.Body>
@@ -119,12 +112,26 @@ function RecoveryContent({ view, dismissing, focusDismissed, onDismiss }: Recove
           <h2 className={styles.name}>{view.headline}</h2>
           <p className={screenStyles.cardBody}>{view.body}</p>
           <div className={styles.facts}>
-            {view.stats.map(stat => (
-              <Statistic key={stat.label} label={stat.label} value={stat.value} unit={stat.unit} size="sm" />
-            ))}
+            {view.stats.map(stat =>
+              stat.kind === 'value' ? (
+                <Statistic key={stat.label} label={stat.label} value={stat.value} unit={stat.unit} size="sm" />
+              ) : (
+                <div key={stat.label}>
+                  <p className={styles.factLabel}>{stat.label}</p>
+                  <p className={styles.factText}>{stat.text}</p>
+                  <p className={styles.factNote}>{stat.note}</p>
+                </div>
+              ),
+            )}
           </div>
         </Card.Body>
       </Card>
+
+      {view.overload ? (
+        <Alert intent="warning" title={view.overload.title}>
+          {view.overload.body}
+        </Alert>
+      ) : null}
 
       {dismissed ? (
         <Card padding="md">

@@ -4,7 +4,7 @@ import { Alert, Button, Card, Progress, Skeleton, Tabs } from '@shadow-library/u
 
 import { DataState } from '@/components/DataState';
 import { Screen, screenStyles } from '@/components/ScreenLayout';
-import { heroAccentKey, type HeroDeck, useComingBack, useHeroDeck } from '@/lib/data';
+import { heroAccentKey, type HeroDeck, NO_HP_YET, useComingBack, useHeroDeck } from '@/lib/data';
 
 import { AchievementsPanel } from './achievements-panel';
 import { CosmeticsPanel } from './cosmetics-panel';
@@ -121,7 +121,7 @@ function LevelProgress({ level, xpIntoLevel, xpForNextLevel }: { level: number; 
 const HP_PIP_CAP = 10;
 
 function HpTally({ hp, hpMax }: { hp: number; hpMax: number }): ReactElement {
-  if (hpMax === 0) return <div className={styles.tallyValue}>No HP yet</div>;
+  if (hpMax === 0) return <div className={styles.tallyValue}>{NO_HP_YET}</div>;
 
   if (hpMax > HP_PIP_CAP)
     return (

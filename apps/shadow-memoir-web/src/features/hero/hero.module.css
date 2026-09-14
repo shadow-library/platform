@@ -398,6 +398,28 @@
   margin-top: 14px;
 }
 
+.factLabel {
+  margin: 0;
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  color: var(--sh-text-secondary);
+}
+
+.factText {
+  margin: 6px 0 0;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sh-text-primary);
+}
+
+.factNote {
+  margin: 2px 0 0;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
 .choice {
   padding: 12px 0;
   border-bottom: 1px solid var(--sh-border-subtle);

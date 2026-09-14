@@ -106,11 +106,27 @@ interface MissedWhileAway {
   state: string;
 }
 
+interface RecoveryValueStat {
+  kind: 'value';
+  label: string;
+  value: number;
+  unit?: string;
+}
+
+interface RecoveryNoteStat {
+  kind: 'note';
+  label: string;
+  text: string;
+  note: string;
+}
+
+export type RecoveryStat = RecoveryValueStat | RecoveryNoteStat;
+
 export interface RecoveryView {
   comingBack: ComingBack;
   headline: string;
   body: string;
-  stats: { label: string; value: number; unit?: string }[];
+  stats: RecoveryStat[];
   choices: RecoveryChoice[];
   intensity: HeroIntensityMode;
   /** Staged for the next daily rollover — not yet in effect, so it must never look already selected. */

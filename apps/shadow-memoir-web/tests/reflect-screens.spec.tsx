@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from '@shadow-library/ui';
@@ -22,6 +25,10 @@ const TODAY = '2026-08-22';
 async function passTheConsentGate(): Promise<void> {
   fireEvent.click(await screen.findByRole('switch', { name: /Journal reflections and reasons/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+}
+
+function readCss(relativePath: string): string {
+  return readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf-8');
 }
 
 function stubNarrowViewport(): void {
@@ -243,6 +250,32 @@ describe('Insights screen', () => {
 
     const tallest = expectedBars.find(bar => bar.value === max);
     expect(barHeightPx(tallest?.value ?? 0, max)).toBe(PLOT_HEIGHT);
+  });
+
+  it('should wrap and clamp the longest streak caption inside its card without duplicating it in a title', async () => {
+    renderScreen(<InsightsScreen />, { today: TODAY });
+    const caption = await screen.findByText(/^Held by /);
+
+    expect(caption.hasAttribute('title')).toBe(false);
+    expect(readCss('../src/features/insights/insights.module.css')).toMatch(/\.kpiCaption\s*{[^}]*overflow-wrap:\s*anywhere;[^}]*-webkit-line-clamp:\s*3;/);
+  });
+
+  it('should put every month bar on one baseline regardless of its label height', async () => {
+    renderScreen(<InsightsScreen />, { today: TODAY });
+    const chart = await screen.findByRole('group', { name: 'Experience earned, by month' });
+    const columns = [...chart.children];
+
+    expect(columns.length).toBeGreaterThan(1);
+    for (const column of columns) {
+      const [plot, label] = [...column.children];
+      expect(plot?.querySelector('[role="img"]')).not.toBeNull();
+      expect(label?.querySelector('[role="img"]')).toBeNull();
+    }
+
+    const css = readCss('../src/features/insights/insights.module.css');
+    expect(css).toMatch(/\.columns\s*{[^}]*align-items:\s*(flex-)?start;/);
+    expect(css).not.toMatch(/\.columns\s*{[^}]*align-items:\s*(flex-)?end;/);
+    expect(css).toMatch(new RegExp(`\\.plot\\s*{[^}]*height:\\s*${PLOT_HEIGHT}px;`));
   });
 });
 

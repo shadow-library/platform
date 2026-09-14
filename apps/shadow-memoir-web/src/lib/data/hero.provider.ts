@@ -9,6 +9,7 @@ import {
   type HeroDeck,
   type HeroIntensityMode,
   type HeroTitle,
+  type RecoveryStat,
   type RecoveryView,
 } from './hero.types';
 import { type HeroState } from './view.types';
@@ -16,10 +17,17 @@ import { type HeroState } from './view.types';
 export const UNTITLED_HERO_NAME = 'New hero';
 export const STARTER_COSMETIC_ID = 'badge_bronze';
 
+export const NO_HP_YET = 'No HP yet';
+
 export function hpNoteFor(hp: number, hpMax: number): string {
   if (hpMax === 0) return 'Arrives with your first quest kept.';
   if (hp === hpMax) return 'full';
   return 'Regenerates overnight, on its own.';
+}
+
+export function hpStat(hp: number, hpMax: number): RecoveryStat {
+  if (hpMax === 0) return { kind: 'note', label: 'HP', text: NO_HP_YET, note: hpNoteFor(hp, hpMax) };
+  return { kind: 'value', label: 'HP', value: hp, unit: `of ${hpMax}` };
 }
 
 /** A hero with earned titles but none displayed can pick one; a hero with none yet has nothing to choose. */
@@ -197,7 +205,7 @@ export const COSMETICS: CosmeticSeed[] = [
   { id: 'badge_silver', name: 'Silver badge', glyph: '⛨', kind: 'badge', priceCoins: 150, note: 'Plain, heavy and slow to earn.' },
   { id: 'badge_gold_streak', name: 'Gold streak badge', glyph: '❄', kind: 'badge', priceCoins: null, note: 'Comes with an achievement, never with coins.' },
   { id: 'accent_ember', name: 'Ember accent', glyph: '◐', kind: 'hero_accent', priceCoins: 100, note: 'A warm edge on the hero card.' },
-  { id: 'accent_frost', name: 'Frost accent', glyph: '❖', kind: 'hero_accent', priceCoins: 100, note: 'A cold blue edge on the hero card.' },
+  { id: 'accent_frost', name: 'Frost accent', glyph: '❖', kind: 'hero_accent', priceCoins: 100, note: 'A cold steel edge on the hero card.' },
   {
     id: 'accent_aurora_platinum',
     name: 'Aurora accent',
@@ -207,7 +215,14 @@ export const COSMETICS: CosmeticSeed[] = [
     note: 'A radiant edge on the hero card. Comes with a hundred-day run.',
   },
   { id: 'theme_sunrise', name: 'Sunrise theme', glyph: '☀', kind: 'theme_accent', priceCoins: 75, note: 'A lighter accent across every surface.' },
-  { id: 'theme_midnight', name: 'Midnight theme', glyph: '◑', kind: 'theme_accent', priceCoins: 75, note: 'A darker accent across every surface.' },
+  {
+    id: 'theme_midnight',
+    name: 'Midnight theme',
+    glyph: '◑',
+    kind: 'theme_accent',
+    priceCoins: 75,
+    note: 'Deep indigo in light mode and moonlit indigo in dark, across every surface.',
+  },
   { id: 'theme_returner', name: 'Returner theme', glyph: '⟲', kind: 'theme_accent', priceCoins: null, note: 'A warm accent across every surface. Comes with the Returner ritual.' },
 ];
 const EARNED_BY_PERSONA: Record<Persona, Record<string, string>> = {
@@ -454,10 +469,10 @@ export function createHeroProvider({ persona = 'active', hero }: HeroFixtureOpti
     headline: 'What happened, and what you can do',
     body: 'You were away eight days and came back on Wednesday. Two streaks closed while you were gone, and their records are intact in History. No XP was removed, no level was lost, and your HP was not spent for days you were not here.',
     stats: [
-      { label: 'Days back', value: 3 },
-      { label: 'Kept since return', value: 7, unit: 'of 9' },
-      { label: 'Shields held', value: 2 },
-      { label: 'HP', value: state.hero.hp, unit: `of ${state.hero.hpMax}` },
+      { kind: 'value', label: 'Days back', value: 3 },
+      { kind: 'value', label: 'Kept since return', value: 7, unit: 'of 9' },
+      { kind: 'value', label: 'Shields held', value: 2 },
+      hpStat(state.hero.hp, state.hero.hpMax),
     ],
     choices: comingBack().kind === 'offered' ? RECOVERY_CHOICES : [],
     intensity: state.intensity,

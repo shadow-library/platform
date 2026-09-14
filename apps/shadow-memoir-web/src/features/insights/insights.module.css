@@ -71,7 +71,13 @@
 }
 
 .kpiCaption {
+  display: -webkit-box;
   margin: 6px 0 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);
 }
@@ -143,9 +149,10 @@
   background: var(--sh-accent);
 }
 
+/* Top-aligned columns over a fixed-height plot share one baseline; bottom-aligned, a wrapped label lifts its own bar. */
 .columns {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 6px;
   margin-top: 4px;
   overflow-x: auto;

@@ -48,7 +48,6 @@
  * hero accent). AA-checked: `--sh-on-accent` on the solid accent and `--sh-accent-text` against the app/card/
  * well surfaces both clear 4.5:1; `--sh-accent` itself as a UI element (border, fill) clears 3:1.
  */
-:root[data-accent='ember'],
 :root[data-accent='sunrise'],
 [data-hero-accent='ember'] {
   --sh-accent: var(--sh-amber-700);
@@ -57,10 +56,8 @@
   --sh-accent-soft: var(--sh-amber-50);
   --sh-accent-text: var(--sh-amber-800);
 }
-:root[data-theme='dark'][data-accent='ember'],
 :root[data-theme='dark'][data-accent='sunrise'],
 :root[data-theme='dark'] [data-hero-accent='ember'],
-.dark[data-accent='ember'],
 .dark[data-accent='sunrise'],
 .dark [data-hero-accent='ember'] {
   --sh-accent: var(--sh-amber-400);
@@ -71,23 +68,21 @@
   --sh-on-accent: var(--sh-neutral-950);
 }
 
-:root[data-accent='frost'],
+/* The platform palette has no blue ramp and the default accent is already indigo, so frost reads as cold steel rather than a blue. */
 [data-hero-accent='frost'] {
-  --sh-accent: var(--sh-indigo-500);
-  --sh-accent-hover: var(--sh-indigo-600);
-  --sh-accent-active: var(--sh-indigo-700);
-  --sh-accent-soft: var(--sh-indigo-50);
-  --sh-accent-text: var(--sh-indigo-600);
+  --sh-accent: var(--sh-neutral-600);
+  --sh-accent-hover: var(--sh-neutral-700);
+  --sh-accent-active: var(--sh-neutral-800);
+  --sh-accent-soft: var(--sh-neutral-150);
+  --sh-accent-text: var(--sh-neutral-700);
 }
-:root[data-theme='dark'][data-accent='frost'],
 :root[data-theme='dark'] [data-hero-accent='frost'],
-.dark[data-accent='frost'],
 .dark [data-hero-accent='frost'] {
-  --sh-accent: var(--sh-indigo-300);
-  --sh-accent-hover: var(--sh-indigo-200);
-  --sh-accent-active: var(--sh-indigo-100);
-  --sh-accent-soft: rgb(91 92 235 / 0.15);
-  --sh-accent-text: var(--sh-indigo-300);
+  --sh-accent: var(--sh-neutral-300);
+  --sh-accent-hover: var(--sh-neutral-200);
+  --sh-accent-active: var(--sh-neutral-100);
+  --sh-accent-soft: rgb(200 205 212 / 0.15);
+  --sh-accent-text: var(--sh-neutral-300);
   --sh-on-accent: var(--sh-neutral-950);
 }
 
@@ -98,17 +93,17 @@
   --sh-accent-soft: var(--sh-indigo-100);
   --sh-accent-text: var(--sh-indigo-800);
 }
-/* Dark is already as deep as a legible accent goes, so midnight reuses the platform's dark accent here — the visible change is light-theme only. */
+/* Any indigo deeper than the dark default drops under 3:1 on dark surfaces, so dark midnight goes moonlit instead. */
 :root[data-theme='dark'][data-accent='midnight'],
 .dark[data-accent='midnight'] {
-  --sh-accent: var(--sh-indigo-500);
-  --sh-accent-hover: var(--sh-indigo-400);
-  --sh-accent-active: var(--sh-indigo-300);
-  --sh-accent-soft: rgb(91 92 235 / 0.15);
-  --sh-accent-text: var(--sh-indigo-400);
+  --sh-accent: var(--sh-indigo-300);
+  --sh-accent-hover: var(--sh-indigo-200);
+  --sh-accent-active: var(--sh-indigo-100);
+  --sh-accent-soft: rgb(165 166 245 / 0.15);
+  --sh-accent-text: var(--sh-indigo-300);
+  --sh-on-accent: var(--sh-neutral-950);
 }
 
-:root[data-accent='aurora'],
 :root[data-accent='returner'],
 [data-hero-accent='aurora'] {
   --sh-accent: var(--sh-green-700);
@@ -117,10 +112,8 @@
   --sh-accent-soft: var(--sh-green-50);
   --sh-accent-text: var(--sh-green-800);
 }
-:root[data-theme='dark'][data-accent='aurora'],
 :root[data-theme='dark'][data-accent='returner'],
 :root[data-theme='dark'] [data-hero-accent='aurora'],
-.dark[data-accent='aurora'],
 .dark[data-accent='returner'],
 .dark [data-hero-accent='aurora'] {
   --sh-accent: var(--sh-green-400);
