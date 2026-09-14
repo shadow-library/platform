@@ -5,6 +5,7 @@ import { Button, Card, SegmentedControl, Skeleton, Statistic } from '@shadow-lib
 import { DataState } from '@/components/DataState';
 import { Screen, screenStyles } from '@/components/ScreenLayout';
 import { type Bar, type InsightKpi, type InsightPeriod, type InsightsView, type TrendSeries, useInsights } from '@/lib/data';
+import { useIsClamped } from '@/lib/use-is-clamped';
 
 import { validateInsightsSearch } from './insights.search';
 import styles from './insights.module.css';
@@ -65,6 +66,9 @@ function InsightsSkeleton(): ReactElement {
 }
 
 function KpiTile({ kpi }: { kpi: InsightKpi }): ReactElement {
+  const caption = useRef<HTMLParagraphElement>(null);
+  const captionClamped = useIsClamped(caption, kpi.caption);
+
   return (
     <Card padding="md">
       <Card.Body>
@@ -78,7 +82,9 @@ function KpiTile({ kpi }: { kpi: InsightKpi }): ReactElement {
             <Statistic label={kpi.label} value={kpi.value} unit={kpi.unit} delta={kpi.delta} positiveIs={kpi.positiveIs} format={kpi.format} size="md" />
           </div>
         )}
-        <p className={styles.kpiCaption}>{kpi.caption}</p>
+        <p ref={caption} className={styles.kpiCaption} title={captionClamped ? kpi.caption : undefined}>
+          {kpi.caption}
+        </p>
       </Card.Body>
     </Card>
   );

@@ -1,8 +1,9 @@
 import { Link } from '@tanstack/react-router';
-import { type ReactElement } from 'react';
+import { type ReactElement, useRef } from 'react';
 import { Button, Card } from '@shadow-library/ui';
 
 import { type ActivityEntry, type QuickLogTile, type StreakBoardEntry, type UpcomingEntry } from '@/lib/data';
+import { useIsClamped } from '@/lib/use-is-clamped';
 
 import { outcomeTone } from '../quests/quest-presenters';
 import styles from './today.module.css';
@@ -14,6 +15,20 @@ export interface DayRailProps {
   activity: ActivityEntry[];
 }
 
+function QuickLogTileLink({ tile }: { tile: QuickLogTile }): ReactElement {
+  const value = useRef<HTMLSpanElement>(null);
+  const valueClipped = useIsClamped(value, tile.value);
+
+  return (
+    <Link to={tile.to} className={styles.tile}>
+      <span className={styles.tileLabel}>{tile.label}</span>
+      <span ref={value} className={styles.tileValue} title={valueClipped ? tile.value : undefined}>
+        {tile.value}
+      </span>
+    </Link>
+  );
+}
+
 export function DayRail({ quickLogs, streaks, upcoming, activity }: DayRailProps): ReactElement {
   return (
     <div className={styles.rail}>
@@ -22,10 +37,7 @@ export function DayRail({ quickLogs, streaks, upcoming, activity }: DayRailProps
           <h2 className={styles.railTitle}>Quick logs</h2>
           <div className={styles.tileGrid}>
             {quickLogs.map(tile => (
-              <Link key={tile.id} to={tile.to} className={styles.tile}>
-                <span className={styles.tileLabel}>{tile.label}</span>
-                <span className={styles.tileValue}>{tile.value}</span>
-              </Link>
+              <QuickLogTileLink key={tile.id} tile={tile} />
             ))}
           </div>
         </Card.Body>

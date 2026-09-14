@@ -282,6 +282,25 @@ describe('TodayScreen quest actions', () => {
     expect(screen.queryByText(/Spends \d HP/)).toBeNull();
   });
 
+  it.each([
+    [1, '1 shield'],
+    [2, '2 shields'],
+  ])('should count %i held shields in the action list header', async (shieldsAvailable, expected) => {
+    const world = projectWorldState(
+      {
+        quests: [{ id: 'q1', name: 'Evening stretch', durationMin: 10, startTimeMin: 1200, recurrence: { frequency: 'daily' }, strictness: 'routine', active: true }],
+        quest_streaks: [{ questId: 'q1', currentRunDays: 9, bestRunDays: 9, shieldsAvailable }],
+      },
+      TODAY,
+    );
+    data.provider = new MemoirEngine(world);
+    renderScreen(<TodayScreen />, { value: data });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Evening stretch' }));
+
+    expect(await screen.findByText(new RegExp(`· 9-day streak · ${expected}$`))).toBeTruthy();
+  });
+
   it('should still charge HP for a shielded break on a standard day', async () => {
     const world = projectWorldState(
       {

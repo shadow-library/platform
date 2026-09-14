@@ -732,12 +732,19 @@ export function deriveInsights(source: ReflectSource, period: InsightPeriod): In
   };
 }
 
-function isoWeek(date: string): number {
+export interface IsoWeek {
+  year: number;
+  week: number;
+}
+
+const WEEK_MS = 7 * 86_400_000;
+
+/** ISO 8601: a week belongs to the year holding its Thursday, and is numbered from that year's first Thursday. */
+export function isoWeekOf(date: string): IsoWeek {
   const parsed = toDate(date);
-  const thursday = new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
-  thursday.setUTCDate(thursday.getUTCDate() + 3 - ((thursday.getUTCDay() + 6) % 7));
-  const firstThursday = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 4));
-  return 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / (7 * 86400000) - ((firstThursday.getUTCDay() + 6) % 7) / 7);
+  const thursday = Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate() + 3 - ((parsed.getDay() + 6) % 7));
+  const year = new Date(thursday).getUTCFullYear();
+  return { year, week: Math.floor((thursday - Date.UTC(year, 0, 1)) / WEEK_MS) + 1 };
 }
 
 type DayOutcome = ReviewQuestRow['days'][number];
@@ -908,7 +915,7 @@ export function deriveReview(source: ReflectSource, local: ReviewLocalState): Re
   ];
 
   return {
-    weekLabel: `Week ${isoWeek(weekStart)} · ${formatRange(weekStart, weekEnd)}`,
+    weekLabel: `Week ${isoWeekOf(weekStart).week} · ${formatRange(weekStart, weekEnd)}`,
     keptHeadline:
       counted.length === 0
         ? 'Nothing was logged last week. The week stays empty rather than guessing at it.'
@@ -925,7 +932,11 @@ export function deriveReview(source: ReflectSource, local: ReviewLocalState): Re
     bodyGap: body.gap,
     prompts,
     completion: local.complete
-      ? { title: `Week ${isoWeek(weekStart)} closed`, body: 'Kept on this device. It stays here through a reload, but does not follow you to another device.', lines: summaryLines }
+      ? {
+          title: `Week ${isoWeekOf(weekStart).week} closed`,
+          body: 'Kept on this device. It stays here through a reload, but does not follow you to another device.',
+          lines: summaryLines,
+        }
       : null,
     glance: [
       counted.length === 0 ? 'No occurrences logged' : `${counted.length} occurrences · ${held} kept · ${percent(keptRatio)}%`,

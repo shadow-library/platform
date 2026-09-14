@@ -21,6 +21,7 @@ import {
   useCommand,
   useMemoirData,
 } from '@/lib/data';
+import { formatCount } from '@/lib/format';
 
 import { alreadyRecordedReason, breakCostNote, breakStreakNote, lockBreakNote, rescheduleDisabledReason } from './quest-presenters';
 import styles from './quest-actions.module.css';
@@ -226,7 +227,7 @@ function summaryLine(occurrence: QuestOccurrence): string {
     STAT_LABELS[occurrence.statAffinity],
     STRICTNESS_LABELS[occurrence.strictness],
     occurrence.streakDays > 0 ? `${occurrence.streakDays}-day streak` : null,
-    occurrence.shields > 0 ? `${occurrence.shields} shields` : null,
+    occurrence.shields > 0 ? formatCount(occurrence.shields, 'shield', 'shields') : null,
   ]
     .filter(Boolean)
     .join(' · ');

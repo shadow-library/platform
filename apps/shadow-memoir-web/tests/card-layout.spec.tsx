@@ -66,6 +66,13 @@ describe('card layout', () => {
     expect(layout).toMatch(/\.actions\s*{[^}]*margin-inline-start:\s*auto;/);
   });
 
+  it('should clip an overlong quick log value with an ellipsis instead of breaking inside a number', () => {
+    const tileValue = readCss('../src/features/today/today.module.css').match(/\.tileValue\s*{([^}]*)}/)?.[1] ?? '';
+    expect(tileValue).toMatch(/overflow:\s*hidden;/);
+    expect(tileValue).toMatch(/text-overflow:\s*ellipsis;/);
+    expect(tileValue).not.toMatch(/overflow-wrap:\s*anywhere|word-break:\s*break-all|white-space:\s*nowrap/);
+  });
+
   it('should keep the list card overflow clip from reaching the row focus ring', () => {
     const quests = readCss('../src/features/quests/quests.module.css');
     expect(quests).toMatch(/\.questRow:focus-visible\s*{[^}]*outline-offset:\s*-\d+px/);

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from '@shadow-library/ui';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -29,6 +29,21 @@ async function passTheConsentGate(): Promise<void> {
 
 function readCss(relativePath: string): string {
   return readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf-8');
+}
+
+function stubResizeObservers(): () => void {
+  const callbacks: (() => void)[] = [];
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        callbacks.push(callback);
+      }
+      observe(): void {}
+      disconnect(): void {}
+    },
+  );
+  return () => callbacks.forEach(callback => callback());
 }
 
 function stubNarrowViewport(): void {
@@ -209,6 +224,8 @@ describe('History screen', () => {
 });
 
 describe('Insights screen', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it('should render the period comparison against your own history only', async () => {
     renderScreen(<InsightsScreen />, { today: TODAY });
     expect(await screen.findByRole('heading', { name: 'Insights' })).toBeDefined();
@@ -272,10 +289,22 @@ describe('Insights screen', () => {
     expect(barHeightPx(tallest?.value ?? 0, max)).toBe(PLOT_HEIGHT);
   });
 
-  it('should wrap and clamp the longest streak caption inside its card without duplicating it in a title', async () => {
+  it('should title the longest streak caption only while its clamp hides part of it', async () => {
+    const resizes = stubResizeObservers();
     renderScreen(<InsightsScreen />, { today: TODAY });
     const caption = await screen.findByText(/^Held by /);
+    const box = { scrollHeight: 66, clientHeight: 66 };
+    Object.defineProperty(caption, 'scrollHeight', { configurable: true, get: () => box.scrollHeight });
+    Object.defineProperty(caption, 'clientHeight', { configurable: true, get: () => box.clientHeight });
 
+    expect(caption.hasAttribute('title')).toBe(false);
+
+    box.scrollHeight = 110;
+    act(resizes);
+    expect(caption.getAttribute('title')).toBe(caption.textContent);
+
+    box.scrollHeight = 66;
+    act(resizes);
     expect(caption.hasAttribute('title')).toBe(false);
     expect(readCss('../src/features/insights/insights.module.css')).toMatch(/\.kpiCaption\s*{[^}]*overflow-wrap:\s*anywhere;[^}]*-webkit-line-clamp:\s*3;/);
   });

@@ -11,6 +11,7 @@ import {
   formatRange,
   type HealthMetricEntry,
   holdsOccurrence,
+  isoWeekOf,
   type JournalEntry,
   type QuestLogState,
   type ReasonTag,
@@ -307,6 +308,20 @@ describe('formatRange', () => {
   });
 });
 
+describe('isoWeekOf', () => {
+  it.each([
+    ['2026-09-07', { year: 2026, week: 37 }],
+    ['2026-09-13', { year: 2026, week: 37 }],
+    ['2026-01-01', { year: 2026, week: 1 }],
+    ['2025-12-29', { year: 2026, week: 1 }],
+    ['2021-01-03', { year: 2020, week: 53 }],
+    ['2020-12-31', { year: 2020, week: 53 }],
+    ['2021-01-04', { year: 2021, week: 1 }],
+  ])('should number %s as ISO 8601 does', (date, expected) => {
+    expect(isoWeekOf(date)).toEqual(expected);
+  });
+});
+
 describe('deriveReview', () => {
   const week = Array.from({ length: 7 }, (_, index) => `2026-08-${String(10 + index).padStart(2, '0')}`);
 
@@ -321,12 +336,12 @@ describe('deriveReview', () => {
   });
 
   it('should read the week that closed rather than the week in progress', () => {
-    expect(deriveReview(lastWeek, { answers: {}, complete: false }).weekLabel).toContain(`Week ${33 - 1}`);
+    expect(deriveReview(lastWeek, { answers: {}, complete: false }).weekLabel).toMatch(/^Week 33 · /);
     expect(deriveReview(lastWeek, { answers: {}, complete: false }).quests.map(quest => quest.id)).toEqual(['run', 'read']);
   });
 
   it('should name the month and year once in the week label', () => {
-    expect(deriveReview(lastWeek, { answers: {}, complete: false }).weekLabel).toBe('Week 32 · 10–16 August 2026');
+    expect(deriveReview(lastWeek, { answers: {}, complete: false }).weekLabel).toBe('Week 33 · 10–16 August 2026');
   });
 
   it('should lay the week out as seven day cells with partials distinguished from misses', () => {

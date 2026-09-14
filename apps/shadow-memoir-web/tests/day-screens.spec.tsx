@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PlanningBoardScreen } from '@/features/planning';
@@ -361,6 +361,39 @@ describe('Today screen', () => {
     expect(screen.getByRole('button', { name: 'Try again' })).toBeDefined();
     expect(screen.queryByText('Your first day is empty on purpose')).toBeNull();
     expect(screen.queryByText('Create your first quest')).toBeNull();
+  });
+
+  it('should title a quick log value only while it is clipped', async () => {
+    const callbacks: (() => void)[] = [];
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          callbacks.push(callback);
+        }
+        observe(): void {}
+        disconnect(): void {}
+      },
+    );
+    try {
+      renderScreen(<TodayScreen />, { today: TODAY });
+      const value = (await screen.findByRole('link', { name: /^Steps/ })).lastElementChild as HTMLElement;
+      const box = { scrollWidth: 72, clientWidth: 72 };
+      Object.defineProperty(value, 'scrollWidth', { configurable: true, get: () => box.scrollWidth });
+      Object.defineProperty(value, 'clientWidth', { configurable: true, get: () => box.clientWidth });
+
+      expect(value.hasAttribute('title')).toBe(false);
+
+      box.scrollWidth = 123;
+      act(() => callbacks.forEach(callback => callback()));
+      expect(value.getAttribute('title')).toBe(value.textContent);
+
+      box.scrollWidth = 72;
+      act(() => callbacks.forEach(callback => callback()));
+      expect(value.hasAttribute('title')).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('should render large HP as a compact meter', async () => {
