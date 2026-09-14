@@ -62,6 +62,15 @@ describe('Finance commands (T-25)', () => {
     return outcome!;
   }
 
+  async function categoryRows(token = bearer): Promise<Record<string, unknown>[]> {
+    const response = await router
+      .mockRequest()
+      .get('/api/v1/sync/delta')
+      .headers({ authorization: `Bearer ${token}` })
+      .query({ since: '0', domains: 'expense_categories' });
+    return response.json().domains.expense_categories;
+  }
+
   /** A brand-new account, first touched by the caller's own command — so `expense_categories` seeding is exercised from a cold start each time. */
   async function freshAccount(): Promise<{ token: string; sub: string }> {
     subject += 1;
@@ -104,6 +113,71 @@ describe('Finance commands (T-25)', () => {
     const [account] = await db.select().from(schema.accounts).where(eq(schema.accounts.identitySub, sub));
     const categories = await db.select().from(schema.expenseCategories).where(eq(schema.expenseCategories.accountId, account!.id));
     expect(categories).toHaveLength(9);
+  });
+
+  it('should archive a custom category', async () => {
+    const { token, sub } = await freshAccount();
+    await submitOne('expense.create', { id: Bun.randomUUIDv7(), amountMinor: 100, amountText: '1.00', currency: 'USD', categoryId: 'food', occurredOn: DATE }, token);
+    const [account] = await db.select().from(schema.accounts).where(eq(schema.accounts.identitySub, sub));
+    await db.insert(schema.expenseCategories).values({ accountId: account!.id, key: 'pets', label: 'Pets' });
+
+    const archived = await submitOne('category.setArchived', { categoryId: 'pets', archived: true }, token);
+    expect(archived.status).toBe('applied');
+    const archivedAt = archived.result['archivedAt'] as string;
+    expect(Date.parse(archivedAt)).not.toBeNaN();
+
+    const again = await submitOne('category.setArchived', { categoryId: 'pets', archived: true }, token);
+    expect(again.result['archivedAt']).toBe(archivedAt);
+
+    const pets = (await categoryRows(token)).find(row => row['key'] === 'pets');
+    expect(pets).toMatchObject({ archivedAt, active: false });
+    const [storedArchived] = await db
+      .select()
+      .from(schema.expenseCategories)
+      .where(and(eq(schema.expenseCategories.accountId, account!.id), eq(schema.expenseCategories.key, 'pets')));
+    expect(storedArchived).toMatchObject({ active: false, archivedAt: new Date(archivedAt) });
+
+    const restored = await submitOne('category.setArchived', { categoryId: 'pets', archived: false }, token);
+    expect(restored.status).toBe('applied');
+    expect((await categoryRows(token)).find(row => row['key'] === 'pets')).toMatchObject({ archivedAt: null, active: true });
+    const [storedRestored] = await db
+      .select()
+      .from(schema.expenseCategories)
+      .where(and(eq(schema.expenseCategories.accountId, account!.id), eq(schema.expenseCategories.key, 'pets')));
+    expect(storedRestored).toMatchObject({ active: true, archivedAt: null });
+  });
+
+  it('should archive a built-in category on an account that has not touched finance yet, and keep it archived across a full resync', async () => {
+    const { token } = await freshAccount();
+
+    const outcome = await submitOne('category.setArchived', { categoryId: 'home', archived: true }, token);
+    expect(outcome.status).toBe('applied');
+
+    const rows = await categoryRows(token);
+    expect(rows).toHaveLength(9);
+    expect(rows.find(row => row['key'] === 'home')).toMatchObject({ archivedAt: outcome.result['archivedAt'], active: false });
+    expect(rows.filter(row => row['archivedAt'] !== null)).toHaveLength(1);
+  });
+
+  it('should refuse to archive built-in categories', async () => {
+    const outcomes = await submit([envelope('category.setArchived', { categoryId: 'uncat', archived: true })]);
+    expect(outcomes[0]!.status).toBe('failed');
+    expect(outcomes[0]!.error?.code).toBe('FIN_007');
+
+    const subscriptions = await submitOne('category.setArchived', { categoryId: 'subs', archived: true });
+    expect(subscriptions.error?.code).toBe('FIN_007');
+
+    const rows = await categoryRows();
+    expect(rows.filter(row => row['key'] === 'uncat' || row['key'] === 'subs').map(row => row['archivedAt'])).toEqual([null, null]);
+  });
+
+  it('should refuse to archive a category the account does not have', async () => {
+    const unknown = await submitOne('category.setArchived', { categoryId: 'nonexistent', archived: true });
+    expect(unknown.status).toBe('failed');
+    expect(unknown.error?.code).toBe('FIN_005');
+
+    const malformed = await submitOne('category.setArchived', { categoryId: 'food', archived: 'yes' });
+    expect(malformed.status).toBe('failed');
   });
 
   it('should round-trip amount_minor and amount_text exactly as submitted', async () => {

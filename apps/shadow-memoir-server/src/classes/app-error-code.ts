@@ -139,6 +139,9 @@ export class AppErrorCode extends ServerErrorCode {
   /** An expense edit tried to change the currency; the product models a currency change as delete+create so a new rate can be locked */
   static readonly FIN_006 = AppErrorCode.badRequest('FIN_006', 'Currency cannot be changed on an existing expense; delete and re-create it instead');
 
+  /** `category.setArchived` targeted Uncategorised or Subscriptions, which the ledger always needs as landing categories */
+  static readonly FIN_007 = AppErrorCode.forbidden('FIN_007', 'This category cannot be archived');
+
   /*!
    * OCR Errors
    */

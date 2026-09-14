@@ -43,6 +43,7 @@ export const accounts = pgTable(
     returnerThresholdDays: integer('returner_threshold_days').notNull().default(7),
     /** A Returner shield with no pre-absence Quest to target (PRD §4.6/O-6); consumed the next time the owner creates a Quest. */
     pendingReturnerShields: smallint('pending_returner_shields').notNull().default(0),
+    monthlyBudgetMinor: bigint('monthly_budget_minor', { mode: 'number' }),
 
     level: integer('level').notNull().default(1),
     totalXp: bigint('total_xp', { mode: 'bigint' })
@@ -95,6 +96,7 @@ export const accounts = pgTable(
     check('accounts_schedule_end_min_check', sql`${t.scheduleEndMin} BETWEEN 0 AND 1439`),
     check('accounts_week_start_check', sql`${t.weekStart} BETWEEN 0 AND 6`),
     check('accounts_pending_returner_shields_check', sql`${t.pendingReturnerShields} >= 0`),
+    check('accounts_monthly_budget_minor_check', sql`${t.monthlyBudgetMinor} >= 0`),
   ],
 );
 

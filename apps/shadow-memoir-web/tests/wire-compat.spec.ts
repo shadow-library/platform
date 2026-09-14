@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import { homeAmountOf } from '@/lib/data';
-import { type DeltaPage, projectFinanceRows, projectWorldState, SNAPSHOT_DOMAINS, SYNC_DOMAINS, type SyncCommand, toWireCommand, type WireCommand } from '@/lib/sync';
+import {
+  type DeltaPage,
+  projectFinanceRows,
+  projectWorldState,
+  SNAPSHOT_DOMAINS,
+  SYNC_DOMAINS,
+  type SyncCommand,
+  SyncedFinanceProvider,
+  toWireCommand,
+  type WireCommand,
+} from '@/lib/sync';
 
 import fixtures from './fixtures/wire-commands.json';
 import { createTestEngine, sharedBacking } from './sync-harness';
@@ -141,5 +151,39 @@ describe('progression contract (P1-17)', () => {
     const rows = second.engine.domains();
     expect(rows.account?.[0]).toMatchObject({ persona: 'returner', shieldsAvailable: 3, crown: { dayCount: 7 } });
     expect(() => projectWorldState(rows, '2026-08-24')).not.toThrow();
+  });
+});
+
+describe('category archive (P1-18)', () => {
+  const HOME = { id: '7', key: 'home', label: 'Home', builtin: true };
+
+  function page(cursor: string, domains: DeltaPage['domains']): DeltaPage {
+    return { cursor, hasMore: false, domains, tombstones: [] };
+  }
+
+  it('should send category.setArchived to the server', async () => {
+    const posted: { type: string; payload: Record<string, unknown> }[] = [];
+    const { engine, server } = createTestEngine({
+      pages: [
+        page('1', { expense_categories: [{ ...HOME, active: true, archivedAt: null }] }),
+        page('2', { expense_categories: [{ ...HOME, active: false, archivedAt: '2026-08-24T08:00:00.000Z' }] }),
+      ],
+      fetchImpl: fake => async (input, init) => {
+        if (String(input).includes('/sync/commands')) posted.push(...(JSON.parse(String(init?.body)) as { commands: typeof posted }).commands);
+        return fake.fetchImpl(input, init);
+      },
+    });
+    await engine.start();
+    const finance = new SyncedFinanceProvider(engine);
+
+    const result = await finance.dispatchCommand({ type: 'category.setArchived', id: 'home', archived: true });
+    expect(result.delivery).toMatchObject({ status: 'queued' });
+    await engine.sync();
+
+    expect(server.batches.flatMap(batch => batch.types)).toEqual(['category.setArchived']);
+    expect(posted[0]).toMatchObject({ type: 'category.setArchived', payload: { categoryId: 'home', archived: true } });
+
+    await finance.reproject();
+    expect((await finance.categories()).items.find(slice => slice.category.id === 'home')?.category.archived).toBe(true);
   });
 });

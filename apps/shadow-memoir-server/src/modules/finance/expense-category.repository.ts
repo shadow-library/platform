@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
 /**
@@ -39,6 +40,17 @@ const BUILTIN_CATEGORIES: readonly BuiltinCategory[] = [
 export class ExpenseCategoryRepository extends OwnerScopedRepository {
   async list(): Promise<ExpenseCategory.Row[]> {
     return (await this.scoped(schema.expenseCategories)) as ExpenseCategory.Row[];
+  }
+
+  async setArchivedInTx(tx: DatabaseTransaction, key: string, archived: boolean): Promise<ExpenseCategory.Row | null> {
+    const [existing] = (await this.using(tx).scoped(schema.expenseCategories, eq(schema.expenseCategories.key, key)).for('update')) as ExpenseCategory.Row[];
+    if (!existing) return null;
+    if ((existing.archivedAt !== null) === archived) return existing;
+
+    const now = new Date();
+    const values = { archivedAt: archived ? now : null, active: !archived, updatedAt: now };
+    const [row] = await this.using(tx).update(schema.expenseCategories, values, eq(schema.expenseCategories.id, existing.id)).returning();
+    return (row as ExpenseCategory.Row) ?? null;
   }
 
   /**

@@ -73,6 +73,7 @@ function toDeltaRow(account: Account.Row, standing: HeroStanding): DeltaRow {
     intensityMode: account.intensityMode,
     pendingIntensityMode: account.pendingIntensityMode,
     returnerThresholdDays: account.returnerThresholdDays,
+    monthlyBudgetMinor: account.monthlyBudgetMinor,
     level: account.level,
     totalXp: String(account.totalXp),
     xpIntoLevel: standing.xpIntoLevel,
@@ -152,6 +153,7 @@ export class AccountService implements OnModuleInit {
     if (body.theme !== undefined) values.theme = body.theme as Account.Theme;
     if (body.weekStart !== undefined) values.weekStart = body.weekStart;
     if (body.returnerThresholdDays !== undefined) values.returnerThresholdDays = body.returnerThresholdDays;
+    if (body.monthlyBudgetMinor !== undefined) values.monthlyBudgetMinor = body.monthlyBudgetMinor;
 
     if (body.scheduleStartMin !== undefined || body.scheduleEndMin !== undefined) {
       const scheduleStartMin = body.scheduleStartMin ?? account.scheduleStartMin;
@@ -181,6 +183,7 @@ export class AccountService implements OnModuleInit {
       timezone: body.timezone,
       scheduleStartMin: body.scheduleStartMin,
       scheduleEndMin: body.scheduleEndMin,
+      ...(defaultCurrency === account.defaultCurrency ? {} : { monthlyBudgetMinor: null }),
     });
     if (!updated) throw AppErrorCode.ACC_003.create();
     return toView(updated);

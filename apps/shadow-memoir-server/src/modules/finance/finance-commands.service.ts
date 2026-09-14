@@ -42,6 +42,9 @@ const SUBSCRIPTION_CREATE = 'subscription.create';
 const SUBSCRIPTION_UPDATE = 'subscription.update';
 const SUBSCRIPTION_DELETE = 'subscription.delete';
 const SUBSCRIPTION_CONFIRM_CYCLE = 'subscription.confirmCycle';
+const CATEGORY_SET_ARCHIVED = 'category.setArchived';
+
+const UNARCHIVABLE_CATEGORY_KEYS: ReadonlySet<string> = new Set(['uncat', 'subs']);
 
 function requireString(payload: Record<string, unknown>, field: string): string {
   const value = payload[field];
@@ -56,6 +59,16 @@ function requireString(payload: Record<string, unknown>, field: string): string 
 function optionalString(payload: Record<string, unknown>, field: string): string | undefined {
   const value = payload[field];
   return typeof value === 'string' ? value : undefined;
+}
+
+function requireBoolean(payload: Record<string, unknown>, field: string): boolean {
+  const value = payload[field];
+  if (typeof value !== 'boolean') {
+    const error = new ValidationError();
+    error.addFieldError(field, `'${field}' must be a boolean`);
+    throw error;
+  }
+  return value;
 }
 
 function requireEnum<T extends string>(payload: Record<string, unknown>, field: string, allowed: readonly T[]): T {
@@ -96,7 +109,7 @@ function monthlyEquivalentMinor(amountMinor: bigint, frequency: string, customIn
 }
 
 /**
- * Registers the expense/subscription command handlers (ARCHITECTURE §14.1–14.2) on the shared
+ * Registers the expense/subscription/category command handlers (ARCHITECTURE §14.1–14.2) on the shared
  * `CommandBus` and their delta sources on the sync assembler, mirroring `DeviceService`'s
  * `OnModuleInit` registration shape. Every handler runs inside the command's own transaction — the
  * account already serialized by `CommandBus.execute`'s advisory lock — so a category seed, an FX
@@ -124,6 +137,7 @@ export class FinanceCommandsService implements OnModuleInit {
     this.commandBus.registerHandler(SUBSCRIPTION_UPDATE, context => this.updateSubscription(context));
     this.commandBus.registerHandler(SUBSCRIPTION_DELETE, context => this.deleteSubscription(context));
     this.commandBus.registerHandler(SUBSCRIPTION_CONFIRM_CYCLE, context => this.confirmSubscriptionCycle(context));
+    this.commandBus.registerHandler(CATEGORY_SET_ARCHIVED, context => this.setCategoryArchived(context));
   }
 
   private async defaultCurrencyOf(tx: DatabaseTransaction, accountId: bigint): Promise<string> {
@@ -307,6 +321,17 @@ export class FinanceCommandsService implements OnModuleInit {
     const removed = await this.subscriptionRepository.remove(tx, id);
     if (!removed) throw AppErrorCode.FIN_004.create();
     return { status: 'applied', result: { id: String(id) } };
+  }
+
+  private async setCategoryArchived({ accountId, envelope, tx }: CommandContext): Promise<CommandResult> {
+    const categoryId = requireString(envelope.payload, 'categoryId');
+    const archived = requireBoolean(envelope.payload, 'archived');
+    if (archived && UNARCHIVABLE_CATEGORY_KEYS.has(categoryId)) throw AppErrorCode.FIN_007.create();
+
+    await this.expenseCategoryRepository.ensureSeeded(tx, accountId);
+    const category = await this.expenseCategoryRepository.setArchivedInTx(tx, categoryId, archived);
+    if (!category) throw AppErrorCode.FIN_005.create();
+    return { status: 'applied', result: { categoryId: category.key, archivedAt: category.archivedAt?.toISOString() ?? null } };
   }
 
   /**

@@ -20,7 +20,8 @@ import { ExpenseCategoryRepository } from './expense-category.repository';
  */
 
 function toCategoryRow(category: ExpenseCategory.Row): Record<string, unknown> {
-  return { id: String(category.id), key: category.key, label: category.label, builtin: category.builtin, active: category.active };
+  const archivedAt = category.archivedAt?.toISOString() ?? null;
+  return { id: String(category.id), key: category.key, label: category.label, builtin: category.builtin, active: archivedAt === null, archivedAt };
 }
 
 /**

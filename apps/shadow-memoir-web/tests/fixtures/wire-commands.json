@@ -346,6 +346,21 @@
     }
   },
   {
+    "scenario": "category.setArchived",
+    "command": {
+      "type": "category.setArchived",
+      "id": "home",
+      "archived": true
+    },
+    "wire": {
+      "type": "category.setArchived",
+      "payload": {
+        "categoryId": "home",
+        "archived": true
+      }
+    }
+  },
+  {
     "scenario": "journal.save",
     "command": {
       "type": "journal.save",

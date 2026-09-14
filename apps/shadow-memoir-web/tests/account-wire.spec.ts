@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { toast } from '@shadow-library/ui';
 
-import { type AccountResponseDto } from '@/lib/apis';
+import { accountApi, type AccountResponseDto } from '@/lib/apis';
 import {
   DELETION_ACCOUNT_UNCONFIRMED,
   DELETION_DEVICE_ERROR,
@@ -117,6 +117,18 @@ describe('Account settings over the wire', () => {
 
     const result = await (await provider()).dispatchCommand({ type: 'day.set', patch: { timezone: 'Europe/Lisbon' } });
     expect(result).toEqual({ status: 'rejected', message: 'That setting could not be saved.', error: { code: 'S999', kind: 'unavailable' } });
+  });
+
+  it('should send the monthly budget in the account patch', async () => {
+    const fake = httpFake({ 'PATCH /api/v1/account': call => ({ body: account({ monthlyBudgetMinor: call.body?.['monthlyBudgetMinor'] as number | null }) }) });
+
+    const stored = await accountApi.patch({ monthlyBudgetMinor: 160000 });
+    expect(fake.calls.at(-1)).toMatchObject({ method: 'PATCH', path: '/api/v1/account', body: { monthlyBudgetMinor: 160000 } });
+    expect(stored.monthlyBudgetMinor).toBe(160000);
+
+    const cleared = await accountApi.patch({ monthlyBudgetMinor: null });
+    expect(fake.calls.at(-1)?.body).toEqual({ monthlyBudgetMinor: null });
+    expect(cleared.monthlyBudgetMinor).toBeNull();
   });
 
   it('should patch one notification category without touching the others', async () => {

@@ -183,6 +183,9 @@ describe('Web wire compatibility (FE-4)', () => {
     });
     expect((await submit(cycle)).map(outcome => outcome.status)).toEqual(['applied', 'applied']);
 
+    const [archived] = await submit([envelope(scenarioFor('category.setArchived').wire)]);
+    expect(archived!.status).toBe('applied');
+
     const quickLogs = ['journal.save', 'meal.log', 'weight.save', 'sidequest.log'].map(name => envelope(scenarioFor(name).wire));
     expect((await submit(quickLogs)).map(outcome => outcome.status)).toEqual(['applied', 'applied', 'applied', 'applied']);
 
@@ -220,6 +223,7 @@ describe('Web wire compatibility (FE-4)', () => {
     expect(subscription!['active']).toBe(false);
 
     expect(rows['expense_categories']!.some(row => row['key'] === 'groceries')).toBe(true);
+    expect(rows['expense_categories']!.find(row => row['key'] === 'home')).toMatchObject({ active: false, archivedAt: expect.any(String) });
 
     const journal = rows['journal_entries']![0];
     for (const key of ['id', 'date', 'text', 'mood', 'tags', 'rewarded', 'loggedAt']) expect(Object.prototype.hasOwnProperty.call(journal, key)).toBe(true);

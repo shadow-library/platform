@@ -43,6 +43,15 @@ describe('GET/PATCH /api/v1/account and POST /api/v1/account/onboarding (T-17)',
       .body(body);
   }
 
+  async function accountRow(token: string): Promise<Record<string, unknown>> {
+    const response = await router
+      .mockRequest()
+      .get('/api/v1/sync/delta')
+      .headers({ authorization: `Bearer ${token}` })
+      .query({ since: '0', domains: 'account' });
+    return response.json().domains.account[0];
+  }
+
   async function onboard(body: Record<string, unknown>, token: string) {
     return router
       .mockRequest()
@@ -100,6 +109,27 @@ describe('GET/PATCH /api/v1/account and POST /api/v1/account/onboarding (T-17)',
       const second = await onboard(body, token);
       expect(second.statusCode).toBe(409);
       expect(second.json()).toMatchObject({ code: 'ACC_003' });
+    });
+
+    it('should clear the monthly budget when onboarding changes the currency', async () => {
+      const token = await freshUser('account-onboard-budget-currency-sub');
+      const before = await getAccount(token);
+      expect(before.json().defaultCurrency).not.toBe('JPY');
+      await patchAccount({ monthlyBudgetMinor: 160000 }, token);
+
+      const onboarded = await onboard({ defaultCurrency: 'JPY', timezone: 'Asia/Tokyo', scheduleStartMin: 360, scheduleEndMin: 1380 }, token);
+      expect(onboarded.statusCode).toBe(200);
+      expect(onboarded.json().monthlyBudgetMinor).toBeNull();
+      expect((await accountRow(token))['monthlyBudgetMinor']).toBeNull();
+    });
+
+    it('should keep the monthly budget when onboarding keeps the currency', async () => {
+      const token = await freshUser('account-onboard-budget-same-sub');
+      const currency = (await getAccount(token)).json().defaultCurrency as string;
+      await patchAccount({ monthlyBudgetMinor: 160000 }, token);
+
+      const onboarded = await onboard({ defaultCurrency: currency.toLowerCase(), timezone: 'UTC', scheduleStartMin: 360, scheduleEndMin: 1380 }, token);
+      expect(onboarded.json().monthlyBudgetMinor).toBe(160000);
     });
 
     it('should reject an inverted schedule window', async () => {
@@ -201,6 +231,42 @@ describe('GET/PATCH /api/v1/account and POST /api/v1/account/onboarding (T-17)',
 
       const tooHigh = await patchAccount({ returnerThresholdDays: 91 }, token);
       expect(tooHigh.statusCode).toBe(422);
+    });
+
+    it('should store and clear the monthly budget', async () => {
+      const token = await freshUser('account-budget-sub');
+      expect((await getAccount(token)).json().monthlyBudgetMinor).toBeNull();
+
+      const stored = await patchAccount({ monthlyBudgetMinor: 160000 }, token);
+      expect(stored.statusCode).toBe(200);
+      expect(stored.json().monthlyBudgetMinor).toBe(160000);
+      expect((await accountRow(token))['monthlyBudgetMinor']).toBe(160000);
+
+      const untouched = await patchAccount({ weekStart: 0 }, token);
+      expect(untouched.json().monthlyBudgetMinor).toBe(160000);
+
+      const cleared = await patchAccount({ monthlyBudgetMinor: null }, token);
+      expect(cleared.statusCode).toBe(200);
+      expect(cleared.json().monthlyBudgetMinor).toBeNull();
+      expect((await accountRow(token))['monthlyBudgetMinor']).toBeNull();
+    });
+
+    it('should reject a negative budget', async () => {
+      const token = await freshUser('account-budget-negative-sub');
+      await patchAccount({ monthlyBudgetMinor: 5000 }, token);
+
+      const negative = await patchAccount({ monthlyBudgetMinor: -1 }, token);
+      expect(negative.statusCode).toBe(422);
+      expect(negative.json()).toMatchObject({
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Error',
+        fields: [{ field: 'body.monthlyBudgetMinor', msg: 'monthlyBudgetMinor must be a whole number of minor units, zero or more' }],
+      });
+
+      const fractional = await patchAccount({ monthlyBudgetMinor: 12.5 }, token);
+      expect(fractional.statusCode).toBe(422);
+
+      expect((await getAccount(token)).json().monthlyBudgetMinor).toBe(5000);
     });
   });
 });

@@ -18,7 +18,7 @@ export interface WireCommand {
  * how to build. A type absent from this set is applied locally and kept out of the outbox entirely:
  * `POST /sync/commands` fails the *whole batch* on an unknown type, so one command the server has not
  * shipped yet would strand every command behind it. Still absent server-side and therefore still local:
- * `quest.setActive`, `plan.setLock`, `category.rename`, `category.setArchived`, `journal.dismissPrompt`,
+ * `quest.setActive`, `plan.setLock`, `category.rename`, `journal.dismissPrompt`,
  * `health.acceptOffer` (the owner's own `quest.complete` is what completes the quest), and
  * `intensity.set`. Reflect and account commands have no server module yet at all.
  */
@@ -36,6 +36,7 @@ const SERVER_BACKED_TYPES = new Set<SyncCommand['type']>([
   'subscription.create',
   'subscription.setActive',
   'subscription.confirmCycle',
+  'category.setArchived',
   'journal.save',
   'meal.log',
   'meal.logPreset',
@@ -216,6 +217,8 @@ export function toWireCommand(command: SyncCommand): WireCommand {
       return { type: 'subscription.update', payload: { id: command.id, active: command.active } };
     case 'subscription.confirmCycle':
       return { type: command.type, payload: { id: command.id, billingDate: command.billingDate } };
+    case 'category.setArchived':
+      return { type: command.type, payload: { categoryId: command.id, archived: command.archived } };
 
     case 'journal.save':
       return {

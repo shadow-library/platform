@@ -651,6 +651,8 @@ export interface components {
       /** @description Staged by PATCH, not yet live; takes effect at the next daily rollover */
       pendingIntensityMode?: components['schemas']['IntensityMode'] | null;
       returnerThresholdDays: number;
+      /** @description Monthly spending budget in minor units of defaultCurrency; null when no budget is set */
+      monthlyBudgetMinor?: null | number;
       notificationPrefs: components['schemas']['NotificationPrefsDto'];
       /**
        * Format: date-time
@@ -722,6 +724,8 @@ export interface components {
       /** @description Staged, not applied immediately — see `pendingIntensityMode` on the GET response */
       intensityMode?: components['schemas']['IntensityMode'];
       returnerThresholdDays?: number;
+      /** @description Monthly spending budget in minor units of defaultCurrency; null clears it */
+      monthlyBudgetMinor?: number | null;
       notificationPrefs?: components['schemas']['NotificationPrefsPatchDto'];
     };
     NotificationPrefsPatchDto: {

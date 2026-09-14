@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Field, Schema } from '@shadow-library/class-schema';
+import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
@@ -92,6 +92,9 @@ export class AccountResponseDto {
 
   @Field({ minimum: 1, maximum: 90 })
   returnerThresholdDays: number;
+
+  @Field(() => Integer, { optional: true, nullable: true, minimum: 0, description: 'Monthly spending budget in minor units of defaultCurrency; null when no budget is set' })
+  monthlyBudgetMinor?: number | null;
 
   @Field(() => NotificationPrefsDto)
   notificationPrefs: NotificationPrefsDto;
@@ -210,6 +213,16 @@ export class AccountPatchDto {
 
   @Field({ optional: true, minimum: 1, maximum: 90, errorMessage: 'returnerThresholdDays must be between 1 and 90' })
   returnerThresholdDays?: number;
+
+  @Field(() => Integer, {
+    optional: true,
+    nullable: true,
+    minimum: 0,
+    maximum: Number.MAX_SAFE_INTEGER,
+    errorMessage: 'monthlyBudgetMinor must be a whole number of minor units, zero or more',
+    description: 'Monthly spending budget in minor units of defaultCurrency; null clears it',
+  })
+  monthlyBudgetMinor?: number | null;
 
   @Field(() => NotificationPrefsPatchDto, { optional: true })
   notificationPrefs?: NotificationPrefsPatchDto;

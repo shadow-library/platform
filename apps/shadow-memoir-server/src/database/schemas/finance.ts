@@ -58,7 +58,9 @@ export const expenseCategories = pgTable(
     key: varchar('key', { length: 32 }).notNull(),
     label: varchar('label', { length: 64 }).notNull(),
     builtin: boolean('builtin').notNull().default(false),
+    /** Mirrors `archivedAt`, which is authoritative; kept in step until no running server still reads it, then dropped. */
     active: boolean('active').notNull().default(true),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

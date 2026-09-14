@@ -42,6 +42,7 @@ const ERROR_CATALOGUE: Record<string, ErrorEntry> = {
   FIN_004: { kind: 'refusal', copy: 'That subscription no longer exists.' },
   FIN_005: { kind: 'refusal', copy: 'That category no longer exists.' },
   FIN_006: { kind: 'refusal', copy: 'A saved expense’s currency can’t be changed. Delete it and add it again.' },
+  FIN_007: { kind: 'refusal', copy: 'Uncategorised and Subscriptions are always kept, so they can’t be archived.' },
   OCR_001: { kind: 'unavailable', copy: 'Today’s receipt scans are used up.' },
   OCR_002: { kind: 'unavailable', copy: 'Receipt scanning isn’t available right now.' },
   MET_001: { kind: 'refusal', copy: 'A metric with that name already exists.' },
