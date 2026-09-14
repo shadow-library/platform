@@ -1,18 +1,21 @@
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { renderHook, screen, waitFor } from '@testing-library/react';
-import { type ReactElement, type ReactNode } from 'react';
+import { keepPreviousData, QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { act, renderHook, screen, waitFor } from '@testing-library/react';
+import { type ReactElement, type ReactNode, useEffect, useState } from 'react';
 import { renderToString } from 'react-dom/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from '@shadow-library/ui';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DataState } from '@/components/DataState';
 import { NetStrip, SystemOverlayProvider } from '@/features/shell';
-import { MemoirDataProvider, useDay, useJournal } from '@/lib/data';
+import { type DayView, MemoirDataProvider, memoirKeys, notifyOutcome, useCommand, useDay, useJournal } from '@/lib/data';
 import {
   type DeltaPage,
   type KeyValueBacking,
   MemoirStore,
+  SYNC_META_KEYS,
   SyncClient,
   SyncedDataProvider,
+  type SyncedMemoirData,
   SyncedQuickLogProvider,
   SyncEngine,
   SyncEngineProvider,
@@ -340,6 +343,23 @@ describe('sync readiness', () => {
     expect(engine.getSnapshot().readiness).toEqual({ kind: 'ready' });
   });
 
+  it('should start a distinct ready epoch after an epoch change even when the clock stands still', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(`${TODAY}T08:00:00.000Z`));
+    try {
+      const { engine, server } = createTestEngine({ today: TODAY });
+      await engine.start();
+      const first = engine.getSnapshot().readySince;
+
+      server.epoch = 'epoch-2';
+      await engine.sync();
+
+      expect(engine.getSnapshot().readySince).toBeGreaterThan(first);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('should load after retrying a failed first pull', async () => {
     let status = 500;
     const { engine } = createTestEngine({ today: TODAY, status: () => status });
@@ -482,6 +502,7 @@ describe('sync readiness', () => {
     );
 
     await waitFor(() => expect(engine.getSnapshot().state).toBe('syncing'));
+    await waitFor(() => expect(data.queryClient.getQueryState<DayView>(memoirKeys.day(TODAY))?.data?.occurrences).toEqual([]));
     open();
 
     expect(await screen.findByText('1 quests')).toBeDefined();
@@ -517,6 +538,175 @@ describe('sync readiness', () => {
 
     expect(html).toContain('online');
     expect(html).not.toContain('offline');
+  });
+});
+
+function holdMirrorReady(): { backing: KeyValueBacking; release: () => void } {
+  const inner = sharedBacking();
+  const gate = { open: (): void => undefined };
+  const released = new Promise<void>(resolve => (gate.open = resolve));
+  const put: KeyValueBacking['put'] = async (key, value) => {
+    if (key.endsWith(SYNC_META_KEYS.mirrorReady)) await released;
+    return inner.put(key, value);
+  };
+  return { backing: { ...inner, put }, release: () => gate.open() };
+}
+
+function slowDay(data: SyncedMemoirData): void {
+  const getDay = data.provider.getDay.bind(data.provider);
+  vi.spyOn(data.provider, 'getDay').mockImplementation(async date => {
+    await new Promise(resolve => setTimeout(resolve, 20));
+    return getDay(date);
+  });
+}
+
+function CompleteQuest(): ReactElement {
+  const command = useCommand();
+  const complete = async (): Promise<void> => {
+    const outcome = await command.run({ type: 'quest.complete', occurrenceId: `q1:${TODAY}` });
+    if (outcome.status === 'needs-confirmation') return;
+    notifyOutcome(outcome, { success: 'Quest completed.', action: 'complete', subject: 'Morning run' });
+  };
+  return <button onClick={() => void complete()}>Complete</button>;
+}
+
+interface SkeletonProbe {
+  skeleton: ReactNode;
+  mounts: () => number;
+}
+
+function skeletonProbe(): SkeletonProbe {
+  let mounts = 0;
+  function Skeleton(): ReactElement {
+    useEffect(() => void (mounts += 1), []);
+    return <span>skeleton</span>;
+  }
+  return { skeleton: <Skeleton />, mounts: () => mounts };
+}
+
+function renderMirrorScreen(data: SyncedMemoirData, node: ReactNode): void {
+  renderScreen(<SyncEngineProvider data={data}>{node}</SyncEngineProvider>, { value: data });
+}
+
+function renderDayState(data: SyncedMemoirData, { inside, outside }: { inside?: ReactNode; outside?: ReactNode }): SkeletonProbe {
+  const probe = skeletonProbe();
+  function Today(): ReactElement {
+    return (
+      <DataState query={useDay()} skeleton={probe.skeleton}>
+        {day => (
+          <section data-testid="day">
+            {day.occurrences.length} quests
+            {inside}
+          </section>
+        )}
+      </DataState>
+    );
+  }
+  renderMirrorScreen(
+    data,
+    <>
+      <Today />
+      {outside}
+    </>,
+  );
+  return probe;
+}
+
+describe('DataState over a refetching mirror', () => {
+  const pages = [page({ domains: { quests: [dailyQuestRow('q1', 'Morning run')] } })];
+
+  beforeEach(() => setOnline(true));
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('should keep ready content when the post-pull refetch finished before ready', async () => {
+    const success = vi.spyOn(toast, 'success');
+    const held = holdMirrorReady();
+    const { engine } = createTestEngine({ backing: held.backing, today: TODAY, pages });
+    const data = createSyncedTestData(engine);
+    const view = renderDayState(data, { outside: <CompleteQuest /> });
+    await waitFor(() => expect(data.queryClient.getQueryState<DayView>(memoirKeys.day(TODAY))).toMatchObject({ fetchStatus: 'idle', data: { occurrences: [expect.anything()] } }));
+    expect(engine.getSnapshot().readiness).toEqual({ kind: 'loading' });
+
+    held.release();
+    const content = await screen.findByTestId('day');
+    expect(data.queryClient.getQueryState(memoirKeys.day(TODAY))?.dataUpdatedAt).toBeLessThan(engine.getSnapshot().readySince);
+    const mounts = view.mounts();
+    slowDay(data);
+    act(() => screen.getByRole('button', { name: 'Complete' }).click());
+
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Quest completed.', undefined));
+    expect(screen.getByTestId('day')).toBe(content);
+    expect(view.mounts()).toBe(mounts);
+  });
+
+  it('should keep ready content while a command refetches the mirror', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(`${TODAY}T08:00:00.000Z`));
+    const success = vi.spyOn(toast, 'success');
+    const { engine } = createTestEngine({ today: TODAY, pages });
+    const data = createSyncedTestData(engine);
+    const view = renderDayState(data, { outside: <CompleteQuest /> });
+    const content = await screen.findByTestId('day');
+    await waitFor(() => expect(content.textContent).toBe('1 quests'));
+
+    const mounts = view.mounts();
+    slowDay(data);
+    act(() => screen.getByRole('button', { name: 'Complete' }).click());
+
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Quest completed.', undefined));
+    expect(screen.getByTestId('day')).toBe(content);
+    expect(view.mounts()).toBe(mounts);
+  });
+
+  it('should settle a command run from inside a page-level DataState', async () => {
+    const success = vi.spyOn(toast, 'success');
+    const held = holdMirrorReady();
+    const { engine } = createTestEngine({ backing: held.backing, today: TODAY, pages });
+    const data = createSyncedTestData(engine);
+    renderDayState(data, { inside: <CompleteQuest /> });
+    await waitFor(() => expect(data.queryClient.getQueryState<DayView>(memoirKeys.day(TODAY))).toMatchObject({ fetchStatus: 'idle', data: { occurrences: [expect.anything()] } }));
+    held.release();
+
+    const complete = await screen.findByRole('button', { name: 'Complete' });
+    slowDay(data);
+    act(() => complete.click());
+
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Quest completed.', undefined));
+    expect(screen.getByRole('button', { name: 'Complete' })).toBe(complete);
+  });
+
+  it('should keep the previous content while a keyed mirror query loads its next key', async () => {
+    const { engine } = createTestEngine({ today: TODAY, pages });
+    const data = createSyncedTestData(engine);
+    const probe = skeletonProbe();
+    function Days(): ReactElement {
+      const [date, setDate] = useState(TODAY);
+      const day = useQuery({ queryKey: memoirKeys.day(date), queryFn: () => data.provider.getDay(date), placeholderData: keepPreviousData }, data.queryClient);
+      return (
+        <DataState query={day} skeleton={probe.skeleton}>
+          {view => (
+            <section data-testid="day">
+              {view.date}
+              <button onClick={() => setDate('2026-08-25')}>Next day</button>
+            </section>
+          )}
+        </DataState>
+      );
+    }
+    renderMirrorScreen(data, <Days />);
+    const content = await screen.findByTestId('day');
+    await waitFor(() => expect(engine.getSnapshot().state).toBe('online'));
+
+    const mounts = probe.mounts();
+    slowDay(data);
+    act(() => screen.getByRole('button', { name: 'Next day' }).click());
+
+    await waitFor(() => expect(content.textContent).toContain('2026-08-25'));
+    expect(screen.getByTestId('day')).toBe(content);
+    expect(probe.mounts()).toBe(mounts);
   });
 });
 

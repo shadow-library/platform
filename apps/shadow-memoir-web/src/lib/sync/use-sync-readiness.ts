@@ -29,6 +29,8 @@ export interface ReadinessContext {
   sync: SyncReadiness;
   readySince: number;
   online: boolean;
+  /** The caller has already shown content since `readySince`, so a refetch must never take it back to loading. */
+  shown?: boolean;
 }
 
 export interface DataReadinessResult {
@@ -48,12 +50,15 @@ export function useSyncReadiness(): SyncReadiness {
   return useSyncStatus().readiness;
 }
 
-export function resolveDataReadiness<T>({ sync, readySince, online }: ReadinessContext, { query, source = 'mirror', isEmpty }: DataReadinessOptions<T>): DataReadiness {
+export function resolveDataReadiness<T>(
+  { sync, readySince, online, shown = false }: ReadinessContext,
+  { query, source = 'mirror', isEmpty }: DataReadinessOptions<T>,
+): DataReadiness {
   if (source === 'mirror' && sync.kind !== 'ready') return sync;
   if (!query) return READY;
   if (query.data === undefined) return query.isError ? { kind: 'failed', reason: toSyncFailureReason(query.error, online) } : LOADING;
-  // The pull's invalidation starts this refetch before `ready` lands, so until it settles the data is the empty mirror's answer.
-  if (source === 'mirror' && query.isFetching && query.dataUpdatedAt <= readySince) return LOADING;
+  // Until content has been shown, data from before `ready` may still be the empty mirror's answer the pull's refetch is replacing.
+  if (source === 'mirror' && !shown && query.isFetching && query.dataUpdatedAt <= readySince) return LOADING;
   return isEmpty?.(query.data) ? EMPTY : READY;
 }
 
@@ -61,9 +66,12 @@ export function useDataReadiness<T>(options: DataReadinessOptions<T> = {}): Data
   const engine = useSyncEngine();
   const { readiness: sync, readySince } = useSyncStatus();
   const [retryingFrom, setRetryingFrom] = useState<FailedReadiness | null>(null);
+  const [shownSince, setShownSince] = useState<number | null>(null);
   const online = typeof navigator === 'undefined' || navigator.onLine !== false;
-  const resolved = resolveDataReadiness({ sync, readySince, online }, options);
+  const shown = sync.kind === 'ready' && shownSince === readySince;
+  const resolved = resolveDataReadiness({ sync, readySince, online, shown }, options);
   const { query, source = 'mirror' } = options;
+  if (!shown && sync.kind === 'ready' && (resolved.kind === 'ready' || resolved.kind === 'empty')) setShownSince(readySince);
 
   const retry = (): void => {
     if (resolved.kind !== 'failed' || retryingFrom) return;

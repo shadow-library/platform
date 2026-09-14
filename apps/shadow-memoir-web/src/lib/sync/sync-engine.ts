@@ -631,7 +631,9 @@ export class SyncEngine {
   }
 
   private patch(next: Partial<SyncSnapshot>): void {
-    const readySince = next.readiness === READY && this.snapshot.readiness !== READY ? Date.now() : this.snapshot.readySince;
+    const entersReady = next.readiness === READY && this.snapshot.readiness !== READY;
+    // Strictly increasing so the per-instance readiness latch sees each ready epoch as new.
+    const readySince = entersReady ? Math.max(Date.now(), this.snapshot.readySince + 1) : this.snapshot.readySince;
     this.snapshot = { ...this.snapshot, ...next, readySince };
     for (const listener of this.listeners) listener();
   }
