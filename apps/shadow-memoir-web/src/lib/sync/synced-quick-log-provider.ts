@@ -17,6 +17,7 @@ import {
   MemoirEngine,
   type MemoirWorldState,
   type ModuleLink,
+  type MoodValence,
   type OccurrenceState,
   type QuestLinkageOffer,
   type QuickLogCommand,
@@ -28,6 +29,7 @@ import {
   rewardedSideQuestsOn,
   type SideQuestsView,
   type ThresholdOffer,
+  todayISODate,
   type WeightView,
 } from '@/lib/data';
 
@@ -35,6 +37,7 @@ import { isQuickLogCommand, mintCommandIds } from './command-wire';
 import { ignoreAccountBoundary } from './memoir-store';
 import { projectFinanceRows, projectQuickLogRows, type QuickLogRows } from './projection';
 import { type SyncEngine } from './sync-engine';
+import { SYNC_META_KEYS } from './sync.types';
 
 const COMPLETED_STATES: OccurrenceState[] = ['completed', 'partial', 'late'];
 
@@ -56,6 +59,12 @@ function seriesOver(dates: string[], valueOf: (date: string) => number | null): 
 interface SyncedQuickLogState extends QuickLogState {
   metricIds: QuickLogRows['metricIds'];
   offers: ThresholdOffer[];
+}
+
+interface StoredJournalDraft {
+  date: string;
+  text: string;
+  mood: MoodValence | null;
 }
 
 function toState(rows: QuickLogRows, today: string): SyncedQuickLogState {
@@ -116,6 +125,14 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
     this.world = this.sync.world();
   }
 
+  // Treats a raced account switch or store wipe as "nothing there" rather than an unhandled rejection.
+  private async readMetaSafe<T>(key: (typeof SYNC_META_KEYS)[keyof typeof SYNC_META_KEYS]): Promise<T | undefined> {
+    return this.sync.store.readMeta<T>(key).catch(error => {
+      ignoreAccountBoundary(error);
+      return undefined;
+    });
+  }
+
   async tiles(date: string, currency: CurrencyCode): Promise<QuickLogTile[]> {
     const { expenses } = projectFinanceRows(this.sync.domains());
     return quickLogTiles({ date, currency, expenses, meals: this.state.meals, metrics: this.state.metrics, weights: this.state.weights, journal: this.state.journal });
@@ -125,10 +142,11 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
     const today = this.sync.today;
     const dates = daysBack(today, 28);
     const byDate = new Map(this.state.journal.map(entry => [entry.date, entry]));
+    const dismissedOn = await this.readMetaSafe<string>(SYNC_META_KEYS.journalPromptDismissedOn);
 
     return {
       today: byDate.get(today) ?? null,
-      prompt: this.state.promptDismissed ? null : JOURNAL_PROMPT,
+      prompt: dismissedOn === todayISODate() ? null : JOURNAL_PROMPT,
       entries: [...this.state.journal].sort((a, b) => (a.date < b.date ? 1 : -1)),
       totalEntries: this.state.journal.length,
       writingStreakDays: writingStreak(new Set(byDate.keys()), today),
@@ -138,6 +156,19 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
       onThisDay: null,
       draftNote: 'Autosaves as you write',
     };
+  }
+
+  async readJournalDraft(): Promise<{ date: string; text: string; mood: MoodValence | null } | null> {
+    const stored = await this.readMetaSafe<StoredJournalDraft>(SYNC_META_KEYS.journalDraft);
+    return stored ? { date: stored.date, text: stored.text, mood: stored.mood } : null;
+  }
+
+  async saveJournalDraft(text: string, mood: MoodValence | null): Promise<void> {
+    await this.sync.store.writeMeta(SYNC_META_KEYS.journalDraft, { date: todayISODate(), text, mood } satisfies StoredJournalDraft).catch(ignoreAccountBoundary);
+  }
+
+  async clearJournalDraft(): Promise<void> {
+    await this.sync.store.writeMeta(SYNC_META_KEYS.journalDraft, null).catch(ignoreAccountBoundary);
   }
 
   async meals(date: string): Promise<MealsView> {
@@ -261,6 +292,11 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
   }
 
   async dispatchCommand(command: QuickLogCommand, options?: DispatchOptions): Promise<QuickLogCommandResult> {
+    if (command.type === 'journal.dismissPrompt') {
+      await this.sync.store.writeMeta(SYNC_META_KEYS.journalPromptDismissedOn, todayISODate()).catch(ignoreAccountBoundary);
+      return { id: 'prompt', message: 'Put away for today.', delivery: { status: 'local' } };
+    }
+
     const resolved = command.type === 'health.save' ? { ...command, metricId: this.state.metricIds[command.key] } : command;
     const minted = mintCommandIds(resolved) as QuickLogCommand;
 
@@ -272,6 +308,8 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
 
     const delivery = await this.sync.enqueue(minted, this.sync.today, options);
     if (delivery.status === 'refused') await this.reproject().catch(ignoreAccountBoundary);
+    // Once queued, the outbox is what survives a reload, not the draft; a later rejection restores the draft from the screen.
+    if (minted.type === 'journal.save' && delivery.status !== 'refused') await this.clearJournalDraft();
     return { ...result, delivery };
   }
 }

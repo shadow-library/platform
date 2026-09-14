@@ -30,6 +30,7 @@ import {
   type Meal,
   type MealPreset,
   type MealsView,
+  type MoodValence,
   type QuestLinkageOffer,
   type QuickLogCommand,
   type QuickLogCommandResult,
@@ -49,6 +50,10 @@ export interface QuickLogProvider {
   health(date: string): Promise<HealthView>;
   sideQuests(): Promise<SideQuestsView>;
   dispatchCommand(command: QuickLogCommand, options?: DispatchOptions): Promise<QuickLogCommandResult>;
+  /** The journal editor's unsaved text, kept outside the outbox. `date` is when it was written, so a caller can flag a draft carried over from an earlier day. */
+  readJournalDraft(): Promise<{ date: string; text: string; mood: MoodValence | null } | null>;
+  saveJournalDraft(text: string, mood: MoodValence | null): Promise<void>;
+  clearJournalDraft(): Promise<void>;
 }
 
 function today(): string {
@@ -253,6 +258,7 @@ const METRIC_TRENDS: Record<HealthMetricKey, string> = {
 
 export class FixtureQuickLogProvider implements QuickLogProvider {
   private state = createState();
+  private draft: { date: string; text: string; mood: MoodValence | null } | null = null;
 
   async tiles(date: string, currency: CurrencyCode): Promise<QuickLogTile[]> {
     return quickLogTiles({ date, currency, expenses: [], meals: this.state.meals, metrics: this.state.metrics, weights: this.state.weights, journal: this.state.journal });
@@ -378,6 +384,18 @@ export class FixtureQuickLogProvider implements QuickLogProvider {
 
   async dispatchCommand(command: QuickLogCommand): Promise<QuickLogCommandResult> {
     return applyQuickLogCommand(this.state, command);
+  }
+
+  async readJournalDraft(): Promise<{ date: string; text: string; mood: MoodValence | null } | null> {
+    return this.draft;
+  }
+
+  async saveJournalDraft(text: string, mood: MoodValence | null): Promise<void> {
+    this.draft = { date: today(), text, mood };
+  }
+
+  async clearJournalDraft(): Promise<void> {
+    this.draft = null;
   }
 }
 

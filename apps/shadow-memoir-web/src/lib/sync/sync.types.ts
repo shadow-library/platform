@@ -210,4 +210,6 @@ export const SYNC_META_KEYS = {
   coveredDomains: 'covered-domains',
   backfillCursor: 'backfill-cursor',
   comingBackDismissedOn: 'coming-back-dismissed-on',
+  journalDraft: 'journal-draft',
+  journalPromptDismissedOn: 'journal-prompt-dismissed-on',
 } as const;

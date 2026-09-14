@@ -68,6 +68,15 @@
   color: var(--sh-accent);
 }
 
+@media (max-width: 619px) {
+  .subnav {
+    padding-inline-end: 32px;
+    scroll-padding-inline-end: 32px;
+    mask-image: linear-gradient(to right, black calc(100% - 32px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 32px), transparent 100%);
+  }
+}
+
 .split {
   display: grid;
   gap: 14px;
@@ -153,22 +162,41 @@
 .moodButton {
   min-width: var(--sh-tap-target, 44px);
   min-height: var(--sh-tap-target, 44px);
-  padding: 0 9px;
+  padding: 6px 9px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 2px;
   border-radius: var(--sh-radius-md);
   border: 1px solid var(--sh-border-subtle);
   background: var(--sh-surface-well);
   color: var(--sh-text-secondary);
-  font-size: var(--sh-text-body);
   cursor: pointer;
 }
 
+.moodGlyph {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--sh-text-primary);
+}
+
+.moodLabel {
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: inherit;
+}
+
 .moodButton[aria-pressed='true'] {
-  background: var(--sh-accent-soft);
+  background: var(--sh-accent);
   border-color: var(--sh-accent);
-  color: var(--sh-accent);
+  color: var(--sh-on-accent);
+}
+
+.moodButton[aria-pressed='true'] .moodGlyph {
+  color: var(--sh-on-accent);
 }
 
 .editorToolbar {
@@ -281,11 +309,24 @@
 }
 
 .excerpt {
-  margin: 5px 0 0 74px;
+  margin: 0;
   font-size: var(--sh-text-body-sm);
   line-height: 1.55;
   color: var(--sh-text-secondary);
   text-wrap: pretty;
+}
+
+.journalEntry {
+  composes: row;
+  align-items: flex-start;
+}
+
+.journalEntryBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .statRow {
@@ -438,10 +479,6 @@
 }
 
 @media (max-width: 619px) {
-  .excerpt {
-    margin-left: 0;
-  }
-
   .weightStats {
     margin-left: 0;
   }

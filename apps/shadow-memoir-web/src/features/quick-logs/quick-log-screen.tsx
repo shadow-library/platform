@@ -1,5 +1,5 @@
-import { Link, Outlet } from '@tanstack/react-router';
-import { type ReactElement } from 'react';
+import { Link, Outlet, useLocation } from '@tanstack/react-router';
+import { type ReactElement, useEffect, useRef } from 'react';
 
 import styles from './quick-logs.module.css';
 
@@ -16,6 +16,13 @@ const DESTINATIONS = [
  * back button all land where the owner expects — the strip is navigation, not a tab widget holding state.
  */
 export function QuickLogScreen(): ReactElement {
+  const { pathname } = useLocation();
+  const navRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    navRef.current?.querySelector<HTMLElement>('[data-status="active"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [pathname]);
+
   return (
     <div className={styles.hub}>
       <header className={styles.header}>
@@ -23,7 +30,7 @@ export function QuickLogScreen(): ReactElement {
         <p className={styles.meta}>Journal, meals, weight, the manual health metrics and side quests. Each entry is meant to take under ten seconds.</p>
       </header>
 
-      <nav className={styles.subnav} aria-label="Quick log surfaces">
+      <nav ref={navRef} className={styles.subnav} aria-label="Quick log surfaces">
         {DESTINATIONS.map(destination => (
           <Link key={destination.to} to={destination.to} activeOptions={{ exact: destination.exact }} className={styles.subnavItem}>
             {destination.label}
