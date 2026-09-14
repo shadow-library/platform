@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { toast, TooltipProvider } from '@shadow-library/ui';
@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SetupLayout } from '@/features/onboarding';
 import { AppShell, useSignOut } from '@/features/shell';
+import setupStyles from '@/features/onboarding/setup-layout.module.css';
 import shellStyles from '@/features/shell/app-shell.module.css';
 import stripStyles from '@/features/shell/net-strip.module.css';
 import { loginUrl, logout } from '@/lib/apis';
@@ -134,8 +135,39 @@ function renderSyncedAppShell(): { store: ReturnType<typeof createTestEngine>['s
   return { store };
 }
 
+function renderSetupLayout(): { store: ReturnType<typeof createTestEngine>['store'] } {
+  const { engine, store } = createTestEngine({ today: '2026-08-24' });
+  const data = createSyncedTestData(engine);
+  const rootRoute = createRootRoute({
+    component: () => (
+      <QueryClientProvider client={data.queryClient}>
+        <MemoirDataProvider value={data}>
+          <SyncEngineProvider data={data}>
+            <TooltipProvider>
+              <SetupLayout>
+                <div>Set up</div>
+              </SetupLayout>
+            </TooltipProvider>
+          </SyncEngineProvider>
+        </MemoirDataProvider>
+      </QueryClientProvider>
+    ),
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([createRoute({ getParentRoute: () => rootRoute, path: '/onboarding', component: () => null })]),
+    history: createMemoryHistory({ initialEntries: ['/onboarding'] }),
+  });
+  render(<RouterProvider router={router as never} />);
+
+  return { store };
+}
+
+function testPath(relativePath: string): string {
+  return fileURLToPath(new URL(relativePath, import.meta.url));
+}
+
 function readCss(relativePath: string): string {
-  return readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf-8');
+  return readFileSync(testPath(relativePath), 'utf-8');
 }
 
 function cssRule(css: string, selector: string): string {
@@ -204,6 +236,71 @@ describe('AppShell net strip', () => {
 
     const phone = css.slice(css.indexOf('@media (max-width: 767px)'));
     expect(cssRule(phone, '  .strip')).toMatch(/top:\s*calc\(var\(--sh-topbar-height\) \+ var\(--sh-safe-top\)\);/);
+  });
+});
+
+describe('Scroll clearance', () => {
+  const CLEARANCE_TOP = 'calc(var(--sm-net-strip-height, 0px) + 12px)';
+  const MARGIN_TOP = 'scroll-margin-top: var(--sm-scroll-clearance-top, 12px);';
+  const MARGIN_BLOCK = 'scroll-margin-block: var(--sm-scroll-clearance-top, 12px) var(--sm-scroll-clearance-bottom, 16px);';
+  const SCROLL_TARGETS = [
+    { file: '../src/features/history/history.module.css', selector: '.groupDate', declaration: MARGIN_TOP },
+    { file: '../src/components/ScreenLayout.module.css', selector: '.revealTarget', declaration: MARGIN_TOP },
+    { file: '../src/features/finance/finance.module.css', selector: '.entryPanel', declaration: MARGIN_BLOCK },
+    { file: '../src/features/quick-logs/quick-logs.module.css', selector: '.entryPanel', declaration: MARGIN_BLOCK },
+  ];
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.mocked(useSyncStatus).mockReset();
+    document.head.querySelectorAll('style[data-app-styles]').forEach(style => style.remove());
+  });
+
+  it('should clear the net strip and, below 768px where the window scrolls, the top bar and safe area too', () => {
+    const css = readCss('../src/styles.css');
+    const main = cssRule(css, 'main');
+    expect(main).toContain(`--sm-scroll-clearance-top: ${CLEARANCE_TOP};`);
+    expect(main).toContain('--sm-scroll-clearance-bottom: calc(var(--sh-shell-bottom-inset, 0px) + 16px);');
+
+    const phone = css.slice(css.indexOf('@media (max-width: 767px)'));
+    expect(cssRule(phone, '  main')).toContain('--sm-scroll-clearance-top: calc(var(--sh-topbar-height) + var(--sh-safe-top) + var(--sm-net-strip-height, 0px) + 12px);');
+  });
+
+  it.each(SCROLL_TARGETS)('should scroll $selector in $file by the shared clearance', ({ file, selector, declaration }) => {
+    expect(cssRule(readCss(file), selector)).toContain(declaration);
+  });
+
+  it('should leave no scroll target computing its own top clearance', () => {
+    const sources = readdirSync(testPath('../src'), { recursive: true, encoding: 'utf-8' }).filter(path => path.endsWith('.css'));
+    const topMargins = sources
+      .flatMap(path =>
+        [...readCss(`../src/${path}`).matchAll(/scroll-margin(?:-top|-block-start|-block)?\s*:\s*([^;]+);/g)].map(match => ({ path, value: match[1]?.trim() ?? '' })),
+      )
+      .filter(({ value }) => !/^0(px)?(\s|$)/.test(value));
+
+    expect(topMargins.map(({ path }) => path)).toEqual(expect.arrayContaining(SCROLL_TARGETS.map(({ file }) => file.replace('../src/', ''))));
+    for (const margin of topMargins) expect(margin.value.startsWith('var(--sm-scroll-clearance-top'), margin.path).toBe(true);
+  });
+
+  it('should declare the clearance on the main landmark of both the app shell and the setup layout', async () => {
+    stubDesktopViewport();
+    vi.mocked(useSyncStatus).mockReturnValue(ONLINE_SNAPSHOT);
+    const appStyles = document.createElement('style');
+    appStyles.dataset.appStyles = '';
+    appStyles.textContent = readCss('../src/styles.css').replace(/^@import .*$/gm, '');
+    document.head.append(appStyles);
+
+    renderAppShell();
+    const shellMain = await screen.findByRole('main');
+    expect(within(shellMain).getByText('Today')).toBeDefined();
+    expect(getComputedStyle(shellMain).getPropertyValue('--sm-scroll-clearance-top')).toBe(CLEARANCE_TOP);
+    cleanup();
+
+    renderSetupLayout();
+    const setupMain = await screen.findByRole('main');
+    expect(within(setupMain).getByText('Set up')).toBeDefined();
+    expect(getComputedStyle(setupMain).getPropertyValue('--sm-scroll-clearance-top')).toBe(CLEARANCE_TOP);
+    expect(setupMain.closest(`.${setupStyles.root}`)).not.toBeNull();
   });
 });
 
@@ -505,29 +602,8 @@ describe('SetupLayout sign-out', () => {
     vi.mocked(logout).mockResolvedValue({ success: true });
     const assign = vi.fn();
     vi.stubGlobal('location', { ...window.location, pathname: '/onboarding', search: '', assign });
-    const { engine, store } = createTestEngine({ today: '2026-08-24' });
-    const data = createSyncedTestData(engine);
+    const { store } = renderSetupLayout();
     const wipeSpy = vi.spyOn(store, 'wipeAccount');
-    const rootRoute = createRootRoute({
-      component: () => (
-        <QueryClientProvider client={data.queryClient}>
-          <MemoirDataProvider value={data}>
-            <SyncEngineProvider data={data}>
-              <TooltipProvider>
-                <SetupLayout>
-                  <div>Set up</div>
-                </SetupLayout>
-              </TooltipProvider>
-            </SyncEngineProvider>
-          </MemoirDataProvider>
-        </QueryClientProvider>
-      ),
-    });
-    const router = createRouter({
-      routeTree: rootRoute.addChildren([createRoute({ getParentRoute: () => rootRoute, path: '/onboarding', component: () => null })]),
-      history: createMemoryHistory({ initialEntries: ['/onboarding'] }),
-    });
-    render(<RouterProvider router={router as never} />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Sign out' }));
 

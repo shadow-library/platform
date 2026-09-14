@@ -295,6 +295,8 @@ describe('expense entry', () => {
 });
 
 describe('subscriptions screen', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it('should surface a due charge with a confirmation the owner has to press', async () => {
     renderWithQuery(<SubscriptionsScreen />);
     expect(await screen.findByRole('heading', { name: 'Subscriptions' })).toBeDefined();
@@ -396,7 +398,6 @@ describe('subscriptions screen', () => {
     expect(posted[0]?.payload).toMatchObject({ id: 'sub-1', active: false });
     await waitFor(() => expect(success).toHaveBeenCalledWith('Subscription paused.', undefined));
     expect(warning).not.toHaveBeenCalled();
-    vi.restoreAllMocks();
   });
 
   it('should describe an overdue subscription as "Was due <date>"', async () => {
@@ -444,7 +445,6 @@ describe('subscriptions screen', () => {
 
     await waitFor(() => expect(warning).toHaveBeenCalledTimes(1));
     expect(String(warning.mock.calls[0]?.[0])).toContain('Couldn’t pause ‘Kindle Unlimited’');
-    vi.restoreAllMocks();
   });
 
   it('should keep the header text inside the page so a long total can truncate', async () => {
@@ -476,8 +476,9 @@ describe('subscriptions screen', () => {
     expect(name.contains(date)).toBe(false);
   });
 
-  it('should scroll the new subscription panel clear of the bottom chrome when it opens', async () => {
+  it('should scroll the new subscription panel the least distance that shows it whole when it fits the scroll area', async () => {
     const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({ height: window.innerHeight - 1 }));
     renderWithQuery(<SubscriptionsScreen />);
     fireEvent.click(await screen.findByRole('button', { name: 'Add subscription' }));
 
@@ -485,7 +486,51 @@ describe('subscriptions screen', () => {
     expect(panel).not.toBeNull();
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
     expect(document.activeElement).toBe(screen.getByLabelText('Name'));
-    vi.restoreAllMocks();
+  });
+
+  it('should scroll a new subscription panel taller than the scroll area to its start, so its heading and focused field stay visible', async () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({ height: window.innerHeight + 1 }));
+    renderWithQuery(<SubscriptionsScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Add subscription' }));
+
+    await screen.findByRole('heading', { name: 'Add subscription' });
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+    expect(document.activeElement).toBe(screen.getByLabelText('Name'));
+  });
+
+  it('should count the panel scroll margins against the scroll area', async () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({ height: window.innerHeight - 150 }));
+    const computed = window.getComputedStyle.bind(window);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) =>
+      element.classList.contains(financeStyles.entryPanel ?? '') ? ({ scrollMarginTop: '100px', scrollMarginBottom: '100px' } as CSSStyleDeclaration) : computed(element, pseudo),
+    );
+    renderWithQuery(<SubscriptionsScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Add subscription' }));
+
+    await screen.findByRole('heading', { name: 'Add subscription' });
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+  });
+
+  it.each([
+    { overflowing: true, block: 'start' },
+    { overflowing: false, block: 'nearest' },
+  ])('should measure against a scrolling ancestor only while its content overflows (overflowing: $overflowing)', async ({ overflowing, block }) => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({ height: window.innerHeight / 2 }));
+    renderWithQuery(
+      <div data-testid="scroller" style={{ overflowY: 'auto' }}>
+        <SubscriptionsScreen />
+      </div>,
+    );
+    const scroller = screen.getByTestId('scroller');
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: window.innerHeight / 4 });
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: overflowing ? window.innerHeight * 2 : window.innerHeight / 4 });
+    fireEvent.click(await screen.findByRole('button', { name: 'Add subscription' }));
+
+    await screen.findByRole('heading', { name: 'Add subscription' });
+    expect(scrollIntoView).toHaveBeenCalledWith({ block });
   });
 
   it('should create a subscription', async () => {
@@ -515,7 +560,6 @@ describe('subscriptions screen', () => {
     await waitFor(() => expect(posted.map(command => command.type)).toEqual(['subscription.create']));
     expect(posted[0]?.payload).toMatchObject({ name: 'Disney+', amountMinor: 899, currency: 'EUR', frequency: 'monthly' });
     await waitFor(() => expect(success).toHaveBeenCalled());
-    vi.restoreAllMocks();
   });
 });
 

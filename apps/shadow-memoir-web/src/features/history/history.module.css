@@ -37,7 +37,7 @@
 
 .groupDate {
   margin: 0 0 4px;
-  scroll-margin-top: 12px;
+  scroll-margin-top: var(--sm-scroll-clearance-top, 12px);
   font-size: var(--sh-text-caption);
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -97,13 +97,6 @@
 
 .rowBadge {
   justify-self: start;
-}
-
-/* Below 768px the window scrolls under the pinned top bar, so a page change would otherwise land the first day heading behind it. */
-@media (max-width: 767px) {
-  .groupDate {
-    scroll-margin-top: calc(var(--sh-topbar-height) + var(--sh-safe-top) + 12px);
-  }
 }
 
 @media (max-width: 599px) {

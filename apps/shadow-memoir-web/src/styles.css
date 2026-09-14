@@ -22,6 +22,18 @@ body {
   --sh-toast-offset-top: calc(var(--sh-topbar-height) + var(--sm-net-strip-height, 0px) + 12px);
 }
 
+/* Declared on `main`, not `body`, so the chrome tokens resolve under a layout's own overrides (onboarding zeroes the top bar). */
+main {
+  --sm-scroll-clearance-top: calc(var(--sm-net-strip-height, 0px) + 12px);
+  --sm-scroll-clearance-bottom: calc(var(--sh-shell-bottom-inset, 0px) + 16px);
+}
+
+@media (max-width: 767px) {
+  main {
+    --sm-scroll-clearance-top: calc(var(--sh-topbar-height) + var(--sh-safe-top) + var(--sm-net-strip-height, 0px) + 12px);
+  }
+}
+
 a {
   color: var(--sh-accent);
   text-decoration: none;

@@ -454,7 +454,7 @@
 }
 
 .entryPanel {
-  scroll-margin-block: 16px 96px;
+  scroll-margin-block: var(--sm-scroll-clearance-top, 12px) var(--sm-scroll-clearance-bottom, 16px);
 }
 
 .entryFields {

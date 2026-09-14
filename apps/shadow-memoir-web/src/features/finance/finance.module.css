@@ -434,7 +434,7 @@
 }
 
 .entryPanel {
-  scroll-margin-block: 16px calc(var(--sh-shell-bottom-inset, 0px) + 16px);
+  scroll-margin-block: var(--sm-scroll-clearance-top, 12px) var(--sm-scroll-clearance-bottom, 16px);
 }
 
 .formActions {
@@ -620,12 +620,6 @@
   .subscriptionRow .rowTrail {
     flex-wrap: wrap;
     justify-content: space-between;
-  }
-}
-
-@media (max-width: 767px) {
-  .entryPanel {
-    scroll-margin-top: calc(var(--sh-topbar-height) + var(--sh-safe-top) + 12px);
   }
 }
 

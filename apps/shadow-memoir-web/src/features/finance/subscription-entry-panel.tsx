@@ -39,6 +39,20 @@ const FREQUENCY_OPTIONS: { value: SubscriptionFrequency; label: string }[] = [
   { value: 'yearly', label: 'Yearly' },
 ];
 
+function scrollAreaHeight(element: HTMLElement): number {
+  for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+    if (ancestor.scrollHeight > ancestor.clientHeight && /auto|scroll/.test(getComputedStyle(ancestor).overflowY)) return ancestor.clientHeight;
+  }
+  return window.innerHeight;
+}
+
+/** `nearest` leaves a panel taller than its clear area wherever it lands, which can hide its heading and focused field under the chrome. */
+function revealBlock(panel: HTMLElement): ScrollLogicalPosition {
+  const { scrollMarginTop, scrollMarginBottom } = getComputedStyle(panel);
+  const needed = panel.getBoundingClientRect().height + (parseFloat(scrollMarginTop) || 0) + (parseFloat(scrollMarginBottom) || 0);
+  return needed > scrollAreaHeight(panel) ? 'start' : 'nearest';
+}
+
 function initialDraft(today: string, homeCurrency: CurrencyCode): FormDraft {
   return { name: '', amountText: '', currency: homeCurrency, frequency: 'monthly', nextDueDate: today, categoryId: 'tools' };
 }
@@ -52,7 +66,7 @@ export function SubscriptionEntryPanel({ today, settings, onClose }: Subscriptio
   const submitting = useRef(false);
 
   useEffect(() => {
-    panelRef.current?.scrollIntoView({ block: 'nearest' });
+    if (panelRef.current) panelRef.current.scrollIntoView({ block: revealBlock(panelRef.current) });
     nameRef.current?.focus({ preventScroll: true });
   }, []);
 
