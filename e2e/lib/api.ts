@@ -27,11 +27,14 @@ export interface MutateOptions {
   csrfSeedPath?: string;
 }
 
-export interface PollOptions {
+export interface PollWindow {
   /** Total time to keep polling before giving up. Defaults to 5 minutes — the per-call AI budget in dev. */
   timeoutMs?: number;
   /** Delay between polls. */
   intervalMs?: number;
+}
+
+export interface PollOptions extends PollWindow {
   /** Statuses (case-insensitive) that end the poll. Defaults cover both the job and run vocabularies. */
   terminalStatuses?: string[];
 }
@@ -85,24 +88,35 @@ export async function mutate(ctx: APIRequestContext, method: MutationMethod, url
   return ctx[method](url, { headers, ...(options.data === undefined ? {} : { data: options.data }) });
 }
 
-/** Polls `poll` until its returned status is terminal (or the timeout elapses), returning the final parsed body. */
-async function pollUntil<T>(poll: () => Promise<{ status: string; body: T }>, options: PollOptions): Promise<T> {
-  const timeoutMs = options.timeoutMs ?? 300_000;
+/**
+ * Polls `probe` until `done` accepts its result or the budget runs out, returning the last result either way —
+ * so a caller asserts on the settled value and gets its own message on a timeout rather than a thrown one.
+ */
+export async function pollUntil<T>(probe: () => Promise<T>, done: (value: T) => boolean, options: PollWindow = {}): Promise<T> {
   const intervalMs = options.intervalMs ?? 2_000;
-  const terminal = (options.terminalStatuses ?? DEFAULT_TERMINAL_STATUSES).map(s => s.toLowerCase());
-  const deadline = Date.now() + timeoutMs;
+  const deadline = Date.now() + (options.timeoutMs ?? 300_000);
 
   for (;;) {
-    const { status, body } = await poll();
-    if (terminal.includes(status.toLowerCase())) return body;
-    if (Date.now() >= deadline) throw new Error(`Poll timed out after ${timeoutMs}ms; last status was "${status}"`);
+    const value = await probe();
+    if (done(value) || Date.now() >= deadline) return value;
     await new Promise(resolve => setTimeout(resolve, intervalMs));
   }
 }
 
+/** Polls `poll` until its returned status is terminal, returning the final parsed body and throwing on a timeout. */
+async function pollStatus<T>(poll: () => Promise<{ status: string; body: T }>, options: PollOptions): Promise<T> {
+  const timeoutMs = options.timeoutMs ?? 300_000;
+  const terminal = (options.terminalStatuses ?? DEFAULT_TERMINAL_STATUSES).map(s => s.toLowerCase());
+  const isTerminal = (status: string): boolean => terminal.includes(status.toLowerCase());
+
+  const last = await pollUntil(poll, ({ status }) => isTerminal(status), { timeoutMs, intervalMs: options.intervalMs });
+  if (!isTerminal(last.status)) throw new Error(`Poll timed out after ${timeoutMs}ms; last status was "${last.status}"`);
+  return last.body;
+}
+
 /** Polls `GET /api/v1/jobs/:jobId` until the job reaches a terminal status, returning its final body. */
 export async function pollJob<T = Record<string, unknown>>(ctx: APIRequestContext, jobId: string, options: PollOptions = {}): Promise<T> {
-  return pollUntil<T>(async () => {
+  return pollStatus<T>(async () => {
     const response = await ctx.get(`/api/v1/jobs/${jobId}`);
     const body = (await response.json()) as T & { status: string };
     return { status: body.status, body };

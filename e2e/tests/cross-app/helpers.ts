@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
-import { type APIRequestContext, type APIResponse, expect, test } from '@playwright/test';
+import { type APIRequestContext, type APIResponse, type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
 /**
  * Importing user defined packages
@@ -70,6 +70,14 @@ export async function loginIdentity(ctx: APIRequestContext, identityUrl: string,
   expect(verifyBody.status, `expected COMPLETED login for ${email}`).toBe('COMPLETED');
 }
 
+/** The opaque app-session handle every Shadow app issues; its value is the session, so a new session is a new value. */
+const APP_SESSION_COOKIE = '__Host-shadow-session';
+
+/** Reads the app-session handle `host` issued, out of a jar that may hold one per origin. */
+function appSessionHandleForHost(cookies: StoredCookie[], host: string): string | undefined {
+  return cookies.find(c => c.name === APP_SESSION_COOKIE && (c.domain === host || c.domain === `.${host}`))?.value;
+}
+
 /** Reads the token half (`expiry:hex` → `hex`) of the `csrf-token` cookie whose domain matches `host`, if present. */
 function csrfTokenForHost(cookies: StoredCookie[], host: string): string | undefined {
   const cookie = cookies.find(c => c.name === 'csrf-token' && (c.domain === host || c.domain === `.${host}`));
@@ -89,6 +97,40 @@ export async function scopedMutate(ctx: APIRequestContext, baseUrl: string, meth
   const token = csrfTokenForHost(cookies as StoredCookie[], host);
   const headers = { ...(token ? { 'x-csrf-token': token } : {}), ...options.headers };
   return ctx[method](`${baseUrl}${path}`, { headers, ...(options.data === undefined ? {} : { data: options.data }) });
+}
+
+/**
+ * A browser context for `persona`, signed in to the app at `baseUrl` and acting inside `organisationId`. A user's
+ * organisation travels in the app session and switching it rotates the session handle, so this mints a *fresh*
+ * app session over the persona's identity cookies and switches that one — leaving the persona's saved storage
+ * state, which the rest of the suite keeps using, untouched. That separation is asserted, not assumed: the
+ * handle must have *changed* before anything rotates it. A missing storage state is not loaded (mirroring
+ * `apiContext`), so a skipped setup project fails on the assertions below rather than on an ENOENT.
+ */
+export async function organisationBoundContext(browser: Browser, persona: LoginPersona, baseUrl: string, organisationId: string): Promise<BrowserContext> {
+  const statePath = storageStateFor(persona);
+  const context = await browser.newContext({ storageState: existsSync(statePath) ? statePath : undefined, ignoreHTTPSErrors: true });
+  const host = hostOf(baseUrl);
+  const saved = appSessionHandleForHost((await context.storageState()).cookies as StoredCookie[], host);
+
+  const page = await context.newPage();
+  try {
+    // `page.goto` resolves on an HTTP error as readily as on a success, and the loaded storage state already
+    // carries a working handle — so a hop that quietly failed still answers `/api/auth/session` with a 200, off
+    // the persona's *saved* session, which the switch below would then rotate and kill for every other spec.
+    // Only a handle that changed proves a second session was minted.
+    const navigation = await page.goto(`${baseUrl}/api/auth/login?return_to=/`);
+    const minted = appSessionHandleForHost((await context.storageState()).cookies as StoredCookie[], host);
+    const detail = `goto ${navigation?.status()}, landed on ${page.url()}`;
+    expect(minted, `the OIDC hop should leave ${persona} an app session on ${host} (${detail})`).toBeTruthy();
+    expect(minted, `the OIDC hop should mint ${persona} a *new* app session, not reuse the saved one (${detail})`).not.toBe(saved);
+  } finally {
+    await page.close();
+  }
+
+  const switched = await scopedMutate(context.request, baseUrl, 'post', '/api/auth/organisation', { data: { organisationId } });
+  expect(switched.status(), `switching ${persona}'s session into organisation ${organisationId} — body ${await switched.text()}`).toBe(200);
+  return context;
 }
 
 /** Reads a single cookie's value out of `persona`'s saved storage state — used to smuggle one origin's opaque handle onto another. */

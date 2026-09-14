@@ -227,6 +227,27 @@ the OIDC hop for a non-privileged user. That denial is itself asserted (see Cros
   membership call to identity; a non-member and a guest get a byte-identical 404 `WBN_001`, and it never appears
   in the PUBLIC catalog. RESTRICTED gate re-confirmed (granted user 200, others 404).
 
+**Organisation bots across identity and Novel Forge** (`cross-app/org-bots.spec.ts`)
+
+- Stand up a per-run TEAM organisation (owner + a plain member); read the bot permission catalog and confirm the
+  granting admin holds what it is about to grant (`heldByYou`); make the owner a curator through identity's admin
+  role-assignment API (the only surface that grants an application role to a person).
+- Create a bot behind step-up, grant it `projects:write` (which carries read), and issue one key — the `sl_bot_…`
+  secret comes back exactly once and never again from the key list.
+- The bot calls Novel Forge with nothing but `Authorization: Bearer sl_bot_…`: the project it creates comes back
+  `ownerKind: bot` and `sharedWithOrg: true`, and appears in its own list.
+- **Sharing**: an organisation curator opens the bot's project and sees it in their list; a member of the same
+  organisation without `novel-forge:curate` gets 404 `PRJ_001` and never sees it listed. (Both act through a
+  freshly minted Novel Forge app session switched into the organisation, so the personas' saved states stay valid.)
+- **Grant ceiling**: `POST /projects/:id/generate` needs the sensitive `generation:run` grant the bot never
+  received → 403 `IAM_002`, not a 500.
+- **Revocation**: the key is revoked and the bot is polled until it 401s — the SDK caches the exchanged token for
+  up to 60s, so the contract is the window, not immediacy.
+- **Activity**: the feed carries `bot.created`, `bot.key.created`, `bot.key.used` and `bot.key.revoked`, every key
+  event naming the one key issued.
+- **Deletion**: the bot is deleted with a transfer to a member; the project ends up user-owned and still shared
+  with the organisation.
+
 **Novel Forge → Web Novel authoring, publishing & wiki** (`novel-forge/wiki-publish.spec.ts`)
 
 - Import a novel bundle (no AI), author wiki via the bible API (entities + revealed canon facts), publish, and
