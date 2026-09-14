@@ -518,9 +518,10 @@ function toMeal(row: DeltaRow): Meal {
   };
 }
 
-function toMealPreset(row: DeltaRow): MealPreset {
+function toMealPreset(row: DeltaRow, meals: Meal[]): MealPreset {
+  const id = String(row['id']);
   return {
-    id: String(row['id']),
+    id,
     name: text(row, 'name') ?? 'Preset',
     calories: number(row, 'calories'),
     mealType: (text(row, 'mealType') ?? 'cooked') as MealType,
@@ -528,7 +529,7 @@ function toMealPreset(row: DeltaRow): MealPreset {
     proteinG: 0,
     carbsG: 0,
     fatG: 0,
-    usageCount: 0,
+    usageCount: meals.filter(meal => meal.presetId === id).length,
   };
 }
 
@@ -586,11 +587,12 @@ function toThresholdOffer(row: DeltaRow, keyOf: (metricId: string) => HealthMetr
 export function projectQuickLogRows(rows: Partial<DomainRows>): QuickLogRows {
   const metricIds = healthMetricIds(rows.metrics ?? []);
   const keyOf = metricKeyResolver(metricIds);
+  const meals = (rows.meals ?? []).map(toMeal);
 
   return {
     journal: (rows.journal_entries ?? []).map(toJournalEntry),
-    meals: (rows.meals ?? []).map(toMeal),
-    presets: (rows.meal_presets ?? []).map(toMealPreset),
+    meals,
+    presets: (rows.meal_presets ?? []).map(row => toMealPreset(row, meals)),
     weights: (rows.weights ?? []).map(toWeightEntry),
     sideQuests: (rows.side_quests ?? []).map(toSideQuest),
     metricEntries: (rows.metric_entries ?? []).flatMap(row => {

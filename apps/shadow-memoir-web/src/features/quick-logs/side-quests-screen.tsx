@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useRef, useState } from 'react';
-import { Button, Card, EmptyState, Input, Select, Skeleton, Statistic, Tag, toast } from '@shadow-library/ui';
+import { Button, Card, EmptyState, Input, Select, Skeleton, Statistic, Tag } from '@shadow-library/ui';
 
 import { DataState } from '@/components/DataState';
 import { EntryCapNote } from '@/components/EntryCapNote';
@@ -17,6 +17,7 @@ import {
 } from '@/lib/data';
 import { formatCount } from '@/lib/format';
 
+import { runQuickLog } from './quick-log-run';
 import styles from './quick-logs.module.css';
 
 const ITEMS_PAGE_SIZE = 20;
@@ -36,19 +37,22 @@ export function SideQuestsScreen(): ReactElement {
     setVisibleCount(ITEMS_PAGE_SIZE);
   };
 
-  const submit = (event: FormEvent): void => {
+  const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
-    if (!name.trim()) return;
-    command.mutate(
-      { type: 'sidequest.log', draft: { date, name: name.trim(), statAffinity: affinity } },
+    const draftName = name.trim();
+    if (!draftName) return;
+    const run = await runQuickLog(
+      command,
+      { type: 'sidequest.log', draft: { date, name: draftName, statAffinity: affinity } },
       {
-        onSuccess: result => {
-          setAdvisory(result.advisory ?? null);
-          toast.success(result.reward?.rewarded ? `${result.message} +${result.reward.xp} XP.` : `${result.message} ${result.reward?.reason ?? ''}`.trim());
-          setName('');
-        },
+        action: 'log',
+        subject: draftName,
+        success: result => (result.reward?.rewarded ? `${result.message} +${result.reward.xp} XP.` : `${result.message} ${result.reward?.reason ?? ''}`.trim()),
       },
     );
+    if (run.kind !== 'saved') return;
+    setAdvisory(run.result.advisory ?? null);
+    setName('');
   };
 
   return (
@@ -71,7 +75,7 @@ export function SideQuestsScreen(): ReactElement {
             onAffinityChange={setAffinity}
             onSearchChange={onSearchChange}
             onShowMore={() => setVisibleCount(count => count + ITEMS_PAGE_SIZE)}
-            onSubmit={submit}
+            onSubmit={event => void submit(event)}
           />
         )}
       </DataState>

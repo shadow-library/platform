@@ -119,9 +119,8 @@ export interface MealsView {
   meals: Meal[];
   presets: MealPreset[];
   totalCalories: number;
-  macros: Macros;
   last14Days: DayValue[];
-  averageCalories: number;
+  averageCalories: number | null;
   history: MealDayHistory[];
   firstOfDayRewarded: boolean;
 }
@@ -231,6 +230,8 @@ export interface HealthMetricState {
   trendLabel: string;
   last14Days: DayValue[];
   offer: ThresholdOffer | null;
+  /** The threshold quest on this metric already completed for the day, so a met threshold keeps a done state after its offer is gone. */
+  completedQuest: string | null;
 }
 
 interface HealthMetricHistoryRow {

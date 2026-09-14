@@ -275,6 +275,7 @@
   display: block;
   font-size: var(--sh-text-body-sm);
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .rowMeta {
@@ -282,6 +283,15 @@
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);
   margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.rowValue {
+  flex: none;
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-body-sm);
+  white-space: nowrap;
+  text-align: right;
 }
 
 .rowStamp {
@@ -329,14 +339,6 @@
   gap: 4px;
 }
 
-.statRow {
-  padding-top: 14px;
-  border-top: 1px solid var(--sh-border-subtle);
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-}
-
 .presetChips {
   display: flex;
   gap: 6px;
@@ -374,7 +376,7 @@
 .metricGrid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .metricHead {
@@ -408,13 +410,11 @@
   max-width: 130px;
 }
 
-.axis {
-  display: flex;
-  justify-content: space-between;
+.fieldError {
+  margin: 6px 0 0;
   font-size: var(--sh-text-caption);
-  color: var(--sh-text-tertiary);
-  margin-top: 8px;
-  gap: 8px;
+  line-height: 18px;
+  color: var(--sh-danger-text-on-subtle);
 }
 
 .list {
@@ -435,6 +435,11 @@
   align-items: baseline;
 }
 
+.railRowLabel {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .railRowWhen {
   color: var(--sh-text-tertiary);
   font-size: var(--sh-text-caption);
@@ -446,6 +451,30 @@
   margin-top: 12px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.entryPanel {
+  scroll-margin-block: 16px 96px;
+}
+
+.entryFields {
+  display: grid;
+  gap: 12px 16px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(140px, 180px);
+  align-items: start;
+  margin-top: 14px;
+}
+
+.entryPresets {
+  margin-top: 16px;
+}
+
+.caloriesStepper {
+  --sh-number-stepper-width: 168px;
+}
+
+.weightStepper {
+  --sh-number-stepper-width: 160px;
 }
 
 .heatmap {
@@ -466,6 +495,12 @@
   background: var(--sh-surface-well);
 }
 
+@media (min-width: 1400px) {
+  .metricGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 1239px) {
   .split {
     grid-template-columns: minmax(0, 1fr) 290px;
@@ -476,10 +511,23 @@
   .split {
     grid-template-columns: 1fr;
   }
+
+  .entryFields {
+    grid-template-columns: auto minmax(140px, 1fr);
+  }
+
+  .entryName {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 619px) {
   .weightStats {
     margin-left: 0;
+  }
+
+  .metricGrid,
+  .entryFields {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

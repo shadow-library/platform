@@ -1,22 +1,27 @@
-import { addDays, toISODate } from '@shadow-library/ui';
+import { addDays, parseISODate, toISODate } from '@shadow-library/ui';
 
-import { formatLocalTime } from '@/lib/format';
+import { formatCount, formatLocalTime } from '@/lib/format';
 
 import {
   applyQuickLogCommand,
   averageOf,
+  capAdvisoryForTier,
   type CurrencyCode,
   type DayValue,
   type DispatchOptions,
   formatMetricValue,
   HEALTH_METRICS,
+  type HealthMetricDefinition,
   type HealthMetricEntry,
+  type HealthMetricKey,
   type HealthView,
+  journalExcerpt,
   type JournalView,
   type MealsView,
   MemoirEngine,
   type MemoirWorldState,
   type ModuleLink,
+  moodOption,
   type MoodValence,
   type OccurrenceState,
   type QuestLinkageOffer,
@@ -35,7 +40,7 @@ import {
 
 import { isQuickLogCommand, mintCommandIds } from './command-wire';
 import { ignoreAccountBoundary } from './memoir-store';
-import { projectFinanceRows, projectQuickLogRows, type QuickLogRows } from './projection';
+import { projectEntitlement, projectFinanceRows, projectQuickLogRows, type QuickLogRows } from './projection';
 import { type SyncEngine } from './sync-engine';
 import { SYNC_META_KEYS } from './sync.types';
 
@@ -47,13 +52,27 @@ function monthOf(date: string): string {
   return date.slice(0, 7);
 }
 
+function shiftDate(date: string, days: number): string {
+  return toISODate(addDays(parseISODate(date) ?? new Date(Number.NaN), days));
+}
+
 function daysBack(today: string, count: number): string[] {
-  const anchor = new Date(`${today}T00:00:00.000Z`);
-  return Array.from({ length: count }, (_, index) => toISODate(addDays(anchor, index - count + 1)));
+  return Array.from({ length: count }, (_, index) => shiftDate(today, index - count + 1));
 }
 
 function seriesOver(dates: string[], valueOf: (date: string) => number | null): DayValue[] {
   return dates.map(date => ({ date, value: valueOf(date) }));
+}
+
+function formatKg(kg: number): string {
+  return kg.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
+function moodNote(moods: DayValue[]): string {
+  const logged = moods.flatMap(day => (day.value === null ? [] : [day.value]));
+  const average = averageOf(logged);
+  if (average === null) return 'No mood logged in the last 28 days.';
+  return `Mostly ${moodOption(Math.round(average) as MoodValence)?.label ?? 'Steady'} across ${formatCount(logged.length, 'day', 'days')} with a mood.`;
 }
 
 interface SyncedQuickLogState extends QuickLogState {
@@ -91,8 +110,7 @@ function toState(rows: QuickLogRows, today: string): SyncedQuickLogState {
 function writingStreak(dates: Set<string>, today: string): number {
   let days = 0;
   for (let index = 0; ; index += 1) {
-    const date = toISODate(addDays(new Date(`${today}T00:00:00.000Z`), -index));
-    if (!dates.has(date)) return days;
+    if (!dates.has(shiftDate(today, -index))) return days;
     days += 1;
   }
 }
@@ -100,6 +118,16 @@ function writingStreak(dates: Set<string>, today: string): number {
 function metricMeta(entry: HealthMetricEntry | null): string {
   if (!entry) return 'Nothing logged today — blank, not zero';
   return `Logged ${formatLocalTime(entry.loggedAt)}`;
+}
+
+function definitionOf(key: HealthMetricKey): HealthMetricDefinition {
+  return HEALTH_METRICS.find(item => item.key === key) as HealthMetricDefinition;
+}
+
+function latestMetricEntry(entries: HealthMetricEntry[], key: HealthMetricKey, date: string): HealthMetricEntry | null {
+  return entries
+    .filter(item => item.key === key && item.date === date)
+    .reduce<HealthMetricEntry | null>((latest, item) => (latest && latest.loggedAt >= item.loggedAt ? latest : item), null);
 }
 
 /**
@@ -133,9 +161,10 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
     });
   }
 
-  async tiles(date: string, currency: CurrencyCode): Promise<QuickLogTile[]> {
-    const { expenses } = projectFinanceRows(this.sync.domains());
-    return quickLogTiles({ date, currency, expenses, meals: this.state.meals, metrics: this.state.metrics, weights: this.state.weights, journal: this.state.journal });
+  async tiles(date: string, _currency: CurrencyCode): Promise<QuickLogTile[]> {
+    const { expenses, settings } = projectFinanceRows(this.sync.domains());
+    const { meals, metrics, weights, journal } = this.state;
+    return quickLogTiles({ date, currency: settings.homeCurrency, expenses, meals, metrics, weights, journal });
   }
 
   async journal(): Promise<JournalView> {
@@ -143,6 +172,8 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
     const dates = daysBack(today, 28);
     const byDate = new Map(this.state.journal.map(entry => [entry.date, entry]));
     const dismissedOn = await this.readMetaSafe<string>(SYNC_META_KEYS.journalPromptDismissedOn);
+    const moodTrend = seriesOver(dates, date => byDate.get(date)?.mood ?? null);
+    const earlierThisDay = this.state.journal.filter(entry => entry.date < today && entry.date.slice(5) === today.slice(5)).sort((a, b) => (a.date < b.date ? 1 : -1))[0];
 
     return {
       today: byDate.get(today) ?? null,
@@ -151,9 +182,9 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
       totalEntries: this.state.journal.length,
       writingStreakDays: writingStreak(new Set(byDate.keys()), today),
       last28Days: seriesOver(dates, date => byDate.get(date)?.wordCount ?? null),
-      moodTrend: seriesOver(dates, date => byDate.get(date)?.mood ?? null),
-      moodNote: '',
-      onThisDay: null,
+      moodTrend,
+      moodNote: moodNote(moodTrend),
+      onThisDay: earlierThisDay ? { year: Number(earlierThisDay.date.slice(0, 4)), excerpt: journalExcerpt(earlierThisDay.text, 140) } : null,
       draftNote: 'Autosaves as you write',
     };
   }
@@ -173,62 +204,72 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
 
   async meals(date: string): Promise<MealsView> {
     const meals = this.state.meals.filter(meal => meal.date === date).sort((a, b) => (a.loggedAt < b.loggedAt ? -1 : 1));
+    const mealsOn = (day: string): number => this.state.meals.filter(meal => meal.date === day).length;
     const caloriesOn = (day: string): number | null => {
       const logged = this.state.meals.filter(meal => meal.date === day);
       return logged.length === 0 ? null : logged.reduce((total, meal) => total + meal.calories, 0);
     };
-    const last14Days = seriesOver(daysBack(this.sync.today, 14), caloriesOn);
+    const days = daysBack(this.sync.today, 14);
+    const last14Days = seriesOver(days, caloriesOn);
+    const average = averageOf(last14Days.map(day => day.value));
 
     return {
       date,
       meals,
-      presets: [...this.state.presets].sort((a, b) => b.usageCount - a.usageCount),
+      presets: [...this.state.presets].sort((a, b) => b.usageCount - a.usageCount || a.name.localeCompare(b.name)),
       totalCalories: meals.reduce((total, meal) => total + meal.calories, 0),
-      macros: { proteinG: 0, carbsG: 0, fatG: 0 },
       last14Days,
-      averageCalories: Math.round(averageOf(last14Days.map(day => day.value)) ?? 0),
-      history: daysBack(this.sync.today, 5)
-        .slice(0, 4)
-        .reverse()
-        .map(day => {
-          const logged = this.state.meals.filter(meal => meal.date === day);
-          return { date: day, summary: logged.length === 0 ? 'Nothing logged — blank, not zero' : `${logged.length} meals`, calories: caloriesOn(day) };
-        }),
+      averageCalories: average === null ? null : Math.round(average),
+      history: [...days].reverse().map(day => ({
+        date: day,
+        summary: mealsOn(day) === 0 ? 'Nothing logged — blank, not zero' : formatCount(mealsOn(day), 'meal', 'meals'),
+        calories: caloriesOn(day),
+      })),
       firstOfDayRewarded: meals.some(meal => meal.rewarded),
     };
   }
 
   async weight(): Promise<WeightView> {
+    const today = this.sync.today;
     const entries = [...this.state.weights].sort((a, b) => (a.date < b.date ? 1 : -1));
-    const newest = entries[0];
-    const oldest = entries[entries.length - 1];
+    const recent = entries.filter(entry => entry.date >= shiftDate(today, -89) && entry.date <= today);
+    const newest = recent[0];
+    const start = recent[recent.length - 1];
+    const kgs = recent.map(entry => entry.kg);
 
     return {
-      today: entries.find(entry => entry.date === this.sync.today) ?? null,
+      today: entries.find(entry => entry.date === today) ?? null,
       entries,
-      trend: entries
-        .slice()
-        .reverse()
-        .map(entry => ({ date: entry.date, value: entry.kg })),
-      sevenDayAverageKg: averageOf(entries.slice(0, 7).map(entry => entry.kg)),
-      ninetyDayChangeKg: newest && oldest ? Number((newest.kg - oldest.kg).toFixed(1)) : null,
-      ninetyDayStartKg: oldest?.kg ?? null,
-      trendNote: '',
+      trend: [...recent].reverse().map(entry => ({ date: entry.date, value: entry.kg })),
+      sevenDayAverageKg: averageOf(recent.filter(entry => entry.date >= shiftDate(today, -6)).map(entry => entry.kg)),
+      ninetyDayChangeKg: newest && start && newest !== start ? Number((newest.kg - start.kg).toFixed(1)) : null,
+      ninetyDayStartKg: newest && start && newest !== start ? start.kg : null,
+      trendNote: kgs.length === 0 ? '' : `${formatKg(Math.min(...kgs))}–${formatKg(Math.max(...kgs))} kg`,
       context: [],
     };
   }
 
   async health(date: string): Promise<HealthView> {
     const dates = daysBack(this.sync.today, 14);
+    const thresholdQuests = this.world.quests.filter(quest => quest.active && quest.healthThreshold !== null);
+    const dayView = thresholdQuests.length === 0 && this.state.offers.length === 0 ? null : await new MemoirEngine(this.world).getDay(date);
+    const completedQuestIds = new Set(dayView?.occurrences.filter(occurrence => COMPLETED_STATES.includes(occurrence.state)).map(occurrence => occurrence.questId));
+    const completedOn = (key: HealthMetricKey): string | null =>
+      thresholdQuests.find(quest => quest.healthThreshold?.metricKey === key && completedQuestIds.has(quest.id))?.name ?? null;
+
     const metrics = HEALTH_METRICS.map(definition => {
-      const entry = this.state.metrics.find(item => item.key === definition.key && item.date === date) ?? null;
+      const entry = latestMetricEntry(this.state.metrics, definition.key, date);
+      const offer = this.state.offers.find(
+        item => item.metricKey === definition.key && item.currentValue === entry?.value && (item.questId === null || !completedQuestIds.has(item.questId)),
+      );
       return {
         definition,
         entry,
         meta: metricMeta(entry),
         trendLabel: '',
-        last14Days: seriesOver(dates, day => this.state.metrics.find(item => item.key === definition.key && item.date === day)?.value ?? null),
-        offer: this.state.offers.find(offer => offer.metricKey === definition.key && offer.currentValue === entry?.value) ?? null,
+        last14Days: seriesOver(dates, day => latestMetricEntry(this.state.metrics, definition.key, day)?.value ?? null),
+        offer: offer ? { ...offer, note: `Threshold ${formatMetricValue(offer.thresholdValue, definition)} reached — the quest is waiting for you.` } : null,
+        completedQuest: completedOn(definition.key),
       };
     });
 
@@ -238,20 +279,19 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
       history: [...this.state.metrics]
         .sort((a, b) => (a.loggedAt < b.loggedAt ? 1 : -1))
         .slice(0, 6)
-        .flatMap(entry => {
-          const definition = HEALTH_METRICS.find(item => item.key === entry.key);
-          if (!definition) return [];
-          return [{ date: entry.date, text: `${definition.name} ${formatMetricValue(entry.value, definition)}`, badge: null }];
-        }),
-      thresholds: this.state.offers.map(offer => ({
-        label: `${HEALTH_METRICS.find(item => item.key === offer.metricKey)?.name ?? offer.metricKey} ≥ ${offer.thresholdValue} → ${offer.questTitle}`,
-      })),
+        .map(entry => ({ date: entry.date, text: `${definitionOf(entry.key).name} ${formatMetricValue(entry.value, definitionOf(entry.key))}`, badge: null })),
+      thresholds: thresholdQuests.flatMap(quest => {
+        const threshold = quest.healthThreshold;
+        if (!threshold) return [];
+        const definition = definitionOf(threshold.metricKey);
+        return [{ label: `${definition.name} ${threshold.comparison === 'gte' ? '≥' : '≤'} ${formatMetricValue(threshold.value, definition)} → ${quest.name}` }];
+      }),
     };
   }
 
   async sideQuests(): Promise<SideQuestsView> {
     const items = [...this.state.sideQuests].sort((a, b) => (a.loggedAt < b.loggedAt ? 1 : -1));
-    const weekStart = toISODate(addDays(new Date(`${this.sync.today}T00:00:00.000Z`), -7));
+    const weekStart = shiftDate(this.sync.today, -7);
     const thisMonth = items.filter(item => monthOf(item.date) === monthOf(this.sync.today));
 
     return {
@@ -303,13 +343,14 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
     const linkable = this.linkableModule(minted);
     const linkage = linkable ? await this.linkageFor(linkable.module, linkable.date) : null;
 
-    const result = applyQuickLogCommand(this.state, minted, { linkage });
-    if (result.needsConfirmation) return result;
+    const applied = applyQuickLogCommand(this.state, minted, { linkage });
+    if (applied.needsConfirmation) return applied;
+    const result = { ...applied, advisory: capAdvisoryForTier(applied.advisory, projectEntitlement(this.sync.domains()).tier) };
 
     const delivery = await this.sync.enqueue(minted, this.sync.today, options);
     if (delivery.status === 'refused') await this.reproject().catch(ignoreAccountBoundary);
-    // Once queued, the outbox is what survives a reload, not the draft; a later rejection restores the draft from the screen.
-    if (minted.type === 'journal.save' && delivery.status !== 'refused') await this.clearJournalDraft();
+    // Once queued, the outbox survives a reload instead of the draft. Only a save of the draft's own text clears it: a line from quick capture must not wipe the editor's draft.
+    if (minted.type === 'journal.save' && delivery.status !== 'refused' && (await this.readJournalDraft())?.text === minted.draft.text) await this.clearJournalDraft();
     return { ...result, delivery };
   }
 }

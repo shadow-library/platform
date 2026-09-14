@@ -1,19 +1,52 @@
-import { type ReactElement, useState } from 'react';
-import { Alert, Badge, Button, Card, Input, Progress, Skeleton, toast } from '@shadow-library/ui';
+import { type FormEvent, type ReactElement, useState } from 'react';
+import { Alert, Badge, Button, Card, EmptyState, Input, Progress, Skeleton } from '@shadow-library/ui';
 
+import { DataState } from '@/components/DataState';
 import { SparkBars } from '@/components/SparkBars';
-import { formatMetricValue, type HealthMetricState, needsConfirmation, type ThresholdOffer, todayISODate, useCommand, useHealth, useQuickLogCommand } from '@/lib/data';
+import {
+  failureCopy,
+  formatMetricValue,
+  type HealthMetricState,
+  type HealthView,
+  metricInputValue,
+  notifyOutcome,
+  readMetricEntry,
+  type ThresholdOffer,
+  todayISODate,
+  useCommand,
+  useHealth,
+  useQuickLogCommand,
+} from '@/lib/data';
+import { formatLocalDate } from '@/lib/format';
 
+import { runQuickLog } from './quick-log-run';
 import styles from './quick-logs.module.css';
 
 function MetricCard({ metric, date }: { metric: HealthMetricState; date: string }): ReactElement {
   const command = useQuickLogCommand();
-  const [entry, setEntry] = useState(metric.entry ? String(metric.entry.value) : '');
+  const { definition } = metric;
+  const [entry, setEntry] = useState(metric.entry ? metricInputValue(metric.entry.value, definition) : '');
+  const [error, setError] = useState<string | null>(null);
+  const errorId = `metric-${definition.key}-error`;
+  const saving = command.isPendingFor(pending => pending.type === 'health.save' && pending.key === definition.key);
 
-  const save = (): void => {
-    const parsed = Number(entry);
-    if (!Number.isFinite(parsed)) return;
-    command.mutate({ type: 'health.save', key: metric.definition.key, date, value: parsed }, { onSuccess: result => toast.success(result.message) });
+  const onEntryChange = (value: string): void => {
+    setEntry(value);
+    setError(null);
+  };
+
+  const save = async (event: FormEvent): Promise<void> => {
+    event.preventDefault();
+    if (saving) return;
+    const reading = readMetricEntry(entry, definition);
+    if (reading.kind === 'invalid') return setError(reading.message);
+
+    const run = await runQuickLog(
+      command,
+      { type: 'health.save', key: definition.key, date, value: reading.storedValue },
+      { action: 'save', subject: definition.name, success: result => result.message },
+    );
+    if (run.kind === 'saved') setEntry(metricInputValue(reading.storedValue, definition));
   };
 
   return (
@@ -21,49 +54,63 @@ function MetricCard({ metric, date }: { metric: HealthMetricState; date: string 
       <Card.Body>
         <div className={styles.metricHead}>
           <div>
-            <h3 className={styles.cardTitle}>{metric.definition.name}</h3>
+            <h3 className={styles.cardTitle}>{definition.name}</h3>
             <p className={styles.metricValue}>
-              {metric.entry === null ? '—' : formatMetricValue(metric.entry.value, { ...metric.definition, unit: '' })}
-              {metric.definition.unit && <span className={styles.metricUnit}> {metric.definition.unit}</span>}
+              {metric.entry === null ? '—' : formatMetricValue(metric.entry.value, { ...definition, unit: '' })}
+              {metric.entry !== null && definition.unit && <span className={styles.metricUnit}> {definition.unit}</span>}
             </p>
             <p className={styles.hint}>{metric.meta}</p>
           </div>
-          {metric.offer && (
-            <Badge variant="soft" intent={metric.offer.met ? 'success' : 'info'}>
-              {metric.offer.met ? 'Threshold met' : `${Math.round(metric.offer.ratio * 100)}% of ${formatMetricValue(metric.offer.thresholdValue, metric.definition)}`}
+          {metric.completedQuest !== null ? (
+            <Badge variant="soft" intent="success">
+              Quest completed
             </Badge>
+          ) : (
+            metric.offer && (
+              <Badge variant="soft" intent={metric.offer.met ? 'success' : 'info'}>
+                {metric.offer.met ? 'Threshold met' : `${Math.round(metric.offer.ratio * 100)}% of ${formatMetricValue(metric.offer.thresholdValue, definition)}`}
+              </Badge>
+            )
           )}
         </div>
 
         {metric.offer && (
           <div style={{ marginTop: 12 }}>
-            <Progress value={metric.offer.ratio * 100} max={100} aria-label={`${metric.definition.name} against its quest threshold`} />
+            <Progress value={metric.offer.ratio * 100} max={100} aria-label={`${definition.name} against its quest threshold`} />
             <p className={styles.hint} style={{ marginTop: 6 }}>
               {metric.offer.note}
             </p>
           </div>
         )}
+        {metric.completedQuest !== null && !metric.offer && (
+          <p className={styles.hint} style={{ marginTop: 12 }}>
+            “{metric.completedQuest}” is completed for today.
+          </p>
+        )}
 
-        <div className={styles.metricEntry}>
+        <form className={styles.metricEntry} onSubmit={event => void save(event)} noValidate>
           <Input
             className={styles.metricInput}
             size="sm"
             inputMode="decimal"
             value={entry}
-            onValueChange={setEntry}
-            suffix={metric.definition.unit || undefined}
-            aria-label={`${metric.definition.name} for today`}
+            onValueChange={onEntryChange}
+            suffix={definition.unit || undefined}
+            invalid={error !== null}
+            aria-describedby={error === null ? undefined : errorId}
+            aria-label={`${definition.name} for today`}
           />
-          <Button size="sm" variant="secondary" loading={command.isPending} onClick={save}>
+          <Button type="submit" size="sm" variant="secondary" loading={saving}>
             Save
           </Button>
-        </div>
+        </form>
+        {error !== null && (
+          <p id={errorId} className={styles.fieldError} role="alert">
+            {error}
+          </p>
+        )}
 
-        <SparkBars values={metric.last14Days.map(day => day.value)} label={`${metric.definition.name}, last 14 days`} highlightLast />
-        <div className={styles.axis}>
-          <span>14 days</span>
-          <span>{metric.trendLabel}</span>
-        </div>
+        <SparkBars values={metric.last14Days.map(day => day.value)} label={`${definition.name}, last 14 days`} highlightLast axis={{ start: '14 days', end: metric.trendLabel }} />
       </Card.Body>
     </Card>
   );
@@ -72,29 +119,6 @@ function MetricCard({ metric, date }: { metric: HealthMetricState; date: string 
 export function HealthMetricsScreen(): ReactElement {
   const date = todayISODate();
   const health = useHealth(date);
-  const command = useQuickLogCommand();
-  const questCommand = useCommand();
-
-  const view = health.data;
-  const offers = view?.metrics.flatMap(metric => (metric.offer?.met ? [{ definition: metric.definition, offer: metric.offer }] : [])) ?? [];
-
-  /**
-   * Consent, never automation (PRD §2.6): the offer the server derives names the quest, and accepting it
-   * dispatches the owner's own `quest.complete`. Without a server-side threshold behind the offer there is
-   * no occurrence to address, so the local acknowledgement is all that is left to do.
-   */
-  const accept = (offer: ThresholdOffer): void => {
-    if (offer.questId === null) {
-      command.mutate({ type: 'health.acceptOffer', key: offer.metricKey, date }, { onSuccess: result => toast.success(result.message) });
-      return;
-    }
-    questCommand.mutate(
-      { type: 'quest.complete', occurrenceId: `${offer.questId}:${date}` },
-      { onSuccess: result => void (needsConfirmation(result) || toast.success(result.message)) },
-    );
-  };
-
-  if (health.isLoading || !view) return <Skeleton.Card />;
 
   return (
     <section className={styles.screen} aria-labelledby="health-title">
@@ -102,12 +126,46 @@ export function HealthMetricsScreen(): ReactElement {
         Body &amp; health
       </h2>
 
+      <DataState query={health} skeleton={<Skeleton.Card />}>
+        {view => <HealthContent view={view} date={date} />}
+      </DataState>
+    </section>
+  );
+}
+
+function HealthContent({ view, date }: { view: HealthView; date: string }): ReactElement {
+  const command = useQuickLogCommand();
+  const questCommand = useCommand();
+  const offers = view.metrics.flatMap(metric => (metric.offer?.met ? [{ definition: metric.definition, offer: metric.offer }] : []));
+
+  /**
+   * Consent, never automation (PRD §2.6): the offer the server derives names the quest, and accepting it
+   * dispatches the owner's own `quest.complete`. Without a server-side threshold behind the offer there is
+   * no occurrence to address, so the local acknowledgement is all that is left to do.
+   */
+  const accept = async (offer: ThresholdOffer): Promise<void> => {
+    if (offer.questId === null) {
+      if (command.isPending) return;
+      await runQuickLog(command, { type: 'health.acceptOffer', key: offer.metricKey, date }, { action: 'complete', subject: offer.questTitle, success: result => result.message });
+      return;
+    }
+
+    if (questCommand.isPending) return;
+    const outcome = await questCommand.run({ type: 'quest.complete', occurrenceId: `${offer.questId}:${date}` }).catch(() => null);
+    if (!outcome) return notifyOutcome({ status: 'failed', message: failureCopy(null), code: null, undone: false }, { action: 'complete', subject: offer.questTitle, success: '' });
+    if (outcome.status === 'needs-confirmation') return;
+    const completed = outcome.status === 'applied' || outcome.status === 'queued-offline';
+    notifyOutcome(outcome, { action: 'complete', subject: offer.questTitle, success: completed ? outcome.local.message : '' });
+  };
+
+  return (
+    <>
       {offers.map(({ definition, offer }) => (
         <Alert
           key={definition.key}
           intent="success"
           title={`${formatMetricValue(offer.thresholdValue, definition)} reached — “${offer.questTitle}” can be completed`}
-          action={{ label: offer.xp > 0 ? `Complete the quest · +${offer.xp} XP` : 'Complete the quest', onClick: () => accept(offer) }}
+          action={{ label: offer.xp > 0 ? `Complete the quest · +${offer.xp} XP` : 'Complete the quest', onClick: () => void accept(offer) }}
         >
           You logged {formatMetricValue(offer.currentValue, definition)}. The quest is yours to complete: Shadow Memoir never completes a quest for you, even when the threshold is
           met.
@@ -124,9 +182,10 @@ export function HealthMetricsScreen(): ReactElement {
         <Card padding="md">
           <Card.Body>
             <h3 className={styles.cardTitle}>Recent entries</h3>
+            {view.history.length === 0 && <EmptyState size="inline" title="Nothing logged yet" description="Metrics you type appear here. Blank days stay blank." />}
             {view.history.map(row => (
               <div key={`${row.date}-${row.text}`} className={styles.row}>
-                <span className={styles.rowStamp}>{row.date}</span>
+                <span className={styles.rowStamp}>{row.date === view.date ? 'Today' : formatLocalDate(row.date, { year: false })}</span>
                 <span className={styles.rowMain}>
                   <span className={styles.rowMeta} style={{ marginTop: 0 }}>
                     {row.text}
@@ -156,15 +215,19 @@ export function HealthMetricsScreen(): ReactElement {
           <Card padding="md">
             <Card.Body>
               <h3 className={styles.railTitle}>Quest thresholds</h3>
-              <ul className={styles.list}>
-                {view.thresholds.map(threshold => (
-                  <li key={threshold.label}>{threshold.label}</li>
-                ))}
-              </ul>
+              {view.thresholds.length === 0 ? (
+                <p className={styles.prose}>No quest reads these metrics yet. A quest with a health threshold is listed here.</p>
+              ) : (
+                <ul className={styles.list}>
+                  {view.thresholds.map(threshold => (
+                    <li key={threshold.label}>{threshold.label}</li>
+                  ))}
+                </ul>
+              )}
             </Card.Body>
           </Card>
         </div>
       </div>
-    </section>
+    </>
   );
 }

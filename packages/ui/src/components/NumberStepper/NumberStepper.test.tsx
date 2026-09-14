@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactElement, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -87,6 +87,20 @@ describe('NumberStepper', () => {
     await user.tab();
     expect(field).toHaveValue('1');
     expect(onValueChange).toHaveBeenLastCalledWith(1);
+  });
+
+  it('should keep an out-of-range typed value on blur when clampOnBlur is false', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<NumberStepper defaultValue={2} min={1} max={30} clampOnBlur={false} onValueChange={onValueChange} aria-label="Every N days" />);
+    const field = screen.getByRole('spinbutton');
+
+    await user.clear(field);
+    await user.type(field, '99');
+    await user.tab();
+    expect(field).toHaveValue('99');
+    expect(onValueChange).toHaveBeenLastCalledWith(99);
+    expect(screen.getByRole('button', { name: 'Increase' })).toBeDisabled();
   });
 
   it('should round a typed value to the precision on blur', async () => {
@@ -186,6 +200,80 @@ describe('NumberStepper', () => {
     await user.keyboard('{ArrowUp}');
     await user.tab();
     expect(onValueChange).not.toHaveBeenCalled();
+  });
+
+  it('should keep stepping from the latest value while a step button is held', () => {
+    vi.useFakeTimers();
+    try {
+      const onValueChange = vi.fn();
+      render(<FallbackStepper fallback={70} min={30} max={250} step={0.1} precision={1} itemLabel="weight" onValueChange={onValueChange} aria-label="Weight" />);
+      const increase = screen.getByRole('button', { name: 'Increase weight' });
+
+      fireEvent.pointerDown(increase);
+      act(() => vi.advanceTimersByTime(400));
+      for (let tick = 0; tick < 3; tick += 1) act(() => vi.advanceTimersByTime(100));
+      fireEvent.pointerUp(increase);
+      act(() => vi.advanceTimersByTime(500));
+
+      expect(screen.getByRole('spinbutton')).toHaveValue('70.4');
+      expect(onValueChange.mock.calls).toEqual([[70.1], [70.2], [70.3], [70.4]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should stop repeating at the bound', () => {
+    vi.useFakeTimers();
+    try {
+      const onValueChange = vi.fn();
+      render(<NumberStepper defaultValue={3} max={4} itemLabel="replicas" onValueChange={onValueChange} aria-label="Replicas" />);
+
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Increase replicas' }));
+      act(() => vi.advanceTimersByTime(400));
+      for (let tick = 0; tick < 5; tick += 1) act(() => vi.advanceTimersByTime(100));
+
+      expect(screen.getByRole('spinbutton')).toHaveValue('4');
+      expect(onValueChange.mock.calls).toEqual([[4]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should stop repeating when the field becomes disabled mid-hold', () => {
+    vi.useFakeTimers();
+    try {
+      const onValueChange = vi.fn();
+      const { rerender } = render(<NumberStepper defaultValue={1} itemLabel="replicas" onValueChange={onValueChange} aria-label="Replicas" />);
+
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Increase replicas' }));
+      act(() => vi.advanceTimersByTime(400));
+      rerender(<NumberStepper defaultValue={1} disabled itemLabel="replicas" onValueChange={onValueChange} aria-label="Replicas" />);
+      for (let tick = 0; tick < 3; tick += 1) act(() => vi.advanceTimersByTime(100));
+      rerender(<NumberStepper defaultValue={1} itemLabel="replicas" onValueChange={onValueChange} aria-label="Replicas" />);
+      for (let tick = 0; tick < 3; tick += 1) act(() => vi.advanceTimersByTime(100));
+
+      expect(onValueChange.mock.calls).toEqual([[2]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should land on startValue when stepping an empty field', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(
+      <NumberStepper defaultValue={null} min={30} max={250} step={0.1} precision={1} startValue={78.4} itemLabel="weight" onValueChange={onValueChange} aria-label="Weight" />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Increase weight' }));
+    expect(screen.getByRole('spinbutton')).toHaveValue('78.4');
+    await user.click(screen.getByRole('button', { name: 'Increase weight' }));
+    expect(onValueChange.mock.calls).toEqual([[78.4], [78.5]]);
+  });
+
+  it('should forward aria-describedby to the field', () => {
+    render(<NumberStepper value={3} aria-label="Replicas" aria-describedby="replicas-error" />);
+    expect(screen.getByRole('spinbutton')).toHaveAttribute('aria-describedby', 'replicas-error');
   });
 
   it('keeps step buttons out of the tab order', () => {

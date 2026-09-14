@@ -1,15 +1,17 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { type ReactElement } from 'react';
 import { toast } from '@shadow-library/ui';
 import { describe, expect, it, vi } from 'vitest';
 
 import { EntryCapNote } from '@/components/EntryCapNote';
 import { HealthMetricsScreen, JournalScreen, MealsScreen, SideQuestsScreen, WeightScreen } from '@/features/quick-logs';
 import { deriveCapAdvisory, FixtureQuickLogProvider, MONTHLY_ENTRY_CAP, setQuickLogProvider, todayISODate } from '@/lib/data';
-import { type DeltaPage, SYNC_META_KEYS, SyncEngineProvider } from '@/lib/sync';
+import { type DeltaPage, SYNC_META_KEYS, type SyncedMemoirData, SyncedQuickLogProvider, SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen, renderWithQuery } from './harness';
 import { withTimeZone } from './setup';
-import { createSyncedTestData, createTestEngine, type FakeServer, rejected, sharedBacking, type TestEngineOptions } from './sync-harness';
+import { createSyncedTestData, createTestEngine, type FakeServer, rejected, sharedBacking, type TestEngine, type TestEngineOptions } from './sync-harness';
 
 interface Gate {
   open: () => void;
@@ -28,6 +30,43 @@ function commandGate(): Gate {
   return { open, options: { fetchImpl } };
 }
 
+const LOG_TODAY = '2026-08-22';
+
+function deltaPage(domains: DeltaPage['domains']): DeltaPage {
+  return { cursor: '1', hasMore: false, tombstones: [], domains };
+}
+
+/** Renders `node` over a synced engine whose day — and the browser clock the screens read — is {@link LOG_TODAY}. */
+async function withSyncedScreen(node: ReactElement, options: TestEngineOptions, body: (test: TestEngine, data: SyncedMemoirData) => Promise<void>): Promise<void> {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(`${LOG_TODAY}T12:00:00.000Z`));
+  const test = createTestEngine({ today: LOG_TODAY, ...options });
+  const data = createSyncedTestData(test.engine);
+  setQuickLogProvider(data.quickLogs);
+  try {
+    renderScreen(<SyncEngineProvider data={data}>{node}</SyncEngineProvider>, { value: data });
+    await body(test, data);
+  } finally {
+    setQuickLogProvider(new FixtureQuickLogProvider());
+    vi.useRealTimers();
+  }
+}
+
+function rowOf(text: string): HTMLElement {
+  const row = screen.getByText(text).closest('div');
+  if (!row) throw new TypeError(`no row holds "${text}"`);
+  return row;
+}
+
+function expectStaticRow(row: HTMLElement): void {
+  expect(within(row).queryAllByRole('button')).toEqual([]);
+  expect(within(row).queryAllByRole('link')).toEqual([]);
+  expect(row.getAttribute('role')).toBeNull();
+  expect(row.hasAttribute('tabindex')).toBe(false);
+}
+
+const WATER_CATALOGUE = [{ id: '504', name: 'Water', isHealth: true }];
+
 describe('weight screen', () => {
   it('should ask before replacing a value already logged for today', async () => {
     renderWithQuery(<WeightScreen />);
@@ -37,11 +76,91 @@ describe('weight screen', () => {
     expect(screen.getByRole('button', { name: 'Replace' })).toBeDefined();
   });
 
-  it('should say the replaced value is kept rather than lost', async () => {
+  it('should name the value a replacement overwrites without promising a history the server does not keep', async () => {
     renderWithQuery(<WeightScreen />);
     fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
 
-    expect(await screen.findByText(/stays visible in History/)).toBeDefined();
+    expect(await screen.findByText('Today already carries 78.4 kg. Saving 78.4 kg replaces it.')).toBeDefined();
+    expect(screen.queryByText(/History/)).toBeNull();
+  });
+
+  it('should show the replaced weight', async () => {
+    const weights = [{ date: LOG_TODAY, kg: '78.50', rewarded: true, loggedAt: `${LOG_TODAY}T07:05:00.000Z`, syncSeq: '1' }];
+    await withSyncedScreen(<WeightScreen />, { pages: [deltaPage({ weights })] }, async test => {
+      const field = await screen.findByRole('spinbutton', { name: 'Weight in kilograms' });
+      fireEvent.change(field, { target: { value: '79.2' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Replace' }));
+
+      expect(await screen.findByText(/replaced 78\.5 kg/)).toBeDefined();
+      await waitFor(() => expect(test.server.batches.flatMap(batch => batch.types)).toEqual(['weight.save']));
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(screen.getByText(/replaced 78\.5 kg/)).toBeDefined();
+      expect(screen.getByText('Replaced 78.5 kg')).toBeDefined();
+    });
+  });
+
+  it('should refuse a weight outside the allowed range with an inline error', async () => {
+    renderScreen(<WeightScreen />);
+    const field = await screen.findByRole('spinbutton', { name: 'Weight in kilograms' });
+    fireEvent.change(field, { target: { value: '300' } });
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    fireEvent.submit(field.closest('form') as HTMLFormElement);
+
+    expect((await screen.findByRole('alert')).textContent).toBe('Weight is between 30 and 250 kg.');
+    expect(field.getAttribute('aria-describedby')).toBe('weight-error');
+    expect(screen.queryByText('Replace today’s weight?')).toBeNull();
+  });
+
+  it('should refuse a typed weight outside the range when Save is clicked', async () => {
+    const user = userEvent.setup();
+    await withSyncedScreen(<WeightScreen />, { pages: [deltaPage({})] }, async test => {
+      const field = (await screen.findByRole('spinbutton', { name: 'Weight in kilograms' })) as HTMLInputElement;
+      await user.click(field);
+      await user.keyboard('10');
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect((await screen.findByRole('alert')).textContent).toBe('Weight is between 30 and 250 kg.');
+      await new Promise(resolve => setTimeout(resolve, 50));
+      expect(field.value).toBe('10');
+      expect(test.server.batches).toEqual([]);
+      expect(await test.engine.outbox.pending()).toEqual([]);
+    });
+  });
+
+  it('should start stepping an empty weight from the last logged value', async () => {
+    const weights = [{ date: '2026-08-19', kg: '78.40', rewarded: true, loggedAt: '2026-08-19T07:05:00.000Z', syncSeq: '1' }];
+    await withSyncedScreen(<WeightScreen />, { pages: [deltaPage({ weights })] }, async () => {
+      await screen.findByText('Nothing logged today');
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Increase' }));
+      fireEvent.pointerUp(screen.getByRole('button', { name: 'Increase' }));
+
+      expect((screen.getByRole('spinbutton', { name: 'Weight in kilograms' }) as HTMLInputElement).value).toBe('78.4');
+    });
+  });
+
+  it('should show blanks instead of zero statistics and an empty trend', async () => {
+    await withSyncedScreen(<WeightScreen />, { pages: [deltaPage({})] }, async () => {
+      expect(await screen.findByText('No trend yet')).toBeDefined();
+      expect(screen.queryByText('7-day average')).toBeNull();
+      expect(screen.queryByText('90 days')).toBeNull();
+      expect(screen.queryByText('Alongside the trend')).toBeNull();
+    });
+  });
+
+  it('should show an error instead of an empty weight log when sync fails', async () => {
+    await withSyncedScreen(<WeightScreen />, { status: () => 500 }, async () => {
+      expect(await screen.findByText("Couldn't load this right now")).toBeDefined();
+      expect(screen.queryByText('No entries yet')).toBeNull();
+      expect(screen.queryByText('Nothing logged today')).toBeNull();
+    });
+  });
+
+  it('should render logged rows as static content', async () => {
+    renderScreen(<WeightScreen />);
+    await screen.findByText('Corrected from 89.1 — typo');
+    expectStaticRow(rowOf('Corrected from 89.1 — typo'));
   });
 
   it('should state that weight is context and never a target', async () => {
@@ -284,6 +403,46 @@ describe('journal screen', () => {
     }
   });
 
+  it('should clear the journal draft when saving within the autosave delay', async () => {
+    const backing = sharedBacking();
+    const test = createTestEngine({ backing, today: JOURNAL_TODAY });
+    const data = createSyncedTestData(test.engine);
+    setQuickLogProvider(data.quickLogs);
+
+    try {
+      const { unmount } = renderScreen(
+        <SyncEngineProvider data={data}>
+          <JournalScreen />
+        </SyncEngineProvider>,
+        { value: data },
+      );
+
+      const editor = (await screen.findByLabelText('Journal entry')) as HTMLTextAreaElement;
+      fireEvent.change(editor, { target: { value: 'Hello' } });
+      await waitFor(async () => expect(await data.quickLogs.readJournalDraft()).toMatchObject({ text: 'Hello' }));
+      fireEvent.change(editor, { target: { value: 'Hello world' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save entry' }));
+
+      await waitFor(() => expect(editor.value).toBe(''));
+      await waitFor(() => expect(test.server.batches.flatMap(batch => batch.types)).toEqual(['journal.save']));
+      await new Promise(resolve => setTimeout(resolve, 500));
+      expect(await data.quickLogs.readJournalDraft()).toBeNull();
+      unmount();
+
+      renderScreen(
+        <SyncEngineProvider data={data}>
+          <JournalScreen />
+        </SyncEngineProvider>,
+        { value: data },
+      );
+      const reopened = (await screen.findByLabelText('Journal entry')) as HTMLTextAreaElement;
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(reopened.value).toBe('');
+    } finally {
+      setQuickLogProvider(new FixtureQuickLogProvider());
+    }
+  });
+
   it('should persist a dismissed prompt', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(`${JOURNAL_TODAY}T12:00:00.000Z`));
@@ -344,6 +503,176 @@ describe('meals screen', () => {
 
     await waitFor(async () => expect((await screen.findByRole('heading', { name: /kcal/ })).textContent).not.toBe(before));
     expect(screen.getAllByText('Oats, berries, skyr').length + screen.getAllByText('Breakfast oats').length).toBeGreaterThan(0);
+  });
+
+  it('should not render macro totals', async () => {
+    renderScreen(<MealsScreen />);
+    expect(await screen.findByRole('heading', { name: /^Today/ })).toBeDefined();
+
+    for (const macro of ['Protein', 'Carbs', 'Fat']) expect(screen.queryByText(macro)).toBeNull();
+  });
+
+  it('should render logged rows as static content', async () => {
+    renderScreen(<MealsScreen />);
+    await screen.findByText('Oats, berries, skyr');
+    expectStaticRow(rowOf('Oats, berries, skyr'));
+  });
+
+  it('should log a preset once on double tap', async () => {
+    const gate = commandGate();
+    const presets = [{ id: '7', name: 'Office canteen lunch', calories: 720, mealType: 'ate_out', note: null }];
+    try {
+      await withSyncedScreen(<MealsScreen />, { pages: [deltaPage({ meal_presets: presets })], ...gate.options }, async test => {
+        const chip = await screen.findByRole('button', { name: 'Office canteen lunch' });
+        fireEvent.click(chip);
+        fireEvent.click(chip);
+        gate.open();
+
+        await waitFor(() => expect(test.server.batches.flatMap(batch => batch.types)).toEqual(['meal.logPreset']));
+        await new Promise(resolve => setTimeout(resolve, 20));
+        expect(test.server.batches.flatMap(batch => batch.types)).toEqual(['meal.logPreset']);
+        expect((await test.engine.outbox.pending()).length).toBe(0);
+      });
+    } finally {
+      gate.open();
+    }
+  });
+
+  it('should keep preset chips in place after logging one', async () => {
+    const presets = [
+      { id: '7', name: 'Apple bowl', calories: 300, mealType: 'cooked', note: null },
+      { id: '8', name: 'Banana shake', calories: 250, mealType: 'cooked', note: null },
+    ];
+    const chipNames = (): string[] => screen.getAllByRole('button').flatMap(chip => presets.filter(preset => chip.textContent?.includes(preset.name)).map(preset => preset.name));
+
+    const gate = commandGate();
+
+    try {
+      await withSyncedScreen(<MealsScreen />, { pages: [deltaPage({ meal_presets: presets })], ...gate.options }, async () => {
+        await screen.findByRole('button', { name: 'Banana shake' });
+        expect(chipNames()).toEqual(['Apple bowl', 'Banana shake']);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Banana shake' }));
+
+        expect(await screen.findByText('· used 1 time')).toBeDefined();
+        expect(screen.getAllByRole('listitem')[0]?.textContent).toContain('Banana shake');
+        expect(chipNames()).toEqual(['Apple bowl', 'Banana shake']);
+      });
+    } finally {
+      gate.open();
+    }
+  });
+
+  it('should count preset usage from logged meals', async () => {
+    const meal = (id: string, presetId: string | null, date: string): Record<string, unknown> => ({
+      id,
+      date,
+      name: 'Logged',
+      calories: 500,
+      mealType: 'cooked',
+      note: null,
+      presetId,
+      rewarded: false,
+      loggedAt: `${date}T12:00:00.000Z`,
+      syncSeq: id,
+    });
+    const presets = [
+      { id: '7', name: 'Office canteen lunch', calories: 720, mealType: 'ate_out', note: null },
+      { id: '8', name: 'Chicken & rice bowl', calories: 640, mealType: 'cooked', note: null },
+    ];
+    const meals = [meal('1', '7', '2026-08-20'), meal('2', '7', '2026-08-21'), meal('3', '8', '2026-08-21'), meal('4', null, '2026-08-21')];
+
+    await withSyncedScreen(<MealsScreen />, { pages: [deltaPage({ meal_presets: presets, meals })] }, async () => {
+      expect(await screen.findByText('· used 2 times')).toBeDefined();
+      expect(screen.getByText('· used 1 time')).toBeDefined();
+    });
+  });
+
+  it('should reset the meal panel after an advisory', async () => {
+    renderScreen(<MealsScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Add meal' }));
+
+    const form = screen.getByRole('heading', { name: 'Add meal' }).closest('form') as HTMLFormElement;
+    const name = within(form).getByRole('textbox') as HTMLInputElement;
+    expect(document.activeElement).toBe(name);
+
+    fireEvent.change(name, { target: { value: 'Cap meal' } });
+    fireEvent.change(within(form).getByRole('spinbutton', { name: 'Calories' }), { target: { value: '300' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Save meal' }));
+
+    await waitFor(() => expect(within(form).getByRole('note').textContent).toMatch(/meals (logged )?this month/));
+    expect(name.value).toBe('');
+    expect((within(form).getByRole('spinbutton', { name: 'Calories' }) as HTMLInputElement).value).toBe('0');
+    expect(within(form).getByRole('button', { name: 'Save meal' })).toHaveProperty('disabled', true);
+  });
+
+  it('should refuse negative calories when Save meal is clicked', async () => {
+    const user = userEvent.setup();
+    await withSyncedScreen(<MealsScreen />, { pages: [deltaPage({})] }, async test => {
+      await user.click(await screen.findByRole('button', { name: 'Add meal' }));
+      const form = screen.getByRole('heading', { name: 'Add meal' }).closest('form') as HTMLFormElement;
+      await user.type(within(form).getByRole('textbox'), 'Negative');
+      const calories = within(form).getByRole('spinbutton', { name: 'Calories' }) as HTMLInputElement;
+      await user.clear(calories);
+      await user.type(calories, '-50');
+      await user.click(within(form).getByRole('button', { name: 'Save meal' }));
+
+      expect(within(form).getByRole('alert').textContent).toContain('Calories are a whole number, zero or more.');
+      await new Promise(resolve => setTimeout(resolve, 50));
+      expect(calories.value).toBe('-50');
+      expect(test.server.batches).toEqual([]);
+      expect(await test.engine.outbox.pending()).toEqual([]);
+    });
+  });
+
+  it('should refuse negative calories with an inline error', async () => {
+    renderScreen(<MealsScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Add meal' }));
+    const form = screen.getByRole('heading', { name: 'Add meal' }).closest('form') as HTMLFormElement;
+
+    fireEvent.change(within(form).getByRole('textbox'), { target: { value: 'Negative' } });
+    fireEvent.change(within(form).getByRole('spinbutton', { name: 'Calories' }), { target: { value: '-50' } });
+
+    expect(within(form).getByRole('alert').textContent).toContain('Calories are a whole number, zero or more.');
+    expect(within(form).getByRole('button', { name: 'Save meal' })).toHaveProperty('disabled', true);
+  });
+
+  it('should list today in a pluralised meal history', async () => {
+    const meals = [
+      {
+        id: 'm1',
+        date: LOG_TODAY,
+        name: 'Oats',
+        calories: 410,
+        mealType: 'cooked',
+        note: null,
+        presetId: null,
+        rewarded: true,
+        loggedAt: `${LOG_TODAY}T07:20:00.000Z`,
+        syncSeq: '1',
+      },
+    ];
+    await withSyncedScreen(<MealsScreen />, { pages: [deltaPage({ meals })] }, async () => {
+      expect(await screen.findByText('1 meal')).toBeDefined();
+      expect(within(rowOf('1 meal')).getByText('Today')).toBeDefined();
+      expect(screen.queryByText(/1 meals/)).toBeNull();
+    });
+  });
+
+  it('should show one Add meal and no zero totals on an empty day', async () => {
+    await withSyncedScreen(<MealsScreen />, { pages: [deltaPage({})] }, async () => {
+      expect(await screen.findByText('Nothing logged today')).toBeDefined();
+      expect(screen.getAllByRole('button', { name: 'Add meal' })).toHaveLength(1);
+      expect(screen.queryByText(/0 kcal/)).toBeNull();
+      expect(screen.getByText(/No presets on this account yet/)).toBeDefined();
+    });
+  });
+
+  it('should show an error instead of an empty meal log when sync fails', async () => {
+    await withSyncedScreen(<MealsScreen />, { status: () => 500 }, async () => {
+      expect(await screen.findByText("Couldn't load this right now")).toBeDefined();
+      expect(screen.queryByText('Nothing logged today')).toBeNull();
+    });
   });
 
   it('should say a blank day is blank rather than zero', async () => {
@@ -423,6 +752,231 @@ describe('health metrics screen', () => {
     renderWithQuery(<HealthMetricsScreen />);
     expect(await screen.findByText(/they never cost HP/)).toBeDefined();
   });
+
+  it('should refuse a blank or non-numeric metric with an inline error', async () => {
+    const dispatch = vi.spyOn(FixtureQuickLogProvider.prototype, 'dispatchCommand');
+    try {
+      renderScreen(<HealthMetricsScreen />);
+      const input = await screen.findByLabelText('Calories burned for today');
+      const save = within(input.closest('form') as HTMLFormElement).getByRole('button', { name: 'Save' });
+
+      fireEvent.change(input, { target: { value: '' } });
+      fireEvent.click(save);
+      expect((await screen.findByRole('alert')).textContent).toBe('Type a value to save — a blank day stays blank.');
+
+      fireEvent.change(input, { target: { value: 'abc' } });
+      fireEvent.click(save);
+      expect((await screen.findByRole('alert')).textContent).toBe('Use digits only, like 7.5.');
+
+      fireEvent.change(input, { target: { value: '-500' } });
+      fireEvent.click(save);
+      expect((await screen.findByRole('alert')).textContent).toBe('Calories burned can’t be negative.');
+      expect(dispatch).not.toHaveBeenCalled();
+    } finally {
+      dispatch.mockRestore();
+    }
+  });
+
+  it('should render logged rows as static content', async () => {
+    renderScreen(<HealthMetricsScreen />);
+    await screen.findByText('Calories burned 620 kcal');
+    expectStaticRow(rowOf('Calories burned 620 kcal'));
+  });
+
+  it('should save water typed in litres as millilitres', async () => {
+    const gate = commandGate();
+    const entries = [{ id: '1', metricId: '504', date: LOG_TODAY, value: '1400', source: 'manual', createdAt: `${LOG_TODAY}T17:30:00.000Z` }];
+    try {
+      await withSyncedScreen(<HealthMetricsScreen />, { pages: [deltaPage({ metrics: WATER_CATALOGUE, metric_entries: entries })], ...gate.options }, async test => {
+        const input = (await screen.findByLabelText('Water for today')) as HTMLInputElement;
+        expect(input.value).toBe('1.4');
+
+        fireEvent.change(input, { target: { value: '1.6' } });
+        fireEvent.click(within(input.closest('form') as HTMLFormElement).getByRole('button', { name: 'Save' }));
+
+        await waitFor(async () =>
+          expect((await test.engine.outbox.pending()).map(entry => entry.command)).toEqual([expect.objectContaining({ type: 'health.save', value: 1600 })]),
+        );
+        expect(await screen.findByText('1.6')).toBeDefined();
+      });
+    } finally {
+      gate.open();
+    }
+  });
+
+  it('should warn once and keep the typed value when a metric save is rejected', async () => {
+    const entries = [{ id: '1', metricId: '504', date: LOG_TODAY, value: '1400', source: 'manual', createdAt: `${LOG_TODAY}T17:30:00.000Z` }];
+    const warning = vi.spyOn(toast, 'warning');
+    const success = vi.spyOn(toast, 'success');
+    try {
+      await withSyncedScreen(
+        <HealthMetricsScreen />,
+        { pages: [deltaPage({ metrics: WATER_CATALOGUE, metric_entries: entries })], outcomes: batch => batch.commandIds.map(id => rejected(id, 'Metric not found', 'MET_002')) },
+        async () => {
+          const input = (await screen.findByLabelText('Water for today')) as HTMLInputElement;
+          fireEvent.change(input, { target: { value: '2' } });
+          fireEvent.click(within(input.closest('form') as HTMLFormElement).getByRole('button', { name: 'Save' }));
+
+          await waitFor(() => expect(warning).toHaveBeenCalledTimes(1));
+          expect(String(warning.mock.calls[0]?.[0])).not.toContain('Metric not found');
+          expect(success).not.toHaveBeenCalled();
+          expect(input.value).toBe('2');
+        },
+      );
+    } finally {
+      warning.mockRestore();
+      success.mockRestore();
+    }
+  });
+
+  it('should keep a completed threshold quest visible after its offer is gone', async () => {
+    const quest = (id: string, name: string, metricId: string, value: number): Record<string, unknown> => ({
+      id,
+      name,
+      durationMin: 20,
+      startTimeMin: 420,
+      strictness: 'routine',
+      recurrence: { frequency: 'daily' },
+      active: true,
+      healthThreshold: { metricId, value, comparison: 'gte' },
+    });
+    const domains: DeltaPage['domains'] = {
+      metrics: [{ id: '501', name: 'Steps', isHealth: true }, ...WATER_CATALOGUE],
+      metric_entries: [{ id: '1', metricId: '501', date: LOG_TODAY, value: '8310', source: 'manual', createdAt: `${LOG_TODAY}T19:02:00.000Z` }],
+      quests: [quest('q-steps', 'Move 8,000 steps', '501', 8000), quest('q-water', 'Drink 2 litres', '504', 2000)],
+      quest_logs: [{ id: 'q-steps-log', questId: 'q-steps', date: LOG_TODAY, state: 'completed', xpAwarded: 30, coinsAwarded: 0, createdAt: `${LOG_TODAY}T19:05:00.000Z` }],
+    };
+
+    await withSyncedScreen(<HealthMetricsScreen />, { pages: [deltaPage(domains)] }, async () => {
+      expect(await screen.findByText('Quest completed')).toBeDefined();
+      expect(screen.getByText('“Move 8,000 steps” is completed for today.')).toBeDefined();
+      expect(screen.getByText('Steps ≥ 8,000 → Move 8,000 steps')).toBeDefined();
+      expect(screen.getByText('Water ≥ 2.0 l → Drink 2 litres')).toBeDefined();
+    });
+  });
+
+  it('should show empty states instead of blank health cards', async () => {
+    await withSyncedScreen(<HealthMetricsScreen />, { pages: [deltaPage({})] }, async () => {
+      expect(await screen.findByText('Nothing logged yet')).toBeDefined();
+      expect(screen.getByText(/No quest reads these metrics yet/)).toBeDefined();
+      expect(screen.getAllByText('—')).toHaveLength(4);
+    });
+  });
+
+  it('should show an error instead of empty health metrics when sync fails', async () => {
+    await withSyncedScreen(<HealthMetricsScreen />, { status: () => 500 }, async () => {
+      expect(await screen.findByText("Couldn't load this right now")).toBeDefined();
+      expect(screen.queryByText('Nothing logged yet')).toBeNull();
+    });
+  });
+});
+
+describe('synced quick-log provider', () => {
+  it('should format the Today expense tile in the account’s home currency', async () => {
+    const domains: DeltaPage['domains'] = {
+      account: [{ defaultCurrency: 'NOK', enabledCurrencies: ['NOK'] }],
+      expenses: [
+        { id: 'e1', amountMinor: 12_500, currency: 'NOK', homeAmountMinor: null, categoryId: 'food', occurredOn: LOG_TODAY, loggedAt: `${LOG_TODAY}T10:00:00.000Z`, syncSeq: '1' },
+      ],
+    };
+    const { engine } = createTestEngine({ today: LOG_TODAY, pages: [deltaPage(domains)] });
+    await engine.start();
+
+    const tiles = await createSyncedTestData(engine).quickLogs.tiles(LOG_TODAY, 'EUR');
+    expect(tiles.find(tile => tile.id === 'expense')?.value).toBe(new Intl.NumberFormat('en-US', { style: 'currency', currency: 'NOK' }).format(125));
+  });
+
+  it('should surface an earlier year’s entry on this day and describe the month’s mood', async () => {
+    const entry = (id: string, date: string, mood: number | null): Record<string, unknown> => ({
+      id,
+      date,
+      text: `Written on ${date}`,
+      mood,
+      loggedAt: `${date}T21:00:00.000Z`,
+      rewarded: true,
+    });
+    const journal = [entry('j1', '2025-08-22', 2), entry('j2', LOG_TODAY, 4), entry('j3', '2026-08-20', 4)];
+    const { engine } = createTestEngine({ today: LOG_TODAY, pages: [deltaPage({ journal_entries: journal })] });
+    await engine.start();
+    const quickLogs = new SyncedQuickLogProvider(engine);
+    await quickLogs.reproject();
+
+    const view = await quickLogs.journal();
+    expect(view.onThisDay).toEqual({ year: 2025, excerpt: 'Written on 2025-08-22' });
+    expect(view.moodNote).toBe('Mostly Good across 2 days with a mood.');
+  });
+
+  it('should keep an unrelated journal draft when another journal line is saved', async () => {
+    const { engine } = createTestEngine({ today: LOG_TODAY });
+    await engine.start();
+    const quickLogs = new SyncedQuickLogProvider(engine);
+
+    await quickLogs.saveJournalDraft('Half a thought about the week', null);
+    await quickLogs.dispatchCommand({ type: 'journal.save', draft: { date: LOG_TODAY, text: 'Captured on the go', mood: null } });
+    expect(await quickLogs.readJournalDraft()).toMatchObject({ text: 'Half a thought about the week' });
+
+    await quickLogs.dispatchCommand({ type: 'journal.save', draft: { date: LOG_TODAY, text: 'Half a thought about the week', mood: null } });
+    expect(await quickLogs.readJournalDraft()).toBeNull();
+  });
+
+  it('should include today in the meal history west of UTC', async () => {
+    await withTimeZone('America/Los_Angeles', async () => {
+      const meals = [
+        {
+          id: 'm1',
+          date: LOG_TODAY,
+          name: 'Oats',
+          calories: 410,
+          mealType: 'cooked',
+          note: null,
+          presetId: null,
+          rewarded: true,
+          loggedAt: `${LOG_TODAY}T07:20:00.000Z`,
+          syncSeq: '1',
+        },
+      ];
+      const { engine } = createTestEngine({ today: LOG_TODAY, pages: [deltaPage({ meals })] });
+      await engine.start();
+      const quickLogs = new SyncedQuickLogProvider(engine);
+      await quickLogs.reproject();
+
+      const view = await quickLogs.meals(LOG_TODAY);
+      expect(view.history[0]).toEqual({ date: LOG_TODAY, summary: '1 meal', calories: 410 });
+      expect(view.last14Days.at(-1)).toEqual({ date: LOG_TODAY, value: 410 });
+      expect(view.last14Days[0]?.date).toBe('2026-08-09');
+    });
+  });
+
+  it('should measure weight windows by account day west of UTC', async () => {
+    await withTimeZone('America/Los_Angeles', async () => {
+      const weight = (date: string, kg: string): Record<string, unknown> => ({ date, kg, rewarded: true, loggedAt: `${date}T07:00:00.000Z`, syncSeq: date });
+      const { engine } = createTestEngine({
+        today: LOG_TODAY,
+        pages: [deltaPage({ weights: [weight(LOG_TODAY, '78.50'), weight('2026-08-15', '90.00'), weight('2026-08-16', '79.50')] })],
+      });
+      await engine.start();
+      const quickLogs = new SyncedQuickLogProvider(engine);
+      await quickLogs.reproject();
+
+      expect((await quickLogs.weight()).sevenDayAverageKg).toBe(79);
+    });
+  });
+
+  it('should measure weight statistics over their own windows', async () => {
+    const weight = (date: string, kg: string): Record<string, unknown> => ({ date, kg, rewarded: true, loggedAt: `${date}T07:00:00.000Z`, syncSeq: date });
+    const weights = [weight('2026-01-10', '95.00'), weight('2026-06-01', '80.00'), weight('2026-08-18', '79.20'), weight('2026-08-22', '78.50')];
+    const { engine } = createTestEngine({ today: LOG_TODAY, pages: [deltaPage({ weights })] });
+    await engine.start();
+    const quickLogs = new SyncedQuickLogProvider(engine);
+    await quickLogs.reproject();
+
+    const view = await quickLogs.weight();
+    expect(view.trend.map(point => point.date)).toEqual(['2026-06-01', '2026-08-18', '2026-08-22']);
+    expect(view.ninetyDayChangeKg).toBe(-1.5);
+    expect(view.ninetyDayStartKg).toBe(80);
+    expect(view.sevenDayAverageKg).toBeCloseTo(78.85);
+    expect(view.trendNote).toBe('78.5–80.0 kg');
+  });
 });
 
 describe('entry cap advisory', () => {
@@ -436,6 +990,11 @@ describe('entry cap advisory', () => {
     const note = screen.getByRole('note');
     expect(note.textContent).toContain('entries keep saving');
     expect(note.dataset.capLevel).toBe('approaching');
+  });
+
+  it('should say the allowance is reached at exactly the limit', () => {
+    renderWithQuery(<EntryCapNote advisory={deriveCapAdvisory('meals', MONTHLY_ENTRY_CAP)} />);
+    expect(screen.getByRole('note').textContent).toContain('reached the free monthly allowance');
   });
 
   it('should keep saving past 100% and say so', () => {

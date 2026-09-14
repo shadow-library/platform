@@ -1,8 +1,36 @@
+.root {
+  margin-top: 10px;
+  min-width: 0;
+}
+
+.chart {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.scale {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: none;
+  font-size: var(--sh-text-caption);
+  line-height: 1;
+  color: var(--sh-text-tertiary);
+  text-align: right;
+}
+
 .strip {
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.strip[data-placement='dated'] {
+  position: relative;
 }
 
 .bar {
@@ -12,7 +40,27 @@
   background: var(--sh-accent);
 }
 
+.strip[data-placement='dated'] .bar {
+  position: absolute;
+  bottom: 0;
+  min-width: 1px;
+}
+
 .blank {
-  background: var(--sh-surface-well);
-  opacity: 1;
+  background: none;
+  border-bottom: 2px solid var(--sh-border-subtle);
+  border-radius: 0;
+}
+
+.axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.axis > span:last-child {
+  text-align: right;
 }

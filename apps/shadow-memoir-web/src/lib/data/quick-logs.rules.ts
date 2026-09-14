@@ -36,6 +36,40 @@ export function toStoredMetricValue(key: HealthMetricKey, displayValue: number):
   return (STORAGE_CONVERT[key] ?? ((value: number) => value))(displayValue);
 }
 
+export function toDisplayMetricValue(key: HealthMetricKey, storedValue: number): number {
+  return (DISPLAY_CONVERT[key] ?? ((value: number) => value))(storedValue);
+}
+
+export const WEIGHT_RANGE_KG = { min: 30, max: 250 } as const;
+
+export function mealCaloriesError(calories: number | null): string | null {
+  if (calories === null) return 'Enter the calories — zero is a valid answer.';
+  if (calories < 0 || !Number.isInteger(calories)) return 'Calories are a whole number, zero or more.';
+  return null;
+}
+
+export function weightError(kg: number | null): string | null {
+  if (kg === null) return 'Enter a weight to save.';
+  if (kg < WEIGHT_RANGE_KG.min || kg > WEIGHT_RANGE_KG.max) return `Weight is between ${WEIGHT_RANGE_KG.min} and ${WEIGHT_RANGE_KG.max} kg.`;
+  return null;
+}
+
+export type MetricEntryReading = { kind: 'valid'; storedValue: number } | { kind: 'invalid'; message: string };
+
+export function readMetricEntry(input: string, definition: HealthMetricDefinition): MetricEntryReading {
+  const typed = input.trim();
+  if (typed === '') return { kind: 'invalid', message: 'Type a value to save — a blank day stays blank.' };
+  const value = Number(typed);
+  if (!Number.isFinite(value)) return { kind: 'invalid', message: 'Use digits only, like 7.5.' };
+  if (value < 0) return { kind: 'invalid', message: `${definition.name} can’t be negative.` };
+  return { kind: 'valid', storedValue: toStoredMetricValue(definition.key, value) };
+}
+
+export function metricInputValue(storedValue: number, definition: HealthMetricDefinition): string {
+  const value = toDisplayMetricValue(definition.key, storedValue);
+  return definition.precision > 0 ? value.toFixed(definition.precision) : String(Math.round(value));
+}
+
 export const SIDE_QUEST_DAILY_REWARD_LIMIT = 3;
 
 const QUICK_LOG_REWARDS = {
@@ -165,7 +199,7 @@ export function deriveThresholdOffer(definition: HealthMetricDefinition, value: 
 }
 
 export function formatMetricValue(value: number, definition: HealthMetricDefinition): string {
-  const scaled = (DISPLAY_CONVERT[definition.key] ?? ((raw: number) => raw))(value);
+  const scaled = toDisplayMetricValue(definition.key, value);
   const formatted = definition.precision > 0 ? scaled.toFixed(definition.precision) : Math.round(scaled).toLocaleString('en-US');
   return definition.unit ? `${formatted} ${definition.unit}` : formatted;
 }

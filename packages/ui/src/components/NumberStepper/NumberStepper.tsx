@@ -6,7 +6,7 @@ import { type ChangeEvent, forwardRef, type KeyboardEvent, useEffect, useRef, us
 /**
  * Importing user defined packages
  */
-import { useControllableState } from '@/hooks';
+import { useControllableState, useIsomorphicLayoutEffect } from '@/hooks';
 import { cn } from '@/lib';
 
 import styles from './NumberStepper.module.css';
@@ -54,8 +54,8 @@ function ChevronDown() {
  * A numeric field with step buttons for quantities adjusted in small increments (replicas, retries,
  * timeouts). The field is role="spinbutton" with aria-valuenow/min/max (+ aria-valuetext for units);
  * step buttons are labelled but removed from the tab order (ArrowUp/ArrowDown in the field do the same job).
- * Non-numeric keystrokes are rejected; typed values are clamped to the range on blur, never mid-edit.
- * Holding a step button repeats.
+ * Non-numeric keystrokes are rejected; typed values are clamped to the range on blur (unless `clampOnBlur` is off), never mid-edit.
+ * Holding a step button repeats from the latest value until the bound.
  */
 export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(function NumberStepper(
   {
@@ -65,6 +65,8 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
     min,
     max,
     step = 1,
+    startValue,
+    clampOnBlur = true,
     precision,
     unit,
     buttons = 'split',
@@ -76,6 +78,7 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
     id,
     className,
     'aria-label': ariaLabel,
+    'aria-describedby': ariaDescribedBy,
   },
   ref,
 ) {
@@ -103,15 +106,26 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
     if (next !== current) setCurrent(next);
   }
 
+  function stopHold(): void {
+    clearTimeout(holdRef.current.timeout);
+    clearInterval(holdRef.current.interval);
+  }
+
   function stepBy(direction: 1 | -1): void {
-    if (disabled || readOnly) return;
+    if (disabled || readOnly) return stopHold();
     const base = current ?? min ?? 0;
     const decimals = precision ?? Math.max(decimalsOf(step), decimalsOf(base));
-    const next = clampRound(Number((base + direction * step).toFixed(decimals)));
+    const next = current == null && startValue != null ? clampRound(startValue) : clampRound(Number((base + direction * step).toFixed(decimals)));
     commit(next);
     setText(format(next));
     setEditing(false);
+    const bound = direction > 0 ? max : min;
+    if (bound != null && next === bound) stopHold();
   }
+  const latestStepBy = useRef(stepBy);
+  useIsomorphicLayoutEffect(() => {
+    latestStepBy.current = stepBy;
+  });
 
   function handleChange(event: ChangeEvent<HTMLInputElement>): void {
     const next = event.target.value;
@@ -129,6 +143,7 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
     if (!editing || disabled || readOnly) return setText(current != null ? format(current) : '');
     const parsed = text === '' ? Number.NaN : Number(text);
     if (Number.isNaN(parsed)) return setText(current != null ? format(current) : '');
+    if (!clampOnBlur) return;
     const next = clampRound(parsed);
     commit(next);
     setText(format(next));
@@ -143,12 +158,8 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
   function startHold(direction: 1 | -1): void {
     stepBy(direction);
     holdRef.current.timeout = setTimeout(() => {
-      holdRef.current.interval = setInterval(() => stepBy(direction), 100);
+      holdRef.current.interval = setInterval(() => latestStepBy.current(direction), 100);
     }, 400);
-  }
-  function stopHold(): void {
-    clearTimeout(holdRef.current.timeout);
-    clearInterval(holdRef.current.interval);
   }
   useEffect(() => {
     const timers = holdRef.current;
@@ -173,6 +184,7 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
       onPointerDown={() => startHold(-1)}
       onPointerUp={stopHold}
       onPointerLeave={stopHold}
+      onPointerCancel={stopHold}
     >
       {buttons === 'split' ? <MinusIcon /> : <ChevronDown />}
     </button>
@@ -187,6 +199,7 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
       onPointerDown={() => startHold(1)}
       onPointerUp={stopHold}
       onPointerLeave={stopHold}
+      onPointerCancel={stopHold}
     >
       {buttons === 'split' ? <PlusIcon /> : <ChevronUp />}
     </button>
@@ -215,6 +228,7 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
         disabled={disabled}
         readOnly={readOnly}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
         aria-valuenow={current ?? undefined}
         aria-valuemin={min}
         aria-valuemax={max}

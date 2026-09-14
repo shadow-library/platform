@@ -7,7 +7,7 @@
 .root {
   display: inline-flex;
   align-items: stretch;
-  width: 112px;
+  width: var(--sh-number-stepper-width, 112px);
   overflow: hidden;
   background: var(--sh-surface-raised);
   border: var(--sh-border-width) solid var(--sh-border-strong);
@@ -17,7 +17,7 @@
     box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
 }
 .root[data-has-unit] {
-  width: 128px;
+  width: var(--sh-number-stepper-width, 128px);
 }
 .root[data-size='sm'] {
   height: var(--sh-control-height-sm);

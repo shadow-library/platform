@@ -21,6 +21,7 @@ import {
 } from './quick-logs.rules';
 import {
   type DayValue,
+  type HealthMetricDefinition,
   type HealthMetricEntry,
   type HealthMetricKey,
   type HealthView,
@@ -282,11 +283,6 @@ export class FixtureQuickLogProvider implements QuickLogProvider {
 
   async meals(date: string): Promise<MealsView> {
     const meals = this.state.meals.filter(meal => meal.date === date).sort((a, b) => (a.loggedAt < b.loggedAt ? -1 : 1));
-    const macros = meals.reduce((total, meal) => ({ proteinG: total.proteinG + meal.proteinG, carbsG: total.carbsG + meal.carbsG, fatG: total.fatG + meal.fatG }), {
-      proteinG: 0,
-      carbsG: 0,
-      fatG: 0,
-    });
     const last14Days = series(14, 2, 1400, 900, [9]);
 
     return {
@@ -294,7 +290,6 @@ export class FixtureQuickLogProvider implements QuickLogProvider {
       meals,
       presets: [...this.state.presets].sort((a, b) => b.usageCount - a.usageCount),
       totalCalories: meals.reduce((total, meal) => total + meal.calories, 0),
-      macros,
       last14Days,
       averageCalories: Math.round(averageOf(last14Days.map(day => day.value)) ?? 0),
       history: [
@@ -338,6 +333,7 @@ export class FixtureQuickLogProvider implements QuickLogProvider {
         trendLabel: METRIC_TRENDS[definition.key],
         last14Days: METRIC_SERIES[definition.key],
         offer: deriveThresholdOffer(definition, entry?.value ?? null),
+        completedQuest: null,
       };
     });
 
@@ -350,7 +346,7 @@ export class FixtureQuickLogProvider implements QuickLogProvider {
         const offer = deriveThresholdOffer(definition, entry.value);
         return [
           {
-            date: entry.date === today() ? 'Today' : entry.date,
+            date: entry.date,
             text: `${definition.name} ${formatMetricValue(entry.value, definition)}${entry.replacedValue === null ? '' : ` · replaced ${formatMetricValue(entry.replacedValue, definition)}`}`,
             badge: offer?.met ? 'Threshold met' : null,
           },
@@ -486,7 +482,7 @@ function saveWeight(state: QuickLogState, date: string, kg: number, confirmedRep
 
   return {
     id: entry.id,
-    message: existing ? `Replaced ${existing.kg} kg with ${kg} kg. The old value stays in History.` : 'Weight saved.',
+    message: existing ? `Replaced ${existing.kg} kg with ${kg} kg.` : 'Weight saved.',
     reward: firstOfDayReward('weight', suppressed),
     advisory: deriveCapAdvisory('weight', state.monthlyCounts.weight),
     ...(context.linkage ? { linkageOffer: context.linkage } : {}),
@@ -516,7 +512,9 @@ function saveMetric(state: QuickLogState, key: HealthMetricKey, date: string, va
   const existing = state.metrics.find(item => item.key === key && item.date === date) ?? null;
   const entry: HealthMetricEntry = { key, date, value, loggedAt: new Date().toISOString(), replacedValue: existing?.value ?? null, source: 'manual' };
   state.metrics = existing ? state.metrics.map(item => (item === existing ? entry : item)) : [entry, ...state.metrics];
-  return { id: `${key}-${date}`, message: existing ? `Replaced ${existing.value} with ${value}.` : 'Saved.' };
+  const definition = HEALTH_METRICS.find(item => item.key === key) as HealthMetricDefinition;
+  const message = existing ? `Replaced ${formatMetricValue(existing.value, definition)} with ${formatMetricValue(value, definition)}.` : 'Saved.';
+  return { id: `${key}-${date}`, message };
 }
 
 /** The optimistic apply, shared by the fixtures and by the sync layer's replay of what is still queued. */

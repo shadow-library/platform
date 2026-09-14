@@ -29,11 +29,16 @@ export function deriveCapAdvisory(module: LoggableModule, used: number, limit: n
   const ratio = limit > 0 ? used / limit : 0;
   const noun = MODULE_NOUNS[module];
   const level: EntryCapLevel = ratio >= 1 ? 'reached' : ratio >= CAP_ADVISORY_THRESHOLD ? 'approaching' : 'clear';
-  const message =
-    level === 'reached'
-      ? `You have logged ${used} ${noun} this month, past the free monthly allowance of ${limit}. Everything still saves; a Memoir subscription lifts the count.`
-      : level === 'approaching'
-        ? `${used} of ${limit} ${noun} logged this month. Nothing changes at the limit — entries keep saving.`
-        : null;
-  return { module, used, limit, ratio, level, message, blocksSave: false };
+  return { module, used, limit, ratio, level, message: capMessage(level, used, limit, noun), blocksSave: false };
+}
+
+function capMessage(level: EntryCapLevel, used: number, limit: number, noun: string): string | null {
+  if (level === 'clear') return null;
+  if (level === 'approaching') return `${used} of ${limit} ${noun} logged this month. Nothing changes at the limit — entries keep saving.`;
+  const position = used === limit ? ' and reached' : ', past';
+  return `You have logged ${used} ${noun} this month${position} the free monthly allowance of ${limit}. Everything still saves; a Memoir subscription lifts the count.`;
+}
+
+export function capAdvisoryForTier(advisory: EntryCapAdvisory | undefined, tier: 'free' | 'paid'): EntryCapAdvisory | undefined {
+  return tier === 'paid' ? undefined : advisory;
 }

@@ -132,10 +132,11 @@ export function JournalScreen(): ReactElement {
     requestAnimationFrame(() => field?.setSelectionRange(edit.selectionStart, edit.selectionEnd));
   };
 
-  const saving = command.isPendingFor(cmd => cmd.type === 'journal.save');
+  const [writingDraft, setWritingDraft] = useState(false);
+  const saving = writingDraft || command.isPendingFor(cmd => cmd.type === 'journal.save');
 
   const save = async (): Promise<void> => {
-    if (!text.trim()) return;
+    if (saving || !text.trim()) return;
     const draftText = text;
     const draftMood = mood;
     const subject = journalExcerpt(draftText, 24) || todayISODate();
@@ -144,8 +145,12 @@ export function JournalScreen(): ReactElement {
     debounceHandleRef.current = null;
     dirtyRef.current = false;
     pendingSaveRef.current = draftText;
+    setWritingDraft(true);
+    await quickLogs.saveJournalDraft(draftText, draftMood).catch(() => undefined);
 
-    const outcome = await command.run({ type: 'journal.save', draft: { date: todayISODate(), text: draftText, mood: draftMood } }).catch(() => null);
+    const running = command.run({ type: 'journal.save', draft: { date: todayISODate(), text: draftText, mood: draftMood } }).catch(() => null);
+    setWritingDraft(false);
+    const outcome = await running;
     pendingSaveRef.current = null;
 
     if (!outcome) {
@@ -391,7 +396,14 @@ function JournalContent({
         <Card padding="md">
           <Card.Body>
             <h3 className={styles.railTitle}>Mood over the month</h3>
-            <SparkBars values={view.moodTrend.map(day => day.value)} label="Mood over the month" height={60} />
+            <SparkBars
+              values={view.moodTrend.map(day => day.value)}
+              label="Mood over the month"
+              height={60}
+              domain={{ min: 1, max: 5 }}
+              scale={{ top: 'Bright', bottom: 'Low' }}
+              axis={{ start: formatLocalDate(view.moodTrend[0]?.date, { year: false }), end: 'Today' }}
+            />
             <p className={styles.prose}>{view.moodNote}</p>
           </Card.Body>
         </Card>

@@ -3,20 +3,25 @@ import { describe, expect, it } from 'vitest';
 import {
   applyMarkdownTool,
   CAP_ADVISORY_THRESHOLD,
+  capAdvisoryForTier,
   deriveCapAdvisory,
   deriveThresholdOffer,
   firstOfDayReward,
   type HealthMetricDefinition,
   type HealthMetricEntry,
   journalExcerpt,
+  mealCaloriesError,
   type MealPreset,
+  metricInputValue,
   MONTHLY_ENTRY_CAP,
   nextSideQuestReward,
   quickLogTiles,
+  readMetricEntry,
   sameDayWeight,
   SIDE_QUEST_DAILY_REWARD_LIMIT,
   snapshotPresetToMeal,
   type WeightEntry,
+  weightError,
 } from '@/lib/data';
 
 const preset: MealPreset = { id: 'preset-oats', name: 'Breakfast oats', calories: 410, mealType: 'cooked', proteinG: 24, carbsG: 58, fatG: 9, usageCount: 84 };
@@ -24,6 +29,8 @@ const preset: MealPreset = { id: 'preset-oats', name: 'Breakfast oats', calories
 const steps: HealthMetricDefinition = { key: 'steps', name: 'Steps', unit: '', step: 100, precision: 0, threshold: { value: 8000, questTitle: 'Move 8,000 steps', xp: 30 } };
 
 const sleep: HealthMetricDefinition = { key: 'sleep', name: 'Sleep', unit: 'h', step: 0.1, precision: 1, threshold: { value: 7, questTitle: null, xp: 0 } };
+
+const water: HealthMetricDefinition = { key: 'water', name: 'Water', unit: 'l', step: 0.1, precision: 1, threshold: { value: 2000, questTitle: 'Drink 2 litres', xp: 20 } };
 
 describe('meal preset snapshot', () => {
   it('should copy the preset values onto the meal so a later preset edit cannot rewrite it', () => {
@@ -52,6 +59,41 @@ describe('weight same-day entry', () => {
   it('should reward only the first weight of the day', () => {
     expect(firstOfDayReward('weight', false).rewarded).toBe(true);
     expect(firstOfDayReward('weight', true)).toMatchObject({ rewarded: false, xp: 0 });
+  });
+});
+
+describe('quick-log entry validation', () => {
+  it('should reject negative calories', () => {
+    expect(mealCaloriesError(-50)).toBe('Calories are a whole number, zero or more.');
+    expect(mealCaloriesError(null)).not.toBeNull();
+    expect(mealCaloriesError(0)).toBeNull();
+    expect(mealCaloriesError(720)).toBeNull();
+  });
+
+  it('should reject weight outside the allowed range', () => {
+    expect(weightError(10)).toBe('Weight is between 30 and 250 kg.');
+    expect(weightError(300)).toBe('Weight is between 30 and 250 kg.');
+    expect(weightError(null)).not.toBeNull();
+    expect(weightError(30)).toBeNull();
+    expect(weightError(78.5)).toBeNull();
+  });
+
+  it('should reject a blank, non-numeric or negative metric entry', () => {
+    expect(readMetricEntry('', steps)).toEqual({ kind: 'invalid', message: 'Type a value to save — a blank day stays blank.' });
+    expect(readMetricEntry('abc', steps)).toEqual({ kind: 'invalid', message: 'Use digits only, like 7.5.' });
+    expect(readMetricEntry('-500', steps)).toEqual({ kind: 'invalid', message: 'Steps can’t be negative.' });
+    expect(readMetricEntry('0', steps)).toEqual({ kind: 'valid', storedValue: 0 });
+  });
+
+  it('should round-trip water between the litres shown and the millilitres stored', () => {
+    expect(metricInputValue(1400, water)).toBe('1.4');
+    expect(readMetricEntry('1.6', water)).toEqual({ kind: 'valid', storedValue: 1600 });
+    expect(metricInputValue(1600, water)).toBe('1.6');
+  });
+
+  it('should prefill a metric with the precision its card shows', () => {
+    expect(metricInputValue(7.25, sleep)).toBe('7.3');
+    expect(metricInputValue(8310, steps)).toBe('8310');
   });
 });
 
@@ -115,6 +157,19 @@ describe('entry cap advisory', () => {
     expect(advisory.level).toBe('reached');
     expect(advisory.blocksSave).toBe(false);
     expect(advisory.message).toContain('Everything still saves');
+  });
+
+  it('should describe the cap at exactly the limit', () => {
+    const atLimit = deriveCapAdvisory('sidequests', MONTHLY_ENTRY_CAP);
+    expect(atLimit.message).toContain(`logged ${MONTHLY_ENTRY_CAP} side quests this month and reached the free monthly allowance of ${MONTHLY_ENTRY_CAP}`);
+    expect(atLimit.message).not.toContain('past');
+    expect(deriveCapAdvisory('sidequests', MONTHLY_ENTRY_CAP + 1).message).toContain(`past the free monthly allowance of ${MONTHLY_ENTRY_CAP}`);
+  });
+
+  it('should not advise a paid owner about the free allowance', () => {
+    const advisory = deriveCapAdvisory('meals', MONTHLY_ENTRY_CAP);
+    expect(capAdvisoryForTier(advisory, 'paid')).toBeUndefined();
+    expect(capAdvisoryForTier(advisory, 'free')).toBe(advisory);
   });
 
   it('should never block a save at any level', () => {
