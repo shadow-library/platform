@@ -4,6 +4,7 @@ import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import { Button, Spinner } from '@shadow-library/ui';
 
 import { StatusPage, StatusRegion } from '@/components/StatusPage';
+import { EquippedThemeAccent } from '@/features/hero';
 import { AppShell } from '@/features/shell';
 import { sessionQueryOptions } from '@/lib/apis';
 import { MemoirDataProvider, type OnboardingStatus, useOnboardingStatus } from '@/lib/data';
@@ -50,6 +51,7 @@ function AuthenticatedShell(): ReactElement {
   return (
     <MemoirDataProvider key={accountId} value={data}>
       <SyncEngineProvider data={data}>
+        <EquippedThemeAccent />
         <OnboardingGate>
           <AppShell>
             <StatusRegion>

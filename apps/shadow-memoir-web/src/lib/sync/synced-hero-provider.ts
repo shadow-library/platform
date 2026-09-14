@@ -15,10 +15,13 @@ import {
   type HeroDeck,
   type HeroProvider,
   type HeroTitle,
+  hpNoteFor,
   INTENSITY_OPTIONS,
   type Momentum,
+  nameFor,
   type RecoveryView,
   type SettledCommandResult,
+  STARTER_COSMETIC_ID,
   STAT_LABELS,
   type StatAffinity,
   TITLES,
@@ -138,9 +141,14 @@ function applied(message: string): SettledCommandResult {
   return { status: 'applied', message, xpAwarded: 0, coinsAwarded: 0 };
 }
 
+/** No `cosmetic_unlocks` row ever seeds `STARTER_COSMETIC_ID`, so its "equipped" look is display-only and drops once another badge is genuinely equipped. */
 function cosmeticsFor(grants: HeroGrants, coins: number): Cosmetic[] {
   return COSMETICS.map(seed => {
     const owned = grants.ownedCosmetics.has(seed.id);
+    if (seed.id === STARTER_COSMETIC_ID && !owned) {
+      const state: Cosmetic['state'] = grants.equippedCosmetics.badge === undefined ? 'equipped' : 'starter';
+      return { ...seed, state, shortfallCoins: null };
+    }
     const equipped = grants.equippedCosmetics[seed.kind] === seed.id;
     const shortfall = seed.priceCoins === null ? null : Math.max(0, seed.priceCoins - coins);
     const state: Cosmetic['state'] = equipped ? 'equipped' : owned ? 'owned' : seed.priceCoins === null ? 'achievement' : shortfall === 0 ? 'affordable' : 'short';
@@ -307,7 +315,13 @@ export class SyncedHeroProvider implements HeroProvider {
     const earned = achievements.filter(item => item.earnedOn !== null).length;
 
     return {
-      hero: { ...hero, title: displayed?.name ?? 'Unnamed hero' },
+      hero: {
+        ...hero,
+        title: nameFor(
+          displayed?.name,
+          titles.some(title => title.earnedOn !== null),
+        ),
+      },
       subtitle: [
         `Level ${hero.level}`,
         standing.activeDays === null ? null : formatCount(standing.activeDays, 'active day', 'active days'),
@@ -317,7 +331,7 @@ export class SyncedHeroProvider implements HeroProvider {
         .join(' · '),
       shields: standing.shieldsAvailable,
       shieldCap: standing.shieldCap,
-      hpNote: hero.hp === hero.hpMax ? 'full' : 'restores one a week on its own',
+      hpNote: hpNoteFor(hero.hp, hero.hpMax),
       momentumLabel: standing.persona === 'active' ? MOMENTUM_LABELS[hero.momentum] : 'Returning',
       momentumNote: 'Momentum describes the last two weeks. It is not a currency and it cannot go negative.',
       crownNote: crownNote(hero.crown),
@@ -354,7 +368,8 @@ export class SyncedHeroProvider implements HeroProvider {
         { label: 'Crown kept', value: hero.crown.keptPercent, unit: '%' },
       ],
       choices: comingBack.kind === 'offered' ? copy.choices : [],
-      intensity: preferences.pendingIntensity ?? preferences.intensity,
+      intensity: preferences.intensity,
+      pendingIntensity: preferences.pendingIntensity,
       intensityOptions: INTENSITY_OPTIONS,
       missed: missedRecently(projectRecentMisses(rows, day)),
       progress: null,

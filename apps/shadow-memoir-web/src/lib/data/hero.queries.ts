@@ -3,7 +3,8 @@ import { useMutation, type UseMutationResult, useQuery, type UseQueryResult } fr
 import { type CommandHook, legacySettledResult, readSettledResult, useDomainCommand } from './command-runner';
 import { type SettledCommandResult } from './command.types';
 import { useMemoirData } from './data-context';
-import { type ComingBack, type HeroCommand, type HeroDeck, type RecoveryView } from './hero.types';
+import { themeAccentKey } from './hero.provider';
+import { type AccentKey, type ComingBack, type HeroCommand, type HeroDeck, type RecoveryView } from './hero.types';
 
 const heroKeys = {
   all: ['memoir', 'hero'] as const,
@@ -15,6 +16,13 @@ const heroKeys = {
 export function useHeroDeck(): UseQueryResult<HeroDeck> {
   const { hero, queryClient } = useMemoirData();
   return useQuery({ queryKey: heroKeys.deck, queryFn: () => hero.getDeck() }, queryClient);
+}
+
+/** Shares the deck query's cache entry but only re-renders its caller when the selected accent id changes. */
+export function useEquippedThemeAccentKey(): AccentKey | null {
+  const { hero, queryClient } = useMemoirData();
+  const query = useQuery({ queryKey: heroKeys.deck, queryFn: () => hero.getDeck(), select: deck => themeAccentKey(deck.cosmetics) }, queryClient);
+  return query.data ?? null;
 }
 
 export function useRecovery(): UseQueryResult<RecoveryView> {

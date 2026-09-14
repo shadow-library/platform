@@ -1,10 +1,10 @@
 import { Link } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
-import { Alert, Button, Card, Progress, Skeleton } from '@shadow-library/ui';
+import { Alert, Button, Card, Progress, Skeleton, Tabs } from '@shadow-library/ui';
 
 import { DataState } from '@/components/DataState';
 import { Screen, screenStyles } from '@/components/ScreenLayout';
-import { type HeroDeck, useComingBack, useHeroDeck } from '@/lib/data';
+import { heroAccentKey, type HeroDeck, useComingBack, useHeroDeck } from '@/lib/data';
 
 import { AchievementsPanel } from './achievements-panel';
 import { CosmeticsPanel } from './cosmetics-panel';
@@ -63,18 +63,27 @@ export function HeroScreen(): ReactElement {
               ))}
             </div>
 
-            <div className={styles.tabs} role="tablist" aria-label="Hero sections">
-              {TABS.map(item => (
-                <Button key={item.id} size="sm" variant={tab === item.id ? 'secondary' : 'ghost'} role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)}>
-                  {item.label}
-                </Button>
-              ))}
-            </div>
-
-            {tab === 'overview' ? <Overview deck={data} /> : null}
-            {tab === 'achievements' ? <AchievementsPanel achievements={data.achievements} /> : null}
-            {tab === 'titles' ? <TitlesPanel deck={data} /> : null}
-            {tab === 'cosmetics' ? <CosmeticsPanel deck={data} /> : null}
+            <Tabs value={tab} onValueChange={value => setTab(value as DeckTab)}>
+              <Tabs.List aria-label="Hero sections">
+                {TABS.map(item => (
+                  <Tabs.Tab key={item.id} value={item.id}>
+                    {item.label}
+                  </Tabs.Tab>
+                ))}
+              </Tabs.List>
+              <Tabs.Panel value="overview">
+                <Overview deck={data} />
+              </Tabs.Panel>
+              <Tabs.Panel value="achievements">
+                <AchievementsPanel achievements={data.achievements} />
+              </Tabs.Panel>
+              <Tabs.Panel value="titles">
+                <TitlesPanel deck={data} />
+              </Tabs.Panel>
+              <Tabs.Panel value="cosmetics">
+                <CosmeticsPanel deck={data} />
+              </Tabs.Panel>
+            </Tabs>
           </>
         )}
       </DataState>
@@ -109,9 +118,30 @@ function LevelProgress({ level, xpIntoLevel, xpForNextLevel }: { level: number; 
   );
 }
 
+const HP_PIP_CAP = 10;
+
+function HpTally({ hp, hpMax }: { hp: number; hpMax: number }): ReactElement {
+  if (hpMax === 0) return <div className={styles.tallyValue}>No HP yet</div>;
+
+  if (hpMax > HP_PIP_CAP)
+    return (
+      <div className={styles.hpBar}>
+        <Progress value={hp} max={hpMax} size="sm" label={`HP ${hp} of ${hpMax}`} />
+      </div>
+    );
+
+  return (
+    <div className={styles.pips} role="img" aria-label={`HP ${hp} of ${hpMax}`}>
+      {Array.from({ length: hpMax }, (_, index) => (
+        <span key={index} className={styles.pip} data-filled={index < hp} />
+      ))}
+    </div>
+  );
+}
+
 function Crest({ deck }: { deck: HeroDeck }): ReactElement {
   return (
-    <Card padding="lg">
+    <Card padding="lg" data-hero-accent={heroAccentKey(deck.cosmetics) ?? undefined}>
       <Card.Body>
         <div className={styles.crestRow}>
           <div className={styles.crest}>
@@ -130,11 +160,7 @@ function Crest({ deck }: { deck: HeroDeck }): ReactElement {
             </div>
             <div>
               <div className={styles.tallyLabel}>HP</div>
-              <div className={styles.pips} role="img" aria-label={`HP ${deck.hero.hp} of ${deck.hero.hpMax}`}>
-                {Array.from({ length: deck.hero.hpMax }, (_, index) => (
-                  <span key={index} className={styles.pip} data-filled={index < deck.hero.hp} />
-                ))}
-              </div>
+              <HpTally hp={deck.hero.hp} hpMax={deck.hero.hpMax} />
               <div className={styles.tallyNote}>{deck.hpNote}</div>
             </div>
             <div>

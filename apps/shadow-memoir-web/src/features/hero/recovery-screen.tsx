@@ -4,7 +4,7 @@ import { Alert, Badge, Button, Card, Progress, Skeleton, Statistic, toast } from
 
 import { DataState } from '@/components/DataState';
 import { Screen, ScreenColumns, screenStyles } from '@/components/ScreenLayout';
-import { type HeroIntensityMode, type RecoveryView, useDismissComingBack, useHeroCommand, useRecovery } from '@/lib/data';
+import { type HeroIntensityMode, notifyOutcome, type RecoveryView, useDismissComingBack, useHeroCommand, useRecovery } from '@/lib/data';
 
 import styles from './hero.module.css';
 
@@ -53,8 +53,14 @@ function RecoveryContent({ view, dismissing, focusDismissed, onDismiss }: Recove
     if (focusDismissed && dismissed) dismissedHeading.current?.focus();
   }, [focusDismissed, dismissed]);
 
-  const setIntensity = (mode: HeroIntensityMode): void => {
-    command.mutate({ type: 'intensity.set', mode }, { onSuccess: result => toast.neutral(result.message) });
+  const effectiveIntensity = view.pendingIntensity ?? view.intensity;
+
+  const setIntensity = async (mode: HeroIntensityMode): Promise<void> => {
+    if (command.isPending || mode === effectiveIntensity) return;
+    const name = view.intensityOptions.find(option => option.mode === mode)?.name ?? mode;
+    const outcome = await command.run({ type: 'intensity.set', mode });
+    const saved = outcome.status === 'applied' || outcome.status === 'queued-offline';
+    notifyOutcome(outcome, { action: 'change intensity to', subject: name, success: saved ? outcome.local.message : '' });
   };
 
   return (
@@ -164,15 +170,35 @@ function RecoveryContent({ view, dismissing, focusDismissed, onDismiss }: Recove
             How much the app should ask of you. This changes load and strictness across every quest at once, and it never changes experience already earned.
           </p>
           <div className={styles.options} role="group" aria-label="Intensity">
-            {view.intensityOptions.map(option => (
-              <button key={option.mode} type="button" className={styles.option} aria-pressed={view.intensity === option.mode} onClick={() => setIntensity(option.mode)}>
-                <span className={styles.optionDot} aria-hidden />
-                <span>
-                  <span className={styles.optionName}>{option.name}</span>
-                  <span className={styles.optionDesc}>{option.description}</span>
-                </span>
-              </button>
-            ))}
+            {view.intensityOptions.map(option => {
+              const pending = command.isPendingFor({ type: 'intensity.set', mode: option.mode });
+              const staged = view.pendingIntensity === option.mode;
+              return (
+                <button
+                  key={option.mode}
+                  type="button"
+                  className={styles.option}
+                  aria-pressed={view.intensity === option.mode}
+                  aria-busy={pending || undefined}
+                  aria-disabled={command.isPending || undefined}
+                  onClick={() => void setIntensity(option.mode)}
+                >
+                  <span className={styles.optionDot} aria-hidden />
+                  <span>
+                    <span className={styles.optionName}>
+                      {option.name}
+                      {staged ? (
+                        <Badge variant="soft" intent="info" size="sm">
+                          From tomorrow
+                        </Badge>
+                      ) : null}
+                      {pending ? <span className={styles.optionStatus}>Saving…</span> : null}
+                    </span>
+                    <span className={styles.optionDesc}>{option.description}</span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </Card.Body>
       </Card>

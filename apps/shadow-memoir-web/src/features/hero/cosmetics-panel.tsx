@@ -1,7 +1,9 @@
-import { type ReactElement } from 'react';
-import { Badge, Button, Card, toast } from '@shadow-library/ui';
+import { type ReactElement, useRef, useState } from 'react';
+import { Badge, Button, Card } from '@shadow-library/ui';
 
-import { type Cosmetic, type HeroDeck, useHeroCommand } from '@/lib/data';
+import { OverlaySurface } from '@/components/OverlaySurface';
+import { screenStyles } from '@/components/ScreenLayout';
+import { type Cosmetic, type HeroCommand, type HeroDeck, notifyOutcome, useHeroCommand } from '@/lib/data';
 
 import styles from './hero.module.css';
 
@@ -9,7 +11,7 @@ export interface CosmeticsPanelProps {
   deck: HeroDeck;
 }
 
-const ACTION_LABELS: Record<Cosmetic['state'], (cosmetic: Cosmetic) => string> = {
+const ACTION_LABELS: Record<Exclude<Cosmetic['state'], 'starter'>, (cosmetic: Cosmetic) => string> = {
   equipped: () => 'Equipped',
   owned: () => 'Equip',
   affordable: cosmetic => `Unlock for ${cosmetic.priceCoins} ◈`,
@@ -17,12 +19,38 @@ const ACTION_LABELS: Record<Cosmetic['state'], (cosmetic: Cosmetic) => string> =
   achievement: () => 'Comes with an achievement',
 };
 
+function cosmeticCommand(cosmetic: Cosmetic): HeroCommand {
+  return { type: cosmetic.state === 'owned' ? 'cosmetic.equip' : 'cosmetic.purchase', cosmeticId: cosmetic.id };
+}
+
 export function CosmeticsPanel({ deck }: CosmeticsPanelProps): ReactElement {
   const command = useHeroCommand();
+  const [confirming, setConfirming] = useState<Cosmetic | null>(null);
+  const [lastConfirming, setLastConfirming] = useState<Cosmetic | null>(null);
+  const [restoreFocusTo, setRestoreFocusTo] = useState<HTMLElement | null>(null);
+  const nameRefs = useRef(new Map<string, HTMLHeadingElement>());
+  const anyShort = deck.cosmetics.some(cosmetic => cosmetic.state === 'short');
 
-  const act = (cosmetic: Cosmetic): void => {
-    const type = cosmetic.state === 'owned' ? 'cosmetic.equip' : 'cosmetic.purchase';
-    command.mutate({ type, cosmeticId: cosmetic.id }, { onSuccess: result => toast.neutral(result.message) });
+  const act = async (cosmetic: Cosmetic): Promise<void> => {
+    const action = cosmetic.state === 'owned' ? 'equip' : 'unlock';
+    const outcome = await command.run(cosmeticCommand(cosmetic));
+    const saved = outcome.status === 'applied' || outcome.status === 'queued-offline';
+    notifyOutcome(outcome, { action, subject: cosmetic.name, success: saved ? outcome.local.message : '' });
+  };
+
+  const trigger = (cosmetic: Cosmetic, opener: HTMLElement): void => {
+    if (cosmetic.state !== 'affordable') return void act(cosmetic);
+    setRestoreFocusTo(opener);
+    setConfirming(cosmetic);
+    setLastConfirming(cosmetic);
+  };
+
+  const confirmPurchase = (): void => {
+    if (!confirming) return;
+    const heading = nameRefs.current.get(confirming.id) ?? null;
+    void act(confirming);
+    setConfirming(null);
+    if (heading) requestAnimationFrame(() => heading.focus());
   };
 
   return (
@@ -31,6 +59,7 @@ export function CosmeticsPanel({ deck }: CosmeticsPanelProps): ReactElement {
         <span className={styles.walletValue}>◈ {deck.hero.coins.toLocaleString()}</span>
         <span className={styles.walletNote}>Coins come from kept quests and crowns. They cannot be bought, and nothing here changes how the game plays.</span>
       </div>
+      {anyShort ? <p className={styles.walletNote}>Cosmetics you can’t yet afford wait here until your balance reaches them.</p> : null}
 
       <div className={styles.cards}>
         {deck.cosmetics.map(cosmetic => {
@@ -44,7 +73,15 @@ export function CosmeticsPanel({ deck }: CosmeticsPanelProps): ReactElement {
                     <span className={styles.glyph} data-owned={owned} aria-hidden>
                       {cosmetic.glyph}
                     </span>
-                    <span className={styles.tileName}>{cosmetic.name}</span>
+                    <h3
+                      className={styles.tileName}
+                      tabIndex={-1}
+                      ref={el => {
+                        if (el) nameRefs.current.set(cosmetic.id, el);
+                      }}
+                    >
+                      {cosmetic.name}
+                    </h3>
                     {cosmetic.state === 'equipped' ? (
                       <Badge variant="soft" intent="info" size="sm">
                         Equipped
@@ -52,15 +89,20 @@ export function CosmeticsPanel({ deck }: CosmeticsPanelProps): ReactElement {
                     ) : null}
                   </div>
                   <span className={styles.tileMeta}>{cosmetic.note}</span>
-                  {cosmetic.state === 'short' ? (
-                    <span className={styles.tileMeta}>
-                      {cosmetic.priceCoins} coins, and you have {deck.hero.coins}. It waits here until the balance reaches it.
-                    </span>
-                  ) : null}
                   <div className={styles.tileAction}>
-                    <Button size="sm" variant={cosmetic.state === 'equipped' ? 'ghost' : 'secondary'} disabled={!actionable} onClick={() => act(cosmetic)}>
-                      {ACTION_LABELS[cosmetic.state](cosmetic)}
-                    </Button>
+                    {cosmetic.state === 'starter' ? (
+                      <span className={styles.tileMeta}>Starter crest</span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant={cosmetic.state === 'equipped' ? 'ghost' : 'secondary'}
+                        disabled={actionable ? undefined : true}
+                        loading={command.isPendingFor(cosmeticCommand(cosmetic))}
+                        onClick={event => trigger(cosmetic, event.currentTarget)}
+                      >
+                        {ACTION_LABELS[cosmetic.state](cosmetic)}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </Card.Body>
@@ -68,6 +110,27 @@ export function CosmeticsPanel({ deck }: CosmeticsPanelProps): ReactElement {
           );
         })}
       </div>
+
+      <OverlaySurface
+        open={confirming !== null}
+        onOpenChange={open => {
+          if (!open) setConfirming(null);
+        }}
+        restoreFocusTo={restoreFocusTo}
+        title={lastConfirming ? `Unlock ${lastConfirming.name}` : 'Unlock'}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirming(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" loading={lastConfirming ? command.isPendingFor(cosmeticCommand(lastConfirming)) : false} onClick={confirmPurchase}>
+              Unlock
+            </Button>
+          </>
+        }
+      >
+        {lastConfirming ? <p className={screenStyles.cardBody}>{`Unlock ${lastConfirming.name} for ${lastConfirming.priceCoins} ◈? You have ${deck.hero.coins}.`}</p> : null}
+      </OverlaySurface>
     </>
   );
 }

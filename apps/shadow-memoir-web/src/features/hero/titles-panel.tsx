@@ -1,8 +1,8 @@
 import { type ReactElement } from 'react';
-import { Badge, Button, Card, EmptyState, toast } from '@shadow-library/ui';
+import { Badge, Button, Card, EmptyState } from '@shadow-library/ui';
 
 import { screenStyles } from '@/components/ScreenLayout';
-import { type HeroDeck, useHeroCommand } from '@/lib/data';
+import { type HeroDeck, notifyOutcome, useHeroCommand } from '@/lib/data';
 import { formatLocalDate } from '@/lib/format';
 
 import styles from './hero.module.css';
@@ -20,8 +20,10 @@ export function TitlesPanel({ deck }: TitlesPanelProps): ReactElement {
   const earned = deck.titles.filter(title => title.earnedOn !== null);
   const unearnedCount = deck.titles.length - earned.length;
 
-  const display = (titleId: string): void => {
-    command.mutate({ type: 'title.display', titleId }, { onSuccess: result => toast.neutral(result.message) });
+  const display = async (titleId: string | null, feedback: { action: string; subject: string }): Promise<void> => {
+    const outcome = await command.run({ type: 'title.display', titleId });
+    const saved = outcome.status === 'applied' || outcome.status === 'queued-offline';
+    notifyOutcome(outcome, { ...feedback, success: saved ? outcome.local.message : '' });
   };
 
   if (earned.length === 0)
@@ -57,7 +59,12 @@ export function TitlesPanel({ deck }: TitlesPanelProps): ReactElement {
                     {title.earnedFrom} · earned {formatLocalDate(title.earnedOn)}
                   </span>
                   <div className={styles.tileAction}>
-                    <Button size="sm" variant={displayed ? 'ghost' : 'secondary'} disabled={displayed} onClick={() => display(title.id)}>
+                    <Button
+                      size="sm"
+                      variant={displayed ? 'ghost' : 'secondary'}
+                      disabled={displayed || command.isPendingFor({ type: 'title.display', titleId: title.id })}
+                      onClick={() => void display(title.id, { action: 'display', subject: title.name })}
+                    >
                       {displayed ? 'Displayed' : `Display ${title.name}`}
                     </Button>
                   </div>
@@ -71,6 +78,16 @@ export function TitlesPanel({ deck }: TitlesPanelProps): ReactElement {
         {unearnedCount > 0 ? 'The rest of the catalogue arrives on its own, with no hints and no counters. ' : ''}
         One title is shown at a time, and every one you have earned is kept whatever you display.
       </p>
+      {deck.displayedTitleId !== null ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={command.isPendingFor({ type: 'title.display', titleId: null })}
+          onClick={() => void display(null, { action: 'clear', subject: 'the displayed title' })}
+        >
+          Clear displayed title
+        </Button>
+      ) : null}
     </>
   );
 }

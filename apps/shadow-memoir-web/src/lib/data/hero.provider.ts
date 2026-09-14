@@ -1,7 +1,57 @@
 import { type DispatchOptions, type SettledCommandResult } from './command.types';
 import { type Persona } from './fixtures';
-import { type Achievement, type ComingBack, type Cosmetic, type HeroCommand, type HeroDeck, type HeroIntensityMode, type HeroTitle, type RecoveryView } from './hero.types';
+import {
+  type AccentKey,
+  type Achievement,
+  type ComingBack,
+  type Cosmetic,
+  type HeroCommand,
+  type HeroDeck,
+  type HeroIntensityMode,
+  type HeroTitle,
+  type RecoveryView,
+} from './hero.types';
 import { type HeroState } from './view.types';
+
+export const UNTITLED_HERO_NAME = 'New hero';
+export const STARTER_COSMETIC_ID = 'badge_bronze';
+
+export function hpNoteFor(hp: number, hpMax: number): string {
+  if (hpMax === 0) return 'Arrives with your first quest kept.';
+  if (hp === hpMax) return 'full';
+  return 'Regenerates overnight, on its own.';
+}
+
+/** A hero with earned titles but none displayed can pick one; a hero with none yet has nothing to choose. */
+export function nameFor(displayedName: string | undefined, anyTitleEarned: boolean): string {
+  if (displayedName) return displayedName;
+  return anyTitleEarned ? 'Choose a name' : UNTITLED_HERO_NAME;
+}
+
+type CosmeticId =
+  'badge_bronze' | 'badge_silver' | 'badge_gold_streak' | 'accent_ember' | 'accent_frost' | 'accent_aurora_platinum' | 'theme_sunrise' | 'theme_midnight' | 'theme_returner';
+
+const ACCENT_KEYS: Partial<Record<CosmeticId, AccentKey>> = {
+  accent_ember: 'ember',
+  accent_frost: 'frost',
+  accent_aurora_platinum: 'aurora',
+  theme_sunrise: 'sunrise',
+  theme_midnight: 'midnight',
+  theme_returner: 'returner',
+};
+
+function equippedAccentOf(cosmetics: Cosmetic[], kind: Cosmetic['kind']): AccentKey | null {
+  const equipped = cosmetics.find(cosmetic => cosmetic.kind === kind && cosmetic.state === 'equipped');
+  return equipped ? (ACCENT_KEYS[equipped.id as CosmeticId] ?? null) : null;
+}
+
+export function themeAccentKey(cosmetics: Cosmetic[]): AccentKey | null {
+  return equippedAccentOf(cosmetics, 'theme_accent');
+}
+
+export function heroAccentKey(cosmetics: Cosmetic[]): AccentKey | null {
+  return equippedAccentOf(cosmetics, 'hero_accent');
+}
 
 export interface HeroProvider {
   getDeck(): Promise<HeroDeck>;
@@ -25,8 +75,8 @@ export interface AchievementSeed {
 export const ACHIEVEMENTS: AchievementSeed[] = [
   { id: 'first_quest_completed', name: 'First Promise', crest: '◈', teaser: 'Something about beginning', description: 'The first quest you completed.', reward: '+50 XP' },
   { id: 'first_level_up', name: 'Second Level', crest: '▲', teaser: 'Something about the first climb', description: 'The first level you reached.', reward: '+50 XP · 10 coins' },
-  { id: 'first_bronze_streak', name: 'Three Days', crest: '·', teaser: 'Something about three days', description: 'A three-day run on any quest.', reward: '+60 XP' },
-  { id: 'first_silver_streak', name: 'Seven Days', crest: '∴', teaser: 'Something about a full week', description: 'A seven-day run on any quest.', reward: '+120 XP' },
+  { id: 'first_bronze_streak', name: 'Three Days', crest: '✱', teaser: 'Something about three days', description: 'A three-day run on any quest.', reward: '+60 XP' },
+  { id: 'first_silver_streak', name: 'Seven Days', crest: '✵', teaser: 'Something about a full week', description: 'A seven-day run on any quest.', reward: '+120 XP' },
   {
     id: 'first_gold_streak',
     name: 'Thirty Mornings',
@@ -43,7 +93,7 @@ export const ACHIEVEMENTS: AchievementSeed[] = [
     description: 'A hundred-day run on one quest.',
     reward: '+600 XP · 80 coins',
   },
-  { id: 'xp_100', name: 'First Hundred', crest: '◦', teaser: 'Something about the first hundred', description: 'A hundred experience earned.', reward: '+25 XP' },
+  { id: 'xp_100', name: 'First Hundred', crest: '✪', teaser: 'Something about the first hundred', description: 'A hundred experience earned.', reward: '+25 XP' },
   { id: 'xp_500', name: 'Five Hundred', crest: '◎', teaser: 'Something about five hundred', description: 'Five hundred experience earned.', reward: '+75 XP' },
   {
     id: 'first_subscription_confirmed',
@@ -143,15 +193,22 @@ export interface CosmeticSeed {
 }
 
 export const COSMETICS: CosmeticSeed[] = [
-  { id: 'badge_bronze', name: 'Bronze badge', glyph: '✒', kind: 'badge', priceCoins: 50, note: 'The crest you started with.' },
+  { id: STARTER_COSMETIC_ID, name: 'Bronze badge', glyph: '✒', kind: 'badge', priceCoins: 50, note: 'The crest you started with.' },
   { id: 'badge_silver', name: 'Silver badge', glyph: '⛨', kind: 'badge', priceCoins: 150, note: 'Plain, heavy and slow to earn.' },
   { id: 'badge_gold_streak', name: 'Gold streak badge', glyph: '❄', kind: 'badge', priceCoins: null, note: 'Comes with an achievement, never with coins.' },
   { id: 'accent_ember', name: 'Ember accent', glyph: '◐', kind: 'hero_accent', priceCoins: 100, note: 'A warm edge on the hero card.' },
   { id: 'accent_frost', name: 'Frost accent', glyph: '❖', kind: 'hero_accent', priceCoins: 100, note: 'A cold blue edge on the hero card.' },
-  { id: 'accent_aurora_platinum', name: 'Aurora accent', glyph: '♛', kind: 'hero_accent', priceCoins: null, note: 'Comes with a hundred-day run.' },
+  {
+    id: 'accent_aurora_platinum',
+    name: 'Aurora accent',
+    glyph: '♛',
+    kind: 'hero_accent',
+    priceCoins: null,
+    note: 'A radiant edge on the hero card. Comes with a hundred-day run.',
+  },
   { id: 'theme_sunrise', name: 'Sunrise theme', glyph: '☀', kind: 'theme_accent', priceCoins: 75, note: 'A lighter accent across every surface.' },
   { id: 'theme_midnight', name: 'Midnight theme', glyph: '◑', kind: 'theme_accent', priceCoins: 75, note: 'A darker accent across every surface.' },
-  { id: 'theme_returner', name: 'Returner theme', glyph: '⟲', kind: 'theme_accent', priceCoins: null, note: 'Comes with the Returner ritual.' },
+  { id: 'theme_returner', name: 'Returner theme', glyph: '⟲', kind: 'theme_accent', priceCoins: null, note: 'A warm accent across every surface. Comes with the Returner ritual.' },
 ];
 const EARNED_BY_PERSONA: Record<Persona, Record<string, string>> = {
   new: {},
@@ -200,9 +257,9 @@ const TITLES_BY_PERSONA: Record<Persona, Record<string, string>> = {
 };
 
 const OWNED_BY_PERSONA: Record<Persona, string[]> = {
-  new: ['badge_bronze'],
-  active: ['badge_bronze', 'accent_frost'],
-  recovery: ['badge_bronze'],
+  new: [STARTER_COSMETIC_ID],
+  active: [STARTER_COSMETIC_ID, 'accent_frost'],
+  recovery: [STARTER_COSMETIC_ID],
 };
 
 const LIFETIME_BY_PERSONA: Record<Persona, HeroDeck['lifetime']> = {
@@ -343,7 +400,7 @@ export function createHeroProvider({ persona = 'active', hero }: HeroFixtureOpti
     hero: { ...hero },
     displayedTitleId: titles.find(title => title.name === hero.title)?.id ?? titles.find(title => title.earnedOn !== null)?.id ?? null,
     owned: new Set(OWNED_BY_PERSONA[persona]),
-    equipped: { badge: 'badge_bronze', hero_accent: null, theme_accent: null },
+    equipped: { badge: STARTER_COSMETIC_ID, hero_accent: null, theme_accent: null },
     intensity: persona === 'recovery' ? 'gentle' : 'standard',
     comingBackDismissed: false,
   };
@@ -358,14 +415,20 @@ export function createHeroProvider({ persona = 'active', hero }: HeroFixtureOpti
     const displayed = earnedTitles.find(title => title.id === state.displayedTitleId);
     const momentum = MOMENTUM_COPY[state.persona];
     return {
-      hero: { ...state.hero, title: displayed?.name ?? 'Unnamed hero' },
+      hero: {
+        ...state.hero,
+        title: nameFor(
+          displayed?.name,
+          earnedTitles.some(title => title.earnedOn !== null),
+        ),
+      },
       subtitle:
         state.persona === 'new'
           ? 'Level 1 · no quests yet · nothing to lose'
           : `Level ${state.hero.level} · 214 days in Shadow Memoir · ${Object.keys(EARNED_BY_PERSONA[state.persona]).length} achievements`,
       shields: state.persona === 'new' ? 0 : 2,
       shieldCap: 3,
-      hpNote: state.hero.hp === state.hero.hpMax ? 'full' : 'restores one a week on its own',
+      hpNote: hpNoteFor(state.hero.hp, state.hero.hpMax),
       momentumLabel: momentum.label,
       momentumNote: momentum.note,
       crownNote:
@@ -394,6 +457,7 @@ export function createHeroProvider({ persona = 'active', hero }: HeroFixtureOpti
     ],
     choices: comingBack().kind === 'offered' ? RECOVERY_CHOICES : [],
     intensity: state.intensity,
+    pendingIntensity: null,
     intensityOptions: INTENSITY_OPTIONS,
     missed: [
       { id: 'm1', title: 'Morning run', meta: '11–18 August · 8 occurrences', state: 'Excluded' },

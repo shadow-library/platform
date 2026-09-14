@@ -18,6 +18,10 @@
   line-height: 1;
 }
 
+:global([data-hero-accent]) .crest {
+  border: 1px solid var(--sh-accent);
+}
+
 .crestLevel {
   font-family: var(--sh-font-mono);
   font-size: 28px;
@@ -94,6 +98,8 @@
 .pips {
   display: flex;
   gap: 4px;
+  flex-wrap: wrap;
+  max-width: 150px;
   margin-top: 9px;
 }
 
@@ -107,6 +113,11 @@
 .pip[data-filled='true'] {
   background: var(--sh-accent);
   border-color: var(--sh-accent);
+}
+
+.hpBar {
+  width: 140px;
+  margin-top: 9px;
 }
 
 .stats {
@@ -134,12 +145,6 @@
   margin: 9px 0 0;
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);
-}
-
-.tabs {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
 }
 
 .events {
@@ -291,7 +296,7 @@
 
 .achievementMeta {
   font-size: var(--sh-text-caption);
-  color: var(--sh-text-tertiary);
+  color: var(--sh-text-secondary);
   line-height: 1.35;
 }
 
@@ -322,6 +327,7 @@
 }
 
 .tileName {
+  margin: 0;
   font-size: var(--sh-text-body-sm);
   font-weight: 600;
 }
@@ -435,14 +441,27 @@
   padding: 12px;
   border-radius: var(--sh-radius-lg);
   border: 1px solid var(--sh-border-subtle);
-  background: var(--sh-surface-well);
+  background: var(--sh-surface-card);
   color: inherit;
   cursor: pointer;
+}
+
+.option:hover:not([aria-disabled='true']) {
+  border-color: var(--sh-border-strong);
 }
 
 .option[aria-pressed='true'] {
   background: var(--sh-accent-soft);
   border-color: var(--sh-accent);
+}
+
+.option[aria-disabled='true']:not([aria-busy='true']) {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.option[aria-disabled='true'][aria-busy='true'] {
+  cursor: progress;
 }
 
 .optionDot {
@@ -460,9 +479,17 @@
 }
 
 .optionName {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   font-size: var(--sh-text-body-sm);
   font-weight: 600;
+}
+
+.optionStatus {
+  font-weight: 500;
+  color: var(--sh-text-tertiary);
 }
 
 .optionDesc {

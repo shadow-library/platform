@@ -23,8 +23,10 @@ export interface HeroTitle {
 
 export type CosmeticKind = 'badge' | 'hero_accent' | 'theme_accent';
 
-/** `achievement` cosmetics are never purchasable — coins and achievements are the only two acquisition paths (PRD §2.9). */
-type CosmeticState = 'equipped' | 'owned' | 'affordable' | 'short' | 'achievement';
+export type AccentKey = 'ember' | 'frost' | 'aurora' | 'sunrise' | 'midnight' | 'returner';
+
+/** `achievement` is never purchasable (PRD §2.9); `starter` is owned by every account but never server-granted, so it carries no action until that lands. */
+type CosmeticState = 'equipped' | 'owned' | 'affordable' | 'short' | 'achievement' | 'starter';
 
 export interface Cosmetic {
   id: string;
@@ -111,6 +113,8 @@ export interface RecoveryView {
   stats: { label: string; value: number; unit?: string }[];
   choices: RecoveryChoice[];
   intensity: HeroIntensityMode;
+  /** Staged for the next daily rollover — not yet in effect, so it must never look already selected. */
+  pendingIntensity: HeroIntensityMode | null;
   intensityOptions: IntensityOption[];
   missed: MissedWhileAway[];
   progress: { percent: number; note: string } | null;
