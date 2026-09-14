@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { assertUnderProjectCap, isProjectCapReached } from '@modules/project';
 import { type AppError, Config } from '@shadow-library/common';
 
+import { type OwnerRef } from '@server/common';
+
 function setConfig(key: string, value: unknown): void {
   (Config as unknown as { cache: Map<string, unknown> })['cache'].set(key, value);
 }
@@ -40,16 +42,18 @@ describe('assertUnderProjectCap', () => {
       },
     }) as never;
 
+  const owner: OwnerRef = { kind: 'user', id: BigInt(7) };
+
   afterEach(() => clearConfig('projects.max-per-owner'));
 
   it('should pass when the owner is below the configured cap', async () => {
     setConfig('projects.max-per-owner', 100);
-    await assertUnderProjectCap(stubDb(99), BigInt(7));
+    await assertUnderProjectCap(stubDb(99), owner);
   });
 
   it('should throw PRJ_004 once the owner reaches the cap', async () => {
     setConfig('projects.max-per-owner', 3);
-    const err = (await assertUnderProjectCap(stubDb(3), BigInt(7)).catch((e: AppError) => e)) as AppError;
+    const err = (await assertUnderProjectCap(stubDb(3), owner).catch((e: AppError) => e)) as AppError;
     expect(err.code).toBe('PRJ_004');
   });
 
@@ -58,7 +62,7 @@ describe('assertUnderProjectCap', () => {
     let counted = false;
     await assertUnderProjectCap(
       stubDb(9_999, () => (counted = true)),
-      BigInt(7),
+      owner,
     );
     expect(counted).toBe(false);
   });

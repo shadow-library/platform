@@ -72,13 +72,16 @@ export class ReforgePromoteService {
     });
 
     const title = options.title?.trim() || source.title || source.name;
-    if (source.ownerId != null) await assertUnderProjectCap(this.db, source.ownerId);
+    if (source.ownerId != null) await assertUnderProjectCap(this.db, { kind: source.ownerKind, id: source.ownerId });
     const promoted = await this.db.transaction(async rawTx => {
       const tx = rawTx as unknown as PrimaryDatabase;
       const [project] = await tx
         .insert(schema.projects)
         .values({
+          ownerKind: source.ownerKind,
           ownerId: source.ownerId,
+          organisationId: source.organisationId,
+          sharedWithOrg: source.sharedWithOrg,
           name: title,
           kind: 'curated',
           title,
@@ -92,7 +95,7 @@ export class ReforgePromoteService {
         .returning()
         .catch(err => this.databaseService.translateError(err));
       if (!project) throw AppError.internal(`failed to create the promoted project for plan ${plan.id}`);
-      if (project.coverImagePath) await trackUploadedCover(tx, project.id, project.coverImagePath, project.ownerId);
+      if (project.coverImagePath) await trackUploadedCover(tx, project.id, project.coverImagePath, project);
       return project;
     });
 

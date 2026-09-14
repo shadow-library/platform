@@ -2,6 +2,7 @@ import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, index, integer, pgEnum, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 import { jsonb } from './jsonb';
+import { ownerKind } from './owner';
 import { projects } from './projects';
 
 export namespace Illustration {
@@ -101,11 +102,15 @@ export const illustrations = pgTable(
     references: jsonb('references').$type<Illustration.Reference[]>().notNull().default([]),
     selectedRef: varchar('selected_ref'),
     revision: integer('revision').notNull().default(1),
+    ownerKind: ownerKind('owner_kind').notNull().default('user'),
     ownerId: bigint('owner_id', { mode: 'bigint' }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  t => [index('illustrations_project_id_subject_type_subject_key_idx').on(t.projectId, t.subjectType, t.subjectKey)],
+  t => [
+    index('illustrations_project_id_subject_type_subject_key_idx').on(t.projectId, t.subjectType, t.subjectKey),
+    index('illustrations_owner_kind_owner_id_idx').on(t.ownerKind, t.ownerId),
+  ],
 );
 
 export const illustrationsRelations = relations(illustrations, ({ one }) => ({

@@ -1,5 +1,6 @@
 import { and, eq, or, type SQL, sql } from 'drizzle-orm';
 
+import { type OwnedRow } from '@server/common';
 import { type Illustration, type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { hashInstructions } from './prompt-spec';
@@ -33,7 +34,7 @@ export function illustrationReferences(ref: string): SQL | undefined {
  * also the state `save()` writes the cover from. Run it inside the transaction that wrote the cover, after that write,
  * so the project row lock serialises concurrent writers.
  */
-export async function trackUploadedCover(tx: PrimaryDatabase, projectId: bigint, ref: string, ownerId: bigint | null): Promise<void> {
+export async function trackUploadedCover(tx: PrimaryDatabase, projectId: bigint, ref: string, owner: OwnedRow): Promise<void> {
   // Stricter than the 0032 backfill on purpose: at write time a saved illustration, or a stale candidate ref, must not leave the new cover unprocessable.
   const tracked = await tx.$count(
     schema.illustrations,
@@ -54,7 +55,8 @@ export async function trackUploadedCover(tx: PrimaryDatabase, projectId: bigint,
     promptSpec,
     candidates: [{ ref, createdAt: new Date().toISOString(), instructionsHash: hashInstructions(promptSpec.instructions), referenceRefs: [], references: [] }],
     selectedRef: ref,
-    ownerId,
+    ownerKind: owner.ownerKind,
+    ownerId: owner.ownerId,
   });
 }
 
@@ -62,7 +64,7 @@ export function setProjectCover(db: PrimaryDatabase, projectId: bigint, ref: str
   return db.transaction(async rawTx => {
     const tx = rawTx as unknown as PrimaryDatabase;
     const [project] = await tx.update(schema.projects).set({ coverImagePath: ref, updatedAt: new Date() }).where(eq(schema.projects.id, projectId)).returning();
-    if (project) await trackUploadedCover(tx, projectId, ref, project.ownerId);
+    if (project) await trackUploadedCover(tx, projectId, ref, project);
     return project;
   });
 }

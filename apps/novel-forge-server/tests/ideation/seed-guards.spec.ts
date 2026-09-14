@@ -136,7 +136,7 @@ describe.if(pgAvailable)('seed-status guards', () => {
   describe('ProjectService.clone', () => {
     /** Unlike the other guarded calls, `clone` attributes the new project to an owner, so it reads the principal before reaching the guard. */
     beforeEach(() => {
-      spyOn(testEnv.getService(ContextService), 'getAuthPrincipal').mockReturnValue({ sub: '1' } as never);
+      spyOn(testEnv.getService(ContextService), 'getAuthPrincipal').mockReturnValue({ kind: 'user', sub: '1' } as never);
     });
 
     afterAll(() => mock.restore());
@@ -156,7 +156,7 @@ describe.if(pgAvailable)('seed-status guards', () => {
 
     // `create` reads the owner from the request-scoped principal, which no service-level call has.
     function projectServiceAsOwner(): ProjectService {
-      spyOn(testEnv.getService(ContextService), 'getAuthPrincipal').mockReturnValue({ sub: '1' } as never);
+      spyOn(testEnv.getService(ContextService), 'getAuthPrincipal').mockReturnValue({ kind: 'user', sub: '1' } as never);
       return testEnv.getService(ProjectService);
     }
 

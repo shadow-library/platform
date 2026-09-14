@@ -1,3 +1,4 @@
+export * from './owner';
 export * from './projects';
 export * from './chapters';
 export * from './knowledge';

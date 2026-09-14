@@ -3,8 +3,10 @@ import { AppError, Logger } from '@shadow-library/common';
 import { Body, ContextService, Get, HttpController, type HttpResponse, HttpStatus, Params, Put, Res, RespondFor } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
+import { ActorService } from '@modules/actor';
 import { ApiKeyAuthenticated } from '@modules/api-key';
 import { AppErrorCode } from '@server/classes';
+import { isOwnedBy } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
@@ -29,6 +31,7 @@ export class OriginalsIngestController {
 
   constructor(
     private readonly translationService: TranslationService,
+    private readonly actorService: ActorService,
     private readonly context: ContextService,
     private readonly audit: IngestAuditService,
     databaseService: DatabaseService,
@@ -63,8 +66,8 @@ export class OriginalsIngestController {
 
   /** A project held by a different owner is answered exactly as one that does not exist, so the surface is not an id oracle. */
   private async requireOwned(projectId: bigint, action: IngestAction): Promise<void> {
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { ownerId: true } });
-    if (project && project.ownerId === BigInt(this.context.getAuthPrincipal().sub)) return;
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { ownerKind: true, ownerId: true } });
+    if (project && isOwnedBy(project, this.actorService.current())) return;
 
     if (project) this.logger.warn('originals ingest addressed a project held by another owner', { projectId: projectId.toString() });
     await this.record(action, projectId, 'not_found');

@@ -3,13 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, utils } from '@shadow-library/common';
-import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { seedContentHash } from '@server/common';
+import { ownedBy, type OwnerRef, seedContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type Ideation, type PrimaryDatabase, type PrimaryTransaction, type Refinement, schema } from '@server/database';
+
+import { ActorService } from '@modules/actor';
 
 import { ContextAssembler, IDEATION_HISTORY_BUDGET } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
@@ -69,7 +70,7 @@ export class IdeationService {
 
   constructor(
     private readonly databaseService: DatabaseService,
-    private readonly context: ContextService,
+    private readonly actorService: ActorService,
     private readonly projectService: ProjectService,
     private readonly contextAssembler: ContextAssembler,
     private readonly modelRouter: ModelRouterService,
@@ -85,8 +86,8 @@ export class IdeationService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  private ownerId(): bigint {
-    return BigInt(this.context.getAuthPrincipal().sub);
+  private owner(): OwnerRef {
+    return this.actorService.current();
   }
 
   private present({ seed, name }: NamedSeed, sessionId: string | null): SeedResponse {
@@ -199,7 +200,7 @@ export class IdeationService {
     const ownedSeedProjectIds = this.db
       .select({ id: schema.projects.id })
       .from(schema.projects)
-      .where(and(eq(schema.projects.ownerId, this.ownerId()), eq(schema.projects.status, 'seed')));
+      .where(and(ownedBy(schema.projects, this.owner()), eq(schema.projects.status, 'seed')));
     const where = inArray(schema.storySeeds.projectId, ownedSeedProjectIds);
     const column = query.sortBy === 'createdAt' ? schema.storySeeds.createdAt : schema.storySeeds.updatedAt;
     const order = query.sortOrder === 'asc' ? asc(column) : desc(column);

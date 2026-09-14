@@ -8,6 +8,7 @@ export * from './draft-fields';
 export * from './draft-staleness';
 export * from './enum.dto';
 export * from './finalize-gate';
+export * from './owner';
 export * from './project-status';
 export * from './publish-token';
 export * from './sanitize-content';

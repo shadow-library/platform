@@ -253,6 +253,13 @@
       "when": 1789328491086,
       "tag": "0035_past_prowler",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1789359790813,
+      "tag": "0036_loose_zeigeist",
+      "breakpoints": true
     }
   ]
 }

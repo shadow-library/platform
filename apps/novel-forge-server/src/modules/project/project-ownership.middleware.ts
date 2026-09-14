@@ -1,23 +1,35 @@
 import { eq, sql } from 'drizzle-orm';
 import { type PgPreparedQuery, type PreparedQueryConfig } from 'drizzle-orm/pg-core';
 import { type HandlerMetadata } from '@shadow-library/app';
+import { AuthClient } from '@shadow-library/auth';
 import { Logger } from '@shadow-library/common';
 import { ContextService, type HttpRequest, Middleware, type RouteHandler } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, schema } from '@server/database';
+import { isOwnedBy } from '@server/common';
+import { APP_NAME, CURATE_PERMISSION } from '@server/constants';
+import { type Owner, type PrimaryDatabase, schema } from '@server/database';
+
+import { type Actor, ActorService } from '@modules/actor';
+
+interface ProjectOwnership {
+  ownerKind: Owner.Kind;
+  ownerId: bigint | null;
+  organisationId: bigint | null;
+  sharedWithOrg: boolean;
+}
 
 /**
  * Object-level authorization for every project-scoped route (audit finding NF-BOLA-01). The class-level
- * `@Authenticated()` on each controller proves *who* the caller is; this guard proves the caller *owns*
+ * `@Authenticated()` on each controller proves *who* the caller is; this guard proves the caller may reach
  * the project the route addresses. It runs after the package `AuthGuard`, which authenticates a stage
- * earlier on `preValidation`, and, for any route that carries a project identifier in its path,
- * loads that project's `owner_id` and rejects the request unless it matches the caller. A missing project
- * or a null `owner_id` is treated as a denial — the response is always a 404 (`PRJ_001`) so a probing
- * caller cannot distinguish "not yours" from "does not exist". Routes without a project param (project
- * create/list, jobs, ai) generate no handler and are scoped by their own services instead.
+ * earlier on `preValidation`, and, for any route that carries a project identifier in its path, loads that
+ * project's owner and rejects the request unless the caller owns it — or is an organisation curator on a
+ * project its bot owner shared. A missing project or a null `owner_id` is treated as a denial — the
+ * response is always a 404 (`PRJ_001`) so a probing caller cannot distinguish "not yours" from "does not
+ * exist". Routes without a project param (project create/list, jobs, ai) generate no handler and are
+ * scoped by their own services instead.
  */
 
 @Middleware({ type: 'preHandler', weight: 50 })
@@ -25,15 +37,20 @@ export class ProjectOwnershipGuard {
   private readonly logger = Logger.getLogger(APP_NAME, ProjectOwnershipGuard.name);
   private readonly db: PrimaryDatabase;
   /** Prepared because this guard runs on every project-scoped request; the driver builds no server-side statement, the saving is Drizzle's per-call SQL generation. */
-  private readonly projectOwnerQuery: PgPreparedQuery<PreparedQueryConfig & { execute: { ownerId: bigint | null } | undefined }>;
+  private readonly projectOwnerQuery: PgPreparedQuery<PreparedQueryConfig & { execute: ProjectOwnership | undefined }>;
 
   constructor(
     private readonly context: ContextService,
+    private readonly actorService: ActorService,
+    private readonly authClient: AuthClient,
     databaseService: DatabaseService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
     this.projectOwnerQuery = this.db.query.projects
-      .findFirst({ where: eq(schema.projects.id, sql.placeholder('projectId')), columns: { ownerId: true } })
+      .findFirst({
+        where: eq(schema.projects.id, sql.placeholder('projectId')),
+        columns: { ownerKind: true, ownerId: true, organisationId: true, sharedWithOrg: true },
+      })
       .prepare('novel_forge_project_owner');
   }
 
@@ -46,9 +63,8 @@ export class ProjectOwnershipGuard {
     if (!param) return undefined;
 
     const handler = async (request: HttpRequest): Promise<void> => {
-      const principal = this.context.getAuthPrincipal();
       const params = (request.params ?? {}) as Record<string, unknown>;
-      await this.assertOwner(params[param], principal.sub);
+      await this.assertPermitted(params[param]);
     };
 
     return handler as unknown as RouteHandler;
@@ -62,16 +78,36 @@ export class ProjectOwnershipGuard {
     return undefined;
   }
 
-  private async assertOwner(rawProjectId: unknown, sub: string): Promise<void> {
+  private async assertPermitted(rawProjectId: unknown): Promise<void> {
     const projectId = this.toBigInt(rawProjectId);
-    const ownerId = this.toBigInt(sub);
-    if (projectId === null || ownerId === null) throw AppErrorCode.PRJ_001.create();
+    if (projectId === null) throw AppErrorCode.PRJ_001.create();
 
+    const actor = this.actorService.current();
     const project = await this.projectOwnerQuery.execute({ projectId });
-    if (!project || project.ownerId === null || project.ownerId !== ownerId) {
-      this.logger.warn('rejected cross-owner project access', { projectId: projectId.toString(), caller: ownerId.toString() });
-      throw AppErrorCode.PRJ_001.create();
-    }
+    if (!project) throw AppErrorCode.PRJ_001.create();
+    if (isOwnedBy(project, actor)) return;
+    if (await this.isOrganisationCurator(project, actor)) return;
+
+    this.logger.warn('rejected cross-owner project access', { projectId: projectId.toString(), callerKind: actor.kind, caller: actor.id.toString() });
+    throw AppErrorCode.PRJ_001.create();
+  }
+
+  /**
+   * The sharing branch: a project its owner opened to the organisation is reachable by a member of that same
+   * organisation who holds `novel-forge:curate` there. Only a user qualifies — a bot is granted permissions
+   * for its own work, never for reading another principal's records — and a null organisation on either side
+   * never matches, which today keeps user-owned projects out because nothing ever writes their organisation column.
+   *
+   * `highRisk` because this guard is the only authorization on the destructive project routes, which scope by id
+   * alone: at the default TTL a revoked curator would keep delete rights on someone else's project for 15 minutes.
+   */
+  private async isOrganisationCurator(project: ProjectOwnership, actor: Actor): Promise<boolean> {
+    if (actor.kind !== 'user' || !project.sharedWithOrg) return false;
+    if (project.organisationId === null || project.organisationId !== actor.organisationId) return false;
+
+    const principal = this.context.getAuthPrincipal();
+    const organisationId = project.organisationId.toString();
+    return this.authClient.check({ action: CURATE_PERMISSION, organisationId, principal }, { highRisk: true });
   }
 
   // The param may already be a bigint (routes whose DTO transforms it) or a raw string (e.g. the image

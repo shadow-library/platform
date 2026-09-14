@@ -3,6 +3,7 @@ import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
+import { ownedBy, type OwnerRef } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Job, type PrimaryDatabase, schema } from '@server/database';
 
@@ -120,14 +121,14 @@ export class JobService {
   }
 
   // The owner-scoped read behind `GET /api/v1/jobs/:jobId` (NF-BOLA-02): a job is only visible to the
-  // owner of its project. Resolving projectId → owner_id via an inner join returns nothing when the job
-  // is missing or owned by someone else, and a null owner_id never matches — so it fails closed.
-  async getForOwner(jobId: string, ownerId: bigint): Promise<Job.Row | undefined> {
+  // owner of its project. Resolving projectId → owner via an inner join returns nothing when the job is
+  // missing or owned by someone else, and a null owner_id never matches — so it fails closed.
+  async getForOwner(jobId: string, owner: OwnerRef): Promise<Job.Row | undefined> {
     const [row] = await this.db
       .select({ job: schema.jobs })
       .from(schema.jobs)
       .innerJoin(schema.projects, eq(schema.jobs.projectId, schema.projects.id))
-      .where(and(eq(schema.jobs.id, jobId), eq(schema.projects.ownerId, ownerId)))
+      .where(and(eq(schema.jobs.id, jobId), ownedBy(schema.projects, owner)))
       .limit(1);
     return row?.job;
   }

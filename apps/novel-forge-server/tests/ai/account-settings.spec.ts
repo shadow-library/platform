@@ -2,6 +2,8 @@ import { SQL } from 'bun';
 import { describe, expect, it } from 'bun:test';
 
 import { AccountSettingsService } from '@modules/ai/account-settings.service';
+import { schema } from '@server/database';
+import { TEST_USER } from '@tests/test-idp';
 import { TestEnvironment } from '@tests/test-environment';
 
 const pgAvailable = await (async () => {
@@ -94,5 +96,25 @@ describe.if(pgAvailable)('Account settings API', () => {
     const projectId = BigInt((await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'plain', kind: 'new_novel' })).json().id);
 
     expect(await testEnv.getService(AccountSettingsService).defaultsFor(undefined, projectId)).toBeUndefined();
+  });
+
+  it('should leave a bot-owned project on the platform defaults though a user with the same id saved some', async () => {
+    await testEnv
+      .getRouter()
+      .mockRequest()
+      .put('/api/v1/ai/settings')
+      .body({ models: { ideation: GLM } });
+    const [project] = await testEnv
+      .getPostgresClient()
+      .insert(schema.projects)
+      .values({ name: 'bot-owned', kind: 'new_novel', ownerKind: 'bot', ownerId: BigInt(TEST_USER.userId), organisationId: BigInt(7001) })
+      .returning({ id: schema.projects.id });
+    const projectId = project?.id as bigint;
+
+    const settings = testEnv.getService(AccountSettingsService);
+
+    expect(await settings.defaultsFor(undefined, projectId)).toBeUndefined();
+    expect(await settings.defaultsFor({ ownerKind: 'bot', ownerId: BigInt(TEST_USER.userId) })).toBeUndefined();
+    expect(await settings.defaultsFor({ ownerKind: 'user', ownerId: BigInt(TEST_USER.userId) })).toEqual({ ideation: GLM });
   });
 });

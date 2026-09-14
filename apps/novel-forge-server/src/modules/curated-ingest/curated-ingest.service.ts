@@ -6,8 +6,11 @@ import { DatabaseService } from '@shadow-library/modules';
 import { chapterContentHash } from '@shadow-library/sdk/publishing';
 
 import { AppErrorCode } from '@server/classes';
+import { isOwnedBy } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type ImportedNovelMetaData, type PrimaryDatabase, type Project, schema } from '@server/database';
+
+import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
 
 import { landFinalChapters } from '../novel-import/land-chapters';
 import { ProjectService } from '../project';
@@ -27,6 +30,7 @@ export class CuratedIngestService {
 
   constructor(
     private readonly databaseService: DatabaseService,
+    private readonly actorService: ActorService,
     private readonly context: ContextService,
     private readonly projectService: ProjectService,
     private readonly audit: IngestAuditService,
@@ -55,7 +59,7 @@ export class CuratedIngestService {
       const [project] = await tx
         .insert(schema.projects)
         .values({
-          ownerId: this.owner(),
+          ...projectOwnerColumns(this.owner()),
           name: body.title,
           kind: 'curated' as const,
           title: body.title,
@@ -166,7 +170,7 @@ export class CuratedIngestService {
   private async resolveOwned(sourceRef: string): Promise<Project.Row | null> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.sourceRef, sourceRef) });
     if (!project) return null;
-    if (project.ownerId === this.owner()) return project;
+    if (isOwnedBy(project, this.owner())) return project;
 
     this.logger.warn('curated ingest addressed a source reference held by another owner', { sourceRef, projectId: project.id.toString() });
     return null;
@@ -205,8 +209,8 @@ export class CuratedIngestService {
     return 'error';
   }
 
-  private owner(): bigint {
-    return BigInt(this.context.getAuthPrincipal().sub);
+  private owner(): Actor {
+    return this.actorService.current();
   }
 
   private async record(action: IngestAction, sourceRef: string, outcome: IngestOutcome, projectId: bigint | null): Promise<void> {

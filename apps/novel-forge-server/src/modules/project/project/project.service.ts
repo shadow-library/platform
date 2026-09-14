@@ -1,13 +1,14 @@
 import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
-import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertActiveProject } from '@server/common';
+import { assertActiveProject, ownedBy } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Bible, type Chapter, type Knowledge, type Plan, type PrimaryDatabase, type Project, schema } from '@server/database';
+
+import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
 
 import { isRegisteredModel } from '../../ai/defaults';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
@@ -44,14 +45,14 @@ export class ProjectService {
 
   constructor(
     private readonly databaseService: DatabaseService,
-    private readonly context: ContextService,
+    private readonly actorService: ActorService,
     private readonly storage: StorageService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  private ownerId(): bigint {
-    return BigInt(this.context.getAuthPrincipal().sub);
+  private actor(): Actor {
+    return this.actorService.current();
   }
 
   // Every persisted model override must name a registry model with the matching provider, regardless of
@@ -82,12 +83,13 @@ export class ProjectService {
     this.logger.debug('create project', { name: body.name, kind: body.kind, contentMode: body.contentMode, status });
     if (body.kind === 'curated') throw AppErrorCode.PRJ_005.create();
     assertLanguageMatchesKind(body.kind, body.originalLanguage);
-    await assertUnderProjectCap(this.db, this.ownerId());
+    const actor = this.actor();
+    await assertUnderProjectCap(this.db, actor);
 
     const [project] = await this.db
       .insert(schema.projects)
       .values({
-        ownerId: this.ownerId(),
+        ...projectOwnerColumns(actor),
         name: body.name,
         kind: body.kind,
         status,
@@ -123,7 +125,7 @@ export class ProjectService {
 
     // Seeds are hidden unless asked for by name: the main shelf is the novels shelf, and an unfiltered
     // list would fill it with ideas that have no bible, plan, or chapters (ideation-studio design §2.1).
-    const conditions = [eq(schema.projects.ownerId, this.ownerId()), eq(schema.projects.status, filter.status ?? 'active')];
+    const conditions = [ownedBy(schema.projects, this.actor()), eq(schema.projects.status, filter.status ?? 'active')];
     if (filter.kind) conditions.push(eq(schema.projects.kind, filter.kind));
     const where = and(...conditions);
     const column = query.sortBy === 'createdAt' ? schema.projects.createdAt : schema.projects.updatedAt;
@@ -241,7 +243,8 @@ export class ProjectService {
 
   async clone(id: bigint, body: CloneProjectBody): Promise<Project.Presented> {
     this.assertConfigModelsAllowed(body.config);
-    await assertUnderProjectCap(this.db, this.ownerId());
+    const actor = this.actor();
+    await assertUnderProjectCap(this.db, actor);
     return this.db.transaction(async tx => {
       const source = await tx.query.projects.findFirst({ where: eq(schema.projects.id, id) });
       if (!source) throw AppErrorCode.PRJ_001.create();
@@ -254,7 +257,7 @@ export class ProjectService {
       const [newProject] = await tx
         .insert(schema.projects)
         .values({
-          ownerId: this.ownerId(),
+          ...projectOwnerColumns(actor),
           name: body.name,
           kind: source.kind,
           title: source.title,

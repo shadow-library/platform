@@ -4,6 +4,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
+import { ownedBy } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
@@ -49,9 +50,8 @@ export class AiQuotaService {
   }
 
   private async readWindowUsage(projectId: bigint, windowStart: Date): Promise<WindowUsageRow[]> {
-    const owner = await this.db.query.projects.findFirst({ columns: { ownerId: true }, where: eq(schema.projects.id, projectId) });
-    const ownerId = owner?.ownerId;
-    if (ownerId == null) return [];
+    const project = await this.db.query.projects.findFirst({ columns: { ownerKind: true, ownerId: true }, where: eq(schema.projects.id, projectId) });
+    if (project?.ownerId == null) return [];
 
     const rows = await this.db
       .select({
@@ -63,7 +63,7 @@ export class AiQuotaService {
       })
       .from(schema.modelCalls)
       .innerJoin(schema.projects, eq(schema.modelCalls.projectId, schema.projects.id))
-      .where(and(eq(schema.projects.ownerId, ownerId), gte(schema.modelCalls.createdAt, windowStart)))
+      .where(and(ownedBy(schema.projects, { kind: project.ownerKind, id: project.ownerId }), gte(schema.modelCalls.createdAt, windowStart)))
       .groupBy(schema.modelCalls.model);
 
     return rows.map(row => ({

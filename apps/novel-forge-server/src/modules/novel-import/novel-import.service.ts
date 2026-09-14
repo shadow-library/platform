@@ -1,10 +1,11 @@
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, ValidationError } from '@shadow-library/common';
-import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Project, schema } from '@server/database';
+
+import { ActorService, projectOwnerColumns } from '@modules/actor';
 
 import { assertUnderProjectCap } from '../project/project/project-limits';
 import { type ImportNovelBody, type ImportNovelResponse } from './novel-import.dto';
@@ -26,7 +27,7 @@ export class NovelImportService {
 
   constructor(
     private readonly databaseService: DatabaseService,
-    private readonly context: ContextService,
+    private readonly actorService: ActorService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -45,8 +46,8 @@ export class NovelImportService {
       throw error;
     }
 
-    const ownerId = BigInt(this.context.getAuthPrincipal().sub);
-    await assertUnderProjectCap(this.db, ownerId);
+    const actor = this.actorService.current();
+    await assertUnderProjectCap(this.db, actor);
     const kind: Project.Kind = bundle.mode === 'final' ? 'new_novel' : 'source';
     const cover = bundle.novel.cover ? (bundle.assets ?? []).find(a => a.name === bundle.novel.cover) : undefined;
 
@@ -56,7 +57,7 @@ export class NovelImportService {
       const [project] = await tx
         .insert(schema.projects)
         .values({
-          ownerId,
+          ...projectOwnerColumns(actor),
           name: bundle.novel.title,
           kind,
           title: bundle.novel.title,

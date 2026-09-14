@@ -53,6 +53,7 @@ describe.if(pgAvailable)('Project ownership (BOLA)', () => {
     it('should stamp the creating user as the project owner', async () => {
       const id = await createProjectAs(aliceToken, 'alice-owned');
       const row = await testEnv.getPostgresClient().query.projects.findFirst({ where: eq(schema.projects.id, BigInt(id)) });
+      expect(row?.ownerKind).toBe('user');
       expect(row?.ownerId).toBe(BigInt(ALICE));
     });
   });

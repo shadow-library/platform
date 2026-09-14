@@ -2,6 +2,8 @@ import { Module } from '@shadow-library/app';
 import { FastifyModule } from '@shadow-library/fastify';
 import { DatabaseModule } from '@shadow-library/modules';
 
+import { ActorModule } from '@modules/actor';
+
 import { EventsModule } from '../events/events.module';
 import { PluginsModule } from '../plugins/plugins.module';
 import { AccountSettingsService } from './account-settings.service';
@@ -19,7 +21,7 @@ import { TelemetryHandler } from './telemetry.handler';
 import { ToolRegistryService } from './tools/tool-registry.service';
 
 @Module({
-  imports: [DatabaseModule, EventsModule, FastifyModule, PluginsModule],
+  imports: [ActorModule, DatabaseModule, EventsModule, FastifyModule, PluginsModule],
   controllers: [AiController],
   providers: [
     AccountSettingsService,

@@ -167,6 +167,7 @@ export class IllustrationService {
         promptSpec: result.promptSpec,
         candidates: result.candidates,
         references: resolved.references,
+        ownerKind: project.ownerKind,
         ownerId: project.ownerId,
       })
       .returning()

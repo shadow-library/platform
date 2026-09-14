@@ -11,6 +11,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
+import { type OwnerFields } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
@@ -34,11 +35,10 @@ import { type PromptModule } from './prompts/types';
 import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toJsonSchemaFormat } from './schemas/validate';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 
-export interface ProjectConfig {
-  ownerId?: bigint | null;
+export type ProjectConfig = OwnerFields & {
   contentMode?: string;
   config?: { models?: Partial<Record<AiRole, ResolvedModel>> } | null;
-}
+};
 
 export interface ImageRequest {
   prompt: string;

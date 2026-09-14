@@ -323,7 +323,7 @@ async function seedPulse(url: string): Promise<void> {
 async function cleanNovelForge(url: string, subs: string[]): Promise<void> {
   const sql = connect(url);
   try {
-    const deleted = await sql`DELETE FROM projects WHERE owner_id = ANY(${subs}::bigint[]) RETURNING id`;
+    const deleted = await sql`DELETE FROM projects WHERE owner_kind = 'user' AND owner_id = ANY(${subs}::bigint[]) RETURNING id`;
     summary.push(`novel_forge: deleted ${deleted.count} project(s) owned by e2e personas`);
   } finally {
     await sql.end();

@@ -2,6 +2,8 @@ import { Module } from '@shadow-library/app';
 import { FastifyModule } from '@shadow-library/fastify';
 import { DatabaseModule, StorageModule } from '@shadow-library/modules';
 
+import { ActorModule } from '@modules/actor';
+
 import { ApiKeyModule } from '../api-key';
 import { ProjectModule } from '../project';
 import { TranslationModule } from '../translation/translation.module';
@@ -15,7 +17,7 @@ import { OriginalsIngestController } from './originals-ingest.controller';
 // ProjectModule supplies ProjectService, whose `setCover` already owns the storage write and the
 // content-addressed ref semantics the ingest cover push needs.
 @Module({
-  imports: [DatabaseModule, StorageModule, FastifyModule, ApiKeyModule, ProjectModule, TranslationModule],
+  imports: [ActorModule, DatabaseModule, StorageModule, FastifyModule, ApiKeyModule, ProjectModule, TranslationModule],
   controllers: [CuratedIngestController, OriginalsIngestController],
   providers: [CuratedIngestService, IngestAuditService],
   exports: [CuratedIngestService],

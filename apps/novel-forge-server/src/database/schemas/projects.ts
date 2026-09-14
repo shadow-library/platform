@@ -1,8 +1,9 @@
-import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { AnyPgColumn, bigint, bigserial, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
+import { AnyPgColumn, bigint, bigserial, boolean, check, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
 
 import { jsonb } from './jsonb';
+import { ownerKind } from './owner';
 
 // Per-role model overrides persisted in `projects.config` (jsonb). Mirrors the wire `ProjectConfig`/
 // `ProjectModelOverrides` in project.dto (enumerated, not an index signature, so it round-trips in both
@@ -77,7 +78,12 @@ export const projects = pgTable(
   'projects',
   {
     id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    ownerKind: ownerKind('owner_kind').notNull().default('user'),
     ownerId: bigint('owner_id', { mode: 'bigint' }),
+    /** The organisation the owner acts for, and the scope `sharedWithOrg` shares into. Required of a bot owner; nothing writes it for a user-owned project today. */
+    organisationId: bigint('organisation_id', { mode: 'bigint' }),
+    /** Opens the project to organisation members holding `novel-forge:curate`, on top of its owner. */
+    sharedWithOrg: boolean('shared_with_org').notNull().default(false),
     name: varchar('name', { length: 255 }).notNull(),
     kind: projectKind('kind').notNull(),
     status: projectStatus('status').notNull().default('active'),
@@ -103,7 +109,11 @@ export const projects = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  t => [unique('projects_source_ref_unique').on(t.sourceRef)],
+  t => [
+    unique('projects_source_ref_unique').on(t.sourceRef),
+    index('projects_owner_kind_owner_id_idx').on(t.ownerKind, t.ownerId),
+    check('projects_bot_owner_organisation_check', sql`${t.ownerKind} <> 'bot' OR ${t.organisationId} IS NOT NULL`),
+  ],
 );
 
 export const projectRelations = relations(projects, ({ one }) => ({
