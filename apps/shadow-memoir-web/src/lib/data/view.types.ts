@@ -96,7 +96,11 @@ export interface PlanDay {
   date: string;
   isToday: boolean;
   locked: boolean;
+  /** Fill width, 0–100, on a scale that leaves headroom past the capacity mark so overload stays visible. */
   loadPercent: number;
+  /** Position of the capacity tick on that same scale, 0–100. */
+  capacityMarkPercent: number;
+  overCapacity: boolean;
   loadSummary: string;
   items: PlanItem[];
   note: string | null;
@@ -114,6 +118,7 @@ export interface PlanMonthCell {
 interface PlanCarryOver {
   title: string;
   body: string;
+  questId: string;
 }
 
 export interface PlanView {

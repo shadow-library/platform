@@ -56,8 +56,11 @@ const BASE_COINS: Record<Strictness, number> = { anchor: 2, routine: 1, goal: 1,
 const HP_COST: Record<Strictness, number> = { anchor: 1, routine: 1, goal: 0, recovery: 0, optional: 0 };
 const XP_CEILING = 25;
 const SOFT_CAPACITY_MINUTES = 150;
+/** Track width in multiples of capacity, so overload has room to show instead of clipping at 100%. */
+const LOAD_TRACK_SCALE = 2;
 const PREVIEW_WINDOW_DAYS = 7;
 const RESCHEDULE_CAP = 2;
+const RECENT_MISS_WINDOW_DAYS = 7;
 
 export interface LogRecord {
   state: OccurrenceState;
@@ -337,11 +340,12 @@ export class MemoirEngine implements DataProvider {
 
   async getPlan(range: PlanRange): Promise<PlanView> {
     const from = range.scope === 'week' ? startOfWeek(range.anchor) : range.anchor;
-    const days = Array.from({ length: 7 }, (_, index) => this.planDay(shiftDate(startOfWeek(range.anchor), index)));
-    const carryMiss = this.scheduledOn(shiftDate(this.state.today, -1)).find(item => item.state === 'missed');
+    const weekStart = startOfWeek(range.anchor);
+    const days = Array.from({ length: 7 }, (_, index) => this.planDay(shiftDate(weekStart, index)));
     const anchorDate = parseISODate(range.anchor) ?? new Date(range.anchor);
     const month = this.planMonth(anchorDate);
     const periodDays = range.scope === 'week' ? days : month.flatMap(cell => (cell.date ? [this.planDay(cell.date)] : []));
+    const isCurrentWeek = this.state.today >= weekStart && this.state.today <= shiftDate(weekStart, 6);
 
     return {
       label: range.scope === 'week' ? formatRange(from, shiftDate(from, 6)) : formatMonth(range.anchor),
@@ -349,16 +353,56 @@ export class MemoirEngine implements DataProvider {
       to: range.scope === 'week' ? shiftDate(from, 6) : range.anchor,
       days,
       month,
-      carryOver: carryMiss
-        ? {
-            title: 'Yesterday left one commitment open',
-            body: `${carryMiss.questName} was scheduled and not completed. Its streak closed at 9 days — the record stays in History. You can add it to today as a recovery quest, or leave it.`,
-          }
-        : null,
+      carryOver: range.scope === 'week' && isCurrentWeek ? this.carryOver() : null,
       crown: { ...this.state.hero.crown },
       rescheduleBudget: this.rescheduleBudget(),
       glance: this.glance(periodDays),
     };
+  }
+
+  /** Only counts a genuine miss (unlogged past occurrence), never a deliberate skip. */
+  private carryOver(): PlanView['carryOver'] {
+    const yesterday = shiftDate(this.state.today, -1);
+    const missed = this.scheduledOn(yesterday).filter(item => this.effectiveState(item, yesterday) === 'missed');
+    if (missed.length === 0) return null;
+
+    const bestRunOf = (item: QuestOccurrence): number => (this.state.progress[item.questId] as QuestProgress | undefined)?.longestStreakDays ?? 0;
+    const worst = [...missed].sort(
+      (a, b) => this.recentMissCount(b.questId, yesterday) - this.recentMissCount(a.questId, yesterday) || bestRunOf(b) - bestRunOf(a),
+    )[0] as QuestOccurrence;
+    const commitments = missed.length === 1 ? 'one commitment' : `${missed.length} commitments`;
+    const quest = this.questById(worst.questId);
+    const progress = this.state.progress[worst.questId] as QuestProgress;
+
+    return {
+      title: `Yesterday left ${commitments} open`,
+      body:
+        quest && this.streakEndedFor(quest, progress, yesterday)
+          ? `${worst.questName} was scheduled and not completed. Its best run, ${progress.longestStreakDays} days, stays in History. Review the quest, or leave it.`
+          : `${worst.questName} was scheduled and not completed. The record stays in History. Review the quest, or leave it.`,
+      questId: worst.questId,
+    };
+  }
+
+  /** Missed scheduled occurrences in the RECENT_MISS_WINDOW_DAYS days up to and including `throughDate`. */
+  private recentMissCount(questId: string, throughDate: string): number {
+    const quest = this.questById(questId);
+    if (!quest) return 0;
+    let count = 0;
+    for (let back = 0; back < RECENT_MISS_WINDOW_DAYS; back += 1) {
+      const date = shiftDate(throughDate, -back);
+      if (!isScheduled(quest, date) || this.effectiveState(this.occurrence(quest, date), date) !== 'missed') continue;
+      count += 1;
+    }
+    return count;
+  }
+
+  /** Never claims a streak ended for a quest the server doesn't track one for, or when the server's own progress/shield says it didn't. */
+  private streakEndedFor(quest: Quest, progress: QuestProgress, yesterday: string): boolean {
+    if (quest.strictness === 'recovery') return false;
+    if (quest.strictness === 'optional' && !quest.optionalStreakOptIn) return false;
+    if (progress.longestStreakDays <= 0 || progress.currentStreakDays > 0) return false;
+    return !this.state.logs.get(occurrenceKey(quest.id, yesterday))?.shielded;
   }
 
   private rescheduleBudget(): PlanView['rescheduleBudget'] {
@@ -382,25 +426,36 @@ export class MemoirEngine implements DataProvider {
     ];
   }
 
+  /** A past occurrence nobody logged reads as missed on the board; the underlying log-derived state everywhere else is untouched. */
+  private effectiveState(item: QuestOccurrence, date: string): OccurrenceState {
+    return item.state === 'upcoming' && date < this.state.today ? 'missed' : item.state;
+  }
+
   private planDay(date: string): PlanDay {
     const occurrences = this.scheduledOn(date);
     const minutes = occurrences.reduce((total, item) => total + item.durationMinutes, 0);
-    const items: PlanItem[] = occurrences.map(item => ({
-      occurrenceId: item.id,
-      questId: item.questId,
-      title: item.questName,
-      meta: [formatTime(item.startTimeMinutes), item.state === 'upcoming' ? null : STATE_LABELS[item.state].toLowerCase()].filter(Boolean).join(' · ') || 'all day',
-      state: item.state,
-      shielded: this.state.logs.get(item.id)?.shielded ?? false,
-    }));
-    const loadPercent = Math.min(100, Math.round((minutes / SOFT_CAPACITY_MINUTES) * 100));
+    const items: PlanItem[] = occurrences.map(item => {
+      const state = this.effectiveState(item, date);
+      return {
+        occurrenceId: item.id,
+        questId: item.questId,
+        title: item.questName,
+        meta: [formatTime(item.startTimeMinutes), state === 'upcoming' ? null : STATE_LABELS[state].toLowerCase()].filter(Boolean).join(' · ') || 'all day',
+        state,
+        shielded: this.state.logs.get(item.id)?.shielded ?? false,
+      };
+    });
+    const capacityScale = SOFT_CAPACITY_MINUTES * LOAD_TRACK_SCALE;
+    const overCapacity = minutes > SOFT_CAPACITY_MINUTES;
 
     return {
       date,
       isToday: date === this.state.today,
       locked: this.state.locks.has(date),
-      loadPercent,
-      loadSummary: `${occurrences.length} quests · about ${formatDuration(minutes)}`,
+      loadPercent: Math.min(100, Math.round((minutes / capacityScale) * 100)),
+      capacityMarkPercent: Math.round((SOFT_CAPACITY_MINUTES / capacityScale) * 100),
+      overCapacity,
+      loadSummary: `${occurrences.length} quests · about ${formatDuration(minutes)}${overCapacity ? ' · over capacity' : ''}`,
       items,
       note: this.lockNote(date),
     };
@@ -413,20 +468,21 @@ export class MemoirEngine implements DataProvider {
   }
 
   private planMonth(anchor: Date): PlanMonthCell[] {
-    return buildMonthMatrix(anchor.getFullYear(), anchor.getMonth(), 1)
-      .flat()
-      .map(day => {
-        const date = toISODate(day);
-        const inMonth = day.getMonth() === anchor.getMonth();
-        return {
-          date: inMonth ? date : null,
-          inMonth,
-          isToday: date === this.state.today,
-          locked: this.state.locks.has(date),
-          note: null,
-          outcomes: inMonth ? this.scheduledOn(date).map(item => item.state) : [],
-        };
-      });
+    const weeks = buildMonthMatrix(anchor.getFullYear(), anchor.getMonth(), 1);
+    while (weeks.length > 1 && weeks[weeks.length - 1]?.every(day => day.getMonth() !== anchor.getMonth())) weeks.pop();
+
+    return weeks.flat().map(day => {
+      const date = toISODate(day);
+      const inMonth = day.getMonth() === anchor.getMonth();
+      return {
+        date: inMonth ? date : null,
+        inMonth,
+        isToday: date === this.state.today,
+        locked: this.state.locks.has(date),
+        note: null,
+        outcomes: inMonth ? this.scheduledOn(date).map(item => this.effectiveState(item, date)) : [],
+      };
+    });
   }
 
   async listQuests(filter: QuestFilter): Promise<QuestSummary[]> {
@@ -518,7 +574,7 @@ export class MemoirEngine implements DataProvider {
       case 'quest.setActive':
         return this.setQuestActive(command.questId, command.active);
       case 'plan.setLock':
-        return this.setLock(command.from, command.to, command.locked);
+        return this.setLock(command.date, command.locked, command.questIds);
       default:
         return this.logCapture(command);
     }
@@ -666,18 +722,18 @@ export class MemoirEngine implements DataProvider {
     return { status: 'applied', message: active ? 'Reactivated. A new streak starts from today.' : 'Paused. Its history and XP are kept.', xpAwarded: 0, coinsAwarded: 0 };
   }
 
-  private setLock(from: string, to: string, locked: boolean): CommandResult {
-    const lockedIds = lockedQuestIdsFor(this.state.quests);
-    for (let date = from; date <= to; date = shiftDate(date, 1)) {
-      if (locked) {
-        this.state.locks.add(date);
-        this.state.lockedQuestIdsByDate.set(date, new Set(lockedIds));
-      } else {
-        this.state.locks.delete(date);
-        this.state.lockedQuestIdsByDate.delete(date);
-      }
+  /** Mirrors `daily_states`: one calendar day, locked with exactly the ids it's asked to lock. */
+  private setLock(date: string, locked: boolean, questIds: string[]): CommandResult {
+    if (locked && date !== this.state.today) return { status: 'rejected', message: 'Only today’s plan can be locked.' };
+    if (locked && questIds.length === 0) return { status: 'rejected', message: 'Nothing is scheduled today to lock.' };
+    if (locked) {
+      this.state.locks.add(date);
+      this.state.lockedQuestIdsByDate.set(date, new Set(questIds));
+    } else {
+      this.state.locks.delete(date);
+      this.state.lockedQuestIdsByDate.delete(date);
     }
-    return { status: 'applied', message: locked ? 'The plan is committed for this week.' : 'The plan is open again.', xpAwarded: 0, coinsAwarded: 0 };
+    return { status: 'applied', message: locked ? "Today's plan is locked in." : "Today's plan is open again.", xpAwarded: 0, coinsAwarded: 0 };
   }
 
   private async logCapture(command: Command): Promise<CommandResult> {

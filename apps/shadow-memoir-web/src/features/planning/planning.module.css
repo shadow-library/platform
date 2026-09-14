@@ -2,6 +2,8 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  container-type: inline-size;
+  container-name: planning;
 }
 
 .header {
@@ -48,8 +50,21 @@
 .toolbarEnd {
   margin-left: auto;
   display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.lockControl {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.lockHint {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-secondary);
 }
 
 .week {
@@ -59,19 +74,37 @@
   grid-template-columns: 1fr;
 }
 
-@media (min-width: 720px) {
+.dayCard[data-today='true'] {
+  order: -1;
+}
+
+/*
+ * Sized against the content column's own width (a container query), not the viewport — the sidebar
+ * otherwise starves a 7-column grid of the width the viewport breakpoint assumed it had.
+ */
+@container planning (min-width: 460px) {
   .week {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .dayCard[data-today='true'] {
+    order: initial;
+  }
 }
 
-@media (min-width: 1000px) {
+@container planning (min-width: 700px) {
   .week {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-@media (min-width: 1280px) {
+@container planning (min-width: 900px) {
+  .week {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@container planning (min-width: 1150px) {
   .week {
     grid-template-columns: repeat(7, minmax(0, 1fr));
   }
@@ -96,7 +129,8 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 4px 8px;
 }
 
 .dayName {
@@ -117,10 +151,17 @@
 }
 
 .lock {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.lockGlyph {
+  display: none;
 }
 
 .loadTrack {
@@ -137,13 +178,20 @@
   inset: 0 auto 0 0;
   background: var(--sh-accent);
   opacity: 0.7;
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
 }
 
+.loadFill[data-over] {
+  background: var(--sh-danger-solid);
+  opacity: 0.85;
+}
+
+/* left is a pre-data fallback; the day's capacityMarkPercent (JSX inline style) is the real position. */
 .capacityMark {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 72%;
+  left: 50%;
   width: 2px;
   background: var(--sh-border-strong);
 }
@@ -176,14 +224,25 @@
   outline-offset: -2px;
 }
 
+/* Solid card surface, not the tint today's own card uses, so a kept tile stays visible there. */
 .dayItem[data-tone='kept'] {
-  background: var(--sh-accent-soft);
-  border-color: transparent;
+  background: var(--sh-surface-card);
+  border-color: var(--sh-border-subtle);
+  border-left: 3px solid var(--sh-accent);
 }
 
 .dayItem[data-tone='kept'] .dayItemTitle {
   color: var(--sh-text-secondary);
   text-decoration: line-through;
+}
+
+.dayItem[data-tone='partial'] {
+  background: var(--sh-warning-bg-subtle);
+  border-color: var(--sh-warning-border);
+}
+
+.dayItem[data-tone='partial'] .dayItemMeta {
+  color: var(--sh-warning-text-on-subtle);
 }
 
 .dayItem[data-tone='closed'] {
@@ -192,7 +251,11 @@
 }
 
 .dayItemTitle {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
   font-size: var(--sh-text-caption);
   font-weight: 500;
   line-height: 1.35;
@@ -203,17 +266,17 @@
   margin-top: 2px;
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);
+  overflow-wrap: anywhere;
 }
 
-/* --sh-text-tertiary falls below 4.5:1 on both tinted item backgrounds; use --sh-text-secondary. */
-.dayItem[data-tone='kept'] .dayItemMeta,
+/* --sh-text-tertiary falls below 4.5:1 on the tinted "closed" item background; use --sh-text-secondary. */
 .dayItem[data-tone='closed'] .dayItemMeta {
   color: var(--sh-text-secondary);
 }
 
 .month {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -232,6 +295,50 @@
   padding: 6px 7px;
   border: 1px solid var(--sh-border-subtle);
   background: var(--sh-surface-card);
+  min-width: 0;
+}
+
+button.monthCell {
+  display: block;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.monthCell:hover {
+  border-color: var(--sh-border-strong);
+}
+
+button.monthCell:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+
+@container planning (max-width: 460px) {
+  .monthCell {
+    min-height: 44px;
+    padding: 4px 5px;
+  }
+
+  .monthCellHead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .lockGlyph {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 1px;
+    background: var(--sh-text-tertiary);
+  }
+
+  .lockText {
+    display: none;
+  }
 }
 
 .monthCell[data-in-month='false'] {
@@ -251,7 +358,8 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 2px 4px;
 }
 
 .mono {
@@ -275,15 +383,19 @@
 }
 
 .dot[data-tone='partial'] {
-  opacity: 0.45;
+  background: var(--sh-warning-text-on-subtle);
 }
 
 .dot[data-tone='closed'] {
-  background: var(--sh-border-strong);
+  background: var(--sh-neutral-solid);
 }
 
+/* A hollow ring, not another solid fill, so "still open" reads by shape too, not just weak border contrast in dark. */
 .dot[data-tone='open'] {
-  background: var(--sh-border-default);
+  width: 5px;
+  height: 5px;
+  background: transparent;
+  border: 1px solid var(--sh-text-tertiary);
 }
 
 .legend {

@@ -10,7 +10,7 @@ export type Command =
   | { type: 'quest.create'; draft: QuestDraft }
   | { type: 'quest.update'; questId: string; patch: Partial<QuestDraft> }
   | { type: 'quest.setActive'; questId: string; active: boolean }
-  | { type: 'plan.setLock'; from: string; to: string; locked: boolean }
+  | { type: 'plan.setLock'; date: string; locked: boolean; questIds: string[] }
   | { type: 'expense.record'; amountMinor: number; currency: string; note: string }
   | { type: 'metric.record'; metric: MetricKind; value: number }
   | { type: 'weight.record'; value: number; unit: 'kg' | 'lb' }

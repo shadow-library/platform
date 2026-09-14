@@ -17,10 +17,11 @@ export interface WireCommand {
  * Every command type the server has a handler for that one of the web's four command unions also knows
  * how to build. A type absent from this set is applied locally and kept out of the outbox entirely:
  * `POST /sync/commands` fails the *whole batch* on an unknown type, so one command the server has not
- * shipped yet would strand every command behind it. Still absent server-side and therefore still local:
- * `quest.setActive`, `plan.setLock`, `category.rename`, `journal.dismissPrompt`,
- * `health.acceptOffer` (the owner's own `quest.complete` is what completes the quest), and
- * `intensity.set`. Reflect and account commands have no server module yet at all.
+ * shipped yet would strand every command behind it. `plan.setLock` is registered server-side
+ * (`CompassionCommandsService`) and locks exactly the one calendar day its envelope carries, via the
+ * `questIds` this module sends. Still absent server-side and therefore still local: `quest.setActive`,
+ * `category.rename`, `journal.dismissPrompt`, `health.acceptOffer` (the owner's own `quest.complete` is
+ * what completes the quest), and `intensity.set`. Reflect and account commands have no server module yet.
  */
 const SERVER_BACKED_TYPES = new Set<SyncCommand['type']>([
   'quest.complete',
@@ -30,6 +31,7 @@ const SERVER_BACKED_TYPES = new Set<SyncCommand['type']>([
   'quest.reschedule',
   'quest.create',
   'quest.update',
+  'plan.setLock',
   'expense.create',
   'expense.update',
   'expense.delete',
@@ -188,6 +190,8 @@ export function toWireCommand(command: SyncCommand): WireCommand {
       return { type: command.type, payload: { ...toDraftWire(command.draft), entityRef: uuidv7() } };
     case 'quest.update':
       return { type: command.type, payload: { questId: command.questId, patch: toPatchWire(command.patch) } };
+    case 'plan.setLock':
+      return { type: command.type, payload: { locked: command.locked, questIds: command.questIds } };
 
     case 'expense.create':
       return { type: command.type, payload: expenseWire(command.draft.id ?? uuidv7(), command.draft) };
