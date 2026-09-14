@@ -5,11 +5,40 @@ import { Alert, Button, Card, EmptyState, Skeleton } from '@shadow-library/ui';
 import { DataState } from '@/components/DataState';
 import { type QuestActions, useQuestActions } from '@/features/quests/quest-actions';
 import { QuestRow } from '@/features/quests/quest-row';
-import { type DayView, formatDayName, KEPT_STATES, type QuestOccurrence, type QuickLogTile, useComingBack, useDay, useMemoirData, useQuickLogTiles } from '@/lib/data';
+import {
+  type DayView,
+  formatDayName,
+  KEPT_STATES,
+  type QuestOccurrence,
+  type QuickLogTile,
+  type UpcomingEntry,
+  useComingBack,
+  useDay,
+  useMemoirData,
+  useQuickLogTiles,
+} from '@/lib/data';
 
 import { DayRail } from './day-rail';
 import { HeroCard } from './hero-card';
 import styles from './today.module.css';
+
+const CROWN_ENTRY_ID = 'crown';
+
+function NothingDueToday({ next }: { next: UpcomingEntry | null }): ReactElement {
+  return (
+    <Card padding="md">
+      <Card.Body>
+        <h2 className={styles.cardTitle}>Nothing is due today</h2>
+        <p className={styles.cardBody}>{next ? `${next.title} is next · ${next.when}.` : 'Your quests are scheduled on other days.'}</p>
+        <div className={styles.actionRow}>
+          <Button size="sm" variant="ghost" asChild>
+            <Link to="/plan">See the week</Link>
+          </Button>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+}
 
 export function TodayScreen(): ReactElement {
   const { today } = useMemoirData();
@@ -72,7 +101,9 @@ function TodayGrid({ day, tiles, actions }: TodayGridProps): ReactElement {
           </>
         ) : null}
 
-        {day.occurrences.length === 0 ? (
+        {day.occurrences.length === 0 && day.hasActiveQuests ? (
+          <NothingDueToday next={day.upcoming.find(entry => entry.id !== CROWN_ENTRY_ID) ?? null} />
+        ) : day.occurrences.length === 0 ? (
           <>
             <Card padding="lg">
               <Card.Body>

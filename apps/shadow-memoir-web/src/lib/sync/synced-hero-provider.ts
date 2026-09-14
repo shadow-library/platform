@@ -1,5 +1,3 @@
-import { toISODate } from '@shadow-library/ui';
-
 import {
   type AccountProvider,
   type Achievement,
@@ -26,7 +24,7 @@ import {
   type StatAffinity,
   TITLES,
 } from '@/lib/data';
-import { formatCount, formatLocalDate, formatRelativeDay } from '@/lib/format';
+import { accountDay, formatCount, formatLocalDate, formatRelativeDay } from '@/lib/format';
 
 import { isHeroCommand } from './command-wire';
 import { ignoreAccountBoundary } from './memoir-store';
@@ -154,18 +152,6 @@ function cosmeticsFor(grants: HeroGrants, coins: number): Cosmetic[] {
     const state: Cosmetic['state'] = equipped ? 'equipped' : owned ? 'owned' : seed.priceCoins === null ? 'achievement' : shortfall === 0 ? 'affordable' : 'short';
     return { ...seed, state, shortfallCoins: state === 'short' ? shortfall : null };
   });
-}
-
-/** The server settles persona and comeback on the account's own day, which is the configured zone's date rather than the browser's. */
-function accountDay(timeZone: string | null): string {
-  if (!timeZone) return toISODate(new Date());
-  try {
-    const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
-    const part = (type: Intl.DateTimeFormatPartTypes): string => parts.find(entry => entry.type === type)?.value ?? '';
-    return `${part('year')}-${part('month')}-${part('day')}`;
-  } catch {
-    return toISODate(new Date());
-  }
 }
 
 function comingBackReason(standing: HeroStanding): ComingBackReason | null {

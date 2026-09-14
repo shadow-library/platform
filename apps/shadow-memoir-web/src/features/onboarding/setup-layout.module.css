@@ -1,0 +1,47 @@
+/* NetStrip breaks out of the shell's gutters through these properties; outside the shell they describe this layout instead. */
+.root {
+  --sh-shell-gutter-block: 0px;
+  --sh-shell-gutter-inline: 16px;
+  --sh-topbar-height: 0px;
+
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--sh-surface-app);
+  color: var(--sh-text-primary);
+}
+
+@media (min-width: 768px) {
+  .root {
+    --sh-shell-gutter-inline: 24px;
+  }
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: calc(8px + var(--sh-safe-top)) 8px;
+  padding-inline: max(var(--sh-shell-gutter-inline), var(--sh-safe-left)) max(var(--sh-shell-gutter-inline), var(--sh-safe-right));
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.main {
+  flex: 1;
+  padding-block: 0 calc(24px + var(--sh-safe-bottom));
+  padding-inline: max(var(--sh-shell-gutter-inline), var(--sh-safe-left)) max(var(--sh-shell-gutter-inline), var(--sh-safe-right));
+}

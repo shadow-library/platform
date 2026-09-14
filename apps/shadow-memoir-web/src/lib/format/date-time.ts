@@ -78,3 +78,15 @@ export function timeZoneOptions(currentZone?: string | null, pendingZone?: strin
   if (pendingZone) zones.add(pendingZone);
   return [...zones].sort().map(zone => ({ value: zone, label: zone.replace(/_/g, ' ') }));
 }
+
+/** The account's own calendar day: the server settles persona, comeback and a new quest's start on the configured zone's date rather than the browser's. */
+export function accountDay(timeZone: string | null | undefined): string {
+  if (!timeZone) return toISODate(new Date());
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const part = (type: Intl.DateTimeFormatPartTypes): string => parts.find(entry => entry.type === type)?.value ?? '';
+    return `${part('year')}-${part('month')}-${part('day')}`;
+  } catch {
+    return toISODate(new Date());
+  }
+}

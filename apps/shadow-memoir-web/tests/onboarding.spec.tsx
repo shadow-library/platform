@@ -1,38 +1,55 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@shadow-library/web';
 
 import { OnboardingScreen } from '@/features/onboarding';
-import { type AccountCommand, type Command, type CommandResult, type DispatchOptions, type SettledCommandResult } from '@/lib/data';
+import { type AccountCommand, type Command, commandRefusal, type CommandResult, type DispatchOptions, type QuestDraft, type SettledCommandResult } from '@/lib/data';
 
 import { createMemoirTestData, renderScreen } from './harness';
+import { withTimeZone } from './setup';
 
 const TODAY = '2026-08-22';
 
+const NAME_PLACEHOLDER = 'e.g. Read 10 pages';
+
 async function goToReview(): Promise<void> {
   fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
-  fireEvent.change(screen.getByPlaceholderText('Read 10 pages'), { target: { value: 'Walk 20 minutes' } });
+  fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), { target: { value: 'Walk 20 minutes' } });
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   fireEvent.click(screen.getByRole('button', { name: 'Review' }));
   await screen.findByText('Step 5 of 5');
 }
 
+function recordCommands(data: ReturnType<typeof createMemoirTestData>): { onboarding: AccountCommand[]; quests: Command[] } {
+  const calls = { onboarding: [] as AccountCommand[], quests: [] as Command[] };
+  const dispatchAccount = data.account.dispatchCommand;
+  data.account.dispatchCommand = (command: AccountCommand): Promise<SettledCommandResult> => {
+    if (command.type === 'onboarding.complete') calls.onboarding.push(command);
+    return dispatchAccount(command);
+  };
+  const dispatchQuest = data.provider.dispatchCommand.bind(data.provider);
+  data.provider.dispatchCommand = (command: Command, options?: DispatchOptions): Promise<CommandResult> => {
+    if (command.type === 'quest.create') calls.quests.push(command);
+    return dispatchQuest(command, options);
+  };
+  return calls;
+}
+
+function createdDraft(quests: Command[]): QuestDraft | undefined {
+  const created = quests.find(command => command.type === 'quest.create');
+  return created?.type === 'quest.create' ? created.draft : undefined;
+}
+
 describe('OnboardingScreen', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('should send one onboarding request when submit is clicked repeatedly', async () => {
     const data = createMemoirTestData({ today: TODAY, persona: 'new' });
-    const onboardingCalls: AccountCommand[] = [];
-    const questCalls: Command[] = [];
-    const dispatchAccount = data.account.dispatchCommand;
-    data.account.dispatchCommand = (command: AccountCommand): Promise<SettledCommandResult> => {
-      if (command.type === 'onboarding.complete') onboardingCalls.push(command);
-      return dispatchAccount(command);
-    };
-    const dispatchQuest = data.provider.dispatchCommand.bind(data.provider);
-    data.provider.dispatchCommand = (command: Command, options?: DispatchOptions): Promise<CommandResult> => {
-      if (command.type === 'quest.create') questCalls.push(command);
-      return dispatchQuest(command, options);
-    };
+    const calls = recordCommands(data);
 
     renderScreen(<OnboardingScreen />, { value: data });
     await goToReview();
@@ -42,8 +59,8 @@ describe('OnboardingScreen', () => {
     fireEvent.click(submit);
     fireEvent.click(submit);
 
-    await waitFor(() => expect(questCalls).toHaveLength(1));
-    expect(onboardingCalls).toHaveLength(1);
+    await waitFor(() => expect(calls.quests).toHaveLength(1));
+    expect(calls.onboarding).toHaveLength(1);
   });
 
   it('should continue to quest creation when onboarding already completed', async () => {
@@ -101,11 +118,11 @@ describe('OnboardingScreen', () => {
     renderScreen(<OnboardingScreen />, { today: TODAY, persona: 'new' });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
-    fireEvent.change(screen.getByPlaceholderText('Read 10 pages'), { target: { value: 'Walk 20 minutes' } });
+    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), { target: { value: 'Walk 20 minutes' } });
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
-    fireEvent.click(screen.getByRole('button', { name: /^Anchor/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /^Anchor/ }));
     const review = screen.getByRole('button', { name: 'Review' });
     expect((review as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText('Choose a start time to continue.')).toBeDefined();
@@ -131,7 +148,7 @@ describe('OnboardingScreen', () => {
     renderScreen(<OnboardingScreen />, { today: TODAY, persona: 'new' });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
-    const name = screen.getByPlaceholderText('Read 10 pages');
+    const name = screen.getByPlaceholderText(NAME_PLACEHOLDER);
     await user.type(name, 'Walk 20 minutes{Enter}');
 
     expect(await screen.findByText('Your week would look like this')).toBeDefined();
@@ -158,5 +175,125 @@ describe('OnboardingScreen', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create it and start' }));
     await waitFor(() => expect(onboardingCalls).toHaveLength(1));
+  });
+
+  it('should default the time zone to the browser zone', async () => {
+    await withTimeZone('Asia/Dubai', async () => {
+      const data = createMemoirTestData({ today: TODAY, persona: 'new' });
+      const calls = recordCommands(data);
+
+      renderScreen(<OnboardingScreen />, { value: data });
+      expect(await screen.findByText('Detected from your browser. Travel will not move your day unless you change it.')).toBeDefined();
+      await goToReview();
+      fireEvent.click(screen.getByRole('button', { name: 'Create it and start' }));
+
+      await waitFor(() => expect(calls.onboarding).toHaveLength(1));
+      expect(calls.onboarding[0]).toMatchObject({ submission: { timezone: 'Asia/Dubai' } });
+    });
+  });
+
+  it('should block continuing without a name', async () => {
+    renderScreen(<OnboardingScreen />, { today: TODAY, persona: 'new' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+
+    expect((screen.getByRole('button', { name: 'Continue' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Name the promise to continue.')).toBeDefined();
+
+    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), { target: { value: '   ' } });
+    expect((screen.getByRole('button', { name: 'Continue' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Name the promise — for example, read 10 pages.')).toBeDefined();
+  });
+
+  it('should block continuing with no days chosen', async () => {
+    renderScreen(<OnboardingScreen />, { today: TODAY, persona: 'new' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), { target: { value: 'Walk 20 minutes' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    for (const day of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']) fireEvent.click(screen.getByRole('button', { name: day }));
+
+    expect((screen.getByRole('button', { name: 'Continue' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole('alert').textContent).toBe('Choose at least one day.');
+    expect(screen.getByText('Two minutes, and no tour afterwards.')).toBeDefined();
+  });
+
+  it('should create a times-a-week quest as weekly', async () => {
+    const data = createMemoirTestData({ today: TODAY, persona: 'new' });
+    const calls = recordCommands(data);
+
+    renderScreen(<OnboardingScreen />, { value: data });
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), { target: { value: 'Walk 20 minutes' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Times a week' }));
+    fireEvent.keyDown(screen.getByRole('slider', { name: 'Days a week' }), { key: 'ArrowLeft' });
+
+    expect(screen.getByText('3 days a week · about 30 minutes of promises. Light enough to keep on a bad week.')).toBeDefined();
+    expect(screen.getByText('Spread across your week on Mon, Wed, Fri. Choose the exact days with Chosen days.')).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    expect(await screen.findByText('3 days a week')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Create it and start' }));
+
+    await waitFor(() => expect(calls.quests).toHaveLength(1));
+    expect(createdDraft(calls.quests)?.recurrence).toMatchObject({ frequency: 'weekly', daysOfWeek: ['mon', 'wed', 'fri'] });
+  });
+
+  it('should not promise Today when the quest is not scheduled today', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 8, 13, 10, 0) });
+    const data = createMemoirTestData({ today: '2026-09-13', persona: 'new' });
+
+    renderScreen(<OnboardingScreen />, { value: data });
+    await goToReview();
+
+    expect(screen.getByText('Starts Monday · your Today screen stays clear until then')).toBeDefined();
+    expect(screen.queryByText(/on your Today screen as soon as you start/)).toBeNull();
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Ready · One quest, starting Monday, with nothing else in the way.');
+  });
+
+  it('should lock the saved day settings when only the first quest failed', async () => {
+    const data = createMemoirTestData({ today: TODAY, persona: 'new' });
+    data.provider.dispatchCommand = async (): Promise<CommandResult> => ({ status: 'rejected', message: 'Anchor quests need a start time.' });
+
+    renderScreen(<OnboardingScreen />, { value: data });
+    await goToReview();
+    fireEvent.click(screen.getByRole('button', { name: 'Create it and start' }));
+    await screen.findByText('Anchor quests need a start time.');
+
+    for (let step = 0; step < 4; step++) fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(await screen.findByText('Step 1 of 5')).toBeDefined();
+    expect((screen.getByRole('combobox', { name: 'Timezone' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('combobox', { name: 'Home currency' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/These are already saved/)).toBeDefined();
+  });
+
+  it('should show owner copy with a retry when setup cannot be saved', async () => {
+    const data = createMemoirTestData({ today: TODAY, persona: 'new' });
+    const dispatchAccount = data.account.dispatchCommand;
+    const failures = [new ApiError(500, { code: 'UNKNOWN', type: 'UnknownError', message: 'Unknown Error' })];
+    const onboardingCalls: AccountCommand[] = [];
+    data.account.dispatchCommand = async (command: AccountCommand): Promise<SettledCommandResult> => {
+      if (command.type !== 'onboarding.complete') return dispatchAccount(command);
+      onboardingCalls.push(command);
+      const failure = failures.shift();
+      return failure ? commandRefusal(failure, 'That could not be saved.') : dispatchAccount(command);
+    };
+
+    const { router } = renderScreen(<OnboardingScreen />, { value: data, initialPath: '/onboarding' });
+    await goToReview();
+    fireEvent.click(screen.getByRole('button', { name: 'Create it and start' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Setup wasn’t saved');
+    expect(alert.textContent).toContain('That could not be saved.');
+    expect(alert.textContent).toContain('Nothing was changed. Check your connection and try again.');
+    expect(screen.queryByText(/Unknown Error/)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    expect(onboardingCalls).toHaveLength(2);
   });
 });

@@ -1,21 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react';
-import { Avatar, BottomNavigation, Button, cn, ConfirmDialog, Fab, IconButton, Kbd, matchPath, toast, Tooltip, useMediaQuery, useShellNav, useTheme } from '@shadow-library/ui';
+import { Avatar, BottomNavigation, Button, cn, Fab, IconButton, Kbd, matchPath, Tooltip, useMediaQuery, useShellNav, useTheme } from '@shadow-library/ui';
 import { AppShell as Chrome } from '@shadow-library/ui/router';
-import { isApiError, userDisplayName } from '@shadow-library/web';
+import { userDisplayName } from '@shadow-library/web';
 
 import { BellIcon, LogIcon, MemoirMark, MoonIcon, SearchIcon, SunIcon } from '@/components/icons';
-import { formatCount } from '@/lib/format';
-import { logout, meQuery } from '@/lib/apis';
-import { currentPage, signInUrl } from '@/lib/session';
-import { useSyncEngine, useSyncStatus } from '@/lib/sync';
+import { meQuery } from '@/lib/apis';
 
 import styles from './app-shell.module.css';
 import { DESKTOP_NAV, PHONE_NAV } from './nav';
 import { NetStrip } from './net-strip';
 import { QuickCapture } from './quick-capture';
 import { SystemOverlayProvider, useSystemOverlays } from './system-overlays';
+import { useSignOut } from './use-sign-out';
 
 export interface AppShellProps {
   children?: ReactNode;
@@ -38,9 +36,6 @@ function SignOutIcon(): ReactElement {
   );
 }
 
-const CONNECTION_NEEDED = 'Sign out needs a connection — nothing was removed.';
-const SIGN_OUT_FAILED = 'Couldn’t sign out — try again';
-
 /**
  * The two-surface chrome. One composition serves both: `AppShell` collapses its sidebar into a drawer below
  * 768px on its own, and this adds what the phone needs on top of that — the bottom bar for the five daily
@@ -51,83 +46,15 @@ function ShellChrome({ children }: AppShellProps): ReactElement {
   const { theme, toggleTheme } = useTheme();
   const isPhone = useMediaQuery('(max-width: 767px)');
   const [captureOpen, setCaptureOpen] = useState(false);
-  const [signingOut, setSigningOut] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const signingOutRef = useRef(false);
   const me = useQuery(meQuery);
-  const { queuedCount } = useSyncStatus();
   const overlays = useSystemOverlays();
-  const engine = useSyncEngine();
+  const { requestSignOut, signingOut, confirmDialog } = useSignOut({ fallbackFocusSelector: '[aria-label="Account menu"]' });
 
   const accountName = userDisplayName(me.data, '');
   const accountEmail = me.isError ? 'Account details unavailable' : me.data?.email;
 
-  // `ConfirmDialog` exposes no `onCloseAutoFocus`, so this restores focus itself on cancel.
-  const confirmOpenerRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    if (confirmOpen) return undefined;
-    const target = confirmOpenerRef.current;
-    const fallback = document.querySelector<HTMLElement>('[aria-label="Account menu"]');
-    const restoreTarget = isFocusable(target) ? target : fallback;
-    const timer = setTimeout(() => {
-      if (isFocusable(restoreTarget)) restoreTarget.focus();
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [confirmOpen]);
-
-  // A full-page `window.location.assign` at the end, never an in-SPA `navigate` to `/login` — that would
-  // leave `useSessionGuard` mounted long enough to race its own redirect in with the wrong `returnTo`.
-  const performSignOut = async (): Promise<void> => {
-    if (signingOutRef.current) return;
-    signingOutRef.current = true;
-    setSigningOut(true);
-    toast.neutral('Signing out…');
-    const returnTo = currentPage();
-
-    let redirectTo: string | undefined;
-    let sessionGone: boolean;
-    try {
-      redirectTo = (await logout()).redirectTo;
-      sessionGone = true;
-    } catch (error) {
-      const status = isApiError(error) ? error.status : undefined;
-      if (status === 401) {
-        sessionGone = true;
-      } else {
-        signingOutRef.current = false;
-        setSigningOut(false);
-        toast[status === -1 || status === undefined ? 'warning' : 'danger'](status === -1 || status === undefined ? CONNECTION_NEEDED : SIGN_OUT_FAILED);
-        return;
-      }
-    }
-
-    if (sessionGone) {
-      try {
-        await engine?.store.wipeAccount();
-      } catch {
-        /* the redirect below still ends the session either way */
-      }
-    }
-    engine?.store.close();
-    window.location.assign(redirectTo ?? signInUrl(returnTo));
-  };
-
-  const handleSignOut = (): void => {
-    if (signingOutRef.current) return;
-    if (!navigator.onLine) {
-      toast.warning(CONNECTION_NEEDED);
-      return;
-    }
-    if (queuedCount > 0) {
-      confirmOpenerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      setConfirmOpen(true);
-      return;
-    }
-    void performSignOut();
-  };
-
   const drawerFooter = isPhone ? (
-    <DrawerAccountPanel name={accountName} email={accountEmail} theme={theme} onToggleTheme={toggleTheme} onSignOut={handleSignOut} signingOut={signingOut} />
+    <DrawerAccountPanel name={accountName} email={accountEmail} theme={theme} onToggleTheme={toggleTheme} onSignOut={requestSignOut} signingOut={signingOut} />
   ) : undefined;
 
   return (
@@ -137,7 +64,7 @@ function ShellChrome({ children }: AppShellProps): ReactElement {
       account={{
         name: accountName,
         email: accountEmail,
-        items: [{ id: 'sign-out', label: signingOut ? 'Signing out…' : 'Sign out', icon: <SignOutIcon />, destructive: true, disabled: signingOut, onSelect: handleSignOut }],
+        items: [{ id: 'sign-out', label: signingOut ? 'Signing out…' : 'Sign out', icon: <SignOutIcon />, destructive: true, disabled: signingOut, onSelect: requestSignOut }],
       }}
       search={
         <button type="button" className={styles.paletteTrigger} onClick={() => setCaptureOpen(true)}>
@@ -169,16 +96,7 @@ function ShellChrome({ children }: AppShellProps): ReactElement {
       {children}
       <Fab className={styles.fab} placement="fixed" icon={<LogIcon size={20} />} aria-label="Quick capture" onClick={() => setCaptureOpen(true)} />
       <QuickCapture open={captureOpen} onOpenChange={setCaptureOpen} />
-      <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        intent="danger"
-        title={`Sign out and discard ${formatCount(queuedCount, 'unsynced change', 'unsynced changes')}?`}
-        confirmLabel="Sign out"
-        cancelLabel="Keep working"
-        loading={signingOut}
-        onConfirm={() => void performSignOut()}
-      />
+      {confirmDialog}
     </Chrome>
   );
 }

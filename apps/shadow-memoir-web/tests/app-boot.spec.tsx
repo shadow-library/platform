@@ -4,15 +4,17 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { type ReactElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { TooltipProvider } from '@shadow-library/ui';
 import { ApiError } from '@shadow-library/web';
 
 import RouteError from '@/components/RouteError';
 import { StatusPage, StatusRegion } from '@/components/StatusPage';
+import { OnboardingScreen, SetupLayout } from '@/features/onboarding';
 import { type OnboardingStatus } from '@/lib/data';
 import { requireSession, routeByOnboarding, seedOnboardingStatus } from '@/lib/session';
 import { createSyncedMemoirData, SyncEngineProvider } from '@/lib/sync';
 import { getRouter } from '@/router';
-import { OnboardingGate } from '@/routes/_app';
+import { OnboardingGate } from '@/routes/_account';
 
 import { createMemoirTestData, renderScreen } from './harness';
 import { createSyncedTestData, createTestEngine } from './sync-harness';
@@ -27,7 +29,7 @@ function renderAt(path: string) {
 
 /**
  * The real root document nests `<html>` inside the test container, where jsdom never finishes dispatching a click, so
- * retrying is exercised through a route guarded exactly like `_app` rather than through the full route tree.
+ * retrying is exercised through a route guarded exactly like `_account` rather than through the full route tree.
  */
 function renderGuardedRoute() {
   const queryClient = new QueryClient();
@@ -331,12 +333,24 @@ describe('server render of the shell', () => {
     expect(html).not.toContain('Opening your account');
   });
 
+  it('should server-render onboarding without the app chrome', async () => {
+    bootFetch(() => json(200, { id: ACCOUNT_ID, onboardingCompletedAt: null }));
+    const router = await loadRouter('/onboarding');
+
+    const html = renderToString(<RouterProvider router={router} />);
+
+    expect(router.state.matches.map(match => match.routeId)).toContain('/_account/_setup/onboarding');
+    expect(html).toContain('Opening your account');
+    expect(html).not.toContain('Quick capture');
+    expect(html).not.toContain('Open navigation');
+  });
+
   it('should redirect a not-onboarded deep link before any screen renders', async () => {
     const fetch = bootFetch(() => json(200, { id: ACCOUNT_ID, onboardingCompletedAt: null }));
     const router = await loadRouter('/finance');
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/onboarding'));
-    expect(router.state.matches.some(match => match.routeId === '/_app/finance/')).toBe(false);
+    expect(router.state.matches.some(match => match.routeId === '/_account/_app/finance/')).toBe(false);
     expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/v1/account'))).toHaveLength(1);
   });
 
@@ -388,5 +402,73 @@ describe('server render of the shell', () => {
 
     expect(isRedirect(outcome)).toBe(true);
     expect(isRedirect(outcome) && outcome.options.to).toBe('/');
+  });
+});
+
+async function routeIdsAt(path: string, onboarded: boolean, landsOn: string): Promise<string[]> {
+  bootFetch(() => json(200, { id: ACCOUNT_ID, onboardingCompletedAt: onboarded ? '2026-01-01T00:00:00.000Z' : null }));
+  const router = await loadRouter(path);
+  await waitFor(() => expect(router.state.location.pathname).toBe(landsOn));
+  await waitFor(() => expect(router.state.matches.at(-1)?.pathname).toBe(landsOn));
+  return router.state.matches.map(match => match.routeId);
+}
+
+function renderSetup(onboarding: OnboardingStatus, initialPath: string) {
+  const data = createMemoirTestData({ persona: 'new' });
+  vi.spyOn(data.account, 'getOnboarding').mockResolvedValue(onboarding);
+  return renderScreen(
+    <TooltipProvider>
+      <OnboardingGate>
+        <SetupLayout>
+          <OnboardingScreen />
+        </SetupLayout>
+      </OnboardingGate>
+    </TooltipProvider>,
+    { value: data, initialPath },
+  );
+}
+
+describe('setup layout', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('should render onboarding without the app chrome', async () => {
+    expect(await routeIdsAt('/onboarding', false, '/onboarding')).toEqual(['__root__', '/_account', '/_account/_setup', '/_account/_setup/onboarding']);
+
+    renderSetup({ completed: false }, '/onboarding');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Set up' })).toBeDefined();
+    expect(screen.getByRole('main')).toBeDefined();
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open navigation' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Notifications' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Account menu' })).toBeNull();
+  });
+
+  it('should not offer quick capture before setup', async () => {
+    renderSetup({ completed: false }, '/onboarding');
+
+    await screen.findByRole('heading', { level: 1, name: 'Set up' });
+    expect(screen.queryByRole('button', { name: 'Quick capture' })).toBeNull();
+    expect(screen.queryByText('Log something, or jump to a screen')).toBeNull();
+  });
+
+  it('should keep the onboarding gate for deep links', async () => {
+    expect(await routeIdsAt('/finance', false, '/onboarding')).toContain('/_account/_setup/onboarding');
+    expect(await routeIdsAt('/onboarding', true, '/')).toEqual(['__root__', '/_account', '/_account/_app', '/_account/_app/']);
+
+    const { router } = renderSetup({ completed: false }, '/finance');
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/onboarding'));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Set up' })).toBeDefined();
+  });
+
+  it('should share one account layout between the app and setup', () => {
+    const router = getRouter();
+
+    expect(router.routesById['/_account/_setup'].parentRoute.id).toBe('/_account');
+    expect(router.routesById['/_account/_app'].parentRoute.id).toBe('/_account');
   });
 });

@@ -7,7 +7,7 @@ import { toast } from '@shadow-library/ui';
 import { OnboardingScreen } from '@/features/onboarding';
 import { AppSyncScreen, BillingScreen, DeleteAccountScreen, ExportScreen, NotificationSettingsScreen, SettingsScreen } from '@/features/settings';
 import { type DeltaPage, SYNC_META_KEYS, SyncEngineProvider } from '@/lib/sync';
-import { OnboardingGate } from '@/routes/_app';
+import { OnboardingGate } from '@/routes/_account';
 
 import { createMemoirTestData, renderScreen } from './harness';
 import { type HttpFake, httpFake } from './http-fake';
@@ -761,7 +761,7 @@ describe('Onboarding', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByText('Which part of you does it grow?')).toBeDefined();
 
-    fireEvent.change(screen.getByPlaceholderText('Read 10 pages'), { target: { value: 'Walk 20 minutes' } });
+    fireEvent.change(screen.getByPlaceholderText('e.g. Read 10 pages'), { target: { value: 'Walk 20 minutes' } });
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByText('Your week would look like this')).toBeDefined();
 

@@ -6,6 +6,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { SetupLayout } from '@/features/onboarding';
 import { AppShell } from '@/features/shell';
 import shellStyles from '@/features/shell/app-shell.module.css';
 import { loginUrl, logout } from '@/lib/apis';
@@ -389,5 +390,51 @@ describe('AppShell phone drawer', () => {
     await user.keyboard('{Escape}');
 
     await waitFor(() => expect(document.activeElement).toBe(hamburger));
+  });
+});
+
+describe('SetupLayout sign-out', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.mocked(logout).mockReset();
+    vi.mocked(useSyncStatus).mockReset();
+    vi.restoreAllMocks();
+  });
+
+  it('should offer sign out during setup', async () => {
+    stubDesktopViewport();
+    vi.mocked(useSyncStatus).mockReturnValue(ONLINE_SNAPSHOT);
+    vi.mocked(logout).mockResolvedValue({ success: true });
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, pathname: '/onboarding', search: '', assign });
+    const { engine, store } = createTestEngine({ today: '2026-08-24' });
+    const data = createSyncedTestData(engine);
+    const wipeSpy = vi.spyOn(store, 'wipeAccount');
+    const rootRoute = createRootRoute({
+      component: () => (
+        <QueryClientProvider client={data.queryClient}>
+          <MemoirDataProvider value={data}>
+            <SyncEngineProvider data={data}>
+              <TooltipProvider>
+                <SetupLayout>
+                  <div>Set up</div>
+                </SetupLayout>
+              </TooltipProvider>
+            </SyncEngineProvider>
+          </MemoirDataProvider>
+        </QueryClientProvider>
+      ),
+    });
+    const router = createRouter({
+      routeTree: rootRoute.addChildren([createRoute({ getParentRoute: () => rootRoute, path: '/onboarding', component: () => null })]),
+      history: createMemoryHistory({ initialEntries: ['/onboarding'] }),
+    });
+    render(<RouterProvider router={router as never} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign out' }));
+
+    await waitFor(() => expect(wipeSpy).toHaveBeenCalled());
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledWith(loginUrl('/onboarding'));
   });
 });

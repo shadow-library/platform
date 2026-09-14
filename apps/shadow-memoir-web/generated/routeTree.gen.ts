@@ -11,36 +11,38 @@
 import { Route as rootRouteImport } from './../src/routes/__root'
 import { Route as LoginRouteImport } from './../src/routes/login'
 import { Route as ErasureRouteImport } from './../src/routes/erasure'
-import { Route as AppRouteImport } from './../src/routes/_app'
-import { Route as AppIndexRouteImport } from './../src/routes/_app/index'
-import { Route as AppReviewRouteImport } from './../src/routes/_app/review'
-import { Route as AppPlanRouteImport } from './../src/routes/_app/plan'
-import { Route as AppOnboardingRouteImport } from './../src/routes/_app/onboarding'
-import { Route as AppLogRouteImport } from './../src/routes/_app/log'
-import { Route as AppInsightsRouteImport } from './../src/routes/_app/insights'
-import { Route as AppHistoryRouteImport } from './../src/routes/_app/history'
-import { Route as AppAiRouteImport } from './../src/routes/_app/ai'
-import { Route as AppSettingsIndexRouteImport } from './../src/routes/_app/settings.index'
-import { Route as AppQuestsIndexRouteImport } from './../src/routes/_app/quests.index'
-import { Route as AppLogIndexRouteImport } from './../src/routes/_app/log.index'
-import { Route as AppHeroIndexRouteImport } from './../src/routes/_app/hero.index'
-import { Route as AppFinanceIndexRouteImport } from './../src/routes/_app/finance.index'
-import { Route as AppSettingsNotificationsRouteImport } from './../src/routes/_app/settings.notifications'
-import { Route as AppSettingsExportRouteImport } from './../src/routes/_app/settings.export'
-import { Route as AppSettingsDeleteRouteImport } from './../src/routes/_app/settings.delete'
-import { Route as AppSettingsBillingRouteImport } from './../src/routes/_app/settings.billing'
-import { Route as AppSettingsAppRouteImport } from './../src/routes/_app/settings.app'
-import { Route as AppQuestsNewRouteImport } from './../src/routes/_app/quests.new'
-import { Route as AppQuestsQuestIdRouteImport } from './../src/routes/_app/quests.$questId'
-import { Route as AppLogWeightRouteImport } from './../src/routes/_app/log.weight'
-import { Route as AppLogSidequestsRouteImport } from './../src/routes/_app/log.sidequests'
-import { Route as AppLogMealsRouteImport } from './../src/routes/_app/log.meals'
-import { Route as AppLogHealthRouteImport } from './../src/routes/_app/log.health'
-import { Route as AppHeroRecoveryRouteImport } from './../src/routes/_app/hero.recovery'
-import { Route as AppFinanceSubscriptionsRouteImport } from './../src/routes/_app/finance.subscriptions'
-import { Route as AppFinanceCategoriesRouteImport } from './../src/routes/_app/finance.categories'
-import { Route as AppQuestsQuestIdEditRouteImport } from './../src/routes/_app/quests.$questId_.edit'
-import { Route as AppFinanceExpensesExpenseIdRouteImport } from './../src/routes/_app/finance.expenses.$expenseId'
+import { Route as AccountRouteImport } from './../src/routes/_account'
+import { Route as AccountSetupRouteImport } from './../src/routes/_account/_setup'
+import { Route as AccountAppRouteImport } from './../src/routes/_account/_app'
+import { Route as AccountAppIndexRouteImport } from './../src/routes/_account/_app/index'
+import { Route as AccountSetupOnboardingRouteImport } from './../src/routes/_account/_setup/onboarding'
+import { Route as AccountAppReviewRouteImport } from './../src/routes/_account/_app/review'
+import { Route as AccountAppPlanRouteImport } from './../src/routes/_account/_app/plan'
+import { Route as AccountAppLogRouteImport } from './../src/routes/_account/_app/log'
+import { Route as AccountAppInsightsRouteImport } from './../src/routes/_account/_app/insights'
+import { Route as AccountAppHistoryRouteImport } from './../src/routes/_account/_app/history'
+import { Route as AccountAppAiRouteImport } from './../src/routes/_account/_app/ai'
+import { Route as AccountAppSettingsIndexRouteImport } from './../src/routes/_account/_app/settings.index'
+import { Route as AccountAppQuestsIndexRouteImport } from './../src/routes/_account/_app/quests.index'
+import { Route as AccountAppLogIndexRouteImport } from './../src/routes/_account/_app/log.index'
+import { Route as AccountAppHeroIndexRouteImport } from './../src/routes/_account/_app/hero.index'
+import { Route as AccountAppFinanceIndexRouteImport } from './../src/routes/_account/_app/finance.index'
+import { Route as AccountAppSettingsNotificationsRouteImport } from './../src/routes/_account/_app/settings.notifications'
+import { Route as AccountAppSettingsExportRouteImport } from './../src/routes/_account/_app/settings.export'
+import { Route as AccountAppSettingsDeleteRouteImport } from './../src/routes/_account/_app/settings.delete'
+import { Route as AccountAppSettingsBillingRouteImport } from './../src/routes/_account/_app/settings.billing'
+import { Route as AccountAppSettingsAppRouteImport } from './../src/routes/_account/_app/settings.app'
+import { Route as AccountAppQuestsNewRouteImport } from './../src/routes/_account/_app/quests.new'
+import { Route as AccountAppQuestsQuestIdRouteImport } from './../src/routes/_account/_app/quests.$questId'
+import { Route as AccountAppLogWeightRouteImport } from './../src/routes/_account/_app/log.weight'
+import { Route as AccountAppLogSidequestsRouteImport } from './../src/routes/_account/_app/log.sidequests'
+import { Route as AccountAppLogMealsRouteImport } from './../src/routes/_account/_app/log.meals'
+import { Route as AccountAppLogHealthRouteImport } from './../src/routes/_account/_app/log.health'
+import { Route as AccountAppHeroRecoveryRouteImport } from './../src/routes/_account/_app/hero.recovery'
+import { Route as AccountAppFinanceSubscriptionsRouteImport } from './../src/routes/_account/_app/finance.subscriptions'
+import { Route as AccountAppFinanceCategoriesRouteImport } from './../src/routes/_account/_app/finance.categories'
+import { Route as AccountAppQuestsQuestIdEditRouteImport } from './../src/routes/_account/_app/quests.$questId_.edit'
+import { Route as AccountAppFinanceExpensesExpenseIdRouteImport } from './../src/routes/_account/_app/finance.expenses.$expenseId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -52,257 +54,273 @@ const ErasureRoute = ErasureRouteImport.update({
   path: '/erasure',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppRoute = AppRouteImport.update({
-  id: '/_app',
+const AccountRoute = AccountRouteImport.update({
+  id: '/_account',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppIndexRoute = AppIndexRouteImport.update({
+const AccountSetupRoute = AccountSetupRouteImport.update({
+  id: '/_setup',
+  getParentRoute: () => AccountRoute,
+} as any)
+const AccountAppRoute = AccountAppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => AccountRoute,
+} as any)
+const AccountAppIndexRoute = AccountAppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountAppRoute,
 } as any)
-const AppReviewRoute = AppReviewRouteImport.update({
-  id: '/review',
-  path: '/review',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppPlanRoute = AppPlanRouteImport.update({
-  id: '/plan',
-  path: '/plan',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppOnboardingRoute = AppOnboardingRouteImport.update({
+const AccountSetupOnboardingRoute = AccountSetupOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountSetupRoute,
 } as any)
-const AppLogRoute = AppLogRouteImport.update({
+const AccountAppReviewRoute = AccountAppReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
+  getParentRoute: () => AccountAppRoute,
+} as any)
+const AccountAppPlanRoute = AccountAppPlanRouteImport.update({
+  id: '/plan',
+  path: '/plan',
+  getParentRoute: () => AccountAppRoute,
+} as any)
+const AccountAppLogRoute = AccountAppLogRouteImport.update({
   id: '/log',
   path: '/log',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountAppRoute,
 } as any)
-const AppInsightsRoute = AppInsightsRouteImport.update({
+const AccountAppInsightsRoute = AccountAppInsightsRouteImport.update({
   id: '/insights',
   path: '/insights',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountAppRoute,
 } as any)
-const AppHistoryRoute = AppHistoryRouteImport.update({
+const AccountAppHistoryRoute = AccountAppHistoryRouteImport.update({
   id: '/history',
   path: '/history',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountAppRoute,
 } as any)
-const AppAiRoute = AppAiRouteImport.update({
+const AccountAppAiRoute = AccountAppAiRouteImport.update({
   id: '/ai',
   path: '/ai',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountAppRoute,
 } as any)
-const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+const AccountAppSettingsIndexRoute = AccountAppSettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountAppRoute,
 } as any)
-const AppQuestsIndexRoute = AppQuestsIndexRouteImport.update({
+const AccountAppQuestsIndexRoute = AccountAppQuestsIndexRouteImport.update({
   id: '/quests/',
   path: '/quests/',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountAppRoute,
 } as any)
-const AppLogIndexRoute = AppLogIndexRouteImport.update({
+const AccountAppLogIndexRoute = AccountAppLogIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppLogRoute,
+  getParentRoute: () => AccountAppLogRoute,
 } as any)
-const AppHeroIndexRoute = AppHeroIndexRouteImport.update({
+const AccountAppHeroIndexRoute = AccountAppHeroIndexRouteImport.update({
   id: '/hero/',
   path: '/hero/',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountAppRoute,
 } as any)
-const AppFinanceIndexRoute = AppFinanceIndexRouteImport.update({
+const AccountAppFinanceIndexRoute = AccountAppFinanceIndexRouteImport.update({
   id: '/finance/',
   path: '/finance/',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountAppRoute,
 } as any)
-const AppSettingsNotificationsRoute =
-  AppSettingsNotificationsRouteImport.update({
+const AccountAppSettingsNotificationsRoute =
+  AccountAppSettingsNotificationsRouteImport.update({
     id: '/settings/notifications',
     path: '/settings/notifications',
-    getParentRoute: () => AppRoute,
+    getParentRoute: () => AccountAppRoute,
   } as any)
-const AppSettingsExportRoute = AppSettingsExportRouteImport.update({
-  id: '/settings/export',
-  path: '/settings/export',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppSettingsDeleteRoute = AppSettingsDeleteRouteImport.update({
-  id: '/settings/delete',
-  path: '/settings/delete',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppSettingsBillingRoute = AppSettingsBillingRouteImport.update({
-  id: '/settings/billing',
-  path: '/settings/billing',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppSettingsAppRoute = AppSettingsAppRouteImport.update({
+const AccountAppSettingsExportRoute =
+  AccountAppSettingsExportRouteImport.update({
+    id: '/settings/export',
+    path: '/settings/export',
+    getParentRoute: () => AccountAppRoute,
+  } as any)
+const AccountAppSettingsDeleteRoute =
+  AccountAppSettingsDeleteRouteImport.update({
+    id: '/settings/delete',
+    path: '/settings/delete',
+    getParentRoute: () => AccountAppRoute,
+  } as any)
+const AccountAppSettingsBillingRoute =
+  AccountAppSettingsBillingRouteImport.update({
+    id: '/settings/billing',
+    path: '/settings/billing',
+    getParentRoute: () => AccountAppRoute,
+  } as any)
+const AccountAppSettingsAppRoute = AccountAppSettingsAppRouteImport.update({
   id: '/settings/app',
   path: '/settings/app',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountAppRoute,
 } as any)
-const AppQuestsNewRoute = AppQuestsNewRouteImport.update({
+const AccountAppQuestsNewRoute = AccountAppQuestsNewRouteImport.update({
   id: '/quests/new',
   path: '/quests/new',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountAppRoute,
 } as any)
-const AppQuestsQuestIdRoute = AppQuestsQuestIdRouteImport.update({
+const AccountAppQuestsQuestIdRoute = AccountAppQuestsQuestIdRouteImport.update({
   id: '/quests/$questId',
   path: '/quests/$questId',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountAppRoute,
 } as any)
-const AppLogWeightRoute = AppLogWeightRouteImport.update({
+const AccountAppLogWeightRoute = AccountAppLogWeightRouteImport.update({
   id: '/weight',
   path: '/weight',
-  getParentRoute: () => AppLogRoute,
+  getParentRoute: () => AccountAppLogRoute,
 } as any)
-const AppLogSidequestsRoute = AppLogSidequestsRouteImport.update({
+const AccountAppLogSidequestsRoute = AccountAppLogSidequestsRouteImport.update({
   id: '/sidequests',
   path: '/sidequests',
-  getParentRoute: () => AppLogRoute,
+  getParentRoute: () => AccountAppLogRoute,
 } as any)
-const AppLogMealsRoute = AppLogMealsRouteImport.update({
+const AccountAppLogMealsRoute = AccountAppLogMealsRouteImport.update({
   id: '/meals',
   path: '/meals',
-  getParentRoute: () => AppLogRoute,
+  getParentRoute: () => AccountAppLogRoute,
 } as any)
-const AppLogHealthRoute = AppLogHealthRouteImport.update({
+const AccountAppLogHealthRoute = AccountAppLogHealthRouteImport.update({
   id: '/health',
   path: '/health',
-  getParentRoute: () => AppLogRoute,
+  getParentRoute: () => AccountAppLogRoute,
 } as any)
-const AppHeroRecoveryRoute = AppHeroRecoveryRouteImport.update({
+const AccountAppHeroRecoveryRoute = AccountAppHeroRecoveryRouteImport.update({
   id: '/hero/recovery',
   path: '/hero/recovery',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => AccountAppRoute,
 } as any)
-const AppFinanceSubscriptionsRoute = AppFinanceSubscriptionsRouteImport.update({
-  id: '/finance/subscriptions',
-  path: '/finance/subscriptions',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppFinanceCategoriesRoute = AppFinanceCategoriesRouteImport.update({
-  id: '/finance/categories',
-  path: '/finance/categories',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppQuestsQuestIdEditRoute = AppQuestsQuestIdEditRouteImport.update({
-  id: '/quests/$questId_/edit',
-  path: '/quests/$questId/edit',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppFinanceExpensesExpenseIdRoute =
-  AppFinanceExpensesExpenseIdRouteImport.update({
+const AccountAppFinanceSubscriptionsRoute =
+  AccountAppFinanceSubscriptionsRouteImport.update({
+    id: '/finance/subscriptions',
+    path: '/finance/subscriptions',
+    getParentRoute: () => AccountAppRoute,
+  } as any)
+const AccountAppFinanceCategoriesRoute =
+  AccountAppFinanceCategoriesRouteImport.update({
+    id: '/finance/categories',
+    path: '/finance/categories',
+    getParentRoute: () => AccountAppRoute,
+  } as any)
+const AccountAppQuestsQuestIdEditRoute =
+  AccountAppQuestsQuestIdEditRouteImport.update({
+    id: '/quests/$questId_/edit',
+    path: '/quests/$questId/edit',
+    getParentRoute: () => AccountAppRoute,
+  } as any)
+const AccountAppFinanceExpensesExpenseIdRoute =
+  AccountAppFinanceExpensesExpenseIdRouteImport.update({
     id: '/finance/expenses/$expenseId',
     path: '/finance/expenses/$expenseId',
-    getParentRoute: () => AppRoute,
+    getParentRoute: () => AccountAppRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AppIndexRoute
+  '/': typeof AccountAppIndexRoute
   '/erasure': typeof ErasureRoute
   '/login': typeof LoginRoute
-  '/ai': typeof AppAiRoute
-  '/history': typeof AppHistoryRoute
-  '/insights': typeof AppInsightsRoute
-  '/log': typeof AppLogRouteWithChildren
-  '/onboarding': typeof AppOnboardingRoute
-  '/plan': typeof AppPlanRoute
-  '/review': typeof AppReviewRoute
-  '/finance/categories': typeof AppFinanceCategoriesRoute
-  '/finance/subscriptions': typeof AppFinanceSubscriptionsRoute
-  '/hero/recovery': typeof AppHeroRecoveryRoute
-  '/log/health': typeof AppLogHealthRoute
-  '/log/meals': typeof AppLogMealsRoute
-  '/log/sidequests': typeof AppLogSidequestsRoute
-  '/log/weight': typeof AppLogWeightRoute
-  '/quests/$questId': typeof AppQuestsQuestIdRoute
-  '/quests/new': typeof AppQuestsNewRoute
-  '/settings/app': typeof AppSettingsAppRoute
-  '/settings/billing': typeof AppSettingsBillingRoute
-  '/settings/delete': typeof AppSettingsDeleteRoute
-  '/settings/export': typeof AppSettingsExportRoute
-  '/settings/notifications': typeof AppSettingsNotificationsRoute
-  '/finance/': typeof AppFinanceIndexRoute
-  '/hero/': typeof AppHeroIndexRoute
-  '/log/': typeof AppLogIndexRoute
-  '/quests/': typeof AppQuestsIndexRoute
-  '/settings/': typeof AppSettingsIndexRoute
-  '/finance/expenses/$expenseId': typeof AppFinanceExpensesExpenseIdRoute
-  '/quests/$questId/edit': typeof AppQuestsQuestIdEditRoute
+  '/ai': typeof AccountAppAiRoute
+  '/history': typeof AccountAppHistoryRoute
+  '/insights': typeof AccountAppInsightsRoute
+  '/log': typeof AccountAppLogRouteWithChildren
+  '/plan': typeof AccountAppPlanRoute
+  '/review': typeof AccountAppReviewRoute
+  '/onboarding': typeof AccountSetupOnboardingRoute
+  '/finance/categories': typeof AccountAppFinanceCategoriesRoute
+  '/finance/subscriptions': typeof AccountAppFinanceSubscriptionsRoute
+  '/hero/recovery': typeof AccountAppHeroRecoveryRoute
+  '/log/health': typeof AccountAppLogHealthRoute
+  '/log/meals': typeof AccountAppLogMealsRoute
+  '/log/sidequests': typeof AccountAppLogSidequestsRoute
+  '/log/weight': typeof AccountAppLogWeightRoute
+  '/quests/$questId': typeof AccountAppQuestsQuestIdRoute
+  '/quests/new': typeof AccountAppQuestsNewRoute
+  '/settings/app': typeof AccountAppSettingsAppRoute
+  '/settings/billing': typeof AccountAppSettingsBillingRoute
+  '/settings/delete': typeof AccountAppSettingsDeleteRoute
+  '/settings/export': typeof AccountAppSettingsExportRoute
+  '/settings/notifications': typeof AccountAppSettingsNotificationsRoute
+  '/finance/': typeof AccountAppFinanceIndexRoute
+  '/hero/': typeof AccountAppHeroIndexRoute
+  '/log/': typeof AccountAppLogIndexRoute
+  '/quests/': typeof AccountAppQuestsIndexRoute
+  '/settings/': typeof AccountAppSettingsIndexRoute
+  '/finance/expenses/$expenseId': typeof AccountAppFinanceExpensesExpenseIdRoute
+  '/quests/$questId/edit': typeof AccountAppQuestsQuestIdEditRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof AccountAppIndexRoute
   '/erasure': typeof ErasureRoute
   '/login': typeof LoginRoute
-  '/ai': typeof AppAiRoute
-  '/history': typeof AppHistoryRoute
-  '/insights': typeof AppInsightsRoute
-  '/onboarding': typeof AppOnboardingRoute
-  '/plan': typeof AppPlanRoute
-  '/review': typeof AppReviewRoute
-  '/': typeof AppIndexRoute
-  '/finance/categories': typeof AppFinanceCategoriesRoute
-  '/finance/subscriptions': typeof AppFinanceSubscriptionsRoute
-  '/hero/recovery': typeof AppHeroRecoveryRoute
-  '/log/health': typeof AppLogHealthRoute
-  '/log/meals': typeof AppLogMealsRoute
-  '/log/sidequests': typeof AppLogSidequestsRoute
-  '/log/weight': typeof AppLogWeightRoute
-  '/quests/$questId': typeof AppQuestsQuestIdRoute
-  '/quests/new': typeof AppQuestsNewRoute
-  '/settings/app': typeof AppSettingsAppRoute
-  '/settings/billing': typeof AppSettingsBillingRoute
-  '/settings/delete': typeof AppSettingsDeleteRoute
-  '/settings/export': typeof AppSettingsExportRoute
-  '/settings/notifications': typeof AppSettingsNotificationsRoute
-  '/finance': typeof AppFinanceIndexRoute
-  '/hero': typeof AppHeroIndexRoute
-  '/log': typeof AppLogIndexRoute
-  '/quests': typeof AppQuestsIndexRoute
-  '/settings': typeof AppSettingsIndexRoute
-  '/finance/expenses/$expenseId': typeof AppFinanceExpensesExpenseIdRoute
-  '/quests/$questId/edit': typeof AppQuestsQuestIdEditRoute
+  '/ai': typeof AccountAppAiRoute
+  '/history': typeof AccountAppHistoryRoute
+  '/insights': typeof AccountAppInsightsRoute
+  '/plan': typeof AccountAppPlanRoute
+  '/review': typeof AccountAppReviewRoute
+  '/onboarding': typeof AccountSetupOnboardingRoute
+  '/finance/categories': typeof AccountAppFinanceCategoriesRoute
+  '/finance/subscriptions': typeof AccountAppFinanceSubscriptionsRoute
+  '/hero/recovery': typeof AccountAppHeroRecoveryRoute
+  '/log/health': typeof AccountAppLogHealthRoute
+  '/log/meals': typeof AccountAppLogMealsRoute
+  '/log/sidequests': typeof AccountAppLogSidequestsRoute
+  '/log/weight': typeof AccountAppLogWeightRoute
+  '/quests/$questId': typeof AccountAppQuestsQuestIdRoute
+  '/quests/new': typeof AccountAppQuestsNewRoute
+  '/settings/app': typeof AccountAppSettingsAppRoute
+  '/settings/billing': typeof AccountAppSettingsBillingRoute
+  '/settings/delete': typeof AccountAppSettingsDeleteRoute
+  '/settings/export': typeof AccountAppSettingsExportRoute
+  '/settings/notifications': typeof AccountAppSettingsNotificationsRoute
+  '/finance': typeof AccountAppFinanceIndexRoute
+  '/hero': typeof AccountAppHeroIndexRoute
+  '/log': typeof AccountAppLogIndexRoute
+  '/quests': typeof AccountAppQuestsIndexRoute
+  '/settings': typeof AccountAppSettingsIndexRoute
+  '/finance/expenses/$expenseId': typeof AccountAppFinanceExpensesExpenseIdRoute
+  '/quests/$questId/edit': typeof AccountAppQuestsQuestIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/_app': typeof AppRouteWithChildren
+  '/_account': typeof AccountRouteWithChildren
   '/erasure': typeof ErasureRoute
   '/login': typeof LoginRoute
-  '/_app/ai': typeof AppAiRoute
-  '/_app/history': typeof AppHistoryRoute
-  '/_app/insights': typeof AppInsightsRoute
-  '/_app/log': typeof AppLogRouteWithChildren
-  '/_app/onboarding': typeof AppOnboardingRoute
-  '/_app/plan': typeof AppPlanRoute
-  '/_app/review': typeof AppReviewRoute
-  '/_app/': typeof AppIndexRoute
-  '/_app/finance/categories': typeof AppFinanceCategoriesRoute
-  '/_app/finance/subscriptions': typeof AppFinanceSubscriptionsRoute
-  '/_app/hero/recovery': typeof AppHeroRecoveryRoute
-  '/_app/log/health': typeof AppLogHealthRoute
-  '/_app/log/meals': typeof AppLogMealsRoute
-  '/_app/log/sidequests': typeof AppLogSidequestsRoute
-  '/_app/log/weight': typeof AppLogWeightRoute
-  '/_app/quests/$questId': typeof AppQuestsQuestIdRoute
-  '/_app/quests/new': typeof AppQuestsNewRoute
-  '/_app/settings/app': typeof AppSettingsAppRoute
-  '/_app/settings/billing': typeof AppSettingsBillingRoute
-  '/_app/settings/delete': typeof AppSettingsDeleteRoute
-  '/_app/settings/export': typeof AppSettingsExportRoute
-  '/_app/settings/notifications': typeof AppSettingsNotificationsRoute
-  '/_app/finance/': typeof AppFinanceIndexRoute
-  '/_app/hero/': typeof AppHeroIndexRoute
-  '/_app/log/': typeof AppLogIndexRoute
-  '/_app/quests/': typeof AppQuestsIndexRoute
-  '/_app/settings/': typeof AppSettingsIndexRoute
-  '/_app/finance/expenses/$expenseId': typeof AppFinanceExpensesExpenseIdRoute
-  '/_app/quests/$questId_/edit': typeof AppQuestsQuestIdEditRoute
+  '/_account/_app': typeof AccountAppRouteWithChildren
+  '/_account/_setup': typeof AccountSetupRouteWithChildren
+  '/_account/_app/ai': typeof AccountAppAiRoute
+  '/_account/_app/history': typeof AccountAppHistoryRoute
+  '/_account/_app/insights': typeof AccountAppInsightsRoute
+  '/_account/_app/log': typeof AccountAppLogRouteWithChildren
+  '/_account/_app/plan': typeof AccountAppPlanRoute
+  '/_account/_app/review': typeof AccountAppReviewRoute
+  '/_account/_setup/onboarding': typeof AccountSetupOnboardingRoute
+  '/_account/_app/': typeof AccountAppIndexRoute
+  '/_account/_app/finance/categories': typeof AccountAppFinanceCategoriesRoute
+  '/_account/_app/finance/subscriptions': typeof AccountAppFinanceSubscriptionsRoute
+  '/_account/_app/hero/recovery': typeof AccountAppHeroRecoveryRoute
+  '/_account/_app/log/health': typeof AccountAppLogHealthRoute
+  '/_account/_app/log/meals': typeof AccountAppLogMealsRoute
+  '/_account/_app/log/sidequests': typeof AccountAppLogSidequestsRoute
+  '/_account/_app/log/weight': typeof AccountAppLogWeightRoute
+  '/_account/_app/quests/$questId': typeof AccountAppQuestsQuestIdRoute
+  '/_account/_app/quests/new': typeof AccountAppQuestsNewRoute
+  '/_account/_app/settings/app': typeof AccountAppSettingsAppRoute
+  '/_account/_app/settings/billing': typeof AccountAppSettingsBillingRoute
+  '/_account/_app/settings/delete': typeof AccountAppSettingsDeleteRoute
+  '/_account/_app/settings/export': typeof AccountAppSettingsExportRoute
+  '/_account/_app/settings/notifications': typeof AccountAppSettingsNotificationsRoute
+  '/_account/_app/finance/': typeof AccountAppFinanceIndexRoute
+  '/_account/_app/hero/': typeof AccountAppHeroIndexRoute
+  '/_account/_app/log/': typeof AccountAppLogIndexRoute
+  '/_account/_app/quests/': typeof AccountAppQuestsIndexRoute
+  '/_account/_app/settings/': typeof AccountAppSettingsIndexRoute
+  '/_account/_app/finance/expenses/$expenseId': typeof AccountAppFinanceExpensesExpenseIdRoute
+  '/_account/_app/quests/$questId_/edit': typeof AccountAppQuestsQuestIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -314,9 +332,9 @@ export interface FileRouteTypes {
     | '/history'
     | '/insights'
     | '/log'
-    | '/onboarding'
     | '/plan'
     | '/review'
+    | '/onboarding'
     | '/finance/categories'
     | '/finance/subscriptions'
     | '/hero/recovery'
@@ -340,15 +358,15 @@ export interface FileRouteTypes {
     | '/quests/$questId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/erasure'
     | '/login'
     | '/ai'
     | '/history'
     | '/insights'
-    | '/onboarding'
     | '/plan'
     | '/review'
-    | '/'
+    | '/onboarding'
     | '/finance/categories'
     | '/finance/subscriptions'
     | '/hero/recovery'
@@ -372,42 +390,44 @@ export interface FileRouteTypes {
     | '/quests/$questId/edit'
   id:
     | '__root__'
-    | '/_app'
+    | '/_account'
     | '/erasure'
     | '/login'
-    | '/_app/ai'
-    | '/_app/history'
-    | '/_app/insights'
-    | '/_app/log'
-    | '/_app/onboarding'
-    | '/_app/plan'
-    | '/_app/review'
-    | '/_app/'
-    | '/_app/finance/categories'
-    | '/_app/finance/subscriptions'
-    | '/_app/hero/recovery'
-    | '/_app/log/health'
-    | '/_app/log/meals'
-    | '/_app/log/sidequests'
-    | '/_app/log/weight'
-    | '/_app/quests/$questId'
-    | '/_app/quests/new'
-    | '/_app/settings/app'
-    | '/_app/settings/billing'
-    | '/_app/settings/delete'
-    | '/_app/settings/export'
-    | '/_app/settings/notifications'
-    | '/_app/finance/'
-    | '/_app/hero/'
-    | '/_app/log/'
-    | '/_app/quests/'
-    | '/_app/settings/'
-    | '/_app/finance/expenses/$expenseId'
-    | '/_app/quests/$questId_/edit'
+    | '/_account/_app'
+    | '/_account/_setup'
+    | '/_account/_app/ai'
+    | '/_account/_app/history'
+    | '/_account/_app/insights'
+    | '/_account/_app/log'
+    | '/_account/_app/plan'
+    | '/_account/_app/review'
+    | '/_account/_setup/onboarding'
+    | '/_account/_app/'
+    | '/_account/_app/finance/categories'
+    | '/_account/_app/finance/subscriptions'
+    | '/_account/_app/hero/recovery'
+    | '/_account/_app/log/health'
+    | '/_account/_app/log/meals'
+    | '/_account/_app/log/sidequests'
+    | '/_account/_app/log/weight'
+    | '/_account/_app/quests/$questId'
+    | '/_account/_app/quests/new'
+    | '/_account/_app/settings/app'
+    | '/_account/_app/settings/billing'
+    | '/_account/_app/settings/delete'
+    | '/_account/_app/settings/export'
+    | '/_account/_app/settings/notifications'
+    | '/_account/_app/finance/'
+    | '/_account/_app/hero/'
+    | '/_account/_app/log/'
+    | '/_account/_app/quests/'
+    | '/_account/_app/settings/'
+    | '/_account/_app/finance/expenses/$expenseId'
+    | '/_account/_app/quests/$questId_/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  AppRoute: typeof AppRouteWithChildren
+  AccountRoute: typeof AccountRouteWithChildren
   ErasureRoute: typeof ErasureRoute
   LoginRoute: typeof LoginRoute
 }
@@ -428,296 +448,337 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ErasureRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app': {
-      id: '/_app'
+    '/_account': {
+      id: '/_account'
       path: ''
       fullPath: '/'
-      preLoaderRoute: typeof AppRouteImport
+      preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/': {
-      id: '/_app/'
+    '/_account/_setup': {
+      id: '/_account/_setup'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AccountSetupRouteImport
+      parentRoute: typeof AccountRoute
+    }
+    '/_account/_app': {
+      id: '/_account/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AccountAppRouteImport
+      parentRoute: typeof AccountRoute
+    }
+    '/_account/_app/': {
+      id: '/_account/_app/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof AppIndexRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppIndexRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/review': {
-      id: '/_app/review'
-      path: '/review'
-      fullPath: '/review'
-      preLoaderRoute: typeof AppReviewRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/plan': {
-      id: '/_app/plan'
-      path: '/plan'
-      fullPath: '/plan'
-      preLoaderRoute: typeof AppPlanRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/onboarding': {
-      id: '/_app/onboarding'
+    '/_account/_setup/onboarding': {
+      id: '/_account/_setup/onboarding'
       path: '/onboarding'
       fullPath: '/onboarding'
-      preLoaderRoute: typeof AppOnboardingRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountSetupOnboardingRouteImport
+      parentRoute: typeof AccountSetupRoute
     }
-    '/_app/log': {
-      id: '/_app/log'
+    '/_account/_app/review': {
+      id: '/_account/_app/review'
+      path: '/review'
+      fullPath: '/review'
+      preLoaderRoute: typeof AccountAppReviewRouteImport
+      parentRoute: typeof AccountAppRoute
+    }
+    '/_account/_app/plan': {
+      id: '/_account/_app/plan'
+      path: '/plan'
+      fullPath: '/plan'
+      preLoaderRoute: typeof AccountAppPlanRouteImport
+      parentRoute: typeof AccountAppRoute
+    }
+    '/_account/_app/log': {
+      id: '/_account/_app/log'
       path: '/log'
       fullPath: '/log'
-      preLoaderRoute: typeof AppLogRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppLogRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/insights': {
-      id: '/_app/insights'
+    '/_account/_app/insights': {
+      id: '/_account/_app/insights'
       path: '/insights'
       fullPath: '/insights'
-      preLoaderRoute: typeof AppInsightsRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppInsightsRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/history': {
-      id: '/_app/history'
+    '/_account/_app/history': {
+      id: '/_account/_app/history'
       path: '/history'
       fullPath: '/history'
-      preLoaderRoute: typeof AppHistoryRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppHistoryRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/ai': {
-      id: '/_app/ai'
+    '/_account/_app/ai': {
+      id: '/_account/_app/ai'
       path: '/ai'
       fullPath: '/ai'
-      preLoaderRoute: typeof AppAiRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppAiRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/settings/': {
-      id: '/_app/settings/'
+    '/_account/_app/settings/': {
+      id: '/_account/_app/settings/'
       path: '/settings'
       fullPath: '/settings/'
-      preLoaderRoute: typeof AppSettingsIndexRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppSettingsIndexRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/quests/': {
-      id: '/_app/quests/'
+    '/_account/_app/quests/': {
+      id: '/_account/_app/quests/'
       path: '/quests'
       fullPath: '/quests/'
-      preLoaderRoute: typeof AppQuestsIndexRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppQuestsIndexRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/log/': {
-      id: '/_app/log/'
+    '/_account/_app/log/': {
+      id: '/_account/_app/log/'
       path: '/'
       fullPath: '/log/'
-      preLoaderRoute: typeof AppLogIndexRouteImport
-      parentRoute: typeof AppLogRoute
+      preLoaderRoute: typeof AccountAppLogIndexRouteImport
+      parentRoute: typeof AccountAppLogRoute
     }
-    '/_app/hero/': {
-      id: '/_app/hero/'
+    '/_account/_app/hero/': {
+      id: '/_account/_app/hero/'
       path: '/hero'
       fullPath: '/hero/'
-      preLoaderRoute: typeof AppHeroIndexRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppHeroIndexRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/finance/': {
-      id: '/_app/finance/'
+    '/_account/_app/finance/': {
+      id: '/_account/_app/finance/'
       path: '/finance'
       fullPath: '/finance/'
-      preLoaderRoute: typeof AppFinanceIndexRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppFinanceIndexRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/settings/notifications': {
-      id: '/_app/settings/notifications'
+    '/_account/_app/settings/notifications': {
+      id: '/_account/_app/settings/notifications'
       path: '/settings/notifications'
       fullPath: '/settings/notifications'
-      preLoaderRoute: typeof AppSettingsNotificationsRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppSettingsNotificationsRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/settings/export': {
-      id: '/_app/settings/export'
+    '/_account/_app/settings/export': {
+      id: '/_account/_app/settings/export'
       path: '/settings/export'
       fullPath: '/settings/export'
-      preLoaderRoute: typeof AppSettingsExportRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppSettingsExportRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/settings/delete': {
-      id: '/_app/settings/delete'
+    '/_account/_app/settings/delete': {
+      id: '/_account/_app/settings/delete'
       path: '/settings/delete'
       fullPath: '/settings/delete'
-      preLoaderRoute: typeof AppSettingsDeleteRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppSettingsDeleteRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/settings/billing': {
-      id: '/_app/settings/billing'
+    '/_account/_app/settings/billing': {
+      id: '/_account/_app/settings/billing'
       path: '/settings/billing'
       fullPath: '/settings/billing'
-      preLoaderRoute: typeof AppSettingsBillingRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppSettingsBillingRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/settings/app': {
-      id: '/_app/settings/app'
+    '/_account/_app/settings/app': {
+      id: '/_account/_app/settings/app'
       path: '/settings/app'
       fullPath: '/settings/app'
-      preLoaderRoute: typeof AppSettingsAppRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppSettingsAppRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/quests/new': {
-      id: '/_app/quests/new'
+    '/_account/_app/quests/new': {
+      id: '/_account/_app/quests/new'
       path: '/quests/new'
       fullPath: '/quests/new'
-      preLoaderRoute: typeof AppQuestsNewRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppQuestsNewRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/quests/$questId': {
-      id: '/_app/quests/$questId'
+    '/_account/_app/quests/$questId': {
+      id: '/_account/_app/quests/$questId'
       path: '/quests/$questId'
       fullPath: '/quests/$questId'
-      preLoaderRoute: typeof AppQuestsQuestIdRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppQuestsQuestIdRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/log/weight': {
-      id: '/_app/log/weight'
+    '/_account/_app/log/weight': {
+      id: '/_account/_app/log/weight'
       path: '/weight'
       fullPath: '/log/weight'
-      preLoaderRoute: typeof AppLogWeightRouteImport
-      parentRoute: typeof AppLogRoute
+      preLoaderRoute: typeof AccountAppLogWeightRouteImport
+      parentRoute: typeof AccountAppLogRoute
     }
-    '/_app/log/sidequests': {
-      id: '/_app/log/sidequests'
+    '/_account/_app/log/sidequests': {
+      id: '/_account/_app/log/sidequests'
       path: '/sidequests'
       fullPath: '/log/sidequests'
-      preLoaderRoute: typeof AppLogSidequestsRouteImport
-      parentRoute: typeof AppLogRoute
+      preLoaderRoute: typeof AccountAppLogSidequestsRouteImport
+      parentRoute: typeof AccountAppLogRoute
     }
-    '/_app/log/meals': {
-      id: '/_app/log/meals'
+    '/_account/_app/log/meals': {
+      id: '/_account/_app/log/meals'
       path: '/meals'
       fullPath: '/log/meals'
-      preLoaderRoute: typeof AppLogMealsRouteImport
-      parentRoute: typeof AppLogRoute
+      preLoaderRoute: typeof AccountAppLogMealsRouteImport
+      parentRoute: typeof AccountAppLogRoute
     }
-    '/_app/log/health': {
-      id: '/_app/log/health'
+    '/_account/_app/log/health': {
+      id: '/_account/_app/log/health'
       path: '/health'
       fullPath: '/log/health'
-      preLoaderRoute: typeof AppLogHealthRouteImport
-      parentRoute: typeof AppLogRoute
+      preLoaderRoute: typeof AccountAppLogHealthRouteImport
+      parentRoute: typeof AccountAppLogRoute
     }
-    '/_app/hero/recovery': {
-      id: '/_app/hero/recovery'
+    '/_account/_app/hero/recovery': {
+      id: '/_account/_app/hero/recovery'
       path: '/hero/recovery'
       fullPath: '/hero/recovery'
-      preLoaderRoute: typeof AppHeroRecoveryRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppHeroRecoveryRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/finance/subscriptions': {
-      id: '/_app/finance/subscriptions'
+    '/_account/_app/finance/subscriptions': {
+      id: '/_account/_app/finance/subscriptions'
       path: '/finance/subscriptions'
       fullPath: '/finance/subscriptions'
-      preLoaderRoute: typeof AppFinanceSubscriptionsRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppFinanceSubscriptionsRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/finance/categories': {
-      id: '/_app/finance/categories'
+    '/_account/_app/finance/categories': {
+      id: '/_account/_app/finance/categories'
       path: '/finance/categories'
       fullPath: '/finance/categories'
-      preLoaderRoute: typeof AppFinanceCategoriesRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppFinanceCategoriesRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/quests/$questId_/edit': {
-      id: '/_app/quests/$questId_/edit'
+    '/_account/_app/quests/$questId_/edit': {
+      id: '/_account/_app/quests/$questId_/edit'
       path: '/quests/$questId/edit'
       fullPath: '/quests/$questId/edit'
-      preLoaderRoute: typeof AppQuestsQuestIdEditRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppQuestsQuestIdEditRouteImport
+      parentRoute: typeof AccountAppRoute
     }
-    '/_app/finance/expenses/$expenseId': {
-      id: '/_app/finance/expenses/$expenseId'
+    '/_account/_app/finance/expenses/$expenseId': {
+      id: '/_account/_app/finance/expenses/$expenseId'
       path: '/finance/expenses/$expenseId'
       fullPath: '/finance/expenses/$expenseId'
-      preLoaderRoute: typeof AppFinanceExpensesExpenseIdRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof AccountAppFinanceExpensesExpenseIdRouteImport
+      parentRoute: typeof AccountAppRoute
     }
   }
 }
 
-interface AppLogRouteChildren {
-  AppLogHealthRoute: typeof AppLogHealthRoute
-  AppLogMealsRoute: typeof AppLogMealsRoute
-  AppLogSidequestsRoute: typeof AppLogSidequestsRoute
-  AppLogWeightRoute: typeof AppLogWeightRoute
-  AppLogIndexRoute: typeof AppLogIndexRoute
+interface AccountAppLogRouteChildren {
+  AccountAppLogHealthRoute: typeof AccountAppLogHealthRoute
+  AccountAppLogMealsRoute: typeof AccountAppLogMealsRoute
+  AccountAppLogSidequestsRoute: typeof AccountAppLogSidequestsRoute
+  AccountAppLogWeightRoute: typeof AccountAppLogWeightRoute
+  AccountAppLogIndexRoute: typeof AccountAppLogIndexRoute
 }
 
-const AppLogRouteChildren: AppLogRouteChildren = {
-  AppLogHealthRoute: AppLogHealthRoute,
-  AppLogMealsRoute: AppLogMealsRoute,
-  AppLogSidequestsRoute: AppLogSidequestsRoute,
-  AppLogWeightRoute: AppLogWeightRoute,
-  AppLogIndexRoute: AppLogIndexRoute,
+const AccountAppLogRouteChildren: AccountAppLogRouteChildren = {
+  AccountAppLogHealthRoute: AccountAppLogHealthRoute,
+  AccountAppLogMealsRoute: AccountAppLogMealsRoute,
+  AccountAppLogSidequestsRoute: AccountAppLogSidequestsRoute,
+  AccountAppLogWeightRoute: AccountAppLogWeightRoute,
+  AccountAppLogIndexRoute: AccountAppLogIndexRoute,
 }
 
-const AppLogRouteWithChildren =
-  AppLogRoute._addFileChildren(AppLogRouteChildren)
+const AccountAppLogRouteWithChildren = AccountAppLogRoute._addFileChildren(
+  AccountAppLogRouteChildren,
+)
 
-interface AppRouteChildren {
-  AppAiRoute: typeof AppAiRoute
-  AppHistoryRoute: typeof AppHistoryRoute
-  AppInsightsRoute: typeof AppInsightsRoute
-  AppLogRoute: typeof AppLogRouteWithChildren
-  AppOnboardingRoute: typeof AppOnboardingRoute
-  AppPlanRoute: typeof AppPlanRoute
-  AppReviewRoute: typeof AppReviewRoute
-  AppIndexRoute: typeof AppIndexRoute
-  AppFinanceCategoriesRoute: typeof AppFinanceCategoriesRoute
-  AppFinanceSubscriptionsRoute: typeof AppFinanceSubscriptionsRoute
-  AppHeroRecoveryRoute: typeof AppHeroRecoveryRoute
-  AppQuestsQuestIdRoute: typeof AppQuestsQuestIdRoute
-  AppQuestsNewRoute: typeof AppQuestsNewRoute
-  AppSettingsAppRoute: typeof AppSettingsAppRoute
-  AppSettingsBillingRoute: typeof AppSettingsBillingRoute
-  AppSettingsDeleteRoute: typeof AppSettingsDeleteRoute
-  AppSettingsExportRoute: typeof AppSettingsExportRoute
-  AppSettingsNotificationsRoute: typeof AppSettingsNotificationsRoute
-  AppFinanceIndexRoute: typeof AppFinanceIndexRoute
-  AppHeroIndexRoute: typeof AppHeroIndexRoute
-  AppQuestsIndexRoute: typeof AppQuestsIndexRoute
-  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
-  AppFinanceExpensesExpenseIdRoute: typeof AppFinanceExpensesExpenseIdRoute
-  AppQuestsQuestIdEditRoute: typeof AppQuestsQuestIdEditRoute
+interface AccountAppRouteChildren {
+  AccountAppAiRoute: typeof AccountAppAiRoute
+  AccountAppHistoryRoute: typeof AccountAppHistoryRoute
+  AccountAppInsightsRoute: typeof AccountAppInsightsRoute
+  AccountAppLogRoute: typeof AccountAppLogRouteWithChildren
+  AccountAppPlanRoute: typeof AccountAppPlanRoute
+  AccountAppReviewRoute: typeof AccountAppReviewRoute
+  AccountAppIndexRoute: typeof AccountAppIndexRoute
+  AccountAppFinanceCategoriesRoute: typeof AccountAppFinanceCategoriesRoute
+  AccountAppFinanceSubscriptionsRoute: typeof AccountAppFinanceSubscriptionsRoute
+  AccountAppHeroRecoveryRoute: typeof AccountAppHeroRecoveryRoute
+  AccountAppQuestsQuestIdRoute: typeof AccountAppQuestsQuestIdRoute
+  AccountAppQuestsNewRoute: typeof AccountAppQuestsNewRoute
+  AccountAppSettingsAppRoute: typeof AccountAppSettingsAppRoute
+  AccountAppSettingsBillingRoute: typeof AccountAppSettingsBillingRoute
+  AccountAppSettingsDeleteRoute: typeof AccountAppSettingsDeleteRoute
+  AccountAppSettingsExportRoute: typeof AccountAppSettingsExportRoute
+  AccountAppSettingsNotificationsRoute: typeof AccountAppSettingsNotificationsRoute
+  AccountAppFinanceIndexRoute: typeof AccountAppFinanceIndexRoute
+  AccountAppHeroIndexRoute: typeof AccountAppHeroIndexRoute
+  AccountAppQuestsIndexRoute: typeof AccountAppQuestsIndexRoute
+  AccountAppSettingsIndexRoute: typeof AccountAppSettingsIndexRoute
+  AccountAppFinanceExpensesExpenseIdRoute: typeof AccountAppFinanceExpensesExpenseIdRoute
+  AccountAppQuestsQuestIdEditRoute: typeof AccountAppQuestsQuestIdEditRoute
 }
 
-const AppRouteChildren: AppRouteChildren = {
-  AppAiRoute: AppAiRoute,
-  AppHistoryRoute: AppHistoryRoute,
-  AppInsightsRoute: AppInsightsRoute,
-  AppLogRoute: AppLogRouteWithChildren,
-  AppOnboardingRoute: AppOnboardingRoute,
-  AppPlanRoute: AppPlanRoute,
-  AppReviewRoute: AppReviewRoute,
-  AppIndexRoute: AppIndexRoute,
-  AppFinanceCategoriesRoute: AppFinanceCategoriesRoute,
-  AppFinanceSubscriptionsRoute: AppFinanceSubscriptionsRoute,
-  AppHeroRecoveryRoute: AppHeroRecoveryRoute,
-  AppQuestsQuestIdRoute: AppQuestsQuestIdRoute,
-  AppQuestsNewRoute: AppQuestsNewRoute,
-  AppSettingsAppRoute: AppSettingsAppRoute,
-  AppSettingsBillingRoute: AppSettingsBillingRoute,
-  AppSettingsDeleteRoute: AppSettingsDeleteRoute,
-  AppSettingsExportRoute: AppSettingsExportRoute,
-  AppSettingsNotificationsRoute: AppSettingsNotificationsRoute,
-  AppFinanceIndexRoute: AppFinanceIndexRoute,
-  AppHeroIndexRoute: AppHeroIndexRoute,
-  AppQuestsIndexRoute: AppQuestsIndexRoute,
-  AppSettingsIndexRoute: AppSettingsIndexRoute,
-  AppFinanceExpensesExpenseIdRoute: AppFinanceExpensesExpenseIdRoute,
-  AppQuestsQuestIdEditRoute: AppQuestsQuestIdEditRoute,
+const AccountAppRouteChildren: AccountAppRouteChildren = {
+  AccountAppAiRoute: AccountAppAiRoute,
+  AccountAppHistoryRoute: AccountAppHistoryRoute,
+  AccountAppInsightsRoute: AccountAppInsightsRoute,
+  AccountAppLogRoute: AccountAppLogRouteWithChildren,
+  AccountAppPlanRoute: AccountAppPlanRoute,
+  AccountAppReviewRoute: AccountAppReviewRoute,
+  AccountAppIndexRoute: AccountAppIndexRoute,
+  AccountAppFinanceCategoriesRoute: AccountAppFinanceCategoriesRoute,
+  AccountAppFinanceSubscriptionsRoute: AccountAppFinanceSubscriptionsRoute,
+  AccountAppHeroRecoveryRoute: AccountAppHeroRecoveryRoute,
+  AccountAppQuestsQuestIdRoute: AccountAppQuestsQuestIdRoute,
+  AccountAppQuestsNewRoute: AccountAppQuestsNewRoute,
+  AccountAppSettingsAppRoute: AccountAppSettingsAppRoute,
+  AccountAppSettingsBillingRoute: AccountAppSettingsBillingRoute,
+  AccountAppSettingsDeleteRoute: AccountAppSettingsDeleteRoute,
+  AccountAppSettingsExportRoute: AccountAppSettingsExportRoute,
+  AccountAppSettingsNotificationsRoute: AccountAppSettingsNotificationsRoute,
+  AccountAppFinanceIndexRoute: AccountAppFinanceIndexRoute,
+  AccountAppHeroIndexRoute: AccountAppHeroIndexRoute,
+  AccountAppQuestsIndexRoute: AccountAppQuestsIndexRoute,
+  AccountAppSettingsIndexRoute: AccountAppSettingsIndexRoute,
+  AccountAppFinanceExpensesExpenseIdRoute:
+    AccountAppFinanceExpensesExpenseIdRoute,
+  AccountAppQuestsQuestIdEditRoute: AccountAppQuestsQuestIdEditRoute,
 }
 
-const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+const AccountAppRouteWithChildren = AccountAppRoute._addFileChildren(
+  AccountAppRouteChildren,
+)
+
+interface AccountSetupRouteChildren {
+  AccountSetupOnboardingRoute: typeof AccountSetupOnboardingRoute
+}
+
+const AccountSetupRouteChildren: AccountSetupRouteChildren = {
+  AccountSetupOnboardingRoute: AccountSetupOnboardingRoute,
+}
+
+const AccountSetupRouteWithChildren = AccountSetupRoute._addFileChildren(
+  AccountSetupRouteChildren,
+)
+
+interface AccountRouteChildren {
+  AccountAppRoute: typeof AccountAppRouteWithChildren
+  AccountSetupRoute: typeof AccountSetupRouteWithChildren
+}
+
+const AccountRouteChildren: AccountRouteChildren = {
+  AccountAppRoute: AccountAppRouteWithChildren,
+  AccountSetupRoute: AccountSetupRouteWithChildren,
+}
+
+const AccountRouteWithChildren =
+  AccountRoute._addFileChildren(AccountRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
-  AppRoute: AppRouteWithChildren,
+  AccountRoute: AccountRouteWithChildren,
   ErasureRoute: ErasureRoute,
   LoginRoute: LoginRoute,
 }

@@ -42,6 +42,44 @@ describe('day group screens', () => {
     expect(await screen.findByRole('heading', { name: 'Streaks' })).toBeDefined();
   });
 
+  it('should not offer a first quest when a quest starts later this week', async () => {
+    const data = createMemoirTestData({ today: '2026-09-13', persona: 'new' });
+    await data.provider.dispatchCommand({
+      type: 'quest.create',
+      draft: {
+        name: 'Walk 20 minutes',
+        notes: null,
+        startTimeMinutes: null,
+        durationMinutes: 10,
+        statAffinity: 'body',
+        strictness: 'goal',
+        optionalStreakOptIn: false,
+        recurrence: {
+          frequency: 'weekly',
+          interval: 1,
+          daysOfWeek: ['mon', 'tue', 'wed', 'thu', 'fri'],
+          dayOfMonth: null,
+          startDate: '2026-09-13',
+          end: { kind: 'never' },
+          exceptions: [],
+        },
+        consequences: [],
+        moduleLink: null,
+        notification: { enabled: false, leadMinutes: 0 },
+        healthThreshold: null,
+        preCommit: false,
+        active: true,
+      },
+    });
+
+    renderScreen(<TodayScreen />, { value: data });
+
+    expect(await screen.findByRole('heading', { name: 'Nothing is due today' })).toBeDefined();
+    expect(screen.getByText('Walk 20 minutes is next · Tomorrow.')).toBeDefined();
+    expect(screen.queryByText('Your first day is empty on purpose')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Create your first quest' })).toBeNull();
+  });
+
   it('should invite a first quest when the day has no occurrences', async () => {
     renderScreen(<TodayScreen />, { today: TODAY, persona: 'new' });
     expect(await screen.findByText('Your first day is empty on purpose')).toBeDefined();
