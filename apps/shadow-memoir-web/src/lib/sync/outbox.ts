@@ -86,6 +86,12 @@ export class Outbox {
     return (await this.store.readMeta<DeadLetter[]>(SYNC_META_KEYS.deadLetters)) ?? [];
   }
 
+  async dismissDeadLetter(commandId: string): Promise<void> {
+    const letters = await this.deadLetters();
+    const kept = letters.filter(letter => letter.commandId !== commandId);
+    if (kept.length !== letters.length) await this.store.writeMeta(SYNC_META_KEYS.deadLetters, kept);
+  }
+
   /** The next batch to post, in the order the owner performed it, capped at the server's batch limit. */
   async nextBatch(): Promise<OutboxEntry[]> {
     return (await this.pending()).slice(0, MAX_BATCH_SIZE);

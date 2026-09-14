@@ -1,3 +1,5 @@
+import { type AppUpdateState } from '@/lib/app-update';
+
 import {
   type AccountCommand,
   type AppSyncView,
@@ -8,6 +10,7 @@ import {
   type ErasureDevice,
   type ExportJob,
   type ExportView,
+  type InstallRow,
   type NotificationPreference,
   type NotificationSettings,
   type OnboardingStatus,
@@ -124,18 +127,43 @@ export const ONLINE_ONLY_NOTE = 'Insights, coaching results and exports need a c
 export const SESSION_NOTE =
   'If your session ends while you are offline, everything you logged stays on the device and syncs once the platform restores it. You are never asked to re-enter anything.';
 
-export const INSTALL_ROWS: AppSyncView['installRows'] = [
-  { id: 'offline', label: 'Offline ready', help: 'Cache warmed for today, this week and the last ninety days.', action: 'Refresh the cache', overlay: null, done: false },
-  { id: 'update', label: 'Update waiting', help: 'A newer version is downloaded and ready to apply.', action: 'Reload to update', overlay: 'update', done: false },
-  {
-    id: 'other-device',
-    label: 'Install on another device',
-    help: 'Open Shadow Memoir there and choose install.',
-    action: 'Show what that looks like',
-    overlay: 'install',
-    done: false,
+export const DEVICE_REMOVED = 'Removed from your devices.';
+
+const OFFLINE_ROWS: Record<AppUpdateState['offline'], InstallRow> = {
+  unavailable: {
+    id: 'offline',
+    label: 'Needs a connection to open',
+    help: 'This browser hasn’t saved the app for offline use. Anything you log is still kept on this device until it syncs.',
+    action: null,
   },
-];
+  'next-load': {
+    id: 'offline',
+    label: 'Opens offline after its next load here',
+    help: 'The app finishes saving itself on this device the next time it loads. Until then, opening it needs a connection.',
+    action: null,
+  },
+  ready: {
+    id: 'offline',
+    label: 'Opens offline',
+    help: 'The app is saved on this device, so it opens with no connection. A screen you haven’t opened here before may still need one.',
+    action: null,
+  },
+};
+
+export function installRows({ offline, update }: AppUpdateState): InstallRow[] {
+  return [
+    OFFLINE_ROWS[offline],
+    update !== 'none'
+      ? { id: 'update', label: 'Update waiting', help: 'A newer version is downloaded and ready to apply.', action: { label: 'Reload to update', overlay: 'update' } }
+      : { id: 'update', label: 'Up to date', help: 'This device runs the newest version it has found.', action: null },
+    {
+      id: 'other-device',
+      label: 'Install on another device',
+      help: 'Open Shadow Memoir in that device’s browser and choose install.',
+      action: { label: 'Preview', overlay: 'install-preview' },
+    },
+  ];
+}
 
 export function billingPlans(current: PlanId): BillingPlan[] {
   return [
@@ -272,6 +300,7 @@ export function createAccountProvider({ persona = 'active', currency }: AccountF
         ...SYNC_COPY[status],
         queuedCount: state.persona === 'new' ? 0 : 2,
         lastSyncedAt: null,
+        failed: [],
         queue:
           state.persona === 'new'
             ? []
@@ -286,7 +315,6 @@ export function createAccountProvider({ persona = 'active', currency }: AccountF
                 { id: 'd1', name: 'Chrome · MacBook', meta: 'Last seen a moment ago', current: true },
                 { id: 'd2', name: 'Shadow Memoir · iPhone', meta: 'Last seen 2 August', current: false },
               ],
-        installRows: INSTALL_ROWS,
         offlineCapabilities: OFFLINE_CAPABILITIES,
         onlineOnly: ONLINE_ONLY_NOTE,
         sessionNote: SESSION_NOTE,
@@ -311,7 +339,10 @@ export function createAccountProvider({ persona = 'active', currency }: AccountF
           return Promise.resolve(applied(command.enabled ? 'On.' : 'Off.'));
 
         case 'device.remove':
-          return Promise.resolve(applied('That device will stop receiving notifications.'));
+          return Promise.resolve(applied(DEVICE_REMOVED));
+
+        case 'failedChange.dismiss':
+          return Promise.resolve(applied(''));
 
         case 'billing.checkout':
           state.plan = 'coach';

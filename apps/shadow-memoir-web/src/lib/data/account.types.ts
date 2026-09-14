@@ -134,13 +134,26 @@ export interface QueueEntry {
   retryable: boolean;
 }
 
-interface InstallRow {
-  id: string;
+interface InstallRowAction {
+  label: string;
+  overlay: 'install-preview' | 'update';
+}
+
+export interface InstallRow {
+  id: 'offline' | 'update' | 'other-device';
   label: string;
   help: string;
-  action: string;
-  overlay: 'install' | 'update' | null;
-  done: boolean;
+  action: InstallRowAction | null;
+}
+
+/** A change the server failed in a way no resend can fix, so it left the queue. */
+export interface FailedChange {
+  id: string;
+  text: string;
+  reason: string;
+  meta: string;
+  /** What the owner wrote, when the failed change is a journal entry — the server never kept it. */
+  journalText: string | null;
 }
 
 export interface AppSyncView {
@@ -150,8 +163,8 @@ export interface AppSyncView {
   queuedCount: number;
   lastSyncedAt: string | null;
   queue: QueueEntry[];
+  failed: FailedChange[];
   devices: AccountDevice[];
-  installRows: InstallRow[];
   offlineCapabilities: string[];
   onlineOnly: string;
   sessionNote: string;
@@ -173,6 +186,7 @@ export type AccountCommand =
   | { type: 'onboarding.complete'; submission: OnboardingSubmission }
   | { type: 'notification.set'; preferenceId: NotificationPrefKey; enabled: boolean }
   | { type: 'device.remove'; deviceId: string }
+  | { type: 'failedChange.dismiss'; commandId: string }
   | { type: 'billing.checkout'; plan: BillingPeriod }
   | { type: 'export.prepare' }
   | { type: 'export.dismiss' }

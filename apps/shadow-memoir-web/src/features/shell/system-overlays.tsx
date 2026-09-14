@@ -1,16 +1,17 @@
 import { useNavigate } from '@tanstack/react-router';
 import { createContext, type ReactElement, type ReactNode, useCallback, useContext, useMemo, useState } from 'react';
-import { Alert, Button } from '@shadow-library/ui';
-import { useServiceWorker } from '@shadow-library/web/pwa';
+import { Alert, Button, Skeleton } from '@shadow-library/ui';
 
+import { DataState } from '@/components/DataState';
 import { OverlaySurface } from '@/components/OverlaySurface';
-import { useAppSync } from '@/lib/data';
+import { useAppUpdate } from '@/lib/app-update';
+import { useAppSync, useNotificationSettings } from '@/lib/data';
 import { type InstallOffer, useInstallOffer } from '@/lib/install-offer';
 import { currentPage, signInUrl } from '@/lib/session';
 
 import styles from './system-overlays.module.css';
 
-export type SystemOverlayKind = 'install' | 'update' | 'session-expired' | 'notifications';
+export type SystemOverlayKind = 'install' | 'install-preview' | 'update' | 'session-expired' | 'notifications';
 
 export interface SystemOverlayControls {
   open: (kind: SystemOverlayKind) => void;
@@ -23,16 +24,12 @@ export function useSystemOverlays(): SystemOverlayControls {
   return useContext(SystemOverlayContext);
 }
 
-const INSTALL_FACTS = [
-  'Opens full screen from your home screen, with your wake window intact.',
-  'Works with no connection — quests, capture and logs all queue on the device.',
-  'Makes push available, and every category stays off until you turn it on.',
-];
+const INSTALL_FACTS = ['Opens full screen from your home screen, with your wake window intact.', 'Works with no connection — quests, capture and logs all queue on the device.'];
 
 /**
  * The shell-level overlays: everything the app needs to say about itself rather than about the day. They are
- * driven by a context rather than by each screen, so App and sync can raise the same install and update
- * sheets the service worker raises on its own.
+ * driven by a context rather than by each screen, so App and sync can raise the same update sheet the
+ * service worker raises on its own.
  */
 export function SystemOverlayProvider({ children }: { children: ReactNode }): ReactElement {
   const [kind, setKind] = useState<SystemOverlayKind | null>(null);
@@ -42,7 +39,7 @@ export function SystemOverlayProvider({ children }: { children: ReactNode }): Re
   const [offered, setOffered] = useState(false);
   if (offered !== install.shouldOffer) {
     setOffered(install.shouldOffer);
-    if (install.shouldOffer) setKind('install');
+    if (install.shouldOffer) setKind(current => current ?? 'install');
   }
 
   return (
@@ -55,9 +52,10 @@ export function SystemOverlayProvider({ children }: { children: ReactNode }): Re
 
 function SystemOverlays({ kind, install, onClose }: { kind: SystemOverlayKind | null; install: InstallOffer; onClose: () => void }): ReactElement {
   const navigate = useNavigate();
-  const { applyUpdate } = useServiceWorker({ url: '/sw.js' });
+  const update = useAppUpdate();
   const appSync = useAppSync();
   const queue = appSync.data?.queue ?? [];
+  const updateWaiting = update.update !== 'none';
 
   const change = useCallback(
     (open: boolean) => {
@@ -65,6 +63,11 @@ function SystemOverlays({ kind, install, onClose }: { kind: SystemOverlayKind | 
     },
     [onClose],
   );
+
+  const declineInstall = (): void => {
+    install.dismiss();
+    onClose();
+  };
 
   const go = (to: string): void => {
     onClose();
@@ -75,7 +78,7 @@ function SystemOverlays({ kind, install, onClose }: { kind: SystemOverlayKind | 
     <>
       <OverlaySurface
         open={kind === 'install'}
-        onOpenChange={change}
+        onOpenChange={open => !open && declineInstall()}
         title="Keep Shadow Memoir a tap away"
         description="Installing adds it to your home screen and lets it open without a browser. Everything works either way — the app already runs offline and syncs when you reconnect."
         footer={
@@ -89,49 +92,55 @@ function SystemOverlays({ kind, install, onClose }: { kind: SystemOverlayKind | 
             >
               Install
             </Button>
-            <Button variant="ghost" onClick={onClose}>
+            <Button variant="ghost" onClick={declineInstall}>
               Not now
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                install.dismiss();
-                onClose();
-              }}
-            >
-              Do not ask again
             </Button>
           </>
         }
       >
-        <ul className={styles.facts}>
-          {INSTALL_FACTS.map(fact => (
-            <li key={fact} className={styles.fact}>
-              <span className={styles.tick} aria-hidden>
-                ✓
-              </span>
-              <span>{fact}</span>
-            </li>
-          ))}
-        </ul>
+        <InstallFacts />
+      </OverlaySurface>
+
+      <OverlaySurface
+        open={kind === 'install-preview'}
+        onOpenChange={change}
+        title="What installing looks like"
+        description="On your other device, open Shadow Memoir in its browser and choose install. This is what it offers there — nothing is installed from here."
+        footer={
+          <Button variant="ghost" onClick={onClose}>
+            Done
+          </Button>
+        }
+      >
+        <InstallFacts />
       </OverlaySurface>
 
       <OverlaySurface
         open={kind === 'update'}
         onOpenChange={change}
-        title="A new version is ready"
+        title={updateWaiting ? 'A new version is ready' : 'You’re up to date'}
         footer={
-          <>
-            <Button variant="primary" onClick={applyUpdate}>
-              Reload now
-            </Button>
+          updateWaiting ? (
+            <>
+              <Button variant="primary" loading={update.update === 'applying'} loadingText="Reloading…" onClick={update.apply}>
+                Reload now
+              </Button>
+              <Button variant="ghost" onClick={onClose}>
+                Later
+              </Button>
+            </>
+          ) : (
             <Button variant="ghost" onClick={onClose}>
-              Later
+              Done
             </Button>
-          </>
+          )
         }
       >
-        <p className={styles.lead}>It applies the next time you open the app, or you can reload now. Anything queued on this device is kept through the update.</p>
+        <p className={styles.lead}>
+          {updateWaiting
+            ? 'It applies the next time you open the app, or you can reload now. Anything queued on this device is kept through the update.'
+            : 'This device already runs the newest version of Shadow Memoir.'}
+        </p>
       </OverlaySurface>
 
       <OverlaySurface
@@ -185,11 +194,52 @@ function SystemOverlays({ kind, install, onClose }: { kind: SystemOverlayKind | 
           </Button>
         }
       >
-        <p className={styles.lead}>
-          Nothing has arrived here yet. Shadow Memoir sends reminders, the weekly review and coaching results by email and push rather than to an in-app inbox — which categories
-          reach you is yours to choose, and every one starts off.
-        </p>
+        <div className={styles.body}>
+          <p className={styles.lead}>Nothing has arrived here yet. Shadow Memoir sends what you choose by email rather than to an in-app inbox.</p>
+          <NotificationCategories />
+        </div>
       </OverlaySurface>
     </>
+  );
+}
+
+function InstallFacts(): ReactElement {
+  return (
+    <ul className={styles.facts}>
+      {INSTALL_FACTS.map(fact => (
+        <li key={fact} className={styles.fact}>
+          <span className={styles.tick} aria-hidden>
+            ✓
+          </span>
+          <span>{fact}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function NotificationCategories(): ReactElement {
+  const settings = useNotificationSettings();
+
+  return (
+    <section className={styles.section} aria-labelledby="notification-categories-label">
+      <h3 id="notification-categories-label" className={styles.sectionLabel}>
+        By email
+      </h3>
+      <DataState query={settings} source="server" size="inline" skeleton={<Skeleton.List rows={3} />}>
+        {data => (
+          <ul className={styles.categories}>
+            {data.preferences.map(preference => (
+              <li key={preference.id} className={styles.category}>
+                <span>{preference.label}</span>
+                <span className={styles.categoryState} data-on={preference.email}>
+                  {preference.email ? 'On' : 'Off'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </DataState>
+    </section>
   );
 }

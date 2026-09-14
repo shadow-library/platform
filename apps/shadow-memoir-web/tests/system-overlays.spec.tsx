@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { type ReactElement, useEffect, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -39,6 +39,17 @@ function renderOverlayWithTrigger(kind: SystemOverlayKind, value?: MemoirData): 
     </SystemOverlayProvider>,
     { value },
   );
+}
+
+const VALUE_DELIVERED_KEY = 'shadow-memoir:value-delivered';
+const OFFER_SETTLED_KEY = 'shadow-memoir:install-offer-settled';
+
+function raiseInstallPrompt(): void {
+  const event = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
+    prompt: () => Promise.resolve(),
+    userChoice: Promise.resolve({ outcome: 'dismissed', platform: 'web' }),
+  });
+  act(() => void window.dispatchEvent(event));
 }
 
 function OpenCaptureButton(): ReactElement {
@@ -86,7 +97,7 @@ describe('system overlays', () => {
     trigger.focus();
     fireEvent.click(trigger);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Later' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Done' }));
 
     await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
@@ -102,6 +113,97 @@ describe('system overlays', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' });
 
     await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+});
+
+describe('install offer', () => {
+  afterEach(() => window.localStorage.clear());
+
+  it('should not spend the install offer from the preview', async () => {
+    window.localStorage.setItem(VALUE_DELIVERED_KEY, '1');
+    renderOverlay('install-preview');
+
+    expect(await screen.findByText('What installing looks like')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Install' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    await waitFor(() => expect(screen.queryByText('What installing looks like')).toBeNull());
+    expect(window.localStorage.getItem(OFFER_SETTLED_KEY)).toBeNull();
+  });
+
+  it('should not spend the install offer when the browser has no prompt to show', async () => {
+    window.localStorage.setItem(VALUE_DELIVERED_KEY, '1');
+    renderOverlay('install');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Install' }));
+
+    await waitFor(() => expect(screen.queryByText('Keep Shadow Memoir a tap away')).toBeNull());
+    expect(window.localStorage.getItem(OFFER_SETTLED_KEY)).toBeNull();
+  });
+
+  it('should settle the install offer on Not now', async () => {
+    window.localStorage.setItem(VALUE_DELIVERED_KEY, '1');
+    renderOverlayWithTrigger('notifications');
+    await screen.findByRole('button', { name: 'Open' });
+
+    raiseInstallPrompt();
+    fireEvent.click(await screen.findByRole('button', { name: 'Not now' }));
+
+    await waitFor(() => expect(screen.queryByText('Keep Shadow Memoir a tap away')).toBeNull());
+    expect(window.localStorage.getItem(OFFER_SETTLED_KEY)).toBe('1');
+
+    raiseInstallPrompt();
+    expect(screen.queryByText('Keep Shadow Memoir a tap away')).toBeNull();
+  });
+
+  it('should settle the install offer when the sheet is closed with Escape', async () => {
+    window.localStorage.setItem(VALUE_DELIVERED_KEY, '1');
+    renderOverlayWithTrigger('notifications');
+    await screen.findByRole('button', { name: 'Open' });
+
+    raiseInstallPrompt();
+    expect(await screen.findByText('Keep Shadow Memoir a tap away')).toBeDefined();
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByText('Keep Shadow Memoir a tap away')).toBeNull());
+    expect(window.localStorage.getItem(OFFER_SETTLED_KEY)).toBe('1');
+  });
+
+  it('should not take over an overlay that is already open', async () => {
+    window.localStorage.setItem(VALUE_DELIVERED_KEY, '1');
+    renderOverlayWithTrigger('notifications');
+    fireEvent.click(await screen.findByRole('button', { name: 'Open' }));
+    expect(await screen.findByText(/Nothing has arrived here yet/)).toBeDefined();
+
+    raiseInstallPrompt();
+
+    expect(screen.queryByText('Keep Shadow Memoir a tap away')).toBeNull();
+    expect(screen.getByText(/Nothing has arrived here yet/)).toBeDefined();
+    expect(window.localStorage.getItem(OFFER_SETTLED_KEY)).toBeNull();
+  });
+});
+
+describe('update overlay', () => {
+  it('should say the app is up to date when no update is waiting', async () => {
+    renderOverlay('update');
+
+    expect(await screen.findByText('You’re up to date')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Reload now' })).toBeNull();
+  });
+});
+
+describe('notifications overlay', () => {
+  it('should describe notification categories from settings', async () => {
+    const data = createMemoirTestData();
+    await data.account.dispatchCommand({ type: 'notification.set', preferenceId: 'weeklyDigest', enabled: true });
+    renderOverlay('notifications', data);
+
+    const categories = within(await screen.findByRole('region', { name: 'By email' }));
+    expect((await categories.findByText('Weekly review')).nextElementSibling?.textContent).toBe('On');
+    expect(categories.getByText('Coaching result ready').nextElementSibling?.textContent).toBe('Off');
+    expect(screen.queryByText(/push/i)).toBeNull();
+    expect(screen.queryByText(/starts off/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Notification preferences' })).toBeDefined();
   });
 });
 

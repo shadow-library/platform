@@ -186,6 +186,19 @@
   border-bottom: none;
 }
 
+.deviceText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.deviceName {
+  display: block;
+  overflow: hidden;
+  font-size: var(--sh-text-body-sm);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .rowTitle {
   display: block;
   font-size: var(--sh-text-body-sm);
@@ -404,6 +417,44 @@
 .queueText {
   flex: 1;
   min-width: 0;
+}
+
+.failedRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.failedRow:last-child {
+  border-bottom: none;
+}
+
+.failedHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.rowActions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.failedText {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-well);
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
 }
 
 .statusHead {

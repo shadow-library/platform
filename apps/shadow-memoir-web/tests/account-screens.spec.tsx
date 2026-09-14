@@ -9,10 +9,10 @@ import { AppSyncScreen, BillingScreen, DeleteAccountScreen, ExportScreen, Notifi
 import { type DeltaPage, SYNC_META_KEYS, SyncEngineProvider } from '@/lib/sync';
 import { OnboardingGate } from '@/routes/_app';
 
-import { renderScreen } from './harness';
+import { createMemoirTestData, renderScreen } from './harness';
 import { type HttpFake, httpFake } from './http-fake';
 import { withTimeZone } from './setup';
-import { createSyncedTestData, createTestEngine, type FakeServer, type TestEngine, type TestEngineOptions } from './sync-harness';
+import { createSyncedTestData, createTestEngine, failed, type FakeServer, type TestEngine, type TestEngineOptions } from './sync-harness';
 
 const TODAY = '2026-08-22';
 
@@ -487,6 +487,46 @@ describe('App and sync', () => {
     renderScreen(<AppSyncScreen />, { today: TODAY, persona: 'new' });
     expect(await screen.findByText('Nothing is waiting')).toBeDefined();
   });
+
+  it('should confirm before removing a device', async () => {
+    const data = createMemoirTestData({ today: TODAY });
+    let release = (): void => undefined;
+    const dispatch = vi.spyOn(data.account, 'dispatchCommand');
+    dispatch.mockImplementation(
+      () => new Promise(resolve => (release = () => resolve({ status: 'applied', message: 'Removed from your devices.', xpAwarded: 0, coinsAwarded: 0 }))),
+    );
+    const success = vi.spyOn(toast, 'success');
+    renderScreen(<AppSyncScreen />, { value: data });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove Shadow Memoir · iPhone' }));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog.textContent).toContain('Remove “Shadow Memoir · iPhone”?');
+    expect(dialog.textContent).not.toMatch(/notification/i);
+    expect(dispatch).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+    await waitFor(() => expect(dispatch).toHaveBeenCalledWith({ type: 'device.remove', deviceId: 'd2' }));
+    const pending = await screen.findByRole('button', { name: 'Remove Shadow Memoir · iPhone' });
+    expect(pending.getAttribute('aria-busy')).toBe('true');
+
+    release();
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Removed from your devices.', undefined));
+    success.mockRestore();
+  });
+
+  it('should keep a device when the removal is cancelled', async () => {
+    const data = createMemoirTestData({ today: TODAY });
+    const dispatch = vi.spyOn(data.account, 'dispatchCommand');
+    renderScreen(<AppSyncScreen />, { value: data });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove Shadow Memoir · iPhone' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep it' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'device.remove' }));
+  });
 });
 
 function setOnline(online: boolean): void {
@@ -626,6 +666,73 @@ describe('App and sync, synced', () => {
     expect(await screen.findByText('Queued')).toBeDefined();
     expect(screen.queryByText('Retrying')).toBeNull();
   });
+
+  it('should list a journal entry the server could not save with its text, and dismiss it', async () => {
+    setOnline(false);
+    const { engine } = renderSyncedAppSync({ outcomes: batch => batch.commandIds.map(id => failed(id, 'Validation Error', 'VALIDATION_ERROR')) });
+    expect(await screen.findByRole('heading', { name: 'Offline — working from this device' })).toBeDefined();
+
+    await engine.enqueue({ type: 'journal.save', draft: { date: TODAY, text: 'The walk home in the rain.\nWorth keeping.', mood: null } }, TODAY);
+    setOnline(true);
+    await engine.sync();
+
+    expect(await screen.findByRole('heading', { name: 'Couldn’t sync' })).toBeDefined();
+    expect(screen.getByText('Journal entry')).toBeDefined();
+    expect(screen.getByText(/The walk home in the rain\.\s+Worth keeping\./)).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Copy text' })).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss Journal entry' }));
+    expect(await screen.findByRole('alertdialog')).toBeDefined();
+    expect(await engine.outbox.deadLetters()).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+    expect(await screen.findByText('Nothing else failed')).toBeDefined();
+    expect(await engine.outbox.deadLetters()).toEqual([]);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Couldn’t sync' })));
+  });
+
+  it('should dismiss a failed change without text at once and move focus to the next one', async () => {
+    setOnline(false);
+    const { engine } = renderSyncedAppSync({ outcomes: batch => batch.commandIds.map(id => failed(id, 'Anchor quests require a start time', 'QST_003')) });
+    expect(await screen.findByRole('heading', { name: 'Offline — working from this device' })).toBeDefined();
+
+    for (const questId of ['a', 'b']) await engine.enqueue({ type: 'quest.complete', occurrenceId: `${questId}:${TODAY}` }, TODAY);
+    setOnline(true);
+    await engine.sync();
+    await waitFor(() => expect(screen.getAllByText('Quest completed')).toHaveLength(2));
+    expect(screen.queryByRole('button', { name: 'Copy text' })).toBeNull();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Dismiss Quest completed' })[0] as HTMLElement);
+
+    await waitFor(() => expect(screen.getAllByText('Quest completed')).toHaveLength(1));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    await waitFor(() => expect(document.activeElement?.textContent).toContain('Quest completed'));
+  });
+
+  it('should ellipsize long device names and tell unnamed devices apart by when they were last seen', async () =>
+    withTimeZone('Asia/Dubai', async () => {
+      const agent = `Mozilla/5.0 CustomEmbeddedBrowser ${'x'.repeat(80)}`;
+      renderSyncedAppSync({
+        pages: [
+          {
+            ...DEVICE_PAGE,
+            domains: {
+              devices: [
+                { id: 'd-1', userAgent: agent, lastSeenAt: '2026-08-22T08:00:00.000Z' },
+                { id: 'd-2', userAgent: null, lastSeenAt: '2026-08-22T06:15:00.000Z' },
+                { id: 'd-3', userAgent: '  ', lastSeenAt: '2026-08-22T09:40:00.000Z' },
+              ],
+            },
+          },
+        ],
+      });
+
+      const long = await screen.findByText(agent);
+      expect(long.getAttribute('title')).toBe(agent);
+      expect(screen.getAllByText('Unnamed device')).toHaveLength(2);
+      expect(screen.getByText('Last seen 22 Aug 2026 at 10:15')).toBeDefined();
+      expect(screen.getByText('Last seen 22 Aug 2026 at 13:40')).toBeDefined();
+    }));
 
   it('should show human command labels with local times', async () =>
     withTimeZone('Asia/Dubai', async () => {

@@ -16,13 +16,15 @@ import {
   commandRefusal,
   type DayPreferences,
   type DeletionView,
+  DEVICE_REMOVED,
   EXPORT_EXPIRED_NOTICE,
   type ExportJob,
   exportJobCopy,
   exportStageWhen,
   type ExportView,
+  type FailedChange,
+  failureCopy,
   type HeroIntensityMode,
-  INSTALL_ROWS,
   NOTIFICATION_SEEDS,
   type NotificationSettings,
   OFFLINE_CAPABILITIES,
@@ -34,6 +36,7 @@ import {
   SYNC_COPY,
 } from '@/lib/data';
 
+import { AccountBoundaryError } from './memoir-store';
 import { projectEntitlement, projectRecordCounts } from './projection';
 import { type SyncEngine } from './sync-engine';
 import { SyncedDeletion } from './synced-deletion';
@@ -76,11 +79,17 @@ function errorCode(error: unknown): string | null {
 }
 
 function deviceLabel(userAgent: string | null): string {
-  if (!userAgent) return 'Unnamed device';
-  const browser = ['Firefox', 'Edg', 'Chrome', 'Safari'].find(name => userAgent.includes(name));
-  const platform = ['iPhone', 'iPad', 'Android', 'Macintosh', 'Windows', 'Linux'].find(name => userAgent.includes(name));
-  if (!browser && !platform) return userAgent.slice(0, 60);
+  const agent = userAgent?.trim();
+  if (!agent) return 'Unnamed device';
+  const browser = ['Firefox', 'Edg', 'Chrome', 'Safari'].find(name => agent.includes(name));
+  const platform = ['iPhone', 'iPad', 'Android', 'Macintosh', 'Windows', 'Linux'].find(name => agent.includes(name));
+  if (!browser && !platform) return agent;
   return [browser === 'Edg' ? 'Edge' : browser, platform].filter(Boolean).join(' · ');
+}
+
+function lastSeen(value: unknown): string {
+  if (typeof value !== 'string' || !formatLocalDate(value)) return 'Not seen yet';
+  return `Last seen ${formatLocalDate(value)} at ${formatLocalTime(value)}`;
 }
 
 /**
@@ -89,7 +98,7 @@ function deviceLabel(userAgent: string | null): string {
  * succeeded. What the delta mirror is used for is the parts the endpoints do not answer — the registered
  * devices, the entitlement, and the record counts the export and deletion screens describe.
  *
- * Local-only by construction: the install/offline copy on the sync screen.
+ * Local-only by construction: the changes this device's outbox dead-lettered.
  */
 export class SyncedAccountProvider implements AccountProvider {
   private readonly deletion: SyncedDeletion;
@@ -192,6 +201,13 @@ export class SyncedAccountProvider implements AccountProvider {
       meta: `Created ${formatLocalTime(entry.createdAt)} · position ${index + 1}`,
       retryable: false,
     }));
+    const failed: FailedChange[] = [...(await this.sync.outbox.deadLetters())].reverse().map(letter => ({
+      id: letter.commandId,
+      text: commandLabel(letter.command.type),
+      reason: failureCopy(letter.code),
+      meta: `Made ${formatLocalDate(letter.createdAt)} at ${formatLocalTime(letter.createdAt)}`,
+      journalText: letter.command.type === 'journal.save' ? letter.command.draft.text : null,
+    }));
 
     return {
       status,
@@ -199,8 +215,8 @@ export class SyncedAccountProvider implements AccountProvider {
       queuedCount: queue.length,
       lastSyncedAt: snapshot.lastSyncedAt,
       queue,
+      failed,
       devices: await this.devices(),
-      installRows: INSTALL_ROWS,
       offlineCapabilities: OFFLINE_CAPABILITIES,
       onlineOnly: ONLINE_ONLY_NOTE,
       sessionNote: SESSION_NOTE,
@@ -216,7 +232,7 @@ export class SyncedAccountProvider implements AccountProvider {
     return (this.sync.domains().devices ?? []).map(row => ({
       id: String(row['id']),
       name: deviceLabel(typeof row['userAgent'] === 'string' ? row['userAgent'] : null),
-      meta: typeof row['lastSeenAt'] === 'string' ? `Last seen ${row['lastSeenAt'].slice(0, 10)}` : 'Not seen yet',
+      meta: lastSeen(row['lastSeenAt']),
       current: String(row['id']) === currentId,
     }));
   }
@@ -246,10 +262,13 @@ export class SyncedAccountProvider implements AccountProvider {
         try {
           await accountApi.removeDevice(command.deviceId);
           void this.sync.sync();
-          return applied('That device will stop receiving notifications.');
+          return applied(DEVICE_REMOVED);
         } catch (error) {
           return commandRefusal(error, 'That device could not be removed.');
         }
+
+      case 'failedChange.dismiss':
+        return this.dismissFailedChange(command.commandId);
 
       case 'billing.checkout':
         return this.startCheckout(command.plan);
@@ -267,6 +286,16 @@ export class SyncedAccountProvider implements AccountProvider {
       case 'deletion.begin':
       case 'deletion.abandon':
         return this.deletion.dispatch(command);
+    }
+  }
+
+  private async dismissFailedChange(commandId: string): Promise<SettledCommandResult> {
+    try {
+      await this.sync.outbox.dismissDeadLetter(commandId);
+      return applied('');
+    } catch (error) {
+      if (!(error instanceof AccountBoundaryError)) throw error;
+      return { status: 'applied', message: '', xpAwarded: 0, coinsAwarded: 0, delivery: { status: 'refused', boundary: error.boundary } };
     }
   }
 

@@ -7,7 +7,7 @@ const OFFER_SETTLED_KEY = 'shadow-memoir:install-offer-settled';
 export interface InstallOffer {
   /** The browser can install, the owner has already got something out of the app, and the offer is unspent. */
   shouldOffer: boolean;
-  /** Shows the native prompt and records the offer as spent whatever the answer. */
+  /** Shows the native prompt and records the offer as spent whatever the answer; with no prompt pending nothing was asked, so nothing is spent. */
   offer: () => Promise<InstallOutcome>;
   /** Records the offer as spent without showing it — the "Not now" path. */
   dismiss: () => void;
@@ -61,7 +61,7 @@ export function useInstallOffer(): InstallOffer {
 
   const offer = useCallback(async (): Promise<InstallOutcome> => {
     const outcome = await promptInstall();
-    settle();
+    if (outcome !== 'unavailable') settle();
     return outcome;
   }, [promptInstall, settle]);
 

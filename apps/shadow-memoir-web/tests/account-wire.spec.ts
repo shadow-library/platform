@@ -510,18 +510,32 @@ describe('Billing over the wire', () => {
   });
 });
 
-describe('Devices over the wire', () => {
-  it('should list the registered devices and mark the one in use', async () => {
+describe('Failed changes', () => {
+  it('should refuse to dismiss a failed change once the store has closed rather than reject', async () => {
     httpFake({});
-    const { engine } = createTestEngine({
-      pages: [page({ devices: [{ id: 'device-a', userAgent: 'Mozilla/5.0 (Macintosh) Chrome/1', lastSeenAt: '2026-08-24T08:00:00.000Z' }] })],
-    });
+    const { engine } = createTestEngine();
     await engine.start();
+    engine.stop();
 
-    const view = await new SyncedAccountProvider(engine).getAppSync();
-    expect(view.devices).toHaveLength(1);
-    expect(view.devices[0]).toMatchObject({ name: 'Chrome · Macintosh', meta: 'Last seen 2026-08-24' });
+    const result = await new SyncedAccountProvider(engine).dispatchCommand({ type: 'failedChange.dismiss', commandId: 'gone' });
+
+    expect(result).toMatchObject({ status: 'applied', delivery: { status: 'refused', boundary: 'closed' } });
   });
+});
+
+describe('Devices over the wire', () => {
+  it('should list the registered devices and mark the one in use', async () =>
+    withTimeZone('Europe/Oslo', async () => {
+      httpFake({});
+      const { engine } = createTestEngine({
+        pages: [page({ devices: [{ id: 'device-a', userAgent: 'Mozilla/5.0 (Macintosh) Chrome/1', lastSeenAt: '2026-08-24T08:00:00.000Z' }] })],
+      });
+      await engine.start();
+
+      const view = await new SyncedAccountProvider(engine).getAppSync();
+      expect(view.devices).toHaveLength(1);
+      expect(view.devices[0]).toMatchObject({ name: 'Chrome · Macintosh', meta: 'Last seen 24 Aug 2026 at 10:00' });
+    }));
 });
 
 describe('Account deletion against the signed-in session', () => {
