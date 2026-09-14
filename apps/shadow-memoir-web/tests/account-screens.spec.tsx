@@ -1,5 +1,8 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { toast } from '@shadow-library/ui';
 
 import { OnboardingScreen } from '@/features/onboarding';
 import { AppSyncScreen, BillingScreen, DeleteAccountScreen, ExportScreen, NotificationSettingsScreen, SettingsScreen } from '@/features/settings';
@@ -7,10 +10,83 @@ import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
 import { OnboardingGate } from '@/routes/_app';
 
 import { renderScreen } from './harness';
+import { type HttpFake, httpFake } from './http-fake';
 import { withTimeZone } from './setup';
-import { createSyncedTestData, createTestEngine, type FakeServer, type TestEngineOptions } from './sync-harness';
+import { createSyncedTestData, createTestEngine, type FakeServer, type TestEngine, type TestEngineOptions } from './sync-harness';
 
 const TODAY = '2026-08-22';
+
+interface AccountServerState {
+  scheduleStartMin: number;
+  scheduleEndMin: number;
+  timezone: string;
+  pendingTimezone: string | null;
+  intensityMode: string;
+  pendingIntensityMode: string | null;
+  defaultCurrency: string;
+  onboardingCompletedAt: string | null;
+  monthlyBudgetMinor: number | null;
+  notificationPrefs: { weeklyDigest: boolean; aiReadiness: boolean; billingReminders: boolean };
+}
+
+const ACCOUNT_PATH = '/api/v1/account';
+
+/** Stubs `GET/PATCH /api/v1/account` and `GET /api/auth/userinfo` on the global fetch `SyncedAccountProvider` sends through — separate from the sync engine's own `FakeServer`. */
+function accountServer(
+  overrides: Partial<AccountServerState> = {},
+  options: { status?: () => number; errorCode?: string; patchGate?: () => Promise<void> } = {},
+): { fake: HttpFake; state: AccountServerState } {
+  const state: AccountServerState = {
+    scheduleStartMin: 6 * 60 + 30,
+    scheduleEndMin: 22 * 60 + 30,
+    timezone: 'Europe/Oslo',
+    pendingTimezone: null,
+    intensityMode: 'standard',
+    pendingIntensityMode: null,
+    defaultCurrency: 'EUR',
+    onboardingCompletedAt: '2026-01-01T00:00:00.000Z',
+    monthlyBudgetMinor: null,
+    notificationPrefs: { weeklyDigest: false, aiReadiness: false, billingReminders: false },
+    ...overrides,
+  };
+
+  const guarded = (reply: () => { status?: number; body: unknown }): { status?: number; body: unknown } => {
+    const status = options.status?.();
+    if (status && status !== 200) return { status, body: { code: options.errorCode, message: 'no' } };
+    return reply();
+  };
+
+  const fake = httpFake({
+    'GET /api/auth/userinfo': () => ({ body: { sub: 'account-a', email: 'owner@memoir.test' } }),
+    [`GET ${ACCOUNT_PATH}`]: () => guarded(() => ({ body: state })),
+    [`PATCH ${ACCOUNT_PATH}`]: async call => {
+      await options.patchGate?.();
+      return guarded(() => {
+        const patch = call.body as Partial<AccountServerState> & { notificationPrefs?: Partial<AccountServerState['notificationPrefs']> };
+        const { timezone, intensityMode, notificationPrefs, ...rest } = patch;
+        Object.assign(state, rest);
+        if (notificationPrefs) Object.assign(state.notificationPrefs, notificationPrefs);
+        if (timezone !== undefined) state.pendingTimezone = timezone;
+        if (intensityMode !== undefined) state.pendingIntensityMode = intensityMode;
+        return { body: state };
+      });
+    },
+  });
+
+  return { fake, state };
+}
+
+function renderSyncedSettings(node: ReactNode, engineOptions: TestEngineOptions = {}): TestEngine {
+  const test = createTestEngine({ today: TODAY, ...engineOptions });
+  const data = createSyncedTestData(test.engine);
+  renderScreen(<SyncEngineProvider data={data}>{node}</SyncEngineProvider>, { value: data });
+  return test;
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('Settings screen', () => {
   it('should render the day, appearance and data sections', async () => {
@@ -21,11 +97,119 @@ describe('Settings screen', () => {
     expect(screen.getByText('Data and privacy')).toBeDefined();
   });
 
-  it('should keep the home currency fixed once it has been set', async () => {
+  it('should show the home currency read-only', async () => {
     renderScreen(<SettingsScreen />, { today: TODAY });
-    const currency = await screen.findByLabelText('Home currency');
-    expect(currency.getAttribute('data-disabled')).not.toBeNull();
+    const currency = (await screen.findByLabelText('Home currency')) as HTMLInputElement;
+    expect(currency.readOnly).toBe(true);
+    expect(currency.disabled).toBe(false);
+    expect(currency.value).toContain('EUR');
     expect(await screen.findByText(/Fixed when you set up/)).toBeDefined();
+  });
+
+  it('should not render behaviour switches', async () => {
+    renderScreen(<SettingsScreen />, { today: TODAY });
+    await screen.findByRole('heading', { name: 'Settings' });
+    expect(screen.queryByText('Compact density')).toBeNull();
+    expect(screen.queryByText('Reduce motion')).toBeNull();
+    expect(screen.queryByText('Daily journal prompt')).toBeNull();
+    expect(screen.queryByText('Show coins and cosmetics')).toBeNull();
+  });
+
+  it('should show a field error for an invalid sleep time', async () => {
+    const user = userEvent.setup();
+    renderScreen(<SettingsScreen />, { today: TODAY });
+    const sleep = (await screen.findByRole('combobox', { name: 'Sleep time' })) as HTMLInputElement;
+    expect(sleep.value).toBe('22:30');
+
+    await user.clear(sleep);
+    await user.type(sleep, '0500');
+    await user.tab();
+
+    expect(await screen.findByText(/Sleep time must be later than wake time/)).toBeDefined();
+    const revertedSleep = (await screen.findByRole('combobox', { name: 'Sleep time' })) as HTMLInputElement;
+    expect(revertedSleep.value).toBe('22:30');
+  });
+});
+
+describe('Settings screen, synced', () => {
+  it('should include the saved time zone in the list', async () => {
+    const user = userEvent.setup();
+    accountServer({ timezone: 'America/Argentina/ComodRivadavia' });
+    renderSyncedSettings(<SettingsScreen />);
+
+    const trigger = await screen.findByLabelText('Timezone');
+    await user.click(trigger);
+
+    expect(await screen.findByRole('option', { name: 'America/Argentina/ComodRivadavia' })).toBeDefined();
+    expect(screen.getAllByRole('option').length).toBeGreaterThan(4);
+  });
+
+  it('should save and clear the monthly budget', async () => {
+    const user = userEvent.setup();
+    const success = vi.spyOn(toast, 'success');
+    const { state } = accountServer({ monthlyBudgetMinor: null });
+    renderSyncedSettings(<SettingsScreen />);
+
+    const budget = (await screen.findByLabelText('Monthly budget')) as HTMLInputElement;
+    await user.type(budget, '1500{Enter}');
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Saved.', undefined));
+    expect(state.monthlyBudgetMinor).toBe(150_000);
+
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Cleared. No monthly budget is set.', undefined));
+    expect(state.monthlyBudgetMinor).toBeNull();
+    expect(budget.value).toBe('');
+  });
+
+  it('should not save a typed amount when Clear is clicked before it commits', async () => {
+    const user = userEvent.setup();
+    const { state } = accountServer({ monthlyBudgetMinor: null });
+    renderSyncedSettings(<SettingsScreen />);
+
+    const budget = (await screen.findByLabelText('Monthly budget')) as HTMLInputElement;
+    await user.type(budget, '900');
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+
+    await waitFor(() => expect(budget.value).toBe(''));
+    expect(state.monthlyBudgetMinor).toBeNull();
+  });
+
+  it('should not commit a draft when Tab moves focus to Clear', async () => {
+    const user = userEvent.setup();
+    const success = vi.spyOn(toast, 'success');
+    const { state } = accountServer({ monthlyBudgetMinor: null });
+    renderSyncedSettings(<SettingsScreen />);
+
+    const budget = (await screen.findByLabelText('Monthly budget')) as HTMLInputElement;
+    await user.type(budget, '700');
+    await user.tab();
+
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Clear' }));
+    expect(success).not.toHaveBeenCalled();
+    expect(state.monthlyBudgetMinor).toBeNull();
+  });
+
+  it('should not toast when saving an unchanged value', async () => {
+    const user = userEvent.setup();
+    const success = vi.spyOn(toast, 'success');
+    const neutral = vi.spyOn(toast, 'neutral');
+    accountServer({ intensityMode: 'standard', pendingIntensityMode: 'low_intensity' });
+    renderSyncedSettings(<SettingsScreen />);
+
+    const intensity = await screen.findByLabelText('Intensity');
+    await screen.findByText('Gentle from your next rollover — Standard stays active today.');
+    await user.click(intensity);
+    await user.click(await screen.findByRole('option', { name: 'Standard' }));
+
+    await waitFor(() => expect(screen.queryByText(/from your next rollover/)).toBeNull());
+    expect(success).not.toHaveBeenCalled();
+    expect(neutral).not.toHaveBeenCalled();
+  });
+
+  it('should show a deletion notice instead of a skeleton', async () => {
+    accountServer({}, { status: () => 403, errorCode: 'ACC_002' });
+    renderSyncedSettings(<SettingsScreen />);
+    expect(await screen.findByText('This account is being deleted')).toBeDefined();
   });
 });
 
@@ -50,6 +234,56 @@ describe('Notification preferences', () => {
   it('should promise never to notify about a missed quest', async () => {
     renderScreen(<NotificationSettingsScreen />, { today: TODAY });
     expect(await screen.findByText(/will not notify you about a missed quest/)).toBeDefined();
+  });
+
+  it('should show push as coming soon', async () => {
+    renderScreen(<NotificationSettingsScreen />, { today: TODAY });
+    const push = (await screen.findByRole('switch', { name: 'Push on this browser' })) as HTMLButtonElement;
+    expect(push.disabled).toBe(true);
+    expect(push.getAttribute('aria-checked')).toBe('false');
+    expect(await screen.findByText('Push notifications are coming soon')).toBeDefined();
+    expect(screen.getByText('Not available yet — email is the only channel for now.')).toBeDefined();
+  });
+});
+
+describe('Notification preferences, synced', () => {
+  it('should revert a notification switch when the save fails', async () => {
+    const user = userEvent.setup();
+    const danger = vi.spyOn(toast, 'danger');
+    let fail = false;
+    accountServer({}, { status: () => (fail ? 500 : 200), errorCode: 'S001' });
+    renderSyncedSettings(<NotificationSettingsScreen />);
+
+    const weeklyReview = await screen.findByRole('switch', { name: 'Weekly review by email' });
+    expect(weeklyReview.getAttribute('aria-checked')).toBe('false');
+
+    fail = true;
+    await user.click(weeklyReview);
+
+    await waitFor(() => expect(weeklyReview.getAttribute('aria-checked')).toBe('false'));
+    expect(danger).toHaveBeenCalled();
+  });
+
+  it('should flip a switch optimistically while the PATCH is held, and send one PATCH on a double click', async () => {
+    const user = userEvent.setup();
+    let releaseGate = (): void => undefined;
+    const gate = new Promise<void>(resolve => (releaseGate = resolve));
+    const { fake } = accountServer({}, { patchGate: () => gate });
+    renderSyncedSettings(<NotificationSettingsScreen />);
+
+    const weeklyReview = await screen.findByRole('switch', { name: 'Weekly review by email' });
+    expect(weeklyReview.getAttribute('aria-checked')).toBe('false');
+
+    await user.click(weeklyReview);
+    await user.click(weeklyReview);
+
+    expect(weeklyReview.getAttribute('aria-checked')).toBe('true');
+    expect(weeklyReview.getAttribute('data-pending')).toBe('true');
+
+    releaseGate();
+    await waitFor(() => expect(weeklyReview.getAttribute('data-pending')).toBeNull());
+    expect(weeklyReview.getAttribute('aria-checked')).toBe('true');
+    expect(fake.count('PATCH', ACCOUNT_PATH)).toBe(1);
   });
 });
 

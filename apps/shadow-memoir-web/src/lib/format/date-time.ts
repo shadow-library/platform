@@ -68,11 +68,12 @@ export interface TimeZoneOption {
   label: string;
 }
 
-/** A-04a: every IANA zone the runtime knows, always including the browser's own and (if given) the account's saved zone, so neither ever goes missing from the list. */
-export function timeZoneOptions(currentZone?: string | null): TimeZoneOption[] {
+/** A-04a: every IANA zone the runtime knows, always including the browser's own and (if given) the account's saved and pending zones, so none of them ever goes missing from the list. */
+export function timeZoneOptions(currentZone?: string | null, pendingZone?: string | null): TimeZoneOption[] {
   const supported = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
   const zones = new Set(supported);
   zones.add(Intl.DateTimeFormat().resolvedOptions().timeZone);
   if (currentZone) zones.add(currentZone);
+  if (pendingZone) zones.add(pendingZone);
   return [...zones].sort().map(zone => ({ value: zone, label: zone.replace(/_/g, ' ') }));
 }

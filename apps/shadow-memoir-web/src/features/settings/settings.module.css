@@ -54,11 +54,15 @@
   min-height: 56px;
   padding: 10px 0;
   border-bottom: 1px solid var(--sh-border-subtle);
-  flex-wrap: wrap;
 }
 
 .settingRow:last-child {
   border-bottom: none;
+}
+
+.settingRowText {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .settingLabel {
@@ -75,6 +79,28 @@
 
 .settingControl {
   flex: none;
+  margin-left: auto;
+}
+
+.budgetRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.budgetRow > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.budgetRow > :last-child {
+  flex: none;
+}
+
+.fieldSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .jump {

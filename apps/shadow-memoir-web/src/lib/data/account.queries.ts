@@ -3,7 +3,6 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
   type AccountCommand,
   type AppSyncView,
-  type BehaviourPreferences,
   type BillingView,
   type DayPreferences,
   type DeletionView,
@@ -18,7 +17,6 @@ import { useMemoirData } from './data-context';
 export const accountKeys = {
   all: ['memoir', 'account'] as const,
   day: ['memoir', 'account', 'day'] as const,
-  behaviour: ['memoir', 'account', 'behaviour'] as const,
   notifications: ['memoir', 'account', 'notifications'] as const,
   billing: ['memoir', 'account', 'billing'] as const,
   export: ['memoir', 'account', 'export'] as const,
@@ -32,11 +30,6 @@ const EXPORT_POLL_MS = 3_000;
 export function useDayPreferences(): UseQueryResult<DayPreferences> {
   const { account, queryClient } = useMemoirData();
   return useQuery({ queryKey: accountKeys.day, queryFn: () => account.getDay() }, queryClient);
-}
-
-export function useBehaviourPreferences(): UseQueryResult<BehaviourPreferences> {
-  const { account, queryClient } = useMemoirData();
-  return useQuery({ queryKey: accountKeys.behaviour, queryFn: () => account.getBehaviour() }, queryClient);
 }
 
 export function useNotificationSettings(): UseQueryResult<NotificationSettings> {

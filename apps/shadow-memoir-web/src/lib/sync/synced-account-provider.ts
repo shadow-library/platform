@@ -7,7 +7,6 @@ import {
   type AccountDevice,
   type AccountProvider,
   type AppSyncView,
-  type BehaviourPreferences,
   BILLING_INVOICES_LINE,
   BILLING_MANAGE_NOTE,
   BILLING_TRIAL_LINE,
@@ -50,6 +49,8 @@ const EXPORT_STAGES: Record<ExportJobResponseDto['status'], ExportJob['stage']> 
 
 const BILLING_STATE_LABELS: Record<string, string> = { free: 'Free', trial: 'Trial', active: 'Active', grace: 'Payment past due', lapsed: 'Lapsed' };
 
+const DEFERRED_MESSAGE = 'Staged. It takes effect at your next daily rollover, so the day in progress is not rewritten.';
+
 function toClock(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 }
@@ -59,12 +60,13 @@ function toMinutes(clock: string): number {
   return Number(hours) * 60 + Number(minutes ?? 0);
 }
 
-function applied(message: string): SettledCommandResult {
-  return { status: 'applied', message, xpAwarded: 0, coinsAwarded: 0 };
+/** The server stages `timezone`/`intensityMode` unconditionally, even back onto the value that is already active — a real stage is only one that differs from it. */
+function pendingValue<T>(pending: T | null | undefined, active: T): T | null {
+  return pending != null && pending !== active ? pending : null;
 }
 
-function rejected(message: string): SettledCommandResult {
-  return { status: 'rejected', message };
+function applied(message: string): SettledCommandResult {
+  return { status: 'applied', message, xpAwarded: 0, coinsAwarded: 0 };
 }
 
 function errorCode(error: unknown): string | null {
@@ -85,11 +87,9 @@ function deviceLabel(userAgent: string | null): string {
  * succeeded. What the delta mirror is used for is the parts the endpoints do not answer — the registered
  * devices, the entitlement, and the record counts the export and deletion screens describe.
  *
- * Local-only by construction: `behaviour.set` (browser presentation preferences the account row has no
- * column for) and the install/offline copy on the sync screen.
+ * Local-only by construction: the install/offline copy on the sync screen.
  */
 export class SyncedAccountProvider implements AccountProvider {
-  private behaviour: BehaviourPreferences = { compactDensity: false, reduceMotion: false, dailyJournalPrompt: false, showCosmetics: true };
   private readonly deletion: SyncedDeletion;
 
   constructor(
@@ -105,20 +105,19 @@ export class SyncedAccountProvider implements AccountProvider {
 
   async getDay(): Promise<DayPreferences> {
     const account = await this.account();
+    const pendingTimezone = pendingValue(account.pendingTimezone, account.timezone);
+    const pendingIntensityMode = pendingValue(account.pendingIntensityMode, account.intensityMode);
     return {
       wakeTime: toClock(account.scheduleStartMin),
       sleepTime: toClock(account.scheduleEndMin),
       timezone: account.timezone,
-      pendingTimezone: account.pendingTimezone ?? null,
+      pendingTimezone,
       intensity: INTENSITY_LOCAL[account.intensityMode] ?? 'standard',
-      pendingIntensity: account.pendingIntensityMode ? (INTENSITY_LOCAL[account.pendingIntensityMode] ?? null) : null,
+      pendingIntensity: pendingIntensityMode ? (INTENSITY_LOCAL[pendingIntensityMode] ?? null) : null,
       currency: account.defaultCurrency,
       currencyLocked: account.onboardingCompletedAt !== null && account.onboardingCompletedAt !== undefined,
+      monthlyBudgetMinor: account.monthlyBudgetMinor ?? null,
     };
-  }
-
-  getBehaviour(): Promise<BehaviourPreferences> {
-    return Promise.resolve({ ...this.behaviour });
   }
 
   async getOnboarding(): Promise<OnboardingStatus> {
@@ -128,17 +127,7 @@ export class SyncedAccountProvider implements AccountProvider {
 
   async getNotifications(): Promise<NotificationSettings> {
     const account = await this.account();
-    const device = await this.currentDeviceRow();
-    const pushOptIn = device ? device['pushOptIn'] === true : false;
-
-    return {
-      pushPermission: typeof Notification === 'undefined' ? 'default' : Notification.permission,
-      permissionNote: pushOptIn
-        ? 'Push is on for this browser. Every category below is email, and each is off until you turn it on.'
-        : 'Push is off for this browser. Turning it on is what asks the browser for permission.',
-      pushOptIn,
-      preferences: NOTIFICATION_SEEDS.map(seed => ({ ...seed, email: account.notificationPrefs[seed.id] })),
-    };
+    return { preferences: NOTIFICATION_SEEDS.map(seed => ({ ...seed, email: account.notificationPrefs[seed.id] })) };
   }
 
   async getBilling(): Promise<BillingView> {
@@ -207,11 +196,6 @@ export class SyncedAccountProvider implements AccountProvider {
     return this.sync.store.readMeta<string>(SYNC_META_KEYS.deviceId);
   }
 
-  private async currentDeviceRow(): Promise<Record<string, unknown> | undefined> {
-    const deviceId = await this.currentDeviceId();
-    return (this.sync.domains().devices ?? []).find(row => String(row['id']) === deviceId);
-  }
-
   private async devices(): Promise<AccountDevice[]> {
     const currentId = await this.currentDeviceId();
     return (this.sync.domains().devices ?? []).map(row => ({
@@ -224,10 +208,6 @@ export class SyncedAccountProvider implements AccountProvider {
 
   async dispatchCommand(command: AccountCommand): Promise<SettledCommandResult> {
     switch (command.type) {
-      case 'behaviour.set':
-        this.behaviour = { ...this.behaviour, ...command.patch };
-        return applied('Saved on this device.');
-
       case 'day.set':
         return this.patchDay(command.patch);
 
@@ -245,15 +225,7 @@ export class SyncedAccountProvider implements AccountProvider {
         }
 
       case 'notification.set':
-        try {
-          await accountApi.patch({ notificationPrefs: { [command.preferenceId]: command.enabled } });
-          return applied(command.enabled ? 'On. Sent by email only.' : 'Off.');
-        } catch (error) {
-          return commandRefusal(error, 'That preference could not be saved.');
-        }
-
-      case 'notification.setPush':
-        return this.setPush(command.enabled);
+        return this.setEmail(command.preferenceId, command.enabled);
 
       case 'device.remove':
         try {
@@ -301,26 +273,29 @@ export class SyncedAccountProvider implements AccountProvider {
         ...(patch.sleepTime === undefined ? {} : { scheduleEndMin: toMinutes(patch.sleepTime) }),
         ...(patch.timezone === undefined ? {} : { timezone: patch.timezone }),
         ...(patch.intensity === undefined ? {} : { intensityMode: INTENSITY_WIRE[patch.intensity] }),
+        ...(patch.monthlyBudgetMinor === undefined ? {} : { monthlyBudgetMinor: patch.monthlyBudgetMinor }),
       });
-
-      const deferred = patch.timezone !== undefined ? account.pendingTimezone : patch.intensity !== undefined ? account.pendingIntensityMode : null;
-      if (deferred) return applied('Staged. It takes effect at your next daily rollover, so the day in progress is not rewritten.');
-      return applied('Saved. Changing your wake window never rewrites past days.');
+      if (patch.monthlyBudgetMinor !== undefined) void this.sync.sync();
+      return applied(this.dayMessage(patch, account));
     } catch (error) {
       return commandRefusal(error, 'That setting could not be saved.');
     }
   }
 
-  private async setPush(enabled: boolean): Promise<SettledCommandResult> {
-    const deviceId = await this.currentDeviceId();
-    if (!deviceId) return rejected('This browser has not registered with the server yet. It does so on the next sync.');
+  private dayMessage(patch: Extract<AccountCommand, { type: 'day.set' }>['patch'], account: AccountResponseDto): string {
+    if (patch.wakeTime !== undefined || patch.sleepTime !== undefined) return 'Saved. Changing your wake window never rewrites past days.';
+    if (patch.timezone !== undefined) return pendingValue(account.pendingTimezone, account.timezone) ? DEFERRED_MESSAGE : '';
+    if (patch.intensity !== undefined) return pendingValue(account.pendingIntensityMode, account.intensityMode) ? DEFERRED_MESSAGE : '';
+    if (patch.monthlyBudgetMinor !== undefined) return patch.monthlyBudgetMinor === null ? 'Cleared. No monthly budget is set.' : 'Saved.';
+    return '';
+  }
 
+  private async setEmail(preferenceId: Extract<AccountCommand, { type: 'notification.set' }>['preferenceId'], enabled: boolean): Promise<SettledCommandResult> {
     try {
-      await accountApi.updateDevice(deviceId, { pushOptIn: enabled });
-      void this.sync.sync();
-      return applied(enabled ? 'Push is on for this browser.' : 'Push is off for this browser.');
+      await accountApi.patch({ notificationPrefs: { [preferenceId]: enabled } });
+      return applied(enabled ? 'On. Sent by email only.' : 'Off.');
     } catch (error) {
-      return commandRefusal(error, 'That could not be saved for this device.');
+      return commandRefusal(error, 'That preference could not be saved.');
     }
   }
 }

@@ -63,6 +63,12 @@ if (typeof window !== 'undefined') {
   window.IntersectionObserver ??= ObserverStub as unknown as typeof IntersectionObserver;
   window.scrollTo = () => undefined;
 
+  /** Radix's overlay primitives (Select, DropdownMenu, …) rely on pointer capture, which jsdom does not implement. */
+  Element.prototype.hasPointerCapture ??= () => false;
+  Element.prototype.setPointerCapture ??= () => undefined;
+  Element.prototype.releasePointerCapture ??= () => undefined;
+  Element.prototype.scrollIntoView ??= () => undefined;
+
   /**
    * Node's own `localStorage` global is gated behind `--localstorage-file` and shadows jsdom's, so the
    * property is present but reads as `undefined` while `sessionStorage` stays intact. Restore a store so

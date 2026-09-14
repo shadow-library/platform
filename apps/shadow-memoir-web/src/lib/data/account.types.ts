@@ -11,16 +11,11 @@ export interface DayPreferences {
   currency: string;
   /** Set once during onboarding and read-only afterwards — past expenses keep the currency they were logged in. */
   currencyLocked: boolean;
+  /** Minor units of `currency`; `null` when no budget is set. */
+  monthlyBudgetMinor: number | null;
 }
 
-export interface BehaviourPreferences {
-  compactDensity: boolean;
-  reduceMotion: boolean;
-  dailyJournalPrompt: boolean;
-  showCosmetics: boolean;
-}
-
-/** The three email categories the account row carries. Push is not per-category — it is one opt-in per registered device. */
+/** The three email categories the account row carries. Push is not modelled here yet. */
 type NotificationPrefKey = 'weeklyDigest' | 'aiReadiness' | 'billingReminders';
 
 export interface NotificationPreference {
@@ -31,9 +26,6 @@ export interface NotificationPreference {
 }
 
 export interface NotificationSettings {
-  pushPermission: 'granted' | 'default' | 'denied';
-  permissionNote: string;
-  pushOptIn: boolean;
   preferences: NotificationPreference[];
 }
 
@@ -174,11 +166,9 @@ interface OnboardingSubmission {
 }
 
 export type AccountCommand =
-  | { type: 'day.set'; patch: Partial<Pick<DayPreferences, 'wakeTime' | 'sleepTime' | 'timezone' | 'intensity'>> }
-  | { type: 'behaviour.set'; patch: Partial<BehaviourPreferences> }
+  | { type: 'day.set'; patch: Partial<Pick<DayPreferences, 'wakeTime' | 'sleepTime' | 'timezone' | 'intensity' | 'monthlyBudgetMinor'>> }
   | { type: 'onboarding.complete'; submission: OnboardingSubmission }
   | { type: 'notification.set'; preferenceId: NotificationPrefKey; enabled: boolean }
-  | { type: 'notification.setPush'; enabled: boolean }
   | { type: 'device.remove'; deviceId: string }
   | { type: 'billing.checkout'; plan: BillingPeriod }
   | { type: 'export.prepare' }

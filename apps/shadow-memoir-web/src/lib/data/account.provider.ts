@@ -1,7 +1,6 @@
 import {
   type AccountCommand,
   type AppSyncView,
-  type BehaviourPreferences,
   type BillingPlan,
   type BillingView,
   type DayPreferences,
@@ -19,7 +18,6 @@ import { type Persona } from './fixtures';
 
 export interface AccountProvider {
   getDay(): Promise<DayPreferences>;
-  getBehaviour(): Promise<BehaviourPreferences>;
   getNotifications(): Promise<NotificationSettings>;
   getBilling(): Promise<BillingView>;
   getExport(): Promise<ExportView>;
@@ -193,7 +191,6 @@ export function exportJobCopy(stage: ExportJob['stage'], downloadUrl: string | n
 interface AccountFixtureState {
   persona: Persona;
   day: DayPreferences;
-  behaviour: BehaviourPreferences;
   notifications: NotificationSettings;
   plan: PlanId;
   exportStage: ExportJob['stage'];
@@ -226,15 +223,9 @@ export function createAccountProvider({ persona = 'active', currency }: AccountF
       pendingIntensity: null,
       currency,
       currencyLocked: persona !== 'new',
+      monthlyBudgetMinor: persona === 'new' ? null : 160_000,
     },
-    behaviour: { compactDensity: false, reduceMotion: false, dailyJournalPrompt: false, showCosmetics: true },
     notifications: {
-      pushPermission: persona === 'new' ? 'default' : 'granted',
-      permissionNote:
-        persona === 'new'
-          ? 'Push has not been asked for on this device. Turning push on is what asks.'
-          : 'Push is allowed on this device. Everything below is still off until you turn it on.',
-      pushOptIn: false,
       preferences: NOTIFICATION_SEEDS.map(seed => ({ ...seed, email: false })),
     },
     plan: 'free',
@@ -253,7 +244,6 @@ export function createAccountProvider({ persona = 'active', currency }: AccountF
 
   return {
     getDay: () => Promise.resolve({ ...state.day }),
-    getBehaviour: () => Promise.resolve({ ...state.behaviour }),
     getNotifications: () => Promise.resolve({ ...state.notifications, preferences: state.notifications.preferences.map(item => ({ ...item })) }),
     getOnboarding: () => Promise.resolve({ completed: state.persona !== 'new' }),
     getBilling: () =>
@@ -309,10 +299,6 @@ export function createAccountProvider({ persona = 'active', currency }: AccountF
           state.day = { ...state.day, ...command.patch };
           return Promise.resolve(applied('Saved. Changing your wake window never rewrites past days.'));
 
-        case 'behaviour.set':
-          state.behaviour = { ...state.behaviour, ...command.patch };
-          return Promise.resolve(applied('Saved.'));
-
         case 'onboarding.complete':
           state.day = { ...state.day, currency: command.submission.currency, currencyLocked: true };
           state.persona = 'active';
@@ -324,10 +310,6 @@ export function createAccountProvider({ persona = 'active', currency }: AccountF
             preferences: state.notifications.preferences.map(item => (item.id === command.preferenceId ? { ...item, email: command.enabled } : item)),
           };
           return Promise.resolve(applied(command.enabled ? 'On.' : 'Off.'));
-
-        case 'notification.setPush':
-          state.notifications = { ...state.notifications, pushOptIn: command.enabled };
-          return Promise.resolve(applied(command.enabled ? 'Push is on for this device.' : 'Push is off for this device.'));
 
         case 'device.remove':
           return Promise.resolve(applied('That device will stop receiving notifications.'));
