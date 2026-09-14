@@ -11,4 +11,5 @@ export const constraintErrorMap: Record<string, AppError> = {
   identity_providers_global_kind_unique: AppErrorCode.FED_003.create(),
   bots_organisation_handle_unique: AppErrorCode.BOT_003.create(),
   bot_keys_expiry_within_365_days: AppErrorCode.BOT_007.create(),
+  bot_ownership_transfers_application_id_applications_id_fk: AppErrorCode.APP_014.create(),
 };

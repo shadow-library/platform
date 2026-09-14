@@ -9,12 +9,16 @@ import { BOT_AUDIT_ACTIONS, type BotAuditAction } from './bot.constants';
 const BOT_STATUSES = ['ACTIVE', 'SUSPENDED', 'DELETING', 'DELETED'] as const;
 const BOT_KEY_STATUSES = ['ACTIVE', 'EXPIRED', 'REVOKED'] as const;
 const BOT_GRANT_LEVELS = ['read', 'write'] as const;
+const BOT_TRANSFER_STATUSES = ['PENDING', 'DONE', 'FAILED'] as const;
+const MEMBER_ROLES = ['OWNER', 'ADMIN', 'MEMBER'] as const;
 const AUDIT_OUTCOMES = ['SUCCESS', 'DENIED', 'FAILURE'] as const;
 const AUDIT_ACTOR_TYPES = ['USER', 'SERVICE_ACCOUNT', 'SYSTEM', 'ADMIN'] as const;
 
 type BotStatus = (typeof BOT_STATUSES)[number];
 type BotKeyStatus = (typeof BOT_KEY_STATUSES)[number];
 type BotGrantLevel = (typeof BOT_GRANT_LEVELS)[number];
+type BotTransferStatus = (typeof BOT_TRANSFER_STATUSES)[number];
+type MemberRole = (typeof MEMBER_ROLES)[number];
 
 @Schema()
 export class BotParams {
@@ -105,6 +109,20 @@ export class UpdateBotBody {
 }
 
 @Schema()
+export class DeleteBotBody {
+  @Field(() => String, { ...PATTERN.ID, description: 'Active member of this organisation who receives every record the bot owns.' })
+  @Transform('bigint:parse')
+  transferToUserId: bigint;
+
+  @Field({
+    minLength: 1,
+    maxLength: 39,
+    description: "The bot's handle, without the `[bot]` suffix, typed back to confirm the deletion.",
+  })
+  confirmHandle: string;
+}
+
+@Schema()
 export class CreateBotKeyBody {
   @Field({ minLength: 1, maxLength: 64, description: 'Where the key will live, such as the CI system or environment that holds it.' })
   name: string;
@@ -124,6 +142,31 @@ export class BotUserItem {
   @Field(() => String, { optional: true })
   @Transform('strip:null')
   displayName?: string;
+}
+
+@Schema()
+export class BotDeletionItem {
+  @Field({ description: 'When an administrator requested the deletion.' })
+  requestedAt: string;
+
+  @Field(() => BotUserItem, { optional: true, description: 'Member the owned records are being handed to.' })
+  @Transform('strip:null')
+  transferTo?: BotUserItem;
+
+  @Field(() => Integer, { description: 'Applications that have not yet confirmed the transfer.' })
+  pending: number;
+
+  @Field(() => Integer, { description: 'Applications that have confirmed the transfer.' })
+  done: number;
+
+  @Field(() => Integer, { description: 'Applications whose last transfer attempt failed; the worker keeps retrying until the attempt budget runs out.' })
+  failed: number;
+
+  @Field(() => Boolean, { description: 'A transfer has used its whole attempt budget. Deletion cannot finish until an administrator retries it.' })
+  stalled: boolean;
+
+  @Field(() => [String], { description: 'Display names of the applications whose transfer is out of attempts, ordered by application name; empty unless `stalled` is true.' })
+  stalledApplications: string[];
 }
 
 @Schema()
@@ -185,6 +228,10 @@ export class BotItem {
   @Field(() => BotUserItem, { optional: true })
   @Transform('strip:null')
   suspendedBy?: BotUserItem;
+
+  @Field(() => BotDeletionItem, { optional: true, description: 'Present once deletion has been requested; absent for every other status.' })
+  @Transform('strip:null')
+  deletion?: BotDeletionItem;
 }
 
 @Schema()
@@ -203,6 +250,111 @@ export class BotsResponse {
 
   @Field(() => BotUsageItem)
   usage: BotUsageItem;
+}
+
+@Schema()
+export class BotOwnedRecordItem {
+  @Field({ description: "The application's own name for the record type, such as `projects`." })
+  kind: string;
+
+  @Field(() => Integer)
+  count: number;
+}
+
+@Schema()
+export class BotOwnershipApplicationItem {
+  @Field(() => Integer)
+  applicationId: number;
+
+  @Field()
+  name: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  displayName?: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  logoUrl?: string;
+
+  @Field(() => Boolean, { description: 'False when the application did not answer in time; its counts are unknown rather than zero.' })
+  available: boolean;
+
+  @Field(() => [BotOwnedRecordItem], { description: 'Empty when the application is unavailable, or when the bot owns nothing there.' })
+  records: BotOwnedRecordItem[];
+
+  @Field(() => Integer, { description: 'Sum of every record count the application reported.' })
+  total: number;
+}
+
+@Schema()
+export class BotOwnershipTransferItem {
+  @Field(() => Integer)
+  applicationId: number;
+
+  @Field()
+  name: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  displayName?: string;
+
+  @Field(() => String, { enum: [...BOT_TRANSFER_STATUSES] })
+  status: BotTransferStatus;
+
+  @Field(() => Integer)
+  attempts: number;
+
+  @Field(() => Boolean, { description: 'The transfer used its whole attempt budget and is no longer retried automatically.' })
+  exhausted: boolean;
+
+  @Field(() => String, { optional: true, description: 'Earliest time the worker will try again; absent once the transfer is done.' })
+  @Transform('strip:null')
+  nextAttemptAt?: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  completedAt?: string;
+}
+
+@Schema()
+export class BotTransferRecipientItem {
+  @Field(() => String)
+  userId: bigint;
+
+  @Field(() => String, { enum: [...MEMBER_ROLES] })
+  role: MemberRole;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  displayName?: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  email?: string;
+}
+
+@Schema()
+export class BotOwnershipResponse {
+  @Field(() => [BotOwnershipApplicationItem], { description: 'Every application that can own records for a bot, ordered by application name.' })
+  applications: BotOwnershipApplicationItem[];
+
+  @Field(() => Boolean, { description: 'At least one application did not answer, so the counts are incomplete.' })
+  degraded: boolean;
+
+  @Field(() => [BotOwnershipTransferItem], { description: 'Handover progress; empty until a deletion has been requested.' })
+  transfers: BotOwnershipTransferItem[];
+
+  @Field(() => [BotTransferRecipientItem], {
+    description: 'Members eligible to receive the records, ordered by id. Validated by the same rule the deletion enforces, so anyone listed here is accepted.',
+  })
+  recipients: BotTransferRecipientItem[];
+}
+
+@Schema()
+export class BotTransferRetryResponse {
+  @Field(() => Integer, { description: 'Transfers handed back to the worker. Zero means nothing had run out of attempts, so nothing was requeued.' })
+  retried: number;
 }
 
 @Schema()
@@ -409,6 +561,13 @@ export class BotActivityDetailItem {
   @Field(() => [String], { optional: true, description: 'Grants removed, each `<application>:<resource>:<level>`.' })
   @Transform('strip:null')
   removed?: string[];
+
+  @Field(() => Integer, {
+    optional: true,
+    description: 'Ownership transfers handed back to the worker after they exhausted their attempts; marks a deletion retry rather than a fresh request.',
+  })
+  @Transform('strip:null')
+  retriedTransfers?: number;
 }
 
 @Schema()

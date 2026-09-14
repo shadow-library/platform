@@ -47,6 +47,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly APP_012 = AppErrorCode.validation('APP_012', 'Invalid redirect uri for a third-party application', 400);
   /** A public client authenticates with PKCE alone, so it holds no secret that could be rotated */
   static readonly APP_013 = AppErrorCode.validation('APP_013', 'A public application has no client secret to rotate', 400);
+  /** Bot ownership transfers still name the application; deleting it would strand the records those bots own there */
+  static readonly APP_014 = AppErrorCode.conflict('APP_014', 'The application still has bot ownership transfers in flight');
 
   /*!
    * User Error Codes
@@ -199,6 +201,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly BOT_006 = AppErrorCode.conflict('BOT_006', 'Bot already has the maximum number of active keys');
   /** Key expiry must be in the future and no more than 365 days away */
   static readonly BOT_007 = AppErrorCode.validation('BOT_007', 'Key expiry is out of range', 400);
+  /** Records a bot owns can only be handed to a person who is still an ACTIVE member of the bot's own organisation */
+  static readonly BOT_008 = AppErrorCode.validation('BOT_008', 'Transfer recipient is not an active member of the organisation', 400);
   /** Absent, deleted, or owned by another organisation — indistinguishable by design */
   static readonly BOT_009 = AppErrorCode.notFound('BOT_009', 'Bot not found');
   /** The bot's lifecycle status does not permit the operation, such as suspending a suspended bot or issuing a key to one that is not active */

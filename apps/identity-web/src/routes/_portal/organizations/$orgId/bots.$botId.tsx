@@ -31,6 +31,7 @@ import { SecretDialog } from '@/features/console';
 import {
   baselineFromGrants,
   countChangedSlots,
+  DeleteBotDialog,
   type DesiredGrantMap,
   desiredGrantsList,
   humanizeResource,
@@ -71,6 +72,7 @@ import {
   useOrgAccess,
   useReplaceBotPermissionsMutation,
   useResumeBotMutation,
+  useRetryBotTransfersMutation,
   useRevokeBotKeyMutation,
   useSuspendBotMutation,
   useUpdateBotMutation,
@@ -220,7 +222,7 @@ function describeEvent(event: BotActivityItem): string {
     case 'bot.key.exchange_denied':
       return `Key exchange refused${event.detail?.reason ? `: ${humanizeCode(event.detail.reason)}` : ''}`;
     case 'bot.deletion.requested':
-      return `${actorName} requested deletion`;
+      return event.detail?.retriedTransfers ? `${actorName} retried the record transfer` : `${actorName} requested deletion`;
     case 'bot.ownership.transferred':
       return `${actorName} transferred ownership`;
     case 'bot.deleted':
@@ -323,17 +325,19 @@ function BotDetailPage(): React.JSX.Element {
             )}
           </div>
         </div>
-        <div className={styles.detailActions}>
-          {manageable && (
+        {manageable && (
+          <div className={styles.detailActions}>
             <Button variant="secondary" size="sm" loading={suspend.isPending || resume.isPending} onClick={toggleSuspend}>
               {data.status === 'ACTIVE' ? 'Suspend' : 'Resume'}
             </Button>
-          )}
-          <Button variant="primary" size="sm" prefix={<KeyIcon size={14} />} disabled={!canGenerateKey} onClick={() => setGenerateOpen(true)}>
-            Generate key
-          </Button>
-        </div>
+            <Button variant="primary" size="sm" prefix={<KeyIcon size={14} />} disabled={!canGenerateKey} onClick={() => setGenerateOpen(true)}>
+              Generate key
+            </Button>
+          </div>
+        )}
       </div>
+
+      {data.deletion && <DeletionNotice orgId={orgId} bot={data} require={require} />}
 
       <div className={styles.detailLayout}>
         <nav className={styles.sectionNav}>
@@ -392,7 +396,16 @@ function BotDetailPage(): React.JSX.Element {
               onGenerate={() => setGenerateOpen(true)}
             />
           )}
-          {tab === 'settings' && <SettingsTab orgId={orgId} bot={data} require={require} onSuspendToggle={toggleSuspend} suspendPending={suspend.isPending || resume.isPending} />}
+          {tab === 'settings' && (
+            <SettingsTab
+              orgId={orgId}
+              organisationName={org?.name ?? 'this organization'}
+              bot={data}
+              require={require}
+              onSuspendToggle={toggleSuspend}
+              suspendPending={suspend.isPending || resume.isPending}
+            />
+          )}
         </div>
       </div>
 
@@ -417,6 +430,53 @@ function BotDetailPage(): React.JSX.Element {
       />
       {dialog}
     </div>
+  );
+}
+
+interface DeletionNoticeProps {
+  orgId: string;
+  bot: BotItem;
+  require: (action: () => void) => void;
+}
+
+/** A deleting bot has no Suspend/Resume, so this banner is the only place its state and any stuck handover are visible. */
+function DeletionNotice({ orgId, bot, require }: DeletionNoticeProps): React.JSX.Element | null {
+  const retry = useRetryBotTransfersMutation(orgId);
+  const deletion = bot.deletion;
+  if (!deletion) return null;
+
+  const recipient = deletion.transferTo?.displayName ?? 'a member';
+  const stuckNames = deletion.stalledApplications.join(', ');
+
+  if (deletion.stalled)
+    return (
+      <Alert
+        intent="danger"
+        title="Deletion is stuck"
+        action={{
+          label: retry.isPending ? 'Retrying…' : 'Retry transfer',
+          onClick: () =>
+            require(() =>
+              retry.mutate(bot.id, {
+                onSuccess: result =>
+                  result.retried > 0
+                    ? toast.success(`${result.retried === 1 ? 'Transfer' : `${result.retried} transfers`} queued again`)
+                    : toast.info('Nothing to requeue — no transfer has run out of attempts yet.'),
+                onError: error => toast.danger(botErrorMessage(error)),
+              }),
+            ),
+        }}
+      >
+        {stuckNames ? `${stuckNames} did not confirm the handover` : 'An app did not confirm the handover'} after every retry. The bot stays suspended and its records stay with it
+        until the transfer succeeds.
+      </Alert>
+    );
+
+  return (
+    <Alert intent="warning" title="Deletion in progress">
+      Requested on {formatDate(deletion.requestedAt)}. The bot is already suspended; {deletion.done} of {deletion.done + deletion.pending + deletion.failed} apps have handed their
+      records to {recipient}.
+    </Alert>
   );
 }
 
@@ -902,14 +962,17 @@ function KeysTab({ orgId, botId, keys, isLoading, canGenerateKey, require, onGen
 
 interface SettingsTabProps {
   orgId: string;
+  organisationName: string;
   bot: BotItem;
   require: (action: () => void) => void;
   onSuspendToggle: () => void;
   suspendPending: boolean;
 }
 
-function SettingsTab({ orgId, bot, require, onSuspendToggle, suspendPending }: SettingsTabProps): React.JSX.Element {
+function SettingsTab({ orgId, organisationName, bot, require, onSuspendToggle, suspendPending }: SettingsTabProps): React.JSX.Element {
   const update = useUpdateBotMutation(orgId);
+  const navigate = Route.useNavigate();
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [displayName, setDisplayName] = useState(bot.displayName);
   const [description, setDescription] = useState(bot.description ?? '');
   const [ipAllowlist, setIpAllowlist] = useState<TokenValue[]>(bot.ipAllowlist.map(value => ({ value, valid: true })));
@@ -1007,15 +1070,27 @@ function SettingsTab({ orgId, bot, require, onSuspendToggle, suspendPending }: S
         </div>
       )}
 
-      <div className={styles.dangerCard}>
-        <div>
-          <div className={styles.dangerTitle}>Delete this bot</div>
-          <div className={styles.dangerDesc}>Available soon. Its records will move to a member you choose first; keys and grants will be removed permanently.</div>
+      {manageable && (
+        <div className={styles.dangerCard}>
+          <div>
+            <div className={styles.dangerTitle}>Delete this bot</div>
+            <div className={styles.dangerDesc}>Its records move to a member you choose first. Keys and grants are removed permanently.</div>
+          </div>
+          <Button variant="danger" onClick={() => setDeleteOpen(true)}>
+            Delete bot…
+          </Button>
         </div>
-        <Button variant="danger" disabled>
-          Delete bot…
-        </Button>
-      </div>
+      )}
+
+      <DeleteBotDialog
+        orgId={orgId}
+        organisationName={organisationName}
+        bot={bot}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        require={require}
+        onDeleted={() => void navigate({ to: '/organizations/$orgId/bots', params: { orgId } })}
+      />
     </div>
   );
 }

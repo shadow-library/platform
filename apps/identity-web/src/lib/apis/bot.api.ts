@@ -17,18 +17,26 @@ import {
   type BotCatalogApplicationItem,
   type BotCatalogLevelItem,
   type BotCatalogResourceItem,
+  type BotDeletionItem,
   type BotGrantBody,
   type BotGrantItem,
   type BotItem,
   type BotKeyItem,
   type BotKeysResponse,
+  type BotOwnedRecordItem,
+  type BotOwnershipApplicationItem,
+  type BotOwnershipResponse,
+  type BotOwnershipTransferItem,
   type BotPermissionCatalogResponse,
   type BotPermissionsResponse,
   type BotsResponse,
+  type BotTransferRecipientItem,
+  type BotTransferRetryResponse,
   type BotUsageItem,
   type CreateBotBody,
   type CreateBotKeyBody,
   type CreatedBotKeyResponse,
+  type DeleteBotBody,
   type ListActivityQueryParams,
   type OrganisationActionResponse,
   type ReplaceBotPermissionsBody,
@@ -44,18 +52,26 @@ export type {
   BotCatalogApplicationItem,
   BotCatalogLevelItem,
   BotCatalogResourceItem,
+  BotDeletionItem,
   BotGrantBody,
   BotGrantItem,
   BotItem,
   BotKeyItem,
   BotKeysResponse,
+  BotOwnedRecordItem,
+  BotOwnershipApplicationItem,
+  BotOwnershipResponse,
+  BotOwnershipTransferItem,
   BotPermissionCatalogResponse,
   BotPermissionsResponse,
   BotsResponse,
+  BotTransferRecipientItem,
+  BotTransferRetryResponse,
   BotUsageItem,
   CreateBotBody,
   CreateBotKeyBody,
   CreatedBotKeyResponse,
+  DeleteBotBody,
   ReplaceBotPermissionsBody,
   UpdateBotBody,
 };
@@ -78,6 +94,7 @@ export const botKeys = {
   list: (orgId: string) => [...botKeys.all(orgId), 'list'] as const,
   detail: (orgId: string, botId: string) => [...botKeys.all(orgId), botId] as const,
   keys: (orgId: string, botId: string) => [...botKeys.detail(orgId, botId), 'keys'] as const,
+  ownership: (orgId: string, botId: string) => [...botKeys.detail(orgId, botId), 'ownership'] as const,
   permissionCatalog: (orgId: string) => [...botKeys.all(orgId), 'permission-catalog'] as const,
   permissions: (orgId: string, botId: string) => [...botKeys.detail(orgId, botId), 'permissions'] as const,
   activity: (orgId: string, botId: string, filter: Omit<BotActivityParams, 'cursor'>) => [...botKeys.detail(orgId, botId), 'activity', filter] as const,
@@ -153,6 +170,43 @@ export function useResumeBotMutation(orgId: string): UseMutationResult<Organisat
     onSuccess: (_, botId) => {
       queryClient.invalidateQueries({ queryKey: botKeys.detail(orgId, botId) });
       queryClient.invalidateQueries({ queryKey: botKeys.list(orgId) });
+    },
+  });
+}
+
+/** The fan-out is slow and degrades per application, so it is never part of a route loader's critical path. */
+export const botOwnershipQueryOptions = (orgId: string, botId: string, enabled = true) =>
+  queryOptions<BotOwnershipResponse, ApiError>({
+    queryKey: botKeys.ownership(orgId, botId),
+    queryFn: ({ signal }) => APIRequest.get(`/organisations/${orgId}/bots/${botId}/ownership`).signal(signal).execute<BotOwnershipResponse>(),
+    enabled: enabled && Boolean(orgId) && Boolean(botId),
+    staleTime: 0,
+  });
+
+export function useBotOwnershipQuery(orgId: string, botId: string, enabled = true): UseQueryResult<BotOwnershipResponse, ApiError> {
+  return useQuery(botOwnershipQueryOptions(orgId, botId, enabled));
+}
+
+export function useDeleteBotMutation(orgId: string): UseMutationResult<OrganisationActionResponse, ApiError, { botId: string; body: DeleteBotBody }> {
+  const queryClient = useQueryClient();
+  return useMutation<OrganisationActionResponse, ApiError, { botId: string; body: DeleteBotBody }>({
+    mutationFn: ({ botId, body }) => APIRequest.delete(`/organisations/${orgId}/bots/${botId}`).body(body).execute<OrganisationActionResponse>(),
+    onSuccess: (_, { botId }) => {
+      queryClient.invalidateQueries({ queryKey: botKeys.detail(orgId, botId) });
+      queryClient.invalidateQueries({ queryKey: botKeys.keys(orgId, botId) });
+      queryClient.invalidateQueries({ queryKey: botKeys.ownership(orgId, botId) });
+      queryClient.invalidateQueries({ queryKey: botKeys.list(orgId) });
+    },
+  });
+}
+
+export function useRetryBotTransfersMutation(orgId: string): UseMutationResult<BotTransferRetryResponse, ApiError, string> {
+  const queryClient = useQueryClient();
+  return useMutation<BotTransferRetryResponse, ApiError, string>({
+    mutationFn: botId => APIRequest.post(`/organisations/${orgId}/bots/${botId}/ownership/retry`).body({}).execute<BotTransferRetryResponse>(),
+    onSuccess: (_, botId) => {
+      queryClient.invalidateQueries({ queryKey: botKeys.detail(orgId, botId) });
+      queryClient.invalidateQueries({ queryKey: botKeys.ownership(orgId, botId) });
     },
   });
 }

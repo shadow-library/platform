@@ -1,6 +1,7 @@
 import { Module } from '@shadow-library/app';
 
 import { AuthzModule } from '@server/modules/authz';
+import { BotOwnershipModule } from '@server/modules/identity/bot-ownership';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 import { LogSamplerModule, SecurityModule } from '@server/modules/infrastructure/security';
@@ -15,7 +16,7 @@ import { BotController } from './bot.controller';
 import { BotService } from './bot.service';
 
 @Module({
-  imports: [DatabaseModule, AuditModule, ApplicationModule, SecurityModule, LogSamplerModule, AuthzModule],
+  imports: [DatabaseModule, AuditModule, ApplicationModule, SecurityModule, LogSamplerModule, AuthzModule, BotOwnershipModule],
   controllers: [BotController, BotPermissionController],
   providers: [BotService, BotKeyService, BotKeyExchangeService, BotPermissionService, BotActivityService],
   exports: [BotService, BotKeyService, BotKeyExchangeService, BotPermissionService, BotActivityService],

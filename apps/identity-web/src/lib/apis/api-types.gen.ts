@@ -683,7 +683,8 @@ export interface paths {
     get: operations['get_api_v1_organisations_organisationId_bots_botId'];
     put?: never;
     post?: never;
-    delete?: never;
+    /** Delete Bot */
+    delete: operations['delete_api_v1_organisations_organisationId_bots_botId'];
     options?: never;
     head?: never;
     /** Update Bot */
@@ -718,6 +719,40 @@ export interface paths {
     put?: never;
     /** Resume Bot */
     post: operations['post_api_v1_organisations_organisationId_bots_botId_resume'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}/ownership': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Ownership */
+    get: operations['get_api_v1_organisations_organisationId_bots_botId_ownership'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}/ownership/retry': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Retry Ownership Transfers */
+    post: operations['post_api_v1_organisations_organisationId_bots_botId_ownership_retry'];
     delete?: never;
     options?: never;
     head?: never;
@@ -3185,10 +3220,28 @@ export interface components {
       updatedAt: string;
       suspendedAt?: string;
       suspendedBy?: components['schemas']['BotUserItem'];
+      /** @description Present once deletion has been requested; absent for every other status. */
+      deletion?: components['schemas']['BotDeletionItem'];
     };
     BotUserItem: {
       id: string;
       displayName?: string;
+    };
+    BotDeletionItem: {
+      /** @description When an administrator requested the deletion. */
+      requestedAt: string;
+      /** @description Member the owned records are being handed to. */
+      transferTo?: components['schemas']['BotUserItem'];
+      /** @description Applications that have not yet confirmed the transfer. */
+      pending: number;
+      /** @description Applications that have confirmed the transfer. */
+      done: number;
+      /** @description Applications whose last transfer attempt failed; the worker keeps retrying until the attempt budget runs out. */
+      failed: number;
+      /** @description A transfer has used its whole attempt budget. Deletion cannot finish until an administrator retries it. */
+      stalled: boolean;
+      /** @description Display names of the applications whose transfer is out of attempts, ordered by application name; empty unless `stalled` is true. */
+      stalledApplications: string[];
     };
     BotUsageItem: {
       /** @description Bots that count toward the limit: every bot not yet deleted. */
@@ -3226,6 +3279,63 @@ export interface components {
       ipAllowlist?: string[];
       rateLimitPerMinute?: number;
     };
+    DeleteBotBody: {
+      /** @description Active member of this organisation who receives every record the bot owns. */
+      transferToUserId: string;
+      /** @description The bot's handle, without the `[bot]` suffix, typed back to confirm the deletion. */
+      confirmHandle: string;
+    };
+    BotOwnershipResponse: {
+      /** @description Every application that can own records for a bot, ordered by application name. */
+      applications: components['schemas']['BotOwnershipApplicationItem'][];
+      /** @description At least one application did not answer, so the counts are incomplete. */
+      degraded: boolean;
+      /** @description Handover progress; empty until a deletion has been requested. */
+      transfers: components['schemas']['BotOwnershipTransferItem'][];
+      /** @description Members eligible to receive the records, ordered by id. Validated by the same rule the deletion enforces, so anyone listed here is accepted. */
+      recipients: components['schemas']['BotTransferRecipientItem'][];
+    };
+    BotOwnershipApplicationItem: {
+      applicationId: number;
+      name: string;
+      displayName?: string;
+      logoUrl?: string;
+      /** @description False when the application did not answer in time; its counts are unknown rather than zero. */
+      available: boolean;
+      /** @description Empty when the application is unavailable, or when the bot owns nothing there. */
+      records: components['schemas']['BotOwnedRecordItem'][];
+      /** @description Sum of every record count the application reported. */
+      total: number;
+    };
+    BotOwnedRecordItem: {
+      /** @description The application's own name for the record type, such as `projects`. */
+      kind: string;
+      count: number;
+    };
+    BotOwnershipTransferItem: {
+      applicationId: number;
+      name: string;
+      displayName?: string;
+      /** @enum {string} */
+      status: 'PENDING' | 'DONE' | 'FAILED';
+      attempts: number;
+      /** @description The transfer used its whole attempt budget and is no longer retried automatically. */
+      exhausted: boolean;
+      /** @description Earliest time the worker will try again; absent once the transfer is done. */
+      nextAttemptAt?: string;
+      completedAt?: string;
+    };
+    BotTransferRecipientItem: {
+      userId: string;
+      /** @enum {string} */
+      role: 'OWNER' | 'ADMIN' | 'MEMBER';
+      displayName?: string;
+      email?: string;
+    };
+    BotTransferRetryResponse: {
+      /** @description Transfers handed back to the worker. Zero means nothing had run out of attempts, so nothing was requeued. */
+      retried: number;
+    };
     BotActivityResponse: {
       /** @description Newest first. */
       events: components['schemas']['BotActivityItem'][];
@@ -3259,6 +3369,8 @@ export interface components {
       added?: string[];
       /** @description Grants removed, each `<application>:<resource>:<level>`. */
       removed?: string[];
+      /** @description Ownership transfers handed back to the worker after they exhausted their attempts; marks a deletion retry rather than a fresh request. */
+      retriedTransfers?: number;
     };
     BotKeysResponse: {
       keys: components['schemas']['BotKeyItem'][];
@@ -6512,6 +6624,51 @@ export interface operations {
       };
     };
   };
+  delete_api_v1_organisations_organisationId_bots_botId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeleteBotBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   patch_api_v1_organisations_organisationId_bots_botId: {
     parameters: {
       query?: never;
@@ -6617,6 +6774,88 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_bots_botId_ownership: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotOwnershipResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_organisations_organisationId_bots_botId_ownership_retry: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotTransferRetryResponse'];
         };
       };
       /** @description Default Response */
@@ -12983,10 +13222,18 @@ export type ServiceAccessRuleDto = components['schemas']['ServiceAccessRuleDto']
 export type BotsResponse = components['schemas']['BotsResponse'];
 export type BotItem = components['schemas']['BotItem'];
 export type BotUserItem = components['schemas']['BotUserItem'];
+export type BotDeletionItem = components['schemas']['BotDeletionItem'];
 export type BotUsageItem = components['schemas']['BotUsageItem'];
 export type CreateBotBody = components['schemas']['CreateBotBody'];
 export type BotGrantBody = components['schemas']['BotGrantBody'];
 export type UpdateBotBody = components['schemas']['UpdateBotBody'];
+export type DeleteBotBody = components['schemas']['DeleteBotBody'];
+export type BotOwnershipResponse = components['schemas']['BotOwnershipResponse'];
+export type BotOwnershipApplicationItem = components['schemas']['BotOwnershipApplicationItem'];
+export type BotOwnedRecordItem = components['schemas']['BotOwnedRecordItem'];
+export type BotOwnershipTransferItem = components['schemas']['BotOwnershipTransferItem'];
+export type BotTransferRecipientItem = components['schemas']['BotTransferRecipientItem'];
+export type BotTransferRetryResponse = components['schemas']['BotTransferRetryResponse'];
 export type BotActivityResponse = components['schemas']['BotActivityResponse'];
 export type BotActivityItem = components['schemas']['BotActivityItem'];
 export type BotActivityDetailItem = components['schemas']['BotActivityDetailItem'];
@@ -13181,6 +13428,7 @@ export type ListOrganisationApplicationsPathParams = Exclude<paths['/api/v1/orga
 export type ListDomainsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/domains']['get']['parameters']['path'], undefined>;
 export type ListBotsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots']['get']['parameters']['path'], undefined>;
 export type GetBotPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}']['get']['parameters']['path'], undefined>;
+export type GetOwnershipPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}/ownership']['get']['parameters']['path'], undefined>;
 export type ListActivityQueryParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}/activity']['get']['parameters']['query'], undefined>;
 export type ListActivityPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}/activity']['get']['parameters']['path'], undefined>;
 export type ListKeysPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}/keys']['get']['parameters']['path'], undefined>;

@@ -3,13 +3,14 @@ import { Config, Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
 import { BackChannelLogoutService } from '@server/modules/auth/token';
+import { BotOwnershipService } from '@server/modules/identity/bot-ownership';
 import { NotificationService } from '@server/modules/infrastructure/notification';
 import { WebhookDeliveryService } from '@server/modules/infrastructure/webhook';
 
 import { BotKeyExpiryService } from './bot-key-expiry.service';
 import { MaintenanceService } from './maintenance.service';
 
-const MAINTENANCE_EVERY_TICKS = 720;
+export const MAINTENANCE_EVERY_TICKS = 720;
 
 @Injectable()
 export class WorkerService implements OnApplicationReady, OnApplicationStop {
@@ -26,6 +27,7 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
     private readonly webhookDeliveryService: WebhookDeliveryService,
     private readonly maintenanceService: MaintenanceService,
     private readonly botKeyExpiryService: BotKeyExpiryService,
+    private readonly botOwnershipService: BotOwnershipService,
   ) {}
 
   async onApplicationReady(): Promise<void> {
@@ -33,6 +35,7 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
     await this.notificationService.recoverStuckDeliveries();
     await this.backChannelLogoutService.recoverStuckDeliveries();
     await this.webhookDeliveryService.recoverStuckDeliveries();
+    await this.botOwnershipService.recoverCompletedDeletions();
     this.timer = setInterval(() => void this.tick(), this.intervalMs);
     this.logger.info('Worker started', { intervalMs: this.intervalMs });
   }
@@ -63,6 +66,8 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
       if (logouts > 0) this.logger.debug('Dispatched back-channel logouts', { logouts });
       const webhooks = await this.webhookDeliveryService.dispatchPending();
       if (webhooks > 0) this.logger.debug('Dispatched webhooks', { webhooks });
+      const transfers = await this.botOwnershipService.dispatchPending();
+      if (transfers > 0) this.logger.info('Transferred bot-owned records', { transfers });
       if (this.ticks++ % MAINTENANCE_EVERY_TICKS === 0) {
         await this.maintenanceService.purgeStaleContactClaims();
         await this.maintenanceService.purgeStaleAppSessions();
@@ -70,6 +75,7 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
         if (reminded > 0) this.logger.info('Reminded bot key expiries', { reminded });
         const expired = await this.botKeyExpiryService.sweepExpiredKeys();
         if (expired > 0) this.logger.info('Audited expired bot keys', { expired });
+        await this.botOwnershipService.recoverCompletedDeletions();
       }
     } catch (error) {
       this.logger.error('Worker tick failed', { error });

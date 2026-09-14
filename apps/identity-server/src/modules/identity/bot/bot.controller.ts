@@ -11,14 +11,17 @@ import {
   BotItem,
   BotKeyParams,
   BotKeysResponse,
+  BotOwnershipResponse,
   BotParams,
   BotsResponse,
+  BotTransferRetryResponse,
   CreateBotBody,
   CreateBotKeyBody,
   CreatedBotKeyResponse,
+  DeleteBotBody,
   UpdateBotBody,
 } from './bot.dto';
-import { type BotListing, BotService, type BotSummary } from './bot.service';
+import { type BotListing, type BotOwnershipView, BotService, type BotSummary } from './bot.service';
 import { type BotActor } from './bot.types';
 
 @HttpController('/api/v1/organisations/:organisationId/bots')
@@ -78,6 +81,30 @@ export class BotController {
   async resumeBot(@Params() params: BotParams): Promise<OrganisationActionResponse> {
     await this.botService.resumeBot(this.actor(), params.organisationId, params.botId);
     return { success: true };
+  }
+
+  @Delete('/:botId')
+  @Auth({ orgRole: 'ADMIN', elevated: true })
+  @HttpStatus(202)
+  @RespondFor(202, OrganisationActionResponse)
+  async deleteBot(@Params() params: BotParams, @Body() body: DeleteBotBody): Promise<OrganisationActionResponse> {
+    await this.botService.requestDeletion(this.actor(), params.organisationId, params.botId, body);
+    return { success: true };
+  }
+
+  @Get('/:botId/ownership')
+  @RespondFor(200, BotOwnershipResponse)
+  getOwnership(@Params() params: BotParams): Promise<BotOwnershipView> {
+    return this.botService.getOwnership(params.organisationId, params.botId);
+  }
+
+  @Post('/:botId/ownership/retry')
+  @Auth({ orgRole: 'ADMIN', elevated: true })
+  @HttpStatus(200)
+  @RespondFor(200, BotTransferRetryResponse)
+  async retryOwnershipTransfers(@Params() params: BotParams): Promise<BotTransferRetryResponse> {
+    const retried = await this.botService.retryTransfers(this.actor(), params.organisationId, params.botId);
+    return { retried };
   }
 
   @Get('/:botId/activity')

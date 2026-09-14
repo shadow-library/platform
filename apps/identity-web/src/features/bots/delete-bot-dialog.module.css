@@ -1,0 +1,81 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.appPanel {
+  border: 1px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  overflow: hidden;
+}
+
+.appPanelTitle {
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--sh-surface-app);
+  border-bottom: 1px solid var(--sh-border-default);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sh-text-secondary);
+}
+
+.appLoading,
+.appEmptyPanel {
+  margin: 0;
+  padding: 14px;
+  font-size: 13px;
+  color: var(--sh-text-tertiary);
+}
+
+.appList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.appRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+.appRow:first-child {
+  border-top: none;
+}
+
+.appName {
+  flex: 1;
+  min-width: 0;
+  color: var(--sh-text-primary);
+}
+
+.appCount {
+  font-variant-numeric: tabular-nums;
+  color: var(--sh-text-secondary);
+}
+
+.appEmpty {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.appUnknown {
+  font-size: 12px;
+  color: var(--sh-warning-text-on-subtle);
+}
+
+.note {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-well);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--sh-text-secondary);
+}

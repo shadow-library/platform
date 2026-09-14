@@ -93,9 +93,10 @@ export const botOwnershipTransfers = pgTable(
     botId: bigint('bot_id', { mode: 'bigint' })
       .notNull()
       .references(() => bots.id, { onDelete: 'cascade' }),
+    /** Restricted, not cascaded: erasing a pending row would let the completion sweep mark the bot DELETED with its records still owned there. */
     applicationId: integer('application_id')
       .notNull()
-      .references(() => applications.id, { onDelete: 'cascade' }),
+      .references(() => applications.id, { onDelete: 'restrict' }),
     toUserId: bigint('to_user_id', { mode: 'bigint' })
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
