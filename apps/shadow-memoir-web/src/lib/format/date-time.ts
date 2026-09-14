@@ -79,14 +79,20 @@ export function timeZoneOptions(currentZone?: string | null, pendingZone?: strin
   return [...zones].sort().map(zone => ({ value: zone, label: zone.replace(/_/g, ' ') }));
 }
 
-/** The account's own calendar day: the server settles persona, comeback and a new quest's start on the configured zone's date rather than the browser's. */
+/** The account's own calendar day: the server settles persona, comeback, a new quest's start and AI quota on the configured zone's date rather than the browser's. */
 export function accountDay(timeZone: string | null | undefined): string {
-  if (!timeZone) return toISODate(new Date());
+  return accountDateOf(new Date(), timeZone);
+}
+
+/** `YYYY-MM-DD` of an instant in the account's zone, or `''` for an invalid instant; falls back to the browser zone when the zone is missing or unknown. */
+export function accountDateOf(instant: Date, timeZone: string | null | undefined): string {
+  if (Number.isNaN(instant.getTime())) return '';
+  if (!timeZone) return toISODate(instant);
   try {
-    const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(instant);
     const part = (type: Intl.DateTimeFormatPartTypes): string => parts.find(entry => entry.type === type)?.value ?? '';
     return `${part('year')}-${part('month')}-${part('day')}`;
   } catch {
-    return toISODate(new Date());
+    return toISODate(instant);
   }
 }

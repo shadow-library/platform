@@ -9,6 +9,7 @@
   margin: 0 0 4px;
   font-size: var(--sh-text-body);
   font-weight: 650;
+  overflow-wrap: anywhere;
 }
 
 .lead {
@@ -39,13 +40,6 @@
   font-family: var(--sh-font-mono);
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);
-}
-
-.scopes {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 12px;
 }
 
 .scopeNote {
@@ -84,6 +78,61 @@
   font-size: var(--sh-text-body-sm);
   line-height: 1.6;
   color: var(--sh-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.refusal {
+  margin-top: 14px;
+}
+
+.limitation {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 18px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--sh-border-subtle);
+  font-size: var(--sh-text-caption);
+  line-height: 1.5;
+  color: var(--sh-text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.limitationLabel {
+  font-weight: 600;
+  color: var(--sh-text-secondary);
+}
+
+.suggestionBlock {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.suggestion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.suggestionText {
+  flex: 1 1 16rem;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .history {
@@ -104,9 +153,45 @@
   border-bottom: none;
 }
 
+.historyBody {
+  flex: 1;
+  min-width: 0;
+}
+
 .historyTitle {
-  display: block;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   font-size: var(--sh-text-body-sm);
+  overflow-wrap: anywhere;
+}
+
+.historyOpen {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sh-accent-text);
+  font: inherit;
+  text-align: start;
+  text-decoration: underline;
+  text-decoration-color: var(--sh-border-subtle);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.historyOpen[aria-current='true'] {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.historyOpen:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+  border-radius: 2px;
 }
 
 .historyWhen {

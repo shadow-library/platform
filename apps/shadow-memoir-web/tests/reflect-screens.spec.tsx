@@ -6,11 +6,13 @@ import { AiScreen } from '@/features/ai';
 import { HistoryScreen } from '@/features/history';
 import { barHeightPx, InsightsScreen, PLOT_HEIGHT } from '@/features/insights';
 import { WeeklyReviewScreen } from '@/features/review';
-import { deriveInsights, reflectSeed, shiftDate } from '@/lib/data';
-import { SyncEngineProvider } from '@/lib/sync';
+import { NetStrip, SystemOverlayProvider } from '@/features/shell';
+import { COACH_POLL_INTERVAL_MS, COACH_QUEUED_POLL_INTERVAL_MS, coachPollDelay, deriveInsights, reflectSeed, shiftDate } from '@/lib/data';
+import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen } from './harness';
-import { createSyncedTestData, createTestEngine, sharedBacking } from './sync-harness';
+import { httpFake } from './http-fake';
+import { createSyncedTestData, createTestEngine, sharedBacking, type TestEngineOptions } from './sync-harness';
 
 const TODAY = '2026-08-22';
 
@@ -372,5 +374,257 @@ describe('Coach screen', () => {
 
     expect(await screen.findByText(/Both requests this month are used/)).toBeDefined();
     expect((screen.getByRole('button', { name: 'Submit request' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  describe('when synced', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    function renderSyncedAsk(options: TestEngineOptions = {}): ReturnType<typeof createTestEngine> {
+      const test = createTestEngine({ today: TODAY, ...options });
+      const data = createSyncedTestData(test.engine);
+      renderScreen(
+        <SyncEngineProvider data={data}>
+          <AiScreen />
+        </SyncEngineProvider>,
+        { value: data },
+      );
+      return test;
+    }
+
+    it('should not show the consent gate before the first sync', async () => {
+      let open = (): void => undefined;
+      const opened = new Promise<void>(resolve => (open = resolve));
+      const { engine } = renderSyncedAsk({
+        fetchImpl: server => async (input, init) => {
+          if (String(input).includes('/sync/delta')) await opened;
+          return server.fetchImpl(input, init);
+        },
+      });
+
+      await waitFor(() => expect(engine.getSnapshot().state).toBe('syncing'));
+      expect(screen.getByRole('status', { name: 'Loading' })).toBeDefined();
+      expect(screen.queryByText('Before the coach reads anything')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Save and continue' })).toBeNull();
+
+      open();
+      expect(await screen.findByText('Before the coach reads anything')).toBeDefined();
+    });
+
+    it('should show a failure rather than the consent gate when the first sync fails', async () => {
+      renderSyncedAsk({ status: () => 500 });
+
+      expect(await screen.findByText("Couldn't load this right now")).toBeDefined();
+      expect(screen.queryByText('Before the coach reads anything')).toBeNull();
+      expect(screen.queryByText(/requests used on Free/)).toBeNull();
+    });
+
+    it('should send one consent update on double click', async () => {
+      let release = (): void => undefined;
+      const held = new Promise<void>(resolve => (release = resolve));
+      const undecided = [
+        { dataClass: 'journal_reflection_reason', granted: false, grantedAt: null, withdrawnAt: null },
+        { dataClass: 'health', granted: false, grantedAt: null, withdrawnAt: null },
+      ];
+      const fake = httpFake({
+        'GET /api/v1/ai/consents': () => ({ body: { consents: undecided } }),
+        'PUT /api/v1/ai/consents': async () => {
+          await held;
+          return { body: { consents: undecided } };
+        },
+      });
+      renderSyncedAsk();
+
+      fireEvent.click(await screen.findByRole('switch', { name: /Journal reflections and reasons/ }));
+      const save = screen.getByRole('button', { name: 'Save and continue' });
+      fireEvent.click(save);
+      fireEvent.click(save);
+      await waitFor(() => expect(fake.count('PUT', '/api/v1/ai/consents')).toBe(1));
+      await waitFor(() => expect(screen.getByRole('button', { name: /Saving/ }).getAttribute('aria-busy')).toBe('true'));
+      fireEvent.click(screen.getByRole('button', { name: /Saving/ }));
+
+      release();
+      await waitFor(() => expect(screen.queryByRole('button', { name: /Saving/ })).toBeNull());
+      expect(fake.count('PUT', '/api/v1/ai/consents')).toBe(1);
+    });
+
+    const CONSENTS = [{ dataClass: 'journal_reflection_reason', grantedAt: '2026-08-01T00:00:00.000Z', withdrawnAt: null }];
+    const WAITING_TASK = {
+      id: 'task-1',
+      queryText: 'Why do Thursdays keep failing?',
+      status: 'running',
+      kind: 'adhoc',
+      submittedAt: '2026-08-22T09:00:00.000Z',
+      expectedBy: '2026-08-22T22:00:00.000Z',
+      quotaMonth: '2026-08',
+      quotaConsumed: true,
+      error: null,
+    };
+    const ANSWER = {
+      id: '77',
+      taskId: 'task-1',
+      answer: 'Thursday carries five occurrences.',
+      patterns: [],
+      suggestions: [],
+      limitationNote: null,
+      createdAt: '2026-08-22T21:00:00.000Z',
+    };
+    const deltaPage = (domains: DeltaPage['domains']): DeltaPage => ({ cursor: '1', hasMore: false, domains, tombstones: [] });
+    const settle = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 30));
+
+    it('should refresh a running request until it is done, and stop once it is', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
+      try {
+        const { server } = renderSyncedAsk({
+          pages: [
+            deltaPage({ ai_consents: CONSENTS, ai_tasks: [WAITING_TASK] }),
+            deltaPage({ ai_consents: CONSENTS, ai_tasks: [{ ...WAITING_TASK, status: 'done' }], ai_results: [ANSWER] }),
+          ],
+        });
+
+        expect(await screen.findByText(/Reading your history now/)).toBeDefined();
+        const pulls = server.deltaRequests.length;
+        await vi.advanceTimersByTimeAsync(COACH_POLL_INTERVAL_MS);
+
+        expect(await screen.findByText('Thursday carries five occurrences.')).toBeDefined();
+        expect(screen.queryByText(/Reading your history now/)).toBeNull();
+        expect(server.deltaRequests.length).toBeGreaterThan(pulls);
+
+        const done = server.deltaRequests.length;
+        await vi.advanceTimersByTimeAsync(COACH_POLL_INTERVAL_MS * 3);
+        await settle();
+        expect(server.deltaRequests.length).toBe(done);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('should check a newly queued request once soon after it is asked', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
+      try {
+        const queued = { ...WAITING_TASK, status: 'pending', expectedBy: new Date(Date.now() + 60 * 60_000).toISOString() };
+        const { server } = renderSyncedAsk({ pages: [deltaPage({ ai_consents: CONSENTS, ai_tasks: [queued] })] });
+
+        expect(await screen.findByRole('button', { name: 'Cancel the request' })).toBeDefined();
+        const pulls = server.deltaRequests.length;
+        await vi.advanceTimersByTimeAsync(COACH_POLL_INTERVAL_MS);
+        await vi.waitFor(() => expect(server.deltaRequests.length).toBe(pulls + 1));
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('should check a queued request slowly after the early check until the time it is expected by', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
+      try {
+        const queued = { ...WAITING_TASK, status: 'pending', expectedBy: new Date(Date.now() + 60 * 60_000).toISOString() };
+        const { server } = renderSyncedAsk({ pages: [deltaPage({ ai_consents: CONSENTS, ai_tasks: [queued] })] });
+
+        expect(await screen.findByRole('button', { name: 'Cancel the request' })).toBeDefined();
+        const beforeEarly = server.deltaRequests.length;
+        await vi.advanceTimersByTimeAsync(COACH_POLL_INTERVAL_MS);
+        await vi.waitFor(() => expect(server.deltaRequests.length).toBeGreaterThan(beforeEarly));
+        await settle();
+        const pulls = server.deltaRequests.length;
+
+        await vi.advanceTimersByTimeAsync(COACH_POLL_INTERVAL_MS * 2);
+        await settle();
+        expect(server.deltaRequests.length).toBe(pulls);
+
+        await vi.advanceTimersByTimeAsync(COACH_QUEUED_POLL_INTERVAL_MS);
+        await vi.waitFor(() => expect(server.deltaRequests.length).toBeGreaterThan(pulls));
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('should refresh a waiting request when the tab becomes visible again', async () => {
+      const queued = { ...WAITING_TASK, status: 'pending', expectedBy: new Date(Date.now() + 60 * 60_000).toISOString() };
+      renderSyncedAsk({
+        pages: [deltaPage({ ai_consents: CONSENTS, ai_tasks: [queued] }), deltaPage({ ai_consents: CONSENTS, ai_tasks: [{ ...queued, status: 'done' }], ai_results: [ANSWER] })],
+      });
+
+      expect(await screen.findByRole('button', { name: 'Cancel the request' })).toBeDefined();
+      fireEvent(document, new Event('visibilitychange'));
+
+      expect(await screen.findByText('Thursday carries five occurrences.')).toBeDefined();
+    });
+
+    it('should not show the syncing strip for a background coach refresh', async () => {
+      const { engine } = createTestEngine({ today: TODAY, pages: [deltaPage({ ai_consents: CONSENTS, ai_tasks: [WAITING_TASK] })] });
+      const data = createSyncedTestData(engine);
+      renderScreen(
+        <SyncEngineProvider data={data}>
+          <SystemOverlayProvider>
+            <NetStrip />
+          </SystemOverlayProvider>
+        </SyncEngineProvider>,
+        { value: data },
+      );
+      await waitFor(() => expect(engine.getSnapshot()).toMatchObject({ state: 'online', readiness: { kind: 'ready' } }));
+
+      const states: string[] = [];
+      const unsubscribe = engine.subscribe(() => states.push(engine.getSnapshot().state));
+      expect(await data.reflect.refreshCoach()).toBe('refreshed');
+      unsubscribe();
+
+      expect(states).not.toContain('syncing');
+      expect(screen.queryByText(/Syncing/)).toBeNull();
+    });
+
+    it('should not refresh anything while the account is being deleted', async () => {
+      const { engine, server } = renderSyncedAsk({ status: () => 403, errorCode: 'ACC_002' });
+      await screen.findByText('This account is being deleted');
+      const pulls = server.deltaRequests.length;
+
+      expect(await createSyncedTestData(engine).reflect.refreshCoach()).toBe('skipped');
+      expect(server.deltaRequests.length).toBe(pulls);
+    });
+
+    it('should disable the composer while deletion is pending', async () => {
+      renderSyncedAsk({ status: () => 403, errorCode: 'ACC_002' });
+
+      expect(await screen.findByText('This account is being deleted')).toBeDefined();
+      expect((screen.getByLabelText('Your question') as HTMLTextAreaElement).disabled).toBe(true);
+      expect((screen.getByRole('button', { name: 'Submit request' }) as HTMLButtonElement).disabled).toBe(true);
+      expect(screen.queryByText('Before the coach reads anything')).toBeNull();
+      expect(screen.queryByText(/requests used on Free/)).toBeNull();
+    });
+  });
+
+  it('should open an older result from the history', async () => {
+    renderScreen(<AiScreen />, { today: TODAY });
+    await passTheConsentGate();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Nightly summary · quests, planning, money' }));
+    expect(screen.getByRole('button', { name: 'Nightly summary · quests, planning, money' }).getAttribute('aria-current')).toBe('true');
+    expect(screen.getAllByRole('button', { name: 'Open the quest' }).length).toBeGreaterThan(0);
+  });
+
+  describe('coachPollDelay', () => {
+    const NOW = Date.parse('2026-08-22T12:00:00.000Z');
+
+    it('should poll a running request every 20 seconds', () => {
+      expect(coachPollDelay({ state: 'processing', expectedBy: '' }, NOW, 0)).toBe(20_000);
+    });
+
+    it('should check a newly queued request once soon after it is asked', () => {
+      expect(coachPollDelay({ state: 'queued', expectedBy: '2026-08-22T22:00:00.000Z' }, NOW, 0, false)).toBe(20_000);
+    });
+
+    it('should poll a queued request every 5 minutes until it is expected, then every 20 seconds', () => {
+      expect(coachPollDelay({ state: 'queued', expectedBy: '2026-08-22T22:00:00.000Z' }, NOW, 0)).toBe(5 * 60_000);
+      expect(coachPollDelay({ state: 'queued', expectedBy: '2026-08-22T12:02:00.000Z' }, NOW, 0)).toBe(2 * 60_000);
+      expect(coachPollDelay({ state: 'queued', expectedBy: '2026-08-22T11:00:00.000Z' }, NOW, 0)).toBe(20_000);
+    });
+
+    it('should back off after failed refreshes up to 5 minutes', () => {
+      const running = { state: 'processing' as const, expectedBy: '' };
+      expect([1, 2, 3, 4, 10].map(failures => coachPollDelay(running, NOW, failures))).toEqual([40_000, 80_000, 160_000, 300_000, 300_000]);
+    });
+
+    it('should not poll a request that is not waiting', () => {
+      expect(coachPollDelay({ state: 'held', expectedBy: '' }, NOW, 0)).toBeNull();
+      expect(coachPollDelay({ state: 'failed', expectedBy: '' }, NOW, 0)).toBeNull();
+    });
   });
 });

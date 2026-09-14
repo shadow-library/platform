@@ -41,6 +41,11 @@ export interface SyncEngineOptions {
   outcomeTimeoutMs?: number;
 }
 
+export interface SyncPassOptions {
+  /** A refresh nobody asked for: over a ready mirror with nothing queued it runs without announcing `syncing`, so the net strip stays quiet. */
+  background?: boolean;
+}
+
 /** `local` commands have no server handler; `refused` ones reached a store this engine's account no longer holds, and the caller must undo its optimistic apply. */
 export type EnqueueResult = { status: 'queued'; commandId: string; ticket?: OutcomeTicket } | { status: 'local' } | { status: 'refused'; boundary: StoreBoundary };
 
@@ -253,8 +258,8 @@ export class SyncEngine {
   }
 
   /** Flush then pull, serialized — two overlapping passes would post the same batch twice and race the cursor. */
-  sync(): Promise<void> {
-    return (this.inFlight ??= this.runSync().finally(() => this.afterPass()));
+  sync(options: SyncPassOptions = {}): Promise<void> {
+    return (this.inFlight ??= this.runSync(options).finally(() => this.afterPass()));
   }
 
   /** A command enqueued while a pass is past its flush would otherwise sit until something else starts one. */
@@ -329,11 +334,12 @@ export class SyncEngine {
     if (notices.length) this.patch({ notices: [...this.snapshot.notices, ...notices] });
   }
 
-  private async runSync(): Promise<void> {
+  private async runSync({ background = false }: SyncPassOptions): Promise<void> {
     if (!isOnline()) return this.markOffline();
 
     this.coldFailure = null;
-    this.patch({ state: 'syncing', readiness: this.readiness() });
+    const quiet = background && this.mirrorReady && !this.deletionPending && this.snapshot.queuedCount === 0;
+    if (!quiet) this.patch({ state: 'syncing', readiness: this.readiness() });
     this.retryRefusedDomains();
     try {
       await this.confirmPrincipal();

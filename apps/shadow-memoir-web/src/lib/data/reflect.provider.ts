@@ -6,6 +6,7 @@ import {
   type AiConsent,
   type AiRequest,
   type AiResult,
+  type CoachRefresh,
   type CoachView,
   type HistoryDetail,
   type HistoryFilter,
@@ -22,6 +23,8 @@ export interface ReflectProvider {
   getInsights(period: InsightPeriod): Promise<InsightsView>;
   getReview(): Promise<ReviewView>;
   getCoach(): Promise<CoachView>;
+  /** Asks the source for the latest request states; the coach query refetches when anything changed. */
+  refreshCoach(): Promise<CoachRefresh>;
   dispatchCommand(command: ReflectCommand): Promise<SettledCommandResult>;
 }
 
@@ -69,11 +72,11 @@ const REQUEST_COPY: Record<AiRequest['state'], { when: string; body: string }> =
 };
 
 const HISTORY_ENTRIES: CoachView['history'] = [
-  { id: 'h1', state: 'ready', title: 'Nightly summary · quests, planning, money', when: 'Today 06:02' },
-  { id: 'h2', state: 'ready', title: 'What is my Thursday problem?', when: '19 Aug' },
-  { id: 'h3', state: 'failed', title: 'Weekly deep read · week 33', when: '18 Aug · no request used' },
-  { id: 'h4', state: 'cancelled', title: 'Is my food spend unusual?', when: '15 Aug · cancelled while queued' },
-  { id: 'h5', state: 'ready', title: 'Weekly deep read · week 32', when: '11 Aug' },
+  { id: 'h1', state: 'ready', title: 'Nightly summary · quests, planning, money', when: 'Today 06:02', resultId: RESULT.id },
+  { id: 'h2', state: 'ready', title: 'What is my Thursday problem?', when: '19 Aug', resultId: null },
+  { id: 'h3', state: 'failed', title: 'Weekly deep read · week 33', when: '18 Aug · no request used', resultId: null },
+  { id: 'h4', state: 'cancelled', title: 'Is my food spend unusual?', when: '15 Aug · cancelled while queued', resultId: null },
+  { id: 'h5', state: 'ready', title: 'Weekly deep read · week 32', when: '11 Aug', resultId: null },
 ];
 
 interface ReflectFixtureState {
@@ -122,7 +125,7 @@ export function createReflectProvider({ today, persona = 'active' }: ReflectFixt
       note: `Free includes ${FREE_MONTHLY_REQUESTS} requests a month. Coach adds sixty a month, the nightly summary and a weekly deep read — and nothing else.`,
     },
     active: state.active,
-    latest: state.consent.decided && state.persona !== 'new' ? RESULT : null,
+    results: state.consent.decided && state.persona !== 'new' ? [RESULT] : [],
     history: state.persona === 'new' ? [] : HISTORY_ENTRIES,
   });
 
@@ -132,6 +135,7 @@ export function createReflectProvider({ today, persona = 'active' }: ReflectFixt
     getInsights: period => Promise.resolve(deriveInsights(state.source, period)),
     getReview: () => Promise.resolve(deriveReview(state.source, { answers: state.answers, complete: state.reviewComplete })),
     getCoach: () => Promise.resolve(coach()),
+    refreshCoach: () => Promise.resolve('skipped'),
     dispatchCommand: command => {
       if (command.type === 'ai.setConsent') {
         state.consent = { ...command.consent, decided: true };
@@ -146,7 +150,7 @@ export function createReflectProvider({ today, persona = 'active' }: ReflectFixt
             message: `Free covers ${FREE_MONTHLY_REQUESTS} requests a month and both are used. The count resets on 1 September, and Coach raises it.`,
           });
         state.quotaUsed += 1;
-        state.active = { id: `req-${state.quotaUsed}`, question: command.question.trim(), state: 'queued', ...REQUEST_COPY.queued };
+        state.active = { id: `req-${state.quotaUsed}`, question: command.question.trim(), state: 'queued', expectedBy: '', ...REQUEST_COPY.queued };
         return Promise.resolve(applied('Queued. The answer will be here within a few hours.'));
       }
 

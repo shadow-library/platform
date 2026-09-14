@@ -1,40 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type DeltaPage, SyncedReflectProvider } from '@/lib/sync';
+import { type DeltaPage, SyncedReflectProvider, type SyncEngine } from '@/lib/sync';
 
+import { httpFake } from './http-fake';
 import { withTimeZone } from './setup';
 import { createTestEngine } from './sync-harness';
 
 const TODAY = '2026-08-24';
-
-interface HttpCall {
-  method: string;
-  path: string;
-  body: Record<string, unknown> | null;
-}
-
-interface HttpReply {
-  status?: number;
-  body?: unknown;
-}
-
-function httpFake(handlers: Record<string, () => HttpReply>): HttpCall[] {
-  const calls: HttpCall[] = [];
-
-  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-    const path = new URL(String(input), 'http://memoir.test').pathname;
-    const method = init?.method ?? 'GET';
-    calls.push({ method, path, body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null });
-
-    const handler = handlers[`${method} ${path}`];
-    if (!handler) return new Response(JSON.stringify({ code: 'TEST_404', type: 'NotFound', message: `no handler for ${method} ${path}` }), { status: 404 });
-
-    const reply = handler();
-    return new Response(JSON.stringify(reply.body ?? {}), { status: reply.status ?? 200, headers: { 'content-type': 'application/json' } });
-  });
-
-  return calls;
-}
 
 function page(domains: DeltaPage['domains']): DeltaPage {
   return { cursor: '1', hasMore: false, domains, tombstones: [] };
@@ -68,6 +40,11 @@ const RESULT = {
   createdAt: '2026-08-25T06:02:00.000Z',
 };
 
+const UNDECIDED_CONSENTS = [
+  { dataClass: 'journal_reflection_reason', granted: false, grantedAt: null, withdrawnAt: null },
+  { dataClass: 'health', granted: false, grantedAt: null, withdrawnAt: null },
+];
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Coaching consent', () => {
@@ -91,8 +68,21 @@ describe('Coaching consent', () => {
     expect(coach.consent).toEqual({ journal: true, health: false, decided: true });
   });
 
+  it('should not overwrite consents another device decided since the last pull', async () => {
+    const { calls } = httpFake({
+      'GET /api/v1/ai/consents': () => ({ body: { consents: [{ ...UNDECIDED_CONSENTS[0], granted: true, grantedAt: '2026-08-20T00:00:00.000Z' }, UNDECIDED_CONSENTS[1]] } }),
+    });
+
+    const result = await (await provider()).dispatchCommand({ type: 'ai.setConsent', consent: { journal: false, health: false } });
+    expect(result).toMatchObject({ status: 'rejected', message: expect.stringContaining('already decided on another device') });
+    expect(calls.some(call => call.method === 'PUT')).toBe(false);
+  });
+
   it('should send both classes as one grant list', async () => {
-    const calls = httpFake({ 'PUT /api/v1/ai/consents': () => ({ body: { consents: [] } }) });
+    const { calls } = httpFake({
+      'GET /api/v1/ai/consents': () => ({ body: { consents: UNDECIDED_CONSENTS } }),
+      'PUT /api/v1/ai/consents': () => ({ body: { consents: [] } }),
+    });
 
     const result = await (await provider()).dispatchCommand({ type: 'ai.setConsent', consent: { journal: true, health: false } });
     expect(result.status).toBe('applied');
@@ -107,7 +97,7 @@ describe('Coaching consent', () => {
 
 describe('Coaching requests', () => {
   it('should submit a question with a client-minted id', async () => {
-    const calls = httpFake({ 'POST /api/v1/ai/tasks': () => ({ status: 201, body: { ...TASK, status: 'pending' } }) });
+    const { calls } = httpFake({ 'POST /api/v1/ai/tasks': () => ({ status: 201, body: { ...TASK, status: 'pending' } }) });
 
     const result = await (await provider()).dispatchCommand({ type: 'ai.submit', question: '  Why do Thursdays keep failing?  ' });
     expect(result.status).toBe('applied');
@@ -117,7 +107,7 @@ describe('Coaching requests', () => {
 
   it('should resubmit an unanswered question under the same id', async () => {
     let attempt = 0;
-    const calls = httpFake({
+    const { calls } = httpFake({
       'POST /api/v1/ai/tasks': () => (attempt++ === 0 ? { status: 503, body: { code: 'S001', type: 'Unavailable', message: 'down' } } : { status: 201, body: TASK }),
     });
     const reflect = await provider();
@@ -130,8 +120,69 @@ describe('Coaching requests', () => {
     expect(ids[1]).toBe(ids[0]);
   });
 
+  it('should reuse the idempotency key for a repeated submit', async () => {
+    let release = (): void => undefined;
+    const held = new Promise<void>(resolve => (release = resolve));
+    let attempt = 0;
+    const { calls } = httpFake({
+      'POST /api/v1/ai/tasks': async () => {
+        if (attempt++ === 0) return { status: 503, body: { code: 'S001', type: 'Unavailable', message: 'down' } };
+        await held;
+        return { status: 201, body: TASK };
+      },
+    });
+    const reflect = await provider();
+    const submit = (): Promise<unknown> => reflect.dispatchCommand({ type: 'ai.submit', question: 'Why do Thursdays keep failing?' });
+
+    await submit();
+    const first = submit();
+    const second = submit();
+    release();
+    expect(await Promise.all([first, second])).toEqual([expect.objectContaining({ status: 'applied' }), expect.objectContaining({ status: 'applied' })]);
+
+    const ids = calls.filter(call => call.path === '/api/v1/ai/tasks').map(call => call.body?.['id']);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(1);
+  });
+
+  it('should mint a new id once the pending submission is in the mirror', async () => {
+    let attempt = 0;
+    const { calls } = httpFake({
+      'POST /api/v1/ai/tasks': () => (attempt++ === 0 ? { status: 503, body: { code: 'S001', type: 'Unavailable', message: 'down' } } : { status: 201, body: TASK }),
+    });
+    const later = page({});
+    const { engine } = createTestEngine({ pages: [page({}), later], today: TODAY });
+    await engine.start();
+    const reflect = new SyncedReflectProvider(engine);
+
+    await reflect.dispatchCommand({ type: 'ai.submit', question: 'Why do Thursdays keep failing?' });
+    const [firstId] = calls.filter(call => call.path === '/api/v1/ai/tasks').map(call => call.body?.['id']);
+    later.domains = { ai_tasks: [{ ...TASK, id: String(firstId), status: 'pending' }] };
+    await engine.sync();
+    await reflect.dispatchCommand({ type: 'ai.submit', question: 'Why do Thursdays keep failing?' });
+
+    const ids = calls.filter(call => call.path === '/api/v1/ai/tasks').map(call => call.body?.['id']);
+    expect(ids).toHaveLength(2);
+    expect(ids[1]).not.toBe(firstId);
+  });
+
+  it('should mint a new id after the server refused the question', async () => {
+    let attempt = 0;
+    const { calls } = httpFake({
+      'POST /api/v1/ai/tasks': () =>
+        attempt++ === 0 ? { status: 402, body: { code: 'AI_001', type: 'Forbidden', message: 'Free-tier AI quota exhausted' } } : { status: 201, body: TASK },
+    });
+    const reflect = await provider();
+
+    await reflect.dispatchCommand({ type: 'ai.submit', question: 'Why do Thursdays keep failing?' });
+    await reflect.dispatchCommand({ type: 'ai.submit', question: 'Why do Thursdays keep failing?' });
+
+    const ids = calls.filter(call => call.path === '/api/v1/ai/tasks').map(call => call.body?.['id']);
+    expect(new Set(ids).size).toBe(2);
+  });
+
   it('should mint a new id once a question has been accepted', async () => {
-    const calls = httpFake({ 'POST /api/v1/ai/tasks': () => ({ status: 201, body: TASK }) });
+    const { calls } = httpFake({ 'POST /api/v1/ai/tasks': () => ({ status: 201, body: TASK }) });
     const reflect = await provider();
 
     await reflect.dispatchCommand({ type: 'ai.submit', question: 'Why do Thursdays keep failing?' });
@@ -142,7 +193,7 @@ describe('Coaching requests', () => {
   });
 
   it('should never reach the server with an empty question', async () => {
-    const calls = httpFake({});
+    const { calls } = httpFake({});
     const result = await (await provider()).dispatchCommand({ type: 'ai.submit', question: '   ' });
 
     expect(result.status).toBe('rejected');
@@ -178,6 +229,42 @@ describe('Coaching requests', () => {
     expect(result).toMatchObject({ status: 'rejected', message: 'It has already started, so it can’t be cancelled.', error: { code: 'AI_004', kind: 'refusal' } });
   });
 
+  it('should resync when cancel conflicts', async () => {
+    httpFake({
+      'POST /api/v1/ai/tasks/task-1/cancel': () => ({ status: 409, body: { code: 'AI_004', type: 'Conflict', message: 'This task is no longer pending and cannot be cancelled' } }),
+    });
+    const { engine, server } = createTestEngine({ pages: [page({ ai_tasks: [{ ...TASK, status: 'pending' }] }), page({ ai_tasks: [TASK], ai_results: [RESULT] })], today: TODAY });
+    await engine.start();
+    const reflect = new SyncedReflectProvider(engine);
+    expect((await reflect.getCoach()).active).toMatchObject({ id: 'task-1', state: 'queued' });
+    const pulls = server.deltaRequests.length;
+
+    const result = await reflect.dispatchCommand({ type: 'ai.cancel', requestId: 'task-1' });
+
+    expect(server.deltaRequests.length).toBeGreaterThan(pulls);
+    expect(result).toMatchObject({ status: 'rejected', message: 'It had already finished, so there was nothing to cancel. The answer is below.', error: { code: 'AI_004' } });
+    const coach = await reflect.getCoach();
+    expect(coach.active).toBeNull();
+    expect(coach.results[0]?.id).toBe('77');
+  });
+
+  it('should keep the worker’s error text out of a failed request', async () => {
+    httpFake({});
+    const coach = await (await provider({ ai_tasks: [{ ...TASK, status: 'failed', error: 'inference timeout after 30000ms' }] })).getCoach();
+
+    expect(coach.active).toMatchObject({ state: 'failed' });
+    expect(coach.active?.when).not.toContain('inference');
+    expect(coach.history[0]?.when).not.toContain('inference');
+  });
+
+  it('should title a held nightly summary the same on the card and in the history', async () => {
+    httpFake({});
+    const coach = await (await provider({ ai_tasks: [{ ...TASK, kind: 'scheduled', status: 'held_upgrade', queryText: 'What did yesterday say about this week?' }] })).getCoach();
+
+    expect(coach.active).toMatchObject({ state: 'held', question: 'Nightly summary' });
+    expect(coach.history[0]?.title).toBe('Nightly summary');
+  });
+
   it('should count only this month’s charged tasks against the free allowance', async () => {
     httpFake({});
     const coach = await (await provider({ ai_tasks: [TASK, { ...TASK, id: 'task-0', quotaMonth: '2020-01' }] })).getCoach();
@@ -191,6 +278,112 @@ describe('Coaching requests', () => {
 
     expect(coach.quota).toMatchObject({ limit: null, planName: 'Coach' });
   });
+
+  it('should count the quota month and its reset in the account’s time zone', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-08-31T12:00:00.000Z') });
+    try {
+      httpFake({});
+      const coach = await (
+        await provider({
+          account: [{ id: 'account-a', timezone: 'Pacific/Kiritimati' }],
+          ai_tasks: [
+            { ...TASK, quotaMonth: '2026-09' },
+            { ...TASK, id: 'task-0', quotaMonth: '2026-08' },
+          ],
+        })
+      ).getCoach();
+
+      expect(coach.quota).toMatchObject({ used: 1, resetsOn: '1 October' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should count today’s charged requests on a paid entitlement', async () => {
+    httpFake({});
+    const now = new Date().toISOString();
+    const coach = await (
+      await provider({
+        entitlement: [{ tier: 'paid', state: 'active', trialUsed: true }],
+        ai_tasks: [
+          { ...TASK, submittedAt: now },
+          { ...TASK, id: 'task-0', submittedAt: '2020-01-01T09:00:00.000Z' },
+        ],
+      })
+    ).getCoach();
+
+    expect(coach.quota.used).toBe(1);
+  });
+});
+
+describe('Coaching refresh', () => {
+  it('should refresh over a ready mirror', async () => {
+    const { engine, server } = createTestEngine({ pages: [page({})], today: TODAY });
+    await engine.start();
+    const pulls = server.deltaRequests.length;
+
+    expect(await new SyncedReflectProvider(engine).refreshCoach()).toBe('refreshed');
+    expect(server.deltaRequests.length).toBeGreaterThan(pulls);
+  });
+
+  it('should skip a background refresh while signed out', async () => {
+    let status = 401;
+    const { engine, server } = createTestEngine({ status: () => status, today: TODAY });
+    await engine.start();
+    expect(engine.getSnapshot().state).toBe('signed-out');
+    status = 200;
+    const pulls = server.deltaRequests.length;
+
+    expect(await new SyncedReflectProvider(engine).refreshCoach()).toBe('skipped');
+    expect(server.deltaRequests.length).toBe(pulls);
+  });
+
+  it('should report a failed background refresh so the caller can back off', async () => {
+    let status = 200;
+    const { engine } = createTestEngine({ pages: [page({})], status: () => status, today: TODAY });
+    await engine.start();
+    status = 500;
+
+    expect(await new SyncedReflectProvider(engine).refreshCoach()).toBe('failed');
+  });
+});
+
+describe('SyncEngine background pass', () => {
+  function recordStates(engine: SyncEngine): string[] {
+    const states: string[] = [];
+    engine.subscribe(() => states.push(engine.getSnapshot().state));
+    return states;
+  }
+
+  it('should announce a background pass that has queued commands', async () => {
+    const { engine } = createTestEngine({ pages: [page({})], today: TODAY });
+    await engine.start();
+    try {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+      await engine.enqueue({ type: 'quest.complete', occurrenceId: `a:${TODAY}` }, TODAY);
+      expect(engine.getSnapshot().queuedCount).toBe(1);
+    } finally {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    }
+    const states = recordStates(engine);
+
+    await engine.sync({ background: true });
+
+    expect(states).toContain('syncing');
+  });
+
+  it('should surface a failed background pass', async () => {
+    let status = 200;
+    const { engine } = createTestEngine({ pages: [page({})], status: () => status, today: TODAY });
+    await engine.start();
+    status = 500;
+    const states = recordStates(engine);
+
+    await engine.sync({ background: true });
+
+    expect(states).not.toContain('syncing');
+    expect(engine.getSnapshot().state).toBe('failed');
+  });
 });
 
 describe('Coaching results', () => {
@@ -199,10 +392,10 @@ describe('Coaching results', () => {
     const coach = await (await provider({ ai_tasks: [TASK], ai_results: [RESULT] })).getCoach();
 
     expect(coach.active).toBeNull();
-    expect(coach.latest?.title).toBe('Why do Thursdays keep failing?');
-    expect(coach.latest?.findings.map(finding => finding.body)).toEqual([RESULT.answer, RESULT.patterns[0]]);
-    expect(coach.latest?.limitationNote).toBe('Fourteen days is a short window.');
-    expect(coach.latest?.suggestions[0]).toMatchObject({ index: 0, label: 'Move the strength session off Thursday', to: '/quests/12' });
+    expect(coach.results[0]?.title).toBe('Why do Thursdays keep failing?');
+    expect(coach.results[0]?.findings.map(finding => finding.body)).toEqual([RESULT.answer, RESULT.patterns[0]]);
+    expect(coach.results[0]?.limitationNote).toBe('Fourteen days is a short window.');
+    expect(coach.results[0]?.suggestions[0]).toMatchObject({ index: 0, label: 'Move the strength session off Thursday', to: '/quests/12' });
   });
 
   it('should show a queued task at the top and offer to cancel it', async () => {
@@ -210,11 +403,11 @@ describe('Coaching results', () => {
     const coach = await (await provider({ ai_tasks: [{ ...TASK, status: 'pending' }] })).getCoach();
 
     expect(coach.active).toMatchObject({ id: 'task-1', state: 'queued' });
-    expect(coach.latest).toBeNull();
+    expect(coach.results).toEqual([]);
   });
 
   it('should record an applied offer without changing the quest itself', async () => {
-    const calls = httpFake({
+    const { calls } = httpFake({
       'POST /api/v1/ai/results/77/apply': () => ({ body: { id: '1', resultId: '77', suggestionIndex: 0, questId: '12', appliedAt: '2026-08-25T07:00:00.000Z' } }),
     });
 
@@ -244,7 +437,7 @@ describe('Coaching timestamps', () => {
       ).getCoach();
 
       expect(coach.active?.when).toBe('submitted 11:00 · expected by 00:00');
-      expect(coach.latest?.meta).toBe('Ready 25 August, 08:02');
+      expect(coach.results[0]?.meta).toBe('Ready 25 August, 08:02');
       expect(coach.history.find(item => item.id === 'task-2')?.when).toBe('24 Aug 2026');
       expect(coach.history.every(item => !/\d{4}-\d{2}-\d{2}T/.test(item.when))).toBe(true);
     }));

@@ -144,6 +144,7 @@ export interface AiConsent extends AiConsentGrants {
 }
 
 interface AiQuota {
+  /** This month's charged requests on Free; today's on a paid plan. */
   used: number;
   /** Null on a paid plan: the allowance is a daily soft cap the server holds, not a monthly count the client can render. */
   limit: number | null;
@@ -160,6 +161,8 @@ export interface AiRequest {
   state: AiRequestState;
   when: string;
   body: string;
+  /** ISO instant the server expects the answer by; empty when it gave none. */
+  expectedBy: string;
 }
 
 export interface AiSuggestion {
@@ -184,13 +187,16 @@ interface AiHistoryEntry {
   state: AiRequestState;
   title: string;
   when: string;
+  resultId: string | null;
 }
+
+export type CoachRefresh = 'refreshed' | 'skipped' | 'failed';
 
 export interface CoachView {
   consent: AiConsent;
   quota: AiQuota;
   active: AiRequest | null;
-  latest: AiResult | null;
+  results: AiResult[];
   history: AiHistoryEntry[];
 }
 
