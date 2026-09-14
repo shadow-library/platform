@@ -249,6 +249,18 @@ function toActivityEntry(row: DeltaRow, questName: string): ActivityEntry {
   };
 }
 
+/** A health threshold is judged against the value the owner registered for the day, so a `quest_log`-sourced entry never counts. */
+function metricValuesOn(rows: DeltaRow[], keyOf: (metricId: string) => HealthMetricKey | null, date: string): Record<string, number> {
+  const latest = new Map<HealthMetricKey, DeltaRow>();
+  for (const row of rows) {
+    const key = keyOf(String(row['metricId']));
+    if (!key || String(row['date']) !== date || text(row, 'source') === 'quest_log') continue;
+    const current = latest.get(key);
+    if (!current || (text(row, 'createdAt') ?? '') >= (text(current, 'createdAt') ?? '')) latest.set(key, row);
+  }
+  return Object.fromEntries([...latest].map(([key, row]) => [key, number(row, 'value')]));
+}
+
 /**
  * Rebuilds the engine's world from the rows the delta pull has left in IndexedDB. It is deliberately total:
  * a domain the server has not yet populated projects to an empty set rather than to a hole, so each domain
@@ -309,7 +321,7 @@ export function projectWorldState(rows: Partial<DomainRows>, today: string): Mem
     hero: toHeroState(account, today),
     activity,
     scheduleEndMinutes: account ? number(account, 'scheduleEndMin', 1380) : null,
-    metrics: {},
+    metrics: metricValuesOn(rows.metric_entries ?? [], keyOf, today),
     locks,
     lockedQuestIdsByDate,
   };

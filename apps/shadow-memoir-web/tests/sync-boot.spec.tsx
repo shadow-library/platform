@@ -113,8 +113,8 @@ describe('sync boot', () => {
     await engine.start();
 
     const tiles = await quickLogs.tiles(TODAY, 'EUR');
-    expect(tiles.find(tile => tile.id === 'expense')?.value).toBe('not yet');
-    expect(tiles.find(tile => tile.id === 'steps')?.value).toBe('not yet');
+    expect(tiles.find(tile => tile.id === 'expense')?.value).toBe('nothing logged');
+    expect(tiles.find(tile => tile.id === 'steps')?.value).toBe('nothing logged');
     expect(tiles.find(tile => tile.id === 'journal')?.value).toMatch(/\d+ words/);
   });
 

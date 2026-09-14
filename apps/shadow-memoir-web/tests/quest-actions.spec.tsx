@@ -127,7 +127,7 @@ describe('TodayScreen quest actions', () => {
 
     expect(await screen.findByRole('button', { name: 'Postpone' })).toBeDefined();
     expect(screen.getAllByText(/A held shield bridges the break/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Spends 1 HP.').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Spends 1 HP when the day closes.').length).toBeGreaterThan(0);
     expect(await stateOf(data, 'move-steps')).toBe('upcoming');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Postpone' }));

@@ -29,6 +29,7 @@ const SERVER_BACKED_TYPES = new Set<SyncCommand['type']>([
   'quest.skip',
   'quest.postpone',
   'quest.reschedule',
+  'quest.deleteLog',
   'quest.create',
   'quest.update',
   'plan.setLock',
@@ -62,6 +63,7 @@ const QUEST_TYPES = new Set<Command['type']>([
   'quest.skip',
   'quest.postpone',
   'quest.reschedule',
+  'quest.deleteLog',
   'quest.create',
   'quest.update',
   'quest.setActive',
@@ -187,6 +189,8 @@ export function toWireCommand(command: SyncCommand): WireCommand {
       return { type: command.type, payload: { occurrenceId: command.occurrenceId, reasonTag: command.reasonTag } };
     case 'quest.reschedule':
       return { type: command.type, payload: { occurrenceId: command.occurrenceId, toMin: command.toMin, acceptBeyondCap: command.acceptBeyondCap ?? false } };
+    case 'quest.deleteLog':
+      return { type: command.type, payload: { occurrenceId: command.occurrenceId } };
     case 'quest.create':
       return { type: command.type, payload: { ...toDraftWire(command.draft), entityRef: uuidv7() } };
     case 'quest.update':

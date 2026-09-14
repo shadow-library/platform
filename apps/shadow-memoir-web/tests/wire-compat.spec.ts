@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { homeAmountOf } from '@/lib/data';
 import {
   type DeltaPage,
+  isServerBacked,
   NEWER_DOMAINS,
   projectFinanceRows,
   projectWorldState,
@@ -50,6 +51,15 @@ describe('command-wire fixtures (FE-4)', () => {
       expect(entityRef).toMatch(UUID_V7);
     });
   }
+});
+
+describe('quest log undo (P2-02)', () => {
+  it('should send quest.deleteLog to the server with only its occurrence id', () => {
+    const command: SyncCommand = { type: 'quest.deleteLog', occurrenceId: '42:2026-09-14' };
+
+    expect(isServerBacked(command)).toBe(true);
+    expect(toWireCommand(command)).toEqual({ type: 'quest.deleteLog', payload: { occurrenceId: '42:2026-09-14' } });
+  });
 });
 
 describe('expense receipts (UI-076)', () => {

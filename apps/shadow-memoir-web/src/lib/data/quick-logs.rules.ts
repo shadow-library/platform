@@ -1,4 +1,4 @@
-import { convertMlToLitres, litresToMl } from '@/lib/format';
+import { convertMlToLitres, formatCount, litresToMl } from '@/lib/format';
 
 import { type CurrencyCode, type Expense } from './finance.types';
 import { formatMinor } from './finance.rules';
@@ -181,7 +181,7 @@ export interface QuickLogTileSource {
 }
 
 /** Blank, not zero: a day with nothing logged says so rather than showing a total the owner never recorded. */
-const NOTHING_LOGGED = 'not yet';
+const NOTHING_LOGGED = 'nothing logged';
 
 function metricTile(source: QuickLogTileSource, key: HealthMetricKey): string {
   const definition = HEALTH_METRICS.find(item => item.key === key) as HealthMetricDefinition;
@@ -201,12 +201,17 @@ export function quickLogTiles(source: QuickLogTileSource): QuickLogTile[] {
   const journal = source.journal.find(entry => entry.date === source.date);
 
   return [
-    { id: 'expense', label: 'Expense', value: spent ? `${formatMinor(spentMinor, source.currency)} today` : NOTHING_LOGGED, to: '/finance' },
+    { id: 'expense', label: 'Expense', value: spent ? formatMinor(spentMinor, source.currency) : NOTHING_LOGGED, to: '/finance' },
     { id: 'meal', label: 'Meal', value: meals ? `${calories.toLocaleString('en-US')} kcal` : NOTHING_LOGGED, to: '/log' },
     { id: 'steps', label: 'Steps', value: metricTile(source, 'steps'), to: '/log' },
     { id: 'water', label: 'Water', value: metricTile(source, 'water'), to: '/log' },
-    { id: 'weight', label: 'Weight', value: weight ? `${weight.kg.toFixed(1)} kg` : NOTHING_LOGGED, to: '/log' },
-    { id: 'journal', label: 'Journal', value: journal ? `${journal.wordCount} words` : NOTHING_LOGGED, to: '/log' },
+    {
+      id: 'weight',
+      label: 'Weight',
+      value: weight ? `${weight.kg.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg` : NOTHING_LOGGED,
+      to: '/log',
+    },
+    { id: 'journal', label: 'Journal', value: journal ? formatCount(journal.wordCount, 'word', 'words', 'en-US') : NOTHING_LOGGED, to: '/log' },
   ];
 }
 

@@ -1,5 +1,7 @@
 import { buildMonthMatrix, parseISODate, toISODate } from '@shadow-library/ui';
 
+import { formatCount } from '@/lib/format';
+
 import { type Command, type CommandResult } from './command.types';
 import { type DataProvider, type PlanRange, type QuestFilter } from './data-provider';
 import { getFinanceProvider } from './finance.provider';
@@ -18,11 +20,12 @@ import {
   startOfWeek,
   STATE_LABELS,
   STRICTNESS_LABELS,
+  toDate,
   WEEKDAY_LABELS,
   weekdayOf,
   WEEKDAYS,
 } from './labels';
-import { RESCHEDULE_WINDOW_DAYS, reschedulesCountedFor } from './quest.rules';
+import { KEPT_STATES, RESCHEDULE_WINDOW_DAYS, reschedulesCountedFor } from './quest.rules';
 import {
   type OccurrenceState,
   type Quest,
@@ -53,8 +56,10 @@ import {
 
 const BASE_XP: Record<Strictness, number> = { anchor: 12, routine: 10, goal: 8, recovery: 5, optional: 8 };
 const BASE_COINS: Record<Strictness, number> = { anchor: 2, routine: 1, goal: 1, recovery: 0, optional: 1 };
-const HP_COST: Record<Strictness, number> = { anchor: 1, routine: 1, goal: 0, recovery: 0, optional: 0 };
+const HOLD_STATES: readonly OccurrenceState[] = ['completed', 'partial', 'late', 'recovery'];
+const BREAK_STATES: readonly OccurrenceState[] = ['skipped', 'missed', 'postponed'];
 const XP_CEILING = 25;
+const MS_PER_DAY = 86_400_000;
 const SOFT_CAPACITY_MINUTES = 150;
 /** Track width in multiples of capacity, so overload has room to show instead of clipping at 100%. */
 const LOAD_TRACK_SCALE = 2;
@@ -138,6 +143,19 @@ function relativeDayLabel(date: string, today: string): string {
   if (date === shiftDate(today, 1)) return 'Tomorrow';
   const parsed = parseISODate(date);
   return parsed ? WEEKDAY_LABELS[WEEKDAYS[(parsed.getDay() + 6) % 7] as keyof typeof WEEKDAY_LABELS] : date;
+}
+
+function closedAgo(date: string, today: string): string {
+  const days = Math.round((toDate(today).getTime() - toDate(date).getTime()) / MS_PER_DAY);
+  if (days <= 0) return 'Closed today';
+  if (days === 1) return 'Closed yesterday';
+  return `Closed ${formatCount(days, 'day', 'days')} ago`;
+}
+
+/** Mirrors `rules/streak.ts#streakApplies` on the server. */
+function streakApplies(quest: Quest): boolean {
+  if (quest.strictness === 'recovery') return false;
+  return quest.strictness !== 'optional' || quest.optionalStreakOptIn;
 }
 
 function recordFor(quest: Quest, state: OccurrenceState): LogRecord {
@@ -271,35 +289,46 @@ export class MemoirEngine implements DataProvider {
     return remaining <= 0 ? 'the wake window has closed' : `about ${formatDuration(remaining)} of wake window left`;
   }
 
+  private dayHasEnded(date: string): boolean {
+    if (date < this.state.today) return true;
+    const closesAt = this.state.scheduleEndMinutes;
+    if (closesAt === null || date !== this.state.today) return false;
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes() >= closesAt;
+  }
+
+  private daySummary(date: string, occurrences: QuestOccurrence[]): DayView['summary'] {
+    if (!this.dayHasEnded(date) || occurrences.every(item => item.state === 'upcoming')) return null;
+    const kept = occurrences.filter(item => KEPT_STATES.includes(item.state)).length;
+    const partial = occurrences.filter(item => item.state === 'partial').length;
+    const skipped = occurrences.filter(item => item.state === 'skipped').length;
+
+    return {
+      headline: 'End of day',
+      detail: [
+        `${kept} of ${formatCount(occurrences.length, 'quest', 'quests')} completed${partial > 0 ? `, ${partial} partial` : ''}.`,
+        skipped > 0 ? `${skipped} skipped.` : null,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    };
+  }
+
   async getDay(date: string): Promise<DayView> {
     const occurrences = this.scheduledOn(date);
-    const resolved = occurrences.filter(item => item.state !== 'upcoming');
-    const completed = occurrences.filter(item => item.state === 'completed' || item.state === 'partial');
-    const skipped = occurrences.filter(item => item.state === 'skipped');
 
     return {
       date,
       mode: this.state.persona,
       hero: { ...this.state.hero, crown: { ...this.state.hero.crown } },
+      hasActiveQuests: this.hasActiveQuests(),
       occurrences,
       recovery: this.state.persona === 'recovery' || this.state.persona === 'returner' ? COMING_BACK_NOTICES[this.state.persona] : null,
       wakeWindowNote: this.wakeWindowNote(date),
       streaks: this.streakBoard(date),
       upcoming: this.upcoming(date),
       activity: this.state.activity,
-      summary:
-        resolved.length === 0
-          ? null
-          : {
-              headline: 'End of day',
-              detail: [
-                `${completed.length} of ${occurrences.length} quests completed.`,
-                skipped.length > 0 ? `${skipped.length} skipped with a reason.` : null,
-                `HP ${this.state.hero.hp} of ${this.state.hero.hpMax}.`,
-              ]
-                .filter(Boolean)
-                .join(' '),
-            },
+      summary: this.daySummary(date, occurrences),
     };
   }
 
@@ -311,13 +340,13 @@ export class MemoirEngine implements DataProvider {
         const week = Array.from({ length: 7 }, (_, index) => {
           const day = shiftDate(date, index - 6);
           if (!isScheduled(quest, day)) return 'upcoming' as OccurrenceState;
-          return this.state.logs.get(occurrenceKey(quest.id, day))?.state ?? ('upcoming' as OccurrenceState);
+          return this.effectiveState(this.occurrence(quest, day), day);
         });
         return {
           questId: quest.id,
           questName: quest.name,
-          label: progress.currentStreakDays > 0 ? `${progress.currentStreakDays} d` : `ended at ${progress.longestStreakDays}`,
-          note: progress.currentStreakDays === 0 && progress.longestStreakDays >= 7 ? 'Closed yesterday. The record stays.' : null,
+          label: this.streakLabel(progress),
+          note: progress.currentStreakDays === 0 && progress.longestStreakDays >= 7 ? this.streakEndNote(quest, date) : null,
           week,
         };
       })
@@ -325,16 +354,52 @@ export class MemoirEngine implements DataProvider {
       .slice(0, 3);
   }
 
+  private streakLabel(progress: QuestProgress): string {
+    if (progress.currentStreakDays > 0) return `${progress.currentStreakDays} d`;
+    return progress.longestStreakDays > 0 ? `ended at ${progress.longestStreakDays}` : 'not started';
+  }
+
+  /** Rollover writes a `missed` log for every day away, so the run closed on the first unshielded break after the last kept day, not the latest one. */
+  private streakEndNote(quest: Quest, date: string): string {
+    const logs = [...this.state.logs]
+      .filter(([key]) => key.startsWith(`${quest.id}:`))
+      .map(([key, log]) => ({ day: key.slice(quest.id.length + 1), log }))
+      .filter(entry => entry.day <= date)
+      .sort((a, b) => a.day.localeCompare(b.day));
+    const lastHold = logs.filter(entry => HOLD_STATES.includes(entry.log.state)).at(-1)?.day;
+    const breakLog = logs.find(entry => (lastHold === undefined || entry.day > lastHold) && BREAK_STATES.includes(entry.log.state) && !entry.log.shielded);
+    const closedOn = breakLog?.day ?? (lastHold === undefined ? undefined : this.nextScheduledAfter(quest, lastHold, date));
+    return closedOn ? `${closedAgo(closedOn, date)}. The record stays.` : 'The record stays.';
+  }
+
+  private nextScheduledAfter(quest: Quest, after: string, through: string): string | undefined {
+    for (let day = shiftDate(after, 1); day <= through; day = shiftDate(day, 1)) if (isScheduled(quest, day)) return day;
+    return undefined;
+  }
+
+  private hasActiveQuests(): boolean {
+    return this.state.quests.some(quest => quest.active);
+  }
+
+  private timeOf(item: QuestOccurrence): number | null {
+    return item.state === 'rescheduled' && item.rescheduledToMin !== null ? item.rescheduledToMin : item.startTimeMinutes;
+  }
+
+  private upcomingMeta(item: QuestOccurrence): string {
+    if (item.state === 'rescheduled') return item.startTimeMinutes === null ? 'Today · moved' : `Today · moved from ${formatTime(item.startTimeMinutes)}`;
+    return item.locked ? 'Today · locked plan' : 'Today';
+  }
+
   private upcoming(date: string): DayView['upcoming'] {
-    const later = this.scheduledOn(date).filter(item => item.state === 'upcoming' && item.startTimeMinutes !== null);
+    const later = this.scheduledOn(date)
+      .filter(item => (item.state === 'upcoming' || item.state === 'rescheduled') && this.timeOf(item) !== null)
+      .sort((a, b) => (this.timeOf(a) ?? 0) - (this.timeOf(b) ?? 0));
     const tomorrow = this.scheduledOn(shiftDate(date, 1)).slice(0, 2);
     const crown = this.state.hero.crown;
     return [
-      ...later
-        .slice(0, 2)
-        .map(item => ({ id: item.id, when: formatTime(item.startTimeMinutes) ?? 'Today', title: item.questName, meta: item.locked ? 'Today · locked plan' : 'Today' })),
+      ...later.slice(0, 2).map(item => ({ id: item.id, when: formatTime(this.timeOf(item)) ?? 'Today', title: item.questName, meta: this.upcomingMeta(item) })),
       ...tomorrow.map(item => ({ id: `${item.id}-next`, when: relativeDayLabel(item.date, date), title: item.questName, meta: formatTime(item.startTimeMinutes) ?? 'all day' })),
-      { id: 'crown', when: relativeDayLabel(crown.closesOn, date), title: 'Crown closes', meta: `${crown.keptPercent}% kept so far` },
+      ...(this.hasActiveQuests() ? [{ id: 'crown', when: relativeDayLabel(crown.closesOn, date), title: 'Crown closes', meta: `${crown.keptPercent}% kept so far` }] : []),
     ].slice(0, 4);
   }
 
@@ -428,7 +493,7 @@ export class MemoirEngine implements DataProvider {
 
   /** A past occurrence nobody logged reads as missed on the board; the underlying log-derived state everywhere else is untouched. */
   private effectiveState(item: QuestOccurrence, date: string): OccurrenceState {
-    return item.state === 'upcoming' && date < this.state.today ? 'missed' : item.state;
+    return (item.state === 'upcoming' || item.state === 'rescheduled') && date < this.state.today ? 'missed' : item.state;
   }
 
   private planDay(date: string): PlanDay {
@@ -508,16 +573,22 @@ export class MemoirEngine implements DataProvider {
       if (!log || log.state === 'upcoming') continue;
       history.push({ date, state: log.state as QuestLogEntry['state'], note: log.reasonTag ? `Reason: ${log.reasonTag.replace(/_/g, ' ')}` : `Recorded as ${log.state}` });
     }
-    const weeklyMinutes = quest.recurrence.daysOfWeek.length * quest.durationMinutes;
-    const totalMinutes = this.state.quests.filter(item => item.active).reduce((total, item) => total + item.recurrence.daysOfWeek.length * item.durationMinutes, 0);
+    const weeklyMinutes = this.daysPerWeek(quest.recurrence) * quest.durationMinutes;
+    const totalMinutes = this.state.quests.filter(item => item.active).reduce((total, item) => total + this.daysPerWeek(item.recurrence) * item.durationMinutes, 0);
+    const cadence = quest.recurrence.frequency === 'monthly' ? 'once a month' : `${formatCount(this.daysPerWeek(quest.recurrence), 'day', 'days')} a week`;
 
     return {
       ...this.summary(quest),
       todayOccurrence: isScheduled(quest, this.state.today) ? this.occurrence(quest, this.state.today) : null,
       history,
       loadShare: totalMinutes === 0 ? 0 : weeklyMinutes / totalMinutes,
-      loadSummary: `About ${formatDuration(quest.durationMinutes)} on the days it runs, ${quest.recurrence.daysOfWeek.length} days a week.`,
+      loadSummary: `About ${formatDuration(quest.durationMinutes)} on the days it runs, ${cadence}.`,
     };
+  }
+
+  private daysPerWeek(recurrence: Recurrence): number {
+    if (recurrence.frequency === 'monthly') return 12 / 52;
+    return this.draftWeekdays(recurrence).length;
   }
 
   async previewDraft(draft: QuestDraft): Promise<QuestDraftPreview> {
@@ -567,6 +638,8 @@ export class MemoirEngine implements DataProvider {
         return this.resolve(command.occurrenceId, 'postponed', { reasonTag: command.reasonTag });
       case 'quest.reschedule':
         return this.reschedule(command.occurrenceId, command.toMin, command.acceptBeyondCap ?? false);
+      case 'quest.deleteLog':
+        return this.deleteLog(command.occurrenceId);
       case 'quest.create':
         return this.createQuest(command.draft);
       case 'quest.update':
@@ -589,8 +662,10 @@ export class MemoirEngine implements DataProvider {
     const base = state === 'partial' ? Math.floor(BASE_XP[quest.strictness] * 0.5) : state === 'completed' ? BASE_XP[quest.strictness] : 0;
     const xpAwarded = Math.min(XP_CEILING, Math.floor(base * streakTier(progress.currentStreakDays)));
     const coinsAwarded = state === 'completed' ? BASE_COINS[quest.strictness] : 0;
-    const holds = state === 'completed' || state === 'partial' || state === 'recovery';
-    const shielded = !holds && progress.shields > 0;
+    const counted = streakApplies(quest);
+    const holds = counted && HOLD_STATES.includes(state);
+    const breaks = counted && BREAK_STATES.includes(state);
+    const shielded = breaks && progress.shields > 0;
 
     this.state.logs.set(occurrenceId, {
       state,
@@ -606,23 +681,30 @@ export class MemoirEngine implements DataProvider {
 
     this.state.progress[questId] = {
       ...progress,
-      currentStreakDays: holds ? progress.currentStreakDays + 1 : shielded ? progress.currentStreakDays : 0,
+      currentStreakDays: holds ? progress.currentStreakDays + 1 : breaks && !shielded ? 0 : progress.currentStreakDays,
       longestStreakDays: Math.max(progress.longestStreakDays, holds ? progress.currentStreakDays + 1 : progress.longestStreakDays),
-      shields: shielded ? progress.shields - 1 : holds ? progress.shields : 0,
+      shields: shielded ? progress.shields - 1 : breaks ? 0 : progress.shields,
       xpEarned: progress.xpEarned + xpAwarded,
     };
 
-    const hpCost = holds || shielded ? 0 : HP_COST[quest.strictness];
+    // Server HP is charged by rollover when the day closes (`rules/hp.ts#computeDayHp`), never by the command, so today's HP must not move here.
     this.state.hero = {
       ...this.state.hero,
       xp: this.state.hero.xp + xpAwarded,
       xpIntoLevel: this.state.hero.xpIntoLevel + xpAwarded,
       coins: this.state.hero.coins + coinsAwarded,
-      hp: Math.max(0, this.state.hero.hp - hpCost),
     };
     this.pushActivity(`${quest.name} ${state}${xpAwarded > 0 ? ` · +${xpAwarded} XP` : ''}`, xpAwarded > 0);
 
     return { status: 'applied', message: this.messageFor(state, quest.name, xpAwarded), xpAwarded, coinsAwarded };
+  }
+
+  /** Mirrors server `quest.deleteLog`: only the log goes; XP, coins, streak and shields already applied stay as they are. */
+  private deleteLog(occurrenceId: string): CommandResult {
+    const [questId] = occurrenceId.split(':') as [string, string];
+    const quest = this.questById(questId);
+    if (!quest || !this.state.logs.delete(occurrenceId)) return { status: 'rejected', message: 'There’s nothing logged for that quest to change.' };
+    return { status: 'applied', message: `${quest.name} is open again.`, xpAwarded: 0, coinsAwarded: 0 };
   }
 
   private messageFor(state: OccurrenceState, name: string, xp: number): string {

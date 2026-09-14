@@ -9,9 +9,12 @@ import styles from './today.module.css';
 export interface HeroCardProps {
   hero: HeroState;
   mode: DayMode;
+  showCrown: boolean;
 }
 
 const MOMENTUM_LABELS = { cold: 'settling', steady: 'steady', warm: 'warm' } as const;
+
+const PIP_LIMIT = 10;
 
 function momentumLabel(hero: HeroState, mode: DayMode): string {
   if (mode === 'new') return 'starting';
@@ -58,7 +61,43 @@ function LevelProgress({ level, xpIntoLevel, xpForNextLevel }: { level: number; 
   );
 }
 
-export function HeroCard({ hero, mode }: HeroCardProps): ReactElement {
+function HpMeter({ hp, hpMax }: { hp: number; hpMax: number }): ReactElement {
+  const shown = Math.min(Math.max(hp, 0), hpMax);
+  return (
+    <span className={styles.hp} role="img" aria-label={`HP ${hp} of ${hpMax}`}>
+      {hpMax < PIP_LIMIT ? (
+        <span className={styles.pips} aria-hidden>
+          {Array.from({ length: hpMax }, (_, index) => (
+            <span key={index} className={styles.pip} data-filled={index < shown} />
+          ))}
+        </span>
+      ) : (
+        <span className={styles.hpBar} data-hp-meter="bar" aria-hidden>
+          <span className={styles.hpBarFill} style={{ width: `${(shown / hpMax) * 100}%` }} />
+        </span>
+      )}
+      <span className={styles.heroMeta}>
+        HP {hp} of {hpMax}
+      </span>
+    </span>
+  );
+}
+
+export function HeroCard({ hero, mode, showCrown }: HeroCardProps): ReactElement {
+  const stats = [
+    ...(hero.hpMax > 0 ? [<HpMeter key="hp" hp={hero.hp} hpMax={hero.hpMax} />] : []),
+    ...(showCrown
+      ? [
+          <span key="crown" className={styles.heroMeta}>
+            Crown · {hero.crown.label} · <span className={styles.heroMetaSoft}>{crownProgress(hero.crown)}</span>
+          </span>,
+        ]
+      : []),
+    <span key="momentum" className={styles.heroMeta}>
+      Momentum <strong>{momentumLabel(hero, mode)}</strong>
+    </span>,
+  ];
+
   return (
     <Card padding="md">
       <Card.Body>
@@ -75,30 +114,15 @@ export function HeroCard({ hero, mode }: HeroCardProps): ReactElement {
             {hero.xpForNextLevel === null ? null : <LevelProgress level={hero.level} xpIntoLevel={hero.xpIntoLevel} xpForNextLevel={hero.xpForNextLevel} />}
           </div>
         </div>
-        <div className={styles.heroStats}>
-          <span className={styles.hp} role="img" aria-label={`HP ${hero.hp} of ${hero.hpMax}`}>
-            <span className={styles.pips} aria-hidden>
-              {Array.from({ length: hero.hpMax }, (_, index) => (
-                <span key={index} className={styles.pip} data-filled={index < hero.hp} />
-              ))}
+        <div className={styles.heroStatsFrame}>
+          <div className={styles.heroStats}>
+            {stats.flatMap((stat, index) => (index === 0 ? [stat] : [<span key={`divider-${index}`} className={styles.divider} aria-hidden />, stat]))}
+            <span className={styles.heroAction}>
+              <Button size="sm" variant="ghost" asChild>
+                <Link to="/hero">Hero</Link>
+              </Button>
             </span>
-            <span className={styles.heroMeta}>
-              HP {hero.hp} of {hero.hpMax}
-            </span>
-          </span>
-          <span className={styles.divider} aria-hidden />
-          <span className={styles.heroMeta}>
-            Crown · {hero.crown.label} · <span className={styles.heroMetaSoft}>{crownProgress(hero.crown)}</span>
-          </span>
-          <span className={styles.divider} aria-hidden />
-          <span className={styles.heroMeta}>
-            Momentum <strong>{momentumLabel(hero, mode)}</strong>
-          </span>
-          <span className={styles.heroAction}>
-            <Button size="sm" variant="ghost" asChild>
-              <Link to="/hero">Hero</Link>
-            </Button>
-          </span>
+          </div>
         </div>
       </Card.Body>
     </Card>

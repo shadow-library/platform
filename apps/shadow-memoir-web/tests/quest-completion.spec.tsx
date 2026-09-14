@@ -1,12 +1,13 @@
 import { onlineManager } from '@tanstack/react-query';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { toast } from '@shadow-library/ui';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TodayScreen } from '@/features/today';
 import { type DeltaPage, type SyncedMemoirData, SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen } from './harness';
-import { createSyncedTestData, createTestEngine } from './sync-harness';
+import { createSyncedTestData, createTestEngine, rejected, type TestEngine } from './sync-harness';
 
 const TODAY = '2026-08-24';
 const OCCURRENCE = `q1:${TODAY}`;
@@ -166,5 +167,106 @@ describe('completing a quest from Today', () => {
 
     expect(await screen.findByRole('button', { name: 'Completed: Morning run' })).toBeDefined();
     await waitFor(() => expect(server.batches.flatMap(batch => batch.types)).toContain('quest.complete'));
+  });
+});
+
+type ToastOptions = { body?: string; action?: { label: string; onClick: () => void } } | undefined;
+
+describe('undoing a quest outcome from Today', () => {
+  afterEach(() => {
+    setOffline(false);
+    vi.restoreAllMocks();
+  });
+
+  async function skip(data: SyncedMemoirData, offline = false): Promise<void> {
+    renderToday(data);
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Morning run' }));
+    if (offline) setOffline(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip with a reason' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip quest' }));
+  }
+
+  /** Serves the delta the server would hold after the last quest command it applied: the skipped log, or its tombstone once deleted. */
+  function serverHoldingSkip(streaks: Record<string, unknown>[] = []): TestEngine {
+    const skippedLog = { ...completedLogRow(), state: 'skipped', xpAwarded: 0, coinsAwarded: 0 };
+    return createTestEngine({
+      today: TODAY,
+      fetchImpl: server => async (input, init) => {
+        if (!String(input).includes('/sync/delta')) return server.fetchImpl(input, init);
+        const types = server.batches.flatMap(batch => batch.types);
+        const quests = { quests: [dailyQuestRow('q1', 'Morning run')], quest_streaks: streaks };
+        const body: DeltaPage = types.includes('quest.deleteLog')
+          ? page({ cursor: '3', domains: quests, tombstones: [{ domain: 'quest_logs', recordId: 'log-1', syncSeq: '3' }] })
+          : types.includes('quest.skip')
+            ? page({ cursor: '2', domains: { ...quests, quest_logs: [skippedLog] } })
+            : page({ domains: quests });
+        return new Response(JSON.stringify(body), { status: 200, headers: { 'x-sync-epoch': server.epoch, 'content-type': 'application/json' } });
+      },
+    });
+  }
+
+  it('should toast when completing from the row check without offering an undo', async () => {
+    const success = vi.spyOn(toast, 'success');
+    const { engine } = createTestEngine({
+      today: TODAY,
+      pages: [page({ domains: { quests: [dailyQuestRow('q1', 'Morning run')] } }), page({ cursor: '2', domains: { quest_logs: [completedLogRow()] } })],
+    });
+    renderToday(createSyncedTestData(engine));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark complete: Morning run' }));
+
+    await waitFor(() => expect(success).toHaveBeenCalledTimes(1));
+    expect(success.mock.calls[0]?.[0]).toContain('Morning run completed.');
+    expect((success.mock.calls[0]?.[1] as ToastOptions)?.action).toBeUndefined();
+  });
+
+  it('should undo a skip the server can fully revert', async () => {
+    const success = vi.spyOn(toast, 'success');
+    const { engine, server } = serverHoldingSkip();
+    await skip(createSyncedTestData(engine));
+
+    await waitFor(() => expect(success).toHaveBeenCalled());
+    const undo = (success.mock.calls[0]?.[1] as ToastOptions)?.action;
+    expect(undo?.label).toBe('Undo');
+    expect(await screen.findByRole('button', { name: 'Skipped: Morning run' })).toBeDefined();
+
+    undo?.onClick();
+
+    expect(await screen.findByRole('button', { name: 'Mark complete: Morning run' })).toBeDefined();
+    await waitFor(() => expect(server.batches.flatMap(batch => batch.types)).toEqual(['quest.skip', 'quest.deleteLog']));
+    await waitFor(async () => expect(await engine.outbox.size()).toBe(0));
+    expect(await screen.findByRole('button', { name: 'Mark complete: Morning run' })).toBeDefined();
+  });
+
+  it('should not offer undo for a skip the server has not confirmed', async () => {
+    const neutral = vi.spyOn(toast, 'neutral');
+    const { engine } = serverHoldingSkip();
+    await skip(createSyncedTestData(engine), true);
+
+    await waitFor(() => expect(neutral).toHaveBeenCalled());
+    expect((neutral.mock.calls[0]?.[1] as ToastOptions)?.action).toBeUndefined();
+  });
+
+  it('should not offer undo for a skip that breaks a running streak', async () => {
+    const success = vi.spyOn(toast, 'success');
+    const { engine } = serverHoldingSkip([{ id: 's1', questId: 'q1', currentRunDays: 4, bestRunDays: 9, shieldsAvailable: 0, syncSeq: '1' }]);
+    await skip(createSyncedTestData(engine));
+
+    await waitFor(() => expect(success).toHaveBeenCalled());
+    expect((success.mock.calls[0]?.[1] as ToastOptions)?.action).toBeUndefined();
+  });
+
+  it('should mark the row when a completion is rejected', async () => {
+    const { engine } = createTestEngine({
+      today: TODAY,
+      pages: [page({ domains: { quests: [dailyQuestRow('q1', 'Morning run')] } }), page({ cursor: '2' })],
+      outcomes: batch => batch.commandIds.map(id => rejected(id, 'no', 'QST_006')),
+    });
+    renderToday(createSyncedTestData(engine));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark complete: Morning run' }));
+
+    expect(await screen.findByText('Your last change to this quest wasn’t saved.')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Mark complete: Morning run' })).toBeDefined();
   });
 });

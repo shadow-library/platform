@@ -24,7 +24,9 @@ export function DayRail({ quickLogs, streaks, upcoming, activity }: DayRailProps
             {quickLogs.map(tile => (
               <Link key={tile.id} to={tile.to} className={styles.tile}>
                 <span className={styles.tileLabel}>{tile.label}</span>
-                <span className={styles.tileValue}>{tile.value}</span>
+                <span className={styles.tileValue} title={tile.value}>
+                  {tile.value}
+                </span>
               </Link>
             ))}
           </div>
@@ -39,39 +41,51 @@ export function DayRail({ quickLogs, streaks, upcoming, activity }: DayRailProps
               <Link to="/insights">All</Link>
             </Button>
           </div>
-          <ul className={styles.streakList}>
-            {streaks.map(streak => (
-              <li key={streak.questId}>
-                <div className={styles.streakHead}>
-                  <span className={styles.streakName}>{streak.questName}</span>
-                  <span className={styles.mono}>{streak.label}</span>
-                </div>
-                <div className={styles.streakWeek} aria-hidden>
-                  {streak.week.map((state, index) => (
-                    <span key={index} className={styles.streakDay} data-tone={outcomeTone(state)} />
-                  ))}
-                </div>
-                {streak.note ? <p className={styles.railNote}>{streak.note}</p> : null}
-              </li>
-            ))}
-          </ul>
+          {streaks.length === 0 ? (
+            <p className={styles.railNote}>No streaks yet. One starts the first day you keep a quest.</p>
+          ) : (
+            <ul className={styles.streakList}>
+              {streaks.map(streak => (
+                <li key={streak.questId}>
+                  <div className={styles.streakHead}>
+                    <span className={styles.streakName} title={streak.questName}>
+                      {streak.questName}
+                    </span>
+                    <span className={`${styles.mono} ${styles.streakLabel}`}>{streak.label}</span>
+                  </div>
+                  <div className={styles.streakWeek} aria-hidden>
+                    {streak.week.map((state, index) => (
+                      <span key={index} className={styles.streakDay} data-tone={outcomeTone(state)} />
+                    ))}
+                  </div>
+                  {streak.note ? <p className={styles.railNote}>{streak.note}</p> : null}
+                </li>
+              ))}
+            </ul>
+          )}
         </Card.Body>
       </Card>
 
       <Card padding="md">
         <Card.Body>
           <h2 className={styles.railTitle}>Coming up</h2>
-          <ul className={styles.upcomingList}>
-            {upcoming.map(entry => (
-              <li key={entry.id} className={styles.upcomingRow}>
-                <span className={styles.upcomingWhen}>{entry.when}</span>
-                <span>
-                  <span className={styles.upcomingTitle}>{entry.title}</span>
-                  <span className={styles.railNote}>{entry.meta}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+          {upcoming.length === 0 ? (
+            <p className={styles.railNote}>Nothing else is scheduled yet.</p>
+          ) : (
+            <ul className={styles.upcomingList}>
+              {upcoming.map(entry => (
+                <li key={entry.id} className={styles.upcomingRow}>
+                  <span className={styles.upcomingWhen}>{entry.when}</span>
+                  <span className={styles.upcomingText}>
+                    <span className={styles.upcomingTitle} title={entry.title}>
+                      {entry.title}
+                    </span>
+                    <span className={styles.railNote}>{entry.meta}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card.Body>
       </Card>
 

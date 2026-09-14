@@ -155,8 +155,10 @@
 }
 
 .heroTitle {
+  min-width: 0;
   font-size: var(--sh-text-body-sm);
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .coins {
@@ -183,20 +185,63 @@
   color: var(--sh-text-secondary);
 }
 
+.heroStatsFrame {
+  container: hero-stats / inline-size;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
 .heroStats {
   display: flex;
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--sh-border-subtle);
 }
 
 .hp {
   display: flex;
   align-items: center;
   gap: 7px;
+  white-space: nowrap;
+}
+
+.hpBar {
+  width: 72px;
+  height: 7px;
+  flex: none;
+  overflow: hidden;
+  border-radius: var(--sh-radius-full);
+  border: 1px solid var(--sh-text-tertiary);
+}
+
+.hpBarFill {
+  display: block;
+  height: 100%;
+  background: var(--sh-accent);
+}
+
+@container hero-stats (max-width: 520px) {
+  .heroStats {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 6px;
+  }
+
+  .heroStats > * {
+    grid-column: 1;
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .heroStats > .heroAction {
+    grid-column: 2;
+    grid-row: 1;
+    margin-left: 0;
+  }
 }
 
 .pips {
@@ -208,7 +253,7 @@
   width: 9px;
   height: 9px;
   border-radius: 2px;
-  border: 1px solid var(--sh-border-strong);
+  border: 1px solid var(--sh-text-tertiary);
 }
 
 .pip[data-filled='true'] {
@@ -265,7 +310,7 @@
 
 .tileGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -294,6 +339,9 @@
 .tileValue {
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .streakList,
@@ -315,10 +363,16 @@
 }
 
 .streakName {
+  min-width: 0;
   font-size: var(--sh-text-body-sm);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.streakLabel {
+  flex: none;
   white-space: nowrap;
 }
 
@@ -332,7 +386,7 @@
   flex: 1;
   height: 5px;
   border-radius: 2px;
-  background: var(--sh-surface-well);
+  background: var(--sh-border-strong);
 }
 
 .streakDay[data-tone='kept'] {
@@ -345,7 +399,7 @@
 }
 
 .streakDay[data-tone='closed'] {
-  background: var(--sh-border-strong);
+  background: var(--sh-text-tertiary);
 }
 
 .upcomingRow {
@@ -363,10 +417,19 @@
   padding-top: 1px;
 }
 
+.upcomingText {
+  flex: 1;
+  min-width: 0;
+}
+
 .upcomingTitle {
-  display: block;
   font-size: var(--sh-text-body-sm);
   font-weight: 500;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .activityRow {
@@ -394,6 +457,7 @@
   font-size: var(--sh-text-caption);
   line-height: 1.5;
   color: var(--sh-text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .activityWhen {

@@ -50,6 +50,7 @@
 
 .row[data-tone='closed'] .checkMark {
   border-style: dashed;
+  border-color: var(--sh-text-tertiary);
 }
 
 .body {
@@ -61,6 +62,7 @@
   margin: 0;
   font-size: var(--sh-text-body);
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .row[data-tone='kept'] .title {
@@ -78,6 +80,14 @@
   margin: 3px 0 0;
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.unsaved {
+  margin: 4px 0 0;
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  color: var(--sh-warning-text-on-subtle);
 }
 
 .threshold {

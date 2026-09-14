@@ -1,6 +1,6 @@
 import { useMatchRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useState } from 'react';
-import { Button, DescriptionList, Slider, Textarea, TimePicker } from '@shadow-library/ui';
+import { Button, DescriptionList, Slider, Textarea, TimePicker, toast } from '@shadow-library/ui';
 
 import { OverlaySurface } from '@/components/OverlaySurface';
 import {
@@ -10,10 +10,12 @@ import {
   formatTime,
   type HeroIntensityMode,
   notifyOutcome,
+  outcomeToast,
   type QuestOccurrence,
   REASON_LABELS,
   REASON_TAGS,
   type ReasonTag,
+  type SettledOutcome,
   STAT_LABELS,
   STRICTNESS_LABELS,
   STRICTNESS_RULES,
@@ -31,6 +33,7 @@ export interface QuestActions {
   open: (occurrence: QuestOccurrence) => void;
   complete: (occurrence: QuestOccurrence) => void;
   reschedule: (occurrence: QuestOccurrence) => void;
+  unsaved: ReadonlySet<string>;
   overlays: ReactNode;
 }
 
@@ -40,7 +43,24 @@ const ACTION_VERBS: Partial<Record<Command['type'], string>> = {
   'quest.skip': 'skip',
   'quest.postpone': 'postpone',
   'quest.reschedule': 'move',
+  'quest.deleteLog': 'undo',
 };
+
+const UNSAVED_STATUSES: ReadonlySet<string> = new Set(['rejected', 'failed', 'refused']);
+
+/**
+ * Server `quest.deleteLog` removes the log (and with it the crown slice and the HP charged at day close) but reverts nothing else: a completion's
+ * XP stays granted and would be granted again, a broken streak or spent shield stays, a reason still counts, and a postpone keeps the lock broken.
+ * It has no expected-state guard either, so it is only offered once the server confirmed this device's own log is the one it would delete.
+ */
+function canUndo(command: Command, target: QuestOccurrence, outcome: SettledOutcome): boolean {
+  if (outcome.status !== 'applied') return false;
+  if (command.type !== 'quest.skip' && command.type !== 'quest.postpone') return false;
+  if (target.state !== 'upcoming' || command.reasonTag !== undefined) return false;
+  if (command.type === 'quest.skip' && command.note !== undefined) return false;
+  if (command.type === 'quest.postpone' && target.locked) return false;
+  return target.strictness === 'recovery' || (target.streakDays === 0 && target.shields === 0);
+}
 
 interface QuestActionDefinition {
   id: string;
@@ -59,14 +79,28 @@ export function useQuestActions(): QuestActions {
   const [confirmation, setConfirmation] = useState<CommandConfirmation | null>(null);
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [restoreFocusTo, setRestoreFocusTo] = useState<HTMLElement | null>(null);
+  const [unsaved, setUnsaved] = useState<ReadonlySet<string>>(() => new Set());
 
   const close = (): void => setStep(null);
   const busy = occurrence !== null && command.isPendingFor(pending => 'occurrenceId' in pending && pending.occurrenceId === occurrence.id);
 
+  const markUnsaved = (occurrenceId: string, isUnsaved: boolean): void =>
+    setUnsaved(current => {
+      if (current.has(occurrenceId) === isUnsaved) return current;
+      const next = new Set(current);
+      if (isUnsaved) next.add(occurrenceId);
+      else next.delete(occurrenceId);
+      return next;
+    });
+
   const settle = async (payload: Command, target: QuestOccurrence, andClose: boolean, successNote?: string): Promise<void> => {
     const feedback = { action: ACTION_VERBS[payload.type] ?? 'save', subject: target.questName };
+    markUnsaved(target.id, false);
     const outcome = await command.run(payload).catch(() => null);
-    if (!outcome) return notifyOutcome({ status: 'failed', message: failureCopy(null), code: null, undone: false }, { ...feedback, success: '' });
+    if (!outcome) {
+      markUnsaved(target.id, true);
+      return notifyOutcome({ status: 'failed', message: failureCopy(null), code: null, undone: false }, { ...feedback, success: '' });
+    }
     if (outcome.status === 'needs-confirmation') {
       setConfirmation(outcome.confirmation);
       setConfirmationOpen(true);
@@ -74,8 +108,13 @@ export function useQuestActions(): QuestActions {
       return;
     }
 
+    markUnsaved(target.id, UNSAVED_STATUSES.has(outcome.status));
     const saved = outcome.status === 'applied' || outcome.status === 'queued-offline';
-    notifyOutcome(outcome, { ...feedback, success: saved ? [outcome.local.message, successNote].filter(Boolean).join(' ') : '' });
+    const success = saved ? [outcome.local.message, successNote].filter(Boolean).join(' ') : '';
+    const undoable = canUndo(payload, target, outcome) ? outcomeToast(outcome, { ...feedback, success }) : null;
+    const undo: Command = { type: 'quest.deleteLog', occurrenceId: target.id };
+    if (undoable) toast[undoable.intent](undoable.title, { body: undoable.body, action: { label: 'Undo', onClick: () => void settle(undo, target, false) } });
+    else notifyOutcome(outcome, { ...feedback, success });
     if (saved && andClose) close();
   };
 
@@ -172,6 +211,7 @@ export function useQuestActions(): QuestActions {
       setStep('reschedule');
       setOccurrence(next);
     },
+    unsaved,
     overlays,
   };
 }

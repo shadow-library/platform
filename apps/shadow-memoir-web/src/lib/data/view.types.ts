@@ -74,6 +74,7 @@ export interface DayView {
   date: string;
   mode: DayMode;
   hero: HeroState;
+  hasActiveQuests: boolean;
   occurrences: QuestOccurrence[];
   recovery: RecoveryNotice | null;
   wakeWindowNote: string;

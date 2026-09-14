@@ -1,5 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PlanningBoardScreen } from '@/features/planning';
 import { QuestBuilderScreen, QuestEditorScreen, QuestListScreen } from '@/features/quests';
@@ -231,5 +231,211 @@ describe('day group screens', () => {
 
     renderScreen(<TodayScreen />, { value: data });
     expect(await screen.findByText('Nothing yet today.')).toBeDefined();
+  });
+});
+
+function questRow(id: string, name: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return { id, name, durationMin: 20, startTimeMin: 420, strictness: 'routine', recurrence: { frequency: 'daily' }, active: true, ...extra };
+}
+
+function logRow(questId: string, date: string, state: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return { id: `${questId}-${date}`, questId, date, state, xpAwarded: 0, coinsAwarded: 0, createdAt: `${date}T08:00:00.000Z`, ...extra };
+}
+
+function engineOver(rows: Parameters<typeof projectWorldState>[0]): MemoirEngine {
+  return new MemoirEngine(projectWorldState(rows, TODAY));
+}
+
+function renderTodayOver(engine: MemoirEngine): void {
+  const data = createMemoirTestData({ today: TODAY });
+  data.provider = engine;
+  renderScreen(<TodayScreen />, { value: data });
+}
+
+describe('Today screen', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('should show a skeleton until the first sync', async () => {
+    let open: () => void = () => undefined;
+    const opened = new Promise<void>(resolve => (open = resolve));
+    const { engine } = createTestEngine({
+      today: TODAY,
+      pages: [{ cursor: '1', hasMore: false, tombstones: [], domains: { account: [{ level: 8, hpToday: 2, hpMax: 5 }], quests: [questRow('q1', 'Morning run')] } }],
+      fetchImpl: server => async (input, init) => {
+        if (String(input).includes('/sync/delta')) await opened;
+        return server.fetchImpl(input, init);
+      },
+    });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <TodayScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    expect(await screen.findByRole('status', { name: 'Loading' })).toBeDefined();
+    expect(screen.queryByText('Your first day is empty on purpose')).toBeNull();
+    expect(screen.queryByLabelText(/^HP /)).toBeNull();
+
+    open();
+    expect(await screen.findByLabelText('HP 2 of 5')).toBeDefined();
+    expect(screen.queryByRole('status', { name: 'Loading' })).toBeNull();
+  });
+
+  it('should show an error when the first sync fails', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    const { engine } = createTestEngine({ today: TODAY, status: () => 500 });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <TodayScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    expect(await screen.findByText("Couldn't load this right now")).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeDefined();
+    expect(screen.queryByText('Your first day is empty on purpose')).toBeNull();
+    expect(screen.queryByText('Create your first quest')).toBeNull();
+  });
+
+  it('should render large HP as a compact meter', async () => {
+    renderSyncedToday({ hpToday: 99, hpMax: 99 });
+
+    const meter = await screen.findByLabelText('HP 99 of 99');
+    expect(screen.getByText('HP 99 of 99')).toBeDefined();
+    expect(meter.querySelector('[data-hp-meter="bar"]')).not.toBeNull();
+    expect(meter.querySelectorAll('[data-filled]')).toHaveLength(0);
+  });
+
+  it('should hide HP for an account that has none yet', async () => {
+    renderSyncedToday({ hpToday: 0, hpMax: 0 });
+
+    expect(await screen.findByText(/Crown · /)).toBeDefined();
+    expect(screen.queryByLabelText(/^HP /)).toBeNull();
+  });
+
+  it('should show threshold progress from metric entries', async () => {
+    renderTodayOver(
+      engineOver({
+        metrics: [{ id: '501', name: 'Steps', isHealth: true }],
+        metric_entries: [
+          { id: '1', metricId: '501', date: TODAY, value: '3000', source: 'manual', createdAt: `${TODAY}T07:00:00.000Z` },
+          { id: '2', metricId: '501', date: TODAY, value: '5200', source: 'manual', createdAt: `${TODAY}T12:00:00.000Z` },
+          { id: '3', metricId: '501', date: TODAY, value: '9999', source: 'quest_log', createdAt: `${TODAY}T13:00:00.000Z` },
+          { id: '4', metricId: '501', date: '2026-08-21', value: '12000', source: 'manual', createdAt: '2026-08-21T20:00:00.000Z' },
+        ],
+        quests: [questRow('q-threshold', 'Move 8,000 steps', { healthThreshold: { metricId: '501', value: 8000, comparison: 'gte' } })],
+      }),
+    );
+
+    expect(await screen.findByText(/5,200 of 8,000/)).toBeDefined();
+    expect(screen.queryByText(/Target reached/)).toBeNull();
+  });
+
+  it('should not count partials as done', async () => {
+    renderTodayOver(
+      engineOver({
+        quests: [questRow('q1', 'Morning run'), questRow('q2', 'Read 20 pages'), questRow('q3', 'Evening stretch')],
+        quest_logs: [logRow('q1', TODAY, 'completed'), logRow('q2', TODAY, 'partial')],
+      }),
+    );
+
+    expect(await screen.findByText('1 of 3 done · 1 partial')).toBeDefined();
+  });
+
+  it('should hold the end-of-day summary until the wake window closes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const engine = engineOver({
+      account: [{ level: 2, hpToday: 4, hpMax: 5, scheduleEndMin: 1320 }],
+      quests: [questRow('q1', 'Morning run'), questRow('q2', 'Read 20 pages')],
+      quest_logs: [logRow('q1', TODAY, 'completed'), logRow('q2', TODAY, 'partial')],
+    });
+
+    vi.setSystemTime(new Date(2026, 7, 22, 14, 30));
+    expect((await engine.getDay(TODAY)).summary).toBeNull();
+
+    vi.setSystemTime(new Date(2026, 7, 22, 22, 15));
+    expect((await engine.getDay(TODAY)).summary?.detail).toBe('1 of 2 quests completed, 1 partial.');
+  });
+
+  it('should keep a rescheduled occurrence in Coming up at its new time', async () => {
+    const engine = engineOver({
+      quests: [questRow('q1', 'Morning run'), questRow('q2', 'Late walk', { startTimeMin: 1260 })],
+      quest_logs: [logRow('q1', TODAY, 'rescheduled', { rescheduledToMin: 1200 })],
+    });
+
+    const upcoming = (await engine.getDay(TODAY)).upcoming;
+    expect(upcoming.slice(0, 2)).toEqual([
+      { id: `q1:${TODAY}`, when: '20:00', title: 'Morning run', meta: 'Today · moved from 07:00' },
+      { id: `q2:${TODAY}`, when: '21:00', title: 'Late walk', meta: 'Today' },
+    ]);
+  });
+
+  it('should leave the crown out of the hero card and Coming up for an account without quests', async () => {
+    renderTodayOver(engineOver({ account: [{ level: 1, hpToday: 0, hpMax: 0 }] }));
+
+    expect(await screen.findByText('Nothing else is scheduled yet.')).toBeDefined();
+    expect(screen.queryByText('Crown closes')).toBeNull();
+    expect(screen.queryByText(/Crown · /)).toBeNull();
+    expect(screen.getByText(/Momentum/)).toBeDefined();
+    expect(screen.getByText('No streaks yet. One starts the first day you keep a quest.')).toBeDefined();
+    expect(screen.getByRole('link', { name: 'Log a side quest' }).getAttribute('href')).toBe('/log/sidequests');
+  });
+
+  it('should date a closed streak from its first unshielded break, not the daily misses after it', async () => {
+    const away = Array.from({ length: 11 }, (_, index) => logRow('q1', `2026-08-${String(11 + index).padStart(2, '0')}`, 'missed'));
+    const engine = engineOver({
+      quests: [questRow('q1', 'Morning run')],
+      quest_streaks: [{ questId: 'q1', currentRunDays: 0, bestRunDays: 41, shieldsAvailable: 0 }],
+      quest_logs: [logRow('q1', '2026-08-08', 'completed'), logRow('q1', '2026-08-09', 'skipped', { shielded: true }), logRow('q1', '2026-08-10', 'missed'), ...away],
+    });
+
+    const [streak] = (await engine.getDay(TODAY)).streaks;
+    expect(streak?.label).toBe('ended at 41');
+    expect(streak?.note).toBe('Closed 12 days ago. The record stays.');
+  });
+
+  it('should date a closed streak from the first scheduled day after the last kept one when no break was logged', async () => {
+    const engine = engineOver({
+      quests: [questRow('q1', 'Morning run')],
+      quest_streaks: [{ questId: 'q1', currentRunDays: 0, bestRunDays: 41, shieldsAvailable: 0 }],
+      quest_logs: [logRow('q1', '2026-08-07', 'completed'), logRow('q1', '2026-08-09', 'partial')],
+    });
+
+    expect((await engine.getDay(TODAY)).streaks[0]?.note).toBe('Closed 12 days ago. The record stays.');
+  });
+
+  it('should read a past rescheduled occurrence as missed on the plan', async () => {
+    const engine = engineOver({ quests: [questRow('q1', 'Morning run')], quest_logs: [logRow('q1', '2026-08-21', 'rescheduled', { rescheduledToMin: 1200 })] });
+
+    const plan = await engine.getPlan({ scope: 'week', anchor: TODAY });
+    expect(plan.days.find(day => day.date === '2026-08-21')?.items[0]?.state).toBe('missed');
+  });
+
+  it('should leave HP to the day close when a quest is skipped', async () => {
+    const engine = engineOver({
+      account: [{ level: 2, hpToday: 4, hpMax: 5 }],
+      quests: [questRow('q1', 'Morning run'), questRow('q2', 'Recovery walk', { strictness: 'recovery' })],
+      quest_streaks: [
+        { questId: 'q1', currentRunDays: 5, bestRunDays: 5, shieldsAvailable: 1 },
+        { questId: 'q2', currentRunDays: 0, bestRunDays: 0, shieldsAvailable: 1 },
+      ],
+    });
+
+    await engine.dispatchCommand({ type: 'quest.skip', occurrenceId: `q1:${TODAY}` });
+    await engine.dispatchCommand({ type: 'quest.skip', occurrenceId: `q2:${TODAY}` });
+
+    const day = await engine.getDay(TODAY);
+    expect(day.hero.hp).toBe(4);
+    expect(day.occurrences.find(item => item.questId === 'q1')).toMatchObject({ streakDays: 5, shields: 0 });
+    expect(day.occurrences.find(item => item.questId === 'q2')).toMatchObject({ shields: 1 });
+  });
+
+  it('should describe a one-day-a-week quest in the singular', async () => {
+    const engine = engineOver({ quests: [questRow('q1', 'Weekly review', { recurrence: { frequency: 'weekly', daysOfWeek: [6] }, durationMin: 30 })] });
+
+    expect((await engine.getQuest('q1')).loadSummary).toBe('About 30m on the days it runs, 1 day a week.');
   });
 });

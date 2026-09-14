@@ -9,11 +9,17 @@ import styles from './quest-row.module.css';
 
 export interface QuestRowProps {
   occurrence: QuestOccurrence;
+  unsaved?: boolean;
   onComplete: (occurrence: QuestOccurrence) => void;
   onOpenActions: (occurrence: QuestOccurrence) => void;
 }
 
-export function QuestRow({ occurrence, onComplete, onOpenActions }: QuestRowProps): ReactElement {
+function thresholdReached(occurrence: QuestOccurrence): boolean {
+  const { threshold } = occurrence;
+  return threshold !== null && threshold.comparison === 'gte' && threshold.current >= threshold.target && !isResolved(occurrence.state);
+}
+
+export function QuestRow({ occurrence, unsaved = false, onComplete, onOpenActions }: QuestRowProps): ReactElement {
   const tone = outcomeTone(occurrence.state);
   const done = tone === 'kept' || tone === 'partial';
   const percent = thresholdPercent(occurrence);
@@ -40,6 +46,8 @@ export function QuestRow({ occurrence, onComplete, onOpenActions }: QuestRowProp
             <Progress value={percent} max={100} size="sm" label={`${thresholdMetricName(occurrence.threshold.metricKey)} progress`} />
           </div>
         )}
+        {thresholdReached(occurrence) ? <p className={styles.meta}>Target reached — check it off when you’re ready.</p> : null}
+        {unsaved ? <p className={styles.unsaved}>Your last change to this quest wasn’t saved.</p> : null}
       </div>
       <div className={styles.trailing}>
         {isResolved(occurrence.state) && !done ? (

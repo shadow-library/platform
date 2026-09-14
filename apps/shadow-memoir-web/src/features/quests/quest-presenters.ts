@@ -195,10 +195,10 @@ export function breakStreakNote(strictness: Strictness, shields: number, optInIf
  */
 export function breakCostNote(strictness: Strictness, intensity: HeroIntensityMode | undefined, streakDays: number, shielded: boolean): string {
   if (!HP_COSTING_STRICTNESSES.includes(strictness)) return 'No HP is spent.';
-  if (intensity === undefined) return 'May spend HP, depending on your intensity.';
+  if (intensity === undefined) return 'May spend HP when the day closes, depending on your intensity.';
   if (intensity === 'gentle') return 'No HP is spent — gentle intensity.';
-  if (intensity === 'demanding' && !shielded && streakDays >= LONG_STREAK_MIN_DAYS) return 'Spends 2 HP — this ends a streak of 7 days or more.';
-  return 'Spends 1 HP.';
+  if (intensity === 'demanding' && !shielded && streakDays >= LONG_STREAK_MIN_DAYS) return 'Spends 2 HP when the day closes — this ends a streak of 7 days or more.';
+  return 'Spends 1 HP when the day closes.';
 }
 
 /** Reuses the server's counting formula (`quest.rules.ts#reschedulesCountedFor`) rather than re-deriving the cap window. */

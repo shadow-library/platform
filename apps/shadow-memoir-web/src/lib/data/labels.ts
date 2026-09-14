@@ -105,6 +105,7 @@ export const COMMAND_LABELS: Partial<Record<OutboxCommandType, string>> = {
   'quest.skip': 'Quest skipped',
   'quest.postpone': 'Quest postponed',
   'quest.reschedule': 'Quest moved',
+  'quest.deleteLog': 'Quest outcome undone',
   'quest.create': 'New quest',
   'quest.update': 'Quest edited',
   'expense.create': 'Expense',

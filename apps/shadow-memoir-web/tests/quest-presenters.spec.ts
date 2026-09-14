@@ -45,7 +45,7 @@ describe('breakCostNote', () => {
   });
 
   it('should hedge when the intensity is unknown', () => {
-    expect(breakCostNote('anchor', undefined, 10, false)).toBe('May spend HP, depending on your intensity.');
+    expect(breakCostNote('anchor', undefined, 10, false)).toBe('May spend HP when the day closes, depending on your intensity.');
   });
 
   it('should never cost HP at gentle intensity', () => {
@@ -53,15 +53,15 @@ describe('breakCostNote', () => {
   });
 
   it('should cost 1 HP at standard intensity', () => {
-    expect(breakCostNote('routine', 'standard', 10, false)).toBe('Spends 1 HP.');
+    expect(breakCostNote('routine', 'standard', 10, false)).toBe('Spends 1 HP when the day closes.');
   });
 
   it('should cost 1 HP at demanding intensity when a shield covers a long streak', () => {
-    expect(breakCostNote('anchor', 'demanding', 10, true)).toBe('Spends 1 HP.');
+    expect(breakCostNote('anchor', 'demanding', 10, true)).toBe('Spends 1 HP when the day closes.');
   });
 
   it('should cost 2 HP at demanding intensity when an unshielded streak of 7+ days ends', () => {
-    expect(breakCostNote('anchor', 'demanding', 7, false)).toBe('Spends 2 HP — this ends a streak of 7 days or more.');
+    expect(breakCostNote('anchor', 'demanding', 7, false)).toBe('Spends 2 HP when the day closes — this ends a streak of 7 days or more.');
   });
 });
 
