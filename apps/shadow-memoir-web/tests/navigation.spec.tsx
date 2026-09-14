@@ -155,6 +155,11 @@ describe('document titles', () => {
     await expectTitleAt('/finance', 'Couldn’t open this page · Shadow Memoir');
   });
 
+  it('should title a route whose guard was refused access as no access rather than a failed load', async () => {
+    stubServer({ session: 403 });
+    await expectTitleAt('/finance', 'This account has no access · Shadow Memoir');
+  });
+
   it('should replace a loaded screen title when its guard fails on a later load', async () => {
     const server = stubServer();
     const router = await renderTitleAt('/finance');

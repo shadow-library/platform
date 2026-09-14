@@ -1,6 +1,8 @@
 /**
  * Importing npm packages
  */
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -15,6 +17,8 @@ import { Sidebar, useSidebar } from './Sidebar';
 /**
  * Declaring the constants
  */
+const css = readFileSync(path.join(import.meta.dirname, 'Sidebar.module.css'), 'utf-8');
+
 function makeStorage(): Storage {
   const map = new Map<string, string>();
   return {
@@ -168,6 +172,18 @@ describe('Sidebar', () => {
     // The logo mark stays mounted (icon-only) rather than being dropped when minimised.
     expect(screen.getByTestId('mark')).toHaveTextContent('A');
     expect(screen.getByRole('button', { name: 'Expand navigation' })).toBeInTheDocument();
+  });
+
+  it('should leave room for a focused brand link ring inside the truncating workspace clip', () => {
+    render(<Sidebar workspace={<a href="/">Shadow Memoir</a>} />);
+
+    expect(screen.getByRole('link', { name: 'Shadow Memoir' }).parentElement).toHaveClass(/workspace/);
+    const workspace = css.match(/\.workspace\s*{([^}]*)}/)?.[1] ?? '';
+    expect(workspace).toContain('overflow: hidden;');
+    expect(workspace).toContain('text-overflow: ellipsis;');
+    expect(workspace).toMatch(/--sh-sidebar-ring-room:\s*calc\(var\(--sh-focus-ring-width\) \+ var\(--sh-focus-ring-offset\)\);/);
+    expect(workspace).toMatch(/\bpadding:\s*var\(--sh-sidebar-ring-room\);/);
+    expect(workspace).toMatch(/\bmargin:\s*calc\(-1 \* var\(--sh-sidebar-ring-room\)\);/);
   });
 
   it('hides labels but keeps accessible names in rail mode', () => {

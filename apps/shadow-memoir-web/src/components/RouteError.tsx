@@ -9,9 +9,11 @@ import { logout } from '@/lib/apis';
 import { currentPage, signInUrl } from '@/lib/session';
 
 import { MemoirMark } from './icons';
-import { StatusPage, useStatusPageVariant } from './StatusPage';
+import styles from './RouteError.module.css';
+import { StatusBrand, StatusPage, useStatusPageVariant } from './StatusPage';
 
 const SIGN_OUT_FAILED = 'Couldn’t sign out — check your connection and try again.';
+const ACCOUNT_DENIED_TITLE = "This account can't use Shadow Memoir";
 const ACCOUNT_DENIED = "You're signed in, but this account doesn't have access. Sign out to switch to another account — nothing you've logged on this device is affected.";
 
 /**
@@ -65,7 +67,8 @@ function LoadFailed(): ReactElement {
 
 function AccountDenied(): ReactElement {
   const [signingOut, setSigningOut] = useState(false);
-  const Root = useStatusPageVariant() === 'page' ? 'main' : 'section';
+  const isPage = useStatusPageVariant() === 'page';
+  const Root = isPage ? 'main' : 'section';
 
   const signOut = async (): Promise<void> => {
     if (signingOut) return;
@@ -81,10 +84,15 @@ function AccountDenied(): ReactElement {
   };
 
   return (
-    <Root className="flex items-center justify-center" style={{ minHeight: Root === 'main' ? '100dvh' : undefined }}>
+    <Root className="flex items-center justify-center" style={{ minHeight: isPage ? '100dvh' : undefined }}>
       <AccessDenied
-        illustration={<MemoirMark size={40} />}
-        title="This account can't use Shadow Memoir"
+        illustration={isPage ? undefined : <MemoirMark size={40} />}
+        title={
+          <div className={styles.deniedHeading}>
+            {isPage ? <StatusBrand /> : null}
+            <h1 className={styles.deniedTitle}>{ACCOUNT_DENIED_TITLE}</h1>
+          </div>
+        }
         description={ACCOUNT_DENIED}
         action={{ label: 'Sign out and switch account', onClick: () => void signOut(), loading: signingOut }}
       />

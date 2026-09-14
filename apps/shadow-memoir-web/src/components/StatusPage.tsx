@@ -17,6 +17,15 @@ export function useStatusPageVariant(): StatusPageVariant {
   return useContext(StatusPageVariantContext);
 }
 
+export function StatusBrand(): ReactElement {
+  return (
+    <span className={styles.brand}>
+      <MemoirMark size={18} />
+      Shadow Memoir
+    </span>
+  );
+}
+
 export interface StatusPageProps {
   title: string;
   description?: ReactNode;
@@ -35,12 +44,7 @@ export function StatusPage({ title, description, pending = false, actions, varia
   return (
     <Root className={styles.root} data-variant={resolved} aria-busy={pending || undefined} aria-labelledby={titleId}>
       <div className={styles.panel}>
-        {resolved === 'page' ? (
-          <span className={styles.brand}>
-            <MemoirMark size={18} />
-            Shadow Memoir
-          </span>
-        ) : null}
+        {resolved === 'page' ? <StatusBrand /> : null}
         {pending ? <Spinner size="lg" aria-hidden="true" /> : null}
         <h1 id={titleId} className={styles.title}>
           {title}

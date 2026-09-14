@@ -9,6 +9,8 @@ import { type SyncSnapshot, useSyncEngine, useSyncStatus } from '@/lib/sync';
 import { useSystemOverlays } from './system-overlays';
 import styles from './net-strip.module.css';
 
+const STRIP_HEIGHT_PROPERTY = '--sm-net-strip-height';
+
 const DELETION_MESSAGE = 'This account is being deleted, so nothing on this device syncs any more.';
 
 interface StripCopy {
@@ -26,6 +28,22 @@ function stripCopy({ state, queuedCount, readiness }: SyncSnapshot): StripCopy {
   return { message: "Couldn't reach Shadow Memoir, so your data hasn't loaded yet.", action: 'retry' };
 }
 
+/** Toasts portal into `<body>`, so the strip's height is published there for `--sh-toast-offset-top` to clear it. */
+function usePublishedStripHeight(strip: HTMLElement | null): void {
+  useEffect(() => {
+    if (!strip) return undefined;
+    const { style } = document.body;
+    const publish = (): void => style.setProperty(STRIP_HEIGHT_PROPERTY, `${strip.offsetHeight}px`);
+    const observer = new ResizeObserver(publish);
+    publish();
+    observer.observe(strip);
+    return () => {
+      observer.disconnect();
+      style.removeProperty(STRIP_HEIGHT_PROPERTY);
+    };
+  }, [strip]);
+}
+
 /**
  * The one place the sync layer speaks to the owner about itself: a quiet strip while anything is not
  * "online", and one toast per notice — a command the server did not apply that no screen was waiting for
@@ -37,6 +55,7 @@ export function NetStrip(): ReactElement | null {
   const overlays = useSystemOverlays();
   const { pathname } = useLocation();
   const [retrying, setRetrying] = useState(false);
+  const [strip, setStrip] = useState<HTMLDivElement | null>(null);
   const shown = useRef(new Set<string>());
 
   /** StrictMode runs this twice against the same snapshot before the dismissal lands, so a notice is remembered, not just dismissed. */
@@ -53,6 +72,8 @@ export function NetStrip(): ReactElement | null {
     if (status.state === 'signed-out' && pathname !== '/onboarding') overlays.open('session-expired');
   }, [status.state, pathname, overlays]);
 
+  usePublishedStripHeight(strip);
+
   if (!engine || status.state === 'online') return null;
 
   const copy = stripCopy(status);
@@ -63,7 +84,7 @@ export function NetStrip(): ReactElement | null {
   };
 
   return (
-    <div className={styles.strip} data-state={status.state} role="status" aria-busy={retrying || undefined}>
+    <div ref={setStrip} className={styles.strip} data-state={status.state} role="status" aria-busy={retrying || undefined}>
       <span>{copy.message}</span>
       <span className={styles.actions}>
         {status.queuedCount > 0 ? <span className={styles.count}>{status.queuedCount} queued</span> : null}

@@ -1,21 +1,23 @@
 /* Breaks out of `.main`'s own gutters (its `--sh-shell-gutter-*`/safe-area custom properties cascade in
    from `packages/ui`'s Shell.module.css regardless of module scoping) with a matching negative margin. */
 .strip {
+  --sm-strip-gutter-block: var(--sh-shell-gutter-block, 20px);
+  /* From md up `.main` scrolls, and a sticky inset resolves against its content edge, one gutter below the top bar. */
   position: sticky;
-  top: 0;
+  top: calc(-1 * var(--sm-strip-gutter-block));
   z-index: var(--sh-z-sticky);
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
-  margin-block-start: calc(-1 * var(--sh-shell-gutter-block, 20px));
+  margin-block: calc(-1 * var(--sm-strip-gutter-block)) var(--sm-strip-gutter-block);
   margin-inline: calc(-1 * max(var(--sh-shell-gutter-inline, 16px), var(--sh-safe-left))) calc(-1 * max(var(--sh-shell-gutter-inline, 16px), var(--sh-safe-right)));
   padding-block: 8px;
   padding-inline: max(var(--sh-shell-gutter-inline, 16px), var(--sh-safe-left)) max(var(--sh-shell-gutter-inline, 16px), var(--sh-safe-right));
   font-size: var(--sh-text-body-sm);
   color: var(--sh-text-secondary);
-  background: var(--sh-surface-well);
+  background: linear-gradient(var(--sh-surface-well), var(--sh-surface-well)) var(--sh-surface-app);
   border-bottom: var(--sh-border-width) solid var(--sh-border-subtle);
 }
 
@@ -40,5 +42,5 @@
 .count {
   flex: none;
   font-variant-numeric: tabular-nums;
-  color: var(--sh-text-tertiary);
+  color: var(--sh-text-secondary);
 }

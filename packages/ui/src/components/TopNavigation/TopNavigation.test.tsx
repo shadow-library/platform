@@ -141,7 +141,7 @@ describe('TopNavigation', () => {
     // full content width before the outer 1fr columns get a share, pushing the utility cluster off-screen.
     const centredRule = css.slice(css.indexOf(".bar[data-layout='centred'] {"));
     expect(centredRule).not.toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto\s*minmax\(0,\s*1fr\)/);
-    expect(centredRule).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*minmax\(0,\s*\d+fr\)\s*minmax\(0,\s*1fr\)/);
+    expect(centredRule).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*minmax\(0,\s*\d+fr\)\s*minmax\(auto,\s*1fr\)/);
     expect(centredRule).toContain('.start');
     expect(centredRule).toContain('.utility');
     expect(centredRule).toContain('min-width: auto;');

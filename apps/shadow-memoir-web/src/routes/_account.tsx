@@ -7,7 +7,7 @@ import { StatusPage } from '@/components/StatusPage';
 import { EquippedThemeAccent } from '@/features/hero';
 import { sessionQueryOptions } from '@/lib/apis';
 import { MemoirDataProvider, type OnboardingStatus, useOnboardingStatus } from '@/lib/data';
-import { routeErrorHead } from '@/lib/document-title';
+import { documentTitle, routeErrorHead } from '@/lib/document-title';
 import { confirmSessionAccount, currentPage, ONBOARDING_PATH, requireSession, routeByOnboarding, seedOnboardingStatus, signInUrl, useSessionGuard } from '@/lib/session';
 import {
   createSyncedMemoirData,
@@ -139,23 +139,32 @@ interface AccountLoadFailedProps {
   retrying: boolean;
 }
 
-const ACCOUNT_FAILURE_COPY: Record<AccountLoadFailedProps['reason'], { title: string; description: string }> = {
+interface AccountFailureCopy {
+  screen: string;
+  title: string;
+  description: string;
+}
+
+const ACCOUNT_FAILURE_COPY: Record<AccountLoadFailedProps['reason'], AccountFailureCopy> = {
   server: {
+    screen: "Couldn't load your account",
     title: "We couldn't load your account",
     description: "Shadow Memoir didn't respond, so it can't tell which screens are ready for you yet. Anything on this device is kept.",
   },
   offline: {
+    screen: 'Offline',
     title: "You're offline",
     description: 'Shadow Memoir needs a connection to open your account on this device for the first time. It will as soon as you reconnect.',
   },
   'signed-out': {
+    screen: 'Session ended',
     title: 'Your session ended',
     description: 'Sign in again to open your account. Anything on this device is kept.',
   },
 };
 
 function AccountLoadFailed({ reason, retry, retrying }: AccountLoadFailedProps): ReactElement {
-  const { title, description } = ACCOUNT_FAILURE_COPY[reason];
+  const { screen, title, description } = ACCOUNT_FAILURE_COPY[reason];
   const action =
     reason === 'signed-out' ? (
       <Button variant="primary" onClick={() => window.location.assign(signInUrl(currentPage()))}>
@@ -167,5 +176,10 @@ function AccountLoadFailed({ reason, retry, retrying }: AccountLoadFailedProps):
       </Button>
     );
 
-  return <StatusPage title={title} description={description} pending={retrying} actions={action} />;
+  return (
+    <>
+      <title>{documentTitle(screen)}</title>
+      <StatusPage title={title} description={description} pending={retrying} actions={action} />
+    </>
+  );
 }

@@ -1,6 +1,8 @@
 /**
  * Importing npm packages
  */
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -16,6 +18,8 @@ import { toast } from './Toast.store';
 /**
  * Declaring the constants
  */
+const css = readFileSync(path.join(import.meta.dirname, 'Toast.module.css'), 'utf-8');
+
 afterEach(() => {
   act(() => {
     toast.dismiss();
@@ -89,5 +93,16 @@ describe('Toast', () => {
 
   it('renders nothing on the server so hydration can never mismatch', () => {
     expect(renderToStaticMarkup(<Toaster />)).toBe('');
+  });
+
+  it('should wrap a long unbroken title inside the card so it never runs under the dismiss button', () => {
+    render(<Toaster />);
+    act(() => {
+      toast.success('Readtenpagesofanovelbeforebedeverynightwithoutfailsothatmyp is in your plan.');
+    });
+
+    const title = screen.getByText(/is in your plan/);
+    expect(title.parentElement?.nextElementSibling).toHaveAccessibleName('Dismiss');
+    expect(css).toMatch(/\.content\s*{[^}]*min-width:\s*0;[^}]*overflow-wrap:\s*anywhere;/);
   });
 });

@@ -28,8 +28,12 @@
   padding: 0 12px 0 18px;
   flex-shrink: 0;
 }
+/* The truncating clip sits one focus ring outside the content so a focused mark keeps its ring; the negative margin cancels the room. */
 .workspace {
+  --sh-sidebar-ring-room: calc(var(--sh-focus-ring-width) + var(--sh-focus-ring-offset));
   min-width: 0;
+  padding: var(--sh-sidebar-ring-room);
+  margin: calc(-1 * var(--sh-sidebar-ring-room));
   font-size: var(--sh-text-body-sm);
   font-weight: 600;
   color: var(--sh-text-primary);

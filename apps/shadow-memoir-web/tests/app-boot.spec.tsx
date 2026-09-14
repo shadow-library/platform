@@ -1,5 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createMemoryHistory, createRootRouteWithContext, createRoute, createRouter, isRedirect, Outlet, RouterProvider, useLocation } from '@tanstack/react-router';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRootRouteWithContext,
+  createRoute,
+  createRouter,
+  HeadContent,
+  isRedirect,
+  Outlet,
+  RouterProvider,
+  useLocation,
+} from '@tanstack/react-router';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { type ReactElement } from 'react';
 import { renderToString } from 'react-dom/server';
@@ -10,7 +21,7 @@ import { ApiError } from '@shadow-library/web';
 import RouteError from '@/components/RouteError';
 import { StatusPage, StatusRegion } from '@/components/StatusPage';
 import { OnboardingScreen, SetupLayout } from '@/features/onboarding';
-import { type OnboardingStatus } from '@/lib/data';
+import { MemoirDataProvider, type OnboardingStatus } from '@/lib/data';
 import { requireSession, routeByOnboarding, seedOnboardingStatus } from '@/lib/session';
 import { createSyncedMemoirData, SyncEngineProvider } from '@/lib/sync';
 import { getRouter } from '@/router';
@@ -122,6 +133,19 @@ describe('app boot', () => {
     expect(screen.queryByText(/IAM_002/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Back to today' })).toBeNull();
   });
+
+  it('should head the refused-session page with the brand wordmark, an h1 and a document title that matches it', async () => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) =>
+      String(input).includes('/auth/session') ? json(403, { code: 'IAM_002', type: 'Forbidden', message: 'Forbidden' }) : json(500, SERVER_ERROR),
+    );
+    renderAt('/');
+
+    const heading = await screen.findByRole('heading', { level: 1, name: "This account can't use Shadow Memoir" }, SLOW);
+    const wordmark = screen.getByText('Shadow Memoir', { selector: 'span' });
+    expect(wordmark.querySelector('svg')).not.toBeNull();
+    expect(wordmark.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await waitFor(() => expect(document.title).toBe('This account has no access · Shadow Memoir'));
+  });
 });
 
 function statusFrom(onboarding: () => Promise<OnboardingStatus>, initialPath = '/finance') {
@@ -135,6 +159,25 @@ function statusFrom(onboarding: () => Promise<OnboardingStatus>, initialPath = '
     { value: data, initialPath },
   );
   return { ...view, data, painted };
+}
+
+function renderGateUnderHead(data: ReturnType<typeof createMemoirTestData>) {
+  const rootRoute = createRootRoute({
+    head: () => ({ meta: [{ title: 'Money · Shadow Memoir' }] }),
+    component: () => (
+      <QueryClientProvider client={data.queryClient}>
+        <MemoirDataProvider value={data}>
+          <HeadContent />
+          <OnboardingGate>
+            <div>Money screen</div>
+          </OnboardingGate>
+        </MemoirDataProvider>
+      </QueryClientProvider>
+    ),
+  });
+  const finance = createRoute({ getParentRoute: () => rootRoute, path: '/finance', component: () => null });
+  const router = createRouter({ routeTree: rootRoute.addChildren([finance]), history: createMemoryHistory({ initialEntries: ['/finance'] }) });
+  return render(<RouterProvider router={router as never} />);
 }
 
 function renderGate(data: ReturnType<typeof createMemoirTestData>, initialPath: string) {
@@ -182,6 +225,20 @@ describe('onboarding gate', () => {
 
     expect(await screen.findByText('Money screen')).toBeDefined();
     expect(getOnboarding).toHaveBeenCalledTimes(2);
+  });
+
+  it('should title the document with the account error over the route title while the gate shows it, and drop it once the gate opens', async () => {
+    const data = createMemoirTestData();
+    vi.spyOn(data.account, 'getOnboarding').mockRejectedValueOnce(serverError()).mockResolvedValue({ completed: true });
+    renderGateUnderHead(data);
+
+    await screen.findByRole('heading', { name: "We couldn't load your account" });
+    await waitFor(() => expect(document.title).toBe("Couldn't load your account · Shadow Memoir"));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    await screen.findByText('Money screen');
+    await waitFor(() => expect(document.title).toBe('Money · Shadow Memoir'));
   });
 
   it('should open from the synced account when the account request fails after a sync', async () => {

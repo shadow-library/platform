@@ -1,14 +1,18 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { toast, TooltipProvider } from '@shadow-library/ui';
 import { ApiError, userInfoQueryKey } from '@shadow-library/web';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, RouterProvider } from '@tanstack/react-router';
-import { fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SetupLayout } from '@/features/onboarding';
 import { AppShell, useSignOut } from '@/features/shell';
 import shellStyles from '@/features/shell/app-shell.module.css';
+import stripStyles from '@/features/shell/net-strip.module.css';
 import { loginUrl, logout } from '@/lib/apis';
 import { MemoirDataProvider } from '@/lib/data';
 import { SyncEngineProvider, type SyncSnapshot, useSyncStatus } from '@/lib/sync';
@@ -129,6 +133,79 @@ function renderSyncedAppShell(): { store: ReturnType<typeof createTestEngine>['s
 
   return { store };
 }
+
+function readCss(relativePath: string): string {
+  return readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf-8');
+}
+
+function cssRule(css: string, selector: string): string {
+  const start = css.indexOf(`\n${selector} {`);
+  return start < 0 ? '' : css.slice(start, css.indexOf('}', start));
+}
+
+describe('AppShell net strip', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.mocked(useSyncStatus).mockReset();
+    vi.restoreAllMocks();
+  });
+
+  it('should render the strip as the first thing in the content column while not online', async () => {
+    stubDesktopViewport();
+    vi.mocked(useSyncStatus).mockReturnValue({ ...ONLINE_SNAPSHOT, state: 'offline' });
+    renderSyncedAppShell();
+
+    const strip = await screen.findByText(/^Offline\./);
+    const root = strip.closest('[data-state]');
+    expect(root?.className).toContain(stripStyles.strip);
+    expect(root?.parentElement?.firstElementChild).toBe(root);
+    expect(root?.closest('main')).not.toBeNull();
+  });
+
+  it('should publish the strip height for toasts to clear, follow its resizes and withdraw it when the strip goes', async () => {
+    stubDesktopViewport();
+    let resize: () => void = () => undefined;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          resize = callback;
+        }
+        observe(): void {}
+        disconnect(): void {}
+      },
+    );
+    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(53);
+    vi.mocked(useSyncStatus).mockReturnValue({ ...ONLINE_SNAPSHOT, state: 'offline' });
+    renderSyncedAppShell();
+
+    await screen.findByText(/^Offline\./);
+    expect(document.body.style.getPropertyValue('--sm-net-strip-height')).toBe('53px');
+
+    height.mockReturnValue(109);
+    resize();
+    expect(document.body.style.getPropertyValue('--sm-net-strip-height')).toBe('109px');
+
+    cleanup();
+    expect(document.body.style.getPropertyValue('--sm-net-strip-height')).toBe('');
+  });
+
+  it('should offset toasts by the published strip height below the top bar', () => {
+    expect(readCss('../src/styles.css')).toMatch(/--sh-toast-offset-top:\s*calc\(var\(--sh-topbar-height\) \+ var\(--sm-net-strip-height, 0px\) \+ 12px\);/);
+  });
+
+  it('should pin the strip flush under the top bar at every width on an opaque surface', () => {
+    const css = readCss('../src/features/shell/net-strip.module.css');
+    const strip = cssRule(css, '.strip');
+    expect(strip).toMatch(/--sm-strip-gutter-block:\s*var\(--sh-shell-gutter-block, 20px\);/);
+    expect(strip).toMatch(/\btop:\s*calc\(-1 \* var\(--sm-strip-gutter-block\)\);/);
+    expect(strip).toMatch(/margin-block:\s*calc\(-1 \* var\(--sm-strip-gutter-block\)\) var\(--sm-strip-gutter-block\);/);
+    expect(strip).toMatch(/background:\s*linear-gradient\(var\(--sh-surface-well\), var\(--sh-surface-well\)\) var\(--sh-surface-app\);/);
+
+    const phone = css.slice(css.indexOf('@media (max-width: 767px)'));
+    expect(cssRule(phone, '  .strip')).toMatch(/top:\s*calc\(var\(--sh-topbar-height\) \+ var\(--sh-safe-top\)\);/);
+  });
+});
 
 describe('AppShell quick-capture FAB', () => {
   afterEach(() => vi.unstubAllGlobals());

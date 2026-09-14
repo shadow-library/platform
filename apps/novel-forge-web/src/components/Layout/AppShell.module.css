@@ -52,11 +52,19 @@
   color: var(--sh-text-tertiary);
   font-size: var(--sh-text-body-sm);
   cursor: pointer;
-  min-width: 220px;
+  min-width: min(220px, 100%);
+}
+
+.search > :not(.searchLabel) {
+  flex-shrink: 0;
 }
 
 .searchLabel {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   text-align: left;
 }
 
