@@ -4,9 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AiScreen } from '@/features/ai';
 import { HistoryScreen } from '@/features/history';
-import { InsightsScreen } from '@/features/insights';
+import { barHeightPx, InsightsScreen, PLOT_HEIGHT } from '@/features/insights';
 import { WeeklyReviewScreen } from '@/features/review';
-import { shiftDate } from '@/lib/data';
+import { deriveInsights, reflectSeed, shiftDate } from '@/lib/data';
 import { SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen } from './harness';
@@ -188,6 +188,39 @@ describe('Insights screen', () => {
     renderScreen(<InsightsScreen />, { today: TODAY });
     fireEvent.click(await screen.findByRole('radio', { name: '30 days' }));
     expect(await screen.findByText('The last 30 days, against the 30 before them.')).toBeDefined();
+  });
+
+  it('should show an error instead of zero KPIs when sync fails', async () => {
+    const test = createTestEngine({ today: TODAY, status: () => 500 });
+    const data = createSyncedTestData(test.engine);
+
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <InsightsScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    expect(await screen.findByText("Couldn't load this right now")).toBeDefined();
+    expect(screen.queryByText('Quests kept')).toBeNull();
+  });
+
+  // Asserts the height math the component writes as an inline style; the real box model is a Phase 4 visual check.
+  it('should scale weekday adherence bars', async () => {
+    renderScreen(<InsightsScreen />, { today: TODAY });
+    await screen.findByRole('heading', { name: 'Insights' });
+
+    const expectedBars = deriveInsights(reflectSeed(TODAY, 'active'), '90').adherenceByWeekday;
+    const max = Math.max(...expectedBars.map(bar => bar.value), 1);
+    expect(max).toBeGreaterThan(0);
+
+    for (const bar of expectedBars) {
+      const el = await screen.findByRole('img', { name: bar.ariaLabel });
+      expect((el as HTMLElement).style.height).toBe(`${barHeightPx(bar.value, max)}px`);
+    }
+
+    const tallest = expectedBars.find(bar => bar.value === max);
+    expect(barHeightPx(tallest?.value ?? 0, max)).toBe(PLOT_HEIGHT);
   });
 });
 

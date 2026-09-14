@@ -41,6 +41,16 @@ export const WEEKDAYS: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 's
 
 export const WEEKDAY_LABELS: Record<Weekday, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
 
+export const WEEKDAY_LONG_LABELS: Record<Weekday, string> = {
+  mon: 'Monday',
+  tue: 'Tuesday',
+  wed: 'Wednesday',
+  thu: 'Thursday',
+  fri: 'Friday',
+  sat: 'Saturday',
+  sun: 'Sunday',
+};
+
 export const STAT_LABELS: Record<StatAffinity, string> = { discipline: 'Discipline', body: 'Body', wealth: 'Wealth', mind: 'Mind' };
 
 export const STRICTNESS_LABELS: Record<Strictness, string> = { anchor: 'Anchor', routine: 'Routine', goal: 'Goal', recovery: 'Recovery', optional: 'Optional' };

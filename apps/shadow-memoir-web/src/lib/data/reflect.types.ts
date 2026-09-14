@@ -44,12 +44,16 @@ export type InsightPeriod = '30' | '90' | '365';
 export interface InsightKpi {
   id: string;
   label: string;
-  value: number;
+  /** `null` when the period holds nothing to rate — rendered as an unavailable tile, never a misleading zero. */
+  value: number | null;
   unit?: string;
   delta?: number;
   positiveIs: 'up' | 'down' | 'neither';
-  comparison: string;
+  /** The final, ready-to-render caption sentence — the screen prints it as-is. */
+  caption: string;
   format?: Intl.NumberFormatOptions;
+  /** The full-precision value behind a compacted display, for a `title` tooltip. */
+  exactValue?: string;
 }
 
 export interface Bar {
@@ -57,6 +61,10 @@ export interface Bar {
   label: string;
   value: number;
   caption: string;
+  /** The full accessible sentence ("Monday: 76% kept") — the chart's own `aria-label`, never assembled from `label`/`caption` at render time. */
+  ariaLabel: string;
+  /** `false` for a bucket with nothing logged in it — distinct from a real `value` of 0. */
+  hasEntries: boolean;
 }
 
 export interface TrendSeries {

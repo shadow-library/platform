@@ -23,7 +23,7 @@ import {
   useFinanceSummary,
   useReceiptScanQuota,
 } from '@/lib/data';
-import { formatLocalDate, formatLocalTime } from '@/lib/format';
+import { formatLocalDate, formatLocalTime, moneyStatFormat } from '@/lib/format';
 import { useDataReadiness } from '@/lib/sync';
 
 import { ExpenseEntryPanel } from './expense-entry-panel';
@@ -35,13 +35,6 @@ const RANGES: { value: FinanceRange; label: string }[] = [
   { value: 'month', label: 'Month' },
   { value: 'year', label: 'Year' },
 ];
-
-const COMPACT_ABOVE_CHARACTERS = 12;
-
-function moneyFormat(amountMinor: number, currency: CurrencyCode): Intl.NumberFormatOptions {
-  const compact = formatMinor(amountMinor, currency).length > COMPACT_ABOVE_CHARACTERS;
-  return compact ? { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 } : { style: 'currency', currency };
-}
 
 interface ExpenseRowProps {
   expense: Expense;
@@ -120,7 +113,12 @@ function Kpi({ label, amountMinor, currency, note, compactLayout }: KpiProps): R
     <Card padding={compactLayout ? 'sm' : 'md'} className={styles.kpiCard}>
       <Card.Body>
         <div className={styles.kpiStat} title={formatMinor(amountMinor, currency)}>
-          <Statistic size={compactLayout ? 'sm' : 'md'} label={label} value={minorToMajor(amountMinor, currency)} format={moneyFormat(amountMinor, currency)} />
+          <Statistic
+            size={compactLayout ? 'sm' : 'md'}
+            label={label}
+            value={minorToMajor(amountMinor, currency)}
+            format={moneyStatFormat(minorToMajor(amountMinor, currency), currency)}
+          />
         </div>
         <p className={styles.kpiNote}>{note}</p>
       </Card.Body>

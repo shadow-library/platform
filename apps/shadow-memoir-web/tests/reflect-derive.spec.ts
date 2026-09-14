@@ -164,8 +164,52 @@ describe('deriveInsights', () => {
     expect(insights.reasons).toEqual([]);
     expect(insights.spend).toEqual([]);
     expect(insights.trends).toEqual([]);
-    expect(insights.kpis.find(kpi => kpi.id === 'kept')?.comparison).toBe('no occurrences logged yet');
+    const kept = insights.kpis.find(kpi => kpi.id === 'kept');
+    expect(kept?.value).toBeNull();
+    expect(kept?.caption).toBe('No occurrences logged yet.');
     expect(insights.weekdayNote).toContain('Not enough occurrences');
+  });
+
+  it('should label each month once in the year view', () => {
+    const insights = deriveInsights(source({ logs: [log({ date: '2026-08-20', state: 'completed', xpAwarded: 40 })] }), '365');
+
+    const labels = insights.xpByMonth.map(bar => bar.label);
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels[0]).toBe('Aug 25');
+    expect(labels.find(label => label === 'Jan 26')).toBe('Jan 26');
+  });
+
+  it('should give every bar an unambiguous aria label', () => {
+    const insights = deriveInsights(source({ logs: [log({ date: '2026-08-20', state: 'completed', xpAwarded: 40 })] }), '30');
+
+    expect(insights.adherenceByWeekday.find(bar => bar.id === 'mon')?.ariaLabel).toBe('Monday: no entries');
+    const month = insights.xpByMonth.find(bar => bar.value > 0);
+    expect(month?.ariaLabel).toMatch(/^August 2026: [\d.]+K? XP$/);
+  });
+
+  it("should say there's nothing earlier when a KPI has no baseline period", () => {
+    const insights = deriveInsights(source(), '30');
+
+    expect(insights.kpis.find(kpi => kpi.id === 'xp')?.caption).toBe('Nothing earlier to compare with yet.');
+    expect(insights.kpis.find(kpi => kpi.id === 'xp')?.delta).toBeUndefined();
+  });
+
+  it('should name the point difference for quests kept instead of a relative percent', () => {
+    const insights = deriveInsights(source({ logs: [log({ date: '2026-08-20', state: 'completed' }), log({ questId: 'other', date: '2026-07-01', state: 'missed' })] }), '30');
+
+    const kept = insights.kpis.find(kpi => kpi.id === 'kept');
+    expect(kept?.caption).toBe('100 points higher than the 30 days before.');
+    expect(kept?.delta).toBeUndefined();
+  });
+
+  it('should show a period caption in the year view instead of hiding it behind a delta', () => {
+    const insights = deriveInsights(source({ logs: [log({ date: '2026-08-20', state: 'completed' })] }), '365');
+    expect(insights.kpis.find(kpi => kpi.id === 'xp')?.caption).toBe('Over the last year.');
+  });
+
+  it('should attribute the longest streak caption to its quest', () => {
+    const insights = deriveInsights(source({ streaks: [{ questId: 'run', questName: 'Morning run', currentRunDays: 3, bestRunDays: 12 }] }), '90');
+    expect(insights.kpis.find(kpi => kpi.id === 'streak')?.caption).toBe('Held by Morning run.');
   });
 });
 

@@ -1,8 +1,10 @@
 import { DEFAULT_LOCALE } from '@shadow-library/ui';
 
-import { categoryById, formatMinor, homeAmountOf } from './finance.rules';
+import { LONG_MONTHS, moneyStatFormat, SHORT_MONTHS } from '@/lib/format';
+
+import { categoryById, formatMinor, homeAmountOf, minorToMajor } from './finance.rules';
 import { BUILT_IN_CATEGORIES, type CurrencyCode, type ExpenseCategory, type ExpenseDetail, type Subscription } from './finance.types';
-import { formatDayName, formatRange, REASON_LABELS, shiftDate, startOfWeek, STATE_LABELS, toDate, WEEKDAY_LABELS, weekdayOf, WEEKDAYS } from './labels';
+import { formatDayName, formatRange, REASON_LABELS, shiftDate, startOfWeek, STATE_LABELS, toDate, WEEKDAY_LABELS, WEEKDAY_LONG_LABELS, weekdayOf, WEEKDAYS } from './labels';
 import { type QuestLogState, type ReasonTag, type StatAffinity, type Weekday } from './quest.types';
 import { formatMetricValue, HEALTH_METRICS } from './quick-logs.rules';
 import { type HealthMetricEntry, type HealthMetricKey, type JournalEntry, type Meal, type SideQuest, type WeightEntry } from './quick-logs.types';
@@ -150,6 +152,8 @@ const PERIOD_NOTES: Record<InsightPeriod, string> = {
 };
 
 const NOTHING_YET = 'Nothing logged in this period yet. It fills in on its own.';
+const NOTHING_EARLIER = 'Nothing earlier to compare with yet.';
+const OVER_THE_YEAR = 'Over the last year.';
 
 function scheduled(logs: ReflectQuestLog[]): ReflectQuestLog[] {
   return logs.filter(log => !CARRIED_STATES.includes(log.state));
@@ -486,24 +490,39 @@ function delta(current: number, previous: number): number | undefined {
   return previous > 0 ? Number(((current - previous) / previous).toFixed(4)) : undefined;
 }
 
+/** `kept`'s value is already a percentage, so a relative delta of it reads as a percentage-of-a-percentage; the point difference is named directly instead. */
+function keptCaption(whole: boolean, period: InsightPeriod, currentRatio: number, previousRatio: number | null): string {
+  if (whole) return OVER_THE_YEAR;
+  if (previousRatio === null) return NOTHING_EARLIER;
+  const points = Math.round((currentRatio - previousRatio) * 100);
+  if (points === 0) return `About the same as the ${PERIOD_DAYS[period]} days before.`;
+  return `${Math.abs(points)} point${Math.abs(points) === 1 ? '' : 's'} ${points > 0 ? 'higher' : 'lower'} than the ${PERIOD_DAYS[period]} days before.`;
+}
+
+function windowCaption(whole: boolean, hasBaseline: boolean, period: InsightPeriod): string {
+  if (whole) return OVER_THE_YEAR;
+  return hasBaseline ? `Compared with the ${PERIOD_DAYS[period]} days before.` : NOTHING_EARLIER;
+}
+
 function kpis(source: ReflectSource, period: InsightPeriod, from: string, previousFrom: string, previousTo: string): InsightKpi[] {
   const whole = period === '365';
-  const comparison = whole ? 'your whole history' : `vs the ${PERIOD_DAYS[period]} days before`;
   const current = adherenceOf(within(source.logs, from, source.today, log => log.date));
   const previous = adherenceOf(within(source.logs, previousFrom, previousTo, log => log.date));
 
   const best = [...source.streaks].sort((left, right) => right.bestRunDays - left.bestRunDays)[0];
   const currentXp = xpIn(source, from, source.today);
+  const previousXp = xpIn(source, previousFrom, previousTo);
   const currentSpend = spendIn(source, from, source.today);
+  const previousSpend = spendIn(source, previousFrom, previousTo);
+  const currentSpendMajor = minorToMajor(currentSpend, source.homeCurrency);
 
   return [
     {
       id: 'kept',
       label: 'Quests kept',
-      value: current.ratio ?? 0,
-      positiveIs: whole ? 'neither' : 'up',
-      ...(whole || previous.ratio === null || current.ratio === null ? {} : { delta: delta(current.ratio, previous.ratio) }),
-      comparison: current.ratio === null ? 'no occurrences logged yet' : comparison,
+      value: current.ratio,
+      positiveIs: 'neither',
+      caption: current.ratio === null ? 'No occurrences logged yet.' : keptCaption(whole, period, current.ratio, previous.ratio),
       format: { style: 'percent' },
     },
     {
@@ -512,24 +531,25 @@ function kpis(source: ReflectSource, period: InsightPeriod, from: string, previo
       value: best?.bestRunDays ?? 0,
       unit: 'days',
       positiveIs: 'neither',
-      comparison: best && best.bestRunDays > 0 ? best.questName : 'no streak recorded yet',
+      caption: best && best.bestRunDays > 0 ? `Held by ${best.questName}.` : 'No streak recorded yet.',
     },
     {
       id: 'xp',
       label: 'XP earned',
       value: currentXp,
       positiveIs: whole ? 'neither' : 'up',
-      ...(whole ? {} : { delta: delta(currentXp, xpIn(source, previousFrom, previousTo)) }),
-      comparison,
+      ...(whole ? {} : { delta: delta(currentXp, previousXp) }),
+      caption: windowCaption(whole, previousXp > 0, period),
     },
     {
       id: 'spend',
       label: 'Spent',
-      value: currentSpend / 100,
+      value: currentSpendMajor,
       positiveIs: whole ? 'neither' : 'down',
-      ...(whole ? {} : { delta: delta(currentSpend, spendIn(source, previousFrom, previousTo)) }),
-      comparison,
-      format: { style: 'currency', currency: source.homeCurrency },
+      ...(whole ? {} : { delta: delta(currentSpend, previousSpend) }),
+      caption: windowCaption(whole, previousSpend > 0, period),
+      format: moneyStatFormat(currentSpendMajor, source.homeCurrency),
+      exactValue: formatMinor(currentSpend, source.homeCurrency),
     },
   ];
 }
@@ -545,7 +565,7 @@ function adherenceByQuest(logs: ReflectQuestLog[]): Bar[] {
   return [...perQuest.values()]
     .map(entry => {
       const value = percent(adherenceOf(entry.logs).ratio ?? 0);
-      return { id: entry.id, label: entry.label, value, caption: `${value}%` };
+      return { id: entry.id, label: entry.label, value, caption: `${value}%`, ariaLabel: `${entry.label}: ${value}% kept`, hasEntries: true };
     })
     .sort((left, right) => right.value - left.value);
 }
@@ -554,12 +574,19 @@ function adherenceByWeekday(logs: ReflectQuestLog[]): Bar[] {
   return WEEKDAYS.map(day => {
     const ratio = adherenceOf(logs.filter(log => weekdayOf(log.date) === day)).ratio;
     const value = ratio === null ? 0 : percent(ratio);
-    return { id: day, label: WEEKDAY_LABELS[day], value, caption: ratio === null ? 'no entries' : `${value}%` };
+    return {
+      id: day,
+      label: WEEKDAY_LABELS[day],
+      value,
+      caption: ratio === null ? 'no entries' : `${value}%`,
+      ariaLabel: `${WEEKDAY_LONG_LABELS[day]}: ${ratio === null ? 'no entries' : `${value}% kept`}`,
+      hasEntries: ratio !== null,
+    };
   });
 }
 
 function weakestWeekday(bars: Bar[]): Weekday | null {
-  const rated = bars.filter(bar => bar.caption !== 'no entries');
+  const rated = bars.filter(bar => bar.hasEntries);
   if (rated.length < 2) return null;
   return (rated.reduce((weakest, bar) => (bar.value < weakest.value ? bar : weakest)).id as Weekday) ?? null;
 }
@@ -580,37 +607,57 @@ function monthsBetween(from: string, to: string): string[] {
   return months;
 }
 
+const COMPACT_XP_FORMAT = new Intl.NumberFormat(DEFAULT_LOCALE, { notation: 'compact', maximumFractionDigits: 1 });
+
+function monthLabel(month: string, showYear: boolean): string {
+  const shortMonth = SHORT_MONTHS[Number(month.slice(5, 7)) - 1] ?? month.slice(5, 7);
+  return showYear ? `${shortMonth} ${month.slice(2, 4)}` : shortMonth;
+}
+
 function xpByMonth(source: ReflectSource, from: string): Bar[] {
-  return monthsBetween(from, source.today).map(month => {
-    const value = xpIn(source, `${month}-01`, `${month}-31`);
+  const months = monthsBetween(from, source.today);
+  const firstYear = months[0]?.slice(0, 4);
+  const lastYear = months.at(-1)?.slice(0, 4);
+  const spansTwoYears = firstYear !== undefined && firstYear !== lastYear;
+
+  return months.map((month, index) => {
+    const monthStart = index === 0 ? from : `${month}-01`;
+    const value = xpIn(source, monthStart, `${month}-31`);
+    const crossesYear = index > 0 && (months[index - 1] as string).slice(0, 4) !== month.slice(0, 4);
+    const caption = value === 0 ? 'no entries' : `${COMPACT_XP_FORMAT.format(value)} XP`;
+    const longMonth = LONG_MONTHS[Number(month.slice(5, 7)) - 1] ?? month.slice(5, 7);
     return {
       id: month,
-      label: toDate(`${month}-01`).toLocaleDateString(DEFAULT_LOCALE, { month: 'short' }),
+      label: monthLabel(month, crossesYear || (index === 0 && spansTwoYears)),
       value,
-      caption: value === 0 ? 'no entries' : `${value.toLocaleString(DEFAULT_LOCALE)} XP`,
+      caption,
+      ariaLabel: `${longMonth} ${month.slice(0, 4)}: ${caption}`,
+      hasEntries: value !== 0,
     };
   });
 }
 
 function reasonBars(logs: ReflectQuestLog[]): Bar[] {
-  const counts = new Map<string, { id: string; label: string; value: number; caption: string }>();
+  const counts = new Map<string, { id: string; label: string; value: number; caption: string; ariaLabel: string; hasEntries: boolean }>();
   for (const log of logs) {
     if (!log.reasonTag) continue;
-    const entry = counts.get(log.reasonTag) ?? { id: log.reasonTag, label: REASON_LABELS[log.reasonTag], value: 0, caption: '' };
+    const entry = counts.get(log.reasonTag) ?? { id: log.reasonTag, label: REASON_LABELS[log.reasonTag], value: 0, caption: '', ariaLabel: '', hasEntries: true };
     entry.value += 1;
     entry.caption = String(entry.value);
+    entry.ariaLabel = `${entry.label}: ${entry.value} time${entry.value === 1 ? '' : 's'}`;
     counts.set(log.reasonTag, entry);
   }
   return rank(counts).slice(0, 6);
 }
 
 function spendBars(source: ReflectSource, from: string): Bar[] {
-  const counts = new Map<string, { id: string; label: string; value: number; caption: string }>();
+  const counts = new Map<string, { id: string; label: string; value: number; caption: string; ariaLabel: string; hasEntries: boolean }>();
   for (const expense of within(source.expenses, from, source.today, item => item.occurredOnDate)) {
     const category = categoryById(expense.categoryId, source.categories);
-    const entry = counts.get(category.id) ?? { id: category.id, label: category.name, value: 0, caption: '' };
+    const entry = counts.get(category.id) ?? { id: category.id, label: category.name, value: 0, caption: '', ariaLabel: '', hasEntries: true };
     entry.value += homeAmountOf(expense, source.homeCurrency) ?? 0;
     entry.caption = formatMinor(entry.value, source.homeCurrency);
+    entry.ariaLabel = `${entry.label}: ${entry.caption}`;
     counts.set(category.id, entry);
   }
   return rank(counts).slice(0, 6);
@@ -674,7 +721,7 @@ export function deriveInsights(source: ReflectSource, period: InsightPeriod): In
     adherenceByWeekday: byWeekday,
     weekdayNote: weakest ? `${WEEKDAY_LABELS[weakest]} is your weakest weekday over this period.` : 'Not enough occurrences yet to tell one weekday from another.',
     xpByMonth: months,
-    xpNote: months.some(month => month.value > 0) ? 'Experience has never decreased. The flat months are pauses, not losses.' : NOTHING_YET,
+    xpNote: months.some(month => month.value > 0) ? 'Each bar is the experience earned that month, not a running total — it moves with how much you logged.' : NOTHING_YET,
     reasons,
     reasonsNote: topReason
       ? `${topReason.label} is the reason you give most, ${topReason.value} time${topReason.value === 1 ? '' : 's'}.`

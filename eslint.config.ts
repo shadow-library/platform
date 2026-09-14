@@ -237,6 +237,14 @@ export default defineConfig([
     },
   },
 
+  /** shadow-memoir-web Insights: a horizontally scrollable chart row needs to be keyboard-reachable, and `role="group"` is the correct role for it — just not one jsx-a11y's default allowlist treats as interactive. */
+  {
+    files: ['apps/shadow-memoir-web/src/features/insights/**/*.tsx'],
+    rules: {
+      'jsx-a11y/no-noninteractive-tabindex': ['error', { roles: ['tabpanel', 'group'] }],
+    },
+  },
+
   /** packages/fastify: route specs declare unused fixture classes and stubs purely to exercise the decorators. */
   {
     files: ['packages/fastify/tests/**/*.spec.ts'],

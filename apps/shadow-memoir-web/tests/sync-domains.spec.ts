@@ -434,7 +434,7 @@ describe('FE-7 reflection derivation', () => {
     const { engine } = await started(reflectPage());
     const insights = await new SyncedReflectProvider(engine).getInsights('30');
 
-    expect(insights.adherenceByQuest).toEqual([{ id: '5', label: 'Move 8,000 steps', value: 70, caption: '70%' }]);
+    expect(insights.adherenceByQuest).toEqual([{ id: '5', label: 'Move 8,000 steps', value: 70, caption: '70%', ariaLabel: 'Move 8,000 steps: 70% kept', hasEntries: true }]);
     expect(insights.reasons.map(bar => bar.id)).toEqual(['work_emergency', 'too_tired']);
     expect(insights.kpis.find(kpi => kpi.id === 'streak')?.value).toBe(22);
     expect(insights.kpis.find(kpi => kpi.id === 'spend')?.value).toBe(12.5);

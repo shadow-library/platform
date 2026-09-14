@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { convertMlToLitres, formatCount, formatEnum, formatLocalDate, formatLocalTime, formatRelativeDay, parseMinuteOfDay, timeZoneOptions } from '@/lib/format';
+import { convertMlToLitres, formatCount, formatEnum, formatLocalDate, formatLocalTime, formatRelativeDay, moneyStatFormat, parseMinuteOfDay, timeZoneOptions } from '@/lib/format';
 
 import { withTimeZone } from './setup';
 
@@ -82,6 +82,22 @@ describe('parseMinuteOfDay', () => {
     expect(parseMinuteOfDay('00:00')).toBe(0);
     expect(parseMinuteOfDay('06:30')).toBe(390);
     expect(parseMinuteOfDay('23:59')).toBe(1439);
+  });
+});
+
+describe('moneyStatFormat', () => {
+  it('should keep standard notation for an ordinary amount', () => {
+    expect(moneyStatFormat(42.5, 'EUR').notation).toBeUndefined();
+  });
+
+  it('should take a zero-exponent currency at face value, not divide it again', () => {
+    expect(moneyStatFormat(500, 'JPY').notation).toBeUndefined();
+    expect(new Intl.NumberFormat('en-US', moneyStatFormat(500, 'JPY')).format(500)).toBe('¥500');
+    expect(moneyStatFormat(12_345_678_901, 'JPY').notation).toBe('compact');
+  });
+
+  it('should switch to compact notation once the exact amount would overflow a KPI tile', () => {
+    expect(moneyStatFormat(1188660221224.14, 'EUR').notation).toBe('compact');
   });
 });
 

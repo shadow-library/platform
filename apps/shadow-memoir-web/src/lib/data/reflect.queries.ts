@@ -35,7 +35,7 @@ export function useHistoryRecord(recordId: string): UseQueryResult<HistoryDetail
 
 export function useInsights(period: InsightPeriod): UseQueryResult<InsightsView> {
   const { reflect, queryClient } = useMemoirData();
-  return useQuery({ queryKey: reflectKeys.insights(period), queryFn: () => reflect.getInsights(period) }, queryClient);
+  return useQuery({ queryKey: reflectKeys.insights(period), queryFn: () => reflect.getInsights(period), placeholderData: keepPreviousData }, queryClient);
 }
 
 export function useReview(): UseQueryResult<ReviewView> {
