@@ -172,7 +172,7 @@ export function createReflectProvider({ today, persona = 'active' }: ReflectFixt
       }
 
       state.reviewComplete = true;
-      return Promise.resolve(applied('Week closed and saved as a journal entry.'));
+      return Promise.resolve(applied('Week closed and kept on this device.'));
     },
   };
 }

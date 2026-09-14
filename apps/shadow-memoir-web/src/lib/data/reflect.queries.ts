@@ -1,4 +1,4 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { type CommandHook, legacySettledResult, readSettledResult, useDomainCommand } from './command-runner';
 import { type SettledCommandResult } from './command.types';
@@ -25,7 +25,7 @@ const reflectKeys = {
 
 export function useHistory(filter: HistoryFilter, query: string, page: number): UseQueryResult<HistoryView> {
   const { reflect, queryClient } = useMemoirData();
-  return useQuery({ queryKey: reflectKeys.history(filter, query, page), queryFn: () => reflect.getHistory(filter, query, page) }, queryClient);
+  return useQuery({ queryKey: reflectKeys.history(filter, query, page), queryFn: () => reflect.getHistory(filter, query, page), placeholderData: keepPreviousData }, queryClient);
 }
 
 export function useHistoryRecord(recordId: string): UseQueryResult<HistoryDetail> {

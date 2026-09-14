@@ -6,8 +6,11 @@ import { AiScreen } from '@/features/ai';
 import { HistoryScreen } from '@/features/history';
 import { InsightsScreen } from '@/features/insights';
 import { WeeklyReviewScreen } from '@/features/review';
+import { shiftDate } from '@/lib/data';
+import { SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen } from './harness';
+import { createSyncedTestData, createTestEngine, sharedBacking } from './sync-harness';
 
 const TODAY = '2026-08-22';
 
@@ -58,6 +61,84 @@ describe('History screen', () => {
     renderScreen(<HistoryScreen />, { today: TODAY });
     fireEvent.change(await screen.findByLabelText('Search all records'), { target: { value: 'nothing at all' } });
     expect(await screen.findByText('Nothing matches that yet')).toBeDefined();
+  });
+
+  it('should not show a record detail for an empty account', async () => {
+    renderScreen(<HistoryScreen />, { today: TODAY, persona: 'new' });
+    expect(await screen.findByText('Nothing logged yet')).toBeDefined();
+    expect(screen.queryByText('Nothing recorded yet')).toBeNull();
+    expect(screen.queryByText(/^Open in /)).toBeNull();
+  });
+
+  it('should not show a filtered-out notice for the unselected auto-picked record', async () => {
+    renderScreen(<HistoryScreen />, { today: TODAY });
+    await screen.findByText(/^Today · /);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Expense' }));
+
+    expect(screen.getByText('Select a record to see its details.')).toBeDefined();
+    expect(screen.queryByText("This record doesn't match the current filter or search.")).toBeNull();
+  });
+
+  it('should show the true record total in pagination', async () => {
+    renderScreen(<HistoryScreen />, { today: TODAY });
+    fireEvent.click(await screen.findByRole('button', { name: 'Quest' }));
+    expect(await screen.findByText(/Showing 1 to 20 of 2,515/)).toBeDefined();
+  });
+
+  it('should recompute range totals for the active filter', async () => {
+    renderScreen(<HistoryScreen />, { today: TODAY });
+    await screen.findByText(/^Today · /);
+    fireEvent.change(screen.getByLabelText('Search all records'), { target: { value: 'nothing at all' } });
+
+    expect(await screen.findByText('Nothing matches that yet')).toBeDefined();
+    expect(screen.getByText('0 quest records · 0 outcomes · 0 kept')).toBeDefined();
+    expect(screen.getByText(/^0 expenses/)).toBeDefined();
+  });
+
+  it('should agree with the Quest chip on how many quest records matched', async () => {
+    renderScreen(<HistoryScreen />, { today: TODAY });
+    fireEvent.click(await screen.findByRole('button', { name: 'Quest' }));
+
+    expect(await screen.findByText('2515 matching records')).toBeDefined();
+    expect(screen.getByText('2,515 quest records · 2,515 outcomes · 2,065 kept')).toBeDefined();
+  });
+
+  it('should show a loading state for history before the first sync', async () => {
+    const { engine } = createTestEngine({ today: TODAY });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <HistoryScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    expect(await screen.findByRole('status', { name: 'Loading' })).toBeDefined();
+  });
+
+  it('should keep focus in the search field while typing', async () => {
+    const user = userEvent.setup();
+    renderScreen(<HistoryScreen />, { today: TODAY });
+    const input = await screen.findByLabelText('Search all records');
+
+    await user.click(input);
+    await user.type(input, 'run');
+
+    expect(document.activeElement).toBe(input);
+    expect((input as HTMLInputElement).value).toBe('run');
+  });
+
+  it('should focus the first row after a page change', async () => {
+    renderScreen(<HistoryScreen />, { today: TODAY });
+    fireEvent.click(await screen.findByRole('button', { name: 'Quest' }));
+    await screen.findByText(/matching records$/);
+
+    const pageTwo = screen.getByRole('button', { name: 'Page 2' });
+    fireEvent.click(pageTwo);
+
+    await waitFor(() => expect(document.activeElement?.getAttribute('aria-pressed')).not.toBeNull());
+    expect(document.activeElement).not.toBe(pageTwo);
   });
 
   it('should move focus to the detail when a history row is selected on narrow layouts', async () => {
@@ -127,6 +208,97 @@ describe('Weekly review', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Finish the review' }));
     expect(await screen.findByText(/^Week \d+ closed$/)).toBeDefined();
+  });
+
+  it('should not claim completion before the review is finished', async () => {
+    renderScreen(<WeeklyReviewScreen />, { today: TODAY });
+    expect(await screen.findByRole('heading', { name: 'Weekly Review' })).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    expect((await screen.findAllByText('Not finished yet')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Completed')).toBeNull();
+  });
+
+  it('should keep review answers after reload', async () => {
+    const backing = sharedBacking();
+    const first = createTestEngine({ backing, today: TODAY, accountId: 'usr_A' });
+    const data = createSyncedTestData(first.engine);
+
+    const view = renderScreen(
+      <SyncEngineProvider data={data}>
+        <WeeklyReviewScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    await screen.findByText('What you kept');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByText('Your reflection');
+
+    const field = (await screen.findAllByPlaceholderText('One sentence is enough'))[0] as HTMLTextAreaElement;
+    fireEvent.change(field, { target: { value: 'Persist me please' } });
+    fireEvent.blur(field);
+    await screen.findByText('Saved');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finish the review' }));
+    expect(await screen.findByText(/^Week \d+ closed$/)).toBeDefined();
+
+    view.unmount();
+
+    const reloaded = createTestEngine({ backing, today: TODAY, accountId: 'usr_A' });
+    const reloadedData = createSyncedTestData(reloaded.engine);
+    renderScreen(
+      <SyncEngineProvider data={reloadedData}>
+        <WeeklyReviewScreen />
+      </SyncEngineProvider>,
+      { value: reloadedData },
+    );
+
+    expect(await screen.findByText(/^Week \d+ closed$/)).toBeDefined();
+    expect(screen.getByText('Completed')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Finish the review' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    const reloadedField = (await screen.findAllByPlaceholderText('One sentence is enough'))[0] as HTMLTextAreaElement;
+    expect(reloadedField.value).toBe('Persist me please');
+  });
+
+  it('should start a fresh review for a new week', async () => {
+    const backing = sharedBacking();
+    const first = createTestEngine({ backing, today: TODAY, accountId: 'usr_A' });
+    const data = createSyncedTestData(first.engine);
+    const view = renderScreen(
+      <SyncEngineProvider data={data}>
+        <WeeklyReviewScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    await screen.findByText('What you kept');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Finish the review' }));
+    expect(await screen.findByText(/^Week \d+ closed$/)).toBeDefined();
+
+    view.unmount();
+
+    const nextWeek = createTestEngine({ backing, today: shiftDate(TODAY, 7), accountId: 'usr_A' });
+    const nextWeekData = createSyncedTestData(nextWeek.engine);
+    renderScreen(
+      <SyncEngineProvider data={nextWeekData}>
+        <WeeklyReviewScreen />
+      </SyncEngineProvider>,
+      { value: nextWeekData },
+    );
+
+    await screen.findByText('What you kept');
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect((await screen.findAllByText('Not finished yet')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Completed')).toBeNull();
   });
 });
 

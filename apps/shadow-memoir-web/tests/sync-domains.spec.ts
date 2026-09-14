@@ -399,7 +399,7 @@ describe('FE-7 reflection derivation', () => {
     const today = history.groups.find(group => group.date === TODAY);
     expect(today?.rows.map(row => row.text)).toContain('Move 8,000 steps · partial · too tired');
     expect(today?.rows.map(row => row.text)).toContain('Food — Kaffebrenneriet');
-    expect(history.totals[0]).toBe('5 quest outcomes · 4 kept');
+    expect(history.totals[0]).toBe('5 quest records · 5 outcomes · 4 kept');
   });
 
   it('should filter the derived feed and search it without reaching the network', async () => {

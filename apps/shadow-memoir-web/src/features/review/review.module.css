@@ -76,17 +76,68 @@
   gap: 10px;
 }
 
+.legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-secondary);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--sh-radius-sm);
+  background: transparent;
+  border: 1px dashed var(--sh-text-tertiary);
+}
+
+.legendSwatch[data-outcome='kept'] {
+  background: var(--sh-accent);
+  border-style: solid;
+  border-color: var(--sh-accent);
+}
+
+.legendSwatch[data-outcome='partial'] {
+  background: linear-gradient(90deg, var(--sh-accent) 50%, transparent 50%);
+  border-style: solid;
+  border-color: var(--sh-accent);
+}
+
+.legendSwatch[data-outcome='missed'] {
+  background: var(--sh-neutral-solid);
+  border-style: solid;
+  border-color: var(--sh-neutral-solid);
+}
+
 .questHead {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 10px;
   font-size: var(--sh-text-caption);
   margin-bottom: 5px;
 }
 
+.questTitle {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .questResult {
   font-family: var(--sh-font-mono);
   color: var(--sh-text-tertiary);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .days {
@@ -98,20 +149,26 @@
   flex: 1;
   height: 14px;
   border-radius: var(--sh-radius-sm);
-  background: var(--sh-surface-well);
+  background: transparent;
+  border: 1px dashed var(--sh-text-tertiary);
 }
 
 .day[data-outcome='kept'] {
   background: var(--sh-accent);
+  border-style: solid;
+  border-color: var(--sh-accent);
 }
 
 .day[data-outcome='partial'] {
-  background: var(--sh-accent);
-  opacity: 0.5;
+  background: linear-gradient(90deg, var(--sh-accent) 50%, transparent 50%);
+  border-style: solid;
+  border-color: var(--sh-accent);
 }
 
 .day[data-outcome='missed'] {
-  background: var(--sh-border-strong);
+  background: var(--sh-neutral-solid);
+  border-style: solid;
+  border-color: var(--sh-neutral-solid);
 }
 
 .facts {

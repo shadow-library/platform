@@ -32,6 +32,11 @@ export interface HistoryView {
   groups: HistoryGroup[];
   totals: string[];
   pageCount: number;
+  /** Every matched record's id, across every page — lets a screen tell a filtered-out selection from a missing one. */
+  matchedIds: Set<string>;
+  matchedCount: number;
+  /** Unfiltered — 0 only for a genuinely empty account, unlike a filter that matches nothing. */
+  totalRecords: number;
 }
 
 export type InsightPeriod = '30' | '90' | '365';

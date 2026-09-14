@@ -21,6 +21,7 @@ import {
   type ReflectSource,
   type ReviewLocalState,
   type ReviewView,
+  reviewWeekStart,
   type SettledCommandResult,
 } from '@/lib/data';
 import { formatLocalDate, formatLocalTime } from '@/lib/format';
@@ -86,6 +87,11 @@ function toResult(row: AiResultRow, task: AiTaskRow | undefined): AiResult {
   };
 }
 
+/** `ReviewLocalState` plus the week it was recorded for, so a state left over from a previous week never leaks into the current one. */
+interface StoredReview extends ReviewLocalState {
+  weekStart: string;
+}
+
 /**
  * The coaching surface, live. Tasks, results and consents are written over HTTP and read back through the
  * delta mirror, so a submitted request appears on the next pull rather than being invented locally — the
@@ -99,7 +105,7 @@ function toResult(row: AiResultRow, task: AiTaskRow | undefined): AiResult {
 export class SyncedReflectProvider implements ReflectProvider {
   private readonly narrative: ReflectProvider;
   private source: ReflectSource;
-  private review: ReviewLocalState = { answers: {}, complete: false };
+  private review: StoredReview;
   private pending: Promise<void> = Promise.resolve();
   private readonly restored: Promise<void>;
   /** The id a question is submitted under until the server accepts it, so asking again after a lost answer finds the task instead of creating a second. */
@@ -108,10 +114,19 @@ export class SyncedReflectProvider implements ReflectProvider {
   constructor(private readonly sync: SyncEngine) {
     this.narrative = createReflectProvider({ today: sync.today, persona: 'active' });
     this.source = projectReflectSource(sync.domains(), sync.today);
+    this.review = this.freshReview();
     this.restored = this.restoreReview().catch(ignoreAccountBoundary);
     // An unreadable store is reported by the store gate; `updateReview` still refuses to write over a review it could not read.
     this.restored.catch(() => undefined);
     sync.subscribeProjection(() => (this.pending = this.pending.then(() => this.reproject())));
+  }
+
+  private freshReview(): StoredReview {
+    return { weekStart: reviewWeekStart(this.sync.today), answers: {}, complete: false };
+  }
+
+  private currentReview(): StoredReview {
+    return this.review.weekStart === reviewWeekStart(this.sync.today) ? this.review : this.freshReview();
   }
 
   async reproject(): Promise<void> {
@@ -136,6 +151,7 @@ export class SyncedReflectProvider implements ReflectProvider {
 
   async getReview(): Promise<ReviewView> {
     await this.restored;
+    this.review = this.currentReview();
     return deriveReview(this.source, this.review);
   }
 
@@ -232,13 +248,14 @@ export class SyncedReflectProvider implements ReflectProvider {
   }
 
   private async restoreReview(): Promise<void> {
-    const stored = await this.sync.store.readMeta<ReviewLocalState>(SYNC_META_KEYS.weeklyReview);
-    if (stored) this.review = stored;
+    const stored = await this.sync.store.readMeta<StoredReview>(SYNC_META_KEYS.weeklyReview);
+    if (stored && stored.weekStart === this.review.weekStart) this.review = stored;
   }
 
   private async updateReview(next: (current: ReviewLocalState) => ReviewLocalState, message: string): Promise<SettledCommandResult> {
     await this.restored;
-    this.review = next(this.review);
+    const current = this.currentReview();
+    this.review = { weekStart: current.weekStart, ...next(current) };
     await this.sync.store.writeMeta(SYNC_META_KEYS.weeklyReview, this.review);
     return applied(message);
   }

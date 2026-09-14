@@ -94,14 +94,18 @@
   color: var(--sh-text-tertiary);
 }
 
+.rowBadge {
+  justify-self: start;
+}
+
 @media (max-width: 599px) {
   .row {
     grid-template-columns: 52px minmax(0, 1fr) auto;
   }
 
-  .row > :nth-child(2) {
+  .rowBadge {
     grid-row: 2;
-    grid-column: 2 / -1;
+    grid-column: 2;
   }
 }
 

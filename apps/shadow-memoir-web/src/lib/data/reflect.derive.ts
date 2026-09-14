@@ -402,16 +402,22 @@ function deriveHistoryRecords(source: ReflectSource): HistoryRecord[] {
   ].sort((left, right) => right.date.localeCompare(left.date) || right.time.localeCompare(left.time) || right.id.localeCompare(left.id));
 }
 
-function historyTotals(source: ReflectSource): string[] {
-  const counted = scheduled(source.logs);
+function historyTotals(source: ReflectSource, matchedIds: Set<string>): string[] {
+  const loggedRecords = source.logs.filter(log => matchedIds.has(`log:${log.id}`));
+  const counted = scheduled(loggedRecords);
   const held = counted.filter(log => holdsOccurrence(log.state)).length;
-  const words = source.journal.reduce((total, entry) => total + entry.wordCount, 0);
-  const spent = source.expenses.reduce((total, expense) => total + (homeAmountOf(expense, source.homeCurrency) ?? 0), 0);
+  const journal = source.journal.filter(entry => matchedIds.has(`journal:${entry.id}`));
+  const words = journal.reduce((total, entry) => total + entry.wordCount, 0);
+  const expenses = source.expenses.filter(expense => matchedIds.has(`expense:${expense.id}`));
+  const spent = expenses.reduce((total, expense) => total + (homeAmountOf(expense, source.homeCurrency) ?? 0), 0);
+  const meals = source.meals.filter(meal => matchedIds.has(`meal:${meal.id}`));
+  const weights = source.weights.filter(entry => matchedIds.has(`weight:${entry.id}`));
+  const metricEntries = source.metricEntries.filter(entry => matchedIds.has(`metric:${entry.key}:${entry.date}`));
   return [
-    `${counted.length} quest outcomes · ${held} kept`,
-    `${source.expenses.length} expenses · ${formatMinor(spent, source.homeCurrency)}`,
-    `${source.journal.length} journal entries · ${words.toLocaleString(DEFAULT_LOCALE)} words`,
-    `${source.metricEntries.length} metric entries · ${source.meals.length} meals · ${source.weights.length} weights`,
+    `${loggedRecords.length.toLocaleString(DEFAULT_LOCALE)} quest records · ${counted.length.toLocaleString(DEFAULT_LOCALE)} outcomes · ${held.toLocaleString(DEFAULT_LOCALE)} kept`,
+    `${expenses.length.toLocaleString(DEFAULT_LOCALE)} expenses · ${formatMinor(spent, source.homeCurrency)}`,
+    `${journal.length.toLocaleString(DEFAULT_LOCALE)} journal entries · ${words.toLocaleString(DEFAULT_LOCALE)} words`,
+    `${metricEntries.length.toLocaleString(DEFAULT_LOCALE)} metric entries · ${meals.length.toLocaleString(DEFAULT_LOCALE)} meals · ${weights.length.toLocaleString(DEFAULT_LOCALE)} weights`,
   ];
 }
 
@@ -419,6 +425,7 @@ export function deriveHistory(source: ReflectSource, filter: HistoryFilter, quer
   const records = deriveHistoryRecords(source);
   const needle = query.trim().toLowerCase();
   const matched = records.filter(record => (filter === 'all' || record.kind === filter) && (needle.length === 0 || record.haystack.toLowerCase().includes(needle)));
+  const matchedIds = new Set(matched.map(record => record.id));
 
   const pageCount = Math.max(1, Math.ceil(matched.length / HISTORY_PAGE_SIZE));
   const start = (Math.min(Math.max(page, 1), pageCount) - 1) * HISTORY_PAGE_SIZE;
@@ -436,8 +443,11 @@ export function deriveHistory(source: ReflectSource, filter: HistoryFilter, quer
   return {
     countLabel: unfiltered ? `${records.length} record${records.length === 1 ? '' : 's'}` : `${matched.length} matching record${matched.length === 1 ? '' : 's'}`,
     groups,
-    totals: historyTotals(source),
+    totals: historyTotals(source, matchedIds),
     pageCount,
+    matchedIds,
+    matchedCount: matched.length,
+    totalRecords: records.length,
   };
 }
 
@@ -816,8 +826,13 @@ function bodyFacts(source: ReflectSource, weekStart: string, weekEnd: string): {
   };
 }
 
+/** The Monday of the week under review — last week, relative to `today`. */
+export function reviewWeekStart(today: string): string {
+  return shiftDate(startOfWeek(today), -7);
+}
+
 export function deriveReview(source: ReflectSource, local: ReviewLocalState): ReviewView {
-  const weekStart = shiftDate(startOfWeek(source.today), -7);
+  const weekStart = reviewWeekStart(source.today);
   const weekEnd = shiftDate(weekStart, 6);
 
   const logs = within(source.logs, weekStart, weekEnd, log => log.date);
@@ -862,7 +877,9 @@ export function deriveReview(source: ReflectSource, local: ReviewLocalState): Re
     bodyFacts: body.facts,
     bodyGap: body.gap,
     prompts,
-    completion: local.complete ? { title: `Week ${isoWeek(weekStart)} closed`, body: 'Saved as a journal entry and to History.', lines: summaryLines } : null,
+    completion: local.complete
+      ? { title: `Week ${isoWeek(weekStart)} closed`, body: 'Kept on this device. It stays here through a reload, but does not follow you to another device.', lines: summaryLines }
+      : null,
     glance: [
       counted.length === 0 ? 'No occurrences logged' : `${counted.length} occurrences · ${held} kept · ${percent(keptRatio)}%`,
       `Level ${source.hero.level} · ${weekXp.toLocaleString(DEFAULT_LOCALE)} XP earned`,
