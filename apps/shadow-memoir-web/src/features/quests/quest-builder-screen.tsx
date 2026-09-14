@@ -1,9 +1,10 @@
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { type ReactElement, useMemo, useState } from 'react';
 import { Alert, Button, Card, FormField, Input, NumberStepper, SegmentedControl, Select, Switch, TimePicker, toast } from '@shadow-library/ui';
 
 import {
   formatDuration,
+  formatTime,
   type QuestDraft,
   type RecurrenceFrequency,
   STAT_LABELS,
@@ -20,6 +21,7 @@ import {
 } from '@/lib/data';
 import { parseMinuteOfDay } from '@/lib/format';
 
+import { type QuestDuplicateSearch } from './quest-duplicate.search';
 import styles from './quests.module.css';
 
 const STRICTNESS_ORDER: Strictness[] = ['anchor', 'routine', 'goal', 'optional'];
@@ -30,16 +32,17 @@ export function QuestBuilderScreen(): ReactElement {
   const navigate = useNavigate();
   const { today } = useMemoirData();
   const command = useCommand();
+  const duplicate = useSearch({ strict: false }) as Partial<QuestDuplicateSearch>;
 
-  const [name, setName] = useState('');
-  const [statAffinity, setStatAffinity] = useState<StatAffinity>('mind');
-  const [strictness, setStrictness] = useState<Strictness>('routine');
-  const [time, setTime] = useState<string | null>(null);
-  const [durationMinutes, setDurationMinutes] = useState(25);
-  const [frequency, setFrequency] = useState<RecurrenceFrequency>('weekly');
-  const [interval, setInterval] = useState(2);
-  const [days, setDays] = useState<Weekday[]>(DEFAULT_DAYS);
-  const [threshold, setThreshold] = useState(false);
+  const [name, setName] = useState(duplicate.duplicateName ?? '');
+  const [statAffinity, setStatAffinity] = useState<StatAffinity>(duplicate.duplicateStatAffinity ?? 'mind');
+  const [strictness, setStrictness] = useState<Strictness>(duplicate.duplicateStrictness ?? 'routine');
+  const [time, setTime] = useState<string | null>(formatTime(duplicate.duplicateStartTimeMinutes ?? null));
+  const [durationMinutes, setDurationMinutes] = useState(duplicate.duplicateDurationMinutes ?? 25);
+  const [frequency, setFrequency] = useState<RecurrenceFrequency>(duplicate.duplicateFrequency ?? 'weekly');
+  const [interval, setInterval] = useState(duplicate.duplicateInterval ?? 2);
+  const [days, setDays] = useState<Weekday[]>(duplicate.duplicateDays ?? DEFAULT_DAYS);
+  const [threshold, setThreshold] = useState(duplicate.duplicateThreshold ?? false);
   const [preCommit, setPreCommit] = useState(true);
 
   const startTimeMinutes = useMemo(() => (time ? parseMinuteOfDay(time) : null), [time]);

@@ -71,3 +71,9 @@
   gap: 6px;
   flex-wrap: wrap;
 }
+
+.fieldError {
+  margin: 0;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-danger-text);
+}

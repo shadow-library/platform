@@ -1,4 +1,4 @@
-import { useNavigate } from '@tanstack/react-router';
+import { useMatchRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useState } from 'react';
 import { Button, DescriptionList, Slider, Textarea, TimePicker } from '@shadow-library/ui';
 
@@ -8,6 +8,7 @@ import {
   type CommandConfirmation,
   failureCopy,
   formatTime,
+  type HeroIntensityMode,
   notifyOutcome,
   type QuestOccurrence,
   REASON_LABELS,
@@ -17,15 +18,19 @@ import {
   STRICTNESS_LABELS,
   STRICTNESS_RULES,
   useCommand,
+  useDayPreferences,
+  useMemoirData,
 } from '@/lib/data';
 
+import { alreadyRecordedReason, breakCostNote, breakStreakNote, rescheduleDisabledReason } from './quest-presenters';
 import styles from './quest-actions.module.css';
 
-type Step = 'actions' | 'partial' | 'reschedule' | null;
+type Step = 'actions' | 'partial' | 'reschedule' | 'skip' | 'postpone' | null;
 
 export interface QuestActions {
   open: (occurrence: QuestOccurrence) => void;
   complete: (occurrence: QuestOccurrence) => void;
+  reschedule: (occurrence: QuestOccurrence) => void;
   overlays: ReactNode;
 }
 
@@ -48,6 +53,7 @@ interface QuestActionDefinition {
 export function useQuestActions(): QuestActions {
   const navigate = useNavigate();
   const command = useCommand();
+  const intensity = useDayPreferences().data?.intensity;
   const [occurrence, setOccurrence] = useState<QuestOccurrence | null>(null);
   const [step, setStep] = useState<Step>(null);
   const [confirmation, setConfirmation] = useState<CommandConfirmation | null>(null);
@@ -57,7 +63,7 @@ export function useQuestActions(): QuestActions {
   const close = (): void => setStep(null);
   const busy = occurrence !== null && command.isPendingFor(pending => 'occurrenceId' in pending && pending.occurrenceId === occurrence.id);
 
-  const settle = async (payload: Command, target: QuestOccurrence, andClose: boolean): Promise<void> => {
+  const settle = async (payload: Command, target: QuestOccurrence, andClose: boolean, successNote?: string): Promise<void> => {
     const feedback = { action: ACTION_VERBS[payload.type] ?? 'save', subject: target.questName };
     const outcome = await command.run(payload).catch(() => null);
     if (!outcome) return notifyOutcome({ status: 'failed', message: failureCopy(null), code: null, undone: false }, { ...feedback, success: '' });
@@ -69,12 +75,12 @@ export function useQuestActions(): QuestActions {
     }
 
     const saved = outcome.status === 'applied' || outcome.status === 'queued-offline';
-    notifyOutcome(outcome, { ...feedback, success: saved ? outcome.local.message : '' });
+    notifyOutcome(outcome, { ...feedback, success: saved ? [outcome.local.message, successNote].filter(Boolean).join(' ') : '' });
     if (saved && andClose) close();
   };
 
-  const dispatch = (payload: Command, andClose = true): void => {
-    if (occurrence) void settle(payload, occurrence, andClose);
+  const dispatch = (payload: Command, andClose = true, successNote?: string): void => {
+    if (occurrence) void settle(payload, occurrence, andClose, successNote);
   };
 
   const overlays = (
@@ -88,12 +94,15 @@ export function useQuestActions(): QuestActions {
             onClose={close}
             onPartial={() => setStep('partial')}
             onReschedule={() => setStep('reschedule')}
+            onSkip={() => setStep('skip')}
+            onPostpone={() => setStep('postpone')}
             onEdit={() => {
               close();
               void navigate({ to: '/quests/$questId', params: { questId: occurrence.questId } });
             }}
             dispatch={dispatch}
             pending={busy}
+            intensity={intensity}
           />
           <PartialOverlay
             key={`partial-${occurrence.id}`}
@@ -103,6 +112,26 @@ export function useQuestActions(): QuestActions {
             onClose={close}
             dispatch={dispatch}
             pending={busy}
+          />
+          <SkipOverlay
+            key={`skip-${occurrence.id}`}
+            occurrence={occurrence}
+            open={step === 'skip'}
+            restoreFocusTo={restoreFocusTo}
+            onClose={close}
+            dispatch={dispatch}
+            pending={busy}
+            intensity={intensity}
+          />
+          <PostponeOverlay
+            key={`postpone-${occurrence.id}`}
+            occurrence={occurrence}
+            open={step === 'postpone'}
+            restoreFocusTo={restoreFocusTo}
+            onClose={close}
+            dispatch={dispatch}
+            pending={busy}
+            intensity={intensity}
           />
           <RescheduleOverlay
             key={`reschedule-${occurrence.id}`}
@@ -138,6 +167,11 @@ export function useQuestActions(): QuestActions {
       setOccurrence(next);
     },
     complete: target => void settle({ type: 'quest.complete', occurrenceId: target.id }, target, false),
+    reschedule: next => {
+      setRestoreFocusTo(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      setStep('reschedule');
+      setOccurrence(next);
+    },
     overlays,
   };
 }
@@ -147,8 +181,9 @@ interface OverlayProps {
   open: boolean;
   restoreFocusTo: HTMLElement | null;
   onClose: () => void;
-  dispatch: (command: Command, andClose?: boolean) => void;
+  dispatch: (command: Command, andClose?: boolean, successNote?: string) => void;
   pending: boolean;
+  intensity?: HeroIntensityMode;
 }
 
 function summaryLine(occurrence: QuestOccurrence): string {
@@ -170,50 +205,66 @@ function ActionListOverlay({
   onClose,
   onPartial,
   onReschedule,
+  onSkip,
+  onPostpone,
   onEdit,
   dispatch,
   pending,
-}: OverlayProps & { onPartial: () => void; onReschedule: () => void; onEdit: () => void }): ReactElement {
-  const spendsHp = occurrence.strictness === 'anchor' || occurrence.strictness === 'routine';
+  intensity,
+}: OverlayProps & { onPartial: () => void; onReschedule: () => void; onSkip: () => void; onPostpone: () => void; onEdit: () => void }): ReactElement {
+  const matchRoute = useMatchRoute();
+  const onOwnDetailPage = Boolean(matchRoute({ to: '/quests/$questId', params: { questId: occurrence.questId } }));
+  const shielded = occurrence.shields > 0;
+  const cost = breakCostNote(occurrence.strictness, intensity, occurrence.streakDays, shielded);
+  const streakNote = breakStreakNote(occurrence.strictness, occurrence.shields);
+
   const actions: QuestActionDefinition[] = [
     {
       id: 'complete',
       label: 'Complete',
       rule: `${STRICTNESS_RULES[occurrence.strictness]} ${STAT_LABELS[occurrence.statAffinity]} gains a point.`,
+      disabledReason: alreadyRecordedReason(occurrence),
       run: () => dispatch({ type: 'quest.complete', occurrenceId: occurrence.id }),
     },
     {
       id: 'partial',
       label: 'Partial',
       rule: 'Keeps the streak and grants XP for what you did. A reason is asked for.',
+      disabledReason: alreadyRecordedReason(occurrence),
       run: onPartial,
     },
     {
       id: 'postpone',
       label: 'Postpone to tomorrow',
-      rule: spendsHp ? 'Moves the occurrence to tomorrow and spends 1 HP. A shield can cover it.' : 'Moves the occurrence to tomorrow. No HP is spent.',
-      disabledReason: occurrence.strictness === 'recovery' || occurrence.strictness === 'optional' ? 'Postpone does not apply to this strictness.' : undefined,
-      run: () => dispatch({ type: 'quest.postpone', occurrenceId: occurrence.id }),
+      rule: `${streakNote} ${cost}`,
+      disabledReason:
+        occurrence.strictness === 'recovery' || occurrence.strictness === 'optional' ? 'Postpone does not apply to this strictness.' : alreadyRecordedReason(occurrence),
+      run: onPostpone,
     },
     {
       id: 'reschedule',
-      label: 'Reschedule to another day',
-      rule: 'Moves only this occurrence. The streak is untouched while the move is inside the cap.',
+      label: 'Reschedule to another time',
+      rule: 'Moves only this occurrence’s time today. The streak is untouched while the move is inside the cap.',
+      disabledReason: rescheduleDisabledReason(occurrence),
       run: onReschedule,
     },
     {
       id: 'skip',
       label: 'Skip with a reason',
-      rule: occurrence.shields > 0 ? 'Ends the streak unless a shield covers it — one is held.' : 'Ends the streak. The reason is only ever shown to you.',
-      run: () => dispatch({ type: 'quest.skip', occurrenceId: occurrence.id }),
+      rule: `${streakNote} ${cost} The reason is only ever shown to you.`,
+      disabledReason: alreadyRecordedReason(occurrence),
+      run: onSkip,
     },
-    {
-      id: 'edit',
-      label: 'Edit quest',
-      rule: 'Changes apply to future occurrences and never rewrite history.',
-      disabledReason: occurrence.locked ? 'Schedule and strictness are locked while this week’s plan is committed.' : undefined,
-      run: onEdit,
-    },
+    ...(onOwnDetailPage
+      ? []
+      : [
+          {
+            id: 'edit',
+            label: 'Quest details',
+            rule: 'History, streak and rules for this quest.',
+            run: onEdit,
+          },
+        ]),
   ];
 
   return (
@@ -253,12 +304,24 @@ function ActionListOverlay({
   );
 }
 
+function ReasonPicker({ reason, onPick }: { reason: ReasonTag | null; onPick: (tag: ReasonTag) => void }): ReactElement {
+  return (
+    <div className={styles.reasons}>
+      {REASON_TAGS.map(tag => (
+        <Button key={tag} size="sm" variant={reason === tag ? 'primary' : 'ghost'} aria-pressed={reason === tag} onClick={() => onPick(tag)}>
+          {REASON_LABELS[tag]}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 function PartialOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pending }: OverlayProps): ReactElement {
   const target = occurrence.partialTarget;
   const max = target?.target ?? 100;
   const unit = target?.unit ?? '%';
   const [progress, setProgress] = useState(Math.round(max / 2));
-  const [reason, setReason] = useState<ReasonTag>('too_tired');
+  const [reason, setReason] = useState<ReasonTag | null>(null);
   const [note, setNote] = useState('');
 
   return (
@@ -279,7 +342,8 @@ function PartialOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, p
           <Button
             variant="primary"
             loading={pending}
-            onClick={() => dispatch({ type: 'quest.partial', occurrenceId: occurrence.id, progress, reasonTag: reason, note: note || undefined })}
+            disabled={!reason}
+            onClick={() => reason && dispatch({ type: 'quest.partial', occurrenceId: occurrence.id, progress, reasonTag: reason, note: note || undefined })}
           >
             Save partial
           </Button>
@@ -302,15 +366,97 @@ function PartialOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, p
           <p className={styles.fieldLabel}>
             Reason <span className={styles.fieldHint}>— used only in your own patterns</span>
           </p>
-          <div className={styles.reasons}>
-            {REASON_TAGS.map(tag => (
-              <Button key={tag} size="sm" variant={reason === tag ? 'secondary' : 'ghost'} aria-pressed={reason === tag} onClick={() => setReason(tag)}>
-                {REASON_LABELS[tag]}
-              </Button>
-            ))}
-          </div>
+          <ReasonPicker reason={reason} onPick={setReason} />
+          {reason ? null : <p className={styles.fieldHint}>Choose a reason to save.</p>}
         </div>
-        <Textarea placeholder="Anything worth remembering (optional)" maxLength={120} value={note} onValueChange={setNote} minRows={2} aria-label="Reason note" />
+        <Textarea placeholder="Anything worth remembering (optional)" maxLength={120} showCount value={note} onValueChange={setNote} minRows={2} aria-label="Reason note" />
+      </div>
+    </OverlaySurface>
+  );
+}
+
+function breakNotesFor(occurrence: QuestOccurrence, intensity: HeroIntensityMode | undefined): { streakNote: string; costNote: string } {
+  return {
+    streakNote: breakStreakNote(occurrence.strictness, occurrence.shields),
+    costNote: breakCostNote(occurrence.strictness, intensity, occurrence.streakDays, occurrence.shields > 0),
+  };
+}
+
+function SkipOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pending, intensity }: OverlayProps): ReactElement {
+  const [reason, setReason] = useState<ReasonTag | null>(null);
+  const [note, setNote] = useState('');
+  const { streakNote, costNote } = breakNotesFor(occurrence, intensity);
+
+  return (
+    <OverlaySurface
+      open={open}
+      onOpenChange={onClose}
+      restoreFocusTo={restoreFocusTo}
+      title={`Skip — ${occurrence.questName}`}
+      description="The reason is only ever shown to you."
+      size="md"
+      sheetSnapPoints={['half', 'full']}
+      sheetDefaultSnap="full"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            loading={pending}
+            onClick={() =>
+              dispatch({ type: 'quest.skip', occurrenceId: occurrence.id, reasonTag: reason ?? undefined, note: note || undefined }, true, `${streakNote} ${costNote}`)
+            }
+          >
+            Skip quest
+          </Button>
+        </>
+      }
+    >
+      <div className={styles.partialBody}>
+        <DescriptionList layout="row" termWidth={150}>
+          <DescriptionList.Item term="Streak">{streakNote}</DescriptionList.Item>
+          <DescriptionList.Item term="Cost">{costNote}</DescriptionList.Item>
+        </DescriptionList>
+        <div>
+          <p className={styles.fieldLabel}>
+            Reason <span className={styles.fieldHint}>— used only in your own patterns</span>
+          </p>
+          <ReasonPicker reason={reason} onPick={setReason} />
+        </div>
+        <Textarea placeholder="Anything worth remembering (optional)" maxLength={120} showCount value={note} onValueChange={setNote} minRows={2} aria-label="Reason note" />
+      </div>
+    </OverlaySurface>
+  );
+}
+
+function PostponeOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pending, intensity }: OverlayProps): ReactElement {
+  const { streakNote, costNote } = breakNotesFor(occurrence, intensity);
+
+  return (
+    <OverlaySurface
+      open={open}
+      onOpenChange={onClose}
+      restoreFocusTo={restoreFocusTo}
+      title={`Postpone — ${occurrence.questName}`}
+      description={`This moves the occurrence to tomorrow. ${streakNote} ${costNote}`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Keep today
+          </Button>
+          <Button variant="primary" loading={pending} onClick={() => dispatch({ type: 'quest.postpone', occurrenceId: occurrence.id }, true, `${streakNote} ${costNote}`)}>
+            Postpone
+          </Button>
+        </>
+      }
+    >
+      <div className={styles.partialBody}>
+        <DescriptionList layout="row" termWidth={150}>
+          <DescriptionList.Item term="Streak">{streakNote}</DescriptionList.Item>
+          <DescriptionList.Item term="Cost">{costNote}</DescriptionList.Item>
+        </DescriptionList>
       </div>
     </OverlaySurface>
   );
@@ -321,16 +467,41 @@ function toMinuteOfDay(time: string): number {
   return (hours ?? 0) * 60 + (minutes ?? 0);
 }
 
+function isPastRescheduleTime(occurrenceDate: string, today: string, minuteOfDay: number): boolean {
+  if (occurrenceDate > today) return false;
+  if (occurrenceDate < today) return true;
+  const now = new Date();
+  return minuteOfDay < now.getHours() * 60 + now.getMinutes();
+}
+
+function nextQuarterHour(now: Date): string {
+  const minuteOfDay = Math.min(1439, Math.ceil((now.getHours() * 60 + now.getMinutes()) / 15) * 15);
+  return `${String(Math.floor(minuteOfDay / 60)).padStart(2, '0')}:${String(minuteOfDay % 60).padStart(2, '0')}`;
+}
+
+const RESCHEDULE_ERROR_ID = 'reschedule-time-error';
+
 function RescheduleOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pending }: OverlayProps): ReactElement {
-  const [time, setTime] = useState(formatTime(occurrence.startTimeMinutes) ?? '09:00');
+  const { today } = useMemoirData();
+  const [time, setTime] = useState(formatTime(occurrence.startTimeMinutes) ?? nextQuarterHour(new Date()));
+  const [error, setError] = useState<string | null>(null);
+
+  const move = (): void => {
+    const toMin = toMinuteOfDay(time);
+    if (isPastRescheduleTime(occurrence.date, today, toMin)) {
+      setError('Pick a time that hasn’t passed yet.');
+      return;
+    }
+    dispatch({ type: 'quest.reschedule', occurrenceId: occurrence.id, toMin });
+  };
 
   return (
     <OverlaySurface
       open={open}
       onOpenChange={onClose}
       restoreFocusTo={restoreFocusTo}
-      title={`Move ${occurrence.questName}`}
-      description="A reschedule moves this occurrence's time. It stays on the same day — the recurring plan is never rewritten."
+      title={`Reschedule — ${occurrence.questName}`}
+      description="This changes only today’s time — the day and the recurring plan don’t move."
       size="md"
       sheetSnapPoints={['half', 'full']}
       sheetDefaultSnap="full"
@@ -339,14 +510,29 @@ function RescheduleOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch
           <Button variant="ghost" onClick={onClose}>
             Keep the plan
           </Button>
-          <Button variant="primary" loading={pending} onClick={() => dispatch({ type: 'quest.reschedule', occurrenceId: occurrence.id, toMin: toMinuteOfDay(time) })}>
+          <Button variant="primary" loading={pending} onClick={move}>
             Move it
           </Button>
         </>
       }
     >
       <div className={styles.partialBody}>
-        <TimePicker value={time} onValueChange={value => setTime(value ?? time)} hour12={false} aria-label="Move to" />
+        <TimePicker
+          value={time}
+          onValueChange={value => {
+            setTime(value ?? time);
+            setError(null);
+          }}
+          hour12={false}
+          aria-label="Move to"
+          aria-invalid={error !== null}
+          aria-describedby={error ? RESCHEDULE_ERROR_ID : undefined}
+        />
+        {error ? (
+          <p className={styles.fieldError} id={RESCHEDULE_ERROR_ID} role="alert">
+            {error}
+          </p>
+        ) : null}
         <DescriptionList layout="row" termWidth={150}>
           <DescriptionList.Item term="Streak">Kept — a move inside the cap does not break it</DescriptionList.Item>
           <DescriptionList.Item term="HP">Unchanged</DescriptionList.Item>

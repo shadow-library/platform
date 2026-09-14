@@ -1,5 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { QuestBuilderScreen } from '@/features/quests';
+import { QuestBuilderScreen, validateQuestDuplicateSearch } from '@/features/quests';
 
-export const Route = createFileRoute('/_app/quests/new')({ component: QuestBuilderScreen });
+export const Route = createFileRoute('/_app/quests/new')({
+  validateSearch: validateQuestDuplicateSearch,
+  component: QuestBuilderScreen,
+});

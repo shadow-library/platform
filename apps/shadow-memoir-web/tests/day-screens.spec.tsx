@@ -175,7 +175,44 @@ describe('day group screens', () => {
     renderScreen(<QuestEditorScreen questId="morning-run" />, { today: TODAY });
     expect(await screen.findByRole('heading', { name: 'Morning run — 5 km' })).toBeDefined();
     expect(await screen.findByText('Rules on this quest')).toBeDefined();
-    expect(await screen.findByText(/2 of 2 used in the last 7 days|0 of 2 used in the last 7 days/)).toBeDefined();
+    expect(await screen.findByText('0 of 2 used in the last 7 days')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Reschedule' })).toBeNull();
+  });
+
+  it('should offer a direct reschedule button for an eligible occurrence', async () => {
+    renderScreen(<QuestEditorScreen questId="strength-session" />, { today: TODAY });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Reschedule' }));
+
+    expect(await screen.findByRole('heading', { name: /Reschedule — Strength session/ })).toBeDefined();
+  });
+
+  it('should not offer to navigate to the quest details page it is already showing', async () => {
+    renderScreen(<QuestEditorScreen questId="morning-run" />, { today: TODAY, initialPath: '/quests/morning-run' });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Today’s actions' }));
+
+    expect(screen.queryByRole('button', { name: 'Quest details' })).toBeNull();
+  });
+
+  it('should show not found for an unknown quest id', async () => {
+    renderScreen(<QuestEditorScreen questId="does-not-exist" />, { today: TODAY });
+    expect(await screen.findByText('This quest isn’t here')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Back to Quests' })).toBeDefined();
+  });
+
+  it('should prefill the builder when duplicating', async () => {
+    const search = [
+      `duplicateName=${encodeURIComponent('Strength session')}`,
+      'duplicateStatAffinity=body',
+      'duplicateStrictness=anchor',
+      'duplicateStartTimeMinutes=1080',
+      'duplicateDurationMinutes=50',
+    ].join('&');
+    renderScreen(<QuestBuilderScreen />, { today: TODAY, initialPath: `/quests/new?${search}` });
+
+    expect(((await screen.findByLabelText('Quest name')) as HTMLInputElement).value).toBe('Strength session');
+    expect(screen.getByRole('button', { name: /Anchor/ }).getAttribute('aria-pressed')).toBe('true');
   });
 
   it('should show not enough history for a quest with no logs', async () => {
