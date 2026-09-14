@@ -57,6 +57,12 @@ const IDENTITY_CATALOG: CatalogEntry[] = [
   },
   { templateKey: 'organisation-role-changed', channels: ['EMAIL'], payload: { role: 'MEMBER' }, fragments: ['MEMBER'] },
   { templateKey: 'organisation-member-removed', channels: ['EMAIL'], payload: {}, fragments: [] },
+  {
+    templateKey: 'bot.key.expiring',
+    channels: ['EMAIL'],
+    payload: { botHandle: 'release-bot', botDisplayName: 'Release Bot', keyName: 'CI deploy key', keyPrefix: 'sl_bot_02tcRIyr', expiresAt: '2026-09-21T00:00:00.000Z' },
+    fragments: ['Release Bot', 'release-bot', 'CI deploy key', 'sl_bot_02tcRIyr', 'September 21, 2026'],
+  },
 ];
 
 describe('Identity notification catalog', () => {

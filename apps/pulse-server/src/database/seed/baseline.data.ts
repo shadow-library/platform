@@ -530,6 +530,33 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
 
   {
+    templateKey: 'bot.key.expiring',
+    name: 'Bot API key expiring',
+    description: 'Reminder that an organisation bot API key is about to expire',
+    messageType: 'TRANSACTIONAL',
+    priority: 'MEDIUM',
+    category: 'organisation',
+    variables: {
+      botHandle: variable('string', true, 'release-bot'),
+      botDisplayName: variable('string', true, 'Release Bot'),
+      keyName: variable('string', true, 'CI deploy key'),
+      keyPrefix: variable('string', true, 'sl_bot_02tcRIyr'),
+      expiresAt: variable('string', true, '2026-09-21T00:00:00.000Z'),
+    },
+    channels: [
+      {
+        channel: 'EMAIL',
+        subject: 'The API key for {{ botDisplayName }} is expiring soon',
+        layoutKey: DEFAULT_LAYOUT_KEY,
+        body: `<h1 class="email-h1">API key expiring soon</h1>
+<p class="email-text">The API key <span class="email-strong">{{ keyName }}</span> (<span class="email-strong">{{ keyPrefix }}…</span>) for bot <span class="email-strong">{{ botDisplayName }}</span> (@{{ botHandle }}) expires on <span class="email-strong">{{ expiresAt | date: '%B %-d, %Y' }}</span>.</p>
+<p class="email-text">Generate a replacement key from the organisation's Bots settings, then revoke the old one once the new key is in place.</p>
+<p class="email-muted">If this bot is no longer needed, you can revoke its key instead of replacing it.</p>`,
+      },
+    ],
+  },
+
+  {
     templateKey: 'memoir-ai-result-ready',
     name: 'Memoir: AI review ready',
     description: 'Notice that a Shadow Memoir AI review has finished and is ready to read',
