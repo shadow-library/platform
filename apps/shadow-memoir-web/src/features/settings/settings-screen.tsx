@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { type FocusEvent, type KeyboardEvent, type ReactElement, type ReactNode, useMemo, useRef, useState } from 'react';
+import { type FocusEvent, type KeyboardEvent, type ReactElement, type ReactNode, useMemo, useState } from 'react';
 import { Avatar, Button, Card, FormField, Input, SegmentedControl, Select, Skeleton, type ThemeMode, TimePicker, useTheme } from '@shadow-library/ui';
 import { userDisplayName } from '@shadow-library/web';
 
@@ -10,6 +10,7 @@ import { meQuery } from '@/lib/apis';
 import {
   type AccountCommandHook,
   CURRENCIES,
+  type CurrencyCode,
   type DayPreferences,
   DELETION_TERMS,
   type ExportJob,
@@ -39,6 +40,8 @@ const INTENSITIES: { value: HeroIntensityMode; label: string }[] = [
 ];
 
 const SLEEP_BEFORE_WAKE = 'Sleep time must be later than wake time.';
+
+const BUDGET_INVALID = 'Enter an amount of zero or more, for example 1500.';
 
 const DAY_AND_MONEY_FIELD_COUNT = 6;
 
@@ -72,12 +75,27 @@ function exportMeta(job: ExportJob): string {
   }
 }
 
+type BudgetDraft = { kind: 'unchanged' } | { kind: 'invalid' } | { kind: 'save'; minor: number | null };
+
+function readBudgetDraft(text: string, currency: CurrencyCode, savedMinor: number | null): BudgetDraft {
+  const trimmed = text.trim();
+  const minor = trimmed === '' ? null : parseAmountToMinor(trimmed, currency);
+  if (trimmed !== '' && minor === null) return { kind: 'invalid' };
+  return minor === savedMinor ? { kind: 'unchanged' } : { kind: 'save', minor };
+}
+
 function intensityLabel(value: HeroIntensityMode): string {
   return INTENSITIES.find(option => option.value === value)?.label ?? value;
 }
 
 function pendingHelp(pendingLabel: string, activeLabel: string): string {
   return `${pendingLabel} from your next rollover — ${activeLabel} stays active today.`;
+}
+
+function devicesLine(readiness: SyncReadiness, count: number | undefined): string {
+  if (readiness.kind === 'failed') return readiness.reason === 'deletion-pending' ? 'Devices aren’t listed during deletion' : "Devices haven't loaded yet";
+  if (readiness.kind === 'loading' || count === undefined) return 'Looking for registered devices';
+  return `${count} device${count === 1 ? '' : 's'} registered`;
 }
 
 function appStatusLine(readiness: SyncReadiness, state: NetState): string {
@@ -141,7 +159,7 @@ export function SettingsScreen(): ReactElement {
                 <h2 className={screenStyles.cardTitle}>App</h2>
                 <ul className={screenStyles.list}>
                   <li>{appStatusLine(syncStatus.readiness, syncStatus.state)}</li>
-                  <li>{appSync.data ? `${appSync.data.devices.length} device${appSync.data.devices.length === 1 ? '' : 's'} registered` : 'Checking this device'}</li>
+                  <li>{devicesLine(syncStatus.readiness, appSync.data?.devices.length)}</li>
                 </ul>
                 <div className={styles.actions}>
                   <Button size="sm" variant="ghost" asChild>
@@ -158,7 +176,7 @@ export function SettingsScreen(): ReactElement {
             <h2 className={styles.sectionTitle}>Profile in Shadow Memoir</h2>
             <div className={styles.identity}>
               <Avatar name={userDisplayName(me.data)} size="lg" />
-              <div>
+              <div className={styles.identityText}>
                 <div className={styles.identityName}>{userDisplayName(me.data)}</div>
                 <p className={styles.identityMeta}>
                   {me.isError
@@ -313,6 +331,7 @@ function DayAndMoneyFields({ day, command }: DayAndMoneyFieldsProps): ReactEleme
   const [budgetText, setBudgetText] = useState(budgetSeed);
   const [syncedBudgetSeed, setSyncedBudgetSeed] = useState(budgetSeed);
   const [budgetError, setBudgetError] = useState<string | undefined>();
+  const [submittedBudget, setSubmittedBudget] = useState<SubmittedBudget | null>(null);
 
   if (syncedTimes.wakeTime !== day.wakeTime || syncedTimes.sleepTime !== day.sleepTime) {
     setSyncedTimes({ wakeTime: day.wakeTime, sleepTime: day.sleepTime });
@@ -322,6 +341,7 @@ function DayAndMoneyFields({ day, command }: DayAndMoneyFieldsProps): ReactEleme
   if (syncedBudgetSeed !== budgetSeed) {
     setSyncedBudgetSeed(budgetSeed);
     setBudgetText(budgetSeed);
+    setSubmittedBudget(null);
   }
 
   const revertTime = (field: keyof TimeState, value: string): void => {
@@ -354,42 +374,31 @@ function DayAndMoneyFields({ day, command }: DayAndMoneyFieldsProps): ReactEleme
     notifyOutcome(outcome, outcome.status === 'applied' ? { success: outcome.local.message, action: 'save' } : { success: '', action: 'save' });
   };
 
-  const commitBudget = async (): Promise<void> => {
-    if (!currency) return;
-    const trimmed = budgetText.trim();
-    if (trimmed === '') {
-      if (day.monthlyBudgetMinor !== null) await clearBudget();
-      return;
-    }
-
-    const parsed = parseAmountToMinor(trimmed, currency);
-    if (parsed === null) {
-      setBudgetError('Enter an amount of zero or more, for example 1500.');
-      return;
-    }
-    if (parsed === day.monthlyBudgetMinor) return;
-
+  const saveBudget = async (minor: number | null): Promise<void> => {
+    if (submittedBudget !== null && submittedBudget.minor === minor) return;
     setBudgetError(undefined);
-    const outcome = await command.run({ type: 'day.set', patch: { monthlyBudgetMinor: parsed } });
+    setSubmittedBudget({ minor });
+    const outcome = await command.run({ type: 'day.set', patch: { monthlyBudgetMinor: minor } });
     if (outcome.status === 'applied') return notifyOutcome(outcome, { success: outcome.local.message, action: 'save', subject: 'monthly budget' });
 
+    setSubmittedBudget(null);
     setBudgetText(budgetSeed);
     if (outcome.status === 'rejected') return setBudgetError(outcome.message);
     notifyOutcome(outcome, { success: '', action: 'save', subject: 'monthly budget' });
   };
 
+  const commitBudget = async (): Promise<void> => {
+    if (!currency) return;
+    const draft = readBudgetDraft(budgetText, currency, day.monthlyBudgetMinor);
+    if (draft.kind === 'invalid') return setBudgetError(BUDGET_INVALID);
+    if (draft.kind === 'save') await saveBudget(draft.minor);
+  };
+
   const clearBudget = async (): Promise<void> => {
     if (!currency) return;
+    setBudgetText('');
     setBudgetError(undefined);
-    if (day.monthlyBudgetMinor === null) return setBudgetText('');
-
-    const outcome = await command.run({ type: 'day.set', patch: { monthlyBudgetMinor: null } });
-    if (outcome.status === 'applied') {
-      setBudgetText('');
-      return notifyOutcome(outcome, { success: outcome.local.message, action: 'save', subject: 'monthly budget' });
-    }
-    if (outcome.status === 'rejected') return setBudgetError(outcome.message);
-    notifyOutcome(outcome, { success: '', action: 'save', subject: 'monthly budget' });
+    if (day.monthlyBudgetMinor !== null) await saveBudget(null);
   };
 
   const budgetPending = command.isPendingFor(item => item.type === 'day.set' && 'monthlyBudgetMinor' in item.patch);
@@ -437,7 +446,7 @@ function DayAndMoneyFields({ day, command }: DayAndMoneyFieldsProps): ReactEleme
         error={budgetError}
         helper={
           budgetDirty
-            ? 'Unsaved — press Enter to save.'
+            ? 'Unsaved — press Enter or move out of the field to save.'
             : currency
               ? 'A soft ceiling for the calendar month — nothing here is blocked when you go over it.'
               : `Monthly budget isn't available for ${day.currency} yet.`
@@ -460,6 +469,10 @@ function DayAndMoneyFields({ day, command }: DayAndMoneyFieldsProps): ReactEleme
       </FormField>
     </div>
   );
+}
+
+interface SubmittedBudget {
+  minor: number | null;
 }
 
 interface BudgetControlProps {
@@ -491,21 +504,21 @@ function BudgetControl({
   invalid,
   'aria-describedby': describedBy,
 }: BudgetControlProps): ReactElement {
-  const clearRef = useRef<HTMLButtonElement>(null);
-
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
     onEnter();
   };
 
-  const handleBlur = (event: FocusEvent<HTMLInputElement>): void => {
-    if (event.relatedTarget === clearRef.current) return;
+  const handleBlur = (event: FocusEvent<HTMLDivElement>): void => {
+    if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+    // Switching window or tab blurs the field but leaves it the active element; only a move within the page commits.
+    if (!document.hasFocus() && document.activeElement === event.target) return;
     onBlur();
   };
 
   return (
-    <div className={styles.budgetRow}>
+    <div className={styles.budgetRow} onBlur={handleBlur}>
       <Input
         id={id}
         size="md"
@@ -519,10 +532,9 @@ function BudgetControl({
         readOnly={pending}
         invalid={invalid}
         onValueChange={onValueChange}
-        onBlur={handleBlur}
         onKeyDown={handleKeyDown}
       />
-      <Button ref={clearRef} type="button" size="sm" variant="ghost" disabled={pending || clearDisabled} onMouseDown={event => event.preventDefault()} onClick={onClear}>
+      <Button type="button" size="sm" variant="ghost" disabled={pending || clearDisabled} onMouseDown={event => event.preventDefault()} onClick={onClear}>
         Clear
       </Button>
     </div>

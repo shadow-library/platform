@@ -2,6 +2,9 @@
  * Importing npm packages
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
@@ -11,6 +14,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
  * Importing user defined packages
  */
 import { Select } from './Select';
+import styles from './Select.module.css';
 
 /**
  * Declaring the constants
@@ -120,5 +124,24 @@ describe('Select', () => {
     expect(hiddenSelect).not.toBeNull();
     expect(trigger.parentElement).not.toBe(form);
     expect(hiddenSelect?.parentElement).toBe(trigger.parentElement);
+  });
+
+  it('should keep a long value in its own truncating slot beside the chevron', () => {
+    const long = 'America/Argentina/ComodRivadavia';
+    render(
+      <Select aria-label="Timezone" value={long}>
+        <Select.Item value={long}>{long}</Select.Item>
+      </Select>,
+    );
+    const trigger = screen.getByRole('combobox', { name: 'Timezone' });
+    const [slot, chevron] = Array.from(trigger.children);
+    expect(trigger.children).toHaveLength(2);
+    expect(slot).toHaveTextContent(long);
+    expect(slot).toHaveClass(styles.value as string);
+    const stylesheet = readFileSync(path.join(import.meta.dirname, 'Select.module.css'), 'utf8');
+    const rule = /\.value\s*\{([^}]*)\}/.exec(stylesheet)?.[1] ?? '';
+    for (const declaration of ['min-width: 0', 'overflow: hidden', 'text-overflow: ellipsis', 'white-space: nowrap']) expect(rule).toContain(declaration);
+    expect(chevron).toHaveAttribute('aria-hidden', 'true');
+    expect(chevron).not.toHaveTextContent(long);
   });
 });

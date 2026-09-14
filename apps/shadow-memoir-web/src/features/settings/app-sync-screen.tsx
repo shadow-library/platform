@@ -5,7 +5,19 @@ import { Badge, Button, Card, ConfirmDialog, copyText, EmptyState, Skeleton, Sta
 import { Screen, ScreenColumns, screenStyles } from '@/components/ScreenLayout';
 import { useSystemOverlays } from '@/features/shell';
 import { useAppUpdate } from '@/lib/app-update';
-import { type AccountCommandHook, type AccountDevice, type FailedChange, type InstallRow, installRows, notifyOutcome, useAccountCommand, useAppSync } from '@/lib/data';
+import {
+  type AccountCommandHook,
+  type AccountDevice,
+  accountKeys,
+  type AppSyncView,
+  type FailedChange,
+  type InstallRow,
+  installRows,
+  notifyOutcome,
+  useAccountCommand,
+  useAppSync,
+  useMemoirData,
+} from '@/lib/data';
 import { useSyncEngine, useSyncReadiness } from '@/lib/sync';
 
 import styles from './settings.module.css';
@@ -14,8 +26,28 @@ const STATUS_GLYPHS = { online: '✓', offline: '◷', syncing: '↻', failed: '
 
 const QUEUE_LABELS = { queued: 'Queued', sent: 'Sent', retrying: 'Retrying', conflict: 'Needs a decision' } as const;
 
+interface LeavingDevice {
+  id: string;
+  lastSyncedAt: string | null;
+  status: AppSyncView['status'];
+  focusCandidates: string[];
+}
+
 function lowerFirst(text: string): string {
   return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+/** The removal's own pass drops the row; a pass that finishes with the device still listed means it is staying, so the row lets go. */
+function isLeaving(entry: LeavingDevice, view: AppSyncView): boolean {
+  if (!view.devices.some(device => device.id === entry.id)) return false;
+  return view.lastSyncedAt === entry.lastSyncedAt && (view.status === entry.status || view.status === 'syncing');
+}
+
+function focusCandidates(devices: AccountDevice[], removedId: string): string[] {
+  const removable = devices.filter(device => !device.current).map(device => device.id);
+  const index = removable.indexOf(removedId);
+  if (index === -1) return [];
+  return [...removable.slice(index + 1), ...removable.slice(0, index).reverse()];
 }
 
 export function AppSyncScreen(): ReactElement {
@@ -27,6 +59,25 @@ export function AppSyncScreen(): ReactElement {
   const update = useAppUpdate();
   const [syncing, setSyncing] = useState(false);
   const [removal, setRemoval] = useState<{ device: AccountDevice; open: boolean } | null>(null);
+  const [leaving, setLeaving] = useState<readonly LeavingDevice[]>([]);
+  const { queryClient } = useMemoirData();
+  const devicesHeading = useRef<HTMLHeadingElement>(null);
+  const removeButtons = useRef(new Map<string, HTMLButtonElement>());
+  const refocused = useRef(new Set<string>());
+  const devices = sync.data?.devices;
+
+  useEffect(() => {
+    if (!devices) return;
+    const gone = leaving.filter(entry => !refocused.current.has(entry.id) && !devices.some(device => device.id === entry.id));
+    if (gone.length === 0) return;
+    for (const entry of gone) refocused.current.add(entry.id);
+    if (document.activeElement !== null && document.activeElement !== document.body) return;
+
+    const stillLeaving = new Set(leaving.map(entry => entry.id));
+    const candidates = gone.flatMap(entry => entry.focusCandidates).filter(id => !stillLeaving.has(id));
+    const target = candidates.map(id => removeButtons.current.get(id)).find(button => button !== undefined) ?? devicesHeading.current;
+    target?.focus();
+  }, [devices, leaving]);
 
   const syncNow = (): void => {
     if (!engine || syncing) return;
@@ -37,6 +88,17 @@ export function AppSyncScreen(): ReactElement {
   const removeDevice = async (device: AccountDevice): Promise<void> => {
     const outcome = await command.run({ type: 'device.remove', deviceId: device.id });
     notifyOutcome(outcome, { success: outcome.status === 'applied' ? outcome.local.message : '', action: 'remove', subject: device.name });
+    const listing = queryClient.getQueryData<AppSyncView>(accountKeys.appSync);
+    if (outcome.status !== 'applied' || !listing) return;
+
+    refocused.current.delete(device.id);
+    const entry: LeavingDevice = { id: device.id, lastSyncedAt: listing.lastSyncedAt, status: listing.status, focusCandidates: focusCandidates(listing.devices, device.id) };
+    setLeaving(current => [...current.filter(item => item.id !== device.id), entry]);
+  };
+
+  const trackRemoveButton = (id: string, button: HTMLButtonElement | null): void => {
+    if (button) removeButtons.current.set(id, button);
+    else removeButtons.current.delete(id);
   };
 
   return (
@@ -139,7 +201,9 @@ export function AppSyncScreen(): ReactElement {
 
           <Card padding="md">
             <Card.Body>
-              <h2 className={screenStyles.cardTitle}>Devices</h2>
+              <h2 ref={devicesHeading} tabIndex={-1} className={screenStyles.cardTitle}>
+                Devices
+              </h2>
               {readiness.kind === 'loading' ? (
                 <Skeleton.List rows={2} />
               ) : readiness.kind === 'failed' ? (
@@ -149,7 +213,14 @@ export function AppSyncScreen(): ReactElement {
               ) : (
                 <ul className={styles.deviceRows}>
                   {sync.data.devices.map(device => (
-                    <DeviceRow key={device.id} device={device} command={command} onRemove={confirmed => setRemoval({ device: confirmed, open: true })} />
+                    <DeviceRow
+                      key={device.id}
+                      device={device}
+                      command={command}
+                      leaving={leaving.some(entry => entry.id === device.id && isLeaving(entry, sync.data))}
+                      buttonRef={button => trackRemoveButton(device.id, button)}
+                      onRemove={confirmed => setRemoval({ device: confirmed, open: true })}
+                    />
                   ))}
                 </ul>
               )}
@@ -188,11 +259,13 @@ export function AppSyncScreen(): ReactElement {
 interface DeviceRowProps {
   device: AccountDevice;
   command: AccountCommandHook;
+  leaving: boolean;
+  buttonRef: (button: HTMLButtonElement | null) => void;
   onRemove: (device: AccountDevice) => void;
 }
 
-function DeviceRow({ device, command, onRemove }: DeviceRowProps): ReactElement {
-  const removing = command.isPendingFor(item => item.type === 'device.remove' && item.deviceId === device.id);
+function DeviceRow({ device, command, leaving, buttonRef, onRemove }: DeviceRowProps): ReactElement {
+  const removing = leaving || command.isPendingFor(item => item.type === 'device.remove' && item.deviceId === device.id);
 
   return (
     <li className={styles.deviceRow}>
@@ -207,7 +280,16 @@ function DeviceRow({ device, command, onRemove }: DeviceRowProps): ReactElement 
           In use
         </Button>
       ) : (
-        <Button size="sm" variant="ghost" aria-label={`Remove ${device.name}`} loading={removing} loadingText="Removing…" disabled={removing} onClick={() => onRemove(device)}>
+        <Button
+          ref={buttonRef}
+          size="sm"
+          variant="ghost"
+          aria-label={`Remove ${device.name}`}
+          loading={removing}
+          loadingText="Removing…"
+          disabled={removing}
+          onClick={() => onRemove(device)}
+        >
           Remove
         </Button>
       )}

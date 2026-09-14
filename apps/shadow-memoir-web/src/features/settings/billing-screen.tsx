@@ -109,10 +109,12 @@ function BillingPlans({ billing }: { billing: BillingView }): ReactElement {
                 <p className={styles.sectionNote}>
                   <strong>Current plan.</strong> Switching between monthly and yearly is done with the payment provider.
                 </p>
+              ) : plan.current ? (
+                <p className={styles.sectionNote}>
+                  <strong>Current plan.</strong> Nothing to set up and nothing to pay.
+                </p>
               ) : (
-                <Button fullWidth variant="secondary" disabled>
-                  {plan.current ? 'Current plan' : 'Included'}
-                </Button>
+                <p className={styles.sectionNote}>Everything on Free stays included with Coach.</p>
               )}
             </Card.Body>
           </Card>

@@ -67,7 +67,9 @@ function SelectRoot({
           aria-label={ariaLabel}
           aria-labelledby={ariaLabelledby}
         >
-          <SelectPrimitive.Value className={styles.value} placeholder={placeholder} />
+          <span className={styles.value}>
+            <SelectPrimitive.Value placeholder={placeholder} />
+          </span>
           <SelectPrimitive.Icon className={styles.chevron}>{loading ? <span className={styles.spinner} aria-hidden="true" /> : <ChevronDownIcon />}</SelectPrimitive.Icon>
         </SelectPrimitive.Trigger>
         <SelectPrimitive.Portal>

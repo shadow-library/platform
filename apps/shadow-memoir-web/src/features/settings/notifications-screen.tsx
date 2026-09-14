@@ -55,7 +55,7 @@ export function NotificationSettingsScreen(): ReactElement {
           {data => (
             <>
               <Alert intent="info" title="Push notifications are coming soon">
-                Email stays the only way to hear from Shadow Memoir for now. Each category below is off until you turn it on.
+                Email stays the only way to hear from Shadow Memoir for now.
               </Alert>
 
               <Card padding="lg">

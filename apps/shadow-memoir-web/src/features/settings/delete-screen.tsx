@@ -417,7 +417,7 @@ function UnderwayStep({ stage, heading, terms }: UnderwayStepProps): ReactElemen
               const status = stepStatus(stage.progress, step.reachedAt, DELETION_STEPS[index - 1]?.reachedAt ?? 'pending');
               return (
                 <li key={step.reachedAt} className={styles.deletionStep} data-status={status}>
-                  <span>{step.label}</span>
+                  <span className={styles.deletionStepLabel}>{step.label}</span>
                   <span className={styles.deletionStepStatus}>{STEP_STATUS_LABELS[status]}</span>
                 </li>
               );

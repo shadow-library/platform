@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -6,13 +6,23 @@ import { toast } from '@shadow-library/ui';
 
 import { OnboardingScreen } from '@/features/onboarding';
 import { AppSyncScreen, BillingScreen, DeleteAccountScreen, ExportScreen, NotificationSettingsScreen, SettingsScreen } from '@/features/settings';
+import { accountKeys } from '@/lib/data';
 import { type DeltaPage, SYNC_META_KEYS, SyncEngineProvider } from '@/lib/sync';
 import { OnboardingGate } from '@/routes/_account';
 
 import { createMemoirTestData, renderScreen } from './harness';
 import { type HttpFake, httpFake } from './http-fake';
 import { withTimeZone } from './setup';
-import { createSyncedTestData, createTestEngine, failed, type FakeServer, type TestEngine, type TestEngineOptions } from './sync-harness';
+import {
+  createLiveTestEngine,
+  createSyncedTestData,
+  createTestEngine,
+  failed,
+  type FakeServer,
+  type LiveTestEngine,
+  type TestEngine,
+  type TestEngineOptions,
+} from './sync-harness';
 
 const TODAY = '2026-08-22';
 
@@ -203,6 +213,157 @@ describe('Settings screen, synced', () => {
     expect(state.monthlyBudgetMinor).toBeNull();
   });
 
+  it('should save the monthly budget when focus leaves the field past Clear', async () => {
+    const user = userEvent.setup();
+    const success = vi.spyOn(toast, 'success');
+    const { fake, state } = accountServer({ monthlyBudgetMinor: null });
+    renderSyncedSettings(<SettingsScreen />);
+
+    const budget = (await screen.findByLabelText('Monthly budget')) as HTMLInputElement;
+    await user.type(budget, '700');
+    expect(await screen.findByText('Unsaved — press Enter or move out of the field to save.')).toBeDefined();
+    await user.tab();
+    await user.tab();
+
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Saved.', undefined));
+    expect(state.monthlyBudgetMinor).toBe(70_000);
+    expect(fake.count('PATCH', ACCOUNT_PATH)).toBe(1);
+  });
+
+  it('should send one budget save when Enter is followed by leaving the field', async () => {
+    const user = userEvent.setup();
+    const success = vi.spyOn(toast, 'success');
+    let releaseGate = (): void => undefined;
+    const gate = new Promise<void>(resolve => (releaseGate = resolve));
+    const { fake, state } = accountServer({ monthlyBudgetMinor: null }, { patchGate: () => gate });
+    renderSyncedSettings(<SettingsScreen />);
+
+    const budget = (await screen.findByLabelText('Monthly budget')) as HTMLInputElement;
+    await user.type(budget, '1500{Enter}');
+    await user.tab();
+    await user.tab();
+    releaseGate();
+
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Saved.', undefined));
+    await user.click(budget);
+    await user.tab();
+    await user.tab();
+    expect(state.monthlyBudgetMinor).toBe(150_000);
+    expect(fake.count('PATCH', ACCOUNT_PATH)).toBe(1);
+  });
+
+  it('should save a retyped amount after the saved budget was changed elsewhere', async () => {
+    const user = userEvent.setup();
+    const { fake, state } = accountServer({ monthlyBudgetMinor: null });
+    const test = createTestEngine({ today: TODAY });
+    const data = createSyncedTestData(test.engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <SettingsScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    const budget = (await screen.findByLabelText('Monthly budget')) as HTMLInputElement;
+    await user.type(budget, '700');
+    await user.tab();
+    await user.tab();
+    await waitFor(() => expect(budget.value).toBe('700.00'));
+
+    state.monthlyBudgetMinor = null;
+    await data.queryClient.invalidateQueries({ queryKey: accountKeys.day });
+    await waitFor(() => expect(budget.value).toBe(''));
+
+    await user.click(budget);
+    await user.type(budget, '700');
+    await user.tab();
+    await user.tab();
+
+    await waitFor(() => expect(fake.count('PATCH', ACCOUNT_PATH)).toBe(2));
+    await waitFor(() => expect(state.monthlyBudgetMinor).toBe(70_000));
+  });
+
+  it('should not save a budget draft when the window loses focus', async () => {
+    const user = userEvent.setup();
+    const { fake } = accountServer({ monthlyBudgetMinor: null });
+    renderSyncedSettings(<SettingsScreen />);
+
+    const budget = (await screen.findByLabelText('Monthly budget')) as HTMLInputElement;
+    await user.type(budget, '70');
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+    fireEvent.focusOut(budget, { relatedTarget: null });
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(fake.count('PATCH', ACCOUNT_PATH)).toBe(0);
+    expect(screen.getByText('Unsaved — press Enter or move out of the field to save.')).toBeDefined();
+  });
+
+  it('should never write an unsaved budget draft into the account the session changed to', async () => {
+    const user = userEvent.setup();
+    const base: Omit<AccountServerState, 'monthlyBudgetMinor'> = {
+      scheduleStartMin: 6 * 60 + 30,
+      scheduleEndMin: 22 * 60 + 30,
+      timezone: 'Europe/Oslo',
+      pendingTimezone: null,
+      intensityMode: 'standard',
+      pendingIntensityMode: null,
+      defaultCurrency: 'EUR',
+      onboardingCompletedAt: '2026-01-01T00:00:00.000Z',
+      notificationPrefs: { weeklyDigest: false, aiReadiness: false, billingReminders: false },
+    };
+    const accounts: Record<'a' | 'b', AccountServerState> = {
+      a: { ...base, notificationPrefs: { ...base.notificationPrefs }, monthlyBudgetMinor: null },
+      b: { ...base, notificationPrefs: { ...base.notificationPrefs }, monthlyBudgetMinor: 25_000 },
+    };
+    let cookie: 'a' | 'b' = 'a';
+    const fake = httpFake({
+      'GET /api/auth/userinfo': () => ({ body: { sub: `account-${cookie}`, email: `${cookie}@memoir.test` } }),
+      [`GET ${ACCOUNT_PATH}`]: () => ({ body: accounts[cookie] }),
+      [`PATCH ${ACCOUNT_PATH}`]: call => {
+        Object.assign(accounts[cookie], call.body as Partial<AccountServerState>);
+        return { body: accounts[cookie] };
+      },
+    });
+    const test = createTestEngine({ today: TODAY, accountId: 'account-a' });
+    const data = createSyncedTestData(test.engine, () => Promise.resolve(`account-${cookie}`));
+    const { unmount } = renderScreen(
+      <SyncEngineProvider data={data}>
+        <SettingsScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    await user.type(await screen.findByLabelText('Monthly budget'), '700');
+    cookie = 'b';
+    unmount();
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(fake.count('PATCH', ACCOUNT_PATH)).toBe(0);
+    expect(accounts.b.monthlyBudgetMinor).toBe(25_000);
+    expect(accounts.a.monthlyBudgetMinor).toBeNull();
+  });
+
+  it('should describe devices neutrally while the account is being deleted', async () => {
+    accountServer({}, { status: () => 403, errorCode: 'ACC_002' });
+    renderSyncedSettings(<SettingsScreen />, { status: () => 403, errorCode: 'ACC_002' });
+
+    expect(await screen.findByText('Devices aren’t listed during deletion')).toBeDefined();
+    expect(screen.queryByText("Devices haven't loaded yet")).toBeNull();
+    expect(screen.queryByText(/devices? registered/)).toBeNull();
+  });
+
+  it('should not count registered devices before the first sync', async () => {
+    accountServer();
+    const gate = held('/sync/delta');
+    renderSyncedSettings(<SettingsScreen />, { fetchImpl: gate.fetchImpl, pages: [DEVICE_PAGE] });
+
+    expect(await screen.findByText('Looking for registered devices')).toBeDefined();
+    expect(screen.queryByText(/devices? registered/)).toBeNull();
+
+    gate.release();
+    expect(await screen.findByText('1 device registered')).toBeDefined();
+  });
+
   it('should not toast when saving an unchanged value', async () => {
     const user = userEvent.setup();
     const success = vi.spyOn(toast, 'success');
@@ -301,6 +462,17 @@ describe('Notification preferences, synced', () => {
   });
 });
 
+describe('Notification preferences, as set', () => {
+  it('should not claim every category is off when some are on', async () => {
+    accountServer({ notificationPrefs: { weeklyDigest: true, aiReadiness: false, billingReminders: true } });
+    renderSyncedSettings(<NotificationSettingsScreen />);
+
+    expect(await screen.findByText('Push notifications are coming soon')).toBeDefined();
+    expect((await screen.findByRole('switch', { name: 'Weekly review by email' })).getAttribute('aria-checked')).toBe('true');
+    expect(screen.queryByText(/off until you turn it on/)).toBeNull();
+  });
+});
+
 describe('Plan and billing', () => {
   it('should sell coaching volume and nothing about the game', async () => {
     renderScreen(<BillingScreen />, { today: TODAY });
@@ -381,6 +553,15 @@ describe('Plan and billing', () => {
     expect(screen.queryByRole('button', { name: 'Pay yearly' })).toBeNull();
     expect(screen.getByText(/done with the payment provider/)).toBeDefined();
     expect(fake.count('POST', '/api/v1/billing/checkout')).toBe(0);
+  });
+
+  it('should label the Free card instead of offering a disabled action', async () => {
+    renderSyncedSettings(<BillingScreen />, { pages: [page({ entitlement: [{ tier: 'paid', state: 'active', expiresAt: '2026-10-06T00:00:00.000Z', trialUsed: true }] })] });
+
+    expect(await screen.findByText('Everything on Free stays included with Coach.')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Included' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Current plan' })).toBeNull();
+    expect(screen.queryAllByRole('button').filter(button => (button as HTMLButtonElement).disabled)).toEqual([]);
   });
 
   it('should describe a lapsed subscription', () =>
@@ -588,6 +769,23 @@ const DEVICE_PAGE: DeltaPage = {
   domains: { devices: [{ id: 'd-1', userAgent: 'Mozilla/5.0 (Macintosh) Chrome/120', lastSeenAt: '2026-08-22T08:00:00.000Z' }] },
 };
 
+const LIVE_DEVICES: DeltaPage['domains'] = {
+  devices: [
+    { id: 'd-1', userAgent: 'Mozilla/5.0 (Macintosh) Chrome/120', lastSeenAt: '2026-08-22T08:00:00.000Z' },
+    { id: 'd-2', userAgent: 'Mozilla/5.0 (Windows) Firefox/1', lastSeenAt: '2026-08-21T08:00:00.000Z' },
+  ],
+};
+
+function renderLiveAppSync(live: LiveTestEngine): void {
+  const data = createSyncedTestData(live.engine);
+  renderScreen(
+    <SyncEngineProvider data={data}>
+      <AppSyncScreen />
+    </SyncEngineProvider>,
+    { value: data },
+  );
+}
+
 describe('App and sync, synced', () => {
   afterEach(() => setOnline(true));
 
@@ -717,6 +915,56 @@ describe('App and sync, synced', () => {
     await waitFor(() => expect(screen.getAllByText('Quest completed')).toHaveLength(1));
     expect(screen.queryByRole('alertdialog')).toBeNull();
     await waitFor(() => expect(document.activeElement?.textContent).toContain('Quest completed'));
+  });
+
+  it('should keep a removed device pending until its row is gone', async () => {
+    const live = createLiveTestEngine({ today: TODAY });
+    live.rows = LIVE_DEVICES;
+    let releasePass: () => Promise<void> = () => Promise.resolve();
+    httpFake({
+      'DELETE /api/v1/account/devices/d-1': async () => {
+        live.rows = { devices: LIVE_DEVICES.devices?.slice(1) ?? [] };
+        releasePass = await live.holdPass();
+        return { status: 200 };
+      },
+    });
+    const success = vi.spyOn(toast, 'success');
+    renderLiveAppSync(live);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove Chrome · Macintosh' }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Remove' }));
+
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Removed from your devices.', undefined));
+    const pending = screen.getByRole('button', { name: 'Remove Chrome · Macintosh' }) as HTMLButtonElement;
+    expect(pending.disabled).toBe(true);
+    expect(pending.getAttribute('aria-busy')).toBe('true');
+
+    await releasePass();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Remove Chrome · Macintosh' })).toBeNull());
+  });
+
+  it('should move focus to the next device once a removed row is gone', async () => {
+    const live = createLiveTestEngine({ today: TODAY });
+    live.rows = LIVE_DEVICES;
+    httpFake({
+      'DELETE /api/v1/account/devices/d-1': () => {
+        live.rows = { devices: LIVE_DEVICES.devices?.slice(1) ?? [] };
+        return { status: 200 };
+      },
+      'DELETE /api/v1/account/devices/d-2': () => {
+        live.rows = { devices: [] };
+        return { status: 200 };
+      },
+    });
+    renderLiveAppSync(live);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove Chrome · Macintosh' }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Remove Firefox · Windows' })));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Firefox · Windows' }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Devices' })));
   });
 
   it('should ellipsize long device names and tell unnamed devices apart by when they were last seen', async () =>

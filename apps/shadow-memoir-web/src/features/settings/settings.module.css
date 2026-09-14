@@ -18,6 +18,12 @@
   margin-bottom: 16px;
 }
 
+.identityText {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .identityName {
   font-size: var(--sh-text-body);
   font-weight: 600;
@@ -337,10 +343,9 @@
 
 .deletionStep {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 4px 12px;
+  gap: 12px;
   min-height: 44px;
   padding: 8px 0;
   border-bottom: 1px solid var(--sh-border-subtle);
@@ -351,7 +356,14 @@
   border-bottom: none;
 }
 
+.deletionStepLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .deletionStepStatus {
+  flex: none;
+  text-align: end;
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);
 }

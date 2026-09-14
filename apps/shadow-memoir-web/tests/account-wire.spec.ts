@@ -607,6 +607,24 @@ describe('Account deletion against the signed-in session', () => {
     expect((await backing.keys()).filter(key => key.startsWith('acct:account-a:') && !key.endsWith(':meta:device-id'))).toEqual([]);
   });
 
+  it('should open a later session on the statements rather than the confirmation once a start succeeds', async () => {
+    const backing = sharedBacking();
+    httpFake({ ...ELEVATED, ...START });
+    const laterSession = async (): Promise<SyncedAccountProvider> => {
+      const { engine, store } = createTestEngine({ today: TODAY, accountId: 'account-a', marker: sharedMarker(), backing });
+      store.open();
+      return new SyncedAccountProvider(engine, SELF);
+    };
+    const subject = await confirmedProvider(SELF, backing);
+    expect((await (await laterSession()).getDeletion()).stage).toEqual({ kind: 'confirm' });
+
+    await subject.dispatchCommand({ type: 'deletion.begin' });
+
+    const later = await (await laterSession()).getDeletion();
+    expect(later.stage).toEqual({ kind: 'idle' });
+    expect(later.acknowledged).toEqual([]);
+  });
+
   it('should report that this device’s copy was kept when the wipe fails', async () => {
     const backing = sharedBacking();
     let failing = false;

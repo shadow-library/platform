@@ -68,7 +68,11 @@
   cursor: not-allowed;
 }
 
+/* Radix's `Select.Value` drops `className`, so the truncation lives on this wrapper. */
 .value {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: start;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
