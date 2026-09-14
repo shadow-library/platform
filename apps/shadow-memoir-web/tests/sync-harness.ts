@@ -1,10 +1,14 @@
 import { memoirQueryClient } from '@/lib/data';
 import {
   type AccountMarker,
+  coverageKey,
   type DeltaPage,
   type KeyValueBacking,
   MemoirStore,
+  SNAPSHOT_DOMAINS,
+  SYNC_DOMAINS,
   SyncClient,
+  type SyncDomain,
   SyncedAccountProvider,
   SyncedDataProvider,
   SyncedFinanceProvider,
@@ -28,6 +32,8 @@ export interface FakeServerOptions {
   outcomes?: (batch: RecordedBatch, attempt: number) => WireCommandOutcome[];
   status?: () => number;
   errorCode?: string;
+  /** The domains this server registers; defaults to every domain the web knows. */
+  serves?: SyncDomain[];
 }
 
 export interface FakeServer {
@@ -58,6 +64,26 @@ export function failed(commandId: string, message = 'transaction rolled back', c
   return { commandId, status: 'failed', result: {}, replayed: false, error: { code, message } };
 }
 
+export function domainsExcept(...excluded: SyncDomain[]): SyncDomain[] {
+  return SYNC_DOMAINS.filter(domain => !excluded.includes(domain));
+}
+
+/** The coverage record a mirror holds once every keyset domain among `domains` is covered. */
+export function coverageFor(domains: SyncDomain[]): string[] {
+  return domains
+    .filter(domain => !SNAPSHOT_DOMAINS.includes(domain))
+    .map(coverageKey)
+    .sort();
+}
+
+/** As the server does, every requested domain it registers is in the page, empty when the page names no rows for it; one it does not know is left out. */
+export function deltaResponse(request: RequestInfo | URL, page: DeltaPage, epoch = 'epoch-1', serves: SyncDomain[] = SYNC_DOMAINS): Response {
+  const requested = new URL(decodeURIComponent(String(request)), 'http://memoir.test').searchParams.get('domains')?.split(',') ?? SYNC_DOMAINS;
+  const domains: DeltaPage['domains'] = {};
+  for (const domain of requested) if (serves.some(served => served === domain)) domains[domain] = page.domains[domain] ?? [];
+  return new Response(JSON.stringify({ ...page, domains }), { status: 200, headers: { 'x-sync-epoch': epoch, 'content-type': 'application/json' } });
+}
+
 export function createFakeServer(options: FakeServerOptions = {}): FakeServer {
   const server: FakeServer = { fetchImpl: null as never, batches: [], deltaRequests: [], deviceRegistrations: [], epoch: options.epoch ?? 'epoch-1', pageIndex: 0 };
 
@@ -84,7 +110,7 @@ export function createFakeServer(options: FakeServerOptions = {}): FakeServer {
     server.deltaRequests.push(url);
     const page = options.pages?.[server.pageIndex] ?? EMPTY_PAGE;
     if (options.pages && server.pageIndex < options.pages.length - 1) server.pageIndex += 1;
-    return new Response(JSON.stringify(page), { status: 200, headers });
+    return deltaResponse(url, page, server.epoch, options.serves);
   }) as typeof fetch;
 
   return server;

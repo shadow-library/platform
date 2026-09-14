@@ -214,6 +214,20 @@
     "performedAt": "2026-02-19T09:00:00.000Z"
   },
   {
+    "scenario": "quest.deleteLog",
+    "command": {
+      "type": "quest.deleteLog",
+      "occurrenceId": "{questId}:2026-02-17"
+    },
+    "wire": {
+      "type": "quest.deleteLog",
+      "payload": {
+        "occurrenceId": "{questId}:2026-02-17"
+      }
+    },
+    "performedAt": "2026-02-20T09:00:00.000Z"
+  },
+  {
     "scenario": "expense.create",
     "command": {
       "type": "expense.create",

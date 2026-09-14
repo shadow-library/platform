@@ -4,7 +4,7 @@ import { type DeltaPage, SyncedReflectProvider, type SyncEngine } from '@/lib/sy
 
 import { httpFake } from './http-fake';
 import { withTimeZone } from './setup';
-import { createTestEngine } from './sync-harness';
+import { createTestEngine, deltaResponse } from './sync-harness';
 
 const TODAY = '2026-08-24';
 
@@ -130,10 +130,7 @@ describe('Coaching consent', () => {
         pulls += 1;
         const rows = [...serverRows];
         if (stalePull) await stalePull;
-        return new Response(JSON.stringify({ ...page({ ai_consents: rows }), cursor: String(pulls) }), {
-          status: 200,
-          headers: { 'x-sync-epoch': server.epoch, 'content-type': 'application/json' },
-        });
+        return deltaResponse(input, { ...page({ ai_consents: rows }), cursor: String(pulls) }, server.epoch);
       },
     });
     await engine.start();

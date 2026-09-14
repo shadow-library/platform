@@ -154,6 +154,22 @@ describe('Web wire compatibility (FE-4)', () => {
     expect(recurrenceOutcome!.status).toBe('applied');
   });
 
+  it('should remove the quest log the pinned quest.deleteLog wire command names', async () => {
+    const create = scenarioFor('quest.create');
+    const [created] = await submit([{ ...envelope(create.wire), payload: { ...create.wire.payload, entityRef: 'wire-compat-undo-ref' } }]);
+    const questId = String(created!.result['id']);
+    const skip = scenarioFor('quest.skip');
+    const [skipped] = await submit([envelope({ type: skip.wire.type, payload: substitute(skip.wire.payload, { questId }) }, skip.performedAt)]);
+    expect(skipped!.status).toBe('applied');
+    expect((await domains())['quest_logs']!.some(row => row['questId'] === questId && row['date'] === '2026-02-17')).toBe(true);
+
+    const deleteLog = scenarioFor('quest.deleteLog');
+    const [deleted] = await submit([envelope({ type: deleteLog.wire.type, payload: substitute(deleteLog.wire.payload, { questId }) }, deleteLog.performedAt)]);
+
+    expect(deleted!.status).toBe('applied');
+    expect((await domains())['quest_logs']!.some(row => row['questId'] === questId && row['date'] === '2026-02-17')).toBe(false);
+  });
+
   /**
    * The four FE-5 domains, driven in the order their ids become known: the metric catalogue has to be
    * seeded before `metric.register` can address a metric, the account has to hold coins before

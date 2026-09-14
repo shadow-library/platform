@@ -1,6 +1,6 @@
 import { isIndexedDbAvailable, OfflineStore } from '@shadow-library/web/offline';
 
-import { type DeltaRow, type OutboxEntry, SYNC_META_KEYS, type SyncDomain } from './sync.types';
+import { type DeadLetter, type DeltaRow, type OutboxEntry, SYNC_META_KEYS, type SyncDomain } from './sync.types';
 
 /**
  * The narrow slice of a key/value store the sync layer needs, so the same `MemoirStore` runs over
@@ -21,6 +21,7 @@ export const MEMOIR_DB_NAME = 'shadow-memoir';
 const DOMAIN_PREFIX = 'domain:';
 const META_PREFIX = 'meta:';
 const OUTBOX_PREFIX = 'outbox:';
+const DEAD_LETTER_PREFIX = 'dead-letter:';
 
 /**
  * Primary key per delta domain, as the server's row projection names it. Upserting by this key is what
@@ -274,6 +275,10 @@ export class MemoirStore {
     await this.upsertRows(domain, rows);
   }
 
+  async readRow(domain: string, recordId: string): Promise<DeltaRow | undefined> {
+    return (await this.readable()).get<DeltaRow>(`${this.scope}${DOMAIN_PREFIX}${domain}:${recordId}`);
+  }
+
   async deleteRow(domain: string, recordId: string): Promise<void> {
     await (await this.writable()).delete(`${this.scope}${DOMAIN_PREFIX}${domain}:${recordId}`);
   }
@@ -303,6 +308,31 @@ export class MemoirStore {
   async removeOutbox(commandId: string): Promise<void> {
     await this.writable();
     for (const key of await this.scopedKeys(OUTBOX_PREFIX)) if (key.endsWith(`:${commandId}`)) await this.guard().delete(key);
+  }
+
+  /** One record per letter, keyed by its outbox position: a letter is added or dismissed without rewriting the others, which another tab or pass may be changing. */
+  async putDeadLetter(seq: number, letter: DeadLetter): Promise<void> {
+    await (await this.writable()).put(`${this.scope}${DEAD_LETTER_PREFIX}${String(seq).padStart(12, '0')}:${letter.commandId}`, letter);
+  }
+
+  async readDeadLetters(): Promise<DeadLetter[]> {
+    await this.adoptDeadLetterList();
+    const keys = (await this.scopedKeys(DEAD_LETTER_PREFIX)).sort();
+    const letters = await Promise.all(keys.map(key => this.guard().get<DeadLetter>(key)));
+    return letters.filter((letter): letter is DeadLetter => letter !== undefined);
+  }
+
+  async removeDeadLetter(commandId: string): Promise<void> {
+    await this.adoptDeadLetterList();
+    for (const key of await this.scopedKeys(DEAD_LETTER_PREFIX)) if (key.endsWith(`:${commandId}`)) await this.guard().delete(key);
+  }
+
+  /** Letters from before one record per letter were a single meta list. Their outbox positions are gone, so they sort first, which is where they belong. */
+  private async adoptDeadLetterList(): Promise<void> {
+    const listed = await this.readMeta<DeadLetter[]>(SYNC_META_KEYS.deadLetters);
+    if (listed === undefined) return;
+    for (const letter of listed) await this.putDeadLetter(0, letter);
+    await (await this.writable()).delete(`${this.scope}${META_PREFIX}${SYNC_META_KEYS.deadLetters}`);
   }
 
   async nextOutboxSeq(): Promise<number> {

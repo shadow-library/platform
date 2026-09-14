@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { type Command } from '@/lib/data';
-import { type DeltaPage, SYNC_META_KEYS, SyncedDataProvider } from '@/lib/sync';
+import { type DeltaPage, NEWER_DOMAINS, SYNC_DOMAINS, SYNC_META_KEYS, SyncedDataProvider } from '@/lib/sync';
 
-import { createTestEngine, type FakeServer, sharedBacking } from './sync-harness';
+import { coverageFor, createTestEngine, deltaResponse, domainsExcept, type FakeServer, sharedBacking, type TestEngine } from './sync-harness';
 
 const TODAY = '2026-08-24';
 
@@ -110,6 +110,31 @@ describe('delta ingestion', () => {
     expect((await second.store.readDomain('quests')).map(quest => quest['id'])).toEqual(['2']);
   });
 
+  it('should keep a re-created row whose syncSeq is newer than its tombstone', async () => {
+    const backing = sharedBacking();
+    const first = createTestEngine({ backing, pages: [page({ cursor: '5', domains: { quests: [{ ...questRow('1', 'Morning run'), syncSeq: '5' }] } })] });
+    await first.engine.start();
+
+    const tombstone = { domain: 'quests', recordId: '1', syncSeq: '8' };
+    const restored = { ...questRow('1', 'Morning run, restored'), syncSeq: '12' };
+    const second = createTestEngine({ backing, pages: [page({ cursor: '12', domains: { quests: [restored] }, tombstones: [tombstone] })] });
+    await second.engine.start();
+    expect((await second.store.readDomain('quests')).map(quest => quest['name'])).toEqual(['Morning run, restored']);
+
+    const overlap = createTestEngine({ backing, pages: [page({ cursor: '12', tombstones: [tombstone] })] });
+    await overlap.engine.start();
+    expect((await overlap.store.readDomain('quests')).map(quest => quest['name'])).toEqual(['Morning run, restored']);
+  });
+
+  it('should remove a row whose tombstone in the same page is newer than it', async () => {
+    const { engine, store } = createTestEngine({
+      pages: [page({ cursor: '14', domains: { quests: [{ ...questRow('1', 'Morning run'), syncSeq: '12' }] }, tombstones: [{ domain: 'quests', recordId: '1', syncSeq: '14' }] })],
+    });
+    await engine.start();
+
+    expect(await store.readDomain('quests')).toEqual([]);
+  });
+
   it('should replace a snapshot domain rather than merge it', async () => {
     const backing = sharedBacking();
     const first = createTestEngine({ backing, pages: [page({ cursor: '1', domains: { devices: [{ id: 'device-a' }, { id: 'device-b' }] } })] });
@@ -184,12 +209,113 @@ describe('domain coverage', () => {
     expect(server.deltaRequests).toHaveLength(2);
     for (const url of server.deltaRequests) expect(requestedDomains(url)).not.toEqual(expect.arrayContaining(['hero_events']));
     for (const url of server.deltaRequests) expect(requestedDomains(url)).not.toContain('progress_counters');
-    expect(await store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['quests@1']);
+    expect(await store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(domainsExcept(...NEWER_DOMAINS, 'quest_logs')));
+  });
+
+  it('should treat a missing domain key as a refusal', async () => {
+    const backing = sharedBacking();
+    const first = createTestEngine({ backing, pages: [page({ cursor: '42', domains: { quests: [questRow('1', 'Morning run')] } })] });
+    await first.engine.start();
+    expect(await first.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(SYNC_DOMAINS));
+
+    const second = createTestEngine({ backing, serves: domainsExcept('reschedule_events'), pages: [page({ cursor: '43' })] });
+    await second.engine.start();
+    await second.engine.sync();
+
+    expect(second.engine.getSnapshot()).toMatchObject({ state: 'online', readiness: { kind: 'ready' } });
+    expect(requestedDomains(second.server.deltaRequests.at(-1)!)).not.toContain('reschedule_events');
+    expect(second.server.deltaRequests.filter(url => url.includes('since=0')).map(requestedDomains)).toEqual([['expense_audits', 'hero_events']]);
+    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(domainsExcept('reschedule_events', 'quest_logs')));
+  });
+
+  it('should not pull everything when every requested domain is refused', async () => {
+    const backing = sharedBacking();
+    const first = createTestEngine({ backing, pages: [page({ cursor: '42', domains: { quests: [] } })] });
+    await first.engine.start();
+    await first.store.writeMeta(SYNC_META_KEYS.coveredDomains, coverageFor(domainsExcept('hero_events')));
+
+    const second = createTestEngine({
+      backing,
+      fetchImpl: refusingDomains(['hero_events'], true, server => server.pageIndex > 0),
+      pages: [page({ cursor: '43' }), page({ cursor: '43' })],
+    });
+    await second.engine.start();
+
+    expect(second.engine.getSnapshot().state).toBe('online');
+    for (const url of second.server.deltaRequests) expect(requestedDomains(url)).not.toEqual([]);
+    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).not.toContain('hero_events@1');
+  });
+
+  /** Backfills `hero_events` over two pages while another tab, on a server that refuses it, starts during the given backfill page and withdraws coverage. */
+  async function backfillWithdrawnDuringPage(withdrawOnPage: number): Promise<TestEngine> {
+    const backing = sharedBacking();
+    const first = createTestEngine({ backing, pages: [page({ cursor: '42', domains: { quests: [] } })] });
+    await first.engine.start();
+    await first.store.writeMeta(SYNC_META_KEYS.coveredDomains, coverageFor(domainsExcept('hero_events')));
+
+    const heroEvent = (id: string): Record<string, unknown> => ({ id, type: 'quest_complete', date: TODAY, syncSeq: id });
+    const olderTab = createTestEngine({ backing, fetchImpl: refusingDomains(['hero_events']), pages: [page({ cursor: '43' })] });
+    let backfillPages = 0;
+    const withdrawingDuringBackfill = (server: FakeServer): typeof fetch =>
+      (async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (requestedDomains(String(input)).join(',') === 'hero_events' && ++backfillPages === withdrawOnPage) await olderTab.engine.start();
+        return server.fetchImpl(input, init);
+      }) as typeof fetch;
+    const backfilling = createTestEngine({
+      backing,
+      fetchImpl: withdrawingDuringBackfill,
+      pages: [
+        page({ cursor: '43' }),
+        page({ cursor: '10', hasMore: true, domains: { hero_events: [heroEvent('10')] } }),
+        page({ cursor: '20', domains: { hero_events: [heroEvent('20')] } }),
+      ],
+    });
+    await backfilling.engine.start();
+    return backfilling;
+  }
+
+  it('should not record coverage that another tab withdrew during a backfill', async () => {
+    const backfilling = await backfillWithdrawnDuringPage(1);
+
+    expect(backfilling.server.deltaRequests.filter(url => requestedDomains(url).join(',') === 'hero_events')).toHaveLength(1);
+    expect(await backfilling.store.readMeta(SYNC_META_KEYS.coveredDomains)).not.toContain('hero_events@1');
+    expect(await backfilling.store.readMeta(SYNC_META_KEYS.backfillCursor)).toBeNull();
+  });
+
+  it('should not record coverage that another tab withdrew during the last backfill page', async () => {
+    const backfilling = await backfillWithdrawnDuringPage(2);
+
+    expect(backfilling.server.deltaRequests.filter(url => requestedDomains(url).join(',') === 'hero_events')).toHaveLength(2);
+    expect(await backfilling.store.readMeta(SYNC_META_KEYS.coveredDomains)).not.toContain('hero_events@1');
+  });
+
+  it('should not re-backfill served domains when a retry refuses the same domains again', async () => {
+    const backing = sharedBacking();
+    const first = createTestEngine({ backing, pages: [page({ cursor: '42', domains: { quests: [] } })] });
+    await first.engine.start();
+
+    const second = createTestEngine({ backing, serves: domainsExcept('reschedule_events'), pages: [page({ cursor: '43' })] });
+    await second.engine.start();
+    for (let pass = 0; pass < 60; pass += 1) await second.engine.sync();
+
+    expect(second.server.deltaRequests.filter(url => requestedDomains(url).includes('reschedule_events')).length).toBeGreaterThan(1);
+    expect(second.server.deltaRequests.filter(url => url.includes('since=0')).map(requestedDomains)).toEqual([['expense_audits', 'hero_events']]);
+  });
+
+  it('should not mark an empty mirror ready when every domain is refused', async () => {
+    const { engine, store, server } = createTestEngine({ serves: [], pages: [page({ cursor: '5' })] });
+    await engine.start();
+    await engine.sync();
+
+    expect(engine.getSnapshot().readiness).toEqual({ kind: 'failed', reason: 'server' });
+    expect(await store.readMeta(SYNC_META_KEYS.mirrorReady)).toBeNull();
+    expect(await store.readMeta(SYNC_META_KEYS.cursor)).toBeUndefined();
+    for (const url of server.deltaRequests) expect(requestedDomains(url)).not.toEqual([]);
   });
 
   it('should backfill a newly served keyset domain without moving the main cursor', async () => {
     const backing = sharedBacking();
-    const first = createTestEngine({ backing, pages: [page({ cursor: '42', domains: { quests: [questRow('1', 'Morning run')] } })] });
+    const first = createTestEngine({ backing, serves: domainsExcept('hero_events'), pages: [page({ cursor: '42', domains: { quests: [questRow('1', 'Morning run')] } })] });
     await first.engine.start();
 
     const heroEvent = (id: string): Record<string, unknown> => ({ id, type: 'quest_complete', date: TODAY, xpDelta: 12, syncSeq: id });
@@ -201,17 +327,17 @@ describe('domain coverage', () => {
 
     expect(second.server.deltaRequests[0]).toContain('since=42');
     expect(second.server.deltaRequests[1]).toContain('since=0');
-    expect(requestedDomains(second.server.deltaRequests[1]!)).toEqual(['hero_events']);
+    expect(requestedDomains(second.server.deltaRequests[1]!)).toEqual(['hero_events', 'quest_logs']);
     expect(await second.store.readMeta(SYNC_META_KEYS.cursor)).toBe('43');
     expect((await second.store.readDomain('hero_events')).map(row => row['id']).sort()).toEqual(['17', '5']);
-    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['hero_events@1', 'quests@1']);
+    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(SYNC_DOMAINS));
   });
 
   it('should re-serve quest logs when their row version changes', async () => {
     const backing = sharedBacking();
     const first = createTestEngine({ backing, pages: [page({ cursor: '42', domains: { quest_logs: [{ id: '71', questId: '1', date: TODAY, state: 'missed' }] } })] });
     await first.engine.start();
-    await first.store.writeMeta(SYNC_META_KEYS.coveredDomains, ['quest_logs@1']);
+    await first.store.writeMeta(SYNC_META_KEYS.coveredDomains, [...coverageFor(domainsExcept('quest_logs')), 'quest_logs@1']);
 
     const second = createTestEngine({
       backing,
@@ -226,7 +352,7 @@ describe('domain coverage', () => {
     expect(second.server.deltaRequests[1]).toContain('since=0');
     expect(await second.store.readDomain('quest_logs')).toEqual([expect.objectContaining({ id: '71', shielded: true })]);
     expect(await second.store.readMeta(SYNC_META_KEYS.cursor)).toBe('43');
-    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['quest_logs@2']);
+    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(SYNC_DOMAINS));
   });
 
   it('should not backfill a domain the server does not serve', async () => {
@@ -234,13 +360,13 @@ describe('domain coverage', () => {
     const first = createTestEngine({ backing, pages: [page({ cursor: '42', domains: { quests: [questRow('1', 'Morning run')] } })] });
     await first.engine.start();
 
-    const second = createTestEngine({ backing, fetchImpl: refusingDomains(['progress_counters', 'hero_events']), pages: [page({ cursor: '43', domains: { quests: [] } })] });
+    const second = createTestEngine({ backing, fetchImpl: refusingDomains(NEWER_DOMAINS), pages: [page({ cursor: '43', domains: { quests: [] } })] });
     await second.engine.start();
 
     expect(second.server.deltaRequests).toHaveLength(1);
     expect(requestedDomains(second.server.deltaRequests[0]!)).not.toContain('hero_events');
     expect(second.engine.getSnapshot().state).toBe('online');
-    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['quests@1']);
+    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(domainsExcept(...NEWER_DOMAINS, 'quest_logs')));
     expect(await second.store.readDomain('hero_events')).toEqual([]);
   });
 
@@ -248,22 +374,22 @@ describe('domain coverage', () => {
     const backing = sharedBacking();
     const first = createTestEngine({ backing, pages: [page({ cursor: '42', domains: { quests: [], quest_logs: [], hero_events: [] } })] });
     await first.engine.start();
-    expect(await first.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['hero_events@1', 'quest_logs@2', 'quests@1']);
+    expect(await first.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(SYNC_DOMAINS));
 
     const rolledBack = createTestEngine({
       backing,
-      fetchImpl: refusingDomains(['progress_counters', 'hero_events']),
+      fetchImpl: refusingDomains(NEWER_DOMAINS),
       pages: [page({ cursor: '43', domains: { quests: [], quest_logs: [] } })],
     });
     await rolledBack.engine.start();
     await rolledBack.engine.sync();
 
-    expect(await rolledBack.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['quests@1']);
+    expect(await rolledBack.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(domainsExcept(...NEWER_DOMAINS, 'quest_logs')));
     expect(rolledBack.server.deltaRequests.filter(url => url.includes('since=0'))).toEqual([]);
 
-    const fresh = createTestEngine({ fetchImpl: refusingDomains(['progress_counters', 'hero_events']), pages: [page({ cursor: '5', domains: { quests: [], quest_logs: [] } })] });
+    const fresh = createTestEngine({ fetchImpl: refusingDomains(NEWER_DOMAINS), pages: [page({ cursor: '5', domains: { quests: [], quest_logs: [] } })] });
     await fresh.engine.start();
-    expect(await fresh.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['quests@1']);
+    expect(await fresh.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(domainsExcept(...NEWER_DOMAINS, 'quest_logs')));
   });
 
   it('should backfill hero_events again after a server refused it', async () => {
@@ -275,11 +401,11 @@ describe('domain coverage', () => {
     const heroEvent = { id: '3', type: 'level_up', date: TODAY, levelAfter: 2, syncSeq: '3' };
     const second = createTestEngine({
       backing,
-      fetchImpl: refusingDomains(['progress_counters', 'hero_events'], true, () => !upgraded),
+      fetchImpl: refusingDomains(NEWER_DOMAINS, true, () => !upgraded),
       pages: [page({ cursor: '43', domains: { quests: [], hero_events: [heroEvent] } })],
     });
     await second.engine.start();
-    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['quests@1']);
+    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(domainsExcept(...NEWER_DOMAINS, 'quest_logs')));
 
     upgraded = true;
     for (let pass = 0; pass < 19; pass += 1) await second.engine.sync();
@@ -287,9 +413,9 @@ describe('domain coverage', () => {
 
     await second.engine.sync();
     const backfills = second.server.deltaRequests.filter(url => url.includes('since=0'));
-    expect(backfills.map(requestedDomains)).toEqual([['hero_events']]);
+    expect(backfills.map(requestedDomains)).toEqual([['expense_audits', 'hero_events', 'quest_logs', 'reschedule_events']]);
     expect((await second.store.readDomain('hero_events')).map(row => row['id'])).toEqual(['3']);
-    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['hero_events@1', 'quests@1']);
+    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(SYNC_DOMAINS));
   });
 
   it('should ask for refused domains again once the epoch changes', async () => {
@@ -311,6 +437,7 @@ describe('domain coverage', () => {
     const backing = sharedBacking();
     const first = createTestEngine({ backing, pages: [page({ cursor: '42', domains: { quests: [] } })] });
     await first.engine.start();
+    await first.store.writeMeta(SYNC_META_KEYS.coveredDomains, coverageFor(domainsExcept('hero_events')));
 
     const heroEvent = (id: string): Record<string, unknown> => ({ id, type: 'quest_complete', date: TODAY, syncSeq: id });
     const routed = (server: FakeServer): typeof fetch =>
@@ -325,7 +452,7 @@ describe('domain coverage', () => {
           : since === '0'
             ? page({ cursor: '10', hasMore: true, domains: { hero_events: [heroEvent('10')] } })
             : page({ cursor: '20', domains: { hero_events: [heroEvent('20')] } });
-        return new Response(JSON.stringify(body), { status: 200, headers: { 'x-sync-epoch': server.epoch, 'content-type': 'application/json' } });
+        return deltaResponse(input, body, server.epoch);
       }) as typeof fetch;
 
     const second = createTestEngine({ backing, maxPages: 1, fetchImpl: routed });
@@ -347,13 +474,13 @@ describe('domain coverage', () => {
     const backing = sharedBacking();
     const first = createTestEngine({ backing, epoch: 'epoch-1', pages: [page({ cursor: '42', domains: { quests: [], hero_events: [] } })] });
     await first.engine.start();
-    expect(await first.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['hero_events@1', 'quests@1']);
+    expect(await first.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(SYNC_DOMAINS));
 
-    const second = createTestEngine({ backing, epoch: 'epoch-2', pages: [page({ cursor: '7', domains: { quests: [] } })] });
+    const second = createTestEngine({ backing, epoch: 'epoch-2', serves: domainsExcept('hero_events'), pages: [page({ cursor: '7', domains: { quests: [] } })] });
     await second.engine.start();
 
     expect(second.server.deltaRequests).toHaveLength(2);
-    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['quests@1']);
+    expect(await second.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(domainsExcept('hero_events', 'quest_logs')));
   });
 });
 

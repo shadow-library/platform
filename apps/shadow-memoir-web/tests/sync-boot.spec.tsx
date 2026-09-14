@@ -251,6 +251,45 @@ describe('sync readiness', () => {
     await waitFor(() => expect(result.current).toEqual({ kind: 'ready' }));
   });
 
+  it('should cancel a stale first fetch before a world invalidation', async () => {
+    const { engine, open } = gatedEngine([page({ domains: { quests: [dailyQuestRow('q1', 'Morning run')] } })]);
+    const data = createSyncedTestData(engine);
+    let releaseReads: () => void = () => undefined;
+    const readsReleased = new Promise<void>(resolve => (releaseReads = resolve));
+    let reads = 0;
+    const answered: number[] = [];
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => {
+        const query = useQuery(
+          {
+            queryKey: [...memoirKeys.all, 'first-fetch-probe'],
+            enabled,
+            queryFn: async () => {
+              reads += 1;
+              const quests = engine.domains().quests?.length ?? 0;
+              await readsReleased;
+              return quests;
+            },
+          },
+          data.queryClient,
+        );
+        useEffect(() => void (query.data === undefined || answered.push(query.data)), [query.data]);
+        return query;
+      },
+      { initialProps: { enabled: false }, wrapper: ({ children }) => <SyncEngineProvider data={data}>{children}</SyncEngineProvider> },
+    );
+
+    await waitFor(() => expect(engine.getSnapshot().state).toBe('syncing'));
+    rerender({ enabled: true });
+    await waitFor(() => expect(reads).toBe(1));
+    open();
+    await waitFor(() => expect(engine.getSnapshot().state).toBe('online'));
+    releaseReads();
+
+    await waitFor(() => expect(result.current.data).toBe(1));
+    expect(answered).toEqual([1]);
+  });
+
   it('should report failed when the first pull errors', async () => {
     const { engine } = createTestEngine({ today: TODAY, status: () => 500 });
     await engine.start();

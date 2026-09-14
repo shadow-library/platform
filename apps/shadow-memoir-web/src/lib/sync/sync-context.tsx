@@ -133,7 +133,11 @@ export function SyncEngineProvider({ data, children }: SyncProviderProps): React
 
   useEffect(() => {
     void engine.start();
-    const unsubscribeWorld = engine.subscribeWorld(() => void queryClient.invalidateQueries({ queryKey: memoirKeys.all }));
+    const unsubscribeWorld = engine.subscribeWorld(() => {
+      // Invalidation joins an in-flight first fetch rather than restarting it, so its answer from the replaced rows would land after the publish and be trusted.
+      void queryClient.cancelQueries({ queryKey: memoirKeys.all });
+      void queryClient.invalidateQueries({ queryKey: memoirKeys.all });
+    });
     let shown = engine.getSnapshot();
     const unsubscribeState = engine.subscribe(() => {
       const next = engine.getSnapshot();

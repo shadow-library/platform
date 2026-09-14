@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { type Command, type OutcomeTicket } from '@/lib/data';
-import { MemoirStore, Outbox, type OutboxEntry, type SyncEngine } from '@/lib/sync';
+import { type DeadLetter, type KeyValueBacking, MemoirStore, Outbox, type OutboxEntry, SYNC_META_KEYS, type SyncEngine } from '@/lib/sync';
 
-import { applied, createTestEngine, failed, rejected, sharedBacking, superseded } from './sync-harness';
+import { applied, createTestEngine, failed, type FakeServer, rejected, sharedBacking, superseded } from './sync-harness';
 
 const TODAY = '2026-08-24';
 
@@ -266,6 +266,45 @@ describe('SyncEngine outcomes', () => {
     expect(engine.getSnapshot()).toMatchObject({ state: 'online', queuedCount: 0, notices: [expect.objectContaining({ outcome: 'failed', code: 'VALIDATION_ERROR' })] });
   });
 
+  it('should not lose a dead letter added during a dismiss', async () => {
+    const backing = sharedBacking();
+    const outbox = new Outbox(new MemoirStore(backing));
+    const [first, second] = (await queued(outbox, ['a', 'b'])) as [OutboxEntry, OutboxEntry];
+    await outbox.ack([first], [failed(first.commandId, 'Anchor quests require a start time', 'QST_003')]);
+
+    let release: () => void = () => undefined;
+    const released = new Promise<void>(resolve => (release = resolve));
+    const readsBeforeRelease: KeyValueBacking = {
+      ...backing,
+      get: async <T>(key: string) => {
+        const value = await backing.get<T>(key);
+        await released;
+        return value;
+      },
+    };
+    const dismissal = new Outbox(new MemoirStore(readsBeforeRelease)).dismissDeadLetter(first.commandId);
+    await outbox.ack([second], [failed(second.commandId, 'Validation Error', 'VALIDATION_ERROR')]);
+    release();
+    await dismissal;
+
+    expect((await outbox.deadLetters()).map(letter => letter.commandId)).toEqual([second.commandId]);
+  });
+
+  it('should carry over dead letters kept as one list by an earlier release', async () => {
+    const store = new MemoirStore(sharedBacking());
+    const outbox = new Outbox(store);
+    const [first, second] = (await queued(outbox, ['a', 'b'])) as [OutboxEntry, OutboxEntry];
+    const letter = (entry: OutboxEntry): DeadLetter => ({ ...entry, code: 'QST_003', deadLetteredAt: entry.createdAt });
+    await store.writeMeta(SYNC_META_KEYS.deadLetters, [letter(first), letter(second)]);
+
+    await outbox.dismissDeadLetter(first.commandId);
+    const [third] = (await queued(outbox, ['c'])) as [OutboxEntry];
+    await outbox.ack([third], [failed(third.commandId, 'Anchor quests require a start time', 'QST_003')]);
+
+    expect((await outbox.deadLetters()).map(kept => kept.commandId)).toEqual([second.commandId, third.commandId]);
+    expect(await store.readMeta(SYNC_META_KEYS.deadLetters)).toBeUndefined();
+  });
+
   it('should keep a transient failure queued', async () => {
     const outbox = new Outbox(new MemoirStore(sharedBacking()));
     const [entry] = (await queued(outbox, ['a'])) as [OutboxEntry];
@@ -434,5 +473,55 @@ describe('SyncEngine outcomes', () => {
 
     await expect(ticket.settled).resolves.toEqual({ status: 'applied', result: {} });
     expect(server.batches).toHaveLength(1);
+  });
+});
+
+describe('SyncEngine fresh pass', () => {
+  beforeEach(() => setOnline(true));
+
+  function heldDeltaEngine(): { engine: SyncEngine; server: FakeServer; hold: () => () => void } {
+    let held = Promise.resolve();
+    const { engine, server } = createTestEngine({
+      fetchImpl: fake => async (input, init) => {
+        if (String(input).includes('/sync/delta')) await held;
+        return fake.fetchImpl(input, init);
+      },
+    });
+    const hold = (): (() => void) => {
+      let release: () => void = () => undefined;
+      held = new Promise<void>(resolve => (release = resolve));
+      return release;
+    };
+    return { engine, server, hold };
+  }
+
+  it('should run a new pass when a fresh sync is requested during an in-flight pass', async () => {
+    const { engine, server, hold } = heldDeltaEngine();
+    const release = hold();
+
+    const passes = [engine.sync(), engine.sync(), engine.sync({ fresh: true }), engine.sync({ fresh: true, background: true })];
+    release();
+    await Promise.all(passes);
+
+    expect(server.deltaRequests).toHaveLength(2);
+  });
+
+  it('should keep a fresh follow-up pass quiet only when every caller waiting on it asked for a background pass', async () => {
+    const { engine, hold } = heldDeltaEngine();
+    await engine.start();
+    const states: string[] = [];
+    engine.subscribe(() => states.push(engine.getSnapshot().state));
+
+    let release = hold();
+    const quiet = [engine.sync({ background: true }), engine.sync({ fresh: true, background: true })];
+    release();
+    await Promise.all(quiet);
+    expect(states).not.toContain('syncing');
+
+    release = hold();
+    const announced = [engine.sync({ background: true }), engine.sync({ fresh: true, background: true }), engine.sync({ fresh: true })];
+    release();
+    await Promise.all(announced);
+    expect(states).toContain('syncing');
   });
 });

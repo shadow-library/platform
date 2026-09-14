@@ -7,7 +7,7 @@ import { TodayScreen } from '@/features/today';
 import { type DeltaPage, type SyncedMemoirData, SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen } from './harness';
-import { createSyncedTestData, createTestEngine, rejected, type TestEngine } from './sync-harness';
+import { createSyncedTestData, createTestEngine, deltaResponse, rejected, type TestEngine } from './sync-harness';
 
 const TODAY = '2026-08-24';
 const OCCURRENCE = `q1:${TODAY}`;
@@ -200,7 +200,7 @@ describe('undoing a quest outcome from Today', () => {
           : types.includes('quest.skip')
             ? page({ cursor: '2', domains: { ...quests, quest_logs: [skippedLog] } })
             : page({ domains: quests });
-        return new Response(JSON.stringify(body), { status: 200, headers: { 'x-sync-epoch': server.epoch, 'content-type': 'application/json' } });
+        return deltaResponse(input, body, server.epoch);
       },
     });
   }

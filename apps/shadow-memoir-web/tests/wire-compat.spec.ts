@@ -18,7 +18,7 @@ import {
 } from '@/lib/sync';
 
 import fixtures from './fixtures/wire-commands.json';
-import { createTestEngine, sharedBacking } from './sync-harness';
+import { coverageFor, createTestEngine, domainsExcept, sharedBacking } from './sync-harness';
 
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -201,6 +201,7 @@ describe('progression contract (P1-17)', () => {
       backing,
       pages: [
         page('11', {
+          account: [ACCOUNT],
           hero_events: [{ id: '3', type: 'level_up', date: '2026-08-24', levelAfter: 6, syncSeq: '11' }],
           progress_counters: [{ questsCompleted: 5, crownsBanked: 1 }],
         }),
@@ -327,9 +328,9 @@ describe('expense audit contract (P1-19)', () => {
 
   it('should backfill expense audits from zero once a server starts serving them', async () => {
     const backing = sharedBacking();
-    const older = createTestEngine({ backing, pages: [page('42', { expenses: [EXPENSE] })] });
+    const older = createTestEngine({ backing, serves: domainsExcept('expense_audits'), pages: [page('42', { expenses: [EXPENSE] })] });
     await older.engine.start();
-    expect(await older.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['expenses@1']);
+    expect(await older.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(domainsExcept('expense_audits', 'quest_logs')));
 
     const upgraded = createTestEngine({
       backing,
@@ -338,10 +339,10 @@ describe('expense audit contract (P1-19)', () => {
     await upgraded.engine.start();
 
     expect(upgraded.server.deltaRequests[1]).toContain('since=0');
-    expect(requestedDomains(upgraded.server.deltaRequests[1]!)).toEqual(['expense_audits']);
+    expect(requestedDomains(upgraded.server.deltaRequests[1]!)).toEqual(['expense_audits', 'quest_logs']);
     expect(await upgraded.store.readMeta(SYNC_META_KEYS.cursor)).toBe('43');
     expect((await upgraded.store.readDomain('expense_audits')).map(row => row['id'])).toEqual(['10', '11']);
-    expect(await upgraded.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['expense_audits@1', 'expenses@1']);
+    expect(await upgraded.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(SYNC_DOMAINS));
   });
 });
 
@@ -399,9 +400,9 @@ describe('reschedule events contract (P1-20b)', () => {
 
   it('should backfill reschedule events from zero once a server starts serving them', async () => {
     const backing = sharedBacking();
-    const older = createTestEngine({ backing, pages: [page('42', { quest_logs: [questLog('completed')] })] });
+    const older = createTestEngine({ backing, serves: domainsExcept('reschedule_events'), pages: [page('42', { quest_logs: [questLog('completed')] })] });
     await older.engine.start();
-    expect(await older.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['quest_logs@2']);
+    expect(await older.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(domainsExcept('reschedule_events', 'quest_logs')));
 
     const upgraded = createTestEngine({
       backing,
@@ -410,10 +411,10 @@ describe('reschedule events contract (P1-20b)', () => {
     await upgraded.engine.start();
 
     expect(upgraded.server.deltaRequests[1]).toContain('since=0');
-    expect(requestedDomains(upgraded.server.deltaRequests[1]!)).toEqual(['reschedule_events']);
+    expect(requestedDomains(upgraded.server.deltaRequests[1]!)).toEqual(['quest_logs', 'reschedule_events']);
     expect(await upgraded.store.readMeta(SYNC_META_KEYS.cursor)).toBe('43');
     expect((await upgraded.store.readDomain('reschedule_events')).map(row => row['id'])).toEqual(['10', '12']);
-    expect(await upgraded.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['quest_logs@2', 'reschedule_events@1']);
+    expect(await upgraded.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(coverageFor(SYNC_DOMAINS));
   });
 
   it('should backfill reschedule events from zero for a mirror that predates coverage records', async () => {
@@ -427,7 +428,7 @@ describe('reschedule events contract (P1-20b)', () => {
 
     expect(upgraded.server.deltaRequests[0]).toContain('since=42');
     expect(upgraded.server.deltaRequests[1]).toContain('since=0');
-    expect(requestedDomains(upgraded.server.deltaRequests[1]!)).toEqual(['reschedule_events']);
+    expect(requestedDomains(upgraded.server.deltaRequests[1]!)).toEqual(['expense_audits', 'hero_events', 'quest_logs', 'reschedule_events']);
     expect(await upgraded.store.readMeta(SYNC_META_KEYS.cursor)).toBe('43');
     expect((await upgraded.store.readDomain('reschedule_events')).map(row => row['id'])).toEqual(['10', '12']);
     expect(await upgraded.store.readMeta(SYNC_META_KEYS.coveredDomains)).toContain('reschedule_events@1');

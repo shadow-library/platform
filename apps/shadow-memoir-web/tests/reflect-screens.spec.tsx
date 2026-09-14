@@ -13,7 +13,7 @@ import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen } from './harness';
 import { httpFake } from './http-fake';
-import { createSyncedTestData, createTestEngine, type FakeServer, sharedBacking, type TestEngineOptions } from './sync-harness';
+import { createSyncedTestData, createTestEngine, deltaResponse, type FakeServer, sharedBacking, type TestEngineOptions } from './sync-harness';
 
 const TODAY = '2026-08-22';
 
@@ -467,7 +467,7 @@ describe('Coach screen', () => {
         async (input, init) => {
           if (!String(input).includes('/sync/delta')) return server.fetchImpl(input, init);
           const page: DeltaPage = { cursor: '1', hasMore: false, domains: { ai_consents: [...stored.values()] }, tombstones: [] };
-          return new Response(JSON.stringify(page), { status: 200, headers: { 'x-sync-epoch': server.epoch, 'content-type': 'application/json' } });
+          return deltaResponse(input, page, server.epoch);
         };
       return { stored, fetchImpl };
     }

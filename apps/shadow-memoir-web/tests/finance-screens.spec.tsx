@@ -12,7 +12,7 @@ import { type DeltaPage, type SyncedMemoirData, SyncEngineProvider } from '@/lib
 
 import { createMemoirTestData, renderScreen, renderWithQuery } from './harness';
 import { withTimeZone } from './setup';
-import { createSyncedTestData, createTestEngine, rejected, type TestEngine, type TestEngineOptions } from './sync-harness';
+import { createSyncedTestData, createTestEngine, deltaResponse, rejected, type TestEngine, type TestEngineOptions } from './sync-harness';
 
 const TODAY = '2026-08-23';
 
@@ -51,10 +51,6 @@ interface PostedCommand {
 
 function postedCommands(init: RequestInit | undefined): PostedCommand[] {
   return (JSON.parse(String(init?.body)) as { commands: PostedCommand[] }).commands;
-}
-
-function deltaResponse(body: DeltaPage): Response {
-  return new Response(JSON.stringify(body), { status: 200, headers: { 'x-sync-epoch': 'epoch-1', 'content-type': 'application/json' } });
 }
 
 function expenseRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -496,7 +492,7 @@ describe('categories screen', () => {
           return server.fetchImpl(input, init);
         }
         if (url.includes('/sync/delta'))
-          return deltaResponse(page({ expense_categories: [{ ...row, archivedAt: archived ? '2026-08-23T00:00:00.000Z' : null }] }, [], archived ? '2' : '1'));
+          return deltaResponse(input, page({ expense_categories: [{ ...row, archivedAt: archived ? '2026-08-23T00:00:00.000Z' : null }] }, [], archived ? '2' : '1'));
         return server.fetchImpl(input, init);
       },
     });
@@ -867,8 +863,8 @@ describe('expense detail screen', () => {
         const restored = posted.find(command => command.type === 'expense.create');
         const deleted = posted.some(command => command.type === 'expense.delete');
         const tombstone = { domain: 'expenses', recordId: oldId, syncSeq: '2' };
-        if (restored) return deltaResponse(page({ expenses: [{ ...row, id: restored.payload['id'] }] }, [tombstone], '3'));
-        return deltaResponse(deleted ? page({ expenses: [] }, [tombstone], '2') : page({ expenses: [row] }));
+        if (restored) return deltaResponse(input, page({ expenses: [{ ...row, id: restored.payload['id'] }] }, [tombstone], '3'));
+        return deltaResponse(input, deleted ? page({ expenses: [] }, [tombstone], '2') : page({ expenses: [row] }));
       },
     });
 

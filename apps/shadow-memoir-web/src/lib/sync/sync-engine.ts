@@ -44,6 +44,16 @@ export interface SyncEngineOptions {
 export interface SyncPassOptions {
   /** A refresh nobody asked for: over a ready mirror with nothing queued it runs without announcing `syncing`, so the net strip stays quiet. */
   background?: boolean;
+  /**
+   * The caller needs server state written after it asked, so a pass already running (which may have pulled before that) is waited out and one more
+   * pass runs. Fresh callers waiting on the same pass share the one after it, which stays quiet only if every one of them asked for `background`.
+   */
+  fresh?: boolean;
+}
+
+interface FollowUpPass {
+  pass: Promise<void>;
+  background: boolean;
 }
 
 /** `local` commands have no server handler; `refused` ones reached a store this engine's account no longer holds, and the caller must undo its optimistic apply. */
@@ -94,6 +104,14 @@ function sameDomains(left: SyncDomain[], right: SyncDomain[]): boolean {
   return left.length === right.length && left.every((domain, index) => domain === right[index]);
 }
 
+const SYNC_SEQ = /^\d+$/;
+
+/** Sync sequences travel as decimal strings of 64-bit values, beyond a double's exact range. */
+function isSequencedAfter(rowSeq: unknown, tombstoneSeq: string): boolean {
+  if (typeof rowSeq !== 'string' || !SYNC_SEQ.test(rowSeq) || !SYNC_SEQ.test(tombstoneSeq)) return false;
+  return BigInt(rowSeq) > BigInt(tombstoneSeq);
+}
+
 function isOnline(): boolean {
   return typeof navigator === 'undefined' || navigator.onLine !== false;
 }
@@ -137,10 +155,13 @@ export class SyncEngine {
   private deletionPending = false;
   private coldFailure: SyncFailureReason | null = null;
   private inFlight: Promise<void> | null = null;
+  private followUp: FollowUpPass | null = null;
   private passRequested = false;
   private readonly claims = new Map<string, OutcomeClaim>();
   /** Domains the server refused this session; they are neither requested again nor ever recorded as covered. */
   private readonly unserved = new Set<SyncDomain>();
+  /** Domains whose last answer was a refusal. Only a domain that was served before its refusal withdraws coverage, so a periodic retry refused again changes nothing. */
+  private readonly refused = new Set<SyncDomain>();
   private passesSinceRefusal = 0;
   private drain = { fromZero: false, served: new Set<SyncDomain>() };
 
@@ -215,6 +236,7 @@ export class SyncEngine {
   /** Ends this engine's hold on the store. A pass still running stops at its next read or write instead of finishing into whatever opens the store next. */
   stop(): void {
     this.passRequested = false;
+    this.followUp = null;
     this.store.close();
     this.settleClaims({ status: 'unconfirmed', reason: 'slow' });
   }
@@ -258,8 +280,24 @@ export class SyncEngine {
   }
 
   /** Flush then pull, serialized — two overlapping passes would post the same batch twice and race the cursor. */
-  sync(options: SyncPassOptions = {}): Promise<void> {
-    return (this.inFlight ??= this.runSync(options).finally(() => this.afterPass()));
+  sync({ background = false, fresh = false }: SyncPassOptions = {}): Promise<void> {
+    if (fresh && this.inFlight) return this.followPass(this.inFlight, background);
+    return (this.inFlight ??= this.runSync({ background }).finally(() => this.afterPass()));
+  }
+
+  private followPass(running: Promise<void>, background: boolean): Promise<void> {
+    if (this.followUp) {
+      this.followUp.background &&= background;
+      return this.followUp.pass;
+    }
+    const followUp: FollowUpPass = { pass: Promise.resolve(), background };
+    const next = (): Promise<void> => {
+      this.followUp = null;
+      return this.sync({ background: followUp.background });
+    };
+    followUp.pass = running.then(next, next);
+    this.followUp = followUp;
+    return followUp.pass;
   }
 
   /** A command enqueued while a pass is past its flush would otherwise sit until something else starts one. */
@@ -472,10 +510,12 @@ export class SyncEngine {
       const since = (await this.store.readMeta<string>(SYNC_META_KEYS.cursor)) ?? '0';
       if (since === '0') this.drain.fromZero = true;
       const response = await this.pullPage(since, this.requestedDomains());
+      if (!response) return false;
       // Checked after the response: a cookie that changed hands mid-drain has already answered this page as the other account.
       await this.confirmPrincipal();
       const reset = await this.reconcileEpoch(response.epoch);
       if (reset) continue;
+      if (this.requestedDomains().length === 0) return false;
 
       for (const domain of this.requestedDomains()) if (response.page.domains[domain]) this.drain.served.add(domain);
       await this.ingest(response.page);
@@ -497,21 +537,21 @@ export class SyncEngine {
 
     const saved = await this.store.readMeta<BackfillCursor>(SYNC_META_KEYS.backfillCursor);
     let since = saved && sameDomains(saved.domains, pending) ? saved.since : '0';
-    const answered = new Set<SyncDomain>();
     for (let page = 0; page < this.maxPages; page += 1) {
       const response = await this.pullPage(since, pending);
+      if (!response) return this.backfill();
       await this.confirmPrincipal();
       if (await this.reconcileEpoch(response.epoch)) return this.pullUntilStalled();
       if (pending.some(domain => this.unserved.has(domain))) return this.backfill();
 
-      for (const domain of pending) if (response.page.domains[domain]) answered.add(domain);
       await this.ingest(response.page, pending);
       since = response.page.cursor;
       if (!response.page.hasMore) {
         await this.store.writeMeta(SYNC_META_KEYS.backfillCursor, null);
-        await this.markCovered([...answered], await this.readCovered());
+        await this.markCovered(pending, covered);
         return true;
       }
+      if (!(await this.coverageKeeping(covered))) return true;
       await this.store.writeMeta(SYNC_META_KEYS.backfillCursor, { domains: pending, since } satisfies BackfillCursor);
     }
     return false;
@@ -538,23 +578,39 @@ export class SyncEngine {
     this.passesSinceRefusal = 0;
   }
 
-  /** A server older than this release refuses a domain it does not know; the domain is dropped for the session and the page asked again. */
-  private async pullPage(since: string, domains: SyncDomain[]): Promise<DeltaResponse> {
+  /**
+   * An older server refuses an unknown domain as `SYN_001` (the page is asked again without it); a newer one leaves its key out of the page. Both are
+   * refusals. Null once every domain asked for is refused, because an empty `domains` asks the server for all of them.
+   */
+  private async pullPage(since: string, domains: SyncDomain[]): Promise<DeltaResponse | null> {
     for (;;) {
       const requested = domains.filter(domain => !this.unserved.has(domain));
+      if (requested.length === 0) return null;
       try {
-        return await this.client.pullDelta({ since, domains: requested });
+        const response = await this.client.pullDelta({ since, domains: requested });
+        for (const domain of requested) if (response.page.domains[domain] !== undefined) this.refused.delete(domain);
+        await this.refuse(requested.filter(domain => response.page.domains[domain] === undefined));
+        return response;
       } catch (error) {
         if (!(error instanceof SyncTransportError) || error.code !== UNKNOWN_DOMAIN_CODE) throw error;
         const named = UNKNOWN_DOMAIN_MESSAGE.exec(error.message)?.[1];
         const refused = requested.filter(domain => (named ? domain === named : NEWER_DOMAINS.includes(domain)));
         if (refused.length === 0) throw error;
-        for (const domain of refused) this.unserved.add(domain);
-        this.passesSinceRefusal = 0;
-        this.drain.served = new Set([...this.drain.served].filter(domain => !this.unserved.has(domain)));
-        await this.forgetNewerCoverage();
+        await this.refuse(refused);
       }
     }
+  }
+
+  private async refuse(domains: SyncDomain[]): Promise<void> {
+    if (domains.length === 0) return;
+    const withdrawn = domains.some(domain => !this.refused.has(domain));
+    for (const domain of domains) {
+      this.unserved.add(domain);
+      this.refused.add(domain);
+    }
+    this.passesSinceRefusal = 0;
+    this.drain.served = new Set([...this.drain.served].filter(domain => !this.unserved.has(domain)));
+    if (withdrawn) await this.forgetNewerCoverage();
   }
 
   /**
@@ -580,7 +636,18 @@ export class SyncEngine {
     return new Set(cursor === '0' ? [] : PRE_COVERAGE_KEYSET_DOMAINS.map(domain => `${domain}@1`));
   }
 
-  private async markCovered(domains: SyncDomain[], covered: Set<string>): Promise<void> {
+  /**
+   * The coverage recorded now, or null when any of `baseline` has gone from it: another tab refused a domain or reset the epoch since `baseline`
+   * was read, and wants those domains drawn down from zero again, which recording coverage or saving a backfill cursor would undo.
+   */
+  private async coverageKeeping(baseline: Set<string>): Promise<Set<string> | null> {
+    const covered = await this.readCovered();
+    return [...baseline].every(key => covered.has(key)) ? covered : null;
+  }
+
+  private async markCovered(domains: SyncDomain[], baseline: Set<string>): Promise<void> {
+    const covered = await this.coverageKeeping(baseline);
+    if (!covered) return;
     for (const domain of domains) {
       if (!this.recordable(domain)) continue;
       for (const key of covered) if (key.startsWith(`${domain}@`)) covered.delete(key);
@@ -589,7 +656,10 @@ export class SyncEngine {
     await this.store.writeMeta(SYNC_META_KEYS.coveredDomains, [...covered].sort());
   }
 
-  /** A server that does not filter tombstones by domain sends a backfill page every domain's deletes since zero; another domain's old delete could remove a row since re-created under the same key. */
+  /**
+   * A server may not filter tombstones by domain, so a backfill applies only its own domains'. The server keeps every tombstone and the cursor overlap
+   * re-serves them, so one older than the row mirrored under its key predates that row's re-creation (an undo, a create replayed after pruning).
+   */
   private async ingest(page: DeltaPage, only?: SyncDomain[]): Promise<void> {
     for (const domain of only ?? SYNC_DOMAINS) {
       const rows = page.domains[domain];
@@ -598,7 +668,11 @@ export class SyncEngine {
       else await this.store.upsertRows(domain, rows);
     }
 
-    for (const tombstone of page.tombstones) if (!only || only.some(domain => domain === tombstone.domain)) await this.store.deleteRow(tombstone.domain, tombstone.recordId);
+    for (const tombstone of page.tombstones) {
+      if (only && !only.some(domain => domain === tombstone.domain)) continue;
+      const mirrored = await this.store.readRow(tombstone.domain, tombstone.recordId);
+      if (!isSequencedAfter(mirrored?.['syncSeq'], tombstone.syncSeq)) await this.store.deleteRow(tombstone.domain, tombstone.recordId);
+    }
     await this.hydrateRows();
   }
 
@@ -635,6 +709,7 @@ export class SyncEngine {
     await this.store.writeMeta(SYNC_META_KEYS.coveredDomains, []);
     await this.store.writeMeta(SYNC_META_KEYS.backfillCursor, null);
     this.unserved.clear();
+    this.refused.clear();
     this.passesSinceRefusal = 0;
     await this.hydrateRows();
     return true;

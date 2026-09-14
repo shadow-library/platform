@@ -3,7 +3,7 @@ import { type ServerSettlement } from '@/lib/data/command.types';
 
 import { isServerBacked, toWireCommand } from './command-wire';
 import { type MemoirStore } from './memoir-store';
-import { type DeadLetter, type OutboxEntry, SYNC_META_KEYS, type SyncCommand, type WireCommandOutcome } from './sync.types';
+import { type DeadLetter, type OutboxEntry, type SyncCommand, type WireCommandOutcome } from './sync.types';
 import { uuidv7 } from './uuid';
 
 const MAX_BATCH_SIZE = 100;
@@ -83,13 +83,11 @@ export class Outbox {
   }
 
   async deadLetters(): Promise<DeadLetter[]> {
-    return (await this.store.readMeta<DeadLetter[]>(SYNC_META_KEYS.deadLetters)) ?? [];
+    return this.store.readDeadLetters();
   }
 
   async dismissDeadLetter(commandId: string): Promise<void> {
-    const letters = await this.deadLetters();
-    const kept = letters.filter(letter => letter.commandId !== commandId);
-    if (kept.length !== letters.length) await this.store.writeMeta(SYNC_META_KEYS.deadLetters, kept);
+    await this.store.removeDeadLetter(commandId);
   }
 
   /** The next batch to post, in the order the owner performed it, capped at the server's batch limit. */
@@ -143,8 +141,9 @@ export class Outbox {
       code,
       deadLetteredAt: this.now().toISOString(),
     };
-    const kept = (await this.deadLetters()).filter(existing => existing.commandId !== entry.commandId);
-    await this.store.writeMeta(SYNC_META_KEYS.deadLetters, [...kept, letter].slice(-MAX_DEAD_LETTERS));
+    await this.store.putDeadLetter(entry.seq, letter);
     await this.store.removeOutbox(entry.commandId);
+    const letters = await this.store.readDeadLetters();
+    for (const overflow of letters.slice(0, -MAX_DEAD_LETTERS)) await this.store.removeDeadLetter(overflow.commandId);
   }
 }
