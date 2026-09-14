@@ -1,6 +1,8 @@
 import { addDays, DEFAULT_LOCALE, parseISODate, toISODate } from '@shadow-library/ui';
 
-import { type DeletionProgress } from './account.types';
+import { formatLocalDate, formatLocalTime } from '@/lib/format';
+
+import { type DeletionProgress, type ExportStage } from './account.types';
 import { type Command } from './command.types';
 import { type FinanceCommand } from './finance.types';
 import { type HeroCommand } from './hero.types';
@@ -174,4 +176,20 @@ export function formatRange(from: string, to: string, locale: string = DEFAULT_L
   const sameMonth = start.getMonth() === end.getMonth();
   const startLabel = sameMonth ? String(start.getDate()) : start.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
   return `${startLabel} – ${end.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+}
+
+export const EXPORT_EXPIRED_NOTICE = 'That export expired — prepare a new one.';
+
+interface ExportJobTimestamps {
+  requestedAt: string;
+  completedAt?: string | null;
+  expiresAt?: string | null;
+}
+
+/** One line per stage, never restating the badge's own label ("Ready" / "Did not finish"). */
+export function exportStageWhen(stage: Exclude<ExportStage, 'idle'>, job: ExportJobTimestamps): string {
+  if (stage === 'preparing') return `Started ${formatLocalTime(job.requestedAt)}`;
+  const finishedAt = formatLocalDate(job.completedAt ?? job.requestedAt);
+  if (stage === 'failed') return `Tried ${finishedAt}`;
+  return job.expiresAt ? `Prepared ${finishedAt} · the link expires ${formatLocalDate(job.expiresAt)}` : `Prepared ${finishedAt}`;
 }

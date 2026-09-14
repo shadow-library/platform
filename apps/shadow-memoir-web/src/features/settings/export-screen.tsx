@@ -1,9 +1,10 @@
 import { Link } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
-import { Badge, Button, Card, Skeleton, Spinner } from '@shadow-library/ui';
+import { Alert, Badge, Button, Card, Skeleton, Spinner } from '@shadow-library/ui';
 
+import { DataState } from '@/components/DataState';
 import { Screen, ScreenColumns, screenStyles } from '@/components/ScreenLayout';
-import { type ExportStage, useAccountCommand, useExportView } from '@/lib/data';
+import { type ExportStage, type ExportView, notifyOutcome, useAccountCommand, useExportView } from '@/lib/data';
 
 import styles from './settings.module.css';
 
@@ -15,8 +16,6 @@ const STAGE_LABELS: Record<Exclude<ExportStage, 'idle'>, { label: string; intent
 
 export function ExportScreen(): ReactElement {
   const view = useExportView();
-  const command = useAccountCommand();
-  const stage = view.data?.job.stage ?? 'idle';
 
   return (
     <Screen
@@ -28,73 +27,100 @@ export function ExportScreen(): ReactElement {
         </Button>
       }
     >
-      {view.isPending || !view.data ? <Skeleton.Card /> : null}
-
-      {view.data ? (
-        <ScreenColumns
-          aside={
-            <Card padding="md">
-              <Card.Body>
-                <h2 className={screenStyles.cardTitle}>How the link works</h2>
-                <p className={screenStyles.cardBody}>
-                  The archive is assembled on the server and handed back as a link that expires on its own. There is no library of past archives to keep — ask again whenever you
-                  want a fresh one, within the daily limit.
-                </p>
-              </Card.Body>
-            </Card>
-          }
-        >
-          <Card padding="lg">
-            <Card.Body>
-              <h2 className={styles.sectionTitle}>Export everything</h2>
-              <div className={styles.sets}>
-                {view.data.sets.map(set => (
-                  <div key={set.name} className={styles.set}>
-                    <div className={styles.setName}>{set.name}</div>
-                    <p className={styles.setMeta}>{set.meta}</p>
-                  </div>
-                ))}
-              </div>
-              <div className={styles.actions}>
-                <Button variant="primary" disabled={stage === 'preparing'} onClick={() => command.mutate({ type: 'export.prepare' })}>
-                  Prepare the export
-                </Button>
-                <span className={styles.jobWhen}>Usually under a minute, and you can leave the page.</span>
-              </div>
-            </Card.Body>
-          </Card>
-
-          {stage !== 'idle' ? (
-            <Card padding="lg">
-              <Card.Body>
-                <div className={styles.jobHead}>
-                  <Badge variant="soft" intent={STAGE_LABELS[stage].intent}>
-                    {STAGE_LABELS[stage].label}
-                  </Badge>
-                  <span className={styles.jobWhen}>{view.data.job.when}</span>
-                  {stage === 'preparing' ? <Spinner size="sm" /> : null}
-                </div>
-                <p className={screenStyles.cardBody}>{view.data.job.body}</p>
-                <div className={styles.actions}>
-                  {view.data.job.downloadUrl ? (
-                    <Button variant="primary" asChild>
-                      <a href={view.data.job.downloadUrl}>Download the archive</a>
-                    </Button>
-                  ) : null}
-                  {stage === 'failed' ? (
-                    <Button variant="primary" onClick={() => command.mutate({ type: 'export.prepare' })}>
-                      Try again
-                    </Button>
-                  ) : null}
-                  <Button variant="ghost" onClick={() => command.mutate({ type: 'export.dismiss' })}>
-                    Clear
-                  </Button>
-                </div>
-              </Card.Body>
-            </Card>
-          ) : null}
-        </ScreenColumns>
-      ) : null}
+      <DataState query={view} skeleton={<Skeleton.Card />}>
+        {data => <ExportFlow view={data} />}
+      </DataState>
     </Screen>
+  );
+}
+
+function ExportFlow({ view }: { view: ExportView }): ReactElement {
+  const command = useAccountCommand();
+  const stage = view.job.stage;
+  const preparing = command.isPendingFor({ type: 'export.prepare' });
+
+  const prepare = async (): Promise<void> => {
+    const outcome = await command.run({ type: 'export.prepare' });
+    notifyOutcome(outcome, { success: '', action: 'prepare the export' });
+  };
+
+  const clear = async (): Promise<void> => {
+    const outcome = await command.run({ type: 'export.dismiss' });
+    notifyOutcome(outcome, { success: '', action: 'clear the export' });
+  };
+
+  return (
+    <ScreenColumns
+      aside={
+        <Card padding="md">
+          <Card.Body>
+            <h2 className={screenStyles.cardTitle}>How the link works</h2>
+            <p className={screenStyles.cardBody}>
+              The archive is assembled on the server and handed back as a link that expires on its own. There is no library of past archives to keep — ask again whenever you want a
+              fresh one, within the daily limit.
+            </p>
+          </Card.Body>
+        </Card>
+      }
+    >
+      <Card padding="lg">
+        <Card.Body>
+          <h2 className={styles.sectionTitle}>Export everything</h2>
+          <div className={styles.sets}>
+            {view.sets.map(set => (
+              <div key={set.name} className={styles.set}>
+                <div className={styles.setName}>{set.name}</div>
+                <p className={styles.setMeta}>{set.meta}</p>
+              </div>
+            ))}
+          </div>
+          {view.notice ? (
+            <Alert className={styles.flowAlert} intent="info">
+              {view.notice}
+            </Alert>
+          ) : null}
+          {stage === 'idle' ? (
+            <div className={styles.actions}>
+              <Button variant="primary" loading={preparing} loadingText="Starting…" disabled={preparing} onClick={() => void prepare()}>
+                Prepare the export
+              </Button>
+              <span className={styles.jobWhen}>Usually under a minute, and you can leave the page.</span>
+            </div>
+          ) : null}
+        </Card.Body>
+      </Card>
+
+      {stage !== 'idle' ? (
+        <Card padding="lg">
+          <Card.Body>
+            <div className={styles.jobHead}>
+              <Badge variant="soft" intent={STAGE_LABELS[stage].intent}>
+                {STAGE_LABELS[stage].label}
+              </Badge>
+              <span className={styles.jobWhen}>{view.job.when}</span>
+              {stage === 'preparing' ? <Spinner size="sm" /> : null}
+            </div>
+            <p className={screenStyles.cardBody}>{view.job.body}</p>
+            <div className={styles.actions}>
+              {stage === 'ready' && view.job.downloadUrl ? (
+                <Button variant="primary" asChild>
+                  <a href={view.job.downloadUrl}>Download the archive</a>
+                </Button>
+              ) : null}
+              {stage === 'failed' ? (
+                <Button variant="primary" loading={preparing} loadingText="Starting…" disabled={preparing} onClick={() => void prepare()}>
+                  Try again
+                </Button>
+              ) : null}
+              {stage !== 'preparing' ? (
+                <Button variant="ghost" onClick={() => void clear()}>
+                  Clear
+                </Button>
+              ) : null}
+            </div>
+          </Card.Body>
+        </Card>
+      ) : null}
+    </ScreenColumns>
   );
 }

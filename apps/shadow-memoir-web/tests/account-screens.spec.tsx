@@ -6,7 +6,7 @@ import { toast } from '@shadow-library/ui';
 
 import { OnboardingScreen } from '@/features/onboarding';
 import { AppSyncScreen, BillingScreen, DeleteAccountScreen, ExportScreen, NotificationSettingsScreen, SettingsScreen } from '@/features/settings';
-import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
+import { type DeltaPage, SYNC_META_KEYS, SyncEngineProvider } from '@/lib/sync';
 import { OnboardingGate } from '@/routes/_app';
 
 import { renderScreen } from './harness';
@@ -81,6 +81,10 @@ function renderSyncedSettings(node: ReactNode, engineOptions: TestEngineOptions 
   const data = createSyncedTestData(test.engine);
   renderScreen(<SyncEngineProvider data={data}>{node}</SyncEngineProvider>, { value: data });
   return test;
+}
+
+function page(domains: DeltaPage['domains']): DeltaPage {
+  return { cursor: '1', hasMore: false, domains, tombstones: [] };
 }
 
 afterEach(() => {
@@ -300,6 +304,101 @@ describe('Plan and billing', () => {
     expect(await screen.findByText(/no route that can write your plan/)).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Cancel the plan' })).toBeNull();
   });
+
+  it('should start one checkout on repeated clicks', async () => {
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign });
+    let releaseGate = (): void => undefined;
+    const gate = new Promise<void>(resolve => (releaseGate = resolve));
+    const fake = httpFake({
+      'POST /api/v1/billing/checkout': async () => {
+        await gate;
+        return { body: { url: 'https://pay.test/session', expiresAt: '2026-08-24T10:00:00.000Z' } };
+      },
+    });
+    renderSyncedSettings(<BillingScreen />);
+
+    const monthly = (await screen.findByRole('button', { name: 'Pay monthly' })) as HTMLButtonElement;
+    fireEvent.click(monthly);
+    fireEvent.click(monthly);
+
+    const yearly = (await screen.findByRole('button', { name: 'Pay yearly' })) as HTMLButtonElement;
+    await waitFor(() => expect(yearly.disabled).toBe(true));
+
+    releaseGate();
+    await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+    expect(fake.count('POST', '/api/v1/billing/checkout')).toBe(1);
+  });
+
+  it('should re-enable checkout when the page is restored after leaving for the provider', async () => {
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign });
+    httpFake({ 'POST /api/v1/billing/checkout': () => ({ body: { url: 'https://pay.test/session', expiresAt: '2026-08-24T10:00:00.000Z' } }) });
+    renderSyncedSettings(<BillingScreen />);
+
+    const monthly = (await screen.findByRole('button', { name: 'Pay monthly' })) as HTMLButtonElement;
+    fireEvent.click(monthly);
+    await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(monthly.disabled).toBe(true));
+
+    const pageShow = new Event('pageshow');
+    Object.defineProperty(pageShow, 'persisted', { value: true });
+    fireEvent(window, pageShow);
+
+    await waitFor(() => expect(monthly.disabled).toBe(false));
+    expect(screen.getByRole('button', { name: 'Pay yearly' })).not.toHaveProperty('disabled', true);
+  });
+
+  it('should explain a failed checkout', async () => {
+    const danger = vi.spyOn(toast, 'danger');
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign });
+    httpFake({ 'POST /api/v1/billing/checkout': () => ({ status: 500, body: { code: 'S001', type: 'Internal', message: 'boom' } }) });
+    renderSyncedSettings(<BillingScreen />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Pay monthly' }));
+    await waitFor(() => expect(danger).toHaveBeenCalled());
+    expect(danger.mock.calls.at(-1)?.[0]).toContain('start checkout');
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('should not offer a second checkout to a Coach subscriber', async () => {
+    const fake = httpFake({ 'POST /api/v1/billing/checkout': () => ({ body: { url: 'https://pay.test/session', expiresAt: '2026-08-24T10:00:00.000Z' } }) });
+    renderSyncedSettings(<BillingScreen />, { pages: [page({ entitlement: [{ tier: 'paid', state: 'active', expiresAt: '2026-10-06T00:00:00.000Z', trialUsed: true }] })] });
+
+    await screen.findByRole('heading', { name: 'Plan and billing' });
+    expect(screen.queryByRole('button', { name: 'Pay monthly' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Pay yearly' })).toBeNull();
+    expect(screen.getByText(/done with the payment provider/)).toBeDefined();
+    expect(fake.count('POST', '/api/v1/billing/checkout')).toBe(0);
+  });
+
+  it('should describe a lapsed subscription', () =>
+    withTimeZone('Europe/Oslo', async () => {
+      renderSyncedSettings(<BillingScreen />, { pages: [page({ entitlement: [{ tier: 'free', state: 'lapsed', expiresAt: '2026-09-04T00:00:00.000Z', trialUsed: true }] })] });
+      expect(await screen.findByText('Coach ended on 4 Sep 2026')).toBeDefined();
+      expect(screen.getByRole('button', { name: 'Renew monthly' })).toBeDefined();
+      expect(screen.getByRole('button', { name: 'Renew yearly' })).toBeDefined();
+    }));
+
+  it('should not advertise a trial without a way to start it', async () => {
+    renderSyncedSettings(<BillingScreen />);
+    await screen.findByRole('heading', { name: 'Plan and billing' });
+    expect(screen.queryByText('Trial')).toBeNull();
+    expect(screen.queryByText(/no card needed to start/)).toBeNull();
+  });
+
+  it('should show an error instead of a free plan when billing cannot load', async () => {
+    renderSyncedSettings(<BillingScreen />, { status: () => 500, errorCode: 'S001' });
+    expect(await screen.findByText("Couldn't load this right now")).toBeDefined();
+    expect(screen.queryByText('Free')).toBeNull();
+  });
+
+  it('should hide billing behind a deletion notice while erasure is under way', async () => {
+    renderSyncedSettings(<BillingScreen />, { status: () => 403, errorCode: 'ACC_002' });
+    expect(await screen.findByText('This account is being deleted')).toBeDefined();
+    expect(screen.queryByText('Free')).toBeNull();
+  });
 });
 
 describe('Data export', () => {
@@ -310,6 +409,41 @@ describe('Data export', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Prepare the export' }));
     expect(await screen.findByText('Preparing')).toBeDefined();
     expect(await screen.findByText(/You can leave this page/)).toBeDefined();
+  });
+
+  it('should explain the export daily limit', async () => {
+    const warning = vi.spyOn(toast, 'warning');
+    httpFake({
+      'POST /api/v1/account/export': () => ({ status: 409, body: { code: 'EXP_002', type: 'Conflict', message: 'Export request limit reached for today; try again later' } }),
+    });
+    renderSyncedSettings(<ExportScreen />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Prepare the export' }));
+    await waitFor(() => expect(warning).toHaveBeenCalled());
+    expect(warning.mock.calls.at(-1)?.[0]).toContain('already asked for an export today');
+  });
+
+  it('should explain an expired export job', () =>
+    withTimeZone('Europe/Oslo', async () => {
+      httpFake({ 'GET /api/v1/account/export/job-1': () => ({ status: 404, body: { code: 'EXP_001', type: 'NotFound', message: 'gone' } }) });
+      const test = createTestEngine({ today: TODAY });
+      await test.store.writeMeta(SYNC_META_KEYS.exportJobId, 'job-1');
+      const data = createSyncedTestData(test.engine);
+      renderScreen(
+        <SyncEngineProvider data={data}>
+          <ExportScreen />
+        </SyncEngineProvider>,
+        { value: data },
+      );
+
+      expect(await screen.findByText('That export expired — prepare a new one.')).toBeDefined();
+      expect(await screen.findByRole('button', { name: 'Prepare the export' })).toBeDefined();
+    }));
+
+  it('should hide export behind a deletion notice while erasure is under way', async () => {
+    renderSyncedSettings(<ExportScreen />, { status: () => 403, errorCode: 'ACC_002' });
+    expect(await screen.findByText('This account is being deleted')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Prepare the export' })).toBeNull();
   });
 });
 

@@ -38,7 +38,7 @@ export interface AccountDevice {
 
 export type PlanId = 'free' | 'coach';
 
-type BillingPeriod = 'monthly' | 'yearly';
+export type BillingPeriod = 'monthly' | 'yearly';
 
 export interface BillingPlan {
   id: PlanId;
@@ -53,6 +53,8 @@ export interface BillingPlan {
 export interface BillingView {
   plans: BillingPlan[];
   status: string;
+  /** Coach has ended and the account is back on Free; checkout is offered as a renewal rather than a first purchase. */
+  lapsed: boolean;
   quotaLine: string;
   trialLine: string;
   invoicesLine: string;
@@ -72,6 +74,7 @@ export interface ExportJob {
 export interface ExportView {
   sets: { name: string; meta: string }[];
   job: ExportJob;
+  notice: string | null;
 }
 
 /** `unknown` is an erasure this session may not read the progress of: the status route needs an elevated session. */

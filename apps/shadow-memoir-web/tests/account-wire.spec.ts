@@ -12,7 +12,7 @@ import {
   DELETION_UNEXPECTED,
   DELETION_WRONG_ACCOUNT,
 } from '@/lib/data';
-import { type DeltaPage, type KeyValueBacking, MissingSessionProbeError, SyncedAccountProvider } from '@/lib/sync';
+import { type DeltaPage, type KeyValueBacking, MissingSessionProbeError, SYNC_META_KEYS, SyncedAccountProvider } from '@/lib/sync';
 
 import { httpFake } from './http-fake';
 import { withTimeZone } from './setup';
@@ -195,6 +195,58 @@ describe('Data export over the wire', () => {
 
     const result = await (await provider()).dispatchCommand({ type: 'export.prepare' });
     expect(result).toMatchObject({ status: 'rejected', message: 'You’ve already asked for an export today. Try again tomorrow.', error: { code: 'EXP_002', kind: 'refusal' } });
+  });
+
+  it('should describe a ready archive by when it was prepared rather than repeating its own badge', () =>
+    withTimeZone('Europe/Oslo', async () => {
+      httpFake({
+        'GET /api/v1/account/export/job-1': () => ({
+          body: {
+            id: 'job-1',
+            status: 'done',
+            requestedAt: '2026-08-24T09:00:00.000Z',
+            completedAt: '2026-08-24T09:02:00.000Z',
+            expiresAt: '2026-08-31T09:02:00.000Z',
+            downloadUrl: 'https://storage.test/archive.zip',
+          },
+        }),
+      });
+      const { engine, store } = createTestEngine({ pages: [page({})], today: TODAY });
+      await store.writeMeta(SYNC_META_KEYS.exportJobId, 'job-1');
+      await engine.start();
+
+      const view = await new SyncedAccountProvider(engine).getExport();
+      expect(view.job.when).toBe('Prepared 24 Aug 2026 · the link expires 31 Aug 2026');
+    }));
+
+  it('should not clobber a newer export saved by another tab while marking an old one expired', async () => {
+    const { engine, store } = createTestEngine({ pages: [page({})], today: TODAY });
+    await store.writeMeta(SYNC_META_KEYS.exportJobId, 'job-1');
+    await engine.start();
+
+    httpFake({
+      'GET /api/v1/account/export/job-1': async () => {
+        await store.writeMeta(SYNC_META_KEYS.exportJobId, 'job-2');
+        return { status: 404, body: { code: 'EXP_001', type: 'NotFound', message: 'gone' } };
+      },
+      'GET /api/v1/account/export/job-2': () => ({ body: { id: 'job-2', status: 'pending', requestedAt: '2026-08-24T09:05:00.000Z' } }),
+    });
+
+    const view = await new SyncedAccountProvider(engine).getExport();
+    expect(view.job.stage).toBe('preparing');
+    expect(view.notice).toBeNull();
+    expect(await store.readMeta(SYNC_META_KEYS.exportJobId)).toBe('job-2');
+  });
+
+  it('should note an expired export instead of silently pretending nothing was ever prepared', async () => {
+    httpFake({ 'GET /api/v1/account/export/job-1': () => ({ status: 404, body: { code: 'EXP_001', type: 'NotFound', message: 'gone' } }) });
+    const { engine, store } = createTestEngine({ pages: [page({})], today: TODAY });
+    await store.writeMeta(SYNC_META_KEYS.exportJobId, 'job-1');
+    await engine.start();
+
+    const view = await new SyncedAccountProvider(engine).getExport();
+    expect(view.job.stage).toBe('idle');
+    expect(view.notice).toBe('That export expired — prepare a new one.');
   });
 });
 
@@ -433,6 +485,29 @@ describe('Billing over the wire', () => {
       expect(billing.status).toBe('Coach · Active until 23 Sep 2026');
       expect(billing.trialLine).toContain('has been used');
     }));
+
+  it('should not advertise a trial that has no way to start', async () => {
+    httpFake({});
+    const billing = await (await provider({ entitlement: [{ tier: 'free', state: 'free', trialUsed: false }] })).getBilling();
+    expect(billing.trialLine).toBe('');
+  });
+
+  it('should describe a lapsed subscriber instead of a never-paid free user', async () =>
+    withTimeZone('Europe/Oslo', async () => {
+      httpFake({});
+      const billing = await (await provider({ entitlement: [{ tier: 'free', state: 'lapsed', expiresAt: '2026-09-04T00:00:00.000Z', trialUsed: true }] })).getBilling();
+
+      expect(billing.status).toBe('Coach ended on 4 Sep 2026');
+      expect(billing.lapsed).toBe(true);
+      expect(billing.plans.find(plan => plan.id === 'free')?.current).toBe(true);
+    }));
+
+  it('should say Free rather than assert a payment method it cannot know', async () => {
+    httpFake({});
+    const billing = await (await provider({ entitlement: [{ tier: 'free', state: 'free', trialUsed: false }] })).getBilling();
+    expect(billing.status).toBe('Free');
+    expect(billing.lapsed).toBe(false);
+  });
 });
 
 describe('Devices over the wire', () => {

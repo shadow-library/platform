@@ -170,8 +170,6 @@ export function billingPlans(current: PlanId): BillingPlan[] {
   ];
 }
 
-export const BILLING_TRIAL_LINE = 'Fourteen days of Coach, with no card needed to start.';
-
 export const BILLING_INVOICES_LINE = 'Sent by email and managed by the payment provider. Shadow Memoir never sees your card.';
 
 export const BILLING_MANAGE_NOTE =
@@ -249,13 +247,14 @@ export function createAccountProvider({ persona = 'active', currency }: AccountF
     getBilling: () =>
       Promise.resolve({
         plans: billingPlans(state.plan),
-        status: state.plan === 'coach' ? 'Coach · active' : 'Free · no payment method on file',
+        status: state.plan === 'coach' ? 'Coach · active' : 'Free',
+        lapsed: false,
         quotaLine: state.plan === 'coach' ? 'A daily allowance, reset at your local midnight' : '1 of 2 requests used this month',
-        trialLine: BILLING_TRIAL_LINE,
+        trialLine: '',
         invoicesLine: BILLING_INVOICES_LINE,
         manageNote: BILLING_MANAGE_NOTE,
       }),
-    getExport: () => Promise.resolve({ sets, job: exportJobCopy(state.exportStage, state.exportStage === 'ready' ? 'https://example.invalid/archive.zip' : null) }),
+    getExport: () => Promise.resolve({ sets, job: exportJobCopy(state.exportStage, state.exportStage === 'ready' ? 'https://example.invalid/archive.zip' : null), notice: null }),
     getDeletion: () =>
       Promise.resolve({
         stage: state.deletionStage === 'idle' ? { kind: 'idle' } : { kind: 'awaiting-reauth', reason: 'step-up' },

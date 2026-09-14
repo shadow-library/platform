@@ -9,15 +9,17 @@ import {
   type AppSyncView,
   BILLING_INVOICES_LINE,
   BILLING_MANAGE_NOTE,
-  BILLING_TRIAL_LINE,
+  type BillingPeriod,
   billingPlans,
   type BillingView,
   commandLabel,
   commandRefusal,
   type DayPreferences,
   type DeletionView,
+  EXPORT_EXPIRED_NOTICE,
   type ExportJob,
   exportJobCopy,
+  exportStageWhen,
   type ExportView,
   type HeroIntensityMode,
   INSTALL_ROWS,
@@ -45,7 +47,7 @@ const INTENSITY_WIRE: Record<HeroIntensityMode, 'low_intensity' | 'standard' | '
   demanding: 'high_intensity',
 };
 
-const EXPORT_STAGES: Record<ExportJobResponseDto['status'], ExportJob['stage']> = { pending: 'preparing', running: 'preparing', done: 'ready', failed: 'failed' };
+const EXPORT_STAGES: Record<ExportJobResponseDto['status'], Exclude<ExportJob['stage'], 'idle'>> = { pending: 'preparing', running: 'preparing', done: 'ready', failed: 'failed' };
 
 const BILLING_STATE_LABELS: Record<string, string> = { free: 'Free', trial: 'Trial', active: 'Active', grace: 'Payment past due', lapsed: 'Lapsed' };
 
@@ -91,6 +93,8 @@ function deviceLabel(userAgent: string | null): string {
  */
 export class SyncedAccountProvider implements AccountProvider {
   private readonly deletion: SyncedDeletion;
+  /** In-memory so a background refetch can't lose it by re-reading an already-cleared jobId; reset on prepare/dismiss. */
+  private expiredExportNotice: string | null = null;
 
   constructor(
     private readonly sync: SyncEngine,
@@ -133,30 +137,41 @@ export class SyncedAccountProvider implements AccountProvider {
   async getBilling(): Promise<BillingView> {
     const entitlement = projectEntitlement(this.sync.domains());
     const paid = entitlement.tier === 'paid';
+    const lapsed = entitlement.state === 'lapsed';
     const until = entitlement.expiresAt ? ` until ${formatLocalDate(entitlement.expiresAt)}` : '';
+    const endedOn = entitlement.expiresAt ? ` on ${formatLocalDate(entitlement.expiresAt)}` : '';
+
+    const status = paid ? `Coach · ${formatEnum(entitlement.state, BILLING_STATE_LABELS)}${until}` : lapsed ? `Coach ended${endedOn}` : 'Free';
 
     return {
       plans: billingPlans(paid ? 'coach' : 'free'),
-      status: paid ? `Coach · ${formatEnum(entitlement.state, BILLING_STATE_LABELS)}${until}` : 'Free · no payment method on file',
+      status,
+      lapsed,
       quotaLine: paid ? 'A daily allowance, reset at your local midnight.' : 'Two coaching requests a month, reset on the first.',
-      trialLine: entitlement.trialUsed ? 'The trial has been used on this account.' : BILLING_TRIAL_LINE,
+      trialLine: entitlement.trialUsed ? 'The trial has been used on this account.' : '',
       invoicesLine: BILLING_INVOICES_LINE,
       manageNote: BILLING_MANAGE_NOTE,
     };
   }
 
-  async getExport(): Promise<ExportView> {
+  async getExport(retried = false): Promise<ExportView> {
     const sets = projectRecordCounts(this.sync.domains());
     const jobId = await this.sync.store.readMeta<string>(SYNC_META_KEYS.exportJobId);
-    if (!jobId) return { sets, job: exportJobCopy('idle', null) };
+    if (!jobId) return { sets, job: exportJobCopy('idle', null), notice: this.expiredExportNotice };
 
     try {
       const job = await accountApi.exportStatus(jobId);
-      return { sets, job: exportJobCopy(EXPORT_STAGES[job.status], job.downloadUrl ?? null) };
+      const stage = EXPORT_STAGES[job.status];
+      const copy = exportJobCopy(stage, job.downloadUrl ?? null);
+      this.expiredExportNotice = null;
+      return { sets, job: { ...copy, when: exportStageWhen(stage, job) }, notice: null };
     } catch (error) {
       if (errorCode(error) !== 'EXP_001') throw error;
+      const stillCurrent = (await this.sync.store.readMeta<string>(SYNC_META_KEYS.exportJobId)) === jobId;
+      if (!stillCurrent) return retried ? { sets, job: exportJobCopy('idle', null), notice: this.expiredExportNotice } : this.getExport(true);
       await this.sync.store.writeMeta(SYNC_META_KEYS.exportJobId, null);
-      return { sets, job: exportJobCopy('idle', null) };
+      this.expiredExportNotice = EXPORT_EXPIRED_NOTICE;
+      return { sets, job: exportJobCopy('idle', null), notice: this.expiredExportNotice };
     }
   }
 
@@ -237,25 +252,14 @@ export class SyncedAccountProvider implements AccountProvider {
         }
 
       case 'billing.checkout':
-        try {
-          const session = await accountApi.checkout({ plan: command.plan });
-          if (typeof window !== 'undefined') window.location.assign(session.url);
-          return applied('Opening the payment provider’s checkout.');
-        } catch (error) {
-          return commandRefusal(error, 'Checkout could not be started.');
-        }
+        return this.startCheckout(command.plan);
 
       case 'export.prepare':
-        try {
-          const job = await accountApi.requestExport();
-          await this.sync.store.writeMeta(SYNC_META_KEYS.exportJobId, job.id);
-          return applied('Preparing your archive. You can leave this page.');
-        } catch (error) {
-          return commandRefusal(error, 'The export could not be started.');
-        }
+        return this.prepareExport();
 
       case 'export.dismiss':
         await this.sync.store.writeMeta(SYNC_META_KEYS.exportJobId, null);
+        this.expiredExportNotice = null;
         return applied('');
 
       case 'deletion.acknowledge':
@@ -288,6 +292,27 @@ export class SyncedAccountProvider implements AccountProvider {
     if (patch.intensity !== undefined) return pendingValue(account.pendingIntensityMode, account.intensityMode) ? DEFERRED_MESSAGE : '';
     if (patch.monthlyBudgetMinor !== undefined) return patch.monthlyBudgetMinor === null ? 'Cleared. No monthly budget is set.' : 'Saved.';
     return '';
+  }
+
+  private async startCheckout(plan: BillingPeriod): Promise<SettledCommandResult> {
+    try {
+      const session = await accountApi.checkout({ plan });
+      if (typeof window !== 'undefined') window.location.assign(session.url);
+      return applied('Opening the payment provider’s checkout.');
+    } catch (error) {
+      return commandRefusal(error, 'Checkout could not be started.');
+    }
+  }
+
+  private async prepareExport(): Promise<SettledCommandResult> {
+    try {
+      const job = await accountApi.requestExport();
+      await this.sync.store.writeMeta(SYNC_META_KEYS.exportJobId, job.id);
+      this.expiredExportNotice = null;
+      return applied('Preparing your archive. You can leave this page.');
+    } catch (error) {
+      return commandRefusal(error, 'The export could not be started.');
+    }
   }
 
   private async setEmail(preferenceId: Extract<AccountCommand, { type: 'notification.set' }>['preferenceId'], enabled: boolean): Promise<SettledCommandResult> {
