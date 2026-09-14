@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { Avatar, Button, ClientOnly, DropdownMenu, EmptyState, IconButton, Input, Select, Table, toast } from '@shadow-library/ui';
+import { Avatar, Badge, Button, ClientOnly, DropdownMenu, EmptyState, IconButton, Input, Select, Table, toast } from '@shadow-library/ui';
 
-import { BotIcon, ClockIcon, LayersIcon, MoreIcon, PlusIcon, SearchIcon, ShieldCheckIcon } from '@/components/icons';
+import { AlertTriangleIcon, BotIcon, ClockIcon, LayersIcon, MoreIcon, PlusIcon, SearchIcon, ShieldCheckIcon } from '@/components/icons';
 import { QueryState, StatusChip } from '@/components/si';
+import { countFlaggedGrants, countGrantsByApplication } from '@/features/bots';
 import { useStepUpGate } from '@/features/portal';
 import {
   type BotItem,
@@ -11,15 +12,49 @@ import {
   type BotStatus,
   myOrganisationsQueryOptions,
   orgAccessOf,
+  useBotPermissionsQuery,
   useBotsQuery,
   useOrgAccess,
   useResumeBotMutation,
   useSuspendBotMutation,
 } from '@/lib/apis';
 import { botErrorMessage } from '@/lib/bot-errors';
-import { formatDate, relativeTime } from '@/lib/format';
+import { daysUntil, formatDate, relativeTime } from '@/lib/format';
 
 import styles from './bots.module.css';
+
+const KEY_EXPIRY_WARNING_DAYS = 7;
+
+interface PermissionsCellProps {
+  orgId: string;
+  botId: string;
+}
+
+function PermissionsCell({ orgId, botId }: PermissionsCellProps): React.JSX.Element {
+  const permissions = useBotPermissionsQuery(orgId, botId, true);
+  const grants = permissions.data?.grants ?? [];
+  const counts = countGrantsByApplication(grants);
+  const flagged = countFlaggedGrants(grants);
+
+  if (permissions.isLoading) return <span className={styles.muted}>—</span>;
+  if (counts.length === 0) return <span className={styles.muted}>None</span>;
+
+  return (
+    <div className={styles.permissionsCell}>
+      {counts.map(count => (
+        <Badge key={count.applicationId} intent="neutral">
+          {count.applicationName} · {count.count}
+        </Badge>
+      ))}
+      {flagged > 0 && (
+        <Badge intent="warning">
+          <AlertTriangleIcon size={12} />
+          {flagged} to review
+        </Badge>
+      )}
+    </div>
+  );
+}
 
 export const Route = createFileRoute('/_portal/organizations/$orgId/bots/')({
   loader: async ({ context, params }) => {
@@ -178,7 +213,27 @@ function BotsListPage(): React.JSX.Element {
                   </StatusChip>
                 ),
               },
-              { id: 'keys', header: 'API keys', cell: bot => <span className={styles.cellName}>{bot.activeKeyCount} active</span> },
+              { id: 'permissions', header: 'Permissions', cell: bot => <PermissionsCell orgId={orgId} botId={bot.id} /> },
+              {
+                id: 'keys',
+                header: 'API keys',
+                cell: bot => (
+                  <div className={styles.stackCell}>
+                    <span className={styles.cellName}>{bot.activeKeyCount} active</span>
+                    {bot.nextKeyExpiresAt && (
+                      <ClientOnly>
+                        {daysUntil(bot.nextKeyExpiresAt) <= KEY_EXPIRY_WARNING_DAYS && (
+                          <span className={styles.keyExpiryWarning}>
+                            <ClockIcon size={12} />
+                            Key expires{' '}
+                            {daysUntil(bot.nextKeyExpiresAt) <= 0 ? 'today' : `in ${daysUntil(bot.nextKeyExpiresAt)} day${daysUntil(bot.nextKeyExpiresAt) === 1 ? '' : 's'}`}
+                          </span>
+                        )}
+                      </ClientOnly>
+                    )}
+                  </div>
+                ),
+              },
               {
                 id: 'lastUsed',
                 header: 'Last used',

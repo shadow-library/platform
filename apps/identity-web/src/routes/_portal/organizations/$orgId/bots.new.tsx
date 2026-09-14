@@ -3,16 +3,20 @@ import { useState } from 'react';
 import { Avatar, Button, DescriptionList, FormField, Input, NumberStepper, Textarea, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
 
 import { ArrowLeftIcon, BotIcon } from '@/components/icons';
-import { SectionCard } from '@/components/si';
+import { QueryState, SectionCard } from '@/components/si';
+import { type DesiredGrantMap, desiredGrantsList, PermissionsMatrix, summarizePermissions } from '@/features/bots';
 import { useStepUpGate } from '@/features/portal';
-import { myOrganisationsQueryOptions, useCreateBotMutation, useOrgAccess } from '@/lib/apis';
+import { botPermissionCatalogQueryOptions, myOrganisationsQueryOptions, orgAccessOf, useBotPermissionCatalogQuery, useCreateBotMutation, useOrgAccess } from '@/lib/apis';
 import { botErrorMessage, botFieldError } from '@/lib/bot-errors';
 import { validateCidr } from '@/lib/cidr';
 
 import styles from './bots.module.css';
 
 export const Route = createFileRoute('/_portal/organizations/$orgId/bots/new')({
-  loader: ({ context }) => context.queryClient.ensureQueryData(myOrganisationsQueryOptions()),
+  loader: async ({ context, params }) => {
+    const mine = await context.queryClient.ensureQueryData(myOrganisationsQueryOptions());
+    if (orgAccessOf(mine, params.orgId).canManage) await context.queryClient.ensureQueryData(botPermissionCatalogQueryOptions(params.orgId));
+  },
   component: NewBotPage,
 });
 
@@ -25,6 +29,7 @@ function NewBotPage(): React.JSX.Element {
   const navigate = useNavigate();
   const { org, canManage } = useOrgAccess(orgId);
   const create = useCreateBotMutation(orgId);
+  const catalog = useBotPermissionCatalogQuery(orgId, canManage);
   const { require, dialog } = useStepUpGate();
 
   const [displayName, setDisplayName] = useState('');
@@ -32,6 +37,7 @@ function NewBotPage(): React.JSX.Element {
   const [description, setDescription] = useState('');
   const [ipAllowlist, setIpAllowlist] = useState<TokenValue[]>([]);
   const [rateLimitPerMinute, setRateLimitPerMinute] = useState<number | null>(MAX_RATE_LIMIT);
+  const [desired, setDesired] = useState<DesiredGrantMap>({});
   const [nameError, setNameError] = useState<string | undefined>();
   const [handleError, setHandleError] = useState<string | undefined>();
 
@@ -62,6 +68,7 @@ function NewBotPage(): React.JSX.Element {
     }
     if (hasInvalidIp || rateLimitInvalid) return;
 
+    const grants = desiredGrantsList(desired);
     require(() =>
       create.mutate(
         {
@@ -70,6 +77,7 @@ function NewBotPage(): React.JSX.Element {
           description: description.trim() || undefined,
           ipAllowlist: validIps.length > 0 ? validIps : undefined,
           rateLimitPerMinute,
+          grants: grants.length > 0 ? grants : undefined,
         },
         {
           onSuccess: bot => {
@@ -114,6 +122,12 @@ function NewBotPage(): React.JSX.Element {
             </div>
           </SectionCard>
 
+          <SectionCard title="Permissions" description="Everything starts at No access. You can only grant permissions that apps allow for bots and that you hold yourself.">
+            <QueryState isLoading={catalog.isLoading} error={catalog.error} isEmpty={false}>
+              <PermissionsMatrix applications={catalog.data?.applications ?? []} desired={desired} onDesiredChange={setDesired} />
+            </QueryState>
+          </SectionCard>
+
           <SectionCard title="Network & limits" description="Checked every time an app exchanges one of this bot’s keys.">
             <div className={styles.form}>
               <FormField
@@ -153,6 +167,17 @@ function NewBotPage(): React.JSX.Element {
             </div>
           </div>
           <DescriptionList layout="column">
+            {summarizePermissions(catalog.data?.applications ?? [], desired).map(group => (
+              <DescriptionList.Item key={group.applicationId} term={group.applicationName}>
+                <div className={styles.stackCell}>
+                  {group.items.map(item => (
+                    <span key={item.resource}>
+                      {item.resourceLabel} · {item.levelLabel}
+                    </span>
+                  ))}
+                </div>
+              </DescriptionList.Item>
+            ))}
             <DescriptionList.Item term="Network">
               {validIps.length > 0 ? `${validIps.length} IP range${validIps.length === 1 ? '' : 's'}` : 'All addresses allowed'}
             </DescriptionList.Item>

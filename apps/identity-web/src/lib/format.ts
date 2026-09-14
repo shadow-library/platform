@@ -22,6 +22,12 @@ export function relativeTime(iso?: string | null): string {
   return new Date(iso).toLocaleDateString(DATE_LOCALE, { month: 'short', day: 'numeric' });
 }
 
+/** Whole days from now until `iso`, rounded up — negative once it's passed. Non-deterministic (reads `Date.now()`): render behind `ClientOnly`. */
+export function daysUntil(iso: string): number {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  return Math.ceil((new Date(iso).getTime() - Date.now()) / DAY_MS);
+}
+
 export function formatDate(iso?: string | null): string {
   if (!iso) return '';
   const date = new Date(iso);

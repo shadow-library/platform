@@ -654,6 +654,163 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/organisations/{organisationId}/bots': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Bots */
+    get: operations['get_api_v1_organisations_organisationId_bots'];
+    put?: never;
+    /** Create Bot */
+    post: operations['post_api_v1_organisations_organisationId_bots'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Bot */
+    get: operations['get_api_v1_organisations_organisationId_bots_botId'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update Bot */
+    patch: operations['patch_api_v1_organisations_organisationId_bots_botId'];
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}/suspend': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Suspend Bot */
+    post: operations['post_api_v1_organisations_organisationId_bots_botId_suspend'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}/resume': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Resume Bot */
+    post: operations['post_api_v1_organisations_organisationId_bots_botId_resume'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}/activity': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Activity */
+    get: operations['get_api_v1_organisations_organisationId_bots_botId_activity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}/keys': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Keys */
+    get: operations['get_api_v1_organisations_organisationId_bots_botId_keys'];
+    put?: never;
+    /** Create Key */
+    post: operations['post_api_v1_organisations_organisationId_bots_botId_keys'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}/keys/{keyId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Revoke Key */
+    delete: operations['delete_api_v1_organisations_organisationId_bots_botId_keys_keyId'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bot-permission-catalog': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Catalog */
+    get: operations['get_api_v1_organisations_organisationId_bot_permission_catalog'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/bots/{botId}/permissions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Permissions */
+    get: operations['get_api_v1_organisations_organisationId_bots_botId_permissions'];
+    /** Replace Permissions */
+    put: operations['put_api_v1_organisations_organisationId_bots_botId_permissions'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/app-sessions': {
     parameters: {
       query?: never;
@@ -1630,111 +1787,6 @@ export interface paths {
     post?: never;
     /** Revoke Scope */
     delete: operations['delete_api_v1_organisations_organisationId_oauth_apps_applicationId_scopes_scopeId'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/organisations/{organisationId}/bots': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Bots */
-    get: operations['get_api_v1_organisations_organisationId_bots'];
-    put?: never;
-    /** Create Bot */
-    post: operations['post_api_v1_organisations_organisationId_bots'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/organisations/{organisationId}/bots/{botId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Bot */
-    get: operations['get_api_v1_organisations_organisationId_bots_botId'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /** Update Bot */
-    patch: operations['patch_api_v1_organisations_organisationId_bots_botId'];
-    trace?: never;
-  };
-  '/api/v1/organisations/{organisationId}/bots/{botId}/suspend': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Suspend Bot */
-    post: operations['post_api_v1_organisations_organisationId_bots_botId_suspend'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/organisations/{organisationId}/bots/{botId}/resume': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Resume Bot */
-    post: operations['post_api_v1_organisations_organisationId_bots_botId_resume'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/organisations/{organisationId}/bots/{botId}/keys': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Keys */
-    get: operations['get_api_v1_organisations_organisationId_bots_botId_keys'];
-    put?: never;
-    /** Create Key */
-    post: operations['post_api_v1_organisations_organisationId_bots_botId_keys'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/organisations/{organisationId}/bots/{botId}/keys/{keyId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Revoke Key */
-    delete: operations['delete_api_v1_organisations_organisationId_bots_botId_keys_keyId'];
     options?: never;
     head?: never;
     patch?: never;
@@ -2778,6 +2830,8 @@ export interface components {
       requested_token_type?: string;
       /** @description Accepted only to reject it; the actor is always the authenticated caller. */
       actor_token?: string;
+      /** @description Address of the caller that presented a bot key to the exchanging service, checked against the bot IP allowlist. Only first-party clients may exchange bot keys, so only they can supply it; without it the connection address is used. */
+      client_ip?: string;
     };
     TokenResponse: {
       access_token: string;
@@ -3074,6 +3128,19 @@ export interface components {
       permissions: string[];
       /** @description When true, every signed-in application user implicitly holds this role without an assignment. */
       default?: boolean;
+      /** @description Makes the role grantable to organisation bots. Sensitivity belongs to this block, not to the role: omitting the block on a later sync revokes bot grantability and resets the resource, level and sensitivity together. A role carrying no permissions may not declare one. */
+      bot?: components['schemas']['CatalogRoleBotGrant'];
+    };
+    CatalogRoleBotGrant: {
+      /** @description Resource an organisation admin sees the grant under, such as `projects`. Unique per level within the application. */
+      resource: string;
+      /**
+       * @description `write` implies `read`: a write role must carry every permission of the read role on the same resource.
+       * @enum {string}
+       */
+      level: 'read' | 'write';
+      /** @description Flags the grant as sensitive to organisation admins, as for spend-incurring actions. Defaults to false. */
+      sensitive?: boolean;
     };
     CatalogSyncResponse: {
       permissionsUpserted: number;
@@ -3089,6 +3156,213 @@ export interface components {
       callerClientId: string;
       method: string;
       path: string;
+    };
+    BotsResponse: {
+      bots: components['schemas']['BotItem'][];
+      usage: components['schemas']['BotUsageItem'];
+    };
+    BotItem: {
+      id: string;
+      /** @description OAuth client backing the bot; it is the principal id in role assignments and issued tokens. */
+      clientId: string;
+      handle: string;
+      displayName: string;
+      description?: string;
+      /** @enum {string} */
+      status: 'ACTIVE' | 'SUSPENDED' | 'DELETING' | 'DELETED';
+      ipAllowlist: string[];
+      rateLimitPerMinute: number;
+      /** @description Keys that are neither revoked nor expired. */
+      activeKeyCount: number;
+      /** @description Most recent use of any of the bot keys. */
+      lastUsedAt?: string;
+      /** @description Caller address of that most recent use. */
+      lastUsedIp?: string;
+      /** @description Earliest expiry among the keys that are neither revoked nor expired; absent when the bot has no active key. */
+      nextKeyExpiresAt?: string;
+      createdBy?: components['schemas']['BotUserItem'];
+      createdAt: string;
+      updatedAt: string;
+      suspendedAt?: string;
+      suspendedBy?: components['schemas']['BotUserItem'];
+    };
+    BotUserItem: {
+      id: string;
+      displayName?: string;
+    };
+    BotUsageItem: {
+      /** @description Bots that count toward the limit: every bot not yet deleted. */
+      count: number;
+      limit: number;
+    };
+    CreateBotBody: {
+      /** @description Organisation-unique handle rendered as `<handle>[bot]` on everything the bot owns; it can never change. */
+      handle: string;
+      displayName: string;
+      description?: string;
+      /** @description IPv4 or IPv6 addresses or CIDR ranges allowed to exchange the bot keys; host bits are cleared and duplicates dropped. Empty allows every address. */
+      ipAllowlist?: string[];
+      /** @description Requests per minute each app accepts from the bot. Defaults to 600, which is also the ceiling. */
+      rateLimitPerMinute?: number;
+      /** @description Grants to apply in the same transaction as the creation, validated exactly as the permissions endpoint validates them. */
+      grants?: components['schemas']['BotGrantBody'][];
+    };
+    BotGrantBody: {
+      /** @description Application the grant belongs to, as listed by the bot permission catalog. */
+      applicationId: number;
+      /** @description Resource the application declares the grant under, such as `members`. */
+      resource: string;
+      /**
+       * @description `write` implies `read`; send one level per resource.
+       * @enum {string}
+       */
+      level: 'read' | 'write';
+    };
+    UpdateBotBody: {
+      displayName?: string;
+      /** @description null clears the description. */
+      description?: string | null;
+      /** @description Replaces the full allowlist; the same rules as creation apply and an empty list allows every address. */
+      ipAllowlist?: string[];
+      rateLimitPerMinute?: number;
+    };
+    BotActivityResponse: {
+      /** @description Newest first. */
+      events: components['schemas']['BotActivityItem'][];
+      /** @description Pass as `cursor` for the next page; absent on the last page. */
+      nextCursor?: string;
+    };
+    BotActivityItem: {
+      id: string;
+      occurredAt: string;
+      action: string;
+      /** @enum {string} */
+      outcome: 'SUCCESS' | 'DENIED' | 'FAILURE';
+      /** @enum {string} */
+      actorType: 'USER' | 'SERVICE_ACCOUNT' | 'SYSTEM' | 'ADMIN';
+      /** @description Present when a person acted; a bot acting on its own key is identified by the key instead. */
+      actor?: components['schemas']['BotUserItem'];
+      keyId?: string;
+      keyName?: string;
+      /** @description Caller address recorded with the event. */
+      ip?: string;
+      detail?: components['schemas']['BotActivityDetailItem'];
+    };
+    BotActivityDetailItem: {
+      /** @description Why a key exchange was refused, such as `ip_not_allowed`. */
+      reason?: string;
+      /** @description `exchange` for a resource server swapping the key for a token, `direct` for a call to identity itself. */
+      purpose?: string;
+      /** @description Bot fields the update changed. */
+      fields?: string[];
+      /** @description Grants added, each `<application>:<resource>:<level>`. */
+      added?: string[];
+      /** @description Grants removed, each `<application>:<resource>:<level>`. */
+      removed?: string[];
+    };
+    BotKeysResponse: {
+      keys: components['schemas']['BotKeyItem'][];
+    };
+    BotKeyItem: {
+      id: string;
+      name: string;
+      /** @description First 16 characters of the key, safe to display for recognising it. */
+      keyPrefix: string;
+      /**
+       * @description REVOKED wins over EXPIRED when both apply.
+       * @enum {string}
+       */
+      status: 'ACTIVE' | 'EXPIRED' | 'REVOKED';
+      expiresAt: string;
+      createdAt: string;
+      createdBy?: components['schemas']['BotUserItem'];
+      lastUsedAt?: string;
+      lastUsedIp?: string;
+      revokedAt?: string;
+      revokedBy?: components['schemas']['BotUserItem'];
+    };
+    CreateBotKeyBody: {
+      /** @description Where the key will live, such as the CI system or environment that holds it. */
+      name: string;
+      /** @description ISO-8601 date-time with seconds and a time zone, such as 2027-03-07T09:30:00Z; strictly in the future and at most 365 days away. */
+      expiresAt: string;
+    };
+    CreatedBotKeyResponse: {
+      id: string;
+      name: string;
+      /** @description First 16 characters of the key, safe to display for recognising it. */
+      keyPrefix: string;
+      /**
+       * @description REVOKED wins over EXPIRED when both apply.
+       * @enum {string}
+       */
+      status: 'ACTIVE' | 'EXPIRED' | 'REVOKED';
+      expiresAt: string;
+      createdAt: string;
+      createdBy?: components['schemas']['BotUserItem'];
+      lastUsedAt?: string;
+      lastUsedIp?: string;
+      revokedAt?: string;
+      revokedBy?: components['schemas']['BotUserItem'];
+      /** @description The full key, returned exactly once; only a SHA-256 hash of its secret is stored. */
+      key: string;
+    };
+    BotPermissionCatalogResponse: {
+      /** @description Applications this organisation can reach that declare bot-grantable roles, ordered by application name. */
+      applications: components['schemas']['BotCatalogApplicationItem'][];
+    };
+    BotCatalogApplicationItem: {
+      applicationId: number;
+      name: string;
+      displayName?: string;
+      logoUrl?: string;
+      resources: components['schemas']['BotCatalogResourceItem'][];
+    };
+    BotCatalogResourceItem: {
+      resource: string;
+      /** @description Ordered read before write. */
+      levels: components['schemas']['BotCatalogLevelItem'][];
+    };
+    BotCatalogLevelItem: {
+      /** @description Application role backing this level; grants are still requested by resource and level. */
+      roleId: number;
+      roleName: string;
+      description?: string;
+      /** @enum {string} */
+      level: 'read' | 'write';
+      /** @description The application flags this grant as sensitive, such as a spend-incurring action. */
+      sensitive: boolean;
+      /** @description The role is declared bot-grantable by an application this organisation reaches. Only eligible grants are catalogued. */
+      eligible: boolean;
+      /** @description You hold this permission in the organisation and may therefore grant it. Advisory only — the server re-checks it on every write. */
+      heldByYou: boolean;
+    };
+    BotPermissionsResponse: {
+      grants: components['schemas']['BotGrantItem'][];
+    };
+    BotGrantItem: {
+      roleId: number;
+      roleName: string;
+      applicationId: number;
+      application: string;
+      applicationDisplayName?: string;
+      /** @description Absent once the application stops declaring the role bot-grantable; the next permissions write drops such a grant. */
+      resource?: string;
+      /** @enum {string} */
+      level?: 'read' | 'write';
+      sensitive: boolean;
+      /** @description The role is still declared bot-grantable by its application. */
+      eligible: boolean;
+      grantedAt: string;
+      grantedBy?: components['schemas']['BotUserItem'];
+      /** @description False when the granting administrator no longer holds this permission. The grant stays in force until an admin removes it. */
+      granterHoldsPermission: boolean;
+      /** @description This grant was made here and a permissions write can change it. False for an assignment applied by platform staff, shown for transparency but never altered by a write here. */
+      managed: boolean;
+    };
+    ReplaceBotPermissionsBody: {
+      /** @description The full desired set of grants, identified by application, resource and level. Every grant made here that the set omits is revoked — including one whose role has since stopped being bot-grantable, which no set can name and which is therefore always revoked by the next write. Assignments applied by platform staff are never touched. Every entry is re-validated server-side. */
+      grants: components['schemas']['BotGrantBody'][];
     };
     CreateAppSessionBody: {
       code: string;
@@ -3614,107 +3888,6 @@ export interface components {
     GrantOrgOAuthAppScopeBody: {
       /** @description Scope from the organisation scope catalog; anything outside it is rejected. */
       scopeId: string;
-    };
-    BotsResponse: {
-      bots: components['schemas']['BotItem'][];
-      usage: components['schemas']['BotUsageItem'];
-    };
-    BotItem: {
-      id: string;
-      /** @description OAuth client backing the bot; it is the principal id in role assignments and issued tokens. */
-      clientId: string;
-      handle: string;
-      displayName: string;
-      description?: string;
-      /** @enum {string} */
-      status: 'ACTIVE' | 'SUSPENDED' | 'DELETING' | 'DELETED';
-      ipAllowlist: string[];
-      rateLimitPerMinute: number;
-      /** @description Keys that are neither revoked nor expired. */
-      activeKeyCount: number;
-      /** @description Most recent use of any of the bot keys. */
-      lastUsedAt?: string;
-      /** @description Caller address of that most recent use. */
-      lastUsedIp?: string;
-      createdBy?: components['schemas']['BotUserItem'];
-      createdAt: string;
-      updatedAt: string;
-      suspendedAt?: string;
-      suspendedBy?: components['schemas']['BotUserItem'];
-    };
-    BotUserItem: {
-      id: string;
-      displayName?: string;
-    };
-    BotUsageItem: {
-      /** @description Bots that count toward the limit: every bot not yet deleted. */
-      count: number;
-      limit: number;
-    };
-    CreateBotBody: {
-      /** @description Organisation-unique handle rendered as `<handle>[bot]` on everything the bot owns; it can never change. */
-      handle: string;
-      displayName: string;
-      description?: string;
-      /** @description IPv4 or IPv6 addresses or CIDR ranges allowed to exchange the bot keys; host bits are cleared and duplicates dropped. Empty allows every address. */
-      ipAllowlist?: string[];
-      /** @description Requests per minute each app accepts from the bot. Defaults to 600, which is also the ceiling. */
-      rateLimitPerMinute?: number;
-    };
-    UpdateBotBody: {
-      displayName?: string;
-      /** @description null clears the description. */
-      description?: string | null;
-      /** @description Replaces the full allowlist; the same rules as creation apply and an empty list allows every address. */
-      ipAllowlist?: string[];
-      rateLimitPerMinute?: number;
-    };
-    BotKeysResponse: {
-      keys: components['schemas']['BotKeyItem'][];
-    };
-    BotKeyItem: {
-      id: string;
-      name: string;
-      /** @description First 16 characters of the key, safe to display for recognising it. */
-      keyPrefix: string;
-      /**
-       * @description REVOKED wins over EXPIRED when both apply.
-       * @enum {string}
-       */
-      status: 'ACTIVE' | 'EXPIRED' | 'REVOKED';
-      expiresAt: string;
-      createdAt: string;
-      createdBy?: components['schemas']['BotUserItem'];
-      lastUsedAt?: string;
-      lastUsedIp?: string;
-      revokedAt?: string;
-      revokedBy?: components['schemas']['BotUserItem'];
-    };
-    CreateBotKeyBody: {
-      /** @description Where the key will live, such as the CI system or environment that holds it. */
-      name: string;
-      /** @description ISO-8601 expiry, strictly in the future and at most 365 days away. */
-      expiresAt: string;
-    };
-    CreatedBotKeyResponse: {
-      id: string;
-      name: string;
-      /** @description First 16 characters of the key, safe to display for recognising it. */
-      keyPrefix: string;
-      /**
-       * @description REVOKED wins over EXPIRED when both apply.
-       * @enum {string}
-       */
-      status: 'ACTIVE' | 'EXPIRED' | 'REVOKED';
-      expiresAt: string;
-      createdAt: string;
-      createdBy?: components['schemas']['BotUserItem'];
-      lastUsedAt?: string;
-      lastUsedIp?: string;
-      revokedAt?: string;
-      revokedBy?: components['schemas']['BotUserItem'];
-      /** @description The full key, returned exactly once; only a SHA-256 hash of its secret is stored. */
-      key: string;
     };
     ResolveUsersBody: {
       emails: string[];
@@ -6192,6 +6365,572 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ServiceAccessResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_bots: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_organisations_organisationId_bots: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateBotBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotItem'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_bots_botId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotItem'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_organisations_organisationId_bots_botId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateBotBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_organisations_organisationId_bots_botId_suspend: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_organisations_organisationId_bots_botId_resume: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_bots_botId_activity: {
+    parameters: {
+      query?: {
+        limit?: number | string;
+        /** @description Opaque cursor from a previous page; omit for the newest events. */
+        cursor?: string;
+        action?:
+          | 'bot.created'
+          | 'bot.updated'
+          | 'bot.suspended'
+          | 'bot.resumed'
+          | 'bot.permissions.changed'
+          | 'bot.key.created'
+          | 'bot.key.revoked'
+          | 'bot.key.expired'
+          | 'bot.key.used'
+          | 'bot.key.exchange_denied'
+          | 'bot.deletion.requested'
+          | 'bot.ownership.transferred'
+          | 'bot.deleted';
+        outcome?: 'SUCCESS' | 'DENIED' | 'FAILURE';
+      };
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotActivityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_bots_botId_keys: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotKeysResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_organisations_organisationId_bots_botId_keys: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateBotKeyBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CreatedBotKeyResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_organisations_organisationId_bots_botId_keys_keyId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+        keyId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_bot_permission_catalog: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotPermissionCatalogResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_bots_botId_permissions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotPermissionsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_organisations_organisationId_bots_botId_permissions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReplaceBotPermissionsBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
         };
       };
       /** @description Default Response */
@@ -8970,386 +9709,6 @@ export interface operations {
         organisationId: string;
         applicationId: string;
         scopeId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['OrganisationActionResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_organisations_organisationId_bots: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        organisationId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BotsResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_organisations_organisationId_bots: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        organisationId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateBotBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BotItem'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_organisations_organisationId_bots_botId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        organisationId: string;
-        botId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BotItem'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  patch_api_v1_organisations_organisationId_bots_botId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        organisationId: string;
-        botId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateBotBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['OrganisationActionResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_organisations_organisationId_bots_botId_suspend: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        organisationId: string;
-        botId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['OrganisationActionResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_organisations_organisationId_bots_botId_resume: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        organisationId: string;
-        botId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['OrganisationActionResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_organisations_organisationId_bots_botId_keys: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        organisationId: string;
-        botId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BotKeysResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_organisations_organisationId_bots_botId_keys: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        organisationId: string;
-        botId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateBotKeyBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CreatedBotKeyResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_organisations_organisationId_bots_botId_keys_keyId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        organisationId: string;
-        botId: string;
-        keyId: string;
       };
       cookie?: never;
     };
@@ -12617,9 +12976,31 @@ export type CheckResponse = components['schemas']['CheckResponse'];
 export type CatalogSyncBody = components['schemas']['CatalogSyncBody'];
 export type CatalogPermission = components['schemas']['CatalogPermission'];
 export type CatalogRole = components['schemas']['CatalogRole'];
+export type CatalogRoleBotGrant = components['schemas']['CatalogRoleBotGrant'];
 export type CatalogSyncResponse = components['schemas']['CatalogSyncResponse'];
 export type ServiceAccessResponse = components['schemas']['ServiceAccessResponse'];
 export type ServiceAccessRuleDto = components['schemas']['ServiceAccessRuleDto'];
+export type BotsResponse = components['schemas']['BotsResponse'];
+export type BotItem = components['schemas']['BotItem'];
+export type BotUserItem = components['schemas']['BotUserItem'];
+export type BotUsageItem = components['schemas']['BotUsageItem'];
+export type CreateBotBody = components['schemas']['CreateBotBody'];
+export type BotGrantBody = components['schemas']['BotGrantBody'];
+export type UpdateBotBody = components['schemas']['UpdateBotBody'];
+export type BotActivityResponse = components['schemas']['BotActivityResponse'];
+export type BotActivityItem = components['schemas']['BotActivityItem'];
+export type BotActivityDetailItem = components['schemas']['BotActivityDetailItem'];
+export type BotKeysResponse = components['schemas']['BotKeysResponse'];
+export type BotKeyItem = components['schemas']['BotKeyItem'];
+export type CreateBotKeyBody = components['schemas']['CreateBotKeyBody'];
+export type CreatedBotKeyResponse = components['schemas']['CreatedBotKeyResponse'];
+export type BotPermissionCatalogResponse = components['schemas']['BotPermissionCatalogResponse'];
+export type BotCatalogApplicationItem = components['schemas']['BotCatalogApplicationItem'];
+export type BotCatalogResourceItem = components['schemas']['BotCatalogResourceItem'];
+export type BotCatalogLevelItem = components['schemas']['BotCatalogLevelItem'];
+export type BotPermissionsResponse = components['schemas']['BotPermissionsResponse'];
+export type BotGrantItem = components['schemas']['BotGrantItem'];
+export type ReplaceBotPermissionsBody = components['schemas']['ReplaceBotPermissionsBody'];
 export type CreateAppSessionBody = components['schemas']['CreateAppSessionBody'];
 export type AppSessionResponse = components['schemas']['AppSessionResponse'];
 export type MintAppTokenBody = components['schemas']['MintAppTokenBody'];
@@ -12712,16 +13093,6 @@ export type OrgOAuthAppDetailResponse = components['schemas']['OrgOAuthAppDetail
 export type UpdateOrgOAuthAppBody = components['schemas']['UpdateOrgOAuthAppBody'];
 export type RotateOrgOAuthAppSecretResponse = components['schemas']['RotateOrgOAuthAppSecretResponse'];
 export type GrantOrgOAuthAppScopeBody = components['schemas']['GrantOrgOAuthAppScopeBody'];
-export type BotsResponse = components['schemas']['BotsResponse'];
-export type BotItem = components['schemas']['BotItem'];
-export type BotUserItem = components['schemas']['BotUserItem'];
-export type BotUsageItem = components['schemas']['BotUsageItem'];
-export type CreateBotBody = components['schemas']['CreateBotBody'];
-export type UpdateBotBody = components['schemas']['UpdateBotBody'];
-export type BotKeysResponse = components['schemas']['BotKeysResponse'];
-export type BotKeyItem = components['schemas']['BotKeyItem'];
-export type CreateBotKeyBody = components['schemas']['CreateBotKeyBody'];
-export type CreatedBotKeyResponse = components['schemas']['CreatedBotKeyResponse'];
 export type ResolveUsersBody = components['schemas']['ResolveUsersBody'];
 export type ResolveUsersResponse = components['schemas']['ResolveUsersResponse'];
 export type ResolvedUserItem = components['schemas']['ResolvedUserItem'];
@@ -12808,6 +13179,13 @@ export type ListOrganisationMembersPathParams = Exclude<paths['/api/v1/organisat
 export type ListOrganisationInvitationsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/invitations']['get']['parameters']['path'], undefined>;
 export type ListOrganisationApplicationsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/applications']['get']['parameters']['path'], undefined>;
 export type ListDomainsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/domains']['get']['parameters']['path'], undefined>;
+export type ListBotsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots']['get']['parameters']['path'], undefined>;
+export type GetBotPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}']['get']['parameters']['path'], undefined>;
+export type ListActivityQueryParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}/activity']['get']['parameters']['query'], undefined>;
+export type ListActivityPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}/activity']['get']['parameters']['path'], undefined>;
+export type ListKeysPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}/keys']['get']['parameters']['path'], undefined>;
+export type ListCatalogPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bot-permission-catalog']['get']['parameters']['path'], undefined>;
+export type ListPermissionsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}/permissions']['get']['parameters']['path'], undefined>;
 export type HandleSamlSsoQueryParams = Exclude<paths['/saml2/sso']['get']['parameters']['query'], undefined>;
 export type ResumeSamlSsoQueryParams = Exclude<paths['/saml2/sso/resume']['get']['parameters']['query'], undefined>;
 export type ChallengeMethodsQueryParams = Exclude<paths['/api/v1/auth/challenge/methods']['get']['parameters']['query'], undefined>;
@@ -12818,9 +13196,6 @@ export type ListIdentityProvidersPathParams = Exclude<paths['/api/v1/organisatio
 export type ListAppsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/oauth-apps']['get']['parameters']['path'], undefined>;
 export type ListScopeCatalogPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/oauth-apps/scope-catalog']['get']['parameters']['path'], undefined>;
 export type GetAppPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/oauth-apps/{applicationId}']['get']['parameters']['path'], undefined>;
-export type ListBotsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots']['get']['parameters']['path'], undefined>;
-export type GetBotPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}']['get']['parameters']['path'], undefined>;
-export type ListKeysPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/bots/{botId}/keys']['get']['parameters']['path'], undefined>;
 export type IsOrganisationMemberPathParams = Exclude<paths['/api/v1/internal/organisations/{organisationId}/members/{userId}']['get']['parameters']['path'], undefined>;
 export type SearchUsersQueryParams = Exclude<paths['/api/v1/admin/users']['get']['parameters']['query'], undefined>;
 export type GetUserDetailPathParams = Exclude<paths['/api/v1/admin/users/{userId}']['get']['parameters']['path'], undefined>;

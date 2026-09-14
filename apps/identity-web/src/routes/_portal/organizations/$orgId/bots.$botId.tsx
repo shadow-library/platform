@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   addDays,
   Alert,
@@ -15,6 +15,7 @@ import {
   NumberStepper,
   parseISODate,
   SegmentedControl,
+  Select,
   Spinner,
   Table,
   Textarea,
@@ -25,21 +26,50 @@ import {
 } from '@shadow-library/ui';
 
 import { ArrowLeftIcon, BotIcon, KeyIcon } from '@/components/icons';
-import { SectionCard, StatusChip } from '@/components/si';
+import { QueryState, SectionCard, StatusChip } from '@/components/si';
 import { SecretDialog } from '@/features/console';
+import {
+  baselineFromGrants,
+  countChangedSlots,
+  type DesiredGrantMap,
+  desiredGrantsList,
+  humanizeResource,
+  PermissionsMatrix,
+  resolvedNotHeldRemovals,
+  resolvedStaleRemovals,
+  staleLevelGrants,
+  summarizeGrants,
+  unrepresentableManagedGrantCount,
+  unresolvedNotHeldGrants,
+} from '@/features/bots';
 import { useStepUpGate } from '@/features/portal';
 import {
+  type ApiError,
+  type BotActivityAction,
+  type BotActivityDetailItem,
+  type BotActivityItem,
+  type BotActivityOutcome,
+  botActivityQueryOptions,
+  type BotCatalogApplicationItem,
+  type BotGrantItem,
   type BotItem,
   type BotKeyItem,
   botKeysQueryOptions,
+  botPermissionCatalogQueryOptions,
+  botPermissionsQueryOptions,
   botQueryOptions,
   isApiError,
   myOrganisationsQueryOptions,
   orgAccessOf,
+  useBotActivityInfiniteQuery,
+  useBotActivityQuery,
   useBotKeysQuery,
+  useBotPermissionCatalogQuery,
+  useBotPermissionsQuery,
   useBotQuery,
   useCreateBotKeyMutation,
   useOrgAccess,
+  useReplaceBotPermissionsMutation,
   useResumeBotMutation,
   useRevokeBotKeyMutation,
   useSuspendBotMutation,
@@ -47,21 +77,23 @@ import {
 } from '@/lib/apis';
 import { botErrorMessage, botFieldError } from '@/lib/bot-errors';
 import { validateCidr } from '@/lib/cidr';
-import { formatDate, relativeTime } from '@/lib/format';
+import { daysUntil, formatDate, relativeTime } from '@/lib/format';
 
 import styles from './bots.module.css';
 
-type Tab = 'overview' | 'keys' | 'settings';
+type Tab = 'overview' | 'permissions' | 'keys' | 'activity' | 'settings';
 
 interface BotSearch {
   tab?: Tab;
   generate?: boolean;
 }
 
+const TAB_VALUES: Tab[] = ['permissions', 'keys', 'activity', 'settings'];
+
 export const Route = createFileRoute('/_portal/organizations/$orgId/bots/$botId')({
   validateSearch: (search: Record<string, unknown>): BotSearch => {
     const tab = search.tab;
-    return { tab: tab === 'keys' || tab === 'settings' ? tab : undefined, generate: search.generate === true ? true : undefined };
+    return { tab: TAB_VALUES.includes(tab as Tab) ? (tab as Tab) : undefined, generate: search.generate === true ? true : undefined };
   },
   loader: async ({ context, params }) => {
     const mine = await context.queryClient.ensureQueryData(myOrganisationsQueryOptions());
@@ -70,6 +102,9 @@ export const Route = createFileRoute('/_portal/organizations/$orgId/bots/$botId'
       await Promise.all([
         context.queryClient.ensureQueryData(botQueryOptions(params.orgId, params.botId)),
         context.queryClient.ensureQueryData(botKeysQueryOptions(params.orgId, params.botId)),
+        context.queryClient.ensureQueryData(botPermissionCatalogQueryOptions(params.orgId)),
+        context.queryClient.ensureQueryData(botPermissionsQueryOptions(params.orgId, params.botId)),
+        context.queryClient.ensureQueryData(botActivityQueryOptions(params.orgId, params.botId, { limit: RECENT_ACTIVITY_LIMIT })),
       ]);
     } catch (error) {
       if (!isApiError(error) || error.status !== 404) throw error;
@@ -80,7 +115,9 @@ export const Route = createFileRoute('/_portal/organizations/$orgId/bots/$botId'
 
 const NAV_ITEMS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
+  { key: 'permissions', label: 'Permissions' },
   { key: 'keys', label: 'API keys' },
+  { key: 'activity', label: 'Activity' },
   { key: 'settings', label: 'Settings' },
 ];
 
@@ -97,13 +134,100 @@ const MAX_ACTIVE_KEYS = 2;
 const EXPIRY_WARNING_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_KEY_LIFETIME_DAYS = 365;
+const RECENT_ACTIVITY_LIMIT = 3;
+const EMPTY_APPLICATIONS: BotCatalogApplicationItem[] = [];
+const EMPTY_GRANTS: BotGrantItem[] = [];
 
 function isManageable(status: BotItem['status']): boolean {
   return status === 'ACTIVE' || status === 'SUSPENDED';
 }
 
-function daysUntil(iso: string): number {
-  return Math.ceil((new Date(iso).getTime() - Date.now()) / DAY_MS);
+const OUTCOME_META: Record<BotActivityOutcome, { label: string; intent: 'success' | 'warning' | 'danger' | 'neutral' }> = {
+  SUCCESS: { label: 'Success', intent: 'success' },
+  DENIED: { label: 'Refused', intent: 'danger' },
+  FAILURE: { label: 'Failed', intent: 'danger' },
+};
+
+const ACTION_LABEL: Record<BotActivityAction, string> = {
+  'bot.created': 'Created',
+  'bot.updated': 'Updated',
+  'bot.suspended': 'Suspended',
+  'bot.resumed': 'Resumed',
+  'bot.permissions.changed': 'Permissions changed',
+  'bot.key.created': 'Key generated',
+  'bot.key.revoked': 'Key revoked',
+  'bot.key.expired': 'Key expired',
+  'bot.key.used': 'Key used',
+  'bot.key.exchange_denied': 'Key exchange refused',
+  'bot.deletion.requested': 'Deletion requested',
+  'bot.ownership.transferred': 'Ownership transferred',
+  'bot.deleted': 'Deleted',
+};
+
+const REFUSAL_REASON_LABEL: Record<string, string> = {
+  ip_not_allowed: 'IP not in allowlist',
+  key_expired: 'key expired',
+  key_revoked: 'key revoked',
+  bot_suspended: 'bot suspended',
+  rate_limited: 'rate limit reached',
+};
+
+function humanizeCode(value: string): string {
+  return REFUSAL_REASON_LABEL[value] ?? value.replace(/_/g, ' ');
+}
+
+function humanizeField(field: string): string {
+  return field.replace(/([A-Z])/g, ' $1').toLowerCase();
+}
+
+function formatGrantLabel(raw: string): string {
+  const [, resource, level] = raw.split(':');
+  return resource && level ? `${humanizeResource(resource)} · ${level}` : raw;
+}
+
+function permissionsChangeSummary(detail: BotActivityDetailItem | undefined): string {
+  const added = detail?.added ?? [];
+  const removed = detail?.removed ?? [];
+  const [firstAdded] = added;
+  const [firstRemoved] = removed;
+  if (added.length > 0 && removed.length === 0) return added.length === 1 && firstAdded ? `granted ${formatGrantLabel(firstAdded)}` : `granted ${added.length} permissions`;
+  if (removed.length > 0 && added.length === 0) return removed.length === 1 && firstRemoved ? `revoked ${formatGrantLabel(firstRemoved)}` : `revoked ${removed.length} permissions`;
+  if (added.length > 0 && removed.length > 0) return `changed ${added.length + removed.length} permissions`;
+  return 'changed permissions';
+}
+
+function describeEvent(event: BotActivityItem): string {
+  const actorName = event.actor?.displayName ?? 'A former member';
+  switch (event.action as BotActivityAction) {
+    case 'bot.created':
+      return `${actorName} created the bot`;
+    case 'bot.updated':
+      return `${actorName} updated ${event.detail?.fields?.map(humanizeField).join(', ') || 'the bot'}`;
+    case 'bot.suspended':
+      return `${actorName} suspended the bot`;
+    case 'bot.resumed':
+      return `${actorName} resumed the bot`;
+    case 'bot.permissions.changed':
+      return `${actorName} ${permissionsChangeSummary(event.detail)}`;
+    case 'bot.key.created':
+      return `${actorName} generated key ${event.keyName ?? ''}`.trim();
+    case 'bot.key.revoked':
+      return `${actorName} revoked key ${event.keyName ?? ''}`.trim();
+    case 'bot.key.expired':
+      return `Key ${event.keyName ?? ''} expired`.trim();
+    case 'bot.key.used':
+      return `Key ${event.keyName ?? 'key'} used`;
+    case 'bot.key.exchange_denied':
+      return `Key exchange refused${event.detail?.reason ? `: ${humanizeCode(event.detail.reason)}` : ''}`;
+    case 'bot.deletion.requested':
+      return `${actorName} requested deletion`;
+    case 'bot.ownership.transferred':
+      return `${actorName} transferred ownership`;
+    case 'bot.deleted':
+      return `${actorName} deleted the bot`;
+    default:
+      return event.action;
+  }
 }
 
 function BotDetailPage(): React.JSX.Element {
@@ -113,6 +237,8 @@ function BotDetailPage(): React.JSX.Element {
   const { org, canManage } = useOrgAccess(orgId);
   const bot = useBotQuery(orgId, botId, canManage);
   const keys = useBotKeysQuery(orgId, botId, canManage);
+  const catalog = useBotPermissionCatalogQuery(orgId, canManage);
+  const permissions = useBotPermissionsQuery(orgId, botId, canManage);
   const suspend = useSuspendBotMutation(orgId);
   const resume = useResumeBotMutation(orgId);
   const { require, dialog } = useStepUpGate();
@@ -154,6 +280,9 @@ function BotDetailPage(): React.JSX.Element {
   const activeKeys = keys.data?.keys.filter(key => key.status === 'ACTIVE') ?? [];
   const canGenerateKey = data.status === 'ACTIVE' && activeKeys.length < MAX_ACTIVE_KEYS;
   const manageable = isManageable(data.status);
+  const applications = catalog.data?.applications ?? EMPTY_APPLICATIONS;
+  const grants = permissions.data?.grants ?? EMPTY_GRANTS;
+  const goToTab = (next: Tab): void => void navigate({ search: prev => ({ ...prev, tab: next === 'overview' ? undefined : next }), replace: true });
 
   const toggleSuspend = (): void => {
     const mutation = data.status === 'ACTIVE' ? suspend : resume;
@@ -215,18 +344,43 @@ function BotDetailPage(): React.JSX.Element {
               className={styles.navItem}
               data-active={tab === item.key || undefined}
               aria-current={tab === item.key ? 'page' : undefined}
-              onClick={() => void navigate({ search: prev => ({ ...prev, tab: item.key === 'overview' ? undefined : item.key }), replace: true })}
+              onClick={() => goToTab(item.key)}
             >
               <span className={styles.navLabel}>{item.label}</span>
               {item.key === 'keys' && <span className={styles.navCount}>{data.activeKeyCount}</span>}
+              {item.key === 'permissions' && grants.length > 0 && <span className={styles.navCount}>{grants.length}</span>}
             </button>
           ))}
         </nav>
 
         <div className={styles.sectionBody}>
           {tab === 'overview' && (
-            <OverviewTab bot={data} activeKeys={activeKeys} onManageKeys={() => void navigate({ search: prev => ({ ...prev, tab: 'keys' }), replace: true })} />
+            <OverviewTab
+              bot={data}
+              activeKeys={activeKeys}
+              orgId={orgId}
+              botId={botId}
+              applications={applications}
+              grants={grants}
+              onManageKeys={() => goToTab('keys')}
+              onEditPermissions={() => goToTab('permissions')}
+              onViewActivity={() => goToTab('activity')}
+            />
           )}
+          {tab === 'permissions' && (
+            <PermissionsTab
+              botId={botId}
+              orgId={orgId}
+              applications={applications}
+              catalogLoading={catalog.isLoading}
+              catalogError={catalog.error}
+              grants={grants}
+              grantsLoading={permissions.isLoading}
+              grantsError={permissions.error}
+              require={require}
+            />
+          )}
+          {tab === 'activity' && <ActivityTab orgId={orgId} botId={botId} />}
           {tab === 'keys' && (
             <KeysTab
               orgId={orgId}
@@ -269,10 +423,20 @@ function BotDetailPage(): React.JSX.Element {
 interface OverviewTabProps {
   bot: BotItem;
   activeKeys: BotKeyItem[];
+  orgId: string;
+  botId: string;
+  applications: BotCatalogApplicationItem[];
+  grants: BotGrantItem[];
   onManageKeys: () => void;
+  onEditPermissions: () => void;
+  onViewActivity: () => void;
 }
 
-function OverviewTab({ bot, activeKeys, onManageKeys }: OverviewTabProps): React.JSX.Element {
+function OverviewTab({ bot, activeKeys, orgId, botId, applications, grants, onManageKeys, onEditPermissions, onViewActivity }: OverviewTabProps): React.JSX.Element {
+  const recent = useBotActivityQuery(orgId, botId, { limit: RECENT_ACTIVITY_LIMIT }, true);
+  const permissionGroups = useMemo(() => summarizeGrants(applications, grants), [applications, grants]);
+  const flaggedCount = useMemo(() => permissionGroups.reduce((count, group) => count + group.items.filter(item => item.flagged).length, 0), [permissionGroups]);
+
   return (
     <div className={styles.overviewGrid}>
       <div className={styles.cardStack}>
@@ -310,36 +474,280 @@ function OverviewTab({ bot, activeKeys, onManageKeys }: OverviewTabProps): React
         </div>
       </div>
 
-      <div className={styles.detailCard}>
-        <div className={`${styles.tabHead} ${styles.tabHeadTight}`}>
-          <div className={styles.cardTitleInline}>API keys</div>
-          <span className={styles.tabHeadNote}>
-            {activeKeys.length} of {MAX_ACTIVE_KEYS} active
-          </span>
+      <div className={styles.cardStack}>
+        <div className={styles.detailCard}>
+          <div className={`${styles.tabHead} ${styles.tabHeadTight}`}>
+            <div className={styles.cardTitleInline}>Permissions</div>
+            <div className={styles.overviewCardActions}>
+              {flaggedCount > 0 && <StatusChip intent="warning">Review</StatusChip>}
+              <button type="button" className={styles.linkButton} onClick={onEditPermissions}>
+                Edit
+              </button>
+            </div>
+          </div>
+          {permissionGroups.length === 0 ? (
+            <p className={styles.muted}>No permissions granted yet.</p>
+          ) : (
+            <div className={styles.rowList}>
+              {permissionGroups.flatMap(group =>
+                group.items.map(item => (
+                  <div key={`${group.applicationId}-${item.resource}`} className={styles.permissionRow}>
+                    <Avatar name={group.applicationName} shape="square" size="sm" />
+                    <span className={styles.permissionResource}>{item.resourceLabel}</span>
+                    <span className={styles.muted}>{item.levelLabel}</span>
+                    {item.flagged && <StatusChip intent="warning">Review</StatusChip>}
+                  </div>
+                )),
+              )}
+            </div>
+          )}
         </div>
-        {activeKeys.length === 0 ? (
-          <p className={styles.muted}>No active keys yet.</p>
-        ) : (
-          <div className={styles.rowList}>
-            {activeKeys.map(key => (
-              <div key={key.id} className={styles.listRow}>
-                <div className={styles.listMain}>
-                  <div className={styles.listName}>{key.name}</div>
-                  <div className={styles.listSub}>
-                    Expires {formatDate(key.expiresAt)} · used{' '}
-                    <ClientOnly fallback={key.lastUsedAt ? formatDate(key.lastUsedAt) : 'never'}>{key.lastUsedAt ? relativeTime(key.lastUsedAt) : 'never'}</ClientOnly>
+
+        <div className={styles.detailCard}>
+          <div className={`${styles.tabHead} ${styles.tabHeadTight}`}>
+            <div className={styles.cardTitleInline}>API keys</div>
+            <span className={styles.tabHeadNote}>
+              {activeKeys.length} of {MAX_ACTIVE_KEYS} active
+            </span>
+          </div>
+          {activeKeys.length === 0 ? (
+            <p className={styles.muted}>No active keys yet.</p>
+          ) : (
+            <div className={styles.rowList}>
+              {activeKeys.map(key => (
+                <div key={key.id} className={styles.listRow}>
+                  <div className={styles.listMain}>
+                    <div className={styles.listName}>{key.name}</div>
+                    <div className={styles.listSub}>
+                      Expires {formatDate(key.expiresAt)} · used{' '}
+                      <ClientOnly fallback={key.lastUsedAt ? formatDate(key.lastUsedAt) : 'never'}>{key.lastUsedAt ? relativeTime(key.lastUsedAt) : 'never'}</ClientOnly>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+          <div className={styles.manageKeysRow}>
+            <Button variant="secondary" size="sm" onClick={onManageKeys}>
+              Manage keys
+            </Button>
           </div>
-        )}
-        <div className={styles.manageKeysRow}>
-          <Button variant="secondary" size="sm" onClick={onManageKeys}>
-            Manage keys
-          </Button>
+        </div>
+
+        <div className={styles.detailCard}>
+          <div className={`${styles.tabHead} ${styles.tabHeadTight}`}>
+            <div className={styles.cardTitleInline}>Recent activity</div>
+            <button type="button" className={styles.linkButton} onClick={onViewActivity}>
+              View all
+            </button>
+          </div>
+          <QueryState isLoading={recent.isLoading} error={recent.error} isEmpty={!recent.isLoading && (recent.data?.events.length ?? 0) === 0} emptyTitle="No activity yet">
+            <div className={styles.rowList}>
+              {(recent.data?.events ?? []).map(event => (
+                <div key={event.id} className={styles.activityRow}>
+                  <span className={styles.activityDot} data-outcome={event.outcome} />
+                  <span className={styles.activityText}>{describeEvent(event)}</span>
+                  <ClientOnly fallback={<span className={styles.listSub}>{formatDate(event.occurredAt)}</span>}>
+                    <span className={styles.listSub}>{relativeTime(event.occurredAt)}</span>
+                  </ClientOnly>
+                </div>
+              ))}
+            </div>
+          </QueryState>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface PermissionsTabProps {
+  orgId: string;
+  botId: string;
+  applications: BotCatalogApplicationItem[];
+  catalogLoading: boolean;
+  catalogError: ApiError | null;
+  grants: BotGrantItem[];
+  grantsLoading: boolean;
+  grantsError: ApiError | null;
+  require: (action: () => void) => void;
+}
+
+function PermissionsTab({ orgId, botId, applications, catalogLoading, catalogError, grants, grantsLoading, grantsError, require }: PermissionsTabProps): React.JSX.Element {
+  const replace = useReplaceBotPermissionsMutation(orgId);
+  const baseline = useMemo(() => baselineFromGrants(applications, grants), [applications, grants]);
+  const [desired, setDesired] = useState<DesiredGrantMap>(baseline);
+  const [saveError, setSaveError] = useState<ApiError | null>(null);
+  const [syncedBaseline, setSyncedBaseline] = useState(baseline);
+
+  if (syncedBaseline !== baseline) {
+    setSyncedBaseline(baseline);
+    setDesired(baseline);
+  }
+
+  const stale = useMemo(() => staleLevelGrants(applications, grants, baseline, desired), [applications, grants, baseline, desired]);
+  const notHeld = useMemo(() => unresolvedNotHeldGrants(applications, grants, baseline, desired), [applications, grants, baseline, desired]);
+  const changedCount =
+    countChangedSlots(baseline, desired) +
+    stale.length +
+    resolvedNotHeldRemovals(applications, grants, desired) +
+    resolvedStaleRemovals(applications, grants, desired) +
+    unrepresentableManagedGrantCount(grants);
+
+  const discard = (): void => {
+    setDesired(baseline);
+    setSaveError(null);
+  };
+
+  const save = (): void => {
+    setSaveError(null);
+    require(() => replace.mutate({ botId, grants: desiredGrantsList(desired) }, { onSuccess: () => toast.success('Permissions updated'), onError: error => setSaveError(error) }));
+  };
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.tabHead}>
+        <div className={styles.tabHeadMain}>
+          <h2 className={styles.tabTitle}>Permissions</h2>
+          <p className={styles.tabDesc}>Grants belong to the organization, not to the admin who made them. Changes reach every app within a minute.</p>
+        </div>
+      </div>
+
+      {saveError && (
+        <Alert intent="danger" title="Couldn’t save permissions">
+          {botErrorMessage(saveError)}
+        </Alert>
+      )}
+
+      {notHeld.length > 0 && (
+        <Alert intent="warning" title="Some grants aren’t yours to keep">
+          <ul className={styles.notHeldList}>
+            {notHeld.map(entry => (
+              <li key={`${entry.applicationId}-${entry.resource}`}>
+                You don’t hold {entry.applicationName} · {entry.resourceLabel} · {entry.levelLabel} — remove it explicitly
+                {entry.hasSibling ? ' (which also clears the other grant on that resource)' : ''}, or ask someone who does.
+              </li>
+            ))}
+          </ul>
+        </Alert>
+      )}
+
+      <div className={styles.detailCard}>
+        <QueryState isLoading={catalogLoading || grantsLoading} error={catalogError ?? grantsError} isEmpty={false}>
+          <PermissionsMatrix applications={applications} grants={grants} desired={desired} onDesiredChange={setDesired} />
+        </QueryState>
+      </div>
+
+      {changedCount > 0 && (
+        <div className={styles.unsavedBar}>
+          <span className={styles.unsavedDot} />
+          <span className={styles.unsavedText}>
+            <strong>
+              {changedCount} unsaved change{changedCount === 1 ? '' : 's'}
+            </strong>
+          </span>
+          <Button variant="ghost" size="sm" onClick={discard}>
+            Discard
+          </Button>
+          <Button variant="primary" size="sm" loading={replace.isPending} disabled={notHeld.length > 0} onClick={save}>
+            Save permissions
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface ActivityTabProps {
+  orgId: string;
+  botId: string;
+}
+
+function ActivityTab({ orgId, botId }: ActivityTabProps): React.JSX.Element {
+  const [action, setAction] = useState<'all' | BotActivityAction>('all');
+  const [outcome, setOutcome] = useState<'all' | BotActivityOutcome>('all');
+  const filter = { action: action === 'all' ? undefined : action, outcome: outcome === 'all' ? undefined : outcome };
+  const activity = useBotActivityInfiniteQuery(orgId, botId, filter, true);
+  const events = activity.data?.pages.flatMap(page => page.events) ?? [];
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.tabHead}>
+        <div className={styles.tabHeadMain}>
+          <h2 className={styles.tabTitle}>Activity</h2>
+          <p className={styles.tabDesc}>Key exchanges, refusals and changes to this bot. What the bot does inside each app is kept in that app.</p>
+        </div>
+      </div>
+
+      <div className={styles.toolbar}>
+        <Select size="sm" value={action} onValueChange={value => setAction(value as 'all' | BotActivityAction)}>
+          <Select.Item value="all">All events</Select.Item>
+          {(Object.keys(ACTION_LABEL) as BotActivityAction[]).map(key => (
+            <Select.Item key={key} value={key}>
+              {ACTION_LABEL[key]}
+            </Select.Item>
+          ))}
+        </Select>
+        <Select size="sm" value={outcome} onValueChange={value => setOutcome(value as 'all' | BotActivityOutcome)}>
+          <Select.Item value="all">All outcomes</Select.Item>
+          {(Object.keys(OUTCOME_META) as BotActivityOutcome[]).map(key => (
+            <Select.Item key={key} value={key}>
+              {OUTCOME_META[key].label}
+            </Select.Item>
+          ))}
+        </Select>
+      </div>
+
+      <div className={styles.tableCard}>
+        <QueryState
+          isLoading={activity.isLoading}
+          error={activity.error}
+          isEmpty={!activity.isLoading && events.length === 0}
+          emptyTitle="No activity yet"
+          emptyDescription="Key exchanges and changes to this bot will show up here."
+        >
+          <Table
+            data={events}
+            rowKey="id"
+            aria-label="Bot activity"
+            columns={[
+              {
+                id: 'time',
+                header: 'Time',
+                cell: event => (
+                  <ClientOnly fallback={<span className={styles.cellName}>{formatDate(event.occurredAt)}</span>}>
+                    <span className={styles.cellName}>{relativeTime(event.occurredAt)}</span>
+                  </ClientOnly>
+                ),
+              },
+              { id: 'event', header: 'Event', cell: event => <span>{describeEvent(event)}</span> },
+              {
+                id: 'key',
+                header: 'Key · IP',
+                cell: event =>
+                  event.keyName || event.ip ? (
+                    <div className={styles.stackCell}>
+                      {event.keyName && <span className={styles.cellName}>{event.keyName}</span>}
+                      {event.ip && <span className={styles.cellSub}>{event.ip}</span>}
+                    </div>
+                  ) : (
+                    <span className={styles.muted}>—</span>
+                  ),
+              },
+              { id: 'outcome', header: 'Outcome', cell: event => <StatusChip intent={OUTCOME_META[event.outcome].intent}>{OUTCOME_META[event.outcome].label}</StatusChip> },
+            ]}
+          />
+        </QueryState>
+      </div>
+
+      {activity.hasNextPage && (
+        <div className={styles.manageKeysRow}>
+          <Button variant="secondary" size="sm" loading={activity.isFetchingNextPage} onClick={() => void activity.fetchNextPage()}>
+            Load more
+          </Button>
+        </div>
+      )}
+
+      <p className={styles.tabDesc}>Successful key use is summarised at most once an hour per key.</p>
     </div>
   );
 }
@@ -684,6 +1092,7 @@ function GenerateKeyDialog({ orgId, botId, botLabel, open, onOpenChange, require
             onOpenChange(false);
             reset();
             onGenerated(result.key, result.name, result.expiresAt);
+            create.reset();
           },
           onError: error => {
             const fieldError = botFieldError(error);

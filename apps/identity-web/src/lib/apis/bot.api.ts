@@ -1,29 +1,86 @@
-import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import {
+  type InfiniteData,
+  queryOptions,
+  useInfiniteQuery,
+  type UseInfiniteQueryResult,
+  useMutation,
+  type UseMutationResult,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 
 import {
+  type BotActivityDetailItem,
+  type BotActivityItem,
+  type BotActivityResponse,
+  type BotCatalogApplicationItem,
+  type BotCatalogLevelItem,
+  type BotCatalogResourceItem,
+  type BotGrantBody,
+  type BotGrantItem,
   type BotItem,
   type BotKeyItem,
   type BotKeysResponse,
+  type BotPermissionCatalogResponse,
+  type BotPermissionsResponse,
   type BotsResponse,
   type BotUsageItem,
   type CreateBotBody,
   type CreateBotKeyBody,
   type CreatedBotKeyResponse,
+  type ListActivityQueryParams,
   type OrganisationActionResponse,
+  type ReplaceBotPermissionsBody,
   type UpdateBotBody,
 } from './api-types.gen';
 import { orgKeys } from './organisation.api';
 import { type ApiError, APIRequest } from './transport';
 
-export type { BotItem, BotKeyItem, BotKeysResponse, BotsResponse, BotUsageItem, CreateBotBody, CreateBotKeyBody, CreatedBotKeyResponse, UpdateBotBody };
+export type {
+  BotActivityDetailItem,
+  BotActivityItem,
+  BotActivityResponse,
+  BotCatalogApplicationItem,
+  BotCatalogLevelItem,
+  BotCatalogResourceItem,
+  BotGrantBody,
+  BotGrantItem,
+  BotItem,
+  BotKeyItem,
+  BotKeysResponse,
+  BotPermissionCatalogResponse,
+  BotPermissionsResponse,
+  BotsResponse,
+  BotUsageItem,
+  CreateBotBody,
+  CreateBotKeyBody,
+  CreatedBotKeyResponse,
+  ReplaceBotPermissionsBody,
+  UpdateBotBody,
+};
 export type BotStatus = BotItem['status'];
 export type BotKeyStatus = BotKeyItem['status'];
+export type BotGrantLevel = BotGrantBody['level'];
+export type BotActivityAction = NonNullable<ListActivityQueryParams['action']>;
+export type BotActivityOutcome = NonNullable<ListActivityQueryParams['outcome']>;
+
+/** Query params for `GET /organisations/:organisationId/bots/:botId/activity` — cursor-based pagination. */
+export interface BotActivityParams {
+  limit?: number;
+  cursor?: string;
+  action?: BotActivityAction;
+  outcome?: BotActivityOutcome;
+}
 
 export const botKeys = {
   all: (orgId: string) => [...orgKeys.detail(orgId), 'bots'] as const,
   list: (orgId: string) => [...botKeys.all(orgId), 'list'] as const,
   detail: (orgId: string, botId: string) => [...botKeys.all(orgId), botId] as const,
   keys: (orgId: string, botId: string) => [...botKeys.detail(orgId, botId), 'keys'] as const,
+  permissionCatalog: (orgId: string) => [...botKeys.all(orgId), 'permission-catalog'] as const,
+  permissions: (orgId: string, botId: string) => [...botKeys.detail(orgId, botId), 'permissions'] as const,
+  activity: (orgId: string, botId: string, filter: Omit<BotActivityParams, 'cursor'>) => [...botKeys.detail(orgId, botId), 'activity', filter] as const,
 };
 
 export const botsQueryOptions = (orgId: string, enabled = true) =>
@@ -122,5 +179,78 @@ export function useRevokeBotKeyMutation(orgId: string): UseMutationResult<Organi
       queryClient.invalidateQueries({ queryKey: botKeys.detail(orgId, botId) });
       queryClient.invalidateQueries({ queryKey: botKeys.list(orgId) });
     },
+  });
+}
+
+export const botPermissionCatalogQueryOptions = (orgId: string, enabled = true) =>
+  queryOptions<BotPermissionCatalogResponse, ApiError>({
+    queryKey: botKeys.permissionCatalog(orgId),
+    queryFn: ({ signal }) => APIRequest.get(`/organisations/${orgId}/bot-permission-catalog`).signal(signal).execute<BotPermissionCatalogResponse>(),
+    enabled: enabled && Boolean(orgId),
+  });
+
+export function useBotPermissionCatalogQuery(orgId: string, enabled = true): UseQueryResult<BotPermissionCatalogResponse, ApiError> {
+  return useQuery(botPermissionCatalogQueryOptions(orgId, enabled));
+}
+
+export const botPermissionsQueryOptions = (orgId: string, botId: string, enabled = true) =>
+  queryOptions<BotPermissionsResponse, ApiError>({
+    queryKey: botKeys.permissions(orgId, botId),
+    queryFn: ({ signal }) => APIRequest.get(`/organisations/${orgId}/bots/${botId}/permissions`).signal(signal).execute<BotPermissionsResponse>(),
+    enabled: enabled && Boolean(orgId) && Boolean(botId),
+  });
+
+export function useBotPermissionsQuery(orgId: string, botId: string, enabled = true): UseQueryResult<BotPermissionsResponse, ApiError> {
+  return useQuery(botPermissionsQueryOptions(orgId, botId, enabled));
+}
+
+export function useReplaceBotPermissionsMutation(orgId: string): UseMutationResult<OrganisationActionResponse, ApiError, { botId: string; grants: BotGrantBody[] }> {
+  const queryClient = useQueryClient();
+  return useMutation<OrganisationActionResponse, ApiError, { botId: string; grants: BotGrantBody[] }>({
+    mutationFn: ({ botId, grants }) =>
+      APIRequest.put(`/organisations/${orgId}/bots/${botId}/permissions`)
+        .body({ grants } satisfies ReplaceBotPermissionsBody)
+        .execute<OrganisationActionResponse>(),
+    onSuccess: (_, { botId }) => {
+      queryClient.invalidateQueries({ queryKey: botKeys.permissions(orgId, botId) });
+      queryClient.invalidateQueries({ queryKey: botKeys.detail(orgId, botId) });
+      queryClient.invalidateQueries({ queryKey: botKeys.list(orgId) });
+    },
+  });
+}
+
+const ACTIVITY_PAGE_LIMIT = 25;
+
+export const botActivityQueryOptions = (orgId: string, botId: string, filter: Omit<BotActivityParams, 'cursor'> = {}, enabled = true) =>
+  queryOptions<BotActivityResponse, ApiError>({
+    queryKey: botKeys.activity(orgId, botId, filter),
+    queryFn: ({ signal }) =>
+      APIRequest.get(`/organisations/${orgId}/bots/${botId}/activity`)
+        .query({ limit: filter.limit ?? ACTIVITY_PAGE_LIMIT, action: filter.action, outcome: filter.outcome })
+        .signal(signal)
+        .execute<BotActivityResponse>(),
+    enabled: enabled && Boolean(orgId) && Boolean(botId),
+  });
+
+export function useBotActivityQuery(orgId: string, botId: string, filter: Omit<BotActivityParams, 'cursor'> = {}, enabled = true): UseQueryResult<BotActivityResponse, ApiError> {
+  return useQuery(botActivityQueryOptions(orgId, botId, filter, enabled));
+}
+
+export function useBotActivityInfiniteQuery(
+  orgId: string,
+  botId: string,
+  filter: Omit<BotActivityParams, 'cursor'> = {},
+  enabled = true,
+): UseInfiniteQueryResult<InfiniteData<BotActivityResponse, string | undefined>, ApiError> {
+  return useInfiniteQuery<BotActivityResponse, ApiError, InfiniteData<BotActivityResponse, string | undefined>, ReturnType<typeof botKeys.activity>, string | undefined>({
+    queryKey: botKeys.activity(orgId, botId, filter),
+    queryFn: ({ signal, pageParam }) =>
+      APIRequest.get(`/organisations/${orgId}/bots/${botId}/activity`)
+        .query({ limit: filter.limit ?? ACTIVITY_PAGE_LIMIT, action: filter.action, outcome: filter.outcome, cursor: pageParam })
+        .signal(signal)
+        .execute<BotActivityResponse>(),
+    initialPageParam: undefined,
+    getNextPageParam: lastPage => lastPage.nextCursor,
+    enabled: enabled && Boolean(orgId) && Boolean(botId),
   });
 }

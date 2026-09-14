@@ -1,7 +1,7 @@
 function isValidIPv4(value: string): boolean {
   const parts = value.split('.');
   if (parts.length !== 4) return false;
-  return parts.every(part => /^\d{1,3}$/.test(part) && Number(part) <= 255);
+  return parts.every(part => /^(0|[1-9]\d{0,2})$/.test(part) && Number(part) <= 255);
 }
 
 function isValidIPv6(value: string): boolean {
