@@ -47,6 +47,7 @@ function HistoryContent(): ReactElement {
   const history = useHistory(filter, query, page);
   const record = useHistoryRecord(selectedId);
   const detailHeadingRef = useRevealOnSelect<HTMLHeadingElement>(selectedId, record.data?.id === selectedId);
+  const firstGroupHeadingRef = useRef<HTMLHeadingElement>(null);
   const firstRowRef = useRef<HTMLButtonElement>(null);
   const pendingPagerFocus = useRef(false);
   const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
@@ -55,9 +56,8 @@ function HistoryContent(): ReactElement {
   useEffect(() => {
     if (!pendingPagerFocus.current || history.isPlaceholderData || !data) return;
     pendingPagerFocus.current = false;
-    const button = firstRowRef.current;
-    button?.scrollIntoView?.({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
-    button?.focus({ preventScroll: true });
+    firstGroupHeadingRef.current?.scrollIntoView?.({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    firstRowRef.current?.focus({ preventScroll: true });
   }, [data, history.isPlaceholderData, reduceMotion]);
 
   const goToPage = (next: number): void => {
@@ -196,7 +196,9 @@ function HistoryContent(): ReactElement {
                 <div className={styles.groups}>
                   {data.groups.map((group, groupIndex) => (
                     <div key={group.date}>
-                      <h2 className={styles.groupDate}>{group.label}</h2>
+                      <h2 ref={groupIndex === 0 ? firstGroupHeadingRef : undefined} className={styles.groupDate}>
+                        {group.label}
+                      </h2>
                       <ul className={styles.rows}>
                         {group.rows.map((row, rowIndex) => (
                           <li key={row.id}>

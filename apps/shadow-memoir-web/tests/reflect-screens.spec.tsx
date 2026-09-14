@@ -41,7 +41,10 @@ function stubNarrowViewport(): void {
 }
 
 describe('History screen', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
 
   it('should group the feed by day and open a record', async () => {
     renderScreen(<HistoryScreen />, { today: TODAY });
@@ -112,7 +115,7 @@ describe('History screen', () => {
     renderScreen(<HistoryScreen />, { today: TODAY });
     fireEvent.click(await screen.findByRole('button', { name: 'Quest' }));
 
-    expect(await screen.findByText('2515 matching records')).toBeDefined();
+    expect(await screen.findByText('2,515 matching records')).toBeDefined();
     expect(screen.getByText('2,515 quest records · 2,515 outcomes · 2,065 kept')).toBeDefined();
   });
 
@@ -151,6 +154,23 @@ describe('History screen', () => {
 
     await waitFor(() => expect(document.activeElement?.getAttribute('aria-pressed')).not.toBeNull());
     expect(document.activeElement).not.toBe(pageTwo);
+  });
+
+  it('should scroll the first day heading of the new page into view rather than its first row', async () => {
+    const scrolled: Element[] = [];
+    vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element) {
+      scrolled.push(this);
+    });
+    renderScreen(<HistoryScreen />, { today: TODAY });
+    fireEvent.click(await screen.findByRole('button', { name: 'Quest' }));
+    await screen.findByText(/matching records$/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+
+    await waitFor(() => expect(document.activeElement?.getAttribute('aria-pressed')).not.toBeNull());
+    const heading = scrolled.at(-1) as HTMLElement;
+    expect(heading.tagName).toBe('H2');
+    expect(heading.nextElementSibling?.querySelector('button')).toBe(document.activeElement);
   });
 
   it('should move focus to the detail when a history row is selected on narrow layouts', async () => {
@@ -691,6 +711,32 @@ describe('Coach screen', () => {
       fireEvent(document, new Event('visibilitychange'));
 
       expect(await screen.findByText('Thursday carries five occurrences.')).toBeDefined();
+    });
+
+    it('should tell the owner a cancelled task had already finished when the resync replaces its card', async () => {
+      const warning = vi.spyOn(toast, 'warning');
+      const queued = { ...WAITING_TASK, status: 'pending', expectedBy: new Date(Date.now() + 60 * 60_000).toISOString() };
+      let domains: DeltaPage['domains'] = { ai_consents: CONSENTS, ai_tasks: [queued] };
+      const fake = httpFake({
+        'POST /api/v1/ai/tasks/task-1/cancel': () => {
+          domains = { ai_consents: CONSENTS, ai_tasks: [{ ...queued, status: 'done' }], ai_results: [ANSWER] };
+          return { status: 409, body: { code: 'AI_004', type: 'Conflict', message: 'This task is no longer pending and cannot be cancelled' } };
+        },
+      });
+      renderSyncedAsk({
+        fetchImpl: server => async (input, init) =>
+          String(input).includes('/sync/delta') ? deltaResponse(input, deltaPage(domains), server.epoch) : server.fetchImpl(input, init),
+      });
+
+      const cancel = await screen.findByRole('button', { name: 'Cancel the request' });
+      fireEvent.click(cancel);
+      fireEvent.click(cancel);
+
+      expect(await screen.findByText('Thursday carries five occurrences.')).toBeDefined();
+      expect(screen.queryByRole('button', { name: /Cancel/ })).toBeNull();
+      await waitFor(() => expect(warning).toHaveBeenCalledWith(expect.stringContaining('It had already finished. The answer is below.'), undefined));
+      expect(warning).toHaveBeenCalledTimes(1);
+      expect(fake.count('POST', '/api/v1/ai/tasks/task-1/cancel')).toBe(1);
     });
 
     it('should not show the syncing strip for a background coach refresh', async () => {

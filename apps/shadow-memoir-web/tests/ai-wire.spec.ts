@@ -347,7 +347,7 @@ describe('Coaching requests', () => {
     const result = await reflect.dispatchCommand({ type: 'ai.cancel', requestId: 'task-1' });
 
     expect(server.deltaRequests.length).toBeGreaterThan(pulls);
-    expect(result).toMatchObject({ status: 'rejected', message: 'It had already finished, so there was nothing to cancel. The answer is below.', error: { code: 'AI_004' } });
+    expect(result).toMatchObject({ status: 'rejected', message: 'It had already finished. The answer is below.', error: { code: 'AI_004' } });
     const coach = await reflect.getCoach();
     expect(coach.active).toBeNull();
     expect(coach.results[0]?.id).toBe('77');
@@ -374,7 +374,7 @@ describe('Coaching requests', () => {
 
     expect(await pending).toMatchObject({
       status: 'rejected',
-      message: 'It had already finished, so there was nothing to cancel. The answer is below.',
+      message: 'It had already finished. The answer is below.',
       error: { code: 'AI_004' },
     });
   });

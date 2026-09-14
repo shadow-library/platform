@@ -45,6 +45,7 @@
   font-weight: 600;
   min-width: 170px;
   text-align: center;
+  text-wrap: balance;
 }
 
 .toolbarEnd {

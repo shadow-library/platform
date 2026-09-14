@@ -59,7 +59,7 @@ const REQUEST_COPY: Record<AiRequestState, string> = {
 
 const CANCEL_CONFLICT_COPY: Partial<Record<AiRequestState, string>> = {
   processing: 'It has already started, so it can’t be cancelled. The answer will be here when it finishes.',
-  ready: 'It had already finished, so there was nothing to cancel. The answer is below.',
+  ready: 'It had already finished. The answer is below.',
   failed: 'It had already stopped without an answer, so there was nothing to cancel.',
   cancelled: 'It was already cancelled, and the request went back to your quota.',
   held: 'It is held for the plan rather than queued, so it can’t be cancelled.',

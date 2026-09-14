@@ -50,6 +50,14 @@ describe('planning board (P2-03)', () => {
     expect(today?.items[0]?.state).toBe('upcoming');
   });
 
+  it('should label a week across the new year with both years', async () => {
+    const world = projectWorldState({ quests: [DAILY_QUEST] }, TODAY);
+    const engine = new MemoirEngine(world);
+
+    expect((await engine.getPlan({ scope: 'week', anchor: TODAY })).label).toBe('17–23 August 2026');
+    expect((await engine.getPlan({ scope: 'week', anchor: '2026-12-30' })).label).toBe('28 December 2026\u00a0– 3 January 2027');
+  });
+
   it('should show overload above capacity', async () => {
     const world = projectWorldState({ quests: [{ ...DAILY_QUEST, name: 'Deep work', durationMin: 240 }] }, TODAY);
     const plan = await new MemoirEngine(world).getPlan({ scope: 'week', anchor: TODAY });

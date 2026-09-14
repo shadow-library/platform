@@ -78,9 +78,10 @@ function AskSkeleton(): ReactElement {
   );
 }
 
-/** Holds the question so a prefill from another screen survives the consent gate giving way to the composer. */
+/** Owns what must outlive a resync replacing the gate or the active card: a prefilled question, and commands whose outcome an unmounted caller never hears. */
 function CoachLayout({ coach }: { coach: CoachView }): ReactElement {
   const consentCommand = useReflectCommand();
+  const requestCommand = useReflectCommand();
   const { ask } = useSearch({ strict: false });
   const [question, setQuestion] = useState(ask ?? '');
   const [selectedResultId, setSelectedResultId] = useState('');
@@ -100,7 +101,7 @@ function CoachLayout({ coach }: { coach: CoachView }): ReactElement {
       {coach.consent.decided ? (
         <>
           <Composer coach={coach} question={question} prefilled={ask !== undefined} onQuestionChange={setQuestion} />
-          {coach.active ? <ActiveRequestCard request={coach.active} /> : null}
+          {coach.active ? <ActiveRequestCard request={coach.active} command={requestCommand} /> : null}
           {result ? <ResultCard result={result} targetRef={resultRef} /> : null}
         </>
       ) : (
@@ -231,7 +232,6 @@ function GuidanceCards(): ReactElement {
   );
 }
 
-/** The command lives in the layout because a saved decision replaces the gate before the save settles, and an unmounted caller never hears its outcome. */
 function ConsentGate({ coach, command }: { coach: CoachView; command: ReflectCommandHook }): ReactElement {
   const [journal, setJournal] = useState(coach.consent.journal);
   const [health, setHealth] = useState(coach.consent.health);
@@ -377,9 +377,7 @@ function Composer({ coach, question, prefilled, onQuestionChange }: ComposerProp
   );
 }
 
-function ActiveRequestCard({ request }: { request: AiRequest }): ReactElement {
-  const command = useReflectCommand();
-
+function ActiveRequestCard({ request, command }: { request: AiRequest; command: ReflectCommandHook }): ReactElement {
   const act = async (type: 'ai.cancel' | 'ai.retry', action: string): Promise<void> => {
     const outcome = await command.run({ type, requestId: request.id });
     notifyOutcome(outcome, { success: outcome.status === 'applied' ? outcome.local.message : '', action });

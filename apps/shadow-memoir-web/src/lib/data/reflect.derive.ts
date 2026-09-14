@@ -1,6 +1,6 @@
 import { DEFAULT_LOCALE } from '@shadow-library/ui';
 
-import { LONG_MONTHS, moneyStatFormat, SHORT_MONTHS } from '@/lib/format';
+import { formatCount, LONG_MONTHS, moneyStatFormat, SHORT_MONTHS } from '@/lib/format';
 
 import { categoryById, formatMinor, homeAmountOf, minorToMajor } from './finance.rules';
 import { BUILT_IN_CATEGORIES, type CurrencyCode, type ExpenseCategory, type ExpenseDetail, type Subscription } from './finance.types';
@@ -445,7 +445,7 @@ export function deriveHistory(source: ReflectSource, filter: HistoryFilter, quer
 
   const unfiltered = filter === 'all' && needle.length === 0;
   return {
-    countLabel: unfiltered ? `${records.length} record${records.length === 1 ? '' : 's'}` : `${matched.length} matching record${matched.length === 1 ? '' : 's'}`,
+    countLabel: unfiltered ? formatCount(records.length, 'record', 'records') : formatCount(matched.length, 'matching record', 'matching records'),
     groups,
     totals: historyTotals(source, matchedIds),
     pageCount,

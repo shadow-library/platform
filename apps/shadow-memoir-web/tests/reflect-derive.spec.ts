@@ -8,6 +8,7 @@ import {
   deriveReview,
   emptyReflectSource,
   type ExpenseDetail,
+  formatRange,
   type HealthMetricEntry,
   holdsOccurrence,
   type JournalEntry,
@@ -268,6 +269,13 @@ describe('deriveHistory', () => {
     expect(deriveHistory(source(), 'all', '').groups).toEqual([]);
     expect(deriveHistory(source(), 'all', '').countLabel).toBe('0 records');
   });
+
+  it('should format a large record count with digit grouping', () => {
+    const large = source({ expenses: Array.from({ length: 2912 }, (_, index) => expense('2026-08-22', 100 + index)) });
+
+    expect(deriveHistory(large, 'all', '').countLabel).toBe('2,912 records');
+    expect(deriveHistory(large, 'expense', '').countLabel).toBe('2,912 matching records');
+  });
 });
 
 describe('metricRecord', () => {
@@ -278,6 +286,24 @@ describe('metricRecord', () => {
     expect(record.title).toBe('Water 1.4 l');
     expect(record.fields).toContainEqual({ label: 'Value', value: '1.4 l' });
     expect(record.fields).toContainEqual({ label: 'Threshold', value: '2.0 l' });
+  });
+});
+
+describe('formatRange', () => {
+  it('should name the month and year once for a range inside one month', () => {
+    expect(formatRange('2026-09-07', '2026-09-13')).toBe('7–13 September 2026');
+  });
+
+  it('should name both months for a range across two months', () => {
+    expect(formatRange('2026-08-31', '2026-09-06')).toBe('31 August\u00a0– 6 September 2026');
+  });
+
+  it('should name both years for a range across two years', () => {
+    expect(formatRange('2026-12-28', '2027-01-03')).toBe('28 December 2026\u00a0– 3 January 2027');
+  });
+
+  it('should name a single day once', () => {
+    expect(formatRange('2026-09-13', '2026-09-13')).toBe('13 September 2026');
   });
 });
 
@@ -297,6 +323,10 @@ describe('deriveReview', () => {
   it('should read the week that closed rather than the week in progress', () => {
     expect(deriveReview(lastWeek, { answers: {}, complete: false }).weekLabel).toContain(`Week ${33 - 1}`);
     expect(deriveReview(lastWeek, { answers: {}, complete: false }).quests.map(quest => quest.id)).toEqual(['run', 'read']);
+  });
+
+  it('should name the month and year once in the week label', () => {
+    expect(deriveReview(lastWeek, { answers: {}, complete: false }).weekLabel).toBe('Week 32 · 10–16 August 2026');
   });
 
   it('should lay the week out as seven day cells with partials distinguished from misses', () => {

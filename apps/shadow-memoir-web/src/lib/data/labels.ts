@@ -181,12 +181,16 @@ export function formatMonth(date: string, locale: string = DEFAULT_LOCALE): stri
   return toDate(date).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
 }
 
-export function formatRange(from: string, to: string, locale: string = DEFAULT_LOCALE): string {
+const RANGE_DASH = '\u00a0– ';
+
+export function formatRange(from: string, to: string): string {
   const start = toDate(from);
   const end = toDate(to);
-  const sameMonth = start.getMonth() === end.getMonth();
-  const startLabel = sameMonth ? String(start.getDate()) : start.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
-  return `${startLabel} – ${end.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  const endLabel = formatLocalDate(to, { month: 'long' });
+  if (from === to) return endLabel;
+  if (start.getFullYear() !== end.getFullYear()) return `${formatLocalDate(from, { month: 'long' })}${RANGE_DASH}${endLabel}`;
+  if (start.getMonth() !== end.getMonth()) return `${formatLocalDate(from, { month: 'long', year: false })}${RANGE_DASH}${endLabel}`;
+  return `${start.getDate()}–${endLabel}`;
 }
 
 export const EXPORT_EXPIRED_NOTICE = 'That export expired — prepare a new one.';
