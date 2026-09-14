@@ -134,11 +134,13 @@ export function OnboardingScreen(): ReactElement {
   const [days, setDays] = useState<Weekday[]>(['mon', 'tue', 'wed', 'thu', 'fri']);
   const [timesPerWeek, setTimesPerWeek] = useState(4);
   const [startTime, setStartTime] = useState<string | null>(null);
+  const [startTimeTouched, setStartTimeTouched] = useState(false);
   const [submitError, setSubmitError] = useState<SubmitError | null>(null);
   const [setup, setSetup] = useState<SetupState>('unsaved');
   const onboardedRef = useRef(false);
   const submittingRef = useRef(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const focusedStep = useRef(step);
 
   const setupSaved = setup !== 'unsaved';
   const savedDay = day.data?.currencyLocked ? day.data : null;
@@ -176,6 +178,8 @@ export function OnboardingScreen(): ReactElement {
   const problem = problems[step] ?? null;
 
   useEffect(() => {
+    if (focusedStep.current === step) return;
+    focusedStep.current = step;
     headingRef.current?.focus();
   }, [step]);
 
@@ -260,7 +264,11 @@ export function OnboardingScreen(): ReactElement {
       void finish();
       return;
     }
-    if (problem) return;
+    if (problem) {
+      if (step === 1) setNameTouched(true);
+      if (step === 3) setStartTimeTouched(true);
+      return;
+    }
     setSubmitError(null);
     setStep(current => Math.min(LAST_STEP, current + 1));
   };
@@ -502,14 +510,26 @@ export function OnboardingScreen(): ReactElement {
                   label="Start time"
                   required
                   helper="Anchor quests happen at a fixed time each day, with thirty minutes of grace."
-                  error={anchorNeedsTime ? 'Choose a start time to continue.' : undefined}
+                  error={anchorNeedsTime && startTimeTouched ? 'Choose a start time to continue.' : undefined}
                   className={styles.startTimeField}
+                  onBlur={event => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) setStartTimeTouched(true);
+                  }}
                 >
-                  <TimePicker value={startTime} onValueChange={setStartTime} hour12={false} aria-label="Start time" />
+                  <TimePicker
+                    value={startTime}
+                    onValueChange={value => {
+                      setStartTime(value);
+                      setStartTimeTouched(true);
+                    }}
+                    hour12={false}
+                    aria-label="Start time"
+                    className={styles.startTimePicker}
+                  />
                 </FormField>
               ) : null}
 
-              <Alert intent="info" title="Shields cover the days you could not help">
+              <Alert intent="info" title="Shields cover the days you could not help" className={styles.shieldsNote}>
                 You earn one shield for each kept week, up to three. A shield protects a streak on an unavoidable miss, with no explanation required from you.
               </Alert>
             </Card.Body>

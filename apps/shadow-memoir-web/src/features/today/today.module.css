@@ -339,9 +339,7 @@
 .tileValue {
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .streakList,

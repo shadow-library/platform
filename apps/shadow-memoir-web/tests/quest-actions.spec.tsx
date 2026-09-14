@@ -26,6 +26,8 @@ describe('TodayScreen quest actions', () => {
     data = createMemoirTestData({ today: TODAY });
   });
 
+  afterEach(() => vi.restoreAllMocks());
+
   it('should render today’s occurrences with their outcomes', async () => {
     renderScreen(<TodayScreen />, { value: data });
     expect(await screen.findByRole('heading', { name: 'Today' })).toBeDefined();
@@ -72,7 +74,7 @@ describe('TodayScreen quest actions', () => {
     renderScreen(<TodayScreen />, { value: data });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for No takeaway today' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Skip with a reason' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
 
     expect(await screen.findByRole('button', { name: 'Skip quest' })).toBeDefined();
     expect(await screen.findByRole('button', { name: 'schedule conflict' })).toBeDefined();
@@ -88,7 +90,7 @@ describe('TodayScreen quest actions', () => {
     renderScreen(<TodayScreen />, { value: data });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Recovery walk' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Skip with a reason' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
 
     expect(screen.getAllByText('Doesn’t touch a streak — this quest doesn’t keep one.').length).toBeGreaterThan(0);
   });
@@ -97,13 +99,49 @@ describe('TodayScreen quest actions', () => {
     renderScreen(<TodayScreen />, { value: data });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for No takeaway today' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Skip with a reason' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
     fireEvent.click(await screen.findByRole('button', { name: 'schedule conflict' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Skip quest' }));
 
     await waitFor(async () => expect(await stateOf(data, 'no-takeaway')).toBe('skipped'));
     const day = await data.provider.getDay(TODAY);
     expect(day.occurrences.find(item => item.questId === 'no-takeaway')?.reasonTag).toBe('schedule_conflict');
+  });
+
+  it('should not claim a reason is kept private when a skip was given none', async () => {
+    const success = vi.spyOn(toast, 'success');
+    renderScreen(<TodayScreen />, { value: data });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for No takeaway today' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip quest' }));
+
+    await waitFor(() => expect(success).toHaveBeenCalledTimes(1));
+    expect(success.mock.calls[0]?.[0]).toContain('No takeaway today skipped.');
+    expect(success.mock.calls[0]?.[0]).not.toContain('reason');
+  });
+
+  it('should tell the owner a given skip reason stays private', async () => {
+    const success = vi.spyOn(toast, 'success');
+    renderScreen(<TodayScreen />, { value: data });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for No takeaway today' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'schedule conflict' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip quest' }));
+
+    await waitFor(() => expect(success).toHaveBeenCalledTimes(1));
+    expect(success.mock.calls[0]?.[0]).toContain('The reason is only ever shown to you.');
+  });
+
+  it('should mark the skip reason as optional', async () => {
+    renderScreen(<TodayScreen />, { value: data });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for No takeaway today' }));
+
+    expect((await screen.findByRole('button', { name: 'Skip' })).textContent).toContain('A reason is optional');
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(await screen.findByText(/optional, used only in your own patterns/)).toBeDefined();
   });
 
   it('should disable saving a partial until a reason is chosen', async () => {
@@ -220,7 +258,7 @@ describe('TodayScreen quest actions', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Strength session' }));
 
     expect((await screen.findByRole('button', { name: 'Postpone to tomorrow' })).textContent).toContain('Postponing breaks today’s locked plan');
-    expect(screen.getByRole('button', { name: 'Skip with a reason' }).textContent).not.toContain('locked plan');
+    expect(screen.getByRole('button', { name: 'Skip' }).textContent).not.toContain('locked plan');
   });
 
   it('should price a break from the day’s synced intensity rather than the account’s', async () => {
@@ -257,7 +295,7 @@ describe('TodayScreen quest actions', () => {
     renderScreen(<TodayScreen />, { value: data });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Evening stretch' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Skip with a reason' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
 
     expect(screen.getAllByText(/A held shield bridges the break/).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Spends 1 HP when the day closes.').length).toBeGreaterThan(0);
@@ -271,7 +309,7 @@ describe('TodayScreen quest actions', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Evening stretch' }));
 
-    expect((await screen.findByRole('button', { name: 'Skip with a reason' })).textContent).toContain('May spend HP when the day closes, depending on your intensity.');
+    expect((await screen.findByRole('button', { name: 'Skip' })).textContent).toContain('May spend HP when the day closes, depending on your intensity.');
   });
 
   it('should ask for a confirmation once the reschedule cap is reached', async () => {
@@ -326,6 +364,56 @@ describe('TodayScreen quest actions', () => {
 
         await waitFor(async () => expect(await stateOf(data, 'move-steps')).toBe('rescheduled'));
         expect(screen.queryByRole('button', { name: 'Move it anyway' })).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  it('should not promise a kept streak when the reschedule cap is already reached', async () => {
+    await withTimeZone('Europe/Oslo', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-08-22T06:00:00.000Z'));
+      try {
+        renderScreen(<TodayScreen />, { value: data });
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Actions for Strength session' }));
+        expect((await screen.findByRole('button', { name: 'Reschedule to another time' })).textContent).toContain('recorded as a postpone');
+        fireEvent.click(screen.getByRole('button', { name: 'Reschedule to another time' }));
+
+        expect(await screen.findByText('Reached — this move is recorded as a postpone')).toBeDefined();
+        expect(screen.queryByText('Kept — a move inside the cap does not break it')).toBeNull();
+        expect(screen.getAllByText(/Postponing breaks today’s locked plan/).length).toBeGreaterThan(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  it('should keep the streak promise for a move inside the reschedule cap', async () => {
+    renderScreen(<TodayScreen />, { value: data });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Move 8,000 steps' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Reschedule to another time' }));
+
+    expect(await screen.findByText('Kept — a move inside the cap does not break it')).toBeDefined();
+    expect(screen.queryByText('Reached — this move is recorded as a postpone')).toBeNull();
+  });
+
+  it('should warn that moving past the cap breaks today’s locked plan', async () => {
+    await withTimeZone('Europe/Oslo', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-08-22T06:00:00.000Z'));
+      try {
+        renderScreen(<TodayScreen />, { value: data });
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Actions for Strength session' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Reschedule to another time' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Move it' }));
+
+        const confirm = await screen.findByRole('dialog', { name: /2 reschedules used in the last 7 days/ });
+        expect(confirm.textContent).toContain('Postponing breaks today’s locked plan');
+        expect(confirm.textContent).toContain('A postpone, so the history stays honest');
       } finally {
         vi.useRealTimers();
       }

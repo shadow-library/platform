@@ -1,8 +1,9 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
 import { occurrenceSupersededCopy } from './command-feedback';
 import { type CommandHandle, type LocalReading, useDomainCommand } from './command-runner';
-import { type Command, type CommandConfirmation, type CommandOutcome, type CommandResult } from './command.types';
+import { type Command, type CommandConfirmation, type CommandOutcome, type CommandResult, type RunOutcome } from './command.types';
 import { type DataProvider, type PlanRange, type QuestFilter } from './data-provider';
 import { useMemoirData } from './data-context';
 import { type QuestDetail, type QuestDraft, type QuestSummary } from './quest.types';
@@ -60,10 +61,12 @@ export function useOccurrenceSearch(query: string, date?: string): UseQueryResul
 
 export type QuestCommandHook = CommandHandle<Command, CommandOutcome, CommandConfirmation>;
 
+type QuestRunOutcome = RunOutcome<CommandOutcome, CommandConfirmation>;
+
 function readQuestResult(result: CommandResult): LocalReading<CommandOutcome, CommandConfirmation> {
   if (result.status === 'needs-confirmation') return { kind: 'confirm', confirmation: result };
   if (result.status === 'rejected') return { kind: 'rejected', message: result.message, error: result.error };
-  return { kind: 'done', local: result, delivery: result.delivery, xpAwarded: result.xpAwarded, coinsAwarded: result.coinsAwarded };
+  return { kind: 'done', local: result, delivery: result.delivery, xpAwarded: 0, coinsAwarded: result.coinsAwarded };
 }
 
 /** The server reports which outcome won an occurrence; the mock and older servers leave it to the delta, which has landed by the time a claim settles. */
@@ -75,13 +78,22 @@ async function describeOccurrenceWinner(provider: DataProvider, command: Command
   return occurrence && occurrence.state !== 'upcoming' ? occurrenceSupersededCopy(occurrence.state) : null;
 }
 
+/** The reading's award is 0 rather than the local estimate, so only a server result that carries its own `xpAwarded` names a figure. */
+function withSettledAward(outcome: QuestRunOutcome): QuestRunOutcome {
+  if (outcome.status !== 'applied' || outcome.xpAwarded <= 0) return outcome;
+  return { ...outcome, local: { ...outcome.local, message: `${outcome.local.message} +${outcome.xpAwarded} XP.` } };
+}
+
 export function useCommand(): QuestCommandHook {
   const { provider, queryClient } = useMemoirData();
-  return useDomainCommand({
+  const handle: QuestCommandHook = useDomainCommand({
     dispatch: (command, options) => provider.dispatchCommand(command, options),
     read: readQuestResult,
     queryClient,
     queryKey: memoirKeys.all,
     describeSuperseded: (command, result) => describeOccurrenceWinner(provider, command, result),
   });
+  const { run: runDomain } = handle;
+  const run = useCallback<QuestCommandHook['run']>(async (command, options) => withSettledAward(await runDomain(command, options)), [runDomain]);
+  return { ...handle, run };
 }

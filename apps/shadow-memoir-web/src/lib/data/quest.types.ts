@@ -163,6 +163,8 @@ export interface QuestOccurrence {
   threshold: ThresholdReading | null;
   /** The scale a partial is measured on, in the quest's own units — pages, kilometres, minutes. */
   partialTarget: PartialProgress | null;
+  /** The rolling seven-day reschedule cap is used up for this date, so moving it is recorded as a postpone. */
+  rescheduleCapReached: boolean;
 }
 
 export interface QuestLogEntry {

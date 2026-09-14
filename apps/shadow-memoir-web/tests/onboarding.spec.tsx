@@ -125,13 +125,53 @@ describe('OnboardingScreen', () => {
     fireEvent.click(screen.getByRole('radio', { name: /^Anchor/ }));
     const review = screen.getByRole('button', { name: 'Review' });
     expect((review as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText('Choose a start time to continue.')).toBeDefined();
 
     const time = screen.getByRole('combobox', { name: 'Start time' });
     await user.clear(time);
     await user.type(time, '07:15{Enter}');
 
     expect((review as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('should show the anchor start-time error only once the field is touched', async () => {
+    renderScreen(<OnboardingScreen />, { today: TODAY, persona: 'new' });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), { target: { value: 'Walk 20 minutes' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('radio', { name: /^Anchor/ }));
+
+    expect(screen.queryByText('Choose a start time to continue.')).toBeNull();
+
+    const time = screen.getByRole('combobox', { name: 'Start time' });
+    fireEvent.focus(time);
+    fireEvent.blur(time);
+
+    expect(await screen.findByText('Choose a start time to continue.')).toBeDefined();
+  });
+
+  it('should show the anchor start-time error when continuing is attempted', async () => {
+    renderScreen(<OnboardingScreen />, { today: TODAY, persona: 'new' });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), { target: { value: 'Walk 20 minutes' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('radio', { name: /^Anchor/ }));
+
+    fireEvent.submit(screen.getByRole('button', { name: 'Review' }).closest('form') as HTMLFormElement);
+
+    expect(await screen.findByText('Choose a start time to continue.')).toBeDefined();
+    expect(screen.getByText('Step 4 of 5')).toBeDefined();
+  });
+
+  it('should not move focus to the step heading on first load', async () => {
+    renderScreen(<OnboardingScreen />, { today: TODAY, persona: 'new' });
+
+    const heading = await screen.findByRole('heading', { level: 2 });
+    expect(heading.textContent).toContain('Set up your day');
+    expect(document.activeElement).not.toBe(heading);
   });
 
   it('should move focus to the step heading when the step changes', async () => {

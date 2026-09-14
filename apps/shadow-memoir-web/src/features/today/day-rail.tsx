@@ -24,9 +24,7 @@ export function DayRail({ quickLogs, streaks, upcoming, activity }: DayRailProps
             {quickLogs.map(tile => (
               <Link key={tile.id} to={tile.to} className={styles.tile}>
                 <span className={styles.tileLabel}>{tile.label}</span>
-                <span className={styles.tileValue} title={tile.value}>
-                  {tile.value}
-                </span>
+                <span className={styles.tileValue}>{tile.value}</span>
               </Link>
             ))}
           </div>

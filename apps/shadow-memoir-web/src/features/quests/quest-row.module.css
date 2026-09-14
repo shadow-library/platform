@@ -29,6 +29,15 @@
   cursor: default;
 }
 
+.check:focus-visible {
+  outline: none;
+}
+
+.check:focus-visible .checkMark {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+
 .checkMark {
   width: 24px;
   height: 24px;

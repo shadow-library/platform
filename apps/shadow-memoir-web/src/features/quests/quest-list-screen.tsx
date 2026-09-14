@@ -4,7 +4,7 @@ import { Alert, Badge, Button, Card, EmptyState, Input, SegmentedControl, Skelet
 
 import { DataState } from '@/components/DataState';
 import { ChevronRightIcon } from '@/components/icons';
-import { type QuestFilter, type QuestSummary, STAT_LABELS, STRICTNESS_LABELS, useQuestList } from '@/lib/data';
+import { type OccurrenceState, type QuestFilter, type QuestSummary, STAT_LABELS, STRICTNESS_LABELS, useQuestList } from '@/lib/data';
 import { formatCount } from '@/lib/format';
 
 import { adherenceLabel, outcomeTone, questMeta } from './quest-presenters';
@@ -132,6 +132,13 @@ function QuestLibrary({ quests, onCreate }: QuestLibraryProps): ReactElement {
   );
 }
 
+const SPARK_SLOTS = 14;
+
+function sparkSlots(summary: QuestSummary): (OccurrenceState | null)[] {
+  const recent = summary.progress.recentOutcomes.slice(-SPARK_SLOTS);
+  return [...Array.from({ length: SPARK_SLOTS - recent.length }, () => null), ...recent];
+}
+
 function QuestListRow({ summary }: { summary: QuestSummary }): ReactElement {
   return (
     <li>
@@ -160,9 +167,9 @@ function QuestListRow({ summary }: { summary: QuestSummary }): ReactElement {
                 <span className={styles.mono}>{adherenceLabel(summary.progress.adherence30d)}</span>
                 <span className={styles.questMeta}>30-day kept</span>
               </span>
-              <span className={styles.spark} aria-hidden>
-                {summary.progress.recentOutcomes.slice(-14).map((state, index) => (
-                  <span key={index} className={styles.sparkBar} data-tone={outcomeTone(state)} />
+              <span className={styles.spark} aria-hidden data-testid="quest-spark">
+                {sparkSlots(summary).map((state, index) => (
+                  <span key={index} className={styles.sparkBar} data-tone={state === null ? undefined : outcomeTone(state)} />
                 ))}
               </span>
             </>

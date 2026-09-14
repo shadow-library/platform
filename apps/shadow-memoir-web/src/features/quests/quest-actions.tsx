@@ -180,6 +180,7 @@ export function useQuestActions(): QuestActions {
       {confirmation ? (
         <RescheduleCapOverlay
           confirmation={confirmation}
+          occurrence={occurrence && 'occurrenceId' in confirmation.command && confirmation.command.occurrenceId === occurrence.id ? occurrence : null}
           open={confirmationOpen}
           restoreFocusTo={restoreFocusTo}
           pending={busy}
@@ -275,14 +276,16 @@ function ActionListOverlay({
     {
       id: 'reschedule',
       label: 'Reschedule to another time',
-      rule: 'Moves only this occurrence’s time today. The streak is untouched while the move is inside the cap.',
+      rule: occurrence.rescheduleCapReached
+        ? 'The reschedule cap is reached, so moving this occurrence is recorded as a postpone.'
+        : 'Moves only this occurrence’s time today. The streak is untouched while the move is inside the cap.',
       disabledReason: rescheduleDisabledReason(occurrence),
       run: onReschedule,
     },
     {
       id: 'skip',
-      label: 'Skip with a reason',
-      rule: [streakNote, costNote, 'The reason is only ever shown to you.'].join(' '),
+      label: 'Skip',
+      rule: [streakNote, costNote, SKIP_REASON_NOTE].join(' '),
       disabledReason: alreadyRecordedReason(occurrence),
       run: onSkip,
     },
@@ -410,6 +413,8 @@ function breakNotesFor(occurrence: QuestOccurrence): { streakNote: string; costN
   return { streakNote: breakStreakNote(occurrence.strictness, occurrence.shields), costNote: breakCostNote(occurrence.strictness, occurrence.dayIntensity) };
 }
 
+const SKIP_REASON_NOTE = 'A reason is optional, and any you give is only ever shown to you.';
+
 function SkipOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pending }: OverlayProps): ReactElement {
   const [reason, setReason] = useState<ReasonTag | null>(null);
   const [note, setNote] = useState('');
@@ -421,7 +426,7 @@ function SkipOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pend
       onOpenChange={onClose}
       restoreFocusTo={restoreFocusTo}
       title={`Skip — ${occurrence.questName}`}
-      description="The reason is only ever shown to you."
+      description={SKIP_REASON_NOTE}
       size="md"
       sheetSnapPoints={['half', 'full']}
       sheetDefaultSnap="full"
@@ -449,7 +454,7 @@ function SkipOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pend
         </DescriptionList>
         <div>
           <p className={styles.fieldLabel}>
-            Reason <span className={styles.fieldHint}>— used only in your own patterns</span>
+            Reason <span className={styles.fieldHint}>— optional, used only in your own patterns</span>
           </p>
           <ReasonPicker reason={reason} onPick={setReason} />
         </div>
@@ -514,6 +519,8 @@ const RESCHEDULE_ERROR_ID = 'reschedule-time-error';
 
 function RescheduleOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch, pending }: OverlayProps): ReactElement {
   const { today } = useMemoirData();
+  const { streakNote, costNote } = breakNotesFor(occurrence);
+  const lockNote = lockBreakNote(occurrence, today);
   const [time, setTime] = useState(formatTime(occurrence.startTimeMinutes) ?? nextQuarterHour(new Date()));
   const [error, setError] = useState<string | null>(null);
 
@@ -564,11 +571,20 @@ function RescheduleOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch
             {error}
           </p>
         ) : null}
-        <DescriptionList layout="row" termWidth={150}>
-          <DescriptionList.Item term="Streak">Kept — a move inside the cap does not break it</DescriptionList.Item>
-          <DescriptionList.Item term="HP">Unchanged</DescriptionList.Item>
-          <DescriptionList.Item term="Recurring plan">Untouched — only today’s occurrence moves</DescriptionList.Item>
-        </DescriptionList>
+        {occurrence.rescheduleCapReached ? (
+          <DescriptionList layout="row" termWidth={150}>
+            <DescriptionList.Item term="Reschedule cap">Reached — this move is recorded as a postpone</DescriptionList.Item>
+            <DescriptionList.Item term="Streak">{streakNote}</DescriptionList.Item>
+            <DescriptionList.Item term="Cost">{costNote}</DescriptionList.Item>
+            {lockNote ? <DescriptionList.Item term="Locked plan">{lockNote}</DescriptionList.Item> : null}
+          </DescriptionList>
+        ) : (
+          <DescriptionList layout="row" termWidth={150}>
+            <DescriptionList.Item term="Streak">Kept — a move inside the cap does not break it</DescriptionList.Item>
+            <DescriptionList.Item term="HP">Unchanged</DescriptionList.Item>
+            <DescriptionList.Item term="Recurring plan">Untouched — only today’s occurrence moves</DescriptionList.Item>
+          </DescriptionList>
+        )}
       </div>
     </OverlaySurface>
   );
@@ -576,6 +592,7 @@ function RescheduleOverlay({ occurrence, open, restoreFocusTo, onClose, dispatch
 
 interface RescheduleCapOverlayProps {
   confirmation: CommandConfirmation;
+  occurrence: QuestOccurrence | null;
   open: boolean;
   restoreFocusTo: HTMLElement | null;
   pending: boolean;
@@ -583,7 +600,11 @@ interface RescheduleCapOverlayProps {
   onConfirm: () => void;
 }
 
-function RescheduleCapOverlay({ confirmation, open, restoreFocusTo, pending, onClose, onConfirm }: RescheduleCapOverlayProps): ReactElement {
+function RescheduleCapOverlay({ confirmation, occurrence, open, restoreFocusTo, pending, onClose, onConfirm }: RescheduleCapOverlayProps): ReactElement {
+  const { today } = useMemoirData();
+  const notes = occurrence ? breakNotesFor(occurrence) : null;
+  const lockNote = occurrence ? lockBreakNote(occurrence, today) : null;
+
   return (
     <OverlaySurface
       open={open}
@@ -603,7 +624,10 @@ function RescheduleCapOverlay({ confirmation, open, restoreFocusTo, pending, onC
       }
     >
       <DescriptionList layout="row" termWidth={150}>
-        <DescriptionList.Item term="Recorded as">A postpone with a reason, so the history stays honest</DescriptionList.Item>
+        <DescriptionList.Item term="Recorded as">A postpone, so the history stays honest</DescriptionList.Item>
+        {notes ? <DescriptionList.Item term="Streak">{notes.streakNote}</DescriptionList.Item> : null}
+        {notes ? <DescriptionList.Item term="Cost">{notes.costNote}</DescriptionList.Item> : null}
+        {lockNote ? <DescriptionList.Item term="Locked plan">{lockNote}</DescriptionList.Item> : null}
         <DescriptionList.Item term="Blocked">Never — the cap advises, it does not stop the move</DescriptionList.Item>
       </DescriptionList>
     </OverlaySurface>

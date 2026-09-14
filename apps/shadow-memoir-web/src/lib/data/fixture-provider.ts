@@ -274,6 +274,7 @@ export class MemoirEngine implements DataProvider {
           }
         : null,
       partialTarget: target ? { value: log?.progress ?? 0, target: target.fullValue, unit: target.unit ?? '' } : null,
+      rescheduleCapReached: reschedulesCountedFor(progress.rescheduledDates, date).length >= progress.rescheduleCap,
     };
   }
 
@@ -719,7 +720,7 @@ export class MemoirEngine implements DataProvider {
     if (state === 'postponed') this.breakLock(questId, date);
     this.pushActivity(`${quest.name} ${state}${xpAwarded > 0 ? ` · +${xpAwarded} XP` : ''}`, xpAwarded > 0);
 
-    return { status: 'applied', message: this.messageFor(state, quest.name, xpAwarded), xpAwarded, coinsAwarded };
+    return { status: 'applied', message: this.messageFor(state, quest.name, extra.reasonTag !== undefined || extra.note !== undefined), xpAwarded, coinsAwarded };
   }
 
   /** Server `resolveBreak` stamps `lockBrokenAt` on the open day only (`updateDailyStateIfOpen`), retiring that day's whole lock; a skip leaves it standing. */
@@ -737,10 +738,10 @@ export class MemoirEngine implements DataProvider {
     return { status: 'applied', message: `${quest.name} is open again.`, xpAwarded: 0, coinsAwarded: 0 };
   }
 
-  private messageFor(state: OccurrenceState, name: string, xp: number): string {
-    if (state === 'completed') return `${name} completed. +${xp} XP.`;
-    if (state === 'partial') return `${name} recorded as partial. +${xp} XP, and the streak holds.`;
-    if (state === 'skipped') return `${name} skipped. The reason is only ever shown to you.`;
+  private messageFor(state: OccurrenceState, name: string, reasoned: boolean): string {
+    if (state === 'completed') return `${name} completed.`;
+    if (state === 'partial') return `${name} recorded as partial, and the streak holds.`;
+    if (state === 'skipped') return reasoned ? `${name} skipped. The reason is only ever shown to you.` : `${name} skipped.`;
     if (state === 'postponed') return `${name} moved to tomorrow.`;
     return `${name} recorded.`;
   }
@@ -759,7 +760,7 @@ export class MemoirEngine implements DataProvider {
         status: 'needs-confirmation',
         kind: 'reschedule-cap',
         title: `${progress.rescheduleCap} reschedules used in the last 7 days`,
-        body: `${progress.rescheduleCap} moves a week is the cap on ${STRICTNESS_LABELS[quest.strictness]} quests. Past it a move is recorded as a postpone with a reason instead of disappearing, so the history stays honest either way. The cap frees up for occurrences from ${formatShortDate(shiftDate(counted[counted.length - progress.rescheduleCap] as string, RESCHEDULE_WINDOW_DAYS))}.`,
+        body: `${progress.rescheduleCap} moves a week is the cap on ${STRICTNESS_LABELS[quest.strictness]} quests. Past it a move is recorded as a postpone instead of disappearing, so the history stays honest either way. The cap frees up for occurrences from ${formatShortDate(shiftDate(counted[counted.length - progress.rescheduleCap] as string, RESCHEDULE_WINDOW_DAYS))}.`,
         confirmLabel: 'Move it anyway',
         cancelLabel: 'Keep the plan',
         command: { type: 'quest.reschedule', occurrenceId, toMin, acceptBeyondCap: true },

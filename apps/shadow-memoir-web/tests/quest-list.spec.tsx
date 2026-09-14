@@ -1,10 +1,11 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { QuestListScreen } from '@/features/quests';
+import { type MemoirEngine, type QuestProgress } from '@/lib/data';
 import { SyncEngineProvider } from '@/lib/sync';
 
-import { renderScreen } from './harness';
+import { createMemoirTestData, renderScreen } from './harness';
 import { createSyncedTestData, createTestEngine } from './sync-harness';
 
 const TODAY = '2026-08-22';
@@ -41,6 +42,25 @@ describe('QuestListScreen', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/quests/new'));
     expect(screen.queryByText(/active quests/)).toBeNull();
+  });
+
+  it('should give every sparkline the same number of slots however few outcomes a quest has', async () => {
+    const data = createMemoirTestData({ today: TODAY });
+    const world = (data.provider as MemoirEngine).world;
+    world.progress['budget-review'] = { ...(world.progress['budget-review'] as QuestProgress), recentOutcomes: ['completed', 'missed', 'completed', 'completed', 'skipped'] };
+    renderScreen(<QuestListScreen />, { value: data });
+
+    const weekly = (await screen.findByText('Weekly budget review')).closest('a') as HTMLElement;
+    const daily = screen.getByText('Read 20 pages').closest('a') as HTMLElement;
+    const slots = (row: HTMLElement): HTMLElement[] => Array.from(within(row).getByTestId('quest-spark').children) as HTMLElement[];
+
+    expect(slots(weekly)).toHaveLength(slots(daily).length);
+    expect(slots(weekly).filter(slot => slot.dataset['tone'] !== undefined)).toHaveLength(5);
+    expect(
+      slots(weekly)
+        .slice(0, -5)
+        .every(slot => slot.dataset['tone'] === undefined),
+    ).toBe(true);
   });
 
   it('should show an error with retry instead of an empty library when the first sync fails', async () => {

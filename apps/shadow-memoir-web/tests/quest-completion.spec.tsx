@@ -7,7 +7,7 @@ import { TodayScreen } from '@/features/today';
 import { type DeltaPage, type SyncedMemoirData, SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen } from './harness';
-import { createSyncedTestData, createTestEngine, deltaResponse, rejected, type TestEngine } from './sync-harness';
+import { applied, createSyncedTestData, createTestEngine, deltaResponse, rejected, type TestEngine } from './sync-harness';
 
 const TODAY = '2026-08-24';
 const OCCURRENCE = `q1:${TODAY}`;
@@ -182,7 +182,7 @@ describe('undoing a quest outcome from Today', () => {
     renderToday(data);
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Morning run' }));
     if (offline) setOffline(true);
-    fireEvent.click(await screen.findByRole('button', { name: 'Skip with a reason' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Skip quest' }));
   }
 
@@ -218,6 +218,50 @@ describe('undoing a quest outcome from Today', () => {
     await waitFor(() => expect(success).toHaveBeenCalledTimes(1));
     expect(success.mock.calls[0]?.[0]).toContain('Morning run completed.');
     expect((success.mock.calls[0]?.[1] as ToastOptions)?.action).toBeUndefined();
+  });
+
+  it('should name the XP the server awarded rather than the local estimate', async () => {
+    const success = vi.spyOn(toast, 'success');
+    const { engine } = createTestEngine({
+      today: TODAY,
+      pages: [page({ domains: { quests: [dailyQuestRow('q1', 'Morning run')] } }), page({ cursor: '2', domains: { quest_logs: [{ ...completedLogRow(), xpAwarded: 25 }] } })],
+      outcomes: batch => batch.commandIds.map(commandId => ({ ...applied(commandId), result: { state: 'completed', xpAwarded: 25, coinsAwarded: 1 } })),
+    });
+    renderToday(createSyncedTestData(engine));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark complete: Morning run' }));
+
+    await waitFor(() => expect(success).toHaveBeenCalledTimes(1));
+    expect(success.mock.calls[0]?.[0]).toBe('Morning run completed. +25 XP.');
+  });
+
+  it('should not name an XP figure when the server result carries none', async () => {
+    const success = vi.spyOn(toast, 'success');
+    const { engine } = createTestEngine({
+      today: TODAY,
+      pages: [page({ domains: { quests: [dailyQuestRow('q1', 'Morning run')] } }), page({ cursor: '2', domains: { quest_logs: [completedLogRow()] } })],
+      outcomes: batch => batch.commandIds.map(commandId => applied(commandId, true)),
+    });
+    renderToday(createSyncedTestData(engine));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark complete: Morning run' }));
+
+    await waitFor(() => expect(success).toHaveBeenCalledTimes(1));
+    expect(success.mock.calls[0]?.[0]).toBe('Morning run completed.');
+  });
+
+  it('should not name an XP figure for a completion the server has not confirmed', async () => {
+    const neutral = vi.spyOn(toast, 'neutral');
+    const { engine } = createTestEngine({ today: TODAY, pages: [page({ domains: { quests: [dailyQuestRow('q1', 'Morning run')] } })] });
+    renderToday(createSyncedTestData(engine));
+
+    expect(await screen.findByRole('button', { name: 'Mark complete: Morning run' })).toBeDefined();
+    setOffline(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Mark complete: Morning run' }));
+
+    await waitFor(() => expect(neutral).toHaveBeenCalledTimes(1));
+    expect(JSON.stringify(neutral.mock.calls[0])).toContain('Morning run completed.');
+    expect(JSON.stringify(neutral.mock.calls[0])).not.toContain('XP');
   });
 
   it('should undo a skip the server can fully revert', async () => {
