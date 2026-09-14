@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { ExpensesScreen } from '@/features/finance';
+import { ExpensesScreen, validateFinanceSearch } from '@/features/finance';
 
-export const Route = createFileRoute('/_app/finance/')({ component: ExpensesScreen });
+export const Route = createFileRoute('/_app/finance/')({ validateSearch: validateFinanceSearch, component: ExpensesScreen });

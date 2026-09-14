@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useRef, useState } from 'react';
 import { Alert, Badge, Button, Card, DEFAULT_LOCALE, EmptyState, Input, Progress, SegmentedControl, Skeleton, Statistic, Tag, useMediaQuery } from '@shadow-library/ui';
 
@@ -9,6 +9,7 @@ import {
   type CurrencyCode,
   type Expense,
   type ExpenseCategory,
+  type ExpenseCategoryId,
   expenseTitle,
   type FinanceRange,
   type FinanceSummary,
@@ -17,6 +18,7 @@ import {
   minorToMajor,
   type RangeSpend,
   todayISODate,
+  unconvertedSubscriptionsNote,
   useExpenses,
   useFinanceSummary,
   useReceiptScanQuota,
@@ -25,6 +27,7 @@ import { formatLocalDate, formatLocalTime } from '@/lib/format';
 import { useDataReadiness } from '@/lib/sync';
 
 import { ExpenseEntryPanel } from './expense-entry-panel';
+import { type FinanceSearch } from './finance.search';
 import styles from './finance.module.css';
 
 const RANGES: { value: FinanceRange; label: string }[] = [
@@ -93,6 +96,14 @@ function spendComparison(spend: RangeSpend): string {
   if (Math.round(delta * 100) === 0) return `About the same as ${spend.comparisonLabel}`;
   const percent = new Intl.NumberFormat(DEFAULT_LOCALE, { style: 'percent', maximumFractionDigits: 0 }).format(Math.abs(delta));
   return `${percent} ${delta < 0 ? 'less' : 'more'} than ${spend.comparisonLabel}`;
+}
+
+function subscriptionsKpiNote(summary: FinanceSummary): string {
+  const unconverted = unconvertedSubscriptionsNote(summary.unconvertedSubscriptions);
+  if (unconverted) return `${summary.activeSubscriptions} active · ${unconverted}`;
+  if (summary.nextSubscription)
+    return `${summary.activeSubscriptions} active · next ${summary.nextSubscription.name} on ${formatLocalDate(summary.nextSubscription.dueDate, { year: false })}`;
+  return `${summary.activeSubscriptions} active`;
 }
 
 interface KpiProps {
@@ -237,41 +248,39 @@ interface MoneyOverviewProps {
   today: string;
   range: FinanceRange;
   onRangeChange: (range: FinanceRange) => void;
+  categoryId?: ExpenseCategoryId;
 }
 
-function MoneyOverview({ summary, today, range, onRangeChange }: MoneyOverviewProps): ReactElement {
+function MoneyOverview({ summary, today, range, onRangeChange, categoryId }: MoneyOverviewProps): ReactElement {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [entryOpen, setEntryOpen] = useState(false);
   const addButton = useRef<HTMLButtonElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
 
   const closeEntry = (): void => {
     setEntryOpen(false);
     addButton.current?.focus();
   };
+  const removeCategoryFilter = (): void => {
+    void navigate({ to: '/finance', search: {} });
+    searchInput.current?.focus();
+  };
   const compactLayout = useMediaQuery('(max-width: 619px)');
-  const expenses = useExpenses({ range, search, limit: 8 });
+  const expenses = useExpenses({ range, search, categoryId, limit: 8 });
 
   const { settings, categories } = summary;
   const home = settings.homeCurrency;
   const spend = summary.ranges[range];
   const page = expenses.data;
+  const filteredCategory = categoryId ? categoryById(categoryId, categories) : null;
 
   return (
     <>
       <div className={styles.kpis}>
         <Kpi label={`Spent ${spend.periodLabel.toLowerCase()}`} amountMinor={spend.spentMinor} currency={home} note={spendComparison(spend)} compactLayout={compactLayout} />
         <BudgetKpi summary={summary} spend={spend} compactLayout={compactLayout} />
-        <Kpi
-          label="Subscriptions a month"
-          amountMinor={summary.subscriptionsMonthlyMinor}
-          currency={home}
-          note={
-            summary.nextSubscription
-              ? `${summary.activeSubscriptions} active · next ${summary.nextSubscription.name} on ${formatLocalDate(summary.nextSubscription.dueDate, { year: false })}`
-              : `${summary.activeSubscriptions} active`
-          }
-          compactLayout={compactLayout}
-        />
+        <Kpi label="Subscriptions a month" amountMinor={summary.subscriptionsMonthlyMinor} currency={home} note={subscriptionsKpiNote(summary)} compactLayout={compactLayout} />
         <Kpi
           label="Average day"
           amountMinor={spend.averageDayMinor}
@@ -290,7 +299,13 @@ function MoneyOverview({ summary, today, range, onRangeChange }: MoneyOverviewPr
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>Expenses</h2>
                 <div className={styles.controls}>
+                  {filteredCategory && (
+                    <Tag size="sm" onRemove={removeCategoryFilter}>
+                      {filteredCategory.name}
+                    </Tag>
+                  )}
                   <Input
+                    ref={searchInput}
                     className={styles.search}
                     size="sm"
                     placeholder="Search notes and merchants"
@@ -318,7 +333,9 @@ function MoneyOverview({ summary, today, range, onRangeChange }: MoneyOverviewPr
               {page && page.items.length === 0 && (
                 <EmptyState
                   size="inline"
-                  title={search ? `Nothing matches “${search}”` : 'No expenses in this range'}
+                  title={
+                    search ? `Nothing matches “${search}”` : filteredCategory ? `No ${filteredCategory.name.toLowerCase()} expenses in this range` : 'No expenses in this range'
+                  }
                   description={search ? 'Try a shorter word, or widen the range.' : 'Add one when you spend something. Ten seconds is the whole cost.'}
                   action={{ label: 'Add expense', onClick: () => setEntryOpen(true) }}
                 />
@@ -416,6 +433,7 @@ function MoneyOverview({ summary, today, range, onRangeChange }: MoneyOverviewPr
 
 export function ExpensesScreen(): ReactElement {
   const [range, setRange] = useState<FinanceRange>('month');
+  const { category: categoryId } = useSearch({ strict: false }) as Partial<FinanceSearch>;
   const summary = useFinanceSummary();
   const { readiness } = useDataReadiness({ query: summary });
   const meta = readiness.kind === 'ready' && summary.data ? headerMeta(summary.data, range) : null;
@@ -436,7 +454,7 @@ export function ExpensesScreen(): ReactElement {
       </header>
 
       <DataState query={summary} skeleton={<MoneySkeleton />}>
-        {view => <MoneyOverview summary={view} today={todayISODate()} range={range} onRangeChange={setRange} />}
+        {view => <MoneyOverview summary={view} today={todayISODate()} range={range} onRangeChange={setRange} categoryId={categoryId} />}
       </DataState>
     </section>
   );

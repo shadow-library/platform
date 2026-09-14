@@ -158,11 +158,14 @@ export type SubscriptionCategoryId = 'music' | 'tools' | 'health' | 'books' | 'm
 
 export const SUBSCRIPTION_CATEGORIES: Record<SubscriptionCategoryId, { name: string; expenseCategoryId: ExpenseCategoryId }> = {
   music: { name: 'Music', expenseCategoryId: 'subs' },
-  tools: { name: 'Tools', expenseCategoryId: 'subs' },
+  tools: { name: 'Subscriptions', expenseCategoryId: 'subs' },
   health: { name: 'Health', expenseCategoryId: 'health' },
-  books: { name: 'Books', expenseCategoryId: 'shopping' },
+  books: { name: 'Shopping', expenseCategoryId: 'shopping' },
   media: { name: 'Media', expenseCategoryId: 'subs' },
 };
+
+/** Only these round-trip through the server. */
+export const SUBSCRIPTION_CATEGORY_OPTIONS: readonly SubscriptionCategoryId[] = ['tools', 'health', 'books'];
 
 export interface Subscription {
   id: string;
@@ -242,6 +245,12 @@ export interface RangeSpend {
   fxRates: FxRateSnapshot[];
 }
 
+/** Active subscriptions whose monthly equivalent could not be converted to the home currency yet (no FX rate seen for their currency) — excluded from every total rather than counted as 0. */
+export interface UnconvertedSubscriptions {
+  count: number;
+  currencies: CurrencyCode[];
+}
+
 export interface FinanceSummary {
   settings: FinanceSettings;
   categories: ExpenseCategory[];
@@ -249,6 +258,7 @@ export interface FinanceSummary {
   /** Always the calendar month, whatever range is on screen: the budget is monthly. */
   budget: BudgetStanding;
   subscriptionsMonthlyMinor: number;
+  unconvertedSubscriptions: UnconvertedSubscriptions;
   activeSubscriptions: number;
   nextSubscription: { name: string; dueDate: string } | null;
   totalExpenses: number;
@@ -299,15 +309,28 @@ export interface UpcomingCharge {
   currency: CurrencyCode;
 }
 
+export interface SubscriptionCollision {
+  date: string;
+  names: string[];
+  /** Sum of the charges with a known rate; `null` when none of them converted. */
+  totalMinor: number | null;
+  /** Charges on this date that could not be converted — reported in their own currency rather than folded into `totalMinor` as 0. */
+  unconvertedCharges: { currency: CurrencyCode; amountMinor: number }[];
+}
+
 export interface SubscriptionsView {
   items: Subscription[];
   homeCurrency: CurrencyCode;
+  settings: FinanceSettings;
   activeCount: number;
   monthlyTotalMinor: number;
   yearlyTotalMinor: number;
   upcoming: UpcomingCharge[];
   /** Days on which more than one active subscription renews — surfaced as information, never as a warning. */
-  collisions: { date: string; names: string[]; totalMinor: number }[];
+  collisions: SubscriptionCollision[];
+  /** The newest locked rate per foreign currency, for converting each subscription's monthly equivalent to `homeCurrency`. */
+  rates: FxRateSnapshot[];
+  unconverted: UnconvertedSubscriptions;
 }
 
 export interface CategoriesView {

@@ -437,10 +437,11 @@ function toFinanceSettings(account: DeltaRow | undefined): FinanceSettings {
   };
 }
 
+/** `archivedAt` is authoritative; `active` is a legacy mirror. */
 function toExpenseCategory(row: DeltaRow): ExpenseCategory {
   const key = (text(row, 'key') ?? 'uncat') as ExpenseCategoryId;
   const builtin = BUILT_IN_CATEGORIES.find(category => category.id === key) ?? UNCATEGORISED;
-  return { ...builtin, id: key, name: text(row, 'label') ?? builtin.name, archived: !bool(row, 'active', true) };
+  return { ...builtin, id: key, name: text(row, 'label') ?? builtin.name, archived: nullableText(row, 'archivedAt') !== undefined };
 }
 
 const REMINDER_LEAD_LOCAL: Record<string, ReminderLead> = { on_day: 'on-day', '1_day': '1-day', '2_day': '2-day', '3_day': '3-day', '1_week': '1-week' };

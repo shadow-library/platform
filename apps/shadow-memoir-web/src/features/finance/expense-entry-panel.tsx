@@ -107,6 +107,10 @@ function previewText(amountMinor: number, draft: FormDraft, settings: FinanceSet
   return `${converted}, the last rate used (${formatLocalDate(known.date, { year: false })}). The saved value uses the rate on ${day}.`;
 }
 
+function availableCategories(categories: ExpenseCategory[], selected: ExpenseCategoryId): ExpenseCategory[] {
+  return categories.filter(category => !category.archived || category.id === selected);
+}
+
 export function ExpenseEntryPanel({ today, settings, rates, categories = BUILT_IN_CATEGORIES, existing, onClose }: ExpenseEntryPanelProps): ReactElement {
   const { finance } = useMemoirData();
   const command = useFinanceCommand();
@@ -266,7 +270,7 @@ export function ExpenseEntryPanel({ today, settings, rates, categories = BUILT_I
 
             <FormField label="Category">
               <Select size="md" value={draft.categoryId} onValueChange={value => patch({ categoryId: value as ExpenseCategoryId })} aria-label="Category">
-                {categories.map(category => (
+                {availableCategories(categories, draft.categoryId).map(category => (
                   <Select.Item key={category.id} value={category.id} description={category.hint}>
                     {category.name}
                   </Select.Item>

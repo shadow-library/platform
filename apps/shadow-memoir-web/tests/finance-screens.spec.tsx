@@ -1,15 +1,17 @@
 import { onlineManager } from '@tanstack/react-query';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { toast } from '@shadow-library/ui';
 
-import { ExpenseDetailScreen, ExpenseEntryPanel, ExpensesScreen, SubscriptionsScreen } from '@/features/finance';
+import { CategoriesScreen, ExpenseDetailScreen, ExpenseEntryPanel, ExpensesScreen, SubscriptionsScreen } from '@/features/finance';
 import { receiptApi } from '@/lib/apis';
-import { type ExpenseDetail, type FinanceSettings, todayISODate } from '@/lib/data';
+import { type ExpenseCategory, type ExpenseDetail, type FinanceSettings, todayISODate, UNCATEGORISED } from '@/lib/data';
 import { type DeltaPage, type SyncedMemoirData, SyncEngineProvider } from '@/lib/sync';
 
 import { createMemoirTestData, renderScreen, renderWithQuery } from './harness';
+import { withTimeZone } from './setup';
 import { createSyncedTestData, createTestEngine, rejected, type TestEngine, type TestEngineOptions } from './sync-harness';
 
 const TODAY = '2026-08-23';
@@ -73,6 +75,31 @@ function expenseRow(overrides: Record<string, unknown> = {}): Record<string, unk
   };
 }
 
+function subscriptionRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'sub-1',
+    name: 'Kindle Unlimited',
+    amountMinor: 999,
+    amountText: '9.99',
+    currency: 'EUR',
+    frequency: 'monthly',
+    billingDay: 25,
+    nextDueDate: '2026-09-25',
+    lastConfirmedDate: '2026-08-25',
+    categoryId: 'subs',
+    reminderEnabled: true,
+    reminderLead: 'on_day',
+    monthlyEquivalentMinor: 999,
+    active: true,
+    createdAt: '2023-01-01',
+    ...overrides,
+  };
+}
+
+function categoryRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return { id: 'cat-home', key: 'home', label: 'Home', builtin: true, active: true, archivedAt: null, ...overrides };
+}
+
 function chooseFile(container: HTMLElement, file: File): void {
   const input = container.querySelector('input[type="file"]');
   if (!input) throw new TypeError('The receipt picker has no file input');
@@ -124,6 +151,19 @@ describe('expense entry', () => {
     typeAmount('18.40');
 
     expect(screen.getByTestId('expense-entry-preview').textContent).toBe('$18.40 ≈ €16.95 at 0.9210, the rate on 23 Aug.');
+  });
+
+  it('should hide archived categories from the entry form', () => {
+    const categories: ExpenseCategory[] = [
+      { id: 'food', name: 'Food', glyph: '◍', hint: 'Coffee, eating out, takeaway', tone: 'warning', swatch: 'var(--sh-warning-solid)', archived: false },
+      { id: 'shopping', name: 'Shopping', glyph: '✦', hint: 'Clothes, books, gifts', tone: 'accent', swatch: 'var(--sh-accent)', archived: true },
+      UNCATEGORISED,
+    ];
+    renderWithQuery(<ExpenseEntryPanel today={TODAY} settings={EUR_SETTINGS} rates={[]} categories={categories} onClose={() => undefined} />);
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Category' }));
+    expect(screen.getByRole('option', { name: /Food/ })).toBeDefined();
+    expect(screen.queryByRole('option', { name: /Shopping/ })).toBeNull();
   });
 
   it('should lock currency when editing an expense', () => {
@@ -260,6 +300,223 @@ describe('subscriptions screen', () => {
     renderWithQuery(<SubscriptionsScreen />);
     expect(await screen.findByText('Waiting to be confirmed')).toBeDefined();
   });
+
+  it('should describe paused subscriptions', async () => {
+    const { engine } = createTestEngine({ today: todayISODate(), pages: [page({ subscriptions: [subscriptionRow({ active: false })] })] });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <SubscriptionsScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    expect(await screen.findByText(/Paused — no renewals/)).toBeDefined();
+    expect(screen.queryByText(/^Renews/)).toBeNull();
+  });
+
+  it('should render the unconverted-subscriptions warning as its own line, separate from the totals', async () => {
+    const { engine } = createTestEngine({ today: todayISODate(), pages: [page({ subscriptions: [subscriptionRow({ currency: 'NOK', monthlyEquivalentMinor: 11633 })] })] });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <SubscriptionsScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    const totals = await screen.findByText(/active ·/);
+    const warning = await screen.findByText(/not converted — no NOK rate yet/);
+    expect(warning).not.toBe(totals);
+    expect(totals.textContent).not.toContain('not converted');
+  });
+
+  it('should send a pause the server accepts', async () => {
+    const posted: PostedCommand[] = [];
+    const success = vi.spyOn(toast, 'success');
+    const warning = vi.spyOn(toast, 'warning');
+    const { engine } = createTestEngine({
+      today: todayISODate(),
+      pages: [page({ subscriptions: [subscriptionRow()] })],
+      fetchImpl: server => async (input, init) => {
+        if (String(input).includes('/sync/commands')) posted.push(...postedCommands(init));
+        return server.fetchImpl(input, init);
+      },
+    });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <SubscriptionsScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+    await waitFor(() => expect(engine.getSnapshot().state).toBe('online'));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Pause' }));
+
+    await waitFor(() => expect(posted.map(command => command.type)).toEqual(['subscription.update']));
+    expect(posted[0]?.payload).toMatchObject({ id: 'sub-1', active: false });
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Subscription paused.', undefined));
+    expect(warning).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it('should describe an overdue subscription as "Was due <date>"', async () => {
+    await withTimeZone('Europe/Oslo', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-09-14T06:00:00.000Z'));
+      try {
+        const { engine } = createTestEngine({
+          today: '2026-09-14',
+          pages: [page({ subscriptions: [subscriptionRow({ nextDueDate: '2026-09-01', lastConfirmedDate: '2026-07-01' })] })],
+        });
+        const data = createSyncedTestData(engine);
+        renderScreen(
+          <SyncEngineProvider data={data}>
+            <SubscriptionsScreen />
+          </SyncEngineProvider>,
+          { value: data },
+        );
+
+        expect(await screen.findByText(/Was due 1 Sep 2026/)).toBeDefined();
+        expect(screen.queryByText(/^Renews/)).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  it('should name the subscription when the server rejects a pause', async () => {
+    const warning = vi.spyOn(toast, 'warning');
+    const { engine } = createTestEngine({
+      today: todayISODate(),
+      pages: [page({ subscriptions: [subscriptionRow({ name: 'Kindle Unlimited' })] })],
+      outcomes: batch => batch.commandIds.map(commandId => rejected(commandId, 'This billing cycle has already been confirmed', 'FIN_004')),
+    });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <SubscriptionsScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+    await waitFor(() => expect(engine.getSnapshot().state).toBe('online'));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Pause' }));
+
+    await waitFor(() => expect(warning).toHaveBeenCalledTimes(1));
+    expect(String(warning.mock.calls[0]?.[0])).toContain('Couldn’t pause ‘Kindle Unlimited’');
+    vi.restoreAllMocks();
+  });
+
+  it('should create a subscription', async () => {
+    const posted: PostedCommand[] = [];
+    const success = vi.spyOn(toast, 'success');
+    const { engine } = createTestEngine({
+      today: todayISODate(),
+      fetchImpl: server => async (input, init) => {
+        if (String(input).includes('/sync/commands')) posted.push(...postedCommands(init));
+        return server.fetchImpl(input, init);
+      },
+    });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <SubscriptionsScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+    await waitFor(() => expect(engine.getSnapshot().state).toBe('online'));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add subscription' }));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Disney+' } });
+    typeAmount('8.99');
+    fireEvent.click(screen.getByRole('button', { name: 'Save subscription' }));
+
+    await waitFor(() => expect(posted.map(command => command.type)).toEqual(['subscription.create']));
+    expect(posted[0]?.payload).toMatchObject({ name: 'Disney+', amountMinor: 899, currency: 'EUR', frequency: 'monthly' });
+    await waitFor(() => expect(success).toHaveBeenCalled());
+    vi.restoreAllMocks();
+  });
+});
+
+describe('categories screen', () => {
+  it('should not offer archiving the system categories', async () => {
+    renderScreen(<CategoriesScreen />);
+
+    expect(await screen.findByRole('button', { name: 'Actions for Food' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Actions for Uncategorised' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Actions for Subscriptions' })).toBeNull();
+  });
+
+  it('should keep an archived category after resync', async () => {
+    const posted: PostedCommand[] = [];
+    let archived = false;
+    const row = categoryRow();
+    const { engine } = createTestEngine({
+      today: todayISODate(),
+      fetchImpl: server => async (input, init) => {
+        const url = String(input);
+        if (url.includes('/sync/commands')) {
+          posted.push(...postedCommands(init));
+          archived = true;
+          return server.fetchImpl(input, init);
+        }
+        if (url.includes('/sync/delta'))
+          return deltaResponse(page({ expense_categories: [{ ...row, archivedAt: archived ? '2026-08-23T00:00:00.000Z' : null }] }, [], archived ? '2' : '1'));
+        return server.fetchImpl(input, init);
+      },
+    });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <CategoriesScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+    await waitFor(() => expect(engine.getSnapshot().state).toBe('online'));
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Actions for Home' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Archive' }));
+
+    await waitFor(() => expect(posted.map(command => command.type)).toEqual(['category.setArchived']));
+
+    await engine.sync();
+
+    expect(await screen.findByText('Archived')).toBeDefined();
+    expect((await data.finance.categories()).items.find(item => item.category.id === 'home')?.category.archived).toBe(true);
+  });
+
+  it('should archive a category and toast owner copy', async () => {
+    const user = userEvent.setup();
+    const posted: PostedCommand[] = [];
+    const success = vi.spyOn(toast, 'success');
+    const { engine } = createTestEngine({
+      today: todayISODate(),
+      pages: [page({ expense_categories: [categoryRow()] })],
+      fetchImpl: server => async (input, init) => {
+        if (String(input).includes('/sync/commands')) posted.push(...postedCommands(init));
+        return server.fetchImpl(input, init);
+      },
+    });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <CategoriesScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+    await waitFor(() => expect(engine.getSnapshot().state).toBe('online'));
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Home' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Archive' }));
+
+    await waitFor(() => expect(posted.map(command => command.type)).toEqual(['category.setArchived']));
+    expect(posted[0]?.payload).toMatchObject({ categoryId: 'home', archived: true });
+    await waitFor(() => expect(success).toHaveBeenCalled());
+    vi.restoreAllMocks();
+  });
 });
 
 function setOffline(offline: boolean): void {
@@ -365,6 +622,32 @@ describe('expenses screen', () => {
     expect(screen.getByText('This month · ¥1,200')).toBeDefined();
     expect(screen.getByText('No monthly budget')).toBeDefined();
     expect(screen.getByRole('link', { name: 'Set a budget' }).getAttribute('href')).toBe('/settings#day-and-money');
+  });
+
+  it('should open the expense list filtered to uncategorised', async () => {
+    const { engine } = createTestEngine({
+      today: todayISODate(),
+      pages: [
+        page({
+          expenses: [expenseRow({ id: 'exp-uncat', note: 'Card payment', categoryId: 'uncat' }), expenseRow({ id: 'exp-coffee', note: 'Coffee', categoryId: 'food' })],
+        }),
+      ],
+    });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <ExpensesScreen />
+      </SyncEngineProvider>,
+      { value: data, initialPath: '/finance?category=uncat' },
+    );
+
+    expect(await screen.findByRole('link', { name: /Card payment/ })).toBeDefined();
+    expect(screen.queryByRole('link', { name: /Coffee/ })).toBeNull();
+    expect(await screen.findByRole('button', { name: 'Remove Uncategorised' })).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Uncategorised' }));
+
+    expect(await screen.findByRole('link', { name: /Coffee/ })).toBeDefined();
   });
 
   it('should show a skeleton rather than an empty account before the first sync', async () => {

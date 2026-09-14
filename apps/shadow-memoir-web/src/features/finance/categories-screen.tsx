@@ -1,23 +1,30 @@
 import { Link } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
-import { Button, Card, cn, DropdownMenu, IconButton, Skeleton, toast } from '@shadow-library/ui';
+import { Badge, Button, Card, cn, DropdownMenu, IconButton, Skeleton } from '@shadow-library/ui';
 
 import { DataState } from '@/components/DataState';
-import { type ExpenseCategoryId, formatMinor, useExpenseCategories, useFinanceCommand } from '@/lib/data';
+import { type ExpenseCategoryId, formatMinor, notifyOutcome, useExpenseCategories, useFinanceCommand } from '@/lib/data';
 import { useDataReadiness } from '@/lib/sync';
 
 import styles from './finance.module.css';
+
+const UNARCHIVABLE_CATEGORIES: ReadonlySet<ExpenseCategoryId> = new Set(['uncat', 'subs']);
 
 export function CategoriesScreen(): ReactElement {
   const categories = useExpenseCategories();
   const command = useFinanceCommand();
 
-  const ready = useDataReadiness({ query: categories }).readiness.kind === 'ready';
+  const { readiness } = useDataReadiness({ query: categories });
+  const ready = readiness.kind === 'ready';
   const view = categories.data;
   const home = view?.homeCurrency ?? 'EUR';
+  const meta = ready && view ? `${view.items.length} categories · ${view.items.filter(slice => slice.category.archived).length} archived` : null;
+  const uncategorisedCount = view?.uncategorised.count ?? 0;
 
-  const setArchived = (id: ExpenseCategoryId, archived: boolean): void => {
-    command.mutate({ type: 'category.setArchived', id, archived }, { onSuccess: result => toast.success(result.message) });
+  const setArchived = async (id: ExpenseCategoryId, archived: boolean, name: string): Promise<void> => {
+    const outcome = await command.run({ type: 'category.setArchived', id, archived });
+    const local = outcome.status === 'applied' || outcome.status === 'queued-offline' ? outcome.local : null;
+    notifyOutcome(outcome, { success: local?.message ?? '', action: archived ? 'archive' : 'restore', subject: name });
   };
 
   return (
@@ -27,7 +34,11 @@ export function CategoriesScreen(): ReactElement {
           <h1 className={styles.title} id="categories-title">
             Categories
           </h1>
-          <p className={styles.meta}>{ready && view ? `${view.items.length} categories · ${view.items.filter(slice => slice.category.archived).length} archived` : 'Loading'}</p>
+          {meta && (
+            <p className={styles.meta} title={meta}>
+              {meta}
+            </p>
+          )}
         </div>
       </header>
 
@@ -43,22 +54,39 @@ export function CategoriesScreen(): ReactElement {
                 <div key={slice.category.id} className={cn(styles.staticRow, slice.category.archived && styles.archived)}>
                   <span className={styles.swatch} style={{ background: slice.category.swatch }} aria-hidden />
                   <span className={styles.rowMain}>
-                    <span className={styles.rowName}>{slice.category.name}</span>
+                    <span className={styles.rowTitleLine}>
+                      <span className={styles.rowName}>{slice.category.name}</span>
+                      {slice.category.archived && (
+                        <Badge variant="outline" size="sm">
+                          Archived
+                        </Badge>
+                      )}
+                    </span>
                     <span className={styles.rowMeta}>
                       {slice.category.hint} · {slice.count} this month
                     </span>
                   </span>
                   <span className={styles.mono}>{formatMinor(slice.totalMinor, home)}</span>
-                  <DropdownMenu>
-                    <DropdownMenu.Trigger asChild>
-                      <IconButton variant="ghost" size="sm" aria-label={`Actions for ${slice.category.name}`} icon={<span aria-hidden>⋯</span>} />
-                    </DropdownMenu.Trigger>
-                    <DropdownMenu.Content>
-                      <DropdownMenu.Item onSelect={() => setArchived(slice.category.id, !slice.category.archived)}>
-                        {slice.category.archived ? 'Restore' : 'Archive'}
-                      </DropdownMenu.Item>
-                    </DropdownMenu.Content>
-                  </DropdownMenu>
+                  {UNARCHIVABLE_CATEGORIES.has(slice.category.id) ? (
+                    <span className={styles.rowSpacer} aria-hidden />
+                  ) : (
+                    <DropdownMenu>
+                      <DropdownMenu.Trigger asChild>
+                        <IconButton
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Actions for ${slice.category.name}`}
+                          icon={<span aria-hidden>⋯</span>}
+                          disabled={command.isPendingFor(c => c.type === 'category.setArchived' && c.id === slice.category.id)}
+                        />
+                      </DropdownMenu.Trigger>
+                      <DropdownMenu.Content>
+                        <DropdownMenu.Item onSelect={() => void setArchived(slice.category.id, !slice.category.archived, slice.category.name)}>
+                          {slice.category.archived ? 'Restore' : 'Archive'}
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu>
+                  )}
                 </div>
               ))}
             </Card.Body>
@@ -74,18 +102,22 @@ export function CategoriesScreen(): ReactElement {
               </Card.Body>
             </Card>
 
-            <Card padding="md">
-              <Card.Body>
-                <h2 className={styles.railTitle}>Uncategorised</h2>
-                <p className={styles.railProse}>
-                  {view?.uncategorised.count ?? 0} expenses, {formatMinor(view?.uncategorised.totalMinor ?? 0, home)} this month. Categorising them takes about twenty seconds and
-                  improves the next guess.
-                </p>
-                <Button size="sm" variant="secondary" asChild>
-                  <Link to="/finance">Categorise now</Link>
-                </Button>
-              </Card.Body>
-            </Card>
+            {uncategorisedCount > 0 && (
+              <Card padding="md">
+                <Card.Body>
+                  <h2 className={styles.railTitle}>Uncategorised</h2>
+                  <p className={styles.railProse}>
+                    {uncategorisedCount} expenses, {formatMinor(view?.uncategorised.totalMinor ?? 0, home)} this month. Categorising them takes about twenty seconds and improves
+                    the next guess.
+                  </p>
+                  <Button size="sm" variant="secondary" className={styles.railAction} asChild>
+                    <Link to="/finance" search={{ category: 'uncat' }}>
+                      Categorise now
+                    </Link>
+                  </Button>
+                </Card.Body>
+              </Card>
+            )}
           </div>
         </div>
       </DataState>

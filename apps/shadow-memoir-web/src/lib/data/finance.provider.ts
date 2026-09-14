@@ -14,6 +14,7 @@ import {
   monthlyEquivalentMinor,
   parseAmountToMinor,
   previousStretch,
+  rateFromSnapshots,
   ratesUsed,
   spendDelta,
   sumHomeMinor,
@@ -35,12 +36,15 @@ import {
   type FinanceRange,
   type FinanceSettings,
   type FinanceSummary,
+  type FxRateSnapshot,
   type RangeSpend,
   type ReceiptScanQuota,
   type ReceiptUploadProgress,
   type Subscription,
+  type SubscriptionCollision,
   type SubscriptionDraft,
   type SubscriptionsView,
+  type UnconvertedSubscriptions,
   type UpcomingCharge,
 } from './finance.types';
 
@@ -407,11 +411,6 @@ function nextExpenseId(): string {
   return `exp-${Date.now().toString(36)}`;
 }
 
-function rateFor(state: FinanceState, currency: CurrencyCode): number | null {
-  if (currency === state.settings.homeCurrency) return null;
-  return latestRates(state.expenses, state.settings.homeCurrency).find(snapshot => snapshot.from === currency)?.rate ?? null;
-}
-
 function rangeSpend(state: FinanceState, range: FinanceRange): RangeSpend {
   const { settings } = state;
   const home = settings.homeCurrency;
@@ -441,20 +440,47 @@ function rangeSpend(state: FinanceState, range: FinanceRange): RangeSpend {
   };
 }
 
+function subscriptionHomeEquivalentMinor(
+  subscription: Pick<Subscription, 'monthlyEquivalentMinor' | 'currency'>,
+  homeCurrency: CurrencyCode,
+  rates: FxRateSnapshot[],
+): number | null {
+  return convertToHomeMinor(subscription.monthlyEquivalentMinor, subscription.currency, rateFromSnapshots(subscription.currency, homeCurrency, rates), homeCurrency);
+}
+
+interface SubscriptionTotals {
+  homeMinor: number;
+  unconverted: UnconvertedSubscriptions;
+}
+
+/** Converts every active subscription once; a currency with no known rate is excluded from the sum, never counted as 0. */
+function subscriptionTotals(subscriptions: Subscription[], homeCurrency: CurrencyCode, rates: FxRateSnapshot[]): SubscriptionTotals {
+  const converted = subscriptions.map(item => ({ item, homeMinor: subscriptionHomeEquivalentMinor(item, homeCurrency, rates) }));
+  const unresolved = converted.filter((entry): entry is { item: Subscription; homeMinor: null } => entry.homeMinor === null).map(entry => entry.item);
+  return {
+    homeMinor: converted.reduce((total, entry) => total + (entry.homeMinor ?? 0), 0),
+    unconverted: { count: unresolved.length, currencies: [...new Set(unresolved.map(item => item.currency))] },
+  };
+}
+
 export function financeSummary(state: FinanceState): FinanceSummary {
+  const home = state.settings.homeCurrency;
   const activeSubscriptions = state.subscriptions.filter(item => item.active);
   const nextDue = [...activeSubscriptions].sort((a, b) => (a.nextDueDate < b.nextDueDate ? -1 : 1))[0];
+  const rates = latestRates(state.expenses, home);
+  const totals = subscriptionTotals(activeSubscriptions, home, rates);
 
   return {
     settings: state.settings,
     categories: state.categories,
     ranges: { week: rangeSpend(state, 'week'), month: rangeSpend(state, 'month'), year: rangeSpend(state, 'year') },
     budget: budgetStanding(state.expenses, state.settings, state.today),
-    subscriptionsMonthlyMinor: activeSubscriptions.reduce((total, item) => total + item.monthlyEquivalentMinor, 0),
+    subscriptionsMonthlyMinor: totals.homeMinor,
+    unconvertedSubscriptions: totals.unconverted,
     activeSubscriptions: activeSubscriptions.length,
     nextSubscription: nextDue ? { name: nextDue.name, dueDate: nextDue.nextDueDate } : null,
     totalExpenses: state.monthlyExpenseCount,
-    latestRates: latestRates(state.expenses, state.settings.homeCurrency),
+    latestRates: rates,
     queuedExpense: state.expenses.find(expense => expense.syncState === 'queued') ?? null,
   };
 }
@@ -480,26 +506,50 @@ export function financeExpenseView(state: FinanceState, id: string): ExpenseView
 
 export function financeSubscriptionsView(state: FinanceState): SubscriptionsView {
   const home = state.settings.homeCurrency;
+  const rates = latestRates(state.expenses, home);
   const items = [...state.subscriptions].sort((a, b) => (a.nextDueDate < b.nextDueDate ? -1 : 1));
   const active = items.filter(item => item.active);
-  const monthlyTotalMinor = active.reduce((total, item) => total + item.monthlyEquivalentMinor, 0);
+  const totals = subscriptionTotals(active, home, rates);
 
   const upcoming: UpcomingCharge[] = active
-    .filter(item => daysBetween(state.today, item.nextDueDate) <= 30)
+    .filter(item => {
+      const days = daysBetween(state.today, item.nextDueDate);
+      return days >= 0 && days <= 30;
+    })
     .map(item => ({ subscriptionId: item.id, name: item.name, dueDate: item.nextDueDate, amountMinor: item.amountMinor, currency: item.currency }));
 
   const byDate = new Map<string, UpcomingCharge[]>();
   for (const charge of upcoming) byDate.set(charge.dueDate, [...(byDate.get(charge.dueDate) ?? []), charge]);
 
-  const collisions = [...byDate.entries()]
+  const collisions: SubscriptionCollision[] = [...byDate.entries()]
     .filter(([, charges]) => charges.length > 1)
-    .map(([date, charges]) => ({
-      date,
-      names: charges.map(charge => charge.name),
-      totalMinor: charges.reduce((total, charge) => total + (convertToHomeMinor(charge.amountMinor, charge.currency, rateFor(state, charge.currency), home) ?? 0), 0),
-    }));
+    .map(([date, charges]) => {
+      const converted = charges.map(charge => ({
+        charge,
+        homeMinor: convertToHomeMinor(charge.amountMinor, charge.currency, rateFromSnapshots(charge.currency, home, rates), home),
+      }));
+      const known = converted.filter((entry): entry is { charge: UpcomingCharge; homeMinor: number } => entry.homeMinor !== null);
+      const unconvertedCharges = converted.filter(entry => entry.homeMinor === null).map(entry => ({ currency: entry.charge.currency, amountMinor: entry.charge.amountMinor }));
+      return {
+        date,
+        names: charges.map(charge => charge.name),
+        totalMinor: known.length > 0 ? known.reduce((total, entry) => total + entry.homeMinor, 0) : null,
+        unconvertedCharges,
+      };
+    });
 
-  return { items, homeCurrency: home, activeCount: active.length, monthlyTotalMinor, yearlyTotalMinor: monthlyTotalMinor * 12, upcoming, collisions };
+  return {
+    items,
+    homeCurrency: home,
+    settings: state.settings,
+    activeCount: active.length,
+    monthlyTotalMinor: totals.homeMinor,
+    yearlyTotalMinor: totals.homeMinor * 12,
+    upcoming,
+    collisions,
+    rates,
+    unconverted: totals.unconverted,
+  };
 }
 
 export function financeCategoriesView(state: FinanceState): CategoriesView {

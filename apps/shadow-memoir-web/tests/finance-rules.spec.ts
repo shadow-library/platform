@@ -8,6 +8,7 @@ import {
   financeExpensePage,
   type FinanceSettings,
   type FinanceState,
+  financeSubscriptionsView,
   financeSummary,
   formatMinor,
   monthlyEquivalentMinor,
@@ -228,5 +229,60 @@ describe('financeExpensePage', () => {
     ]);
 
     expect(financeExpensePage(state, { range: 'month' }).items.map(item => item.id)).toEqual(['evening', 'morning', 'confirmed-later']);
+  });
+});
+
+describe('financeSubscriptionsView', () => {
+  it('should convert foreign subscription totals to the home currency', () => {
+    const state: FinanceState = {
+      today: '2026-09-14',
+      settings: SETTINGS,
+      expenses: [expense('nok-rate', '2026-09-10', 21400, { currency: 'NOK', fxRate: 0.086, homeAmountMinor: 1840 })],
+      subscriptions: [
+        subscription({ id: 'sub-nok', name: 'Aftenposten', amountMinor: 34900, currency: 'NOK', frequency: 'quarterly', monthlyEquivalentMinor: 11633, nextDueDate: '2026-09-25' }),
+      ],
+      categories: [...BUILT_IN_CATEGORIES],
+      monthlyExpenseCount: 1,
+    };
+
+    const view = financeSubscriptionsView(state);
+    expect(view.monthlyTotalMinor).toBe(1000);
+    expect(view.yearlyTotalMinor).toBe(12000);
+  });
+
+  it('should leave a home-currency subscription unconverted', () => {
+    const state: FinanceState = {
+      today: '2026-09-14',
+      settings: SETTINGS,
+      expenses: [],
+      subscriptions: [subscription({ id: 'sub-eur', monthlyEquivalentMinor: 999 })],
+      categories: [...BUILT_IN_CATEGORIES],
+      monthlyExpenseCount: 0,
+    };
+
+    expect(financeSubscriptionsView(state).monthlyTotalMinor).toBe(999);
+  });
+
+  it('should flag a foreign subscription without a rate instead of counting it as zero', () => {
+    const state: FinanceState = {
+      today: '2026-09-14',
+      settings: SETTINGS,
+      expenses: [],
+      subscriptions: [
+        subscription({ id: 'sub-eur', name: 'Spotify', currency: 'EUR', monthlyEquivalentMinor: 1099 }),
+        subscription({ id: 'sub-nok', name: 'Aftenposten', currency: 'NOK', monthlyEquivalentMinor: 11633 }),
+      ],
+      categories: [...BUILT_IN_CATEGORIES],
+      monthlyExpenseCount: 0,
+    };
+
+    const view = financeSubscriptionsView(state);
+    expect(view.monthlyTotalMinor).toBe(1099);
+    expect(view.yearlyTotalMinor).toBe(1099 * 12);
+    expect(view.unconverted).toEqual({ count: 1, currencies: ['NOK'] });
+
+    const summary = financeSummary(state);
+    expect(summary.subscriptionsMonthlyMinor).toBe(1099);
+    expect(summary.unconvertedSubscriptions).toEqual({ count: 1, currencies: ['NOK'] });
   });
 });

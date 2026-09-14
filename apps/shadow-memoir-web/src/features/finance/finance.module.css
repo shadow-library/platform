@@ -34,6 +34,12 @@
   white-space: nowrap;
 }
 
+.metaWarning {
+  margin: 3px 0 0;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-warning-text);
+}
+
 .kpis {
   display: grid;
   gap: 14px;
@@ -161,6 +167,18 @@
 
 .staticRow:hover {
   background: none;
+}
+
+.rowTrail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.rowSpacer {
+  flex: none;
+  width: var(--sh-control-height-sm);
 }
 
 .glyph {
@@ -340,6 +358,15 @@
 .railRowName {
   min-width: 0;
   color: var(--sh-text-secondary);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.railAction {
+  margin-top: 10px;
 }
 
 .railRowWhen {
@@ -553,6 +580,21 @@
 
   .kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .subscriptionRow {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .subscriptionRow .rowMain,
+  .subscriptionRow .rowTrail {
+    flex: 1 1 100%;
+  }
+
+  .subscriptionRow .rowTrail {
+    flex-wrap: wrap;
+    justify-content: space-between;
   }
 }
 

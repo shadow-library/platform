@@ -21,6 +21,7 @@ import {
   type SubscriptionDueState,
   type SubscriptionFrequency,
   UNCATEGORISED,
+  type UnconvertedSubscriptions,
 } from './finance.types';
 
 const DAYS_PER_MONTH = 365 / 12;
@@ -87,6 +88,16 @@ export function convertToHomeMinor(amountMinor: number, currency: CurrencyCode, 
   if (fxRate === null) return null;
   const major = minorToMajor(amountMinor, currency) * fxRate;
   return Math.round(major * 10 ** currencyExponent(homeCurrency));
+}
+
+export function rateFromSnapshots(currency: CurrencyCode, homeCurrency: CurrencyCode, rates: FxRateSnapshot[]): number | null {
+  if (currency === homeCurrency) return null;
+  return rates.find(rate => rate.from === currency)?.rate ?? null;
+}
+
+export function unconvertedSubscriptionsNote(unconverted: UnconvertedSubscriptions): string {
+  if (unconverted.count === 0) return '';
+  return `${unconverted.count} not converted — no ${unconverted.currencies.join('/')} rate yet`;
 }
 
 export function monthlyEquivalentMinor(amountMinor: number, frequency: SubscriptionFrequency, customIntervalDays?: number): number {

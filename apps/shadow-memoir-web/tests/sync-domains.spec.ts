@@ -56,8 +56,8 @@ const SUBSCRIPTION_ROW = {
 };
 
 const CATEGORY_ROWS = [
-  { id: '1', key: 'food', label: 'Food', builtin: true, active: true },
-  { id: '2', key: 'groceries', label: 'Groceries', builtin: true, active: false },
+  { id: '1', key: 'food', label: 'Food', builtin: true, active: true, archivedAt: null },
+  { id: '2', key: 'groceries', label: 'Groceries', builtin: true, active: false, archivedAt: `${TODAY}T00:00:00.000Z` },
 ];
 
 const JOURNAL_ROW = {
