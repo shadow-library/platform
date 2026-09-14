@@ -4,5 +4,6 @@ import { QuestBuilderScreen, validateQuestDuplicateSearch } from '@/features/que
 
 export const Route = createFileRoute('/_account/_app/quests/new')({
   validateSearch: validateQuestDuplicateSearch,
+  staticData: { title: 'New quest' },
   component: QuestBuilderScreen,
 });

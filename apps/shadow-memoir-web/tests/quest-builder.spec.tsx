@@ -4,7 +4,8 @@ import { toast } from '@shadow-library/ui';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { QuestBuilderScreen, QuestDetailScreen, QuestEditScreen } from '@/features/quests';
-import { type Command, type CommandResult, type DispatchOptions, type MemoirData } from '@/lib/data';
+import { type Command, type CommandResult, type DispatchOptions, type MemoirData, MemoirEngine } from '@/lib/data';
+import { projectWorldState } from '@/lib/sync';
 
 import { createMemoirTestData, renderScreen } from './harness';
 
@@ -27,6 +28,31 @@ function createButton(): HTMLButtonElement {
 describe('QuestBuilderScreen', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('should show an over-capacity day in the builder preview as over capacity', async () => {
+    const daily = { id: 'q1', name: 'Deep work', durationMin: 125, recurrence: { frequency: 'daily' }, active: true };
+    const sunday = { id: 'q2', name: 'Long ride', durationMin: 175, recurrence: { frequency: 'weekly', daysOfWeek: [7] }, active: true };
+    const data = { ...createMemoirTestData({ today: TODAY }), provider: new MemoirEngine(projectWorldState({ quests: [daily, sunday] }, TODAY)) };
+    renderScreen(<QuestBuilderScreen />, { value: data });
+
+    const track = async (label: string): Promise<{ fill: HTMLElement; mark: HTMLElement; row: HTMLElement }> => {
+      const row = (await screen.findByText(label)).closest('li') as HTMLElement;
+      const [fill, mark] = Array.from(row.querySelectorAll<HTMLElement>('span[style]'));
+      return { fill: fill as HTMLElement, mark: mark as HTMLElement, row };
+    };
+
+    const atCapacity = await track('Today');
+    const doubled = await track('Tomorrow');
+
+    expect(atCapacity.fill.style.width).toBe('50%');
+    expect(atCapacity.fill.dataset.over).toBeUndefined();
+    expect(doubled.fill.style.width).toBe('100%');
+    expect(doubled.fill.dataset.over).toBe('true');
+    expect(Number.parseFloat(doubled.fill.style.width)).toBeGreaterThan(Number.parseFloat(doubled.mark.style.left));
+    expect(atCapacity.mark.style.left).toBe('50%');
+    expect(doubled.row.textContent).toContain('over capacity');
+    expect(atCapacity.row.textContent).not.toContain('over capacity');
   });
 
   it('should describe every-N-days drafts with N in the preview', async () => {

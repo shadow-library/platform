@@ -1,7 +1,6 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-import { CommandRefusedError } from './command-feedback';
-import { type CommandHook, type LocalReading, useDomainCommand } from './command-runner';
+import { type CommandHandle, type LocalReading, useDomainCommand } from './command-runner';
 import { useMemoirData } from './data-context';
 import { type HealthView, type JournalView, type MealsView, type QuickLogCommand, type QuickLogCommandResult, type SideQuestsView, type WeightView } from './quick-logs.types';
 
@@ -39,25 +38,19 @@ export function useSideQuests(): UseQueryResult<SideQuestsView> {
   return useQuery({ queryKey: quickLogKeys.sideQuests(), queryFn: () => quickLogs.sideQuests() }, queryClient);
 }
 
-export type QuickLogCommandHook = CommandHook<QuickLogCommand, QuickLogCommandResult, QuickLogCommandResult, QuickLogCommandResult>;
+export type QuickLogCommandHook = CommandHandle<QuickLogCommand, QuickLogCommandResult, QuickLogCommandResult>;
 
 function readQuickLogResult(result: QuickLogCommandResult): LocalReading<QuickLogCommandResult, QuickLogCommandResult> {
   if (result.needsConfirmation) return { kind: 'confirm', confirmation: result };
   return { kind: 'done', local: result, delivery: result.delivery, xpAwarded: result.reward?.xp ?? 0, coinsAwarded: result.reward?.coins ?? 0 };
 }
 
-function legacyQuickLogResult(result: QuickLogCommandResult): QuickLogCommandResult {
-  if (result.delivery?.status === 'refused') throw new CommandRefusedError(result.delivery.boundary);
-  return result;
-}
-
 export function useQuickLogCommand(): QuickLogCommandHook {
   const { quickLogs, queryClient } = useMemoirData();
   return useDomainCommand({
-    queryClient,
     dispatch: (command, options) => quickLogs.dispatchCommand(command, options),
     read: readQuickLogResult,
-    legacy: legacyQuickLogResult,
-    refresh: () => queryClient.invalidateQueries({ queryKey: quickLogKeys.all }),
+    queryClient,
+    queryKey: quickLogKeys.all,
   });
 }

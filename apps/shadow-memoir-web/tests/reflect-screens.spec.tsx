@@ -5,11 +5,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AiScreen } from '@/features/ai';
 import { HistoryScreen } from '@/features/history';
-import { barHeightPx, InsightsScreen, PLOT_HEIGHT } from '@/features/insights';
+import { barHeightPx, InsightsScreen, PLOT_HEIGHT, validateInsightsSearch } from '@/features/insights';
 import { WeeklyReviewScreen } from '@/features/review';
 import { NetStrip, SystemOverlayProvider } from '@/features/shell';
 import { COACH_POLL_INTERVAL_MS, COACH_QUEUED_POLL_INTERVAL_MS, coachPollDelay, deriveInsights, reflectSeed, shiftDate } from '@/lib/data';
 import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
+import { getRouter } from '@/router';
+import { Route as AskRoute } from '@/routes/_account/_app/ai';
 
 import { renderScreen } from './harness';
 import { httpFake } from './http-fake';
@@ -193,6 +195,23 @@ describe('Insights screen', () => {
     expect(await screen.findByText('The last 30 days, against the 30 before them.')).toBeDefined();
   });
 
+  it('should keep the viewed period in the address and hand it to Ask', async () => {
+    const { router } = renderScreen(<InsightsScreen />, { today: TODAY, initialPath: '/insights' });
+    fireEvent.click(await screen.findByRole('radio', { name: '30 days' }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ period: '30' }));
+
+    fireEvent.click(screen.getByRole('link', { name: 'Ask the coach about this' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/ai'));
+    expect(router.state.location.search).toEqual({ ask: 'Looking at my last 30 days against the 30 before them, what stands out, and what would be worth changing?' });
+  });
+
+  it('should read the insights period from the address whether it was written as a number or a string', () => {
+    expect(validateInsightsSearch({ period: 30 })).toEqual({ period: '30' });
+    expect(validateInsightsSearch({ period: '365' })).toEqual({ period: '365' });
+    expect(validateInsightsSearch({ period: '7' })).toEqual({ period: undefined });
+  });
+
   it('should show an error instead of zero KPIs when sync fails', async () => {
     const test = createTestEngine({ today: TODAY, status: () => 500 });
     const data = createSyncedTestData(test.engine);
@@ -224,6 +243,25 @@ describe('Insights screen', () => {
 
     const tallest = expectedBars.find(bar => bar.value === max);
     expect(barHeightPx(tallest?.value ?? 0, max)).toBe(PLOT_HEIGHT);
+  });
+});
+
+describe('Ask route search', () => {
+  const validateAskSearch = AskRoute.options.validateSearch as (search: Record<string, unknown>) => { ask?: string };
+
+  it('should carry a prefill with special characters through the address unchanged', () => {
+    const router = getRouter();
+    const ask = 'Why do “Thursdays” & 50% of #mornings slip?\nLine two — 🙂';
+    const { href } = router.buildLocation({ to: '/ai', search: { ask } });
+
+    expect(validateAskSearch(router.options.parseSearch(new URL(href, 'http://localhost').search))).toEqual({ ask });
+  });
+
+  it('should drop a prefill the server could not accept', () => {
+    expect(validateAskSearch({ ask: 'x'.repeat(2001) })).toEqual({ ask: undefined });
+    expect(validateAskSearch({ ask: 'x'.repeat(2000) })).toEqual({ ask: 'x'.repeat(2000) });
+    expect(validateAskSearch({ ask: '   ' })).toEqual({ ask: undefined });
+    expect(validateAskSearch({ ask: 90 })).toEqual({ ask: undefined });
   });
 });
 
@@ -344,6 +382,25 @@ describe('Coach screen', () => {
     expect(await screen.findByRole('heading', { name: 'Ask' })).toBeDefined();
     expect(await screen.findByText('Before the coach reads anything')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Submit request' })).toBeNull();
+  });
+
+  it('should prefill Ask from an insight link', async () => {
+    const insights = renderScreen(<InsightsScreen />, { today: TODAY, initialPath: '/insights' });
+    fireEvent.click(await screen.findByRole('radio', { name: 'Year' }));
+    await waitFor(() => expect(insights.router.state.location.search).toEqual({ period: '365' }));
+    const href = screen.getByRole('link', { name: 'Ask the coach about this' }).getAttribute('href') ?? '';
+    insights.unmount();
+
+    const { router } = renderScreen(<AiScreen />, { today: TODAY, initialPath: href });
+    await passTheConsentGate();
+
+    const composer = (await screen.findByLabelText('Your question')) as HTMLTextAreaElement;
+    expect(composer.value).toBe('Looking at my last year, what stands out, and what would be worth changing?');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+    expect(await screen.findByText('Queued')).toBeDefined();
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    expect((screen.getByLabelText('Your question') as HTMLTextAreaElement).value).toBe('');
   });
 
   it('should show the remaining quota once the gate is passed', async () => {

@@ -9,7 +9,7 @@ interface ErasureSearch {
 
 export const Route = createFileRoute('/erasure')({
   validateSearch: (search: Record<string, unknown>): ErasureSearch => ({ device: toErasureDeviceState(search.device) }),
-  head: () => ({ meta: [{ title: 'Erasing your data · Shadow Memoir' }] }),
+  staticData: { title: 'Erasing your data' },
   component: ErasureRoute,
 });
 

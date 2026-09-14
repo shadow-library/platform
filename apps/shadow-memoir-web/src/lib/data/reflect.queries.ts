@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 
-import { type CommandHook, legacySettledResult, readSettledResult, useDomainCommand } from './command-runner';
+import { type CommandHandle, readSettledResult, useDomainCommand } from './command-runner';
 import { type SettledCommandResult } from './command.types';
 import { useMemoirData } from './data-context';
 import { type ReflectProvider } from './reflect.provider';
@@ -120,15 +120,14 @@ function useCoachRefresh(reflect: ReflectProvider, request: AiRequest | null): v
   }, [reflect, id, state, expectedBy]);
 }
 
-export type ReflectCommandHook = CommandHook<ReflectCommand, SettledCommandResult, SettledCommandResult>;
+export type ReflectCommandHook = CommandHandle<ReflectCommand, SettledCommandResult>;
 
 export function useReflectCommand(): ReflectCommandHook {
   const { reflect, queryClient } = useMemoirData();
   return useDomainCommand({
-    queryClient,
     dispatch: command => reflect.dispatchCommand(command),
     read: readSettledResult,
-    legacy: legacySettledResult,
-    refresh: () => queryClient.invalidateQueries({ queryKey: reflectKeys.all }),
+    queryClient,
+    queryKey: reflectKeys.all,
   });
 }

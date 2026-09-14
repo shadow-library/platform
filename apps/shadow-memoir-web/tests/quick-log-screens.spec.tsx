@@ -5,11 +5,12 @@ import { toast } from '@shadow-library/ui';
 import { describe, expect, it, vi } from 'vitest';
 
 import { EntryCapNote } from '@/components/EntryCapNote';
+import { LinkageOfferNote } from '@/components/LinkageOfferNote';
 import { HealthMetricsScreen, JournalScreen, MealsScreen, SideQuestsScreen, WeightScreen } from '@/features/quick-logs';
 import { deriveCapAdvisory, FixtureQuickLogProvider, MONTHLY_ENTRY_CAP, setQuickLogProvider, todayISODate } from '@/lib/data';
 import { type DeltaPage, SYNC_META_KEYS, type SyncedMemoirData, SyncedQuickLogProvider, SyncEngineProvider } from '@/lib/sync';
 
-import { renderScreen, renderWithQuery } from './harness';
+import { createMemoirTestData, renderScreen, renderWithQuery } from './harness';
 import { withTimeZone } from './setup';
 import { createSyncedTestData, createTestEngine, type FakeServer, rejected, sharedBacking, type TestEngine, type TestEngineOptions } from './sync-harness';
 
@@ -1005,6 +1006,33 @@ describe('synced quick-log provider', () => {
     expect(view.ninetyDayStartKg).toBe(80);
     expect(view.sevenDayAverageKg).toBeCloseTo(78.85);
     expect(view.trendNote).toBe('78.5–80.0 kg');
+  });
+});
+
+describe('linkage offer note', () => {
+  const TODAY = '2026-08-22';
+
+  it('should complete the offered quest only when asked and report the outcome', async () => {
+    const success = vi.spyOn(toast, 'success');
+    const data = createMemoirTestData({ today: TODAY });
+    renderScreen(<LinkageOfferNote offer={{ status: 'offered', questId: 'read-pages', questName: 'Read 20 pages', date: TODAY }} />, { value: data });
+
+    expect((await data.provider.getDay(TODAY)).occurrences.find(item => item.questId === 'read-pages')?.state).toBe('upcoming');
+    fireEvent.click(await screen.findByRole('button', { name: 'Complete Read 20 pages' }));
+
+    await waitFor(() => expect(success).toHaveBeenCalledWith(expect.stringContaining('Read 20 pages'), undefined));
+    expect((await data.provider.getDay(TODAY)).occurrences.find(item => item.questId === 'read-pages')?.state).toBe('completed');
+    vi.restoreAllMocks();
+  });
+
+  it('should name the quest without claiming an undo when the completion is refused', async () => {
+    const warning = vi.spyOn(toast, 'warning');
+    renderScreen(<LinkageOfferNote offer={{ status: 'offered', questId: 'gone', questName: 'Old habit', date: TODAY }} />, { today: TODAY });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Complete Old habit' }));
+
+    await waitFor(() => expect(warning).toHaveBeenCalledWith('Couldn’t complete ‘Old habit’: That quest is no longer in your plan.', undefined));
+    vi.restoreAllMocks();
   });
 });
 

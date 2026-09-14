@@ -10,7 +10,7 @@ import {
   type NotificationSettings,
   type OnboardingStatus,
 } from './account.types';
-import { type CommandHook, legacySettledResult, readSettledResult, useDomainCommand } from './command-runner';
+import { type CommandHandle, readSettledResult, useDomainCommand } from './command-runner';
 import { type SettledCommandResult } from './command.types';
 import { useMemoirData } from './data-context';
 
@@ -73,15 +73,14 @@ export function useOnboardingStatus(): UseQueryResult<OnboardingStatus> {
   return useQuery({ queryKey: accountKeys.onboarding, queryFn: () => account.getOnboarding(), staleTime: ONBOARDING_STALE_MS }, queryClient);
 }
 
-export type AccountCommandHook = CommandHook<AccountCommand, SettledCommandResult, SettledCommandResult>;
+export type AccountCommandHook = CommandHandle<AccountCommand, SettledCommandResult>;
 
 export function useAccountCommand(): AccountCommandHook {
   const { account, queryClient } = useMemoirData();
   return useDomainCommand({
-    queryClient,
     dispatch: command => account.dispatchCommand(command),
     read: readSettledResult,
-    legacy: legacySettledResult,
-    refresh: () => queryClient.invalidateQueries({ queryKey: accountKeys.all }),
+    queryClient,
+    queryKey: accountKeys.all,
   });
 }

@@ -2,4 +2,4 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { RecoveryScreen } from '@/features/hero';
 
-export const Route = createFileRoute('/_account/_app/hero/recovery')({ component: RecoveryScreen });
+export const Route = createFileRoute('/_account/_app/hero/recovery')({ staticData: { title: 'Coming back' }, component: RecoveryScreen });

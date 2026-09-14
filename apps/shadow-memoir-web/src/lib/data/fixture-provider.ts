@@ -64,8 +64,17 @@ const SOFT_CAPACITY_MINUTES = 150;
 /** Track width in multiples of capacity, so overload has room to show instead of clipping at 100%. */
 const LOAD_TRACK_SCALE = 2;
 const PREVIEW_WINDOW_DAYS = 7;
+const DRAFT_QUEST_ID = 'draft';
 const RESCHEDULE_CAP = 2;
 const RECENT_MISS_WINDOW_DAYS = 7;
+
+interface DayLoad {
+  occurrences: QuestOccurrence[];
+  minutes: number;
+  loadPercent: number;
+  capacityMarkPercent: number;
+  overCapacity: boolean;
+}
 
 export interface LogRecord {
   state: OccurrenceState;
@@ -126,6 +135,12 @@ function isScheduled(quest: Quest, date: string): boolean {
 function everyNDaysNote(interval: number, occurrences: number): string {
   const cadence = interval <= 1 ? 'Every day' : `Every ${interval} days`;
   return `${cadence} — ${occurrences} ${occurrences === 1 ? 'time' : 'times'} in the next ${PREVIEW_WINDOW_DAYS} days.`;
+}
+
+function previewDayLabel(date: string, today: string): string {
+  if (date === today) return 'Today';
+  if (date === shiftDate(today, 1)) return 'Tomorrow';
+  return `${WEEKDAY_LABELS[weekdayOf(date)]} ${Number(date.slice(8))}`;
 }
 
 function relativeDayLabel(date: string, today: string): string {
@@ -495,9 +510,22 @@ export class MemoirEngine implements DataProvider {
     return (item.state === 'upcoming' || item.state === 'rescheduled') && date < this.state.today ? 'missed' : item.state;
   }
 
-  private planDay(date: string): PlanDay {
+  private dayLoad(date: string, draft: Quest | null = null): DayLoad {
     const occurrences = this.scheduledOn(date);
-    const minutes = occurrences.reduce((total, item) => total + item.durationMinutes, 0);
+    const scheduled = occurrences.reduce((total, item) => total + item.durationMinutes, 0);
+    const minutes = scheduled + (draft?.active && isScheduled(draft, date) ? draft.durationMinutes : 0);
+    const capacityScale = SOFT_CAPACITY_MINUTES * LOAD_TRACK_SCALE;
+    return {
+      occurrences,
+      minutes,
+      loadPercent: Math.min(100, Math.round((minutes / capacityScale) * 100)),
+      capacityMarkPercent: Math.round((SOFT_CAPACITY_MINUTES / capacityScale) * 100),
+      overCapacity: minutes > SOFT_CAPACITY_MINUTES,
+    };
+  }
+
+  private planDay(date: string): PlanDay {
+    const { occurrences, minutes, loadPercent, capacityMarkPercent, overCapacity } = this.dayLoad(date);
     const items: PlanItem[] = occurrences.map(item => {
       const state = this.effectiveState(item, date);
       return {
@@ -509,15 +537,13 @@ export class MemoirEngine implements DataProvider {
         shielded: this.state.logs.get(item.id)?.shielded ?? false,
       };
     });
-    const capacityScale = SOFT_CAPACITY_MINUTES * LOAD_TRACK_SCALE;
-    const overCapacity = minutes > SOFT_CAPACITY_MINUTES;
 
     return {
       date,
       isToday: date === this.state.today,
       locked: this.state.locks.has(date),
-      loadPercent: Math.min(100, Math.round((minutes / capacityScale) * 100)),
-      capacityMarkPercent: Math.round((SOFT_CAPACITY_MINUTES / capacityScale) * 100),
+      loadPercent,
+      capacityMarkPercent,
       overCapacity,
       loadSummary: `${occurrences.length} quests · about ${formatDuration(minutes)}${overCapacity ? ' · over capacity' : ''}`,
       items,
@@ -590,21 +616,23 @@ export class MemoirEngine implements DataProvider {
   }
 
   async previewDraft(draft: QuestDraft): Promise<QuestDraftPreview> {
-    const draftDays = this.draftWeekdays(draft.recurrence);
-    const days = WEEKDAYS.map(day => {
-      const existing = this.state.quests.filter(quest => quest.active && quest.recurrence.daysOfWeek.includes(day)).reduce((total, quest) => total + quest.durationMinutes, 0);
-      const minutes = existing + (draftDays.includes(day) ? draft.durationMinutes : 0);
-      return { label: WEEKDAY_LABELS[day], minutes, percentOfCapacity: Math.round((minutes / SOFT_CAPACITY_MINUTES) * 100) };
+    const { today } = this.state;
+    const startDate = draft.recurrence.startDate === '' ? today : draft.recurrence.startDate;
+    const quest: Quest = { ...draft, id: DRAFT_QUEST_ID, recurrence: { ...draft.recurrence, startDate }, createdAt: today, updatedAt: today };
+    const from = startDate > today ? startDate : today;
+    const days = Array.from({ length: PREVIEW_WINDOW_DAYS }, (_, index) => {
+      const date = shiftDate(from, index);
+      const { minutes, loadPercent, capacityMarkPercent, overCapacity } = this.dayLoad(date, quest);
+      return { date, label: previewDayLabel(date, today), minutes, loadPercent, capacityMarkPercent, overCapacity };
     });
     const heaviest = days.reduce((worst, day) => (day.minutes > worst.minutes ? day : worst), days[0] as (typeof days)[number]);
 
     return {
       days,
-      cadenceNote: draft.recurrence.frequency === 'daily' ? everyNDaysNote(draft.recurrence.interval, draftDays.length) : null,
-      overloadNote:
-        heaviest.percentOfCapacity > 100
-          ? `${heaviest.label} would be the heaviest day — about ${formatDuration(heaviest.minutes)}, above your usual load. This is a note, not a limit.`
-          : null,
+      cadenceNote: draft.recurrence.frequency === 'daily' ? everyNDaysNote(draft.recurrence.interval, this.draftWeekdays(draft.recurrence).length) : null,
+      overloadNote: heaviest.overCapacity
+        ? `${heaviest.label} would be the heaviest day — about ${formatDuration(heaviest.minutes)}, above your usual load. This is a note, not a limit.`
+        : null,
     };
   }
 

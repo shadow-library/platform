@@ -20,7 +20,7 @@ const STALLED_AFTER_MS = 3_000;
  */
 export const Route = createFileRoute('/login')({
   validateSearch: (search: Record<string, unknown>): LoginSearch => ({ returnTo: safeReturnTo(search.returnTo) }),
-  head: () => ({ meta: [{ title: 'Signing in · Shadow Memoir' }] }),
+  staticData: { title: 'Signing in' },
   component: LoginRedirect,
 });
 

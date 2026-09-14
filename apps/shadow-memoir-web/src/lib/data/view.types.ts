@@ -138,9 +138,13 @@ export interface PlanView {
 }
 
 interface LoadPreviewDay {
+  date: string;
+  /** "Today", "Tomorrow", or the weekday and day of the month ("Mon 24"). */
   label: string;
   minutes: number;
-  percentOfCapacity: number;
+  loadPercent: number;
+  capacityMarkPercent: number;
+  overCapacity: boolean;
 }
 
 export interface QuestDraftPreview {

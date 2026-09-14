@@ -66,13 +66,6 @@ export function occurrenceSupersededCopy(state: OccurrenceState): string {
   return `Another device already recorded it as ${STATE_LABELS[state].toLowerCase()}.`;
 }
 
-export class CommandRefusedError extends Error {
-  constructor(readonly boundary: CommandBoundary) {
-    super(REFUSED_COPY[boundary]);
-    this.name = 'CommandRefusedError';
-  }
-}
-
 export interface OutcomeFeedback {
   /** Shown once the change is applied; an empty string shows nothing. */
   success: string;
@@ -109,6 +102,7 @@ export function outcomeToast(outcome: SettledOutcome, feedback: OutcomeFeedback)
       return { intent: 'neutral', title, ...(feedback.success ? { body: feedback.success } : {}) };
     }
     case 'rejected':
+      return { intent: 'warning', title: couldNot(feedback.action, feedback.subject, outcome.message, outcome.undone) };
     case 'refused':
       return { intent: 'warning', title: couldNot(feedback.action, feedback.subject, outcome.message, true) };
     case 'failed':

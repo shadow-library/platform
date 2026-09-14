@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { Button, Card, SegmentedControl, Skeleton, Statistic } from '@shadow-library/ui';
 
@@ -6,14 +6,27 @@ import { DataState } from '@/components/DataState';
 import { Screen, screenStyles } from '@/components/ScreenLayout';
 import { type Bar, type InsightKpi, type InsightPeriod, type InsightsView, type TrendSeries, useInsights } from '@/lib/data';
 
+import { validateInsightsSearch } from './insights.search';
 import styles from './insights.module.css';
+
+export * from './insights.search';
 
 export const PLOT_HEIGHT = 148;
 const MAX_SPARK_POINTS = 60;
+const DEFAULT_PERIOD: InsightPeriod = '90';
+
+const ASK_ABOUT_PERIOD: Record<InsightPeriod, string> = {
+  '30': 'Looking at my last 30 days against the 30 before them, what stands out, and what would be worth changing?',
+  '90': 'Looking at my last 90 days against the 90 before them, what stands out, and what would be worth changing?',
+  '365': 'Looking at my last year, what stands out, and what would be worth changing?',
+};
 
 export function InsightsScreen(): ReactElement {
-  const [period, setPeriod] = useState<InsightPeriod>('90');
+  const search = useSearch({ strict: false });
+  const { period = DEFAULT_PERIOD } = validateInsightsSearch(search);
+  const navigate = useNavigate();
   const insights = useInsights(period);
+  const setPeriod = (next: InsightPeriod): void => void navigate({ to: '/insights', search: { period: next }, replace: true });
 
   return (
     <Screen title="Insights" subtitle="Your history against itself. There are no leaderboards, no percentile ranks and no comparison with anyone else.">
@@ -28,7 +41,9 @@ export function InsightsScreen(): ReactElement {
         </span>
         <span className={styles.toolbarEnd}>
           <Button size="sm" variant="ghost" asChild>
-            <Link to="/ai">Ask the coach about this</Link>
+            <Link to="/ai" search={{ ask: ASK_ABOUT_PERIOD[period] }}>
+              Ask the coach about this
+            </Link>
           </Button>
         </span>
       </div>

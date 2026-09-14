@@ -1,7 +1,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-import { occurrenceSupersededCopy, refusedCopy } from './command-feedback';
-import { type CommandHook, type LocalReading, useDomainCommand } from './command-runner';
+import { occurrenceSupersededCopy } from './command-feedback';
+import { type CommandHandle, type LocalReading, useDomainCommand } from './command-runner';
 import { type Command, type CommandConfirmation, type CommandOutcome, type CommandResult } from './command.types';
 import { type DataProvider, type PlanRange, type QuestFilter } from './data-provider';
 import { useMemoirData } from './data-context';
@@ -58,17 +58,12 @@ export function useOccurrenceSearch(query: string, date?: string): UseQueryResul
   return useQuery({ queryKey: memoirKeys.occurrences(query, day), queryFn: () => provider.findOccurrences(query, day), enabled: query.trim().length > 0 }, queryClient);
 }
 
-export type QuestCommandHook = CommandHook<Command, CommandResult, CommandOutcome, CommandConfirmation>;
+export type QuestCommandHook = CommandHandle<Command, CommandOutcome, CommandConfirmation>;
 
 function readQuestResult(result: CommandResult): LocalReading<CommandOutcome, CommandConfirmation> {
   if (result.status === 'needs-confirmation') return { kind: 'confirm', confirmation: result };
   if (result.status === 'rejected') return { kind: 'rejected', message: result.message, error: result.error };
   return { kind: 'done', local: result, delivery: result.delivery, xpAwarded: result.xpAwarded, coinsAwarded: result.coinsAwarded };
-}
-
-function legacyQuestResult(result: CommandResult): CommandResult {
-  if (result.status === 'needs-confirmation' || result.status === 'rejected' || result.delivery?.status !== 'refused') return result;
-  return { status: 'rejected', message: refusedCopy(result.delivery.boundary) };
 }
 
 /** The server reports which outcome won an occurrence; the mock and older servers leave it to the delta, which has landed by the time a claim settles. */
@@ -83,11 +78,10 @@ async function describeOccurrenceWinner(provider: DataProvider, command: Command
 export function useCommand(): QuestCommandHook {
   const { provider, queryClient } = useMemoirData();
   return useDomainCommand({
-    queryClient,
     dispatch: (command, options) => provider.dispatchCommand(command, options),
     read: readQuestResult,
-    legacy: legacyQuestResult,
-    refresh: () => queryClient.invalidateQueries({ queryKey: memoirKeys.all }),
+    queryClient,
+    queryKey: memoirKeys.all,
     describeSuperseded: (command, result) => describeOccurrenceWinner(provider, command, result),
   });
 }

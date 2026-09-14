@@ -506,13 +506,17 @@ function WeekEffect({ draft }: { draft: QuestDraft }): ReactElement {
           {preview.data?.cadenceNote ? <p className={styles.cardBody}>{preview.data.cadenceNote}</p> : null}
           <ul className={styles.loadList}>
             {(preview.data?.days ?? []).map(day => (
-              <li key={day.label}>
+              <li key={day.date}>
                 <div className={styles.loadHead}>
                   <span>{day.label}</span>
-                  <span className={styles.mono}>{formatDuration(day.minutes)}</span>
+                  <span className={styles.mono}>
+                    {formatDuration(day.minutes)}
+                    {day.overCapacity ? ' · over capacity' : ''}
+                  </span>
                 </div>
                 <div className={styles.loadTrack}>
-                  <span className={styles.loadFill} style={{ width: `${Math.min(100, day.percentOfCapacity)}%` }} />
+                  <span className={styles.loadFill} data-over={day.overCapacity || undefined} style={{ width: `${day.loadPercent}%` }} />
+                  <span className={styles.capacityMark} style={{ left: `${day.capacityMarkPercent}%` }} aria-hidden />
                 </div>
               </li>
             ))}

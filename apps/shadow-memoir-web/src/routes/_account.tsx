@@ -7,6 +7,7 @@ import { StatusPage } from '@/components/StatusPage';
 import { EquippedThemeAccent } from '@/features/hero';
 import { sessionQueryOptions } from '@/lib/apis';
 import { MemoirDataProvider, type OnboardingStatus, useOnboardingStatus } from '@/lib/data';
+import { routeErrorHead } from '@/lib/document-title';
 import { confirmSessionAccount, currentPage, ONBOARDING_PATH, requireSession, routeByOnboarding, seedOnboardingStatus, signInUrl, useSessionGuard } from '@/lib/session';
 import {
   createSyncedMemoirData,
@@ -25,6 +26,7 @@ export const Route = createFileRoute('/_account')({
     const session = await requireSession(context.queryClient, location.href);
     await routeByOnboarding(context.queryClient, session.sub, location.pathname);
   },
+  head: routeErrorHead,
   component: AccountLayout,
 });
 

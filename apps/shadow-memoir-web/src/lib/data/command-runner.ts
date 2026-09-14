@@ -1,4 +1,4 @@
-import { type QueryClient, useMutation, type UseMutationResult } from '@tanstack/react-query';
+import { type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { failureCopy, refusedCopy, rejectionCopy, supersededCopy } from './command-feedback';
@@ -20,12 +20,10 @@ export type LocalReading<TLocal, TConfirm = never> =
   | { kind: 'done'; local: TLocal; delivery?: CommandDelivery; xpAwarded: number; coinsAwarded: number };
 
 export interface DomainCommandSpec<TCommand, TResult, TLocal, TConfirm = never> {
-  queryClient: QueryClient;
   dispatch: (command: TCommand, options?: DispatchOptions) => Promise<TResult>;
   read: (result: TResult) => LocalReading<TLocal, TConfirm>;
-  refresh: () => Promise<unknown>;
-  /** What the `mutate` path resolves with. A domain whose result has no rejection shape throws here instead, so `onSuccess` never announces a change that was undone. */
-  legacy: (result: TResult) => TResult;
+  queryClient: QueryClient;
+  queryKey: QueryKey;
   /** Says what won a superseded command when the server's result does not, for a domain that can read it back from the mirror. */
   describeSuperseded?: (command: TCommand, result: Record<string, unknown>) => Promise<string | null>;
 }
@@ -42,10 +40,6 @@ export interface CommandHandle<TCommand, TLocal, TConfirm = never> {
   /** For item lists: whether a run of this command, or of any command the predicate matches, is in flight. */
   isPendingFor: (match: TCommand | ((command: TCommand) => boolean)) => boolean;
 }
-
-/** `mutate` stays for screens that have not moved to `run`: it resolves on the optimistic apply and leaves outcomes to the net strip's notices. */
-export type CommandHook<TCommand, TResult, TLocal, TConfirm = never> = CommandHandle<TCommand, TLocal, TConfirm> &
-  Pick<UseMutationResult<TResult, Error, TCommand>, 'mutate' | 'mutateAsync'>;
 
 type AnyOutcome<TLocal, TConfirm> = SettledOutcome<TLocal> | OutcomeConfirmation<TConfirm>;
 
@@ -66,11 +60,6 @@ export function readSettledResult(result: SettledCommandResult): LocalReading<Se
   return { kind: 'done', local: result, delivery: result.delivery, xpAwarded: result.xpAwarded, coinsAwarded: result.coinsAwarded };
 }
 
-export function legacySettledResult(result: SettledCommandResult): SettledCommandResult {
-  if (result.status !== 'rejected' && result.delivery?.status === 'refused') return { status: 'rejected', message: refusedCopy(result.delivery.boundary) };
-  return result;
-}
-
 /** The claim is already acknowledged here, so a failed read-back must not lose the outcome. */
 async function describeWinner<TCommand, TResult, TLocal, TConfirm>(
   spec: DomainCommandSpec<TCommand, TResult, TLocal, TConfirm>,
@@ -82,6 +71,12 @@ async function describeWinner<TCommand, TResult, TLocal, TConfirm>(
   } catch {
     return null;
   }
+}
+
+/** Invalidation joins a first fetch already in flight rather than restarting it, and that fetch read the state from before the apply. */
+async function refresh(spec: Pick<DomainCommandSpec<unknown, unknown, unknown>, 'queryClient' | 'queryKey'>): Promise<void> {
+  await spec.queryClient.cancelQueries({ queryKey: spec.queryKey });
+  await spec.queryClient.invalidateQueries({ queryKey: spec.queryKey });
 }
 
 async function toOutcome<TCommand, TResult, TLocal, TConfirm>(
@@ -101,7 +96,7 @@ async function toOutcome<TCommand, TResult, TLocal, TConfirm>(
     case 'unconfirmed':
       return { status: 'queued-offline', local: reading.local, reason: settlement.reason };
     case 'rejected':
-      return { status: 'rejected', message: rejectionCopy(settlement.code, settlement.result), code: settlement.code };
+      return { status: 'rejected', message: rejectionCopy(settlement.code, settlement.result), code: settlement.code, undone: true };
     case 'superseded':
       return { status: 'superseded', message: (await describeWinner(spec, command, settlement.result)) ?? supersededCopy(settlement.result) };
     case 'failed':
@@ -135,11 +130,13 @@ async function settleTicketed<TCommand, TResult, TLocal, TConfirm>(
   ticket: OutcomeTicket | undefined,
 ): Promise<AnyOutcome<TLocal, TConfirm>> {
   const { spec, mounted } = scope;
-  await spec.refresh();
+  await refresh(spec);
   if (reading.kind === 'confirm') return { status: 'needs-confirmation', confirmation: reading.confirmation };
   if (reading.kind === 'rejected') {
     const code = reading.error?.code ?? null;
-    return reading.error?.kind === 'unavailable' ? { status: 'failed', message: reading.message, code, undone: false } : { status: 'rejected', message: reading.message, code };
+    return reading.error?.kind === 'unavailable'
+      ? { status: 'failed', message: reading.message, code, undone: false }
+      : { status: 'rejected', message: reading.message, code, undone: false };
   }
 
   const delivery = reading.delivery ?? { status: 'local' };
@@ -148,7 +145,7 @@ async function settleTicketed<TCommand, TResult, TLocal, TConfirm>(
   if (!ticket) return { status: 'queued-offline', local: reading.local, reason: 'slow' };
 
   const outcome = await toOutcome(spec, command, reading, await awaitTicket(scope as RunScope<unknown, unknown, unknown, unknown>, ticket));
-  await spec.refresh();
+  await refresh(spec);
   return mounted.current ? outcome : UNMOUNTED;
 }
 
@@ -174,8 +171,7 @@ async function settle<TCommand, TResult, TLocal, TConfirm>(scope: RunScope<TComm
 /** In-flight runs are keyed by the command itself, so a double click on a form is a no-op while completing two different quests in a row is not. */
 export function useDomainCommand<TCommand, TResult, TLocal, TConfirm = never>(
   spec: DomainCommandSpec<TCommand, TResult, TLocal, TConfirm>,
-): CommandHook<TCommand, TResult, TLocal, TConfirm> {
-  const mutation = useMutation({ mutationFn: async (command: TCommand) => spec.legacy(await spec.dispatch(command)), onSuccess: () => void spec.refresh() }, spec.queryClient);
+): CommandHandle<TCommand, TLocal, TConfirm> {
   const scope = useRef<RunScope<TCommand, TResult, TLocal, TConfirm>>({ spec, tickets: new Set(), mounted: { current: true } });
   const running = useRef(new Map<string, Promise<AnyOutcome<TLocal, TConfirm>>>());
   const [inFlight, setInFlight] = useState<readonly InFlight<TCommand>[]>([]);
@@ -216,5 +212,5 @@ export function useDomainCommand<TCommand, TResult, TLocal, TConfirm = never>(
     return inFlight.some(item => item.key === key);
   };
 
-  return { run, isPending: inFlight.length > 0 || mutation.isPending, isPendingFor, mutate: mutation.mutate, mutateAsync: mutation.mutateAsync };
+  return { run, isPending: inFlight.length > 0, isPendingFor };
 }

@@ -1,6 +1,6 @@
 import { useMutation, type UseMutationResult, useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-import { type CommandHook, legacySettledResult, readSettledResult, useDomainCommand } from './command-runner';
+import { type CommandHandle, readSettledResult, useDomainCommand } from './command-runner';
 import { type SettledCommandResult } from './command.types';
 import { useMemoirData } from './data-context';
 import { themeAccentKey } from './hero.provider';
@@ -40,15 +40,14 @@ export function useDismissComingBack(): UseMutationResult<void, unknown, void> {
   return useMutation({ mutationFn: () => hero.dismissComingBack(), onSuccess: () => queryClient.invalidateQueries({ queryKey: heroKeys.all }) }, queryClient);
 }
 
-export type HeroCommandHook = CommandHook<HeroCommand, SettledCommandResult, SettledCommandResult>;
+export type HeroCommandHook = CommandHandle<HeroCommand, SettledCommandResult>;
 
 export function useHeroCommand(): HeroCommandHook {
   const { hero, queryClient } = useMemoirData();
   return useDomainCommand({
-    queryClient,
     dispatch: (command, options) => hero.dispatchCommand(command, options),
     read: readSettledResult,
-    legacy: legacySettledResult,
-    refresh: () => queryClient.invalidateQueries({ queryKey: heroKeys.all }),
+    queryClient,
+    queryKey: heroKeys.all,
   });
 }

@@ -1,4 +1,4 @@
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, type RefObject, useState } from 'react';
 import { Alert, Badge, Button, Card, Progress, Skeleton, Spinner, Switch, Textarea } from '@shadow-library/ui';
 
@@ -78,8 +78,11 @@ function AskSkeleton(): ReactElement {
   );
 }
 
+/** Holds the question so a prefill from another screen survives the consent gate giving way to the composer. */
 function CoachLayout({ coach }: { coach: CoachView }): ReactElement {
   const consentCommand = useReflectCommand();
+  const { ask } = useSearch({ strict: false });
+  const [question, setQuestion] = useState(ask ?? '');
   const [selectedResultId, setSelectedResultId] = useState('');
   const result = coach.results.find(candidate => candidate.id === selectedResultId) ?? coach.results[0] ?? null;
   const resultRef = useRevealOnSelect<HTMLDivElement>(selectedResultId, result !== null);
@@ -96,7 +99,7 @@ function CoachLayout({ coach }: { coach: CoachView }): ReactElement {
     >
       {coach.consent.decided ? (
         <>
-          <Composer coach={coach} />
+          <Composer coach={coach} question={question} prefilled={ask !== undefined} onQuestionChange={setQuestion} />
           {coach.active ? <ActiveRequestCard request={coach.active} /> : null}
           {result ? <ResultCard result={result} targetRef={resultRef} /> : null}
         </>
@@ -311,10 +314,16 @@ function QuestionCard({ question, meta, note, disabled = false, pending = false,
   );
 }
 
-function Composer({ coach }: { coach: CoachView }): ReactElement {
+interface ComposerProps {
+  coach: CoachView;
+  question: string;
+  prefilled: boolean;
+  onQuestionChange: (question: string) => void;
+}
+
+function Composer({ coach, question, prefilled, onQuestionChange }: ComposerProps): ReactElement {
   const command = useReflectCommand();
   const navigate = useNavigate();
-  const [question, setQuestion] = useState('');
   const [refusal, setRefusal] = useState<Refusal | null>(null);
 
   const { quota } = coach;
@@ -333,7 +342,8 @@ function Composer({ coach }: { coach: CoachView }): ReactElement {
     const outcome = await command.run({ type: 'ai.submit', question });
     if (outcome.status === 'applied') {
       setRefusal(null);
-      setQuestion('');
+      onQuestionChange('');
+      if (prefilled) void navigate({ to: '/ai', search: {}, replace: true });
       notifyOutcome(outcome, { success: outcome.local.message, action: 'queue the request' });
       return;
     }
@@ -351,7 +361,7 @@ function Composer({ coach }: { coach: CoachView }): ReactElement {
       note={note}
       pending={pending}
       canSubmit={question.trim().length > 0 && !quotaSpent}
-      onQuestionChange={setQuestion}
+      onQuestionChange={onQuestionChange}
       onSubmit={() => void submit()}
     >
       {refusal ? (

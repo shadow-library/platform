@@ -2,4 +2,4 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { SideQuestsScreen } from '@/features/quick-logs';
 
-export const Route = createFileRoute('/_account/_app/log/sidequests')({ component: SideQuestsScreen });
+export const Route = createFileRoute('/_account/_app/log/sidequests')({ staticData: { title: 'Side quests' }, component: SideQuestsScreen });

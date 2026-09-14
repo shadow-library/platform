@@ -2,7 +2,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { PlanningBoardScreen } from '@/features/planning';
-import { MemoirEngine } from '@/lib/data';
+import { formatDuration, MemoirEngine, type QuestDraft, shiftDate } from '@/lib/data';
 import { projectWorldState, SyncedDataProvider } from '@/lib/sync';
 
 import { createMemoirTestData, renderScreen } from './harness';
@@ -12,6 +12,30 @@ const TODAY = '2026-08-22';
 const YESTERDAY = '2026-08-21';
 
 const DAILY_QUEST = { id: 'q1', name: 'Morning run', durationMin: 30, recurrence: { frequency: 'daily' }, active: true };
+
+const MON_TO_SAT_DRAFT: QuestDraft = {
+  name: 'Read 20 pages',
+  notes: null,
+  startTimeMinutes: null,
+  durationMinutes: 25,
+  statAffinity: 'mind',
+  strictness: 'routine',
+  optionalStreakOptIn: false,
+  recurrence: {
+    frequency: 'weekly',
+    interval: 1,
+    daysOfWeek: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
+    dayOfMonth: null,
+    startDate: TODAY,
+    end: { kind: 'never' },
+    exceptions: [],
+  },
+  consequences: [],
+  moduleLink: null,
+  notification: { enabled: false, leadMinutes: 0 },
+  healthThreshold: null,
+  active: true,
+};
 
 describe('planning board (P2-03)', () => {
   it('should mark past days without logs as missed', async () => {
@@ -34,6 +58,40 @@ describe('planning board (P2-03)', () => {
     expect(today?.overCapacity).toBe(true);
     expect(today?.loadPercent).toBeLessThanOrEqual(100);
     expect(today?.loadPercent).toBeGreaterThan(today?.capacityMarkPercent ?? 0);
+  });
+
+  it('should use the same load for the builder preview and the plan', async () => {
+    const mondayQuest = { id: 'q2', name: 'Weekly planning', durationMin: 45, recurrence: { frequency: 'weekly', daysOfWeek: [1] }, active: true };
+    const everyOtherDay: QuestDraft = { ...MON_TO_SAT_DRAFT, name: 'Stretch', recurrence: { ...MON_TO_SAT_DRAFT.recurrence, frequency: 'daily', interval: 2, daysOfWeek: [] } };
+
+    const expectParity = async (draft: QuestDraft, minutes: number[]): Promise<void> => {
+      const engine = new MemoirEngine(projectWorldState({ quests: [DAILY_QUEST, mondayQuest] }, TODAY));
+      const preview = await engine.previewDraft(draft);
+      await engine.dispatchCommand({ type: 'quest.create', draft });
+      const plans = await Promise.all([TODAY, shiftDate(TODAY, 7)].map(anchor => engine.getPlan({ scope: 'week', anchor })));
+      const planDays = plans.flatMap(plan => plan.days);
+
+      expect(preview.days.map(day => day.minutes)).toEqual(minutes);
+      for (const day of preview.days) {
+        const planned = planDays.find(planDay => planDay.date === day.date);
+        expect(planned?.loadSummary).toContain(`about ${formatDuration(day.minutes)}`);
+        expect(planned).toMatchObject({ loadPercent: day.loadPercent, capacityMarkPercent: day.capacityMarkPercent, overCapacity: day.overCapacity });
+      }
+    };
+
+    await expectParity(MON_TO_SAT_DRAFT, [30 + 25, 30, 30 + 45 + 25, 30 + 25, 30 + 25, 30 + 25, 30 + 25]);
+    await expectParity(everyOtherDay, [30 + 25, 30, 30 + 45 + 25, 30, 30 + 25, 30, 30 + 25]);
+  });
+
+  it('should label preview days by date and name the heaviest one the same way', async () => {
+    const deepWork = { ...DAILY_QUEST, name: 'Deep work', durationMin: 90, recurrence: { frequency: 'weekly', daysOfWeek: [2] } };
+    const engine = new MemoirEngine(projectWorldState({ quests: [deepWork] }, TODAY));
+
+    const preview = await engine.previewDraft({ ...MON_TO_SAT_DRAFT, durationMinutes: 90 });
+
+    expect(preview.days.map(day => day.label)).toEqual(['Today', 'Tomorrow', 'Mon 24', 'Tue 25', 'Wed 26', 'Thu 27', 'Fri 28']);
+    expect(preview.days.map(day => day.date)).toEqual(Array.from({ length: 7 }, (_, index) => shiftDate(TODAY, index)));
+    expect(preview.overloadNote).toBe('Tue 25 would be the heaviest day — about 3h, above your usual load. This is a note, not a limit.');
   });
 
   it('should hide carry-over when nothing carried over', async () => {

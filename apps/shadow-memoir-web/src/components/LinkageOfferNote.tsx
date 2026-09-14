@@ -1,7 +1,7 @@
 import { type ReactElement } from 'react';
-import { Alert, toast } from '@shadow-library/ui';
+import { Alert } from '@shadow-library/ui';
 
-import { needsConfirmation, type QuestLinkageOffer, useCommand } from '@/lib/data';
+import { failureCopy, notifyOutcome, type QuestLinkageOffer, useCommand } from '@/lib/data';
 
 export interface LinkageOfferNoteProps {
   offer: QuestLinkageOffer | null | undefined;
@@ -23,19 +23,17 @@ export function LinkageOfferNote({ offer }: LinkageOfferNoteProps): ReactElement
       </Alert>
     );
 
+  const feedback = { action: 'complete', subject: offer.questName };
+  const complete = async (): Promise<void> => {
+    const outcome = await command.run({ type: 'quest.complete', occurrenceId: `${offer.questId}:${offer.date}` }).catch(() => null);
+    if (!outcome) return notifyOutcome({ status: 'failed', message: failureCopy(null), code: null, undone: false }, { ...feedback, success: '' });
+    if (outcome.status === 'needs-confirmation') return;
+    const completed = outcome.status === 'applied' || outcome.status === 'queued-offline';
+    notifyOutcome(outcome, { ...feedback, success: completed ? outcome.local.message : '' });
+  };
+
   return (
-    <Alert
-      intent="success"
-      title={`This could complete “${offer.questName}”`}
-      action={{
-        label: `Complete ${offer.questName}`,
-        onClick: () =>
-          command.mutate(
-            { type: 'quest.complete', occurrenceId: `${offer.questId}:${offer.date}` },
-            { onSuccess: result => void (needsConfirmation(result) || toast.success(result.message)) },
-          ),
-      }}
-    >
+    <Alert intent="success" title={`This could complete “${offer.questName}”`} action={{ label: `Complete ${offer.questName}`, onClick: () => void complete() }}>
       The entry is saved and carries no reward of its own — the quest’s reward is yours to claim, and Shadow Memoir never claims it for you.
     </Alert>
   );

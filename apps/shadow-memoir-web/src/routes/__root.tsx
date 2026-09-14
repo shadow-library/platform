@@ -13,20 +13,21 @@ import AppProvider from '@/components/AppProvider';
 import NotFound from '@/components/NotFound';
 import { PwaLifecycle } from '@/components/PwaLifecycle';
 import RouteError from '@/components/RouteError';
+import { APP_TITLE, titleForMatches } from '@/lib/document-title';
 import '@/styles.css';
 
 interface RouterContext {
   queryClient: QueryClient;
 }
 
-const PWA_HEAD = { manifestUrl: '/manifest.webmanifest', themeColor: '#4f46e5', appleTouchIcon: '/icons/icon.svg', appleTitle: 'Shadow Memoir' };
+const PWA_HEAD = { manifestUrl: '/manifest.webmanifest', themeColor: '#4f46e5', appleTouchIcon: '/icons/icon.svg', appleTitle: APP_TITLE };
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   head: ({ matches }) => ({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1.0, viewport-fit=cover' },
-      { title: matches.some(match => match.globalNotFound) ? 'Not found · Shadow Memoir' : 'Shadow Memoir' },
+      { title: titleForMatches(matches) },
       { name: 'description', content: 'Shadow Memoir — a private self-improvement RPG for your commitments, money, body and thoughts.' },
       // Every screen is behind authentication and there is nothing here to index.
       { name: 'robots', content: 'noindex, nofollow' },

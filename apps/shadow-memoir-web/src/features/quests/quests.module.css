@@ -499,6 +499,20 @@
 }
 
 .loadList .loadTrack {
+  position: relative;
   margin-top: 4px;
   height: 6px;
+}
+
+.loadList .loadFill[data-over] {
+  background: var(--sh-danger-solid);
+  opacity: 0.85;
+}
+
+.capacityMark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--sh-border-strong);
 }

@@ -88,10 +88,11 @@ export function needsConfirmation(result: CommandResult): result is CommandConfi
   return result.status === 'needs-confirmation';
 }
 
+/** `undone` means a change already applied on this device was reverted; false means nothing was applied. */
 export type SettledOutcome<TLocal = unknown> =
   | { status: 'applied'; local: TLocal; xpAwarded: number; coinsAwarded: number }
   | { status: 'queued-offline'; local: TLocal; reason: UnconfirmedReason }
-  | { status: 'rejected'; message: string; code: string | null }
+  | { status: 'rejected'; message: string; code: string | null; undone: boolean }
   | { status: 'superseded'; message: string }
   | { status: 'failed'; message: string; code: string | null; undone: boolean }
   | { status: 'refused'; message: string; boundary: CommandBoundary };

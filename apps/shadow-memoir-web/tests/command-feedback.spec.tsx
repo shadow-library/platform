@@ -14,18 +14,38 @@ import {
   noticeToast,
   notifyOutcome,
   outcomeToast,
+  type QuestDraft,
   refusedCopy,
   rejectionCopy,
   toCommandError,
+  useAccountCommand,
+  useCommand,
+  useDay,
   useFinanceCommand,
 } from '@/lib/data';
 import { type SyncedMemoirData, SyncEngineProvider } from '@/lib/sync';
 
-import { renderScreen } from './harness';
+import { createMemoirTestData, renderScreen } from './harness';
 import { applied, createSyncedTestData, createTestEngine, type FakeServer, rejected, type TestEngineOptions } from './sync-harness';
 
 const TODAY = '2026-08-24';
 const EXPENSE: FinanceCommand = { type: 'expense.create', draft: { amountText: '4.20', currency: 'EUR', categoryId: 'food', occurredOnDate: TODAY, note: 'coffee' } };
+
+const THRESHOLD_DRAFT: QuestDraft = {
+  name: 'Walk',
+  notes: null,
+  startTimeMinutes: null,
+  durationMinutes: 20,
+  statAffinity: 'body',
+  strictness: 'goal',
+  optionalStreakOptIn: false,
+  recurrence: { frequency: 'weekly', interval: 1, daysOfWeek: ['mon'], dayOfMonth: null, startDate: TODAY, end: { kind: 'never' }, exceptions: [] },
+  consequences: [],
+  moduleLink: null,
+  notification: { enabled: false, leadMinutes: 0 },
+  healthThreshold: { metricKey: 'steps', value: 8000, comparison: 'gte' },
+  active: true,
+};
 
 function setOnline(online: boolean): void {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: online });
@@ -97,9 +117,13 @@ describe('command feedback copy', () => {
     const feedback = { success: 'Evening stretch completed. +8 XP.', action: 'complete', subject: 'Evening stretch' };
 
     expect(outcomeToast({ status: 'applied', local: null, xpAwarded: 8, coinsAwarded: 0 }, feedback)).toEqual({ intent: 'success', title: 'Evening stretch completed. +8 XP.' });
-    expect(outcomeToast({ status: 'rejected', message: 'Entries older than 7 days can’t be changed.', code: 'QST_006' }, feedback)).toEqual({
+    expect(outcomeToast({ status: 'rejected', message: 'Entries older than 7 days can’t be changed.', code: 'QST_006', undone: true }, feedback)).toEqual({
       intent: 'warning',
       title: 'Couldn’t complete ‘Evening stretch’ — undone: Entries older than 7 days can’t be changed.',
+    });
+    expect(outcomeToast({ status: 'rejected', message: 'That setting can’t be changed.', code: 'ACC_004', undone: false }, feedback)).toEqual({
+      intent: 'warning',
+      title: 'Couldn’t complete ‘Evening stretch’: That setting can’t be changed.',
     });
     expect(outcomeToast({ status: 'failed', message: 'Something went wrong on our side.', code: null, undone: true }, feedback)).toEqual({
       intent: 'danger',
@@ -220,9 +244,66 @@ describe('useDomainCommand run', () => {
 
     const outcome = await act(() => result.current.run(EXPENSE));
 
-    expect(outcome).toEqual({ status: 'rejected', message: 'That expense no longer exists.', code: 'FIN_003' });
+    expect(outcome).toEqual({ status: 'rejected', message: 'That expense no longer exists.', code: 'FIN_003', undone: true });
     expect((await data.finance.expenses({ range: 'month', search: '', limit: 8 })).items).toEqual([]);
     expect(engine.getSnapshot().notices).toEqual([]);
+  });
+
+  it('should not claim a request/response rejection was undone', async () => {
+    const warning = vi.spyOn(toast, 'warning');
+    const data = createMemoirTestData({ today: TODAY });
+    vi.spyOn(data.account, 'dispatchCommand').mockResolvedValue({ status: 'rejected', message: 'That setting can’t be changed.', error: { code: 'ACC_004', kind: 'refusal' } });
+    const { result } = renderHook(() => useAccountCommand(), {
+      wrapper: ({ children }: { children: ReactNode }) => <MemoirDataProvider value={data}>{children}</MemoirDataProvider>,
+    });
+
+    const outcome = await act(() => result.current.run({ type: 'day.set', patch: { intensity: 'gentle' } }));
+    notifyOutcome(outcome, { success: '', action: 'change intensity' });
+
+    expect(outcome).toEqual({ status: 'rejected', message: 'That setting can’t be changed.', code: 'ACC_004', undone: false });
+    expect(warning).toHaveBeenCalledWith('Couldn’t change intensity: That setting can’t be changed.', undefined);
+    vi.restoreAllMocks();
+  });
+
+  it('should not claim a quest refused on this device before its apply was undone', async () => {
+    const { engine } = createTestEngine({ today: TODAY });
+    await engine.start();
+    const { result } = renderHook(() => useCommand(), {
+      wrapper: ({ children }: { children: ReactNode }) => <MemoirDataProvider value={createSyncedTestData(engine)}>{children}</MemoirDataProvider>,
+    });
+
+    const outcome = await act(() => result.current.run({ type: 'quest.create', draft: THRESHOLD_DRAFT }));
+    if (outcome.status !== 'rejected') throw new TypeError(`expected a local refusal, got ${outcome.status}`);
+
+    expect(outcome.undone).toBe(false);
+    expect(outcomeToast(outcome, { success: '', action: 'save', subject: 'Walk' })?.title).toBe(`Couldn’t save ‘Walk’: ${outcome.message}`);
+  });
+
+  it('should not keep a first fetch that read the state before a local apply', async () => {
+    const data = createMemoirTestData({ today: TODAY });
+    const readDay = data.provider.getDay.bind(data.provider);
+    let release: () => void = () => undefined;
+    const held = new Promise<void>(resolve => (release = resolve));
+    let reads = 0;
+    vi.spyOn(data.provider, 'getDay').mockImplementation(async date => {
+      reads += 1;
+      const view = await readDay(date);
+      if (reads === 1) await held;
+      return view;
+    });
+    const { result } = renderHook(() => ({ day: useDay(TODAY), command: useCommand() }), {
+      wrapper: ({ children }: { children: ReactNode }) => <MemoirDataProvider value={data}>{children}</MemoirDataProvider>,
+    });
+    await waitFor(() => expect(reads).toBe(1));
+    const occurrence = (await readDay(TODAY)).occurrences.find(item => item.state === 'upcoming');
+    if (!occurrence) throw new TypeError('expected an upcoming occurrence');
+
+    const running = act(() => result.current.command.run({ type: 'quest.complete', occurrenceId: occurrence.id }));
+    release();
+    await running;
+
+    await waitFor(() => expect(result.current.day.data?.occurrences.find(item => item.id === occurrence.id)?.state).toBe('completed'));
+    vi.restoreAllMocks();
   });
 
   it('should resolve as queued-offline straight away while offline', async () => {
