@@ -4,7 +4,7 @@ import { Button, toISODate } from '@shadow-library/ui';
 import { StatusPage } from '@/components/StatusPage';
 import { accountKeys, type MemoirData, memoirKeys, memoirQueryClient, setFinanceProvider, setQuickLogProvider } from '@/lib/data';
 
-import { type AccountMarker, MemoirStore } from './memoir-store';
+import { type AccountMarker, MemoirStore, type UnloadBacking } from './memoir-store';
 import { SyncEngine } from './sync-engine';
 import { SyncedAccountProvider } from './synced-account-provider';
 import { SyncedDataProvider } from './synced-provider';
@@ -55,6 +55,13 @@ const LAST_ACCOUNT_MARKER: AccountMarker = {
   },
 };
 
+const LOCAL_UNLOAD_BACKING: UnloadBacking = {
+  get: key => localStorage.getItem(key),
+  set: (key, value) => localStorage.setItem(key, value),
+  remove: key => localStorage.removeItem(key),
+  keys: () => Object.keys(localStorage),
+};
+
 const SyncEngineContext = createContext<SyncEngine | null>(null);
 
 export function useSyncEngine(): SyncEngine | null {
@@ -95,7 +102,7 @@ export interface SyncedMemoirOptions {
  */
 export function createSyncedMemoirData(options: SyncedMemoirOptions): SyncedMemoirData {
   const today = options.today ?? toISODate(new Date());
-  const store = new MemoirStore(undefined, { accountId: options.accountId, marker: LAST_ACCOUNT_MARKER });
+  const store = new MemoirStore(undefined, { accountId: options.accountId, marker: LAST_ACCOUNT_MARKER, unload: LOCAL_UNLOAD_BACKING });
   const engine = new SyncEngine({ store, today, principal: options.principal, onAccountChanged: options.onAccountChanged });
   const account = new SyncedAccountProvider(engine, options.principal);
   const finance = new SyncedFinanceProvider(engine);

@@ -8,11 +8,11 @@ import { EntryCapNote } from '@/components/EntryCapNote';
 import { LinkageOfferNote } from '@/components/LinkageOfferNote';
 import { HealthMetricsScreen, JournalScreen, MealsScreen, SideQuestsScreen, WeightScreen } from '@/features/quick-logs';
 import { deriveCapAdvisory, FixtureQuickLogProvider, MONTHLY_ENTRY_CAP, setQuickLogProvider, todayISODate } from '@/lib/data';
-import { type DeltaPage, SYNC_META_KEYS, type SyncedMemoirData, SyncedQuickLogProvider, SyncEngineProvider } from '@/lib/sync';
+import { type DeltaPage, type KeyValueBacking, SYNC_META_KEYS, type SyncedMemoirData, SyncedQuickLogProvider, SyncEngineProvider } from '@/lib/sync';
 
 import { createMemoirTestData, renderScreen, renderWithQuery } from './harness';
 import { withTimeZone } from './setup';
-import { createSyncedTestData, createTestEngine, type FakeServer, rejected, sharedBacking, type TestEngine, type TestEngineOptions } from './sync-harness';
+import { createSyncedTestData, createTestEngine, type FakeServer, rejected, sharedBacking, sharedUnload, type TestEngine, type TestEngineOptions } from './sync-harness';
 
 interface Gate {
   open: () => void;
@@ -216,6 +216,15 @@ describe('journal screen', () => {
     expect(await screen.findByText('Mood is optional')).toBeDefined();
   });
 
+  it('should draw the Low mood as a solid outline rather than a dotted ring', async () => {
+    renderWithQuery(<JournalScreen />);
+    const glyphs = within(await screen.findByRole('group', { name: 'Mood' }))
+      .getAllByRole('button')
+      .map(button => button.querySelector('[aria-hidden]')?.textContent);
+
+    expect(glyphs).toEqual(['○', '◍', '◉', '◈', '✦']);
+  });
+
   it('should restore the journal draft after reload', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(`${JOURNAL_TODAY}T12:00:00.000Z`));
@@ -254,6 +263,54 @@ describe('journal screen', () => {
         setQuickLogProvider(new FixtureQuickLogProvider());
       }
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should restore journal edits typed just before a hard unload', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(`${JOURNAL_TODAY}T12:00:00.000Z`));
+    const backing = sharedBacking();
+    const unload = sharedUnload();
+    let unloaded = false;
+    const tab: KeyValueBacking = { ...backing, put: (key, value) => (unloaded ? new Promise<void>(() => undefined) : backing.put(key, value)) };
+
+    try {
+      const first = createTestEngine({ backing: tab, unload, accountId: 'owner-1', today: JOURNAL_TODAY });
+      const firstData = createSyncedTestData(first.engine);
+      setQuickLogProvider(firstData.quickLogs);
+      const { unmount } = renderScreen(
+        <SyncEngineProvider data={firstData}>
+          <JournalScreen />
+        </SyncEngineProvider>,
+        { value: firstData },
+      );
+
+      const editor = await screen.findByLabelText('Journal entry');
+      fireEvent.change(editor, { target: { value: 'Morning pages' } });
+      await waitFor(async () => expect(await first.store.readMeta(SYNC_META_KEYS.journalDraft)).toMatchObject({ text: 'Morning pages' }));
+
+      fireEvent.change(editor, { target: { value: 'Morning pages, and the last line' } });
+      unloaded = true;
+      window.dispatchEvent(new Event('pagehide'));
+      unmount();
+
+      const second = createTestEngine({ backing, unload, accountId: 'owner-1', today: JOURNAL_TODAY });
+      const secondData = createSyncedTestData(second.engine);
+      setQuickLogProvider(secondData.quickLogs);
+      renderScreen(
+        <SyncEngineProvider data={secondData}>
+          <JournalScreen />
+        </SyncEngineProvider>,
+        { value: secondData },
+      );
+
+      const restored = (await screen.findByLabelText('Journal entry')) as HTMLTextAreaElement;
+      await waitFor(() => expect(restored.value).toBe('Morning pages, and the last line'));
+      await waitFor(async () => expect(await second.store.readMeta(SYNC_META_KEYS.journalDraft)).toMatchObject({ text: 'Morning pages, and the last line' }));
+      expect(unload.keys()).toEqual([]);
+    } finally {
+      setQuickLogProvider(new FixtureQuickLogProvider());
       vi.useRealTimers();
     }
   });
@@ -472,6 +529,17 @@ describe('journal screen', () => {
       vi.useRealTimers();
     }
   });
+
+  it('should move focus to today’s entry after dismissing the prompt', async () => {
+    await withSyncedScreen(<JournalScreen />, {}, async () => {
+      const dismiss = await screen.findByRole('button', { name: 'Not today' });
+      dismiss.focus();
+      fireEvent.click(dismiss);
+
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Not today' })).toBeNull());
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: '22 Aug 2026' })));
+    });
+  });
 });
 
 describe('side quests screen', () => {
@@ -537,6 +605,68 @@ describe('meals screen', () => {
     } finally {
       gate.open();
     }
+  });
+
+  it('should ask before logging a preset again right after logging it', async () => {
+    const presets = [{ id: '7', name: 'Office canteen lunch', calories: 720, mealType: 'ate_out', note: null }];
+    await withSyncedScreen(<MealsScreen />, { pages: [deltaPage({ meal_presets: presets })] }, async test => {
+      const logged = (): string[] => test.server.batches.flatMap(batch => batch.types);
+      fireEvent.click(await screen.findByRole('button', { name: 'Office canteen lunch' }));
+      await waitFor(() => expect(logged()).toEqual(['meal.logPreset']));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Office canteen lunch' })).toHaveProperty('disabled', false));
+
+      const chip = screen.getByRole('button', { name: 'Office canteen lunch' });
+      fireEvent.click(chip);
+      await waitFor(() => expect(chip.getAttribute('aria-describedby')).not.toBeNull());
+      expect(chip).toHaveProperty('textContent', 'Office canteen lunch');
+      expect(document.getElementById(chip.getAttribute('aria-describedby') ?? '')?.textContent).toBe('Just logged. Select Office canteen lunch again to log a second one.');
+      await new Promise(resolve => setTimeout(resolve, 450));
+      expect(logged()).toEqual(['meal.logPreset']);
+
+      fireEvent.click(chip);
+      await waitFor(() => expect(logged()).toEqual(['meal.logPreset', 'meal.logPreset']));
+      expect(chip.getAttribute('aria-describedby')).toBeNull();
+    });
+  });
+
+  it('should explain the repeat confirmation inside the Add meal panel', async () => {
+    const presets = [{ id: '7', name: 'Office canteen lunch', calories: 720, mealType: 'ate_out', note: null }];
+    await withSyncedScreen(<MealsScreen />, { pages: [deltaPage({ meal_presets: presets })] }, async test => {
+      const panelChip = (): HTMLElement => screen.getByRole('button', { name: 'Office canteen lunch · 720 kcal' });
+      fireEvent.click(await screen.findByRole('button', { name: 'Add meal' }));
+      fireEvent.click(panelChip());
+      await waitFor(() => expect(test.server.batches.flatMap(batch => batch.types)).toEqual(['meal.logPreset']));
+      await waitFor(() => expect(screen.queryByRole('heading', { name: 'Add meal' })).toBeNull());
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add meal' }));
+      fireEvent.click(panelChip());
+
+      const form = screen.getByRole('heading', { name: 'Add meal' }).closest('form') as HTMLFormElement;
+      await waitFor(() => expect(panelChip().getAttribute('aria-describedby')).not.toBeNull());
+      const hint = document.getElementById(panelChip().getAttribute('aria-describedby') ?? '');
+      expect(form.contains(hint)).toBe(true);
+      expect(hint?.textContent).toBe('Just logged. Select Office canteen lunch again to log a second one.');
+      expect(hint?.getAttribute('role')).toBeNull();
+      expect(screen.getAllByRole('status').filter(status => status.textContent?.includes('Just logged'))).toHaveLength(1);
+    });
+  });
+
+  it('should not log a preset again when the confirming tap follows the asking tap too quickly', async () => {
+    const presets = [{ id: '7', name: 'Office canteen lunch', calories: 720, mealType: 'ate_out', note: null }];
+    await withSyncedScreen(<MealsScreen />, { pages: [deltaPage({ meal_presets: presets })] }, async test => {
+      const logged = (): string[] => test.server.batches.flatMap(batch => batch.types);
+      fireEvent.click(await screen.findByRole('button', { name: 'Office canteen lunch' }));
+      await waitFor(() => expect(logged()).toEqual(['meal.logPreset']));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Office canteen lunch' })).toHaveProperty('disabled', false));
+
+      const chip = screen.getByRole('button', { name: 'Office canteen lunch' });
+      fireEvent.click(chip);
+      fireEvent.click(chip);
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      expect(logged()).toEqual(['meal.logPreset']);
+      expect(chip.getAttribute('aria-describedby')).not.toBeNull();
+    });
   });
 
   it('should keep preset chips in place after logging one', async () => {
@@ -934,6 +1064,36 @@ describe('synced quick-log provider', () => {
     const view = await quickLogs.journal();
     expect(view.onThisDay).toEqual({ year: 2025, excerpt: 'Written on 2025-08-22' });
     expect(view.moodNote).toBe('Mostly Good across 2 days with a mood.');
+  });
+
+  it('should keep a newer unload backup written while another tab’s draft save is running', async () => {
+    const backing = sharedBacking();
+    const unload = sharedUnload();
+    let release: () => void = () => undefined;
+    const held = new Promise<void>(resolve => (release = resolve));
+    let holding = false;
+    const slowBacking: KeyValueBacking = { ...backing, put: (key, value) => (holding ? held.then(() => backing.put(key, value)) : backing.put(key, value)) };
+    const slowTab = createTestEngine({ backing: slowBacking, unload, accountId: 'owner-1', today: JOURNAL_TODAY });
+    const closingTab = createTestEngine({ backing, unload, accountId: 'owner-1', today: JOURNAL_TODAY });
+    slowTab.store.open();
+    closingTab.store.open();
+    const slow = new SyncedQuickLogProvider(slowTab.engine);
+    const closing = new SyncedQuickLogProvider(closingTab.engine);
+    await slow.readJournalDraft();
+    await closing.readJournalDraft();
+
+    holding = true;
+    const saving = slow.saveJournalDraft('Older text', null);
+    await Promise.resolve();
+    closing.backupJournalDraft('Last words before closing', null);
+    release();
+    await saving;
+
+    const reopenedTab = createTestEngine({ backing, unload, accountId: 'owner-1', today: JOURNAL_TODAY });
+    reopenedTab.store.open();
+    const reopened = new SyncedQuickLogProvider(reopenedTab.engine);
+    expect(await reopened.readJournalDraft()).toMatchObject({ text: 'Last words before closing' });
+    expect(unload.keys()).toEqual([]);
   });
 
   it('should keep an unrelated journal draft when another journal line is saved', async () => {

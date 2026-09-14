@@ -11,7 +11,7 @@ export interface MoodOption {
 }
 
 export const MOODS: MoodOption[] = [
-  { value: 1, label: 'Low', glyph: '◌' },
+  { value: 1, label: 'Low', glyph: '○' },
   { value: 2, label: 'Flat', glyph: '◍' },
   { value: 3, label: 'Steady', glyph: '◉' },
   { value: 4, label: 'Good', glyph: '◈' },

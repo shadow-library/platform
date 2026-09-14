@@ -126,13 +126,30 @@ export interface AccountMarker {
   clear?(): void;
 }
 
+/** Synchronous storage shared by every tab, for what a page unload cannot wait for IndexedDB to write. Any call may throw (quota, blocked storage). */
+export interface UnloadBacking {
+  get(key: string): string | null;
+  set(key: string, value: string): void;
+  remove(key: string): void;
+  keys(): string[];
+}
+
 export interface MemoirStoreOptions {
   /** The signed-in account. A bound store keeps every key under `acct:<URI-encoded accountId>:`; an unbound one (tests) uses the bare layout. */
   accountId?: string;
   marker?: AccountMarker;
+  unload?: UnloadBacking;
+}
+
+export type MetaKey = (typeof SYNC_META_KEYS)[keyof typeof SYNC_META_KEYS];
+
+export interface UnloadCopy {
+  raw: string;
+  value: unknown;
 }
 
 const ACCOUNT_PREFIX = 'acct:';
+const UNLOAD_PREFIX = 'shadow-memoir:unload:';
 
 /**
  * The local mirror: one namespaced record per delta row, the sync metadata (cursor, epoch, device id),
@@ -220,6 +237,7 @@ export class MemoirStore {
   }
 
   private async deleteForeign(keys: string[]): Promise<void> {
+    this.removeUnloadCopies(key => key.startsWith(`${UNLOAD_PREFIX}${ACCOUNT_PREFIX}`) && !key.startsWith(`${UNLOAD_PREFIX}${this.scope}`));
     for (const key of keys) if (key.startsWith(ACCOUNT_PREFIX) && !key.startsWith(this.scope)) await this.guard().delete(key);
   }
 
@@ -232,6 +250,7 @@ export class MemoirStore {
   /** Deletes this account's keys (device id kept) in place rather than dropping the whole database, which blocks on any other tab's connection. */
   async wipeAccount(): Promise<void> {
     if (this.accountId === undefined) return;
+    this.removeUnloadCopies(key => key.startsWith(`${UNLOAD_PREFIX}${this.scope}`));
     await this.writable();
     this.wiping = true;
     try {
@@ -249,12 +268,66 @@ export class MemoirStore {
     return (await (await this.readable()).keys()).filter(key => key.startsWith(scoped));
   }
 
-  async readMeta<T>(key: (typeof SYNC_META_KEYS)[keyof typeof SYNC_META_KEYS]): Promise<T | undefined> {
+  async readMeta<T>(key: MetaKey): Promise<T | undefined> {
     return (await this.readable()).get<T>(`${this.scope}${META_PREFIX}${key}`);
   }
 
-  async writeMeta(key: (typeof SYNC_META_KEYS)[keyof typeof SYNC_META_KEYS], value: unknown): Promise<void> {
+  async writeMeta(key: MetaKey, value: unknown): Promise<void> {
     await (await this.writable()).put(`${this.scope}${META_PREFIX}${key}`, value);
+  }
+
+  writeUnloadMeta(key: MetaKey, value: unknown): void {
+    const unload = this.ownedUnload();
+    if (!unload) return;
+    try {
+      unload.set(this.unloadKey(key), JSON.stringify(value));
+    } catch {
+      return;
+    }
+  }
+
+  readUnloadMeta(key: MetaKey): UnloadCopy | null {
+    const unload = this.ownedUnload();
+    if (!unload) return null;
+    try {
+      const raw = unload.get(this.unloadKey(key));
+      return raw === null ? null : { raw, value: JSON.parse(raw) as unknown };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Removes the copy only while it is still `copy`: another tab may have written a newer one meanwhile. */
+  releaseUnloadMeta(key: MetaKey, copy: UnloadCopy | null): void {
+    const unload = this.options.unload;
+    if (!unload || !copy) return;
+    try {
+      if (unload.get(this.unloadKey(key)) === copy.raw) unload.remove(this.unloadKey(key));
+    } catch {
+      return;
+    }
+  }
+
+  // A cleared marker means another tab signed out or deleted the account, so plaintext must not be written back under it.
+  private ownedUnload(): UnloadBacking | null {
+    const { unload, marker } = this.options;
+    if (!unload || this.closed || this.wiping) return null;
+    if (this.accountId !== undefined && marker && marker.read() !== this.accountId) return null;
+    return unload;
+  }
+
+  private unloadKey(key: MetaKey): string {
+    return `${UNLOAD_PREFIX}${this.scope}${META_PREFIX}${key}`;
+  }
+
+  private removeUnloadCopies(matches: (key: string) => boolean): void {
+    const unload = this.options.unload;
+    if (!unload) return;
+    try {
+      for (const key of unload.keys()) if (matches(key)) unload.remove(key);
+    } catch {
+      return;
+    }
   }
 
   async readDomain(domain: SyncDomain): Promise<DeltaRow[]> {

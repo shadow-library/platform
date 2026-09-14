@@ -17,6 +17,7 @@ import {
   SyncedQuickLogProvider,
   SyncedReflectProvider,
   SyncEngine,
+  type UnloadBacking,
   type WireCommandOutcome,
 } from '@/lib/sync';
 
@@ -141,6 +142,7 @@ export interface TestEngineOptions extends FakeServerOptions {
   principal?: () => Promise<string>;
   onAccountChanged?: () => void;
   marker?: AccountMarker;
+  unload?: UnloadBacking;
   fetchImpl?: (server: FakeServer) => typeof fetch;
   outcomeTimeoutMs?: number;
   maxPages?: number;
@@ -152,9 +154,19 @@ export function sharedMarker(initial: string | null = null): AccountMarker {
   return { read: () => value, write: accountId => void (value = accountId) };
 }
 
+export function sharedUnload(): UnloadBacking {
+  const map = new Map<string, string>();
+  return {
+    get: key => map.get(key) ?? null,
+    set: (key, value) => void map.set(key, value),
+    remove: key => void map.delete(key),
+    keys: () => [...map.keys()],
+  };
+}
+
 export function createTestEngine(options: TestEngineOptions = {}): TestEngine {
   const server = createFakeServer(options);
-  const store = new MemoirStore(options.backing ?? sharedBacking(), { accountId: options.accountId, marker: options.marker });
+  const store = new MemoirStore(options.backing ?? sharedBacking(), { accountId: options.accountId, marker: options.marker, unload: options.unload });
   const fetchImpl = options.fetchImpl?.(server) ?? server.fetchImpl;
   const engine = new SyncEngine({
     store,

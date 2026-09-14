@@ -1,4 +1,4 @@
-import { type ReactElement, useState } from 'react';
+import { type ReactElement, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Alert, Button, Card, EmptyState, Skeleton } from '@shadow-library/ui';
 
 import { DataState } from '@/components/DataState';
@@ -19,8 +19,12 @@ import {
 import { formatCount, formatLocalDate, formatLocalTime } from '@/lib/format';
 
 import { MealEntryPanel } from './meal-entry-panel';
-import { mealLoggedMessage, runQuickLog } from './quick-log-run';
+import { mealLoggedMessage, relogPrompt, runQuickLog } from './quick-log-run';
 import styles from './quick-logs.module.css';
+
+const RELOG_GUARD_MS = 1500;
+const RELOG_CONFIRM_MS = 4000;
+const RELOG_CONFIRM_SETTLE_MS = 400;
 
 export function MealsScreen(): ReactElement {
   const date = todayISODate();
@@ -47,6 +51,11 @@ function inSessionOrder(presets: MealPreset[], order: string[]): MealPreset[] {
   return [...presets].sort((a, b) => rank(a) - rank(b));
 }
 
+interface PresetMoment {
+  presetId: string;
+  at: number;
+}
+
 function MealsContent({ view, date }: { view: MealsView; date: string }): ReactElement {
   const command = useQuickLogCommand();
   const [chipOrder] = useState(() => view.presets.map(preset => preset.id));
@@ -54,13 +63,41 @@ function MealsContent({ view, date }: { view: MealsView; date: string }): ReactE
   const [formOpen, setFormOpen] = useState(false);
   const [advisory, setAdvisory] = useState<EntryCapAdvisory | null>(null);
   const [linkage, setLinkage] = useState<QuestLinkageOffer | null>(null);
+  const [confirmingPreset, setConfirmingPreset] = useState<MealPreset | null>(null);
+  const lastPresetLogRef = useRef<PresetMoment | null>(null);
+  const confirmRef = useRef<PresetMoment | null>(null);
+  const relogStatusId = useId();
+
+  const endConfirm = useCallback((): void => {
+    confirmRef.current = null;
+    setConfirmingPreset(null);
+  }, []);
+
+  useEffect(() => {
+    if (!confirmingPreset) return;
+    const handle = setTimeout(endConfirm, RELOG_CONFIRM_MS);
+    return () => clearTimeout(handle);
+  }, [confirmingPreset, endConfirm]);
 
   const presetsBusy = command.isPendingFor(pending => pending.type === 'meal.logPreset');
   const isLoggingPreset = (presetId: string): boolean => command.isPendingFor(pending => pending.type === 'meal.logPreset' && pending.presetId === presetId);
 
   const logPreset = async (preset: MealPreset): Promise<boolean> => {
+    const now = performance.now();
+    const confirm = confirmRef.current?.presetId === preset.id ? confirmRef.current : null;
+    if (confirm && now - confirm.at < RELOG_CONFIRM_SETTLE_MS) return false;
+
+    const lastLog = lastPresetLogRef.current;
+    if (!confirm && lastLog?.presetId === preset.id && now - lastLog.at < RELOG_GUARD_MS) {
+      confirmRef.current = { presetId: preset.id, at: now };
+      setConfirmingPreset(preset);
+      return false;
+    }
+
+    endConfirm();
     const run = await runQuickLog(command, { type: 'meal.logPreset', presetId: preset.id, date }, { action: 'log', subject: preset.name, success: mealLoggedMessage });
     if (run.kind !== 'saved') return false;
+    lastPresetLogRef.current = { presetId: preset.id, at: performance.now() };
     setAdvisory(run.result.advisory ?? null);
     setLinkage(run.result.linkageOffer ?? null);
     return true;
@@ -106,6 +143,7 @@ function MealsContent({ view, date }: { view: MealsView; date: string }): ReactE
             presets={chipPresets}
             presetsBusy={presetsBusy}
             isLoggingPreset={isLoggingPreset}
+            confirmingPresetId={confirmingPreset?.id ?? null}
             onLogPreset={logPreset}
             onSaved={onPanelSaved}
             onClose={() => setFormOpen(false)}
@@ -168,11 +206,22 @@ function MealsContent({ view, date }: { view: MealsView; date: string }): ReactE
                 </ul>
                 <div className={styles.presetChips} style={{ marginTop: 12 }}>
                   {chipPresets.slice(0, 4).map(preset => (
-                    <Button key={preset.id} size="sm" variant="secondary" loading={isLoggingPreset(preset.id)} disabled={presetsBusy} onClick={() => void logPreset(preset)}>
+                    <Button
+                      key={preset.id}
+                      size="sm"
+                      variant={confirmingPreset?.id === preset.id ? 'primary' : 'secondary'}
+                      aria-describedby={confirmingPreset?.id === preset.id ? relogStatusId : undefined}
+                      loading={isLoggingPreset(preset.id)}
+                      disabled={presetsBusy}
+                      onClick={() => void logPreset(preset)}
+                    >
                       {preset.name}
                     </Button>
                   ))}
                 </div>
+                <p id={relogStatusId} className={styles.hint} role="status" style={confirmingPreset ? { marginTop: 10 } : undefined}>
+                  {confirmingPreset && relogPrompt(confirmingPreset.name)}
+                </p>
                 <p className={styles.hint} style={{ marginTop: 10 }}>
                   A logged meal keeps the numbers it was logged with. Editing a preset later never changes a past meal.
                 </p>

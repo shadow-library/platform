@@ -54,6 +54,8 @@ export interface QuickLogProvider {
   readJournalDraft(): Promise<{ date: string; text: string; mood: MoodValence | null } | null>;
   saveJournalDraft(text: string, mood: MoodValence | null): Promise<void>;
   clearJournalDraft(): Promise<void>;
+  /** Synchronously keeps edits a page unload would abandon mid-`saveJournalDraft`; the next `readJournalDraft` prefers them. Empty `text` records a cleared editor. */
+  backupJournalDraft(text: string, mood: MoodValence | null): void;
 }
 
 function today(): string {
@@ -391,6 +393,10 @@ export class FixtureQuickLogProvider implements QuickLogProvider {
 
   async clearJournalDraft(): Promise<void> {
     this.draft = null;
+  }
+
+  backupJournalDraft(text: string, mood: MoodValence | null): void {
+    this.draft = text.trim() ? { date: today(), text, mood } : null;
   }
 }
 

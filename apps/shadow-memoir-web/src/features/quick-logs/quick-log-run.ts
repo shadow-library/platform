@@ -21,6 +21,10 @@ export async function runQuickLog(command: QuickLogCommandHook, input: QuickLogC
   return saved ? { kind: 'saved', result: outcome.local } : { kind: 'unsaved' };
 }
 
+export function relogPrompt(presetName: string): string {
+  return `Just logged. Select ${presetName} again to log a second one.`;
+}
+
 export function mealLoggedMessage(result: QuickLogCommandResult): string {
   return result.reward?.rewarded ? `${result.message} First meal today — +${result.reward.xp} XP.` : result.message;
 }

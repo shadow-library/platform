@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { type AccountMarker, type KeyValueBacking, MemoirStore } from '@/lib/sync';
+import { type AccountMarker, type KeyValueBacking, MemoirStore, SYNC_META_KEYS } from '@/lib/sync';
 
-import { sharedBacking } from './sync-harness';
+import { sharedBacking, sharedUnload } from './sync-harness';
 
 interface TestMarker extends AccountMarker {
   value: string | null;
@@ -149,5 +149,87 @@ describe('MemoirStore wipeAccount', () => {
     await tabA.wipeAccount();
 
     expect(await tabB.readDomain('quests')).toEqual([]);
+  });
+});
+
+describe('MemoirStore unload copies', () => {
+  const DRAFT = SYNC_META_KEYS.journalDraft;
+
+  it('should remove this account’s copy when the account is wiped', async () => {
+    const unload = sharedUnload();
+    const owner = marker();
+    const store = new MemoirStore(sharedBacking(), { accountId: 'acct-a', marker: owner, unload });
+    store.open();
+    await store.readMeta(DRAFT);
+    store.writeUnloadMeta(DRAFT, { text: 'private' });
+
+    await store.wipeAccount();
+
+    expect(unload.keys()).toEqual([]);
+  });
+
+  it('should remove the copy even when the wipe cannot reach IndexedDB', async () => {
+    const unload = sharedUnload();
+    const owner = marker();
+    const backing = sharedBacking();
+    const store = new MemoirStore(backing, { accountId: 'acct-a', marker: owner, unload });
+    store.open();
+    await store.readMeta(DRAFT);
+    store.writeUnloadMeta(DRAFT, { text: 'private' });
+    const broken = new MemoirStore({ ...backing, keys: () => Promise.reject(new TypeError('storage unavailable')) }, { accountId: 'acct-a', marker: owner, unload });
+    broken.open();
+
+    await expect(broken.wipeAccount()).rejects.toThrow('storage unavailable');
+    expect(unload.keys()).toEqual([]);
+  });
+
+  it('should remove another account’s copy when this account claims the store', async () => {
+    const unload = sharedUnload();
+    const owner = marker();
+    const backing = sharedBacking();
+    const previous = new MemoirStore(backing, { accountId: 'acct-a', marker: owner, unload });
+    previous.open();
+    await previous.readMeta(DRAFT);
+    previous.writeUnloadMeta(DRAFT, { text: 'private' });
+
+    const next = new MemoirStore(backing, { accountId: 'acct-b', marker: owner, unload });
+    next.open();
+    await next.readMeta(DRAFT);
+
+    expect(unload.keys()).toEqual([]);
+  });
+
+  it('should refuse a stale tab’s copy after another tab switches account', async () => {
+    const unload = sharedUnload();
+    const owner = marker();
+    const backing = sharedBacking();
+    const stale = new MemoirStore(backing, { accountId: 'acct-a', marker: owner, unload });
+    stale.open();
+    await stale.readMeta(DRAFT);
+    const next = new MemoirStore(backing, { accountId: 'acct-b', marker: owner, unload });
+    next.open();
+    await next.readMeta(DRAFT);
+
+    stale.writeUnloadMeta(DRAFT, { text: 'late' });
+
+    expect(unload.keys()).toEqual([]);
+    expect(stale.readUnloadMeta(DRAFT)).toBeNull();
+  });
+
+  it('should refuse a stale tab’s copy after another tab signs the same account out', async () => {
+    const unload = sharedUnload();
+    const owner = marker();
+    const backing = sharedBacking();
+    const stale = new MemoirStore(backing, { accountId: 'acct-a', marker: owner, unload });
+    const signingOut = new MemoirStore(backing, { accountId: 'acct-a', marker: owner, unload });
+    stale.open();
+    signingOut.open();
+    await stale.readMeta(DRAFT);
+    await signingOut.readMeta(DRAFT);
+
+    await signingOut.wipeAccount();
+    stale.writeUnloadMeta(DRAFT, { text: 'after sign-out' });
+
+    expect(unload.keys()).toEqual([]);
   });
 });

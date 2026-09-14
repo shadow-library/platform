@@ -38,7 +38,7 @@ import {
 } from '@/lib/data';
 
 import { isQuickLogCommand, mintCommandIds } from './command-wire';
-import { ignoreAccountBoundary } from './memoir-store';
+import { ignoreAccountBoundary, type MetaKey, type UnloadCopy } from './memoir-store';
 import { mirroredTier, projectFinanceRows, projectQuickLogRows, type QuickLogRows } from './projection';
 import { type SyncEngine } from './sync-engine';
 import { SYNC_META_KEYS } from './sync.types';
@@ -83,6 +83,12 @@ interface StoredJournalDraft {
   date: string;
   text: string;
   mood: MoodValence | null;
+}
+
+function isStoredJournalDraft(value: unknown): value is StoredJournalDraft {
+  if (typeof value !== 'object' || value === null) return false;
+  const { date, text, mood } = value as Record<string, unknown>;
+  return typeof date === 'string' && typeof text === 'string' && (mood === null || moodOption(mood as MoodValence) !== null);
 }
 
 function toState(rows: QuickLogRows, today: string): SyncedQuickLogState {
@@ -153,7 +159,7 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
   }
 
   // Treats a raced account switch or store wipe as "nothing there" rather than an unhandled rejection.
-  private async readMetaSafe<T>(key: (typeof SYNC_META_KEYS)[keyof typeof SYNC_META_KEYS]): Promise<T | undefined> {
+  private async readMetaSafe<T>(key: MetaKey): Promise<T | undefined> {
     return this.sync.store.readMeta<T>(key).catch(error => {
       ignoreAccountBoundary(error);
       return undefined;
@@ -189,16 +195,33 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
   }
 
   async readJournalDraft(): Promise<{ date: string; text: string; mood: MoodValence | null } | null> {
-    const stored = await this.readMetaSafe<StoredJournalDraft>(SYNC_META_KEYS.journalDraft);
+    const persisted = await this.readMetaSafe<StoredJournalDraft>(SYNC_META_KEYS.journalDraft);
+    const backup = this.sync.store.readUnloadMeta(SYNC_META_KEYS.journalDraft);
+    const stored = backup && isStoredJournalDraft(backup.value) ? await this.adoptDraftBackup(backup, backup.value) : persisted;
     return stored ? { date: stored.date, text: stored.text, mood: stored.mood } : null;
   }
 
   async saveJournalDraft(text: string, mood: MoodValence | null): Promise<void> {
-    await this.sync.store.writeMeta(SYNC_META_KEYS.journalDraft, { date: todayISODate(), text, mood } satisfies StoredJournalDraft).catch(ignoreAccountBoundary);
+    await this.persistJournalDraft({ date: todayISODate(), text, mood }).catch(ignoreAccountBoundary);
   }
 
   async clearJournalDraft(): Promise<void> {
-    await this.sync.store.writeMeta(SYNC_META_KEYS.journalDraft, null).catch(ignoreAccountBoundary);
+    await this.persistJournalDraft(null).catch(ignoreAccountBoundary);
+  }
+
+  backupJournalDraft(text: string, mood: MoodValence | null): void {
+    this.sync.store.writeUnloadMeta(SYNC_META_KEYS.journalDraft, { date: todayISODate(), text, mood } satisfies StoredJournalDraft);
+  }
+
+  private async adoptDraftBackup(copy: UnloadCopy, backup: StoredJournalDraft): Promise<StoredJournalDraft | null> {
+    const draft = backup.text.trim() ? backup : null;
+    await this.persistJournalDraft(draft, copy).catch(ignoreAccountBoundary);
+    return draft;
+  }
+
+  private async persistJournalDraft(draft: StoredJournalDraft | null, copy = this.sync.store.readUnloadMeta(SYNC_META_KEYS.journalDraft)): Promise<void> {
+    await this.sync.store.writeMeta(SYNC_META_KEYS.journalDraft, draft);
+    this.sync.store.releaseUnloadMeta(SYNC_META_KEYS.journalDraft, copy);
   }
 
   async meals(date: string): Promise<MealsView> {

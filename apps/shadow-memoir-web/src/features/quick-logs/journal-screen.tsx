@@ -97,14 +97,23 @@ export function JournalScreen(): ReactElement {
   }, [text, mood, quickLogs]);
 
   useEffect(() => {
+    const unsaved = (): boolean => pendingSaveRef.current === null && dirtyRef.current && hydratedRef.current;
     const flush = (): void => {
-      if (pendingSaveRef.current !== null || !dirtyRef.current) return;
-      if (hydratedRef.current && textRef.current.trim()) void quickLogs.saveJournalDraft(textRef.current, moodRef.current);
+      if (unsaved() && textRef.current.trim()) void quickLogs.saveJournalDraft(textRef.current, moodRef.current);
     };
-    window.addEventListener('pagehide', flush);
+    const flushBeforeUnload = (): void => {
+      if (unsaved()) quickLogs.backupJournalDraft(textRef.current, moodRef.current);
+      flush();
+    };
+    const onVisibilityChange = (): void => {
+      if (document.visibilityState === 'hidden') flushBeforeUnload();
+    };
+    window.addEventListener('pagehide', flushBeforeUnload);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       flush();
-      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('pagehide', flushBeforeUnload);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [quickLogs]);
 
@@ -263,6 +272,15 @@ function JournalContent({
 
   const rowsRef = useRef<HTMLDivElement>(null);
   const previousVisibleCountRef = useRef(visibleCount);
+  const entryHeadingRef = useRef<HTMLHeadingElement>(null);
+  const hasPrompt = view.prompt !== null;
+  const hadPromptRef = useRef(hasPrompt);
+
+  useEffect(() => {
+    const focusDropped = document.activeElement === null || document.activeElement === document.body;
+    if (hadPromptRef.current && !hasPrompt && focusDropped) entryHeadingRef.current?.focus({ preventScroll: true });
+    hadPromptRef.current = hasPrompt;
+  }, [hasPrompt]);
 
   useEffect(() => {
     if (visibleCount > previousVisibleCountRef.current) {
@@ -296,7 +314,9 @@ function JournalContent({
           <Card.Body>
             <div className={styles.cardHead}>
               <div>
-                <h3 className={styles.cardTitle}>{todayISODate()}</h3>
+                <h3 ref={entryHeadingRef} className={styles.cardTitle} tabIndex={-1}>
+                  <time dateTime={todayISODate()}>{formatLocalDate(todayISODate())}</time>
+                </h3>
                 <p className={styles.hint}>{view.draftNote}</p>
                 {draftDate && draftDate !== todayISODate() && <p className={styles.hint}>Draft from {formatLocalDate(draftDate)}</p>}
               </div>

@@ -1,10 +1,10 @@
-import { type FormEvent, type ReactElement, useEffect, useRef, useState } from 'react';
+import { type FormEvent, type ReactElement, useEffect, useId, useRef, useState } from 'react';
 import { Button, Card, FormField, Input, NumberStepper, Select } from '@shadow-library/ui';
 
 import { EntryCapNote } from '@/components/EntryCapNote';
 import { type EntryCapAdvisory, MEAL_TYPE_LABELS, mealCaloriesError, type MealPreset, type MealType, type QuickLogCommandResult, useQuickLogCommand } from '@/lib/data';
 
-import { mealLoggedMessage, runQuickLog } from './quick-log-run';
+import { mealLoggedMessage, relogPrompt, runQuickLog } from './quick-log-run';
 import styles from './quick-logs.module.css';
 
 export interface MealEntryPanelProps {
@@ -12,6 +12,7 @@ export interface MealEntryPanelProps {
   presets: MealPreset[];
   presetsBusy: boolean;
   isLoggingPreset: (presetId: string) => boolean;
+  confirmingPresetId: string | null;
   /** Resolves `true` once the preset's meal is saved or queued. */
   onLogPreset: (preset: MealPreset) => Promise<boolean>;
   onSaved: (result: QuickLogCommandResult) => void;
@@ -22,7 +23,7 @@ export interface MealEntryPanelProps {
  * Calories are typed. There is no commercial food database behind this field (D15), so zero is a legitimate
  * value — water and black coffee are meals a day can contain.
  */
-export function MealEntryPanel({ date, presets, presetsBusy, isLoggingPreset, onLogPreset, onSaved, onClose }: MealEntryPanelProps): ReactElement {
+export function MealEntryPanel({ date, presets, presetsBusy, isLoggingPreset, confirmingPresetId, onLogPreset, onSaved, onClose }: MealEntryPanelProps): ReactElement {
   const command = useQuickLogCommand();
   const panelRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -32,6 +33,9 @@ export function MealEntryPanel({ date, presets, presetsBusy, isLoggingPreset, on
   const [caloriesTouched, setCaloriesTouched] = useState(false);
   const [draftKey, setDraftKey] = useState(0);
   const [advisory, setAdvisory] = useState<EntryCapAdvisory | null>(null);
+
+  const relogHintId = useId();
+  const confirmingPreset = presets.find(preset => preset.id === confirmingPresetId) ?? null;
 
   const caloriesError = caloriesTouched ? mealCaloriesError(calories) : null;
   const saving = command.isPendingFor(pending => pending.type === 'meal.log');
@@ -131,7 +135,8 @@ export function MealEntryPanel({ date, presets, presetsBusy, isLoggingPreset, on
                     key={preset.id}
                     type="button"
                     size="sm"
-                    variant="secondary"
+                    variant={confirmingPresetId === preset.id ? 'primary' : 'secondary'}
+                    aria-describedby={confirmingPresetId === preset.id ? relogHintId : undefined}
                     loading={isLoggingPreset(preset.id)}
                     disabled={presetsBusy}
                     onClick={() => void logPreset(preset)}
@@ -140,6 +145,11 @@ export function MealEntryPanel({ date, presets, presetsBusy, isLoggingPreset, on
                   </Button>
                 ))}
               </div>
+              {confirmingPreset && (
+                <p id={relogHintId} className={styles.hint} style={{ marginTop: 10 }}>
+                  {relogPrompt(confirmingPreset.name)}
+                </p>
+              )}
             </div>
           )}
         </form>
