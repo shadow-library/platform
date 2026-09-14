@@ -1,0 +1,2 @@
+ALTER TABLE "reschedule_events" ADD COLUMN "sync_seq" bigint DEFAULT nextval('sync_seq') NOT NULL;--> statement-breakpoint
+CREATE INDEX "reschedule_events_account_id_sync_seq_idx" ON "reschedule_events" USING btree ("account_id","sync_seq");

@@ -41,6 +41,7 @@ function progress(partial: Partial<QuestProgress>): QuestProgress {
     xpEarned: 0,
     reschedulesUsed: 0,
     rescheduleCap: 2,
+    rescheduledDates: [],
     recentOutcomes: outcomes(['completed']),
     ...partial,
   };
@@ -343,7 +344,10 @@ export function seed(today: string, persona: Persona): SeedResult {
   const seeds = persona === 'new' ? [] : persona === 'recovery' ? RECOVERY_SEEDS : [...ACTIVE_SEEDS, ...INACTIVE_SEEDS];
   const quests = seeds.map(item => toQuest(item, today));
   const questProgress: Record<string, QuestProgress> = {};
-  for (const item of seeds) questProgress[item.id] = item.progress;
+  for (const item of seeds) {
+    const rescheduledDates = Array.from({ length: item.progress.reschedulesUsed }, (_, index) => shiftDate(today, -(index + 1)));
+    questProgress[item.id] = { ...item.progress, rescheduledDates };
+  }
 
   return {
     quests,

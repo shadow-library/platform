@@ -129,6 +129,7 @@ export class QuestCommandsService implements OnModuleInit {
     this.deltaRegistry.register(this.keysetSource('quests', schema.quests));
     this.deltaRegistry.register({ domain: 'quest_logs', kind: 'keyset', fetch: ({ since, limit }) => this.questLogRepository.fetchDeltaSince(since, limit) });
     this.deltaRegistry.register(this.keysetSource('quest_streaks', schema.questStreaks));
+    this.deltaRegistry.register(this.keysetSource('reschedule_events', schema.rescheduleEvents));
   }
 
   private keysetSource(domain: string, table: Parameters<DeltaRepository['fetchSince']>[0]): KeysetDeltaSource {

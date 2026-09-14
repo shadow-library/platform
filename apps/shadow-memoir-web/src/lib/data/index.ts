@@ -20,6 +20,7 @@ export * from './hero.queries';
 export * from './hero.types';
 export * from './labels';
 export * from './queries';
+export * from './quest.rules';
 export * from './quest.types';
 export * from './quick-logs.provider';
 export * from './quick-logs.queries';

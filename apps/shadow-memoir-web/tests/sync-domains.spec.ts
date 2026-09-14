@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { formatShortDate } from '@/lib/data';
 import { type DeltaPage, SyncedAccountProvider, SyncedDataProvider, SyncedFinanceProvider, SyncedHeroProvider, SyncedQuickLogProvider, SyncedReflectProvider } from '@/lib/sync';
 
 import { withTimeZone } from './setup';
@@ -478,55 +479,45 @@ function noStreakPage(): DeltaPage {
   return page;
 }
 
-const RESCHEDULE_QUEST_ROW = { id: '21', name: 'Read pages', statAffinity: 'mind', strictness: 'goal', durationMin: 20, active: true, recurrence: {}, syncSeq: '40' };
+const RESCHEDULE_QUEST_ROW = {
+  id: '21',
+  name: 'Strength session',
+  statAffinity: 'body',
+  strictness: 'anchor',
+  startTimeMin: 1080,
+  durationMin: 50,
+  active: true,
+  recurrence: {},
+  syncSeq: '40',
+};
 
-const RESCHEDULE_LOG_ROWS = [
-  {
-    id: '400',
-    questId: '21',
-    date: '2026-08-10',
-    state: 'rescheduled',
-    xpAwarded: 0,
-    coinsAwarded: 0,
-    statAffinity: 'mind',
-    strictness: 'goal',
-    rescheduledToMin: 1200,
-    syncSeq: '41',
-  },
-  {
-    id: '401',
-    questId: '21',
-    date: '2026-08-19',
-    state: 'rescheduled',
-    xpAwarded: 0,
-    coinsAwarded: 0,
-    statAffinity: 'mind',
-    strictness: 'goal',
-    rescheduledToMin: 1200,
-    syncSeq: '42',
-  },
-  { id: '402', questId: '21', date: TODAY, state: 'rescheduled', xpAwarded: 0, coinsAwarded: 0, statAffinity: 'mind', strictness: 'goal', rescheduledToMin: 1300, syncSeq: '43' },
-  {
-    id: '403',
-    questId: '21',
-    date: '2026-08-26',
-    state: 'rescheduled',
-    xpAwarded: 0,
-    coinsAwarded: 0,
-    statAffinity: 'mind',
-    strictness: 'goal',
-    rescheduledToMin: 900,
-    syncSeq: '45',
-  },
-];
+function rescheduleEvent(id: string, date: string): Record<string, unknown> {
+  return { id, accountId: '1', questId: '21', date, fromMin: 1080, toMin: 1140, reasonTag: null, reasonNote: null, createdAt: `${date}T06:00:00.000Z`, syncSeq: id };
+}
 
-const RESCHEDULE_STREAK_ROW = { questId: '21', currentRunDays: 0, bestRunDays: 0, shieldsAvailable: 0, syncSeq: '44' };
+function rescheduleLog(id: string, date: string, state: string): Record<string, unknown> {
+  return {
+    id,
+    questId: '21',
+    date,
+    state,
+    xpAwarded: state === 'completed' ? 12 : 0,
+    coinsAwarded: 0,
+    statAffinity: 'body',
+    strictness: 'anchor',
+    rescheduledToMin: null,
+    syncSeq: id,
+  };
+}
 
-function reschedulePage(): DeltaPage {
+const RESCHEDULE_STREAK_ROW = { questId: '21', currentRunDays: 0, bestRunDays: 0, shieldsAvailable: 0, syncSeq: '39' };
+
+function reschedulePage(events: Record<string, unknown>[], logs: Record<string, unknown>[] = []): DeltaPage {
   const page = fullPage();
   page.domains['quests'] = [RESCHEDULE_QUEST_ROW];
-  page.domains['quest_logs'] = RESCHEDULE_LOG_ROWS;
+  page.domains['quest_logs'] = logs;
   page.domains['quest_streaks'] = [RESCHEDULE_STREAK_ROW];
+  page.domains['reschedule_events'] = events;
   return page;
 }
 
@@ -724,11 +715,63 @@ describe('FE-8 quest statistics', () => {
     expect(detail.progress.adherence30d).toBeCloseTo(2 / 3);
   });
 
-  it('should count reschedules in the rolling seven days', async () => {
-    const { engine } = await started(reschedulePage());
+  it('should keep counting a reschedule after the occurrence is completed', async () => {
+    const { engine } = await started(
+      reschedulePage([rescheduleEvent('41', '2026-08-19'), rescheduleEvent('42', TODAY)], [rescheduleLog('50', '2026-08-19', 'completed'), rescheduleLog('51', TODAY, 'late')]),
+    );
+    const detail = await new SyncedDataProvider(engine).getQuest('21');
+
+    expect(detail.progress.reschedulesUsed).toBe(2);
+  });
+
+  it('should count reschedules of future occurrences in the window', async () => {
+    const events = [rescheduleEvent('41', '2026-08-10'), rescheduleEvent('42', '2026-08-18'), rescheduleEvent('43', '2026-08-26'), rescheduleEvent('44', '2026-09-20')];
+    const { engine } = await started(reschedulePage(events));
     const detail = await new SyncedDataProvider(engine).getQuest('21');
 
     expect(detail.progress.reschedulesUsed).toBe(3);
+    expect(detail.progress.rescheduleCap).toBe(2);
+  });
+
+  it('should anchor the cap confirmation on the rescheduled occurrence', async () => {
+    const { engine } = await started(reschedulePage([rescheduleEvent('41', '2026-08-19'), rescheduleEvent('42', '2026-08-20')]));
+    const provider = new SyncedDataProvider(engine);
+
+    const capped = await provider.dispatchCommand({ type: 'quest.reschedule', occurrenceId: '21:2026-08-25', toMin: 1140 });
+    expect(capped).toMatchObject({ status: 'needs-confirmation', kind: 'reschedule-cap' });
+    expect(capped.status === 'needs-confirmation' && capped.body).toContain(formatShortDate('2026-08-26'));
+
+    const clear = await provider.dispatchCommand({ type: 'quest.reschedule', occurrenceId: '21:2026-08-26', toMin: 1140 });
+    expect(clear.status).toBe('applied');
+    expect((await provider.getQuest('21')).progress.reschedulesUsed).toBe(3);
+  });
+
+  it('should refuse to move the same occurrence twice', async () => {
+    const { engine } = await started(reschedulePage([rescheduleEvent('41', TODAY)], [rescheduleLog('50', TODAY, 'rescheduled')]));
+    const provider = new SyncedDataProvider(engine);
+
+    const repeated = await provider.dispatchCommand({ type: 'quest.reschedule', occurrenceId: `21:${TODAY}`, toMin: 1200 });
+
+    expect(repeated).toMatchObject({ status: 'rejected', message: 'This occurrence has already been moved.' });
+    expect((await provider.getQuest('21')).progress.reschedulesUsed).toBe(1);
+    expect(await engine.outbox.size()).toBe(0);
+  });
+
+  it('should count queued reschedules toward the cap confirmation', async () => {
+    const { engine } = await started(reschedulePage([]));
+    const provider = new SyncedDataProvider(engine);
+    setOnline(false);
+
+    expect((await provider.dispatchCommand({ type: 'quest.reschedule', occurrenceId: `21:${TODAY}`, toMin: 1140 })).status).toBe('applied');
+    expect((await provider.dispatchCommand({ type: 'quest.reschedule', occurrenceId: '21:2026-08-25', toMin: 1140 })).status).toBe('applied');
+    await provider.reproject();
+
+    expect((await provider.getQuest('21')).progress.reschedulesUsed).toBe(2);
+    expect(await provider.dispatchCommand({ type: 'quest.reschedule', occurrenceId: '21:2026-08-26', toMin: 1140 })).toMatchObject({
+      status: 'needs-confirmation',
+      kind: 'reschedule-cap',
+    });
+    expect(await engine.outbox.size()).toBe(2);
   });
 
   it('should mark shielded logs', async () => {

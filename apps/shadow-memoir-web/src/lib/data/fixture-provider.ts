@@ -22,6 +22,7 @@ import {
   weekdayOf,
   WEEKDAYS,
 } from './labels';
+import { RESCHEDULE_WINDOW_DAYS, reschedulesCountedFor } from './quest.rules';
 import {
   type OccurrenceState,
   type Quest,
@@ -577,26 +578,30 @@ export class MemoirEngine implements DataProvider {
   }
 
   private reschedule(occurrenceId: string, toMin: number, acceptBeyondCap: boolean): CommandResult {
-    const [questId] = occurrenceId.split(':') as [string, string];
+    const [questId, date] = occurrenceId.split(':') as [string, string];
     const quest = this.questById(questId);
     if (!quest) return { status: 'rejected', message: 'That quest is no longer in your plan.' };
     const progress = this.state.progress[questId] as QuestProgress;
     const toTime = formatTime(toMin);
+    const counted = reschedulesCountedFor(progress.rescheduledDates, date);
+    const overCap = counted.length >= progress.rescheduleCap;
 
-    if (progress.reschedulesUsed >= progress.rescheduleCap && !acceptBeyondCap)
+    if (overCap && !acceptBeyondCap)
       return {
         status: 'needs-confirmation',
         kind: 'reschedule-cap',
         title: `${progress.rescheduleCap} reschedules used in the last 7 days`,
-        body: `${progress.rescheduleCap} moves a week is the cap on ${STRICTNESS_LABELS[quest.strictness]} quests. Past it a move is recorded as a postpone with a reason instead of disappearing, so the history stays honest either way. The cap frees up on ${shiftDate(this.state.today, 7)}.`,
+        body: `${progress.rescheduleCap} moves a week is the cap on ${STRICTNESS_LABELS[quest.strictness]} quests. Past it a move is recorded as a postpone with a reason instead of disappearing, so the history stays honest either way. The cap frees up for occurrences from ${formatShortDate(shiftDate(counted[counted.length - progress.rescheduleCap] as string, RESCHEDULE_WINDOW_DAYS))}.`,
         confirmLabel: 'Move it anyway',
         cancelLabel: 'Keep the plan',
         command: { type: 'quest.reschedule', occurrenceId, toMin, acceptBeyondCap: true },
       };
 
-    if (progress.reschedulesUsed >= progress.rescheduleCap) return this.resolve(occurrenceId, 'postponed');
+    if (overCap) return this.resolve(occurrenceId, 'postponed');
+    if (progress.rescheduledDates.includes(date)) return { status: 'rejected', message: 'This occurrence has already been moved.' };
 
-    this.state.progress[questId] = { ...progress, reschedulesUsed: progress.reschedulesUsed + 1 };
+    const rescheduledDates = [...progress.rescheduledDates, date];
+    this.state.progress[questId] = { ...progress, rescheduledDates, reschedulesUsed: reschedulesCountedFor(rescheduledDates, this.state.today).length };
     this.state.logs.set(occurrenceId, {
       state: 'rescheduled',
       xpAwarded: 0,
@@ -641,6 +646,7 @@ export class MemoirEngine implements DataProvider {
       xpEarned: 0,
       reschedulesUsed: 0,
       rescheduleCap: RESCHEDULE_CAP,
+      rescheduledDates: [],
       recentOutcomes: [],
     };
     this.syncQuestLock(id, draft.preCommit);

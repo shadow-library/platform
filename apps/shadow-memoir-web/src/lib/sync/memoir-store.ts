@@ -31,6 +31,7 @@ const DOMAIN_KEYS: Record<SyncDomain, (row: DeltaRow) => string> = {
   quest_logs: row => String(row['id']),
   daily_states: row => String(row['date']),
   quest_streaks: row => String(row['questId']),
+  reschedule_events: row => String(row['id']),
   account: () => 'self',
   devices: row => String(row['id']),
   expenses: row => String(row['id']),

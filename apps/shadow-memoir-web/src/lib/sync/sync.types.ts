@@ -7,6 +7,7 @@ export type SyncDomain =
   | 'quest_logs'
   | 'daily_states'
   | 'quest_streaks'
+  | 'reschedule_events'
   | 'account'
   | 'devices'
   | 'expenses'
@@ -37,6 +38,7 @@ export const SYNC_DOMAINS: SyncDomain[] = [
   'quest_logs',
   'daily_states',
   'quest_streaks',
+  'reschedule_events',
   'account',
   'devices',
   'expenses',
@@ -64,7 +66,7 @@ export const SYNC_DOMAINS: SyncDomain[] = [
 ];
 
 /** Domains a server released before them refuses; one that refuses without naming the domain loses all of these for the session. */
-export const NEWER_DOMAINS: SyncDomain[] = ['progress_counters', 'hero_events', 'expense_audits'];
+export const NEWER_DOMAINS: SyncDomain[] = ['progress_counters', 'hero_events', 'expense_audits', 'reschedule_events'];
 
 /**
  * The keyset domains a mirror pulled before coverage was recorded already holds, at row version 1. Every later

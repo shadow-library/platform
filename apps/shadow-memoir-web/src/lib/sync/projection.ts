@@ -38,6 +38,7 @@ import {
   type ReflectQuestLog,
   type ReflectSource,
   type ReminderLead,
+  reschedulesCountedFor,
   shiftDate,
   type SideQuest,
   type StatAffinity,
@@ -195,7 +196,6 @@ function toLogRecord(row: DeltaRow): LogRecord {
 }
 
 const ADHERENCE_WINDOW_DAYS = 30;
-const RESCHEDULE_WINDOW_DAYS = 7;
 const MIN_COUNTED_OCCURRENCES = 3;
 
 function questLogState(row: DeltaRow): QuestLogState {
@@ -210,9 +210,8 @@ function activityTimestamp(row: DeltaRow): string {
   return text(row, 'performedAt') ?? text(row, 'updatedAt') ?? text(row, 'createdAt') ?? '';
 }
 
-function toProgress(row: DeltaRow | undefined, logs: DeltaRow[], today: string, questNames: Map<string, string>): QuestProgress {
+function toProgress(row: DeltaRow | undefined, logs: DeltaRow[], rescheduledDates: string[], today: string, questNames: Map<string, string>): QuestProgress {
   const adherenceSince = shiftDate(today, -(ADHERENCE_WINDOW_DAYS - 1));
-  const rescheduleSince = shiftDate(today, -(RESCHEDULE_WINDOW_DAYS - 1));
   const windowed = logs
     .filter(log => logDate(log) >= adherenceSince && logDate(log) <= today)
     .sort((a, b) => logDate(a).localeCompare(logDate(b)))
@@ -220,7 +219,6 @@ function toProgress(row: DeltaRow | undefined, logs: DeltaRow[], today: string, 
 
   const adherence = adherenceOf(windowed);
   const xpEarned = logs.reduce((total, log) => total + number(log, 'xpAwarded'), 0);
-  const reschedulesUsed = logs.filter(log => text(log, 'state') === 'rescheduled' && logDate(log) >= rescheduleSince).length;
 
   return {
     currentStreakDays: row ? number(row, 'currentRunDays') : 0,
@@ -228,8 +226,9 @@ function toProgress(row: DeltaRow | undefined, logs: DeltaRow[], today: string, 
     shields: row ? number(row, 'shieldsAvailable') : 0,
     adherence30d: adherence.occurrences >= MIN_COUNTED_OCCURRENCES ? adherence.ratio : null,
     xpEarned,
-    reschedulesUsed,
+    reschedulesUsed: reschedulesCountedFor(rescheduledDates, today).length,
     rescheduleCap: 2,
+    rescheduledDates,
     recentOutcomes: windowed.filter(log => !CARRIED_STATES.includes(log.state)).map(log => log.state),
   };
 }
@@ -264,11 +263,18 @@ export function projectWorldState(rows: Partial<DomainRows>, today: string): Mem
     else logsByQuest.set(questId, [row]);
   }
 
+  const rescheduledDatesByQuest = new Map<string, string[]>();
+  for (const row of rows.reschedule_events ?? []) {
+    const questId = String(row['questId']);
+    rescheduledDatesByQuest.set(questId, [...(rescheduledDatesByQuest.get(questId) ?? []), String(row['date'])]);
+  }
+
   const streaksByQuest = new Map<string, DeltaRow>();
   for (const row of rows.quest_streaks ?? []) streaksByQuest.set(String(row['questId']), row);
 
   const progress: Record<string, QuestProgress> = {};
-  for (const quest of quests) progress[quest.id] = toProgress(streaksByQuest.get(quest.id), logsByQuest.get(quest.id) ?? [], today, questNames);
+  for (const quest of quests)
+    progress[quest.id] = toProgress(streaksByQuest.get(quest.id), logsByQuest.get(quest.id) ?? [], rescheduledDatesByQuest.get(quest.id) ?? [], today, questNames);
 
   const logs = new Map<string, LogRecord>();
   for (const row of questLogRows) logs.set(`${String(row['questId'])}:${logDate(row)}`, toLogRecord(row));

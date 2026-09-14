@@ -194,6 +194,7 @@ describe('GET /api/v1/sync/delta and the device registry (T-16)', () => {
         'quest_logs',
         'quest_streaks',
         'quests',
+        'reschedule_events',
         'titles_earned',
       ]);
     });

@@ -36,6 +36,13 @@ interface Outcome {
   error?: { code: string; message: string };
 }
 
+interface DeltaBody {
+  cursor: string;
+  hasMore: boolean;
+  domains: Record<string, Record<string, unknown>[]>;
+  tombstones: { domain: string; recordId: string; syncSeq: string }[];
+}
+
 /** The `quest.create`/`quest.update` wire shape (string dates), not the parsed `RecurrenceRule` `rules` stores — `parseRecurrence` converts between them. */
 function dailyRecurrence(startDate: string, exceptions: string[] = []): Record<string, unknown> {
   return { frequency: 'daily', interval: 1, startDate, end: { kind: 'never' }, exceptions };
@@ -77,6 +84,16 @@ describe('Quest engine commands (T-18)', () => {
       .query({ since: '0' });
     const [account] = await db.select({ id: accounts.id }).from(accounts).where(eq(accounts.identitySub, sub));
     return { token, accountId: account!.id };
+  }
+
+  async function delta(token: string, query: Record<string, string>): Promise<DeltaBody> {
+    const response = await router
+      .mockRequest()
+      .get('/api/v1/sync/delta')
+      .headers({ authorization: `Bearer ${token}` })
+      .query(query);
+    expect(response.statusCode).toBe(200);
+    return response.json() as DeltaBody;
   }
 
   function questPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -440,6 +457,68 @@ describe('Quest engine commands (T-18)', () => {
 
       const events = await db.select().from(rescheduleEvents).where(eq(rescheduleEvents.questId, questId));
       expect(events).toHaveLength(2);
+    });
+
+    it('should serve reschedule events in the delta', async () => {
+      const { token } = await newUser();
+      const questId = await createQuest(token, { strictness: 'anchor', startTimeMinutes: 360, durationMinutes: 30 });
+      const fresh = await delta(token, { since: '0', domains: 'reschedule_events' });
+      expect(fresh.domains['reschedule_events']).toEqual([]);
+
+      const [dateA, dateB] = ['2026-05-01', '2026-05-03'] as const;
+      const reschedules = [
+        envelope(
+          'quest.reschedule',
+          { occurrenceId: occurrence(questId, dateA), toMin: 420, reasonTag: 'schedule_conflict' },
+          { localDate: dateA, performedAt: `${dateA}T05:00:00.000Z` },
+        ),
+        envelope('quest.reschedule', { occurrenceId: occurrence(questId, dateB), toMin: 480 }, { localDate: dateB, performedAt: `${dateB}T05:00:00.000Z` }),
+      ];
+      for (const command of reschedules) expect((await submit([command], token))[0]!.status).toBe('applied');
+
+      const firstPage = await delta(token, { since: '0', domains: 'reschedule_events', limit: '1' });
+      expect(firstPage.hasMore).toBe(true);
+      const secondPage = await delta(token, { since: firstPage.cursor, domains: 'reschedule_events' });
+      const rows = [...firstPage.domains['reschedule_events']!, ...secondPage.domains['reschedule_events']!];
+
+      expect(rows).toEqual([
+        expect.objectContaining({ questId: String(questId), date: dateA, fromMin: 360, toMin: 420, reasonTag: 'schedule_conflict', reasonNote: null, syncSeq: expect.any(String) }),
+        expect.objectContaining({ questId: String(questId), date: dateB, fromMin: 360, toMin: 480, reasonTag: null, reasonNote: null, syncSeq: expect.any(String) }),
+      ]);
+      expect(BigInt(rows[0]!['syncSeq'] as string)).toBeLessThan(BigInt(rows[1]!['syncSeq'] as string));
+    });
+
+    it('should keep serving reschedule events once their occurrences are completed, their logs deleted and the quest deleted', async () => {
+      const { token } = await newUser();
+      const questId = await createQuest(token, { strictness: 'anchor', startTimeMinutes: 360, durationMinutes: 30 });
+      const [dateA, dateB, dateC] = ['2026-06-01', '2026-06-02', '2026-06-03'] as const;
+
+      for (const date of [dateA, dateB]) {
+        const [rescheduled] = await submit(
+          [envelope('quest.reschedule', { occurrenceId: occurrence(questId, date), toMin: 420 }, { localDate: date, performedAt: `${date}T05:00:00.000Z` })],
+          token,
+        );
+        expect(rescheduled!.status).toBe('applied');
+        const [completed] = await submit(
+          [envelope('quest.complete', { occurrenceId: occurrence(questId, date) }, { localDate: date, performedAt: `${date}T07:05:00.000Z` })],
+          token,
+        );
+        expect(completed).toMatchObject({ status: 'applied', result: { state: expect.not.stringMatching('rescheduled') } });
+      }
+
+      const third = await submit(
+        [envelope('quest.reschedule', { occurrenceId: occurrence(questId, dateC), toMin: 420 }, { localDate: dateC, performedAt: `${dateC}T05:00:00.000Z` })],
+        token,
+      );
+      expect(third[0]).toMatchObject({ status: 'rejected', result: { kind: 'reschedule-cap', rescheduleCountInWindow: 2 } });
+
+      expect((await submit([envelope('quest.deleteLog', { occurrenceId: occurrence(questId, dateA) })], token))[0]!.status).toBe('applied');
+      expect((await submit([envelope('quest.delete', { questId: String(questId) })], token))[0]!.status).toBe('applied');
+
+      const body = await delta(token, { since: '0', domains: 'reschedule_events,quest_logs' });
+      expect(body.domains['reschedule_events']!.map(row => row['date'])).toEqual([dateA, dateB]);
+      expect(body.domains['quest_logs']!.map(row => row['date']).filter(date => date === dateA || date === dateB)).toEqual([dateB]);
+      expect(body.tombstones.map(tombstone => tombstone.domain)).toEqual(['quest_logs']);
     });
   });
 

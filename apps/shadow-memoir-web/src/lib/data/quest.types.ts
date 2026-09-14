@@ -101,6 +101,8 @@ export interface QuestProgress {
   xpEarned: number;
   reschedulesUsed: number;
   rescheduleCap: number;
+  /** Occurrence dates this quest was rescheduled on, including ones still queued offline; `reschedulesCountedFor` applies the cap window. */
+  rescheduledDates: string[];
   /** Oldest first, one entry per day over the trailing 30 days. */
   recentOutcomes: OccurrenceState[];
 }

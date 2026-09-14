@@ -49,10 +49,14 @@ export const rescheduleEvents = pgTable(
     reasonTag: reasonTag('reason_tag'),
     reasonNote: varchar('reason_note', { length: 120 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    syncSeq: bigint('sync_seq', { mode: 'bigint' })
+      .notNull()
+      .default(sql`nextval('sync_seq')`),
   },
   t => [
     unique('reschedule_events_account_id_quest_id_date_unique').on(t.accountId, t.questId, t.date),
     index('reschedule_events_account_id_date_idx').on(t.accountId, t.date),
+    index('reschedule_events_account_id_sync_seq_idx').on(t.accountId, t.syncSeq),
     check('reschedule_events_from_min_check', sql`${t.fromMin} BETWEEN 0 AND 1439`),
     check('reschedule_events_to_min_check', sql`${t.toMin} BETWEEN 0 AND 1439`),
   ],

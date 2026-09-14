@@ -254,3 +254,92 @@ describe('expense audit contract (P1-19)', () => {
     expect(await upgraded.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['expense_audits@1', 'expenses@1']);
   });
 });
+
+describe('reschedule events contract (P1-20b)', () => {
+  const QUEST_ID = '104';
+  const DATE = '2026-08-24';
+  const QUEST = { id: QUEST_ID, name: 'Strength session', statAffinity: 'body', strictness: 'anchor', startTimeMin: 1050, durationMin: 50, active: true, recurrence: {} };
+
+  function rescheduleEvent(id: string, date = DATE): Record<string, unknown> {
+    return { id, accountId: '1', questId: QUEST_ID, date, fromMin: 1050, toMin: 1110, reasonTag: null, reasonNote: null, createdAt: `${date}T16:00:00.000Z`, syncSeq: id };
+  }
+
+  function questLog(state: string): Record<string, unknown> {
+    return {
+      id: '20',
+      accountId: '1',
+      questId: QUEST_ID,
+      date: DATE,
+      state,
+      xpAwarded: 0,
+      coinsAwarded: 0,
+      rescheduledToMin: state === 'rescheduled' ? 1110 : null,
+      shielded: false,
+    };
+  }
+
+  function page(cursor: string, domains: DeltaPage['domains'], tombstones: DeltaPage['tombstones'] = []): DeltaPage {
+    return { cursor, hasMore: false, domains, tombstones };
+  }
+
+  function requestedDomains(url: string): string[] {
+    return new URL(decodeURIComponent(url), 'http://memoir.test').searchParams.get('domains')?.split(',') ?? [];
+  }
+
+  it('should keep reschedule events as a watermark domain after their occurrence log is completed and deleted', async () => {
+    expect(SYNC_DOMAINS).toContain('reschedule_events');
+    expect(NEWER_DOMAINS).toContain('reschedule_events');
+    expect(SNAPSHOT_DOMAINS).not.toContain('reschedule_events');
+
+    const backing = sharedBacking();
+    const first = createTestEngine({ backing, pages: [page('11', { quests: [QUEST], quest_logs: [questLog('rescheduled')], reschedule_events: [rescheduleEvent('10')] })] });
+    await first.engine.start();
+
+    const second = createTestEngine({ backing, pages: [page('13', { quest_logs: [questLog('completed')], reschedule_events: [] })] });
+    await second.engine.start();
+    expect(await second.store.readDomain('reschedule_events')).toEqual([expect.objectContaining({ id: '10', questId: QUEST_ID, date: DATE })]);
+
+    const third = createTestEngine({ backing, pages: [page('14', { quest_logs: [], reschedule_events: [] }, [{ domain: 'quest_logs', recordId: '20', syncSeq: '14' }])] });
+    await third.engine.start();
+
+    expect(await third.store.readDomain('quest_logs')).toEqual([]);
+    expect(await third.store.readDomain('reschedule_events')).toEqual([expect.objectContaining({ id: '10' })]);
+    expect(projectWorldState(third.engine.domains(), DATE).progress[QUEST_ID]?.reschedulesUsed).toBe(1);
+  });
+
+  it('should backfill reschedule events from zero once a server starts serving them', async () => {
+    const backing = sharedBacking();
+    const older = createTestEngine({ backing, pages: [page('42', { quest_logs: [questLog('completed')] })] });
+    await older.engine.start();
+    expect(await older.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['quest_logs@2']);
+
+    const upgraded = createTestEngine({
+      backing,
+      pages: [page('43', { quest_logs: [], reschedule_events: [] }), page('12', { reschedule_events: [rescheduleEvent('10'), rescheduleEvent('12', '2026-08-22')] })],
+    });
+    await upgraded.engine.start();
+
+    expect(upgraded.server.deltaRequests[1]).toContain('since=0');
+    expect(requestedDomains(upgraded.server.deltaRequests[1]!)).toEqual(['reschedule_events']);
+    expect(await upgraded.store.readMeta(SYNC_META_KEYS.cursor)).toBe('43');
+    expect((await upgraded.store.readDomain('reschedule_events')).map(row => row['id'])).toEqual(['10', '12']);
+    expect(await upgraded.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['quest_logs@2', 'reschedule_events@1']);
+  });
+
+  it('should backfill reschedule events from zero for a mirror that predates coverage records', async () => {
+    const backing = sharedBacking();
+    const upgraded = createTestEngine({
+      backing,
+      pages: [page('43', { quests: [], reschedule_events: [] }), page('12', { reschedule_events: [rescheduleEvent('10'), rescheduleEvent('12', '2026-08-22')] })],
+    });
+    await upgraded.store.writeMeta(SYNC_META_KEYS.cursor, '42');
+    await upgraded.engine.start();
+
+    expect(upgraded.server.deltaRequests[0]).toContain('since=42');
+    expect(upgraded.server.deltaRequests[1]).toContain('since=0');
+    expect(requestedDomains(upgraded.server.deltaRequests[1]!)).toEqual(['reschedule_events']);
+    expect(await upgraded.store.readMeta(SYNC_META_KEYS.cursor)).toBe('43');
+    expect((await upgraded.store.readDomain('reschedule_events')).map(row => row['id'])).toEqual(['10', '12']);
+    expect(await upgraded.store.readMeta(SYNC_META_KEYS.coveredDomains)).toContain('reschedule_events@1');
+  });
+});
