@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { type ReactElement, useState } from 'react';
 import { toast } from '@shadow-library/ui';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -103,7 +103,7 @@ describe('quick capture routing', () => {
     expect(posted[0]?.payload).toMatchObject({ amountMinor: 1200, currency: 'JPY', categoryId: 'uncat', note: 'ramen' });
   });
 
-  it('should keep the line and report a rejected capture instead of announcing it', async () => {
+  it('should keep the line and report a rejected capture inside the palette rather than over its field', async () => {
     const success = vi.spyOn(toast, 'success');
     const warning = vi.spyOn(toast, 'warning');
     renderSynced(
@@ -115,9 +115,198 @@ describe('quick capture routing', () => {
     await screen.findByText('Food');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    await waitFor(() => expect(warning).toHaveBeenCalledWith(expect.stringContaining('Couldn’t save ‘coffee 4.20’'), undefined));
+    expect((await screen.findByRole('alert')).textContent).toContain('Couldn’t save ‘coffee 4.20’');
+    expect(warning).not.toHaveBeenCalled();
     expect(success).not.toHaveBeenCalled();
     expect((field as HTMLInputElement).value).toBe('coffee 4.20');
+
+    fireEvent.change(field, { target: { value: 'coffee 4.30' } });
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+
+  it('should report a rejection with a toast once the palette no longer shows the line', async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>(resolve => (release = resolve));
+    const warning = vi.spyOn(toast, 'warning');
+    const { posted } = renderSynced(
+      { defaultCurrency: 'EUR', enabledCurrencies: ['EUR'], weekStart: 1 },
+      { held, outcomes: batch => batch.commandIds.map(commandId => rejected(commandId, 'Expense not found', 'FIN_003')) },
+    );
+
+    const field = await type('coffee 4.20');
+    await screen.findByText('Food');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    fireEvent.keyDown(field, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: /Log something/ })).toBeNull());
+
+    release();
+    await waitFor(() => expect(warning).toHaveBeenCalledWith(expect.stringContaining('Couldn’t save ‘coffee 4.20’'), undefined));
+  });
+
+  it('should not silently replace today’s water from quick capture', async () => {
+    const data = createMemoirTestData();
+    const dispatch = vi.spyOn(data.quickLogs, 'dispatchCommand');
+    const success = vi.spyOn(toast, 'success');
+    renderScreen(<OpenCapture />, { value: data });
+
+    await type('2 l');
+    expect(await screen.findByText('Today already has 1.4 l of water. Add 2 l to it, or set it to 2 l? Nothing is saved until you pick.')).toBeDefined();
+    expect(screen.queryByText(/adds to today/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Set today to 2 l \(replaces 1\.4 l\)/ }));
+
+    await waitFor(() => expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'health.save', key: 'water', value: 2000 }), expect.anything()));
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Replaced 1.4 l with 2.0 l.', undefined));
+  });
+
+  it('should add a glass to today’s water when Add is picked', async () => {
+    const data = createMemoirTestData();
+    const dispatch = vi.spyOn(data.quickLogs, 'dispatchCommand');
+    renderScreen(<OpenCapture />, { value: data });
+
+    await type('250 ml');
+    fireEvent.click(await screen.findByRole('button', { name: /Add 250 ml → 1\.65 l/ }));
+
+    await waitFor(() => expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'health.save', key: 'water', value: 1650 }), expect.anything()));
+    const view = await data.quickLogs.health(todayISODate());
+    expect(view.metrics.find(item => item.definition.key === 'water')?.entry?.value).toBe(1650);
+  });
+
+  it('should not save water on Enter before a choice is made', async () => {
+    const data = createMemoirTestData();
+    const dispatch = vi.spyOn(data.quickLogs, 'dispatchCommand');
+    renderScreen(<OpenCapture />, { value: data });
+
+    const field = await type('250 ml');
+    await screen.findByRole('button', { name: /Add 250 ml/ });
+    fireEvent.keyDown(field, { key: 'Enter' });
+
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(document.activeElement?.textContent).toContain('Add 250 ml → 1.65 l');
+    expect(screen.getByRole('group', { name: /Today already has 1\.4 l of water/ })).toBeDefined();
+  });
+
+  it('should not save water on Enter when adding would pass the daily limit', async () => {
+    const data = createMemoirTestData();
+    await data.quickLogs.dispatchCommand({ type: 'health.save', key: 'water', date: todayISODate(), value: 9900 });
+    const dispatch = vi.spyOn(data.quickLogs, 'dispatchCommand');
+    renderScreen(<OpenCapture />, { value: data });
+
+    const field = await type('250 ml');
+    const add = await screen.findByRole('button', { name: /Add 250 ml would pass 10 l/ });
+    expect(add.getAttribute('aria-disabled')).toBe('true');
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(document.activeElement).toBe(add);
+    fireEvent.click(add);
+    fireEvent.keyDown(add, { key: 'Enter' });
+
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('should offer Try again instead of checking forever when today’s health log cannot be read', async () => {
+    const data = createMemoirTestData();
+    const read = data.quickLogs.health.bind(data.quickLogs);
+    vi.spyOn(data.quickLogs, 'health').mockRejectedValueOnce(new Error('mirror unreadable')).mockImplementation(read);
+    renderScreen(<OpenCapture />, { value: data });
+
+    await type('8000 steps');
+    expect(await screen.findByText('Today’s health log couldn’t be read on this device, so this line isn’t saved.')).toBeDefined();
+    expect(screen.queryByText('Checking what’s already logged today…')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByRole('button', { name: 'Save' })).toBeDefined();
+  });
+
+  it('should keep a metric line instead of saving it before the first sync has pulled today’s health log', async () => {
+    let release: () => void = () => undefined;
+    const pulled = new Promise<void>(resolve => (release = resolve));
+    const today = '2026-08-24';
+    const water: DeltaPage = page({
+      account: [{ defaultCurrency: 'EUR', enabledCurrencies: ['EUR'], weekStart: 1 }],
+      metrics: [{ id: '504', name: 'Water', isHealth: true }],
+      metric_entries: [{ id: '1', metricId: '504', date: today, value: '1400', source: 'manual', createdAt: `${today}T17:30:00.000Z` }],
+    });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(`${today}T12:00:00.000Z`));
+    try {
+      const { engine } = createTestEngine({
+        today,
+        pages: [water],
+        fetchImpl: server => async (input, init) => {
+          if (String(input).includes('/sync/delta')) await pulled;
+          return server.fetchImpl(input, init);
+        },
+      });
+      const data = createSyncedTestData(engine);
+      renderScreen(
+        <SyncEngineProvider data={data}>
+          <OpenCapture />
+        </SyncEngineProvider>,
+        { value: data },
+      );
+
+      const field = await type('2 l');
+      expect(await screen.findByText(/Today’s health log hasn’t loaded on this device yet, so this line can’t be saved/)).toBeDefined();
+      expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+      fireEvent.keyDown(field, { key: 'Enter' });
+      expect(await engine.outbox.pending()).toEqual([]);
+      expect((field as HTMLInputElement).value).toBe('2 l');
+
+      await act(async () => release());
+      expect(await screen.findByText(/Today already has 1\.4 l of water/, undefined, { timeout: 3_000 })).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should keep Save available after midnight while the new day’s health read is still loading', { timeout: 10_000 }, async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 7, 22, 23, 59, 59, 900));
+    let release: () => void = () => undefined;
+    const newDayRead = new Promise<void>(resolve => (release = resolve));
+    try {
+      const data = createMemoirTestData({ today: '2026-08-22' });
+      const read = data.quickLogs.health.bind(data.quickLogs);
+      vi.spyOn(data.quickLogs, 'health').mockImplementation(async date => {
+        if (date === '2026-08-23') await newDayRead;
+        return read(date);
+      });
+      renderScreen(<OpenCapture />, { value: data });
+
+      await type('j a thought just before midnight');
+      await screen.findByRole('button', { name: 'Save' });
+      vi.setSystemTime(new Date(2026, 7, 23, 0, 0, 5));
+
+      expect(await screen.findByText(NEW_DAY_NOTICE, undefined, { timeout: 3_000 })).toBeDefined();
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDefined();
+
+      await type('8000 steps');
+      expect(await screen.findByText('Checking what’s already logged today…')).toBeDefined();
+      release();
+      expect(await screen.findByRole('button', { name: 'Save' })).toBeDefined();
+    } finally {
+      release();
+      vi.useRealTimers();
+    }
+  });
+
+  it('should say a quest already completed today is done and save nothing', async () => {
+    const data = createMemoirTestData();
+    await data.provider.dispatchCommand({ type: 'quest.complete', occurrenceId: `journal-line:${todayISODate()}` });
+    const dispatch = vi.spyOn(data.provider, 'dispatchCommand');
+    renderScreen(<OpenCapture />, { value: data });
+
+    const field = await type('done journal a line');
+    expect(await screen.findByText(/“Journal a line” is already completed today, so nothing is saved/)).toBeDefined();
+    expect(screen.queryByText('Quest completion')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    fireEvent.keyDown(field, { key: 'Enter' });
+
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(dispatch).not.toHaveBeenCalled();
   });
 
   it('should not send a second command when the palette is closed and reopened mid-save', async () => {
@@ -180,7 +369,7 @@ describe('quick capture routing', () => {
       expect(await screen.findByText(NEW_DAY_NOTICE)).toBeDefined();
       expect(dispatch).not.toHaveBeenCalled();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
       await waitFor(() => expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'health.save', key: 'steps', date: '2026-08-23' }), expect.anything()));
     } finally {
       vi.useRealTimers();
@@ -200,12 +389,12 @@ describe('quick capture routing', () => {
       vi.setSystemTime(new Date(2026, 7, 23, 0, 0, 5));
 
       expect(await screen.findByText(NEW_DAY_NOTICE, undefined, { timeout: 3_000 })).toBeDefined();
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
       await new Promise(resolve => setTimeout(resolve, 20));
       expect(dispatch).not.toHaveBeenCalled();
       expect(screen.getByText(NEW_DAY_NOTICE)).toBeDefined();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
       await waitFor(() => expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'health.save', key: 'steps', date: '2026-08-23' }), expect.anything()));
       expect(dispatch).toHaveBeenCalledTimes(1);
     } finally {

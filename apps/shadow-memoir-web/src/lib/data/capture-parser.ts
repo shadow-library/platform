@@ -1,8 +1,9 @@
 import { type Command } from './command.types';
 import { formatMinor, parseAmountToMinor } from './finance.rules';
 import { CURRENCIES, type CurrencyCode, type ExpenseCategory, type FinanceCommand } from './finance.types';
-import { lbToKg, toStoredMetricValue, WEIGHT_RANGE_KG } from './quick-logs.rules';
-import { type HealthMetricKey, type QuickLogCommand, type WeightEntry } from './quick-logs.types';
+import { type OccurrenceState } from './quest.types';
+import { lbToKg, toDisplayMetricValue, WEIGHT_RANGE_KG } from './quick-logs.rules';
+import { type HealthMetricEntry, type HealthMetricKey, type QuickLogCommand, type WeightEntry } from './quick-logs.types';
 import { type CaptureTarget } from './view.types';
 
 export type CaptureKind = 'expense' | 'metric' | 'weight' | 'journal' | 'side-quest' | 'quest-action';
@@ -28,17 +29,24 @@ export interface CaptureDraft {
 
 export type CaptureProblem =
   | { kind: 'no-quest' }
+  | { kind: 'quest-resolved'; questName: string; state: OccurrenceState }
   | { kind: 'weight-out-of-range' }
   | { kind: 'sleep-out-of-range' }
+  | { kind: 'water-out-of-range' }
+  | { kind: 'health-unavailable' }
+  | { kind: 'reading-failed'; on: CaptureReadingSource }
   | { kind: 'money-unavailable' }
   | { kind: 'currency-not-enabled'; symbol: string; homeCurrency: CurrencyCode };
 
 export type CaptureParse =
   | { status: 'idle' }
   | { status: 'draft'; draft: CaptureDraft }
-  | { status: 'ambiguous'; candidates: CaptureDraft[] }
-  | { status: 'waiting'; on: 'weight' }
+  | { status: 'ambiguous'; question: string; choices: CaptureChoice[] }
+  | { status: 'waiting'; on: CaptureReadingSource }
   | { status: 'unrecognised'; problem: CaptureProblem };
+
+/** An `unavailable` choice is still listed, so the owner sees why that reading can't be saved. */
+export type CaptureChoice = { status: 'available'; draft: CaptureDraft } | { status: 'unavailable'; kind: CaptureKind; kindLabel: string; summary: string };
 
 export interface CaptureMoney {
   homeCurrency: CurrencyCode;
@@ -46,17 +54,32 @@ export interface CaptureMoney {
   categories: ExpenseCategory[];
 }
 
+export interface CaptureOccurrence extends CaptureTarget {
+  state: OccurrenceState;
+}
+
 export interface CaptureContext {
   date: string;
-  occurrences: CaptureTarget[];
+  occurrences: CaptureOccurrence[];
   /** Null until the account's Money settings are known; an amount is never saved in a guessed currency. */
   money: CaptureMoney | null;
   weight: CaptureWeight;
+  health: CaptureHealth;
 }
 
-export type CaptureWeight = { status: 'loading' } | { status: 'known'; today: WeightEntry | null };
+export type CaptureReadingSource = 'weight' | 'health';
+
+export type CaptureWeight = { status: 'loading' } | { status: 'failed' } | { status: 'known'; today: WeightEntry | null };
+
+/** `unavailable`: the first sync has not landed, so a value already on the server would be neither shown nor addressable. */
+export type CaptureHealth = { status: 'loading' } | { status: 'unavailable' } | { status: 'failed' } | { status: 'known'; today: HealthMetricEntry[] };
 
 export const CAPTURE_SLEEP_MAX_HOURS = 24;
+
+export const CAPTURE_WATER_MAX_LITRES = 10;
+
+const TWO_THINGS = 'That could be two things. Pick one — nothing is saved until you do.';
+const THOUSANDS_GROUPED = /^\d{1,3}(?:[.,]\d{3})+$/;
 
 /**
  * A number is only an amount when it stands on its own: never glued to a letter (`e2e`, `2e5`), never part
@@ -145,13 +168,33 @@ export function captureQuestQuery(raw: string): string {
   return raw.trim().replace(DONE_PREFIX, '');
 }
 
-function matchQuest(query: string, occurrences: CaptureTarget[]): { target: CaptureTarget; match: QuestNameMatch } | null {
-  let best: { target: CaptureTarget; match: QuestNameMatch } | null = null;
+interface QuestMatch {
+  target: CaptureOccurrence;
+  match: QuestNameMatch;
+}
+
+/** `rescheduled` only moves the time, so it can still be completed. */
+function isOpen(state: OccurrenceState): boolean {
+  return state === 'upcoming' || state === 'rescheduled';
+}
+
+function matchScore({ target, match }: QuestMatch): number {
+  return NAME_MATCH_RANK[match] * 2 + (isOpen(target.state) ? 0 : 1);
+}
+
+function matchQuest(query: string, occurrences: CaptureOccurrence[]): QuestMatch | null {
+  let best: QuestMatch | null = null;
   for (const target of occurrences) {
     const match = matchQuestName(query, target.questName);
-    if (match !== null && (best === null || NAME_MATCH_RANK[match] < NAME_MATCH_RANK[best.match])) best = { target, match };
+    if (match === null) continue;
+    const candidate = { target, match };
+    if (best === null || matchScore(candidate) < matchScore(best)) best = candidate;
   }
   return best;
+}
+
+function resolvedQuest(target: CaptureOccurrence): CaptureParse {
+  return { status: 'unrecognised', problem: { kind: 'quest-resolved', questName: target.questName, state: target.state } };
 }
 
 function questDraft(target: CaptureTarget): CaptureDraft {
@@ -200,6 +243,7 @@ function weightParse(value: number, unit: 'kg' | 'lb', context: CaptureContext):
   const kg = unit === 'lb' ? lbToKg(value) : value;
   if (kg < WEIGHT_RANGE_KG.min || kg > WEIGHT_RANGE_KG.max) return { status: 'unrecognised', problem: { kind: 'weight-out-of-range' } };
   if (context.weight.status === 'loading') return { status: 'waiting', on: 'weight' };
+  if (context.weight.status === 'failed') return { status: 'unrecognised', problem: { kind: 'reading-failed', on: 'weight' } };
   const earlier = context.weight.today;
 
   return {
@@ -218,17 +262,95 @@ function weightParse(value: number, unit: 'kg' | 'lb', context: CaptureContext):
   };
 }
 
-function metricDraft(key: HealthMetricKey, label: string, value: number, unit: string, hint: string, date: string): CaptureDraft {
+function formatAmount(value: number, fractionDigits?: number): string {
+  const digits = fractionDigits === undefined ? { maximumFractionDigits: 3 } : { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits };
+  return new Intl.NumberFormat('en-US', digits).format(value);
+}
+
+function typedFractionDigits(typed: string): number {
+  return typed.split(/[.,]/)[1]?.length ?? 0;
+}
+
+interface MetricReading {
+  key: HealthMetricKey;
+  label: string;
+  unit: string;
+  stored: number;
+  /** The value at the precision the owner typed it, so the preview never rounds away what is saved. */
+  shown: string;
+  hint: string;
+}
+
+type TodaysMetric = { status: 'blocked'; parse: CaptureParse } | { status: 'read'; earlier: HealthMetricEntry | null };
+
+function readTodaysMetric(key: HealthMetricKey, context: CaptureContext): TodaysMetric {
+  const { health } = context;
+  if (health.status === 'loading') return { status: 'blocked', parse: { status: 'waiting', on: 'health' } };
+  if (health.status === 'unavailable') return { status: 'blocked', parse: { status: 'unrecognised', problem: { kind: 'health-unavailable' } } };
+  if (health.status === 'failed') return { status: 'blocked', parse: { status: 'unrecognised', problem: { kind: 'reading-failed', on: 'health' } } };
+  return { status: 'read', earlier: health.today.find(entry => entry.key === key && entry.date === context.date) ?? null };
+}
+
+function storedAmount(key: HealthMetricKey, stored: number, unit: string): string {
+  return `${formatAmount(toDisplayMetricValue(key, stored))} ${unit}`;
+}
+
+interface MetricSave {
+  stored: number;
+  fields: CaptureField[];
+  warning: string | null;
+}
+
+function metricDraft({ key, label, hint }: MetricReading, date: string, { stored, fields, warning }: MetricSave): CaptureDraft {
+  return { kind: 'metric', kindLabel: label, hint, warning, fields, action: { domain: 'quick-log', command: { type: 'health.save', key, date, value: stored } } };
+}
+
+/** `health.save` stores the day's value, the same as the Body & health screen, so a line never adds to what is already logged unless the owner picks Add. */
+function replacingDraft(reading: MetricReading, date: string, earlier: HealthMetricEntry | null): CaptureDraft {
+  const { key, label, unit, stored, shown } = reading;
+  const fields = [
+    { label, value: shown, mono: true },
+    { label: 'Date', value: 'Today', guessed: true },
+  ];
+  const warning = earlier
+    ? `Saving sets today’s ${label.toLowerCase()} to ${shown} (was ${storedAmount(key, earlier.value, unit)}). It replaces that value rather than adding to it.`
+    : null;
+  return metricDraft(reading, date, { stored, fields, warning });
+}
+
+function metricParse(reading: MetricReading, context: CaptureContext): CaptureParse {
+  const today = readTodaysMetric(reading.key, context);
+  if (today.status === 'blocked') return today.parse;
+  return { status: 'draft', draft: replacingDraft(reading, context.date, today.earlier) };
+}
+
+function waterParse(amount: string, unit: string, context: CaptureContext): CaptureParse {
+  const inMillilitres = unit.toLowerCase().startsWith('m');
+  const exact = inMillilitres ? (THOUSANDS_GROUPED.test(amount) ? Number(amount.replace(/[.,]/g, '')) : decimal(amount)) : decimal(amount) * 1000;
+  const millilitres = Math.round(exact);
+  if (Math.abs(exact - millilitres) > 1e-6 || millilitres > CAPTURE_WATER_MAX_LITRES * 1000) return { status: 'unrecognised', problem: { kind: 'water-out-of-range' } };
+
+  const shown = inMillilitres ? `${formatAmount(millilitres)} ml` : `${formatAmount(decimal(amount), typedFractionDigits(amount))} l`;
+  const reading: MetricReading = { key: 'water', label: 'Water', unit: 'l', stored: millilitres, shown, hint: 'sets today’s total' };
+  const today = readTodaysMetric('water', context);
+  if (today.status === 'blocked') return today.parse;
+  const { earlier } = today;
+  if (!earlier) return { status: 'draft', draft: replacingDraft(reading, context.date, null) };
+
+  const was = storedAmount('water', earlier.value, 'l');
+  const total = earlier.value + millilitres;
+  const choice = (value: string, stored: number): CaptureChoice => ({
+    status: 'available',
+    draft: metricDraft(reading, context.date, { stored, fields: [{ label: 'Water', value }], warning: null }),
+  });
+  const add: CaptureChoice =
+    total > CAPTURE_WATER_MAX_LITRES * 1000
+      ? { status: 'unavailable', kind: 'metric', kindLabel: 'Water', summary: `Add ${shown} would pass ${CAPTURE_WATER_MAX_LITRES} l` }
+      : choice(`Add ${shown} → ${storedAmount('water', total, 'l')}`, total);
   return {
-    kind: 'metric',
-    kindLabel: label,
-    hint,
-    warning: null,
-    fields: [
-      { label, value: `${value} ${unit}`, mono: true },
-      { label: 'Date', value: 'Today', guessed: true },
-    ],
-    action: { domain: 'quick-log', command: { type: 'health.save', key, date, value: toStoredMetricValue(key, value) } },
+    status: 'ambiguous',
+    question: `Today already has ${was} of water. Add ${shown} to it, or set it to ${shown}? Nothing is saved until you pick.`,
+    choices: [add, choice(`Set today to ${shown} (replaces ${was})`, millilitres)],
   };
 }
 
@@ -282,7 +404,8 @@ export function parseCapture(raw: string, context: CaptureContext): CaptureParse
 
   if (DONE_PREFIX.test(text)) {
     const found = matchQuest(captureQuestQuery(text), context.occurrences);
-    return found ? { status: 'draft', draft: questDraft(found.target) } : { status: 'unrecognised', problem: { kind: 'no-quest' } };
+    if (!found) return { status: 'unrecognised', problem: { kind: 'no-quest' } };
+    return isOpen(found.target.state) ? { status: 'draft', draft: questDraft(found.target) } : resolvedQuest(found.target);
   }
 
   let match = /^(?:j|journal)\s+(.{3,})/i.exec(text);
@@ -297,29 +420,40 @@ export function parseCapture(raw: string, context: CaptureContext): CaptureParse
   match = /(\d[\d.,]*)\s*(k)?\s*steps?\b/i.exec(text);
   if (match) {
     const steps = match[2] ? Math.round(decimal(match[1] as string) * 1000) : Number((match[1] as string).replace(/[.,]/g, ''));
-    return { status: 'draft', draft: metricDraft('steps', 'Steps', steps, 'steps', 'overwrites today’s steps', date) };
+    return metricParse({ key: 'steps', label: 'Steps', unit: 'steps', stored: steps, shown: `${formatAmount(steps)} steps`, hint: 'overwrites today’s steps' }, context);
   }
 
-  match = /(\d+(?:[.,]\d)?)\s*(?:l|litres?|liters?|water)\b/i.exec(text);
-  if (match) return { status: 'draft', draft: metricDraft('water', 'Water', decimal(match[1] as string), 'l', 'adds to today', date) };
+  match = /(?<![\d.,])(\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)\s*(ml|millilitres?|milliliters?|l|litres?|liters?|water)\b/i.exec(text);
+  if (match) return waterParse(match[1] as string, match[2] as string, context);
 
   match = /(?:slept|sleep)\s*(\d+(?:[.,]\d+)?)/i.exec(text);
   if (match) {
-    const hours = decimal(match[1] as string);
+    const typed = match[1] as string;
+    const hours = decimal(typed);
     if (hours > CAPTURE_SLEEP_MAX_HOURS) return { status: 'unrecognised', problem: { kind: 'sleep-out-of-range' } };
-    return { status: 'draft', draft: metricDraft('sleep', 'Sleep', hours, 'h', 'last night', date) };
+    return metricParse({ key: 'sleep', label: 'Sleep', unit: 'h', stored: hours, shown: `${formatAmount(hours, typedFractionDigits(typed))} h`, hint: 'last night' }, context);
   }
 
   match = /(\d[\d.,]*)\s*(?:kcal|calories)\b/i.exec(text);
-  if (match) return { status: 'draft', draft: metricDraft('calories', 'Calories burned', Number((match[1] as string).replace(/[.,]/g, '')), 'kcal', 'optional metric', date) };
-
-  if (/^[a-z][a-z\s]*[a-z]\s+\d+(?:[.,]\d{1,2})?$/i.test(text)) {
-    const quest = matchQuest(text, context.occurrences);
-    if (quest) return { status: 'ambiguous', candidates: [questDraft(quest.target), sideQuestDraft(text, date)] };
+  if (match) {
+    const calories = Number((match[1] as string).replace(/[.,]/g, ''));
+    return metricParse({ key: 'calories', label: 'Calories burned', unit: 'kcal', stored: calories, shown: `${formatAmount(calories)} kcal`, hint: 'optional metric' }, context);
   }
 
   const named = matchQuest(text, context.occurrences);
-  if (named && named.match !== 'words-besides-number') return { status: 'draft', draft: questDraft(named.target) };
+  if (named?.match === 'exact' && !isOpen(named.target.state)) return resolvedQuest(named.target);
+  const open = context.occurrences.filter(occurrence => isOpen(occurrence.state));
+
+  if (/^[a-z][a-z\s]*[a-z]\s+\d+(?:[.,]\d{1,2})?$/i.test(text)) {
+    const quest = matchQuest(text, open);
+    if (quest) {
+      const choices: CaptureChoice[] = [questDraft(quest.target), sideQuestDraft(text, date)].map(draft => ({ status: 'available', draft }));
+      return { status: 'ambiguous', question: TWO_THINGS, choices };
+    }
+  }
+
+  const openNamed = matchQuest(text, open);
+  if (openNamed && openNamed.match !== 'words-besides-number') return { status: 'draft', draft: questDraft(openNamed.target) };
 
   const found = findAmount(text);
   if (found) return expenseParse(text, found, context);

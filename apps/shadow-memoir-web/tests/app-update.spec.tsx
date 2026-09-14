@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { type ReactElement, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { type RegisterServiceWorkerOptions, type ServiceWorkerController } from '@shadow-library/web/pwa';
 
@@ -36,6 +37,21 @@ async function renderAppSync(): Promise<void> {
   renderScreen(
     <SystemOverlayProvider>
       <AppSyncScreen />
+    </SystemOverlayProvider>,
+  );
+}
+
+async function renderInstallOffer(): Promise<void> {
+  vi.resetModules();
+  const [{ SystemOverlayProvider, useSystemOverlays }, { renderScreen }] = await Promise.all([import('@/features/shell'), import('./harness')]);
+  function OpenInstallOffer(): ReactElement {
+    const overlays = useSystemOverlays();
+    useEffect(() => overlays.open('install'), [overlays]);
+    return <span />;
+  }
+  renderScreen(
+    <SystemOverlayProvider>
+      <OpenInstallOffer />
     </SystemOverlayProvider>,
   );
 }
@@ -90,6 +106,26 @@ describe('app update', () => {
     act(() => worker.options?.onRegistered?.({} as ServiceWorkerRegistration));
 
     expect(await screen.findByText('Opens offline')).toBeDefined();
+  });
+
+  it('should claim offline opening in the install offer only when a worker served this load', async () => {
+    stubServiceWorker(null);
+    await renderInstallOffer();
+
+    expect(await screen.findByText(/anything you log is kept on this device and syncs when you reconnect/)).toBeDefined();
+    act(() => worker.options?.onRegistered?.({} as ServiceWorkerRegistration));
+    expect(await screen.findByText(/it opens offline after its next load here/)).toBeDefined();
+    expect(screen.queryByText(/already opens offline/)).toBeNull();
+    expect(screen.queryByText(/already runs offline/)).toBeNull();
+  });
+
+  it('should say the install offer opens offline once a worker controls the page', async () => {
+    stubServiceWorker({});
+    await renderInstallOffer();
+
+    expect(await screen.findByText(/anything you log is kept on this device/)).toBeDefined();
+    act(() => worker.options?.onRegistered?.({} as ServiceWorkerRegistration));
+    expect(await screen.findByText(/the app already opens offline and syncs when you reconnect/)).toBeDefined();
   });
 
   it('should offer the update only once a worker is waiting, and apply it on Reload now', async () => {

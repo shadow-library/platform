@@ -4,7 +4,7 @@ import { Alert, Button, Skeleton } from '@shadow-library/ui';
 
 import { DataState } from '@/components/DataState';
 import { OverlaySurface } from '@/components/OverlaySurface';
-import { useAppUpdate } from '@/lib/app-update';
+import { type OfflineReadiness, useAppUpdate } from '@/lib/app-update';
 import { useAppSync, useNotificationSettings } from '@/lib/data';
 import { type InstallOffer, useInstallOffer } from '@/lib/install-offer';
 import { currentPage, signInUrl } from '@/lib/session';
@@ -24,7 +24,18 @@ export function useSystemOverlays(): SystemOverlayControls {
   return useContext(SystemOverlayContext);
 }
 
-const INSTALL_FACTS = ['Opens full screen from your home screen, with your wake window intact.', 'Works with no connection — quests, capture and logs all queue on the device.'];
+const INSTALL_FACTS = [
+  'Opens full screen from your home screen, with your wake window intact.',
+  'Keeps working when the connection drops — quests, capture and logs queue on the device.',
+];
+
+const INSTALL_OFFER_PREFIX = 'Installing adds it to your home screen and lets it open without a browser.';
+
+const INSTALL_OFFER_OFFLINE: Record<OfflineReadiness, string> = {
+  unavailable: 'Either way, anything you log is kept on this device and syncs when you reconnect.',
+  'next-load': 'Either way, it opens offline after its next load here, and anything you log syncs when you reconnect.',
+  ready: 'Everything works either way — the app already opens offline and syncs when you reconnect.',
+};
 
 /**
  * The shell-level overlays: everything the app needs to say about itself rather than about the day. They are
@@ -80,7 +91,7 @@ function SystemOverlays({ kind, install, onClose }: { kind: SystemOverlayKind | 
         open={kind === 'install'}
         onOpenChange={open => !open && declineInstall()}
         title="Keep Shadow Memoir a tap away"
-        description="Installing adds it to your home screen and lets it open without a browser. Everything works either way — the app already runs offline and syncs when you reconnect."
+        description={`${INSTALL_OFFER_PREFIX} ${INSTALL_OFFER_OFFLINE[update.offline]}`}
         footer={
           <>
             <Button
