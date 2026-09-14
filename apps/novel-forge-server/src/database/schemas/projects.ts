@@ -112,6 +112,10 @@ export const projects = pgTable(
   t => [
     unique('projects_source_ref_unique').on(t.sourceRef),
     index('projects_owner_kind_owner_id_idx').on(t.ownerKind, t.ownerId),
+    // Backs ProjectService.list()'s sharing branch (a seq scan otherwise, once for $count and once for findMany).
+    index('projects_shared_with_org_organisation_id_idx')
+      .on(t.organisationId)
+      .where(sql`${t.sharedWithOrg}`),
     check('projects_bot_owner_organisation_check', sql`${t.ownerKind} <> 'bot' OR ${t.organisationId} IS NOT NULL`),
   ],
 );

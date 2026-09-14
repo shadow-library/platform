@@ -21,7 +21,7 @@ import {
   useTranslationStatusQuery,
   useUpdateProjectMutation,
 } from '@/lib/apis';
-import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle, translationLifecycle } from '@/lib/format';
+import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag, translationLifecycle } from '@/lib/format';
 import { firstTitle } from '@/lib/idea-title';
 
 import { BookIcon, EditIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SparkIcon, SunIcon } from '../icons';
@@ -82,13 +82,18 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
     translation: { count: translation?.glossary.suggested ?? 0, intent: 'warning' },
   };
 
-  const options = projects.map(candidate => ({
-    id: candidate.id,
-    label: projectTitle(candidate),
-    caption: `${projectKindTag(candidate.kind)} · #${candidate.id}`,
-    imageUrl: candidate.coverUrl ?? undefined,
-    color: projectDotColor(candidate),
-  }));
+  const options = projects.map(candidate => {
+    const ownerTag = sharedOwnerTag(candidate);
+    return {
+      id: candidate.id,
+      label: projectTitle(candidate),
+      // The marker goes first: `.switcherCaption` is nowrap-ellipsis, so a trailing marker is the first
+      // thing truncated — worst in the collapsed trigger showing the currently open project.
+      caption: `${ownerTag ? `${ownerTag} · ` : ''}${projectKindTag(candidate.kind)} · #${candidate.id}`,
+      imageUrl: candidate.coverUrl ?? undefined,
+      color: projectDotColor(candidate),
+    };
+  });
 
   const toLeaf = (screen: ProjectScreen): NavLeaf => ({
     to: screen.to,

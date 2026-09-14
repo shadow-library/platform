@@ -19,12 +19,13 @@ export type ChipIntent = 'neutral' | 'info' | 'success' | 'warning' | 'danger' |
 interface StatusChipProps {
   intent?: ChipIntent;
   dot?: boolean;
+  className?: string;
   children: ReactNode;
 }
 
-export function StatusChip({ intent = 'neutral', dot = false, children }: StatusChipProps): ReactElement {
+export function StatusChip({ intent = 'neutral', dot = false, className, children }: StatusChipProps): ReactElement {
   return (
-    <span className="nf-chip" data-intent={intent}>
+    <span className={className ? `nf-chip ${className}` : 'nf-chip'} data-intent={intent}>
       {dot && <span className="nf-dot" />}
       {children}
     </span>

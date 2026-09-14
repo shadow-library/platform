@@ -7,7 +7,7 @@ import { projectHomeRoute } from '@/components/Layout';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
 import { listProjectsQueryOptions, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
-import { projectKindIntent, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
+import { projectKindIntent, projectKindLabel, projectKindTag, projectTitle, relativeTime, sharedOwnerLabel } from '@/lib/format';
 
 import styles from './index.module.css';
 
@@ -49,6 +49,7 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
   const status = statusQuery.data;
   const isSource = project.kind === 'source';
   const draftsDone = (status?.draftsTotal ?? 0) > 0 && status?.draftsFinal === status?.draftsTotal;
+  const ownerLabel = sharedOwnerLabel(project);
   const open = (): void => {
     navigate({ to: '/novels/$novelId/overview', params: { novelId: project.id } });
   };
@@ -75,6 +76,11 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
           <StatusChip intent={projectKindIntent(project.kind)}>{projectKindTag(project.kind)}</StatusChip>
           <span className={styles.cardId}>#{project.id}</span>
         </div>
+        {ownerLabel && (
+          <StatusChip intent="info" className={styles.sharedChip}>
+            {ownerLabel}
+          </StatusChip>
+        )}
         <h3 className={styles.cardTitle}>{projectTitle(project)}</h3>
         <p className={styles.cardSub}>
           {projectKindLabel(project.kind)}

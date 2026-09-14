@@ -91,6 +91,12 @@
   color: var(--sh-text-tertiary);
 }
 
+/* Doubled selector beats .nf-chip's equal-specificity base rule regardless of emitted stylesheet order. */
+.sharedChip.sharedChip {
+  white-space: normal;
+  margin-bottom: 4px;
+}
+
 .cardTitle {
   margin: 8px 0 0;
   font-size: var(--sh-text-body-lg);

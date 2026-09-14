@@ -137,7 +137,7 @@ function buildHarness(db: PrimaryDatabase): Harness {
     workflowRuns,
     new EntityService(dbStub, storage as never),
     new ChapterImageService(dbStub, storage as never),
-    new ProjectService(dbStub, {} as never, storage as never),
+    new ProjectService(dbStub, {} as never, storage as never, {} as never, {} as never),
     noPluginPolicy(),
     new IllustrationReferenceService(dbStub, storage as never, router),
     describer,
@@ -445,7 +445,7 @@ describe.if(pgAvailable)('IllustrationService — canon-driven generation', () =
   });
 
   function projectService(): ProjectService {
-    return new ProjectService({ getPostgresClient: () => db } as never, {} as never, harness.storage as never);
+    return new ProjectService({ getPostgresClient: () => db } as never, {} as never, harness.storage as never, {} as never, {} as never);
   }
 
   async function uploadCover(projectId: bigint, image = 'aW1hZ2U='): Promise<string> {

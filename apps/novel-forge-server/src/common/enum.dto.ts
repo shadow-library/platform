@@ -4,6 +4,7 @@ import { CONTENT_RATING_LEVELS, NOVEL_GENRES, NOVEL_TAGS } from '@shadow-library
 import { schema } from '@server/database';
 
 export const SortByTime = EnumType.create('SortByTime', ['createdAt', 'updatedAt']);
+export const OwnerKind = EnumType.create('OwnerKind', schema.ownerKind.enumValues);
 export const ProjectKind = EnumType.create('ProjectKind', schema.projectKind.enumValues);
 export const ProjectStatus = EnumType.create('ProjectStatus', schema.projectStatus.enumValues);
 export const ContentMode = EnumType.create('ContentMode', schema.contentMode.enumValues);

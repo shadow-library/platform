@@ -23,8 +23,9 @@ interface OwnedTable {
 
 // Every ownership comparison filters on the (kind, id) pair and never on `owner_id` alone: user ids and bot
 // ids come from separate sequences, so a bot routinely shares its numeric id with an unrelated user.
-export function ownedBy(table: OwnedTable, owner: OwnerRef): SQL | undefined {
-  return and(eq(table.ownerKind, owner.kind), eq(table.ownerId, owner.id));
+// The cast is safe because two concrete `eq()` operands can never yield `undefined`, whatever `and()` types.
+export function ownedBy(table: OwnedTable, owner: OwnerRef): SQL {
+  return and(eq(table.ownerKind, owner.kind), eq(table.ownerId, owner.id)) as SQL;
 }
 
 export function isOwnedBy(row: OwnedRow, owner: OwnerRef): boolean {

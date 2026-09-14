@@ -1,11 +1,13 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
+import { AuthClient } from '@shadow-library/auth';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
+import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import { assertActiveProject, ownedBy } from '@server/common';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, CURATE_PERMISSION } from '@server/constants';
 import { type Bible, type Chapter, type Knowledge, type Plan, type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
@@ -47,12 +49,29 @@ export class ProjectService {
     private readonly databaseService: DatabaseService,
     private readonly actorService: ActorService,
     private readonly storage: StorageService,
+    private readonly authClient: AuthClient,
+    private readonly context: ContextService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
   private actor(): Actor {
     return this.actorService.current();
+  }
+
+  /** Mirrors `ProjectOwnershipGuard`'s sharing branch, one PDP check per request, skipped for bots and org-less users. */
+  private async listVisibilityFilter(actor: Actor): Promise<SQL> {
+    const own = ownedBy(schema.projects, actor);
+    if (actor.kind !== 'user' || actor.organisationId === null) return own;
+
+    const principal = this.context.getAuthPrincipal();
+    const organisationId = actor.organisationId.toString();
+    const isCurator = await this.authClient.check({ action: CURATE_PERMISSION, organisationId, principal }, { highRisk: true });
+    if (!isCurator) return own;
+
+    // A constant, not `eq(sharedWithOrg, true)`: a bound parameter defeats a generic plan's ability to prove
+    // the partial index's `WHERE shared_with_org` predicate, degrading this branch (and the whole OR) to a seq scan.
+    return or(own, and(sql`${schema.projects.sharedWithOrg}`, eq(schema.projects.organisationId, actor.organisationId))) as SQL;
   }
 
   // Every persisted model override must name a registry model with the matching provider, regardless of
@@ -123,9 +142,10 @@ export class ProjectService {
       defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' },
     });
 
+    const visibility = await this.listVisibilityFilter(this.actor());
     // Seeds are hidden unless asked for by name: the main shelf is the novels shelf, and an unfiltered
     // list would fill it with ideas that have no bible, plan, or chapters (ideation-studio design §2.1).
-    const conditions = [ownedBy(schema.projects, this.actor()), eq(schema.projects.status, filter.status ?? 'active')];
+    const conditions = [visibility, eq(schema.projects.status, filter.status ?? 'active')];
     if (filter.kind) conditions.push(eq(schema.projects.kind, filter.kind));
     const where = and(...conditions);
     const column = query.sortBy === 'createdAt' ? schema.projects.createdAt : schema.projects.updatedAt;

@@ -98,6 +98,19 @@ export function projectDotColor(project: Pick<ProjectResponse, 'kind'>): string 
   return kindDotColors[project.kind] ?? 'var(--sh-green-400)';
 }
 
+// `sharedWithOrg` is never true for a project the caller created — projectOwnerColumns sets it only for a
+// bot — so it alone marks "not created here", even after a bot-ownership transfer leaves it on a user-owned row.
+export function sharedOwnerLabel(project: Pick<ProjectResponse, 'ownerKind' | 'sharedWithOrg'>): string | null {
+  if (!project.sharedWithOrg) return null;
+  return project.ownerKind === 'bot' ? 'Bot-owned · shared with your organisation' : 'Shared with your organisation';
+}
+
+/** Short form of `sharedOwnerLabel` for space-constrained captions (the project switcher). */
+export function sharedOwnerTag(project: Pick<ProjectResponse, 'ownerKind' | 'sharedWithOrg'>): string | null {
+  if (!project.sharedWithOrg) return null;
+  return project.ownerKind === 'bot' ? 'Bot-owned' : 'Shared';
+}
+
 /** Sidebar lifecycle labels per workflow — curated has none, so the bar hides entirely for it. */
 export const LIFECYCLE_PHASES: Record<ProjectResponse['kind'], readonly string[]> = {
   new_novel: ['Bible', 'Plan', 'Arcs', 'Drafts', 'Review'],

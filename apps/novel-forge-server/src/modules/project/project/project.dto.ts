@@ -2,8 +2,8 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-import { ContentMode, ProjectKind, ProjectStatus, SortByTime } from '@server/common';
-import { type Project } from '@server/database';
+import { ContentMode, OwnerKind, ProjectKind, ProjectStatus, SortByTime } from '@server/common';
+import { type Owner, type Project } from '@server/database';
 
 @Schema()
 export class ProjectParams {
@@ -133,6 +133,12 @@ export class ProjectResponse {
 
   @Field(() => ProjectStatus, { description: 'A `seed` project is an Ideation Studio idea and has no bible, plan, or chapters until it graduates.' })
   status: Project.Status;
+
+  @Field(() => OwnerKind, { description: 'Whether the project was created by a signed-in person or an organisation bot.' })
+  ownerKind: Owner.Kind;
+
+  @Field({ description: 'True when the project is open to every member of its owning organisation who holds the curate permission, on top of its owner.' })
+  sharedWithOrg: boolean;
 
   @Field({ optional: true, nullable: true })
   title?: string | null;

@@ -3459,6 +3459,10 @@ export interface components {
       kind: components['schemas']['ProjectKind'];
       /** @description A `seed` project is an Ideation Studio idea and has no bible, plan, or chapters until it graduates. */
       status: components['schemas']['ProjectStatus'];
+      /** @description Whether the project was created by a signed-in person or an organisation bot. */
+      ownerKind: components['schemas']['OwnerKind'];
+      /** @description True when the project is open to every member of its owning organisation who holds the curate permission, on top of its owner. */
+      sharedWithOrg: boolean;
       title?: null | string;
       /** @description Absolute public cover URL resolved by the server; absent when the project has no cover. */
       coverUrl?: null | string;
@@ -3477,6 +3481,8 @@ export interface components {
     };
     /** @enum {string} */
     ProjectStatus: 'seed' | 'active';
+    /** @enum {string} */
+    OwnerKind: 'user' | 'bot';
     ProjectConfig: {
       models?: components['schemas']['ProjectModelOverrides'];
     };
@@ -15431,6 +15437,7 @@ export type ProjectKind = components['schemas']['ProjectKind'];
 export type ContentMode = components['schemas']['ContentMode'];
 export type ProjectResponse = components['schemas']['ProjectResponse'];
 export type ProjectStatus = components['schemas']['ProjectStatus'];
+export type OwnerKind = components['schemas']['OwnerKind'];
 export type ProjectConfig = components['schemas']['ProjectConfig'];
 export type ProjectModelOverrides = components['schemas']['ProjectModelOverrides'];
 export type ProjectModelRef = components['schemas']['ProjectModelRef'];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { LIFECYCLE_PHASES, lifecyclePhase, projectDotColor, projectKindIntent, projectKindLabel, projectKindTag } from '../src/lib/format';
+import { LIFECYCLE_PHASES, lifecyclePhase, projectDotColor, projectKindIntent, projectKindLabel, projectKindTag, sharedOwnerLabel } from '../src/lib/format';
 
 describe('projectKindLabel', () => {
   it('should label every project kind', () => {
@@ -33,6 +33,21 @@ describe('projectDotColor', () => {
   it('should give every project kind a distinct dot colour', () => {
     const colors = (['new_novel', 'source', 'translation', 'curated'] as const).map(kind => projectDotColor({ kind }));
     expect(new Set(colors).size).toBe(4);
+  });
+});
+
+describe('sharedOwnerLabel', () => {
+  it('should mark a bot-owned shared project by ownership and org, not just sharing', () => {
+    expect(sharedOwnerLabel({ ownerKind: 'bot', sharedWithOrg: true })).toBe('Bot-owned · shared with your organisation');
+  });
+
+  it('should mark a user-owned shared project without claiming a bot owns it', () => {
+    expect(sharedOwnerLabel({ ownerKind: 'user', sharedWithOrg: true })).toBe('Shared with your organisation');
+  });
+
+  it('should return null for a project the caller was not shown as shared', () => {
+    expect(sharedOwnerLabel({ ownerKind: 'bot', sharedWithOrg: false })).toBeNull();
+    expect(sharedOwnerLabel({ ownerKind: 'user', sharedWithOrg: false })).toBeNull();
   });
 });
 
