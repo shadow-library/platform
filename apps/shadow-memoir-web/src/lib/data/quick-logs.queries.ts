@@ -2,7 +2,16 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { type CommandHandle, type LocalReading, useDomainCommand } from './command-runner';
 import { useMemoirData } from './data-context';
-import { type HealthView, type JournalView, type MealsView, type QuickLogCommand, type QuickLogCommandResult, type SideQuestsView, type WeightView } from './quick-logs.types';
+import {
+  type HealthView,
+  type JournalView,
+  type MealsView,
+  type QuickLogCommand,
+  type QuickLogCommandResult,
+  type QuickLogDispatchResult,
+  type SideQuestsView,
+  type WeightView,
+} from './quick-logs.types';
 
 const quickLogKeys = {
   all: ['memoir', 'quick-logs'] as const,
@@ -40,7 +49,8 @@ export function useSideQuests(): UseQueryResult<SideQuestsView> {
 
 export type QuickLogCommandHook = CommandHandle<QuickLogCommand, QuickLogCommandResult, QuickLogCommandResult>;
 
-function readQuickLogResult(result: QuickLogCommandResult): LocalReading<QuickLogCommandResult, QuickLogCommandResult> {
+function readQuickLogResult(result: QuickLogDispatchResult): LocalReading<QuickLogCommandResult, QuickLogCommandResult> {
+  if ('status' in result) return { kind: 'rejected', message: result.message, error: result.error };
   if (result.needsConfirmation) return { kind: 'confirm', confirmation: result };
   return { kind: 'done', local: result, delivery: result.delivery, xpAwarded: result.reward?.xp ?? 0, coinsAwarded: result.reward?.coins ?? 0 };
 }

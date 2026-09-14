@@ -1,7 +1,7 @@
 import { type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { failureCopy, refusedCopy, rejectionCopy, supersededCopy } from './command-feedback';
+import { failureCopy, METRICS_NOT_SET_UP_COPY, refusedCopy, rejectionCopy, supersededCopy } from './command-feedback';
 import {
   type CommandDelivery,
   type CommandError,
@@ -140,6 +140,7 @@ async function settleTicketed<TCommand, TResult, TLocal, TConfirm>(
   }
 
   const delivery = reading.delivery ?? { status: 'local' };
+  if (delivery.status === 'unaddressed') return { status: 'rejected', message: METRICS_NOT_SET_UP_COPY, code: null, undone: false };
   if (delivery.status === 'local') return { status: 'applied', local: reading.local, xpAwarded: reading.xpAwarded, coinsAwarded: reading.coinsAwarded };
   if (delivery.status === 'refused') return { status: 'refused', message: refusedCopy(delivery.boundary), boundary: delivery.boundary };
   if (!ticket) return { status: 'queued-offline', local: reading.local, reason: 'slow' };

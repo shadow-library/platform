@@ -8,6 +8,7 @@ import {
   formatMetricValue,
   type HealthMetricState,
   type HealthView,
+  metricDisplay,
   metricInputValue,
   notifyOutcome,
   readMetricEntry,
@@ -28,6 +29,7 @@ function MetricCard({ metric, date }: { metric: HealthMetricState; date: string 
   const [entry, setEntry] = useState(metric.entry ? metricInputValue(metric.entry.value, definition) : '');
   const [error, setError] = useState<string | null>(null);
   const errorId = `metric-${definition.key}-error`;
+  const shown = metric.entry === null ? null : metricDisplay(metric.entry.value, definition);
   const saving = command.isPendingFor(pending => pending.type === 'health.save' && pending.key === definition.key);
 
   const onEntryChange = (value: string): void => {
@@ -56,8 +58,8 @@ function MetricCard({ metric, date }: { metric: HealthMetricState; date: string 
           <div>
             <h3 className={styles.cardTitle}>{definition.name}</h3>
             <p className={styles.metricValue}>
-              {metric.entry === null ? '—' : formatMetricValue(metric.entry.value, { ...definition, unit: '' })}
-              {metric.entry !== null && definition.unit && <span className={styles.metricUnit}> {definition.unit}</span>}
+              {shown === null ? '—' : shown.value}
+              {shown?.unit && <span className={styles.metricUnit}> {shown.unit}</span>}
             </p>
             <p className={styles.hint}>{metric.meta}</p>
           </div>
@@ -68,7 +70,7 @@ function MetricCard({ metric, date }: { metric: HealthMetricState; date: string 
           ) : (
             metric.offer && (
               <Badge variant="soft" intent={metric.offer.met ? 'success' : 'info'}>
-                {metric.offer.met ? 'Threshold met' : `${Math.round(metric.offer.ratio * 100)}% of ${formatMetricValue(metric.offer.thresholdValue, definition)}`}
+                {metric.offer.met ? 'Threshold met' : `${Math.floor(metric.offer.ratio * 100)}% of ${formatMetricValue(metric.offer.thresholdValue, definition)}`}
               </Badge>
             )
           )}

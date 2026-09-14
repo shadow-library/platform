@@ -181,7 +181,10 @@ describe('quest threshold wire', () => {
 
       const result = await provider.dispatchCommand({ type: 'quest.create', draft: draft({ metricKey: 'steps', value: 8000, comparison: 'gte' }) });
 
-      expect(result).toMatchObject({ status: 'rejected', message: expect.stringContaining('Turn it off to save the quest') });
+      expect(result).toMatchObject({
+        status: 'rejected',
+        message: 'Health metrics aren’t set up for this account yet, so the threshold can’t be saved. Turn it off to save the quest.',
+      });
       expect(await engine.outbox.size()).toBe(0);
       expect(await provider.listQuests('all')).toHaveLength(0);
       expect(server.batches).toHaveLength(0);

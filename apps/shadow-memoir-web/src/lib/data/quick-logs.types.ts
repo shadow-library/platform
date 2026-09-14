@@ -1,4 +1,4 @@
-import { type CommandDelivery } from './command.types';
+import { type CommandDelivery, type CommandRejection } from './command.types';
 import { type EntryCapAdvisory } from './entry-caps';
 import { type StatAffinity } from './quest.types';
 
@@ -276,7 +276,7 @@ export type QuickLogCommand =
   | { type: 'meal.savePreset'; preset: Omit<MealPreset, 'id' | 'usageCount'> }
   | { type: 'weight.save'; date: string; kg: number; confirmedReplacement: boolean }
   | { type: 'sidequest.log'; draft: SideQuestDraft }
-  /** `metricId` is the server's catalogue id for `key`, resolved at dispatch; without it the save stays local because no `metric.register` can address the metric. */
+  /** `metricId` is the server's catalogue id for `key`, resolved at dispatch; without it the save is refused because no `metric.register` can address the metric. */
   | { type: 'health.save'; key: HealthMetricKey; date: string; value: number; metricId?: string }
   | { type: 'health.acceptOffer'; key: HealthMetricKey; date: string };
 
@@ -290,3 +290,5 @@ export interface QuickLogCommandResult {
   linkageOffer?: QuestLinkageOffer;
   delivery?: CommandDelivery;
 }
+
+export type QuickLogDispatchResult = QuickLogCommandResult | CommandRejection;

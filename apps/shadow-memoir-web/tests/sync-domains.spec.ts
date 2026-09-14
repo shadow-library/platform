@@ -256,12 +256,11 @@ describe('FE-5 optimistic apply', () => {
     const quickLogs = new SyncedQuickLogProvider(engine);
 
     const second = await quickLogs.dispatchCommand({ type: 'journal.save', draft: { date: TODAY, text: 'A second entry.', mood: 4 } });
-    expect(second.reward?.rewarded).toBe(false);
+    expect(second).toMatchObject({ reward: { rewarded: false } });
 
     const fresh = new SyncedQuickLogProvider((await started({ ...fullPage(), domains: { account: [ACCOUNT_ROW] } })).engine);
     const first = await fresh.dispatchCommand({ type: 'journal.save', draft: { date: TODAY, text: 'The first entry.', mood: 4 } });
-    expect(first.reward?.rewarded).toBe(true);
-    expect(first.reward?.xp).toBe(5);
+    expect(first).toMatchObject({ reward: { rewarded: true, xp: 5 } });
   });
 
   it('should hold a same-day weight back until the replacement is confirmed', async () => {
@@ -269,7 +268,7 @@ describe('FE-5 optimistic apply', () => {
     const quickLogs = new SyncedQuickLogProvider(engine);
 
     const held = await quickLogs.dispatchCommand({ type: 'weight.save', date: TODAY, kg: 78.1, confirmedReplacement: false });
-    expect(held.needsConfirmation?.kind).toBe('weight-replace');
+    expect(held).toMatchObject({ needsConfirmation: { kind: 'weight-replace' } });
     expect(server.batches).toHaveLength(0);
 
     const confirmed = await quickLogs.dispatchCommand({ type: 'weight.save', date: TODAY, kg: 78.1, confirmedReplacement: true });
@@ -308,14 +307,30 @@ describe('FE-5 optimistic apply', () => {
     expect(server.batches.at(-1)?.types).toEqual(['metric.register']);
   });
 
-  it('should keep a health save local when the metric catalogue has not been pulled yet', async () => {
+  it('should refuse a health save before applying it when the metric catalogue has not been pulled yet', async () => {
     const { engine, server } = await started({ ...fullPage(), domains: { account: [ACCOUNT_ROW] } });
     const quickLogs = new SyncedQuickLogProvider(engine);
 
     const result = await quickLogs.dispatchCommand({ type: 'health.save', key: 'steps', date: TODAY, value: 8200 });
 
-    expect(result.message).toBe('Saved.');
+    expect(result).toEqual({ status: 'rejected', message: 'Health metrics aren’t set up for this account yet, so this can’t be saved.' });
+    expect((await quickLogs.health(TODAY)).metrics.find(metric => metric.definition.key === 'steps')?.entry).toBeNull();
+    expect(await engine.outbox.pending()).toHaveLength(0);
+    await engine.sync();
     expect(server.batches).toHaveLength(0);
+  });
+
+  it('should undo the optimistic apply when the engine cannot address a quick-log command', async () => {
+    const { engine } = await started({ ...fullPage(), domains: { account: [ACCOUNT_ROW] } });
+    const quickLogs = new SyncedQuickLogProvider(engine);
+    vi.spyOn(engine, 'enqueue').mockResolvedValue({ status: 'unaddressed' });
+
+    const result = await quickLogs.dispatchCommand({ type: 'sidequest.log', draft: { date: TODAY, name: 'Fixed the bike', statAffinity: 'body' } });
+
+    expect(result).toMatchObject({ delivery: { status: 'unaddressed' } });
+    expect((await quickLogs.sideQuests()).items).toEqual([]);
+    expect(await engine.outbox.pending()).toEqual([]);
+    vi.restoreAllMocks();
   });
 });
 

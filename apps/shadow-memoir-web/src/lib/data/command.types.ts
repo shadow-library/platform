@@ -44,7 +44,8 @@ export interface OutcomeTicket {
   release(): void;
 }
 
-export type CommandDelivery = { status: 'local' } | { status: 'queued'; commandId: string; ticket?: OutcomeTicket } | { status: 'refused'; boundary: CommandBoundary };
+export type CommandDelivery =
+  { status: 'local' } | { status: 'unaddressed' } | { status: 'queued'; commandId: string; ticket?: OutcomeTicket } | { status: 'refused'; boundary: CommandBoundary };
 
 export interface DispatchOptions {
   /** Claims the outcome of every command this dispatch queues; the result's `delivery` carries the ticket. */

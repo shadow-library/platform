@@ -935,6 +935,42 @@ describe('health metrics screen', () => {
     }
   });
 
+  it('should show a water card under a litre in millilitres and a 1.65 l day to two decimals', async () => {
+    const entries = [
+      { id: '1', metricId: '504', date: LOG_TODAY, value: '250', source: 'manual', createdAt: `${LOG_TODAY}T07:30:00.000Z` },
+      { id: '2', metricId: '504', date: '2026-08-21', value: '1650', source: 'manual', createdAt: '2026-08-21T20:00:00.000Z' },
+    ];
+    await withSyncedScreen(<HealthMetricsScreen />, { pages: [deltaPage({ metrics: WATER_CATALOGUE, metric_entries: entries })] }, async () => {
+      const input = (await screen.findByLabelText('Water for today')) as HTMLInputElement;
+      expect(input.value).toBe('0.25');
+      expect((await screen.findByText('250')).closest('p')?.textContent).toBe('250 ml');
+      expect(screen.getByText('Water 1.65 l')).toBeDefined();
+    });
+  });
+
+  it('should not report a Body & health save as done when the account has no metric catalogue', async () => {
+    const warning = vi.spyOn(toast, 'warning');
+    const success = vi.spyOn(toast, 'success');
+    try {
+      await withSyncedScreen(<HealthMetricsScreen />, { pages: [deltaPage({ account: [{ defaultCurrency: 'EUR', enabledCurrencies: ['EUR'], weekStart: 1 }] })] }, async test => {
+        const input = (await screen.findByLabelText('Water for today')) as HTMLInputElement;
+        fireEvent.change(input, { target: { value: '1.6' } });
+        fireEvent.click(within(input.closest('form') as HTMLFormElement).getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(warning).toHaveBeenCalledWith('Couldn’t save ‘Water’: Health metrics aren’t set up for this account yet, so this can’t be saved.', undefined));
+        expect(success).not.toHaveBeenCalled();
+        expect(screen.queryByText('1.6')).toBeNull();
+        expect(input.value).toBe('1.6');
+        expect(await test.engine.outbox.pending()).toEqual([]);
+        await test.engine.sync();
+        expect(test.server.batches).toEqual([]);
+      });
+    } finally {
+      warning.mockRestore();
+      success.mockRestore();
+    }
+  });
+
   it('should warn once and keep the typed value when a metric save is rejected', async () => {
     const entries = [{ id: '1', metricId: '504', date: LOG_TODAY, value: '1400', source: 'manual', createdAt: `${LOG_TODAY}T17:30:00.000Z` }];
     const warning = vi.spyOn(toast, 'warning');

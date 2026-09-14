@@ -19,13 +19,14 @@ import {
   type MealsView,
   MemoirEngine,
   type MemoirWorldState,
+  METRICS_NOT_SET_UP_COPY,
   type ModuleLink,
   moodOption,
   type MoodValence,
   type OccurrenceState,
   type QuestLinkageOffer,
   type QuickLogCommand,
-  type QuickLogCommandResult,
+  type QuickLogDispatchResult,
   type QuickLogProvider,
   type QuickLogState,
   type QuickLogTile,
@@ -37,7 +38,7 @@ import {
   type WeightView,
 } from '@/lib/data';
 
-import { isQuickLogCommand, mintCommandIds } from './command-wire';
+import { isQuickLogCommand, isUnaddressed, mintCommandIds } from './command-wire';
 import { ignoreAccountBoundary, type MetaKey, type UnloadCopy } from './memoir-store';
 import { mirroredTier, projectFinanceRows, projectQuickLogRows, type QuickLogRows } from './projection';
 import { type SyncEngine } from './sync-engine';
@@ -353,13 +354,14 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
     return null;
   }
 
-  async dispatchCommand(command: QuickLogCommand, options?: DispatchOptions): Promise<QuickLogCommandResult> {
+  async dispatchCommand(command: QuickLogCommand, options?: DispatchOptions): Promise<QuickLogDispatchResult> {
     if (command.type === 'journal.dismissPrompt') {
       await this.sync.store.writeMeta(SYNC_META_KEYS.journalPromptDismissedOn, todayISODate()).catch(ignoreAccountBoundary);
       return { id: 'prompt', message: 'Put away for today.', delivery: { status: 'local' } };
     }
 
     const resolved = command.type === 'health.save' ? { ...command, metricId: this.state.metricIds[command.key] } : command;
+    if (isUnaddressed(resolved)) return { status: 'rejected', message: METRICS_NOT_SET_UP_COPY };
     const minted = mintCommandIds(resolved) as QuickLogCommand;
 
     const linkable = this.linkableModule(minted);
@@ -370,7 +372,7 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
     const result = { ...applied, advisory: capAdvisoryForTier(applied.advisory, mirroredTier(this.sync.domains())) };
 
     const delivery = await this.sync.enqueue(minted, this.sync.today, options);
-    if (delivery.status === 'refused') await this.reproject().catch(ignoreAccountBoundary);
+    if (delivery.status === 'refused' || delivery.status === 'unaddressed') await this.reproject().catch(ignoreAccountBoundary);
     // Once queued, the outbox survives a reload instead of the draft. Only a save of the draft's own text clears it: a line from quick capture must not wipe the editor's draft.
     if (minted.type === 'journal.save' && delivery.status !== 'refused' && (await this.readJournalDraft())?.text === minted.draft.text) await this.clearJournalDraft();
     return { ...result, delivery };

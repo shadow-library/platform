@@ -53,8 +53,11 @@ const SERVER_BACKED_TYPES = new Set<SyncCommand['type']>([
 ]);
 
 export function isServerBacked(command: SyncCommand): boolean {
-  if (command.type === 'health.save') return command.metricId !== undefined;
-  return SERVER_BACKED_TYPES.has(command.type);
+  return SERVER_BACKED_TYPES.has(command.type) && !isUnaddressed(command);
+}
+
+export function isUnaddressed(command: SyncCommand): boolean {
+  return command.type === 'health.save' && command.metricId === undefined;
 }
 
 const QUEST_TYPES = new Set<Command['type']>([

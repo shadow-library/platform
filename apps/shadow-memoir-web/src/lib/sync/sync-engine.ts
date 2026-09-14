@@ -1,6 +1,6 @@
 import { type DispatchOptions, type OutcomeTicket, type ServerSettlement, type UnconfirmedReason } from '@/lib/data/command.types';
 
-import { isServerBacked } from './command-wire';
+import { isServerBacked, isUnaddressed } from './command-wire';
 import { AccountBoundaryError, ignoreAccountBoundary, type MemoirStore, type StoreBoundary } from './memoir-store';
 import { type DomainRows, projectWorldState } from './projection';
 import { type AckedCommand, Outbox } from './outbox';
@@ -56,8 +56,12 @@ interface FollowUpPass {
   background: boolean;
 }
 
-/** `local` commands have no server handler; `refused` ones reached a store this engine's account no longer holds, and the caller must undo its optimistic apply. */
-export type EnqueueResult = { status: 'queued'; commandId: string; ticket?: OutcomeTicket } | { status: 'local' } | { status: 'refused'; boundary: StoreBoundary };
+/**
+ * `local` commands have no server handler; `unaddressed` ones have a handler but lack the id it needs, so nothing was queued;
+ * `refused` ones reached a store this engine's account no longer holds, and the caller must undo its optimistic apply.
+ */
+export type EnqueueResult =
+  { status: 'queued'; commandId: string; ticket?: OutcomeTicket } | { status: 'local' } | { status: 'unaddressed' } | { status: 'refused'; boundary: StoreBoundary };
 
 interface OutcomeClaim {
   commandType: SyncCommand['type'];
@@ -257,6 +261,7 @@ export class SyncEngine {
    * unclaimed and raise a notice the claimant is about to present itself.
    */
   async enqueue(command: SyncCommand, localDate: string, options: DispatchOptions = {}): Promise<EnqueueResult> {
+    if (isUnaddressed(command)) return { status: 'unaddressed' };
     const commandId = this.outbox.mintCommandId();
     const ticket = options.awaitOutcome && isServerBacked(command) ? this.claim(commandId, command.type) : undefined;
     try {

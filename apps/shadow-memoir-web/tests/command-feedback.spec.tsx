@@ -22,6 +22,7 @@ import {
   useCommand,
   useDay,
   useFinanceCommand,
+  useQuickLogCommand,
 } from '@/lib/data';
 import { type SyncedMemoirData, SyncEngineProvider } from '@/lib/sync';
 
@@ -277,6 +278,27 @@ describe('useDomainCommand run', () => {
 
     expect(outcome.undone).toBe(false);
     expect(outcomeToast(outcome, { success: '', action: 'save', subject: 'Walk' })?.title).toBe(`Couldn’t save ‘Walk’: ${outcome.message}`);
+  });
+
+  it('should report a local-only enqueue of a server-backed command as not saved', async () => {
+    const { engine, server } = createTestEngine({ today: TODAY });
+    await engine.start();
+    const data = createSyncedTestData(engine);
+    vi.spyOn(data.quickLogs, 'dispatchCommand').mockImplementation(async (command, options) => ({
+      id: 'water',
+      message: 'Saved.',
+      delivery: await engine.enqueue(command, TODAY, options),
+    }));
+    const { result } = renderHook(() => useQuickLogCommand(), {
+      wrapper: ({ children }: { children: ReactNode }) => <MemoirDataProvider value={data}>{children}</MemoirDataProvider>,
+    });
+
+    const outcome = await act(() => result.current.run({ type: 'health.save', key: 'water', date: TODAY, value: 1600 }));
+
+    expect(outcome).toEqual({ status: 'rejected', message: 'Health metrics aren’t set up for this account yet, so this can’t be saved.', code: null, undone: false });
+    expect(await engine.outbox.pending()).toEqual([]);
+    expect(server.batches).toEqual([]);
+    vi.restoreAllMocks();
   });
 
   it('should not keep a first fetch that read the state before a local apply', async () => {

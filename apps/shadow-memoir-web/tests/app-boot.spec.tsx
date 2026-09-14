@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -19,6 +22,7 @@ import { TooltipProvider } from '@shadow-library/ui';
 import { ApiError } from '@shadow-library/web';
 
 import RouteError from '@/components/RouteError';
+import routeErrorStyles from '@/components/RouteError.module.css';
 import { StatusPage, StatusRegion } from '@/components/StatusPage';
 import { OnboardingScreen, SetupLayout } from '@/features/onboarding';
 import { MemoirDataProvider, type OnboardingStatus } from '@/lib/data';
@@ -31,6 +35,12 @@ import { createMemoirTestData, renderScreen } from './harness';
 import { createSyncedTestData, createTestEngine } from './sync-harness';
 
 const SLOW = { timeout: 10_000 };
+
+function cssRule(relativePath: string, className: string): Record<string, string> {
+  const css = readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf-8');
+  const body = new RegExp(`\\.${className}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+  return Object.fromEntries(body.split(';').flatMap(line => (line.includes(':') ? [line.split(':').map(part => part.trim()) as [string, string]] : [])));
+}
 
 function renderAt(path: string) {
   const router = getRouter();
@@ -353,6 +363,17 @@ describe('status page', () => {
     expect(screen.queryByRole('main')).toBeNull();
     expect(screen.getByRole('region', { name: "Shadow Memoir couldn't open this page" })).toBeDefined();
     expect(screen.queryByText('Shadow Memoir')).toBeNull();
+  });
+
+  it('should size the refused-account heading like the other full-page status headings', () => {
+    render(<RouteError error={new ApiError(403, { code: 'IAM_002', type: 'Forbidden', message: 'Forbidden' })} reset={() => undefined} />);
+
+    const heading = screen.getByRole('heading', { level: 1, name: "This account can't use Shadow Memoir" });
+    expect(heading.classList.contains(routeErrorStyles.deniedTitle ?? '')).toBe(true);
+    const statusTitle = cssRule('../src/components/StatusPage.module.css', 'title');
+    const deniedTitle = cssRule('../src/components/RouteError.module.css', 'deniedTitle');
+    for (const property of ['font-size', 'line-height', 'font-weight', 'color']) expect(deniedTitle[property]).toBe(statusTitle[property]);
+    expect(deniedTitle['font-size']).toBe('var(--sh-text-h2)');
   });
 });
 

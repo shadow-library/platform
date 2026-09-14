@@ -1,3 +1,5 @@
+import { DEFAULT_LOCALE } from '@shadow-library/ui';
+
 import { convertMlToLitres, formatCount, litresToMl } from '@/lib/format';
 
 import { type CurrencyCode, type Expense } from './finance.types';
@@ -65,9 +67,33 @@ export function readMetricEntry(input: string, definition: HealthMetricDefinitio
   return { kind: 'valid', storedValue: toStoredMetricValue(definition.key, value) };
 }
 
+interface FractionDigits {
+  minimumFractionDigits: number;
+  maximumFractionDigits: number;
+}
+
+export interface MetricDisplay {
+  value: string;
+  unit: string;
+}
+
+const MILLILITRES_PER_LITRE = 1000;
+const WHOLE: FractionDigits = { minimumFractionDigits: 0, maximumFractionDigits: 0 };
+const WATER_LITRES_SHOWN: FractionDigits = { minimumFractionDigits: 1, maximumFractionDigits: 2 };
+const WATER_LITRES_TYPED: FractionDigits = { minimumFractionDigits: 1, maximumFractionDigits: 3 };
+
+function precisionOf(definition: HealthMetricDefinition): FractionDigits {
+  return { minimumFractionDigits: definition.precision, maximumFractionDigits: definition.precision };
+}
+
+function formatDecimal(value: number, digits: FractionDigits, useGrouping = true): string {
+  return new Intl.NumberFormat(DEFAULT_LOCALE, { ...digits, useGrouping }).format(value);
+}
+
+/** Typed water keeps every stored millilitre, so saving a prefilled value never rounds the day's total. */
 export function metricInputValue(storedValue: number, definition: HealthMetricDefinition): string {
-  const value = toDisplayMetricValue(definition.key, storedValue);
-  return definition.precision > 0 ? value.toFixed(definition.precision) : String(Math.round(value));
+  const digits = definition.key === 'water' ? WATER_LITRES_TYPED : precisionOf(definition);
+  return formatDecimal(toDisplayMetricValue(definition.key, storedValue), digits, false);
 }
 
 export const SIDE_QUEST_DAILY_REWARD_LIMIT = 3;
@@ -199,10 +225,16 @@ export function deriveThresholdOffer(definition: HealthMetricDefinition, date: s
   };
 }
 
-export function formatMetricValue(value: number, definition: HealthMetricDefinition): string {
-  const scaled = toDisplayMetricValue(definition.key, value);
-  const formatted = definition.precision > 0 ? scaled.toFixed(definition.precision) : Math.round(scaled).toLocaleString('en-US');
-  return definition.unit ? `${formatted} ${definition.unit}` : formatted;
+export function metricDisplay(storedValue: number, definition: HealthMetricDefinition): MetricDisplay {
+  if (definition.key !== 'water') return { value: formatDecimal(toDisplayMetricValue(definition.key, storedValue), precisionOf(definition)), unit: definition.unit };
+  const millilitres = Math.round(storedValue);
+  if (millilitres < MILLILITRES_PER_LITRE) return { value: formatDecimal(millilitres, WHOLE), unit: 'ml' };
+  return { value: formatDecimal(convertMlToLitres(millilitres), WATER_LITRES_SHOWN), unit: definition.unit };
+}
+
+export function formatMetricValue(storedValue: number, definition: HealthMetricDefinition): string {
+  const { value, unit } = metricDisplay(storedValue, definition);
+  return unit ? `${value} ${unit}` : value;
 }
 
 export interface QuickLogTileSource {

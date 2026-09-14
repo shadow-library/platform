@@ -34,6 +34,7 @@ import {
   type QuestLinkageOffer,
   type QuickLogCommand,
   type QuickLogCommandResult,
+  type QuickLogDispatchResult,
   type SideQuest,
   type SideQuestDraft,
   type SideQuestsView,
@@ -49,7 +50,7 @@ export interface QuickLogProvider {
   weight(): Promise<WeightView>;
   health(date: string): Promise<HealthView>;
   sideQuests(): Promise<SideQuestsView>;
-  dispatchCommand(command: QuickLogCommand, options?: DispatchOptions): Promise<QuickLogCommandResult>;
+  dispatchCommand(command: QuickLogCommand, options?: DispatchOptions): Promise<QuickLogDispatchResult>;
   /** The journal editor's unsaved text, kept outside the outbox. `date` is when it was written, so a caller can flag a draft carried over from an earlier day. */
   readJournalDraft(): Promise<{ date: string; text: string; mood: MoodValence | null } | null>;
   saveJournalDraft(text: string, mood: MoodValence | null): Promise<void>;

@@ -7,6 +7,7 @@ import {
   deriveCapAdvisory,
   deriveThresholdOffer,
   firstOfDayReward,
+  formatMetricValue,
   type HealthMetricDefinition,
   type HealthMetricEntry,
   journalExcerpt,
@@ -95,6 +96,36 @@ describe('quick-log entry validation', () => {
     expect(metricInputValue(7.25, sleep)).toBe('7.3');
     expect(metricInputValue(8310, steps)).toBe('8310');
   });
+
+  it('should prefill water with every stored millilitre so saving it again changes nothing', () => {
+    expect(metricInputValue(1650, water)).toBe('1.65');
+    expect(metricInputValue(1655, water)).toBe('1.655');
+    expect(metricInputValue(250, water)).toBe('0.25');
+    expect(metricInputValue(2000, water)).toBe('2.0');
+  });
+});
+
+describe('formatMetricValue', () => {
+  it('should show water in litres to two decimals, rounding halves the same way up and down', () => {
+    expect(formatMetricValue(1650, water)).toBe('1.65 l');
+    expect(formatMetricValue(1750, water)).toBe('1.75 l');
+    expect(formatMetricValue(1655, water)).toBe('1.66 l');
+    expect(formatMetricValue(1645, water)).toBe('1.65 l');
+    expect(formatMetricValue(1400, water)).toBe('1.4 l');
+    expect(formatMetricValue(2000, water)).toBe('2.0 l');
+  });
+
+  it('should show water below a litre in millilitres', () => {
+    expect(formatMetricValue(250, water)).toBe('250 ml');
+    expect(formatMetricValue(0, water)).toBe('0 ml');
+    expect(formatMetricValue(999.6, water)).toBe('1.0 l');
+  });
+
+  it('should round other metrics half up by their decimal value rather than their binary one', () => {
+    expect(formatMetricValue(7.05, sleep)).toBe('7.1 h');
+    expect(formatMetricValue(7.25, sleep)).toBe('7.3 h');
+    expect(formatMetricValue(8000, steps)).toBe('8,000');
+  });
 });
 
 describe('side quest rewards', () => {
@@ -136,6 +167,15 @@ describe('Today quick-log tiles', () => {
     const tiles = quickLogTiles({ date: '2026-08-24', currency: 'EUR', expenses: [], meals: [], metrics: [water], weights: [], journal: [] });
 
     expect(tiles.find(tile => tile.id === 'water')?.value).toBe('1.4 l');
+  });
+
+  it('should read a water tile under a litre in millilitres and keep a 1.65 l day exact', () => {
+    const entry = (value: number): HealthMetricEntry => ({ key: 'water', date: '2026-08-24', value, loggedAt: '2026-08-24T17:30:00.000Z', replacedValue: null, source: 'manual' });
+    const tileFor = (value: number): string | undefined =>
+      quickLogTiles({ date: '2026-08-24', currency: 'EUR', expenses: [], meals: [], metrics: [entry(value)], weights: [], journal: [] }).find(tile => tile.id === 'water')?.value;
+
+    expect(tileFor(250)).toBe('250 ml');
+    expect(tileFor(1650)).toBe('1.65 l');
   });
 });
 

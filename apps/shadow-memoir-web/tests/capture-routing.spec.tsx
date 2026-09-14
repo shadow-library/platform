@@ -309,6 +309,22 @@ describe('quick capture routing', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  it('should refuse a quick-capture metric line when the metric catalogue is missing', async () => {
+    const success = vi.spyOn(toast, 'success');
+    const warning = vi.spyOn(toast, 'warning');
+    const { posted } = renderSynced({ defaultCurrency: 'EUR', enabledCurrencies: ['EUR'], weekStart: 1 });
+
+    const field = await type('8000 steps');
+    fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Couldn’t save ‘8000 steps’: Health metrics aren’t set up for this account yet, so this can’t be saved.');
+    expect(warning).not.toHaveBeenCalled();
+    expect(success).not.toHaveBeenCalled();
+    expect((field as HTMLInputElement).value).toBe('8000 steps');
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(posted).toEqual([]);
+  });
+
   it('should not send a second command when the palette is closed and reopened mid-save', async () => {
     let release: () => void = () => undefined;
     const held = new Promise<void>(resolve => (release = resolve));

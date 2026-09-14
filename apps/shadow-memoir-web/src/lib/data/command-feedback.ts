@@ -16,6 +16,9 @@ const REJECTED_FALLBACK = 'The server didn’t accept this change.';
 const FAILED_FALLBACK = 'Something went wrong on our side.';
 const SUPERSEDED_FALLBACK = 'Another device got there first, so this change wasn’t applied.';
 
+export const METRICS_NOT_SET_UP_COPY = 'Health metrics aren’t set up for this account yet, so this can’t be saved.';
+export const THRESHOLD_METRICS_NOT_SET_UP_COPY = 'Health metrics aren’t set up for this account yet, so the threshold can’t be saved. Turn it off to save the quest.';
+
 const REFUSED_COPY: Record<CommandBoundary, string> = {
   'owner-changed': 'A different account is now signed in on this browser.',
   'principal-changed': 'A different account is now signed in on this browser.',

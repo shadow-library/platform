@@ -6,7 +6,11 @@
 }
 
 .deniedTitle {
-  font: inherit;
+  margin: 0;
+  font-size: var(--sh-text-h2);
+  line-height: var(--sh-text-h2--line-height);
+  font-weight: 600;
   letter-spacing: inherit;
-  color: inherit;
+  color: var(--sh-text-primary);
+  text-wrap: balance;
 }
