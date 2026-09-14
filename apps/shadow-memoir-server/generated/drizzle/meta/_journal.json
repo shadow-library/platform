@@ -22,6 +22,13 @@
       "when": 1789361196998,
       "tag": "0002_overconfident_bastion",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789364913791,
+      "tag": "0003_little_omega_flight",
+      "breakpoints": true
     }
   ]
 }

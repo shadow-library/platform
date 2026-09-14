@@ -33,6 +33,18 @@ export namespace Expense {
   export type Source = InferEnum<typeof expenseSource>;
 }
 
+export namespace ExpenseAudit {
+  export type Row = InferSelectModel<typeof expenseAudits>;
+  export type Action = InferEnum<typeof expenseAuditAction>;
+  export type Field = 'amountMinor' | 'currency' | 'occurredOn' | 'categoryId' | 'note' | 'merchant';
+
+  export interface Change {
+    field: Field;
+    from: string | null;
+    to: string | null;
+  }
+}
+
 export namespace Subscription {
   export type Row = InferSelectModel<typeof subscriptions>;
   export type Frequency = InferEnum<typeof subscriptionFrequency>;
@@ -46,6 +58,7 @@ export namespace FxRate {
 export const expenseSource = pgEnum('expense_source', ['manual', 'ocr']);
 export const subscriptionFrequency = pgEnum('subscription_frequency', ['weekly', 'monthly', 'quarterly', 'yearly', 'custom']);
 export const reminderLead = pgEnum('reminder_lead', ['on_day', '1_day', '2_day', '3_day', '1_week']);
+export const expenseAuditAction = pgEnum('expense_audit_action', ['created', 'updated', 'deleted', 'receipt_confirmed']);
 
 /** [Recommendation resolving ARCHITECTURE §10.3 O-5] user-scoped rows seeded from the 9 PRD §2.5 built-ins on first finance touch, not a code constant. */
 export const expenseCategories = pgTable(
@@ -146,6 +159,26 @@ export const expenses = pgTable(
   ],
 );
 
+/** `expense_id` is a historical id, not a foreign key: the `deleted` row outlives the expense it describes. */
+export const expenseAudits = pgTable(
+  'expense_audits',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    accountId: bigint('account_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    expenseId: uuid('expense_id').notNull(),
+    action: expenseAuditAction('action').notNull(),
+    changes: jsonb('changes').$type<ExpenseAudit.Change[]>().notNull(),
+    deviceId: uuid('device_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    syncSeq: bigint('sync_seq', { mode: 'bigint' })
+      .notNull()
+      .default(sql`nextval('sync_seq')`),
+  },
+  t => [index('expense_audits_account_id_expense_id_idx').on(t.accountId, t.expenseId), index('expense_audits_account_id_sync_seq_idx').on(t.accountId, t.syncSeq)],
+);
+
 /**
  * Not user-owned (ARCHITECTURE §14.1): one shared, date-scoped cache of public FX rates the
  * reconciliation sweep refreshes, never touched through `OwnerScopedRepository`. `rate` is nullable so
@@ -166,4 +199,5 @@ export const fxRates = pgTable(
 
 sensitive(expenses.merchant, 'sensitive');
 sensitive(expenses.note, 'sensitive');
+sensitive(expenseAudits.changes, 'sensitive');
 sensitive(subscriptions.note, 'sensitive');

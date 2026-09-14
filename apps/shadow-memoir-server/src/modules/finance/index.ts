@@ -1,3 +1,4 @@
+export * from './expense-audit.repository';
 export * from './expense-category.repository';
 export * from './expense.repository';
 export * from './finance-commands.service';

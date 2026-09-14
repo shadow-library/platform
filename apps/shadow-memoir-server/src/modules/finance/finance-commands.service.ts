@@ -12,9 +12,10 @@ import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from 
 import { ProgressionService } from '@modules/progression';
 import { ReceiptService } from '@modules/receipts';
 import { AppErrorCode } from '@server/classes';
-import { type DatabaseTransaction, type Expense, schema, type Subscription } from '@server/database';
+import { type DatabaseTransaction, type Expense, type ExpenseAudit, schema, type Subscription } from '@server/database';
 import { pseudoAccountId, TelemetryService } from '@server/telemetry';
 
+import { ExpenseAuditRepository } from './expense-audit.repository';
 import { ExpenseCategoryRepository } from './expense-category.repository';
 import { ExpenseRepository } from './expense.repository';
 import { FxRateRepository } from './fx-rate.repository';
@@ -45,6 +46,8 @@ const SUBSCRIPTION_CONFIRM_CYCLE = 'subscription.confirmCycle';
 const CATEGORY_SET_ARCHIVED = 'category.setArchived';
 
 const UNARCHIVABLE_CATEGORY_KEYS: ReadonlySet<string> = new Set(['uncat', 'subs']);
+
+const AUDITED_EXPENSE_FIELDS: readonly ExpenseAudit.Field[] = ['amountMinor', 'currency', 'occurredOn', 'categoryId', 'note', 'merchant'];
 
 function requireString(payload: Record<string, unknown>, field: string): string {
   const value = payload[field];
@@ -99,6 +102,14 @@ function optionalAmountMinor(payload: Record<string, unknown>, field = 'amountMi
   return field in payload ? requireAmountMinor(payload, field) : undefined;
 }
 
+function auditValue(value: bigint | string | null): string | null {
+  return value === null || value === '' ? null : String(value);
+}
+
+function expenseChanges(before: Expense.Row, after: Expense.Row): ExpenseAudit.Change[] {
+  return AUDITED_EXPENSE_FIELDS.map(field => ({ field, from: auditValue(before[field]), to: auditValue(after[field]) })).filter(change => change.from !== change.to);
+}
+
 /** Monthly-equivalent precompute (ARCHITECTURE §10.3): fast amortized reporting without re-deriving it per read. */
 function monthlyEquivalentMinor(amountMinor: bigint, frequency: string, customIntervalDays: number | null): bigint {
   if (frequency === 'weekly') return (amountMinor * 52n) / 12n;
@@ -123,6 +134,7 @@ export class FinanceCommandsService implements OnModuleInit {
     private readonly progressionService: ProgressionService,
     private readonly expenseCategoryRepository: ExpenseCategoryRepository,
     private readonly expenseRepository: ExpenseRepository,
+    private readonly expenseAuditRepository: ExpenseAuditRepository,
     private readonly subscriptionRepository: SubscriptionRepository,
     private readonly fxRateRepository: FxRateRepository,
     private readonly telemetry: TelemetryService,
@@ -194,6 +206,12 @@ export class FinanceCommandsService implements OnModuleInit {
       ...fx,
     });
 
+    await this.expenseAuditRepository.removeForExpense(tx, expense.id);
+    await this.expenseAuditRepository.append(tx, { accountId, expenseId: expense.id, action: 'created', deviceId: envelope.deviceId });
+    if (expense.receiptRef && (await this.receiptService.isStoredInTx(tx, expense.receiptRef))) {
+      await this.expenseAuditRepository.append(tx, { accountId, expenseId: expense.id, action: 'receipt_confirmed', deviceId: envelope.deviceId });
+    }
+
     this.telemetry.emit({
       name: 'expense_recorded',
       pseudoId: pseudoAccountId(accountId),
@@ -206,7 +224,7 @@ export class FinanceCommandsService implements OnModuleInit {
     return { status: 'applied', result: { id: expense.id } };
   }
 
-  private async updateExpense({ envelope, tx }: CommandContext): Promise<CommandResult> {
+  private async updateExpense({ accountId, envelope, tx }: CommandContext): Promise<CommandResult> {
     const payload = envelope.payload;
     const id = requireString(payload, 'id');
     const existing = await this.expenseRepository.findByIdInTx(tx, id);
@@ -234,16 +252,21 @@ export class FinanceCommandsService implements OnModuleInit {
 
     const updated = await this.expenseRepository.update(tx, id, values);
     if (!updated) throw AppErrorCode.FIN_003.create();
+
+    const changes = expenseChanges(existing, updated);
+    if (changes.length > 0) await this.expenseAuditRepository.append(tx, { accountId, expenseId: id, action: 'updated', changes, deviceId: envelope.deviceId });
     return { status: 'applied', result: { id: updated.id } };
   }
 
   /** Cascades to the receipt row + object (ARCHITECTURE §19.2 Lifecycle) — receipts are 1:1 with expenses, never shared. */
-  private async deleteExpense({ envelope, tx }: CommandContext): Promise<CommandResult> {
+  private async deleteExpense({ accountId, envelope, tx }: CommandContext): Promise<CommandResult> {
     const id = requireString(envelope.payload, 'id');
     const existing = await this.expenseRepository.findByIdInTx(tx, id);
     const removed = await this.expenseRepository.remove(tx, id);
     if (!removed) throw AppErrorCode.FIN_003.create();
     if (existing?.receiptRef) await this.receiptService.deleteForExpense(tx, existing.receiptRef);
+    await this.expenseAuditRepository.removeForExpense(tx, id);
+    await this.expenseAuditRepository.append(tx, { accountId, expenseId: id, action: 'deleted', deviceId: envelope.deviceId });
     return { status: 'applied', result: { id } };
   }
 
@@ -384,6 +407,8 @@ export class FinanceCommandsService implements OnModuleInit {
         .where(and(eq(schema.expenses.accountId, accountId), eq(schema.expenses.linkedSubscriptionId, subscriptionId), eq(schema.expenses.billingCycleDate, billingDate)));
       expense = existing;
     } else {
+      await this.expenseAuditRepository.removeForExpense(tx, expense.id);
+      await this.expenseAuditRepository.append(tx, { accountId, expenseId: expense.id, action: 'created', deviceId: envelope.deviceId });
       const nextDueDate = advanceDueDate(subscription, billingDate);
       await this.subscriptionRepository.advanceCycle(tx, subscriptionId, billingDate, nextDueDate);
       this.telemetry.emit({ name: 'subscription_cycle_confirmed', pseudoId: pseudoAccountId(accountId), occurredAtMs: Date.now(), frequency: subscription.frequency });

@@ -6,7 +6,7 @@ import path from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { bigserial, pgTable, varchar } from 'drizzle-orm/pg-core';
 import { Dispatcher, Module, type ShadowApplication, ShadowFactory } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
@@ -55,6 +55,7 @@ const APP_TABLES = new Set([
   'quest_logs',
   'accounts',
   'expenses',
+  'expense_audits',
   'subscriptions',
   'metrics',
   'metric_entries',
@@ -163,6 +164,23 @@ describe('Privacy canary suite (T-28)', () => {
     });
     coveredKeys.add('expenses.merchant');
     coveredKeys.add('expenses.note');
+    expect(lines).not.toContain(CANARY);
+  });
+
+  it('should not leak a canary merchant/note through the expense audit an expense.update records', async () => {
+    const id = Bun.randomUUIDv7();
+    await submit([envelope('expense.create', { id, amountMinor: 100, amountText: '1.00', currency: 'USD', categoryId: 'food', occurredOn: DATE })]);
+
+    const lines = await capture(async () => {
+      const result = await submit([envelope('expense.update', { id, merchant: CANARY, note: CANARY })]);
+      expect(result.outcomes[0]?.status).toBe('applied');
+    });
+    const [audit] = await db
+      .select()
+      .from(schema.expenseAudits)
+      .where(and(eq(schema.expenseAudits.expenseId, id), eq(schema.expenseAudits.action, 'updated')));
+    expect(JSON.stringify(audit?.changes)).toContain(CANARY);
+    coveredKeys.add('expense_audits.changes');
     expect(lines).not.toContain(CANARY);
   });
 

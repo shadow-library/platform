@@ -9,6 +9,7 @@ import { SchedulerModule } from '@modules/scheduler';
 import { SyncModule } from '@modules/sync';
 import { TelemetryModule } from '@server/telemetry';
 
+import { ExpenseAuditRepository } from './expense-audit.repository';
 import { ExpenseCategoryRepository } from './expense-category.repository';
 import { ExpenseRepository } from './expense.repository';
 import { FinanceCommandsService } from './finance-commands.service';
@@ -21,6 +22,7 @@ import { SubscriptionRepository } from './subscription.repository';
 @Module({
   imports: [DatabaseModule, MemoirAuthModule, CommandsModule, ProgressionModule, ReceiptsModule, SchedulerModule, SyncModule, TelemetryModule],
   providers: [
+    ExpenseAuditRepository,
     ExpenseCategoryRepository,
     ExpenseRepository,
     SubscriptionRepository,

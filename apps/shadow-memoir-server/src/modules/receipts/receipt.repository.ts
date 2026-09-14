@@ -8,7 +8,7 @@ import { Injectable } from '@shadow-library/app';
  * Importing user defined packages
  */
 import { OwnerScopedRepository } from '@modules/auth';
-import { type DatabaseTransaction, type Receipt, schema } from '@server/database';
+import { appendExpenseAudit, type DatabaseTransaction, type Receipt, schema } from '@server/database';
 
 /**
  * Defining types
@@ -40,9 +40,25 @@ export class ReceiptRepository extends OwnerScopedRepository {
     return (row as Receipt.Row) ?? null;
   }
 
-  async markStored(ref: string, sizeBytes: number, contentType: string): Promise<Receipt.Row | null> {
-    const [row] = await this.scopedUpdate(schema.receipts, { status: 'stored', sizeBytes, contentType }, eq(schema.receipts.ref, ref)).returning();
+  async findByRefForUpdateInTx(tx: DatabaseTransaction, ref: string): Promise<Receipt.Row | null> {
+    const [row] = await this.using(tx).scoped(schema.receipts, eq(schema.receipts.ref, ref)).for('update');
     return (row as Receipt.Row) ?? null;
+  }
+
+  /** Only the upload that moves a receipt out of `pending_upload` records it on the expense already pointing at it; `expense.create` records the opposite order. */
+  async markStored(ref: string, sizeBytes: number, contentType: string): Promise<Receipt.Row | null> {
+    return this.transaction(async tx => {
+      const scope = this.using(tx);
+      const [row] = await scope
+        .update(schema.receipts, { status: 'stored', sizeBytes, contentType }, eq(schema.receipts.ref, ref), eq(schema.receipts.status, 'pending_upload'))
+        .returning();
+      if (!row) return null;
+
+      const receipt = row as Receipt.Row;
+      const [expense] = await scope.scoped(schema.expenses, eq(schema.expenses.receiptRef, ref)).limit(1);
+      if (expense) await appendExpenseAudit(tx, { accountId: receipt.accountId, expenseId: String(expense['id']), action: 'receipt_confirmed' });
+      return receipt;
+    });
   }
 
   /** Owner-scoped removal for the confirm-step reject path (bad upload) and the delete endpoint; returns whether a row was actually removed. */

@@ -105,8 +105,9 @@ export async function seedFullAccount(db: PrimaryDatabase, accountId: bigint): P
     .returning();
   if (!subscription) throw AppError.internal('subscription seed failed');
 
+  const expenseId = Bun.randomUUIDv7();
   await db.insert(schema.expenses).values({
-    id: Bun.randomUUIDv7(),
+    id: expenseId,
     accountId,
     amountMinor: 500n,
     amountText: '5.00',
@@ -116,6 +117,7 @@ export async function seedFullAccount(db: PrimaryDatabase, accountId: bigint): P
     note: 'a sensitive expense note',
     occurredOn: today,
   });
+  await db.insert(schema.expenseAudits).values({ accountId, expenseId, action: 'updated', changes: [{ field: 'note', from: null, to: 'a sensitive expense note' }] });
 
   await db.insert(schema.metricEntries).values({ accountId, metricId: metric.id, date: today, value: '1234', source: 'manual' });
 

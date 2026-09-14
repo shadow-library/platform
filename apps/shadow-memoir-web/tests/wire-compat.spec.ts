@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { homeAmountOf } from '@/lib/data';
 import {
   type DeltaPage,
+  NEWER_DOMAINS,
   projectFinanceRows,
   projectWorldState,
   SNAPSHOT_DOMAINS,
   SYNC_DOMAINS,
+  SYNC_META_KEYS,
   type SyncCommand,
   SyncedFinanceProvider,
   toWireCommand,
@@ -185,5 +187,70 @@ describe('category archive (P1-18)', () => {
 
     await finance.reproject();
     expect((await finance.categories()).items.find(slice => slice.category.id === 'home')?.category.archived).toBe(true);
+  });
+});
+
+describe('expense audit contract (P1-19)', () => {
+  const EXPENSE_ID = '0192f1a2-7b3c-7d4e-8f50-1a2b3c4d5e6f';
+  const EXPENSE = { id: EXPENSE_ID, amountMinor: '520', amountText: '5.20', currency: 'EUR', categoryId: 'transport', occurredOn: '2026-08-24', note: null, merchant: null };
+
+  function audit(id: string, action: string, changes: Record<string, unknown>[] = []): Record<string, unknown> {
+    return { id, accountId: '1', expenseId: EXPENSE_ID, action, changes, deviceId: null, createdAt: '2026-08-24T09:00:00.000Z', syncSeq: id };
+  }
+
+  function page(cursor: string, domains: DeltaPage['domains'], tombstones: DeltaPage['tombstones'] = []): DeltaPage {
+    return { cursor, hasMore: false, domains, tombstones };
+  }
+
+  function requestedDomains(url: string): string[] {
+    return new URL(decodeURIComponent(url), 'http://memoir.test').searchParams.get('domains')?.split(',') ?? [];
+  }
+
+  it('should accept expense audits as a watermark domain whose earlier rows leave with a deleted expense', async () => {
+    expect(SYNC_DOMAINS).toContain('expense_audits');
+    expect(NEWER_DOMAINS).toContain('expense_audits');
+    expect(SNAPSHOT_DOMAINS).not.toContain('expense_audits');
+
+    const backing = sharedBacking();
+    const first = createTestEngine({
+      backing,
+      pages: [page('11', { expenses: [EXPENSE], expense_audits: [audit('10', 'created'), audit('11', 'updated', [{ field: 'note', from: null, to: 'Oat flat white' }])] })],
+    });
+    await first.engine.start();
+
+    const second = createTestEngine({
+      backing,
+      pages: [
+        page('14', { expenses: [], expense_audits: [audit('14', 'deleted')] }, [
+          { domain: 'expenses', recordId: EXPENSE_ID, syncSeq: '12' },
+          { domain: 'expense_audits', recordId: '10', syncSeq: '13' },
+          { domain: 'expense_audits', recordId: '11', syncSeq: '13' },
+        ]),
+      ],
+    });
+    await second.engine.start();
+
+    expect(await second.store.readDomain('expense_audits')).toEqual([expect.objectContaining({ id: '14', action: 'deleted', changes: [] })]);
+    expect(await second.store.readDomain('expenses')).toEqual([]);
+    expect(() => projectFinanceRows(second.engine.domains())).not.toThrow();
+  });
+
+  it('should backfill expense audits from zero once a server starts serving them', async () => {
+    const backing = sharedBacking();
+    const older = createTestEngine({ backing, pages: [page('42', { expenses: [EXPENSE] })] });
+    await older.engine.start();
+    expect(await older.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['expenses@1']);
+
+    const upgraded = createTestEngine({
+      backing,
+      pages: [page('43', { expenses: [], expense_audits: [] }), page('11', { expense_audits: [audit('10', 'created'), audit('11', 'updated')] })],
+    });
+    await upgraded.engine.start();
+
+    expect(upgraded.server.deltaRequests[1]).toContain('since=0');
+    expect(requestedDomains(upgraded.server.deltaRequests[1]!)).toEqual(['expense_audits']);
+    expect(await upgraded.store.readMeta(SYNC_META_KEYS.cursor)).toBe('43');
+    expect((await upgraded.store.readDomain('expense_audits')).map(row => row['id'])).toEqual(['10', '11']);
+    expect(await upgraded.store.readMeta(SYNC_META_KEYS.coveredDomains)).toEqual(['expense_audits@1', 'expenses@1']);
   });
 });

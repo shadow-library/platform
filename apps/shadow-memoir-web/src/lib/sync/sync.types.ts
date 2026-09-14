@@ -11,6 +11,7 @@ export type SyncDomain =
   | 'devices'
   | 'expenses'
   | 'expense_categories'
+  | 'expense_audits'
   | 'subscriptions'
   | 'journal_entries'
   | 'meals'
@@ -40,6 +41,7 @@ export const SYNC_DOMAINS: SyncDomain[] = [
   'devices',
   'expenses',
   'expense_categories',
+  'expense_audits',
   'subscriptions',
   'journal_entries',
   'meals',
@@ -62,7 +64,7 @@ export const SYNC_DOMAINS: SyncDomain[] = [
 ];
 
 /** Domains a server released before them refuses; one that refuses without naming the domain loses all of these for the session. */
-export const NEWER_DOMAINS: SyncDomain[] = ['progress_counters', 'hero_events'];
+export const NEWER_DOMAINS: SyncDomain[] = ['progress_counters', 'hero_events', 'expense_audits'];
 
 /**
  * The keyset domains a mirror pulled before coverage was recorded already holds, at row version 1. Every later

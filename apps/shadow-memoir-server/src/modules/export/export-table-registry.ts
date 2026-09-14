@@ -47,6 +47,7 @@ export const EXPORT_TABLE_REGISTRY: readonly ExportTableEntry[] = [
   { key: 'expense_categories', table: schema.expenseCategories, cursor: schema.expenseCategories.id, cursorKey: 'id' },
   { key: 'subscriptions', table: schema.subscriptions, cursor: schema.subscriptions.id, cursorKey: 'id' },
   { key: 'expenses', table: schema.expenses, cursor: schema.expenses.id, cursorKey: 'id' },
+  { key: 'expense_audits', table: schema.expenseAudits, cursor: schema.expenseAudits.id, cursorKey: 'id' },
   { key: 'metrics', table: schema.metrics, cursor: schema.metrics.id, cursorKey: 'id' },
   { key: 'metric_entries', table: schema.metricEntries, cursor: schema.metricEntries.id, cursorKey: 'id' },
   { key: 'progress_counters', table: schema.progressCounters, cursor: schema.progressCounters.accountId, cursorKey: 'accountId' },

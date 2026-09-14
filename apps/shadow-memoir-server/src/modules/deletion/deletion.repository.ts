@@ -63,6 +63,7 @@ const PURGE_ORDER = [
   'quests',
   'metric_entries',
   'metrics',
+  'expense_audits',
   'expenses',
   'subscriptions',
   'expense_categories',

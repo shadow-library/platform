@@ -93,6 +93,7 @@ describe('Export assembly (T-29)', () => {
       'expense_categories',
       'subscriptions',
       'expenses',
+      'expense_audits',
       'metrics',
       'metric_entries',
       'progress_counters',

@@ -97,8 +97,8 @@ export class ReceiptService {
       throw AppErrorCode.RCP_003.create({ maxBytes });
     }
 
-    const updated = await this.receiptRepository.markStored(ref, head.size, head.contentType);
-    if (!updated) throw AppErrorCode.RCP_001.create();
+    const updated = (await this.receiptRepository.markStored(ref, head.size, head.contentType)) ?? (await this.receiptRepository.findByRef(ref));
+    if (updated?.status !== 'stored') throw AppErrorCode.RCP_001.create();
     return updated;
   }
 
@@ -125,6 +125,11 @@ export class ReceiptService {
       logMetric(this.logger, 'Receipt object delete failed during expense-deletion cascade', 'receipts.cascade_object_delete_failed', 1, { ref }, 'warn');
       this.logger.warn('Receipt object delete failed during expense-deletion cascade', { ref, error });
     }
+  }
+
+  async isStoredInTx(tx: DatabaseTransaction, ref: string): Promise<boolean> {
+    const receipt = await this.receiptRepository.findByRefForUpdateInTx(tx, ref);
+    return receipt?.status === 'stored';
   }
 
   private expiresAt(): string {
