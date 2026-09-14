@@ -1,18 +1,25 @@
+import { Authenticated, BotPermission, RequirePermission } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, type HttpResponse, HttpStatus, Params, Post, Put, Res, RespondFor } from '@shadow-library/fastify';
 
-import { ApiKeyAuthenticated } from '@modules/api-key';
+import { CURATE_PERMISSION } from '@server/constants';
 
 import { IngestChapterBody, IngestChapterParams, IngestCoverBody, IngestManifestResponse, IngestNovelBody, IngestNovelParams, IngestNovelResponse } from './curated-ingest.dto';
 import { CuratedIngestService } from './curated-ingest.service';
 
 /**
- * The scraper-facing surface: authenticated by an API key alone, and deliberately NOT `@Authenticated()`.
- * The package `AuthGuard` sorts ahead of `ApiKeyGuard` and would reject a key-only caller with `IAM_001`
- * before it ever ran, so the two decorators are mutually exclusive rather than complementary. Nothing here
- * is project-id addressed either, which keeps `ProjectOwnershipGuard` out of the picture — ownership is
- * proven against the key owner while resolving the source reference.
+ * The scraper-facing surface, reached by the curation bot with an `sl_bot_…` key and by a curator from the
+ * web app. Nothing here is project-id addressed, which keeps `ProjectOwnershipGuard` out of the picture —
+ * ownership is proven against the caller while resolving the source reference.
+ *
+ * Both decorators name the same permission on purpose: `@BotPermission` is evaluated for bots alone, so
+ * without `@RequirePermission` any authenticated person could mint a `curated` project — which publishes
+ * under a third party's `originalAuthor` and is exactly what `novel-forge:curate` exists to gate. The guard
+ * unions the two for a bot, so a bot still answers one PDP check. `highRisk` pins that decision's TTL to a
+ * minute, matching `ProjectOwnershipGuard`'s curator check.
  */
-@ApiKeyAuthenticated()
+@Authenticated()
+@RequirePermission(CURATE_PERMISSION, { highRisk: true })
+@BotPermission(CURATE_PERMISSION)
 @HttpController('/api/v1/ingest')
 export class CuratedIngestController {
   constructor(private readonly ingestService: CuratedIngestService) {}

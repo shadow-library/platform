@@ -239,61 +239,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/api-keys': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Api Keys */
-    get: operations['get_api_v1_api_keys'];
-    put?: never;
-    /** Create Api Key */
-    post: operations['post_api_v1_api_keys'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/api-keys/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Revoke Api Key */
-    delete: operations['delete_api_v1_api_keys_id'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/api-keys/current': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    /**
-     * Revoke Current Api Key
-     * @description Revokes the key presented in the `x-api-key` header, so a client rotating its credential can retire the old one holding nothing but that old one. Not idempotent: a repeat call is answered 401 `KEY_002` by the authentication guard, which a client should treat as already-retired rather than as a failure.
-     */
-    delete: operations['delete_api_v1_api_keys_current'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/internal/bots/{botId}/ownership': {
     parameters: {
       query?: never;
@@ -3230,45 +3175,6 @@ export interface components {
       };
       /** @description Order this plugin contributes in relative to the other plugins enabled on the novel. Lower runs first. This request replaces the stored row, so omitting it resets the order to 0. */
       ordinal?: number;
-    };
-    CreateApiKeyBody: {
-      /** @description Human-readable label; it is the only way to tell two keys apart once the secret is gone. */
-      name: string;
-    };
-    CreateApiKeyResponse: {
-      id: string;
-      name: string;
-      /** @description The first 8 characters of the secret, for identification only — it authenticates nothing. */
-      keyPrefix: string;
-      /** Format: date-time */
-      createdAt: string;
-      /**
-       * Format: date-time
-       * @description Recorded at most once a minute, so it lags real usage by up to 60 seconds.
-       */
-      lastUsedAt?: null | string;
-      /** Format: date-time */
-      revokedAt?: null | string;
-      /** @description The plaintext secret. Returned by this call alone — the server keeps only its hash and can never show it again. */
-      secret: string;
-    };
-    ListApiKeysResponse: {
-      keys: components['schemas']['ApiKeyResponse'][];
-    };
-    ApiKeyResponse: {
-      id: string;
-      name: string;
-      /** @description The first 8 characters of the secret, for identification only — it authenticates nothing. */
-      keyPrefix: string;
-      /** Format: date-time */
-      createdAt: string;
-      /**
-       * Format: date-time
-       * @description Recorded at most once a minute, so it lags real usage by up to 60 seconds.
-       */
-      lastUsedAt?: null | string;
-      /** Format: date-time */
-      revokedAt?: null | string;
     };
     BotOwnershipResponse: {
       projects: number;
@@ -6904,146 +6810,6 @@ export interface operations {
         projectId: string;
         pluginId: string;
       };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_api_keys: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListApiKeysResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_api_keys: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateApiKeyBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CreateApiKeyResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_api_keys_id: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_api_keys_current: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
       cookie?: never;
     };
     requestBody?: never;
@@ -15642,10 +15408,6 @@ export type PluginActionSurface = components['schemas']['PluginActionSurface'];
 export type ProjectPluginResponse = components['schemas']['ProjectPluginResponse'];
 export type ProjectPluginResponse1 = components['schemas']['ProjectPluginResponse1'];
 export type EnablePluginBody = components['schemas']['EnablePluginBody'];
-export type CreateApiKeyBody = components['schemas']['CreateApiKeyBody'];
-export type CreateApiKeyResponse = components['schemas']['CreateApiKeyResponse'];
-export type ListApiKeysResponse = components['schemas']['ListApiKeysResponse'];
-export type ApiKeyResponse = components['schemas']['ApiKeyResponse'];
 export type BotOwnershipResponse = components['schemas']['BotOwnershipResponse'];
 export type TransferOwnershipBody = components['schemas']['TransferOwnershipBody'];
 export type TransferOwnershipResponse = components['schemas']['TransferOwnershipResponse'];

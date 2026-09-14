@@ -207,7 +207,8 @@ function ProgressCard({ novelId, status, onOpenQueue }: ProgressCardProps): Reac
         <span className={styles.mono}>
           PUT /api/v1/ingest/projects/{novelId}/originals/{'{chapter}'}
         </span>{' '}
-        with an API key issued from <span className={styles.mono}>POST /api/v1/api-keys</span>.
+        with an organisation bot key as <span className={styles.mono}>Authorization: Bearer sl_bot_…</span>. The bot needs the Curated ingest · Write grant and must own the novel —
+        a bot only reaches novels it created itself — so an admin sets one up in Shadow Identity first.
       </p>
     </div>
   );
@@ -531,7 +532,7 @@ function ChaptersTab({ novelId, status, page, filter, lastChapter, onPage, onFil
         error={chaptersQuery.error}
         isEmpty={total === 0}
         emptyTitle="No original chapters yet"
-        emptyDescription="Paste the first chapter in its original language, or push chapters from another app with an API key."
+        emptyDescription="Paste the first chapter in its original language, or push chapters from another app with an organisation bot key."
         emptyAction={{ label: 'Add chapter', onClick: onAddChapter }}
       >
         <div className={styles.table}>

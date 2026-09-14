@@ -1,13 +1,13 @@
 import { eq } from 'drizzle-orm';
+import { Authenticated, BotPermission, RequirePermission } from '@shadow-library/auth/module';
 import { AppError, Logger } from '@shadow-library/common';
-import { Body, ContextService, Get, HttpController, type HttpResponse, HttpStatus, Params, Put, Res, RespondFor } from '@shadow-library/fastify';
+import { Body, Get, HttpController, type HttpResponse, HttpStatus, Params, Put, Res, RespondFor } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { ActorService } from '@modules/actor';
-import { ApiKeyAuthenticated } from '@modules/api-key';
 import { AppErrorCode } from '@server/classes';
 import { isOwnedBy } from '@server/common';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, CURATE_PERMISSION } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { OriginalChapterBody, OriginalsManifestResponse, TranslationChapterParams, TranslationParams } from '../translation/translation.dto';
@@ -15,15 +15,19 @@ import { TranslationService } from '../translation/translation.service';
 import { type IngestAction, IngestAuditService, type IngestOutcome } from './ingest-audit.service';
 
 /**
- * The external translation app's door onto the originals (translation design D9), authenticated by an API
- * key alone and deliberately NOT `@Authenticated()` — the constraint documented on `CuratedIngestController`.
+ * The external translation app's door onto the originals (translation design D9), reached by the curation
+ * bot or by a curator holding the project.
  *
- * Unlike that controller this one IS project-id addressed, so the app-global `ProjectOwnershipGuard` also
- * runs and answers a foreign or absent project with `PRJ_001` before the handler is reached. The ownership
- * check below is therefore the audited one rather than the only one: it keeps the trail truthful if the
- * guard's path matching ever changes, and answers with the `ING_001` shape the rest of the ingest surface uses.
+ * The permission pair is `CuratedIngestController`'s, for its reasons. Unlike that controller this one IS
+ * project-id addressed, so the app-global `ProjectOwnershipGuard` also runs and answers a foreign or absent
+ * project with `PRJ_001` before the handler is reached — but a stage later, so a caller without the permission
+ * is answered `IAM_002` without the route ever revealing whether the project exists. The ownership check below
+ * is therefore the audited one rather than the only one: it keeps the trail truthful if the guard's path
+ * matching ever changes, and answers with the `ING_001` shape the rest of the ingest surface uses.
  */
-@ApiKeyAuthenticated()
+@Authenticated()
+@RequirePermission(CURATE_PERMISSION, { highRisk: true })
+@BotPermission(CURATE_PERMISSION)
 @HttpController('/api/v1/ingest/projects/:projectId')
 export class OriginalsIngestController {
   private readonly logger = Logger.getLogger(APP_NAME, OriginalsIngestController.name);
@@ -32,7 +36,6 @@ export class OriginalsIngestController {
   constructor(
     private readonly translationService: TranslationService,
     private readonly actorService: ActorService,
-    private readonly context: ContextService,
     private readonly audit: IngestAuditService,
     databaseService: DatabaseService,
   ) {
@@ -82,9 +85,8 @@ export class OriginalsIngestController {
 
   /** The trail must never displace the answer: a failed audit write is logged and swallowed so the caller still receives its own status. */
   private async record(action: IngestAction, projectId: bigint, outcome: IngestOutcome): Promise<void> {
-    const apiKeyId = this.context.getAuthPrincipal().claims?.['api_key_id'];
     await this.audit
-      .record({ apiKeyId: typeof apiKeyId === 'string' ? BigInt(apiKeyId) : null, action, sourceRef: `project:${projectId}`, projectId, outcome })
+      .record({ action, sourceRef: `project:${projectId}`, projectId, outcome })
       .catch((cause: Error) => this.logger.error('could not record an originals ingest attempt', { projectId: projectId.toString(), action, reason: cause.message }));
   }
 }

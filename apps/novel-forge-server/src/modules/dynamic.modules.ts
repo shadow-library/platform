@@ -13,7 +13,6 @@ import { HttpCoreModule } from '@shadow-library/modules';
  * Importing user defined packages
  */
 import { AiModule } from '@modules/ai';
-import { ApiKeyModule } from '@modules/api-key';
 import { AppAuthModule } from '@modules/auth';
 import { BibleModule } from '@modules/bible';
 import { BotOwnershipModule } from '@modules/bot-ownership';
@@ -53,7 +52,6 @@ export const HttpRouteModule = FastifyModule.forRoot({
     AppHttpCoreModule,
     AppAuthModule,
     AiModule,
-    ApiKeyModule,
     BotOwnershipModule,
     CuratedIngestModule,
     EventsModule,

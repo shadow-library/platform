@@ -44,8 +44,8 @@ describe('ActorService', () => {
   });
 
   it('should attribute a new project to the bot organisation, and never to a user one', () => {
-    expect(projectOwnerColumns(actorFor(bot).current())).toEqual({ ownerKind: 'bot', ownerId: BigInt(1001), organisationId: BigInt(7001) });
-    expect(projectOwnerColumns(actorFor(user).current())).toEqual({ ownerKind: 'user', ownerId: BigInt(1001), organisationId: null });
+    expect(projectOwnerColumns(actorFor(bot).current())).toEqual({ ownerKind: 'bot', ownerId: BigInt(1001), organisationId: BigInt(7001), sharedWithOrg: true });
+    expect(projectOwnerColumns(actorFor(user).current())).toEqual({ ownerKind: 'user', ownerId: BigInt(1001), organisationId: null, sharedWithOrg: false });
   });
 });
 

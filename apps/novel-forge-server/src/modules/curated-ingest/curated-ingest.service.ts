@@ -1,7 +1,6 @@
 import { and, asc, eq, isNotNull, max } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
-import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { chapterContentHash } from '@shadow-library/sdk/publishing';
 
@@ -31,7 +30,6 @@ export class CuratedIngestService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly actorService: ActorService,
-    private readonly context: ContextService,
     private readonly projectService: ProjectService,
     private readonly audit: IngestAuditService,
   ) {
@@ -50,16 +48,17 @@ export class CuratedIngestService {
       return { projectId: existing.id, created: false };
     }
 
+    const owner = this.owner();
     // Only a genuinely new source reaches here — an existing one returned above — so the cap bounds the
     // per-owner novel count without ever blocking an idempotent re-push of an already-ingested source.
-    await assertUnderProjectCap(this.db, this.owner());
+    await assertUnderProjectCap(this.db, owner);
 
     const created = await this.db.transaction(async rawTx => {
       const tx = rawTx as unknown as PrimaryDatabase;
       const [project] = await tx
         .insert(schema.projects)
         .values({
-          ...projectOwnerColumns(this.owner()),
+          ...projectOwnerColumns(owner),
           name: body.title,
           kind: 'curated' as const,
           title: body.title,
@@ -213,8 +212,7 @@ export class CuratedIngestService {
     return this.actorService.current();
   }
 
-  private async record(action: IngestAction, sourceRef: string, outcome: IngestOutcome, projectId: bigint | null): Promise<void> {
-    const apiKeyId = this.context.getAuthPrincipal().claims?.['api_key_id'];
-    await this.audit.record({ apiKeyId: typeof apiKeyId === 'string' ? BigInt(apiKeyId) : null, action, sourceRef, projectId, outcome });
+  private record(action: IngestAction, sourceRef: string, outcome: IngestOutcome, projectId: bigint | null): Promise<void> {
+    return this.audit.record({ action, sourceRef, projectId, outcome });
   }
 }

@@ -1,5 +1,5 @@
 import { SQL } from 'bun';
-import { beforeEach, describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import { asc, eq } from 'drizzle-orm';
 import { type FastifyRouter } from '@shadow-library/fastify';
 import { chapterContentHash } from '@shadow-library/sdk/publishing';
@@ -7,7 +7,7 @@ import { chapterContentHash } from '@shadow-library/sdk/publishing';
 import { CURATE_PERMISSION } from '@server/constants';
 import { schema } from '@server/database';
 import { TestEnvironment } from '@tests/test-environment';
-import { TEST_ORG, TEST_USER, testIdP } from '@tests/test-idp';
+import { issueTestBotKey, issueTestToken, TEST_BOT_ORG, TEST_ORG, TEST_USER, testIdP } from '@tests/test-idp';
 
 const pgAvailable = await (async () => {
   try {
@@ -22,6 +22,9 @@ const pgAvailable = await (async () => {
 
 testIdP.grantPermission({ kind: 'user', sub: TEST_USER.userId }, TEST_ORG, CURATE_PERMISSION);
 
+const TRANSLATION_BOT_ID = 301n;
+const translationKey = issueTestBotKey(TRANSLATION_BOT_ID.toString(), [CURATE_PERMISSION]);
+
 const testEnv = new TestEnvironment('originals_ingest');
 
 const CHAPTER_ONE = { title: '第一章', content: '叶凡站在青云宗的山门前，抬头望着漫天星辰。' };
@@ -30,29 +33,31 @@ const CHAPTER_TWO = { title: '第二章', content: '第二日清晨，云海翻�
 describe.if(pgAvailable)('Originals ingest', () => {
   testEnv.init();
 
-  let secret = '';
-
-  beforeEach(async () => {
-    const response = await testEnv.getRouter().mockRequest().post('/api/v1/api-keys').body({ name: 'translator' });
-    secret = response.json().secret as string;
-  });
-
   const ingest = (): FastifyRouter => {
     const router = testEnv.getRouter({ authenticated: false });
-    const key = secret;
     return new Proxy(router, {
       get(target, property, receiver) {
         if (property !== 'mockRequest') return Reflect.get(target, property, receiver) as unknown;
-        return () => target.mockRequest().headers({ 'x-api-key': key });
+        return () => target.mockRequest().headers({ authorization: `Bearer ${translationKey}` });
       },
     });
   };
 
-  async function createProject(ownerId = BigInt(TEST_USER.userId)): Promise<bigint> {
+  async function createProject(ownerId = TRANSLATION_BOT_ID): Promise<bigint> {
     const [project] = await testEnv
       .getPostgresClient()
       .insert(schema.projects)
-      .values({ ownerId, name: `originals-${Math.random()}`, kind: 'translation', originalLanguage: 'zh' })
+      .values({ ownerKind: 'bot', ownerId, organisationId: BigInt(TEST_BOT_ORG), name: `originals-${Math.random()}`, kind: 'translation', originalLanguage: 'zh' })
+      .returning();
+    if (!project) throw new Error('failed to seed project');
+    return project.id;
+  }
+
+  async function createUserProject(): Promise<bigint> {
+    const [project] = await testEnv
+      .getPostgresClient()
+      .insert(schema.projects)
+      .values({ ownerKind: 'user', ownerId: BigInt(TEST_USER.userId), name: `originals-${Math.random()}`, kind: 'translation', originalLanguage: 'zh' })
       .returning();
     if (!project) throw new Error('failed to seed project');
     return project.id;
@@ -63,14 +68,38 @@ describe.if(pgAvailable)('Originals ingest', () => {
 
   const auditRows = () => testEnv.getPostgresClient().select().from(schema.ingestAuditLog).orderBy(asc(schema.ingestAuditLog.id));
 
-  it('should reject a request carrying no api key', async () => {
+  it('should reject a request carrying no credential', async () => {
     const projectId = await createProject();
     const response = await testEnv.getRouter({ authenticated: false }).mockRequest().put(`/api/v1/ingest/projects/${projectId}/originals/1`).body(CHAPTER_ONE);
     expect(response.statusCode).toBe(401);
-    expect(response.json().code).toBe('KEY_001');
+    expect(response.json().code).toBe('IAM_001');
   });
 
-  it('should land an original for a key-only caller and audit it against the project reference', async () => {
+  /** The permission is checked at `preValidation`, a stage ahead of `ProjectOwnershipGuard`, so the refusal never depends on the project existing. */
+  it('should refuse an authenticated user who does not hold the curate permission', async () => {
+    const projectId = await createUserProject();
+    const token = await issueTestToken({ sub: '9999' });
+    const response = await testEnv
+      .getRouter({ authenticated: false })
+      .mockRequest()
+      .headers({ authorization: `Bearer ${token}` })
+      .put(`/api/v1/ingest/projects/${projectId}/originals/1`)
+      .body(CHAPTER_ONE);
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().code).toBe('IAM_002');
+    expect(await testEnv.getPostgresClient().$count(schema.chapters, eq(schema.chapters.projectId, projectId))).toBe(0);
+  });
+
+  it('should land an original for a human holding the curate permission on their own project', async () => {
+    const projectId = await createUserProject();
+    const response = await testEnv.getRouter().mockRequest().put(`/api/v1/ingest/projects/${projectId}/originals/1`).body(CHAPTER_ONE);
+
+    expect(response.statusCode).toBe(201);
+    expect(await auditRows()).toMatchObject([{ action: 'original.push', outcome: 'created', actorKind: 'user', actorId: BigInt(TEST_USER.userId), botKeyId: null }]);
+  });
+
+  it('should land an original for the bot and audit it against the project reference', async () => {
     const projectId = await createProject();
 
     const created = await push(projectId, 1, CHAPTER_ONE);
@@ -79,7 +108,9 @@ describe.if(pgAvailable)('Originals ingest', () => {
     const chapter = await testEnv.getPostgresClient().query.chapters.findFirst({ where: eq(schema.chapters.projectId, projectId) });
     expect(chapter).toMatchObject({ number: 1, originalTitle: CHAPTER_ONE.title, originalContent: CHAPTER_ONE.content, content: null, locked: false });
 
-    expect(await auditRows()).toMatchObject([{ action: 'original.push', sourceRef: `project:${projectId}`, projectId, outcome: 'created' }]);
+    expect(await auditRows()).toMatchObject([
+      { action: 'original.push', sourceRef: `project:${projectId}`, projectId, outcome: 'created', actorKind: 'bot', actorId: TRANSLATION_BOT_ID },
+    ]);
   });
 
   it('should answer an identical re-push with 204 and an overwrite with 200', async () => {
@@ -105,7 +136,7 @@ describe.if(pgAvailable)('Originals ingest', () => {
    * property that matters: a foreign project must be indistinguishable from one that does not exist.
    */
   it('should answer a foreign project exactly like an absent one', async () => {
-    const foreign = await createProject(BigInt(TEST_USER.userId) + 1n);
+    const foreign = await createProject(TRANSLATION_BOT_ID + 1n);
 
     const pushed = await push(foreign, 1, CHAPTER_ONE);
     const manifest = await ingest().mockRequest().get(`/api/v1/ingest/projects/${foreign}/originals`);

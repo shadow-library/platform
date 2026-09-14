@@ -16,15 +16,24 @@ export interface BotActor extends OwnerRef {
 
 export type Actor = UserActor | BotActor;
 
-/** The owner columns a new `projects` row takes from its creator; `organisationId` is set only for a bot. */
+/** The owner columns a new `projects` row takes from its creator; `organisationId` and `sharedWithOrg` are set only for a bot. */
 export interface ProjectOwnerColumns {
   ownerKind: Actor['kind'];
   ownerId: bigint;
   organisationId: bigint | null;
+  sharedWithOrg: boolean;
 }
 
+/**
+ * A bot works on its organisation's behalf and nobody can hand a record back to it — the ownership guard's
+ * sharing branch admits users only — so anything a bot creates is shared with its organisation from the
+ * start. Unshared, a bot-owned project would be reachable by that one bot and by no person at all. The rule
+ * lives here rather than at each call site so every create path agrees: create, clone, novel import and
+ * curated ingest. A user-owned project carries no organisation, so sharing it would share it with nobody.
+ */
 export function projectOwnerColumns(actor: Actor): ProjectOwnerColumns {
-  return { ownerKind: actor.kind, ownerId: actor.id, organisationId: actor.kind === 'bot' ? actor.organisationId : null };
+  const isBot = actor.kind === 'bot';
+  return { ownerKind: actor.kind, ownerId: actor.id, organisationId: isBot ? actor.organisationId : null, sharedWithOrg: isBot };
 }
 
 function toId(value: string | undefined): bigint | null {

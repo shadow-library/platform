@@ -1,13 +1,13 @@
 import { SQL } from 'bun';
-import { beforeEach, describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import { and, asc, eq } from 'drizzle-orm';
 import { type FastifyRouter } from '@shadow-library/fastify';
 import { chapterContentHash } from '@shadow-library/sdk/publishing';
 
 import { CURATE_PERMISSION } from '@server/constants';
 import { schema } from '@server/database';
-import { TestEnvironment } from '@tests/test-environment';
-import { TEST_ORG, TEST_USER, testIdP } from '@tests/test-idp';
+import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
+import { AUTH_AUDIENCE, issueTestBotKey, issueTestToken, TEST_BOT_ORG, TEST_ORG, TEST_USER, testIdP } from '@tests/test-idp';
 
 const pgAvailable = await (async () => {
   try {
@@ -22,6 +22,15 @@ const pgAvailable = await (async () => {
 
 testIdP.grantPermission({ kind: 'user', sub: TEST_USER.userId }, TEST_ORG, CURATE_PERMISSION);
 
+/** A curator of the bot's own organisation — TEST_USER's `org-test` is not numeric, so it can never match a bot's. */
+const ORG_CURATOR = '4242';
+const ORG_MEMBER = '4243';
+testIdP.grantPermission({ kind: 'user', sub: ORG_CURATOR }, TEST_BOT_ORG, CURATE_PERMISSION);
+
+const CURATION_BOT_ID = 401n;
+const curationKey = issueTestBotKey(CURATION_BOT_ID.toString(), [CURATE_PERMISSION]);
+const uncuratedKey = issueTestBotKey('402', []);
+
 const testEnv = new TestEnvironment('curated_ingest_test');
 
 const SOURCE_REF = 'mvlempyr:1234';
@@ -30,23 +39,17 @@ const NOVEL = { title: 'A Borrowed Sky', synopsis: 'A courier smuggles weather a
 describe.if(pgAvailable)('Curated ingest', () => {
   testEnv.init();
 
-  let secret = '';
-
-  beforeEach(async () => {
-    const response = await testEnv.getRouter().mockRequest().post('/api/v1/api-keys').body({ name: 'scraper' });
-    secret = response.json().secret as string;
-  });
-
-  const ingest = (): FastifyRouter => {
+  const asBot = (key: string): FastifyRouter => {
     const router = testEnv.getRouter({ authenticated: false });
-    const key = secret;
     return new Proxy(router, {
       get(target, property, receiver) {
         if (property !== 'mockRequest') return Reflect.get(target, property, receiver) as unknown;
-        return () => target.mockRequest().headers({ 'x-api-key': key });
+        return () => target.mockRequest().headers({ authorization: `Bearer ${key}` });
       },
     });
   };
+
+  const ingest = (): FastifyRouter => asBot(curationKey);
 
   const createNovel = async (sourceRef = SOURCE_REF): Promise<bigint> => {
     const response = await ingest().mockRequest().put(`/api/v1/ingest/novels/${sourceRef}`).body(NOVEL);
@@ -62,24 +65,100 @@ describe.if(pgAvailable)('Curated ingest', () => {
   const auditRows = () => testEnv.getPostgresClient().select().from(schema.ingestAuditLog).orderBy(asc(schema.ingestAuditLog.id));
 
   describe('authentication', () => {
-    it('should reject a request carrying no api key', async () => {
+    it('should reject a request carrying no credential', async () => {
       const response = await testEnv.getRouter({ authenticated: false }).mockRequest().put(`/api/v1/ingest/novels/${SOURCE_REF}`).body(NOVEL);
       expect(response.statusCode).toBe(401);
-      expect(response.json().code).toBe('KEY_001');
+      expect(response.json().code).toBe('IAM_001');
     });
 
-    it('should reject an unknown api key on every ingest route', async () => {
+    it('should treat an x-api-key request as unauthenticated, with no special handling left', async () => {
       const router = testEnv.getRouter({ authenticated: false });
       const responses = await Promise.all([
         router.mockRequest().headers({ 'x-api-key': 'nfk_absent' }).get(`/api/v1/ingest/novels/${SOURCE_REF}/manifest`),
         router.mockRequest().headers({ 'x-api-key': 'nfk_absent' }).post(`/api/v1/ingest/novels/${SOURCE_REF}/cover`).body({ mime: 'image/png', image: 'AA==' }),
       ]);
       expect(responses.map(response => response.statusCode)).toEqual([401, 401]);
+      expect(responses.map(response => response.json().code)).toEqual(['IAM_001', 'IAM_001']);
+    });
+
+    it('should refuse a bot that does not hold the curate permission on every ingest route', async () => {
+      const stranger = asBot(uncuratedKey);
+      const responses = await Promise.all([
+        stranger.mockRequest().put(`/api/v1/ingest/novels/${SOURCE_REF}`).body(NOVEL),
+        stranger.mockRequest().get(`/api/v1/ingest/novels/${SOURCE_REF}/manifest`),
+        stranger.mockRequest().post(`/api/v1/ingest/novels/${SOURCE_REF}/cover`).body({ mime: 'image/png', image: 'AA==' }),
+      ]);
+      expect(responses.map(response => response.statusCode)).toEqual([403, 403, 403]);
+      expect(responses.map(response => response.json().code)).toEqual(['IAM_002', 'IAM_002', 'IAM_002']);
+    });
+
+    it('should refuse an authenticated user who does not hold the curate permission', async () => {
+      const token = await issueTestToken({ sub: '9999' });
+      const stranger = testEnv.getRouter({ authenticated: false });
+      const responses = await Promise.all([
+        stranger
+          .mockRequest()
+          .headers({ authorization: `Bearer ${token}` })
+          .put(`/api/v1/ingest/novels/${SOURCE_REF}`)
+          .body(NOVEL),
+        stranger
+          .mockRequest()
+          .headers({ authorization: `Bearer ${token}` })
+          .get(`/api/v1/ingest/novels/${SOURCE_REF}/manifest`),
+      ]);
+      expect(responses.map(response => response.statusCode)).toEqual([403, 403]);
+      expect(responses.map(response => response.json().code)).toEqual(['IAM_002', 'IAM_002']);
+      expect(await testEnv.getPostgresClient().$count(schema.projects)).toBe(0);
+    });
+
+    it('should no longer route the retired api-key surface', async () => {
+      const router = testEnv.getRouter();
+      const responses = await Promise.all([
+        router.mockRequest().get('/api/v1/api-keys'),
+        router.mockRequest().post('/api/v1/api-keys').body({ name: 'scraper' }),
+        router.mockRequest().delete('/api/v1/api-keys/current'),
+      ]);
+      expect(responses.map(response => response.statusCode)).toEqual([404, 404, 404]);
+    });
+
+    it('should refuse a permissionless caller before the body is validated', async () => {
+      const token = await issueTestToken({ sub: '9999' });
+      const refused = await testEnv
+        .getRouter({ authenticated: false })
+        .mockRequest()
+        .headers({ authorization: `Bearer ${token}` })
+        .put(`/api/v1/ingest/novels/${SOURCE_REF}`)
+        .body({});
+      const validated = await testEnv.getRouter().mockRequest().put(`/api/v1/ingest/novels/${SOURCE_REF}`).body({});
+
+      expect(refused.statusCode).toBe(403);
+      expect(validated.statusCode).toBe(422);
+    });
+
+    it('should refuse a caller whose credential names no organisation to evaluate the permission in', async () => {
+      const token = await testIdP.issueToken({ sub: TEST_USER.userId, audience: AUTH_AUDIENCE });
+      const response = await testEnv
+        .getRouter({ authenticated: false })
+        .mockRequest()
+        .headers({ authorization: `Bearer ${token}` })
+        .put(`/api/v1/ingest/novels/${SOURCE_REF}`)
+        .body(NOVEL);
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json().code).toBe('IAM_002');
+    });
+
+    it('should let a human holding the curate permission ingest, owning the project itself and sharing it with nobody', async () => {
+      const response = await testEnv.getRouter().mockRequest().put('/api/v1/ingest/novels/mvlempyr:4242').body(NOVEL);
+      expect(response.statusCode).toBe(201);
+
+      const project = await testEnv.getPostgresClient().query.projects.findFirst({ where: eq(schema.projects.id, BigInt(response.json().projectId as string)) });
+      expect(project).toMatchObject({ ownerKind: 'user', ownerId: BigInt(TEST_USER.userId), organisationId: null, sharedWithOrg: false });
     });
   });
 
   describe('PUT /api/v1/ingest/novels/:sourceRef', () => {
-    it('should create the curated project and the imported metadata without bible placeholders', async () => {
+    it('should create the curated project owned by the bot and shared with its organisation', async () => {
       const response = await ingest().mockRequest().put(`/api/v1/ingest/novels/${SOURCE_REF}`).body(NOVEL);
       expect(response.statusCode).toBe(201);
       expect(response.json()).toEqual({ projectId: expect.stringMatching(/^\d+$/), created: true });
@@ -87,7 +166,10 @@ describe.if(pgAvailable)('Curated ingest', () => {
       const projectId = BigInt(response.json().projectId as string);
       const project = await testEnv.getPostgresClient().query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
       expect(project).toMatchObject({
-        ownerId: BigInt(TEST_USER.userId),
+        ownerKind: 'bot',
+        ownerId: CURATION_BOT_ID,
+        organisationId: BigInt(TEST_BOT_ORG),
+        sharedWithOrg: true,
         kind: 'curated',
         status: 'active',
         name: NOVEL.title,
@@ -258,15 +340,35 @@ describe.if(pgAvailable)('Curated ingest', () => {
       });
     });
 
-    it('should answer 404 for a novel this key never ingested', async () => {
+    it('should answer 404 for a novel this bot never ingested', async () => {
       const response = await ingest().mockRequest().get('/api/v1/ingest/novels/mvlempyr:0/manifest');
       expect(response.statusCode).toBe(404);
       expect(response.json().code).toBe('ING_001');
     });
   });
 
+  describe('organisation sharing', () => {
+    const asUser = (token: string) =>
+      testEnv
+        .getRouter({ authenticated: false })
+        .mockRequest()
+        .headers({ authorization: `Bearer ${token}` });
+
+    it('should let a curator of the bot organisation work on what the bot ingested, and nobody else', async () => {
+      const projectId = await createNovel();
+
+      const curator = await asUser(await testIdP.issueToken({ sub: ORG_CURATOR, audience: AUTH_AUDIENCE, org: TEST_BOT_ORG })).get(`/api/v1/projects/${projectId}`);
+      const member = await asUser(await testIdP.issueToken({ sub: ORG_MEMBER, audience: AUTH_AUDIENCE, org: TEST_BOT_ORG })).get(`/api/v1/projects/${projectId}`);
+      const outsider = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${projectId}`);
+
+      expect(curator.statusCode).toBe(200);
+      expect(curator.json().id).toBe(projectId.toString());
+      expect([member.statusCode, outsider.statusCode]).toEqual([404, 404]);
+    });
+  });
+
   describe('audit trail', () => {
-    it('should record one row per mutation, rejections included, naming the api key', async () => {
+    it('should record one row per mutation, rejections included, naming the actor and the bot key', async () => {
       await createNovel();
       await pushChapter(1, chapterBody(1));
       await pushChapter(1, chapterBody(1));
@@ -285,8 +387,16 @@ describe.if(pgAvailable)('Curated ingest', () => {
         ['chapter.push', 'not_found'],
         ['cover.set', 'applied'],
       ]);
-      expect(rows.every(row => row.sourceRef.startsWith('mvlempyr:') && row.apiKeyId !== null)).toBe(true);
+      expect(rows.every(row => row.sourceRef.startsWith('mvlempyr:') && row.actorKind === 'bot' && row.actorId === CURATION_BOT_ID)).toBe(true);
+      expect(rows.every(row => TEST_REGEX.uuid.test(row.botKeyId as string))).toBe(true);
       expect(rows.at(-2)?.projectId).toBeNull();
+    });
+
+    it('should name a human curator as the actor and no bot key', async () => {
+      await testEnv.getRouter().mockRequest().put('/api/v1/ingest/novels/mvlempyr:4242').body(NOVEL);
+
+      const rows = await auditRows();
+      expect(rows).toMatchObject([{ action: 'novel.upsert', outcome: 'created', actorKind: 'user', actorId: BigInt(TEST_USER.userId), botKeyId: null }]);
     });
 
     it('should not record a row for a read', async () => {

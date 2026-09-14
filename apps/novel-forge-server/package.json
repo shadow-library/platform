@@ -18,7 +18,8 @@
   },
   "shadow": {
     "entries": [
-      "src/migrate.ts"
+      "src/migrate.ts",
+      "src/transfer-curated-projects.ts"
     ],
     "assets": [
       "generated/drizzle"

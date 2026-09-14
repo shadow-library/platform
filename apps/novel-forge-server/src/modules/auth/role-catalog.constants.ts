@@ -26,7 +26,7 @@ export const NOVEL_FORGE_ROLE_CATALOG: RoleCatalogManifest = {
     { name: PROJECTS_WRITE_PERMISSION, description: 'Create and edit projects and the chapters, bible, planning and pipeline material under them' },
     { name: ILLUSTRATIONS_WRITE_PERMISSION, description: 'Upload, attach and manage project illustrations' },
     { name: GENERATION_RUN_PERMISSION, description: 'Run AI generation — drafting, planning, ideation and image generation — which incurs model spend' },
-    { name: CURATE_PERMISSION, description: 'Publish third-party novels under their original author and manage curated-ingest API keys' },
+    { name: CURATE_PERMISSION, description: 'Publish third-party novels under their original author and push them through the curated-ingest surface' },
   ],
   roles: [
     {
@@ -63,7 +63,6 @@ export const NOVEL_FORGE_ROLE_CATALOG: RoleCatalogManifest = {
       name: 'NovelForgeCurator',
       description: 'Internal platform admin who brings third-party novels into the platform',
       permissions: [CURATE_PERMISSION],
-      /** Unlocks nothing yet: the ingest surface still authenticates by API key and is moved onto bots in the next change. */
       bot: { resource: 'curated-ingest', level: 'write' },
     },
   ],

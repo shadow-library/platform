@@ -1,6 +1,6 @@
 export const APP_NAME = 'novel-forge';
 
-/** The identity permission that authorises authoring and ingest; API keys act only as an owner who still holds it. */
+/** The identity permission that authorises curation and the ingest surface; a bot reaches it through the `curated-ingest` grant. */
 export const CURATE_PERMISSION = 'novel-forge:curate';
 
 export const PROJECTS_READ_PERMISSION = 'novel-forge:projects:read';

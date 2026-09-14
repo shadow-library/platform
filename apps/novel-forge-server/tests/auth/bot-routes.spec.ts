@@ -95,10 +95,11 @@ describe.if(pgAvailable)('bots on the novel forge API', () => {
       expect(retitled.json().title).toBe('A Bot Wrote This');
     });
 
-    it('should own what it creates on behalf of its organisation', async () => {
+    /** Shared on creation, not later: nothing can hand a record to a bot, and the sharing branch is user-only, so an unshared bot project would be reachable by no person at all. */
+    it('should own what it creates on behalf of its organisation, and share it with that organisation', async () => {
       const projectId = await createProject(keys.writer, 'owned');
       const project = await testEnv.getPostgresClient().query.projects.findFirst({ where: eq(schema.projects.id, BigInt(projectId)) });
-      expect(project).toMatchObject({ ownerKind: 'bot', ownerId: 102n, organisationId: BigInt(TEST_BOT_ORG) });
+      expect(project).toMatchObject({ ownerKind: 'bot', ownerId: 102n, organisationId: BigInt(TEST_BOT_ORG), sharedWithOrg: true });
     });
   });
 
@@ -158,8 +159,6 @@ describe.if(pgAvailable)('bots on the novel forge API', () => {
       expect((await bot(keys.everything).get('/api/v1/ai/settings')).statusCode).toBe(403);
       expect((await bot(keys.everything).put('/api/v1/ai/settings').body({})).statusCode).toBe(403);
       expect((await bot(keys.everything).get('/api/v1/ai/models')).statusCode).toBe(403);
-      expect((await bot(keys.everything).get('/api/v1/api-keys')).statusCode).toBe(403);
-      expect((await bot(keys.everything).post('/api/v1/api-keys').body({ name: 'key' })).statusCode).toBe(403);
     });
 
     it('should refuse the publishing surface, which acts for a human organisation member', async () => {
@@ -173,9 +172,13 @@ describe.if(pgAvailable)('bots on the novel forge API', () => {
       const projectId = await createProject(keys.everything, 'legacy');
       expect((await bot(keys.everything).post(`/api/v1/projects/${projectId}/entities/hero/illustration`).body({})).statusCode).toBe(403);
     });
+  });
 
-    it('should not authenticate a bot key on the api-key ingest surface', async () => {
-      expect((await bot(keys.everything).get('/api/v1/ingest/novels/some-ref/manifest')).statusCode).toBe(401);
+  describe('curated ingest', () => {
+    it('should gate the ingest surface on the curate permission alone', async () => {
+      expect((await bot(keys.writer).get('/api/v1/ingest/novels/some-ref/manifest')).statusCode).toBe(403);
+      // Past the guard: `ING_001`, because no novel was ever pushed at that reference.
+      expect((await bot(keys.everything).get('/api/v1/ingest/novels/some-ref/manifest')).statusCode).toBe(404);
     });
   });
 
