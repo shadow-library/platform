@@ -6,6 +6,18 @@ import { type FinanceCommand } from './finance.types';
 import { type HeroCommand } from './hero.types';
 import { type OccurrenceState, type ReasonTag, type StatAffinity, type Strictness, type Weekday } from './quest.types';
 import { type QuickLogCommand } from './quick-logs.types';
+import { type DayMode } from './view.types';
+
+export const COMING_BACK_NOTICES: Record<Extract<DayMode, 'recovery' | 'returner'>, { title: string; body: string }> = {
+  recovery: {
+    title: 'A recovery quest is on today',
+    body: 'A quest was missed yesterday, so today also offers a lighter recovery quest you can keep before the day closes. Nothing you have earned was taken away.',
+  },
+  returner: {
+    title: 'Welcome back',
+    body: 'You have been away for a while. Your experience, levels and titles are untouched, and streaks that closed while you were gone keep their records in History.',
+  },
+};
 
 export const DELETION_PROGRESS_COPY: Record<DeletionProgress, { title: string; body: string }> = {
   pending: { title: 'The erasure has started', body: 'Stored receipt images and export archives are removed first, then your records.' },

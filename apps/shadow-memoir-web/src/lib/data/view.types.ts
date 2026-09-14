@@ -2,12 +2,18 @@ import { type OccurrenceState, type QuestOccurrence, type StatAffinity } from '.
 
 export type Momentum = 'cold' | 'steady' | 'warm';
 
-export type DayMode = 'new' | 'active' | 'recovery';
+export type DayMode = 'new' | 'active' | 'recovery' | 'returner';
+
+export type CrownCadence = 'daily' | 'weekly';
 
 export interface CrownPeriod {
   label: string;
+  cadence: CrownCadence;
+  periodStart: string;
+  closesOn: string;
   dayIndex: number;
   dayCount: number;
+  /** Share of the period's crown still standing, 0–100; 100 when nothing was endowed. */
   keptPercent: number;
 }
 
@@ -17,7 +23,8 @@ export interface HeroState {
   coins: number;
   xp: number;
   xpIntoLevel: number;
-  xpForNextLevel: number;
+  /** 0 at the highest level; null when the account row does not carry the server's level curve. */
+  xpForNextLevel: number | null;
   hp: number;
   hpMax: number;
   momentum: Momentum;
@@ -117,7 +124,8 @@ export interface PlanView {
   month: PlanMonthCell[];
   carryOver: PlanCarryOver | null;
   crown: CrownPeriod;
-  rescheduleBudget: { used: number; cap: number; resetsOn: string };
+  /** The quest closest to its rolling seven-day reschedule cap; `questName` is null when nothing moved. */
+  rescheduleBudget: { used: number; cap: number; questName: string | null };
   glance: string[];
 }
 

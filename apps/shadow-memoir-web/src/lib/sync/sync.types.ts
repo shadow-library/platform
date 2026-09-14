@@ -207,4 +207,5 @@ export const SYNC_META_KEYS = {
   deadLetters: 'dead-letters',
   coveredDomains: 'covered-domains',
   backfillCursor: 'backfill-cursor',
+  comingBackDismissedOn: 'coming-back-dismissed-on',
 } as const;

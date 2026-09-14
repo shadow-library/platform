@@ -6,7 +6,10 @@ import {
   CARRIED_STATES,
   type CosmeticKind,
   COSMETICS,
+  type CrownCadence,
+  type CrownPeriod,
   type CurrencyCode,
+  type DayMode,
   type ExpenseCategory,
   type ExpenseCategoryId,
   type ExpenseDetail,
@@ -14,6 +17,7 @@ import {
   type HealthComparison,
   type HealthMetricEntry,
   type HealthMetricKey,
+  type HeroState,
   type JournalEntry,
   journalExcerpt,
   journalWordCount,
@@ -59,14 +63,6 @@ function toMomentum(value: string | null): Momentum {
   return MOMENTUM_STATES.find(state => state === value) ?? 'steady';
 }
 
-/**
- * The level curve is a *server* rule (`rules/level.ts`), and the ruleset it reads is not shipped to the
- * client yet — ARCHITECTURE §12.1 wants the same versioned module on both sides, which is its own task.
- * Until then the account row's authoritative `level`, `totalXp`, `coins` and HP are projected verbatim and
- * the two derived bar values are left at the point the server last placed them.
- */
-const XP_PER_LEVEL = 250;
-
 function text(row: DeltaRow, key: string): string | null {
   const value = row[key];
   return typeof value === 'string' ? value : null;
@@ -82,6 +78,51 @@ function number(row: DeltaRow, key: string, fallback = 0): number {
 function bool(row: DeltaRow, key: string, fallback = false): boolean {
   const value = row[key];
   return typeof value === 'boolean' ? value : fallback;
+}
+
+const CROWN_CADENCES: CrownCadence[] = ['daily', 'weekly'];
+
+function dayOneCrown(today: string): CrownPeriod {
+  return { label: 'today', cadence: 'daily', periodStart: today, closesOn: today, dayIndex: 1, dayCount: 1, keptPercent: 100 };
+}
+
+function toCrown(raw: unknown, today: string): CrownPeriod {
+  const fallback = dayOneCrown(today);
+  if (typeof raw !== 'object' || raw === null) return fallback;
+  const crown = raw as DeltaRow;
+  return {
+    label: text(crown, 'label') ?? fallback.label,
+    cadence: CROWN_CADENCES.find(cadence => cadence === text(crown, 'cadence')) ?? fallback.cadence,
+    periodStart: text(crown, 'periodStart') ?? fallback.periodStart,
+    closesOn: text(crown, 'closesOn') ?? fallback.closesOn,
+    dayIndex: number(crown, 'dayIndex', fallback.dayIndex),
+    dayCount: number(crown, 'dayCount', fallback.dayCount),
+    keptPercent: number(crown, 'keptPercent', fallback.keptPercent),
+  };
+}
+
+export type HeroPersona = Extract<DayMode, 'active' | 'returner' | 'recovery'>;
+
+const HERO_PERSONAS: HeroPersona[] = ['active', 'returner', 'recovery'];
+
+function toHeroPersona(value: string | null): HeroPersona {
+  return HERO_PERSONAS.find(persona => persona === value) ?? 'active';
+}
+
+function toHeroState(account: DeltaRow | undefined, today: string): HeroState {
+  if (!account) return { level: 1, title: '', coins: 0, xp: 0, xpIntoLevel: 0, xpForNextLevel: null, hp: 0, hpMax: 3, momentum: 'steady', crown: dayOneCrown(today) };
+  return {
+    level: number(account, 'level', 1),
+    title: TITLES.find(title => title.id === text(account, 'displayedTitleId'))?.name ?? '',
+    coins: number(account, 'coins'),
+    xp: number(account, 'totalXp'),
+    xpIntoLevel: number(account, 'xpIntoLevel'),
+    xpForNextLevel: numberOrNull(account, 'xpForNextLevel'),
+    hp: number(account, 'hpToday'),
+    hpMax: number(account, 'hpMax', 3),
+    momentum: toMomentum(text(account, 'warmthState')),
+    crown: toCrown(account['crown'], today),
+  };
 }
 
 const WEEKDAY_LOCAL: Record<number, Weekday> = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat', 7: 'sun' };
@@ -247,27 +288,13 @@ export function projectWorldState(rows: Partial<DomainRows>, today: string): Mem
     lockedQuestIdsByDate.set(date, new Set(((row['lockedQuestIds'] as unknown[] | undefined) ?? []).map(String)));
   }
 
-  const totalXp = account ? number(account, 'totalXp') : 0;
-  const level = account ? number(account, 'level', 1) : 1;
-
   return {
     today,
-    persona: 'active',
+    persona: toHeroPersona(account ? text(account, 'persona') : null),
     quests,
     progress,
     logs,
-    hero: {
-      level,
-      title: '',
-      coins: account ? number(account, 'coins') : 0,
-      xp: totalXp,
-      xpIntoLevel: totalXp % XP_PER_LEVEL,
-      xpForNextLevel: XP_PER_LEVEL,
-      hp: account ? number(account, 'hpToday') : 0,
-      hpMax: account ? number(account, 'hpMax', 3) : 3,
-      momentum: toMomentum(account ? text(account, 'warmthState') : null),
-      crown: { label: '', dayIndex: 0, dayCount: 7, keptPercent: 0 },
-    },
+    hero: toHeroState(account, today),
     activity,
     scheduleEndMinutes: account ? number(account, 'scheduleEndMin', 1380) : null,
     metrics: {},
@@ -711,4 +738,161 @@ export function projectHeroGrants(rows: Partial<DomainRows>): HeroGrants {
   }
 
   return { achievements, titles, ownedCosmetics, equippedCosmetics, displayedTitleId: rows.account?.[0] ? text(rows.account[0], 'displayedTitleId') : null };
+}
+
+export interface ComebackStanding {
+  armed: boolean;
+  firedOn: string | null;
+}
+
+const HERO_EVENT_TYPES = [
+  'quest_complete',
+  'quest_partial',
+  'quest_late',
+  'recovery',
+  'level_up',
+  'achievement_unlock',
+  'coin_grant',
+  'crown_banked',
+  'side_quest',
+  'journal',
+  'meal',
+  'weight',
+  'coin_spend',
+  'recovery_spawned',
+  'recovery_completed',
+  'recovery_expired',
+  'crown_init',
+  'crown_forfeit',
+  'returner_fired',
+] as const;
+
+export type HeroEventType = (typeof HERO_EVENT_TYPES)[number];
+
+export interface HeroEventRecord {
+  id: string;
+  type: HeroEventType;
+  questName: string | null;
+  achievementId: string | null;
+  xpDelta: number;
+  coinsDelta: number;
+  statAffinity: StatAffinity | null;
+  statDelta: number;
+  levelAfter: number | null;
+  date: string;
+  createdAt: string;
+}
+
+export interface ClosedCrown {
+  periodStart: string;
+  closedOn: string;
+  banked: boolean;
+}
+
+export interface RecentMiss {
+  questId: string;
+  questName: string;
+  /** Oldest first. */
+  misses: { date: string; shielded: boolean }[];
+}
+
+export interface HeroStanding {
+  persona: HeroPersona;
+  comeback: ComebackStanding | null;
+  shieldsAvailable: number;
+  shieldCap: number;
+  timezone: string | null;
+  stats: Record<StatAffinity, number>;
+  activeDays: number | null;
+}
+
+const STAT_AFFINITIES: StatAffinity[] = ['body', 'mind', 'wealth', 'discipline'];
+const RECENT_MISS_WINDOW_DAYS = 7;
+
+function toComeback(raw: unknown): ComebackStanding | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const comeback = raw as DeltaRow;
+  return { armed: bool(comeback, 'armed'), firedOn: text(comeback, 'firedOn') };
+}
+
+function toHeroEvent(row: DeltaRow, questNames: Map<string, string>): HeroEventRecord | null {
+  const type = HERO_EVENT_TYPES.find(candidate => candidate === text(row, 'type'));
+  if (!type) return null;
+  const questId = row['questId'] === null || row['questId'] === undefined ? null : String(row['questId']);
+  return {
+    id: String(row['id']),
+    type,
+    questName: questId === null ? null : (questNames.get(questId) ?? null),
+    achievementId: text(row, 'achievementId'),
+    xpDelta: number(row, 'xpDelta'),
+    coinsDelta: number(row, 'coinsDelta'),
+    statAffinity: STAT_AFFINITIES.find(stat => stat === text(row, 'statAffinity')) ?? null,
+    statDelta: number(row, 'statDelta'),
+    levelAfter: numberOrNull(row, 'levelAfter'),
+    date: String(row['date']),
+    createdAt: text(row, 'createdAt') ?? '',
+  };
+}
+
+/** `hero_events` rows migrated before P1-17 received their `syncSeq` in physical order, so the cursor order is not the order they happened in. */
+function newestFirst(left: HeroEventRecord, right: HeroEventRecord): number {
+  return right.createdAt.localeCompare(left.createdAt) || Number(right.id) - Number(left.id);
+}
+
+function toClosedCrown(row: DeltaRow): ClosedCrown | null {
+  const bankedXp = numberOrNull(row, 'crownBankedXp');
+  if (bankedXp === null) return null;
+  const closedOn = String(row['date']);
+  return { periodStart: text(row, 'crownPeriodStart') ?? closedOn, closedOn, banked: bankedXp + number(row, 'crownBankedCoins') > 0 };
+}
+
+function questNamesOf(rows: Partial<DomainRows>): Map<string, string> {
+  return new Map((rows.quests ?? []).map(row => [String(row['id']), text(row, 'name') ?? 'Quest']));
+}
+
+/** Newest first. */
+export function projectHeroEvents(rows: Partial<DomainRows>): HeroEventRecord[] {
+  const questNames = questNamesOf(rows);
+  return (rows.hero_events ?? []).flatMap(row => toHeroEvent(row, questNames) ?? []).sort(newestFirst);
+}
+
+/** Oldest first. */
+export function projectCrownHistory(rows: Partial<DomainRows>): ClosedCrown[] {
+  return (rows.daily_states ?? []).flatMap(row => toClosedCrown(row) ?? []).sort((left, right) => left.closedOn.localeCompare(right.closedOn));
+}
+
+export function projectRecentMisses(rows: Partial<DomainRows>, today: string): RecentMiss[] {
+  const questNames = questNamesOf(rows);
+  const since = shiftDate(today, -RECENT_MISS_WINDOW_DAYS);
+  const byQuest = new Map<string, RecentMiss['misses']>();
+  for (const row of rows.quest_logs ?? []) {
+    const date = logDate(row);
+    if (text(row, 'state') !== 'missed' || date < since || date >= today) continue;
+    const questId = String(row['questId']);
+    const miss = { date, shielded: bool(row, 'shielded') };
+    const misses = byQuest.get(questId);
+    if (misses) misses.push(miss);
+    else byQuest.set(questId, [miss]);
+  }
+  return [...byQuest].map(([questId, misses]) => ({
+    questId,
+    questName: questNames.get(questId) ?? 'Quest',
+    misses: misses.sort((left, right) => left.date.localeCompare(right.date)),
+  }));
+}
+
+export function projectHeroStanding(rows: Partial<DomainRows>): HeroStanding {
+  const account = rows.account?.[0];
+  const counters = rows.progress_counters?.[0];
+  const stat = (field: string): number => (account ? number(account, field) : 0);
+
+  return {
+    persona: toHeroPersona(account ? text(account, 'persona') : null),
+    comeback: account ? toComeback(account['comeback']) : null,
+    shieldsAvailable: account ? number(account, 'shieldsAvailable') : 0,
+    shieldCap: account ? number(account, 'shieldCap') : 0,
+    timezone: account ? text(account, 'timezone') : null,
+    stats: { body: stat('statBody'), mind: stat('statMind'), wealth: stat('statWealth'), discipline: stat('statDiscipline') },
+    activeDays: counters ? numberOrNull(counters, 'activeDays') : null,
+  };
 }

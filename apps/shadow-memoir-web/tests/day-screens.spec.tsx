@@ -4,12 +4,35 @@ import { describe, expect, it } from 'vitest';
 import { PlanningBoardScreen } from '@/features/planning';
 import { QuestBuilderScreen, QuestEditorScreen, QuestListScreen } from '@/features/quests';
 import { TodayScreen } from '@/features/today';
-import { MemoirEngine } from '@/lib/data';
-import { projectWorldState } from '@/lib/sync';
+import { formatShortDate, MemoirEngine } from '@/lib/data';
+import { type DeltaPage, projectWorldState, SyncEngineProvider } from '@/lib/sync';
 
 import { createMemoirTestData, renderScreen } from './harness';
+import { createSyncedTestData, createTestEngine } from './sync-harness';
 
 const TODAY = '2026-08-22';
+
+const WEEKLY_CROWN = { label: 'this week', cadence: 'weekly', periodStart: '2026-08-17', closesOn: '2026-08-23', dayIndex: 6, dayCount: 7, keptPercent: 86 };
+
+function renderSyncedToday(account: Record<string, unknown>): void {
+  const page: DeltaPage = {
+    cursor: '1',
+    hasMore: false,
+    tombstones: [],
+    domains: {
+      account: [{ level: 8, totalXp: '1231', xpIntoLevel: 104, xpForNextLevel: 339, coins: 40, hpToday: 2, hpMax: 5, warmthState: 'cold', crown: WEEKLY_CROWN, ...account }],
+      quests: [{ id: 'q1', name: 'Morning run', durationMin: 30, recurrence: { frequency: 'daily' }, active: true }],
+    },
+  };
+  const { engine } = createTestEngine({ today: TODAY, pages: [page] });
+  const data = createSyncedTestData(engine);
+  renderScreen(
+    <SyncEngineProvider data={data}>
+      <TodayScreen />
+    </SyncEngineProvider>,
+    { value: data },
+  );
+}
 
 describe('day group screens', () => {
   it('should render the Today screen with its hero summary and quest list', async () => {
@@ -25,10 +48,47 @@ describe('day group screens', () => {
     expect(screen.getByRole('button', { name: 'Create your first quest' })).toBeDefined();
   });
 
-  it('should state the reduced load calmly on a comeback week', async () => {
-    renderScreen(<TodayScreen />, { today: TODAY, persona: 'recovery' });
-    expect(await screen.findByText(/Comeback week/)).toBeDefined();
-    expect(await screen.findByText(/no HP at stake today/)).toBeDefined();
+  it('should show the recovery alert for a recovery persona', async () => {
+    renderSyncedToday({ persona: 'recovery', comeback: { armed: true, firedOn: null }, timezone: 'UTC' });
+
+    expect(await screen.findByText('A recovery quest is on today')).toBeDefined();
+    expect(screen.getByRole('link', { name: 'See recovery choices' }).getAttribute('href')).toBe('/hero/recovery');
+    expect(screen.getByText('returning')).toBeDefined();
+  });
+
+  it('should not show the recovery alert for an active persona', async () => {
+    renderSyncedToday({ persona: 'active', comeback: null, timezone: 'UTC' });
+
+    expect(await screen.findByLabelText('HP 2 of 5')).toBeDefined();
+    expect(screen.queryByText('A recovery quest is on today')).toBeNull();
+    expect(screen.queryByText('Welcome back')).toBeNull();
+  });
+
+  it('should show the displayed title on the hero card', async () => {
+    renderSyncedToday({ persona: 'active', displayedTitleId: 'anchor_holder' });
+
+    expect(await screen.findByText('Anchor Holder')).toBeDefined();
+    expect(screen.getByText('104 / 339')).toBeDefined();
+    expect(screen.getByText('235 XP to level 9')).toBeDefined();
+    expect(screen.getByText(/day 6 of 7 · 86% kept/)).toBeDefined();
+    expect(screen.queryByText(/250/)).toBeNull();
+  });
+
+  it('should show the highest level instead of an experience target', async () => {
+    renderSyncedToday({ level: 999, xpIntoLevel: 71, xpForNextLevel: 0 });
+
+    expect(await screen.findByText('Highest level reached')).toBeDefined();
+    expect(screen.queryByText(/XP to level 1000/)).toBeNull();
+  });
+
+  it('should show the plain level when the account row has no level curve', async () => {
+    renderSyncedToday({ level: 4, xpIntoLevel: undefined, xpForNextLevel: undefined, crown: { ...WEEKLY_CROWN, cadence: 'daily', label: 'today', dayCount: 1, dayIndex: 1 } });
+
+    expect(await screen.findByText('4')).toBeDefined();
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.queryByText('Highest level reached')).toBeNull();
+    expect(screen.getByText((_, element) => element?.textContent === 'Crown · today · 86% kept')).toBeDefined();
+    expect(screen.queryByText(/closes today/)).toBeNull();
   });
 
   it('should render a threshold quest from the server shape', async () => {
@@ -60,7 +120,26 @@ describe('day group screens', () => {
     renderScreen(<PlanningBoardScreen />, { today: TODAY });
     expect(await screen.findByRole('heading', { name: 'Planning Board' })).toBeDefined();
     expect(await screen.findByRole('heading', { name: 'Reschedule budget' })).toBeDefined();
-    expect(await screen.findByText(/recorded as postpones with a reason/)).toBeDefined();
+    expect(await screen.findByText(/Each quest can move 2 times in any 7 days/)).toBeDefined();
+    expect(screen.queryByText(/recorded as skips/)).toBeNull();
+    expect(screen.queryByText(/Crown period ·/)).toBeNull();
+  });
+
+  it('should show the real crown and a formatted heaviest day on the Planning Board', async () => {
+    const world = projectWorldState(
+      {
+        account: [{ level: 3, crown: WEEKLY_CROWN }],
+        quests: [{ id: 'q-1', name: 'Morning walk', durationMin: 40, recurrence: { frequency: 'daily' }, active: true }],
+      },
+      TODAY,
+    );
+    const data = createMemoirTestData({ today: TODAY });
+    data.provider = new MemoirEngine(world);
+
+    renderScreen(<PlanningBoardScreen />, { value: data });
+    expect(await screen.findByRole('heading', { name: 'Current crown · this week' })).toBeDefined();
+    expect(screen.getByText(/Day 6 of 7 · 86% of the crown kept so far/)).toBeDefined();
+    expect(screen.getByText(`Heaviest day ${formatShortDate('2026-08-17')}`)).toBeDefined();
   });
 
   it('should switch the Planning Board to a month view', async () => {

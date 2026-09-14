@@ -1,11 +1,13 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HeroScreen, RecoveryScreen } from '@/features/hero';
-import { type DeltaPage, SyncEngineProvider } from '@/lib/sync';
+import { type DeltaPage, SYNC_META_KEYS, type SyncedMemoirData, SyncEngineProvider } from '@/lib/sync';
 
 import { renderScreen } from './harness';
+import { httpFake } from './http-fake';
 import { withTimeZone } from './setup';
 import { createSyncedTestData, createTestEngine } from './sync-harness';
 
@@ -20,6 +22,46 @@ const GRANTS_PAGE: DeltaPage = {
     titles_earned: [{ id: 't1', titleId: 'anchor_holder', earnedAt: '2026-05-17T09:00:00.000Z' }],
   },
 };
+
+const PROGRESSION_ACCOUNT = {
+  level: 8,
+  totalXp: '1231',
+  xpIntoLevel: 104,
+  xpForNextLevel: 339,
+  coins: 40,
+  hpToday: 4,
+  hpMax: 5,
+  warmthState: 'warm',
+  statBody: 30,
+  statMind: 15,
+  statWealth: 0,
+  statDiscipline: 12,
+  shieldsAvailable: 2,
+  shieldCap: 3,
+  timezone: 'UTC',
+  persona: 'active',
+  comeback: null,
+  crown: { label: 'this week', cadence: 'weekly', periodStart: '2026-08-17', closesOn: '2026-08-23', dayIndex: 6, dayCount: 7, keptPercent: 86 },
+};
+
+function progressionPage(account: Record<string, unknown> = {}, domains: DeltaPage['domains'] = {}): DeltaPage {
+  return { cursor: '1', hasMore: false, tombstones: [], domains: { account: [{ ...PROGRESSION_ACCOUNT, ...account }], ...domains } };
+}
+
+function stubAccountApi(): void {
+  httpFake({
+    'GET /api/v1/account': () => ({
+      body: { intensityMode: 'standard', pendingIntensityMode: null, scheduleStartMin: 420, scheduleEndMin: 1380, timezone: 'UTC', defaultCurrency: 'EUR' },
+    }),
+  });
+}
+
+function renderSynced(node: ReactNode, pages: DeltaPage[]): ReturnType<typeof createTestEngine> & { data: SyncedMemoirData } {
+  const test = createTestEngine({ today: TODAY, pages });
+  const data = createSyncedTestData(test.engine);
+  renderScreen(<SyncEngineProvider data={data}>{node}</SyncEngineProvider>, { value: data });
+  return { ...test, data };
+}
 
 function renderSyncedHero(): ReturnType<typeof createTestEngine> {
   const test = createTestEngine({ today: TODAY, pages: [GRANTS_PAGE] });
@@ -148,6 +190,50 @@ describe('Hero screen', () => {
     expect((await screen.findAllByText('◈ 212')).length).toBeGreaterThan(0);
   });
 
+  it('should show level progress from the account row', async () => {
+    renderSynced(<HeroScreen />, [progressionPage()]);
+
+    expect(await screen.findByText('104 / 339 XP')).toBeDefined();
+    expect(screen.getByText(/235 to level 9/)).toBeDefined();
+    expect(screen.getByText('2 of 3')).toBeDefined();
+    expect(screen.getByText('Crown · this week')).toBeDefined();
+    expect(screen.getByText('Day 6 of 7 · closes 23 Aug · 86% kept.')).toBeDefined();
+    expect(screen.getByText('Warm')).toBeDefined();
+    expect(screen.getByText('Body')).toBeDefined();
+    expect(screen.queryByRole('link', { name: 'Coming back' })).toBeNull();
+  });
+
+  it('should list hero events', async () => {
+    renderSynced(<HeroScreen />, [
+      progressionPage(
+        {},
+        {
+          quests: [{ id: '7', name: 'Morning run', durationMin: 30, recurrence: { frequency: 'daily' }, active: true }],
+          hero_events: [
+            { id: '3', type: 'level_up', levelAfter: 9, date: TODAY, createdAt: '2026-08-22T07:31:00.000Z', xpDelta: 0, coinsDelta: 0 },
+            { id: '1', type: 'crown_init', date: TODAY, createdAt: '2026-08-22T00:01:00.000Z', xpDelta: 0, coinsDelta: 0 },
+            { id: '2', type: 'quest_complete', questId: '7', statAffinity: 'body', statDelta: 1, date: TODAY, createdAt: '2026-08-22T07:30:00.000Z', xpDelta: 12, coinsDelta: 2 },
+          ],
+          daily_states: [
+            { date: '2026-08-20', crownPeriodStart: '2026-08-20', crownBankedXp: 30, crownBankedCoins: 3 },
+            { date: '2026-08-21', crownPeriodStart: '2026-08-21', crownBankedXp: 0, crownBankedCoins: 0 },
+            { date: TODAY, crownPeriodStart: TODAY, crownBankedXp: null, crownBankedCoins: null },
+          ],
+        },
+      ),
+    ]);
+
+    expect(await screen.findByText('Level 9 reached')).toBeDefined();
+    const kept = screen.getByText('Morning run kept');
+    expect(screen.getByText('Level 9 reached').compareDocumentPosition(kept) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('+12 XP · +2 ◈')).toBeDefined();
+    expect(screen.getByText('Body +1')).toBeDefined();
+    expect(screen.queryByText('Crown period opened')).toBeNull();
+    expect(screen.queryByText(/Nothing has happened yet/)).toBeNull();
+    expect(screen.getByLabelText('20 Aug: banked')).toBeDefined();
+    expect(screen.getByLabelText('21 Aug: not banked')).toBeDefined();
+  });
+
   it('should never price a cosmetic that comes from an achievement', async () => {
     renderScreen(<HeroScreen />, { today: TODAY });
     fireEvent.click(await screen.findByRole('tab', { name: 'Cosmetics' }));
@@ -163,6 +249,81 @@ describe('Recovery screen', () => {
     expect(await screen.findByRole('heading', { name: 'Coming back' })).toBeDefined();
     expect(await screen.findByText(/No XP was removed, no level was lost/)).toBeDefined();
     expect(screen.getByText('Open choices')).toBeDefined();
+  });
+
+  it('should not show the fixture narrative', async () => {
+    stubAccountApi();
+    renderSynced(<RecoveryScreen />, [progressionPage({ persona: 'returner', hpToday: 1 })]);
+
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeDefined();
+    expect(screen.getByText('Open choices')).toBeDefined();
+    expect(screen.queryByText(/eight days/)).toBeNull();
+    expect(screen.queryByText('Next week reads heavy')).toBeNull();
+    expect(screen.queryByText('Add a morning walk')).toBeNull();
+    expect(screen.queryByText(/Thursday/)).toBeNull();
+  });
+
+  it('should mark a shielded miss as shielded on coming back', async () => {
+    stubAccountApi();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-22T10:00:00.000Z'));
+    try {
+      renderSynced(<RecoveryScreen />, [
+        progressionPage(
+          { persona: 'recovery' },
+          {
+            quests: [
+              { id: '7', name: 'Morning run', durationMin: 30, recurrence: { frequency: 'daily' }, active: true },
+              { id: '8', name: 'Evening stretch', durationMin: 10, recurrence: { frequency: 'daily' }, active: true },
+              { id: '9', name: 'Read 20 pages', durationMin: 20, recurrence: { frequency: 'daily' }, active: true },
+            ],
+            quest_logs: [
+              { id: 'l1', questId: '7', date: '2026-08-21', state: 'missed', shielded: true },
+              { id: 'l2', questId: '8', date: '2026-08-20', state: 'missed', shielded: false },
+              { id: 'l3', questId: '9', date: '2026-08-19', state: 'missed', shielded: true },
+              { id: 'l4', questId: '9', date: '2026-08-20', state: 'missed', shielded: false },
+            ],
+            quest_streaks: [
+              { questId: '7', currentRunDays: 0 },
+              { questId: '8', currentRunDays: 12 },
+            ],
+          },
+        ),
+      ]);
+
+      const shielded = (await screen.findByText('Morning run')).closest('li') as HTMLElement;
+      expect(within(shielded).getByText('Shielded')).toBeDefined();
+      const missed = screen.getByText('Evening stretch').closest('li') as HTMLElement;
+      expect(within(missed).getByText('Missed')).toBeDefined();
+      const mixed = screen.getByText('Read 20 pages').closest('li') as HTMLElement;
+      expect(within(mixed).getByText('Missed')).toBeDefined();
+      expect(within(mixed).getByText(/1 shielded/)).toBeDefined();
+      expect(screen.queryByText(/Streak kept|Streak closed/)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should dismiss coming back for the day', async () => {
+    stubAccountApi();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-22T10:00:00.000Z'));
+    try {
+      const { data, store } = renderSynced(<RecoveryScreen />, [progressionPage({ persona: 'recovery', comeback: { armed: true, firedOn: null } })]);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Not now' }));
+
+      const note = await screen.findByRole('heading', { name: 'Not now' });
+      await waitFor(() => expect(document.activeElement).toBe(note));
+      expect(screen.queryByText('Open choices')).toBeNull();
+      expect(await store.readMeta(SYNC_META_KEYS.comingBackDismissedOn)).toBe('2026-08-22');
+      expect(await data.hero.getComingBack()).toEqual({ kind: 'dismissed', reason: 'recovery' });
+
+      vi.setSystemTime(new Date('2026-08-23T10:00:00.000Z'));
+      expect(await data.hero.getComingBack()).toEqual({ kind: 'offered', reason: 'recovery' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('should let intensity be lowered without touching earned experience', async () => {

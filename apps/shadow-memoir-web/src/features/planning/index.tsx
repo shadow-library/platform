@@ -4,7 +4,7 @@ import { addMonths, Alert, Button, Card, IconButton, Progress, SegmentedControl,
 
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons';
 import { outcomeTone } from '@/features/quests/quest-presenters';
-import { formatShortDate, type PlanDay, type PlanScope, shiftDate, toDate, useCommand, useMemoirData, usePlan } from '@/lib/data';
+import { type CrownPeriod, formatShortDate, type PlanDay, type PlanScope, type PlanView, shiftDate, toDate, useCommand, useMemoirData, usePlan } from '@/lib/data';
 
 import styles from './planning.module.css';
 
@@ -117,12 +117,9 @@ export function PlanningBoardScreen(): ReactElement {
           <div className={styles.summaries}>
             <Card padding="md">
               <Card.Body>
-                <h2 className={styles.cardTitle}>Crown period · {plan.data.crown.label}</h2>
-                <Progress value={plan.data.crown.keptPercent} max={100} size="md" label="Crown period progress" />
-                <p className={styles.cardBody}>
-                  Day {plan.data.crown.dayIndex} of {plan.data.crown.dayCount} · {plan.data.crown.keptPercent}% of scheduled occurrences kept. The crown is awarded on the period,
-                  not on any single day.
-                </p>
+                <h2 className={styles.cardTitle}>Current crown · {plan.data.crown.label}</h2>
+                <Progress value={plan.data.crown.keptPercent} max={100} size="md" aria-label={`Crown ${plan.data.crown.label}: ${plan.data.crown.keptPercent}% kept`} />
+                <p className={styles.cardBody}>{crownSummary(plan.data.crown)}</p>
               </Card.Body>
             </Card>
             <Card padding="md">
@@ -134,14 +131,12 @@ export function PlanningBoardScreen(): ReactElement {
                   </span>
                   <span className={styles.cardBody}>used in the last 7 days</span>
                 </p>
-                <p className={styles.cardBody}>
-                  Resets {formatShortDate(plan.data.rescheduleBudget.resetsOn)}. Past the cap, moves still happen — they are recorded as postpones with a reason instead.
-                </p>
+                <p className={styles.cardBody}>{rescheduleSummary(plan.data.rescheduleBudget)}</p>
               </Card.Body>
             </Card>
             <Card padding="md">
               <Card.Body>
-                <h2 className={styles.cardTitle}>This week at a glance</h2>
+                <h2 className={styles.cardTitle}>At a glance · {plan.data.label}</h2>
                 <ul className={styles.glance}>
                   {plan.data.glance.map(line => (
                     <li key={line}>{line}</li>
@@ -154,6 +149,17 @@ export function PlanningBoardScreen(): ReactElement {
       ) : null}
     </section>
   );
+}
+
+function crownSummary(crown: CrownPeriod): string {
+  const progress = `${crown.keptPercent}% of the crown kept so far.`;
+  if (crown.cadence === 'daily') return `${progress} Today's crown is banked when the day closes.`;
+  return `Day ${crown.dayIndex} of ${crown.dayCount} · ${progress} This week's crown is banked when the week closes on ${formatShortDate(crown.closesOn)}.`;
+}
+
+function rescheduleSummary(budget: PlanView['rescheduleBudget']): string {
+  const rule = `Each quest can move ${budget.cap} times in any 7 days. Past the cap, moves still happen — they are recorded as postpones with a reason instead.`;
+  return budget.questName ? `Most moved: ${budget.questName}. ${rule}` : `No quest has moved in the last 7 days. ${rule}`;
 }
 
 function PlanDayCard({ day }: { day: PlanDay }): ReactElement {

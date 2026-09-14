@@ -2,8 +2,9 @@ import { Link } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { Alert, Button, Card, Progress, Skeleton } from '@shadow-library/ui';
 
+import { DataState } from '@/components/DataState';
 import { Screen, screenStyles } from '@/components/ScreenLayout';
-import { type HeroDeck, useHeroDeck } from '@/lib/data';
+import { type HeroDeck, useComingBack, useHeroDeck } from '@/lib/data';
 
 import { AchievementsPanel } from './achievements-panel';
 import { CosmeticsPanel } from './cosmetics-panel';
@@ -21,6 +22,7 @@ const TABS: { id: DeckTab; label: string }[] = [
 
 export function HeroScreen(): ReactElement {
   const deck = useHeroDeck();
+  const comingBack = useComingBack();
   const [tab, setTab] = useState<DeckTab>('overview');
 
   return (
@@ -28,55 +30,86 @@ export function HeroScreen(): ReactElement {
       title="Hero"
       subtitle="Everything you have earned, and nothing you can lose. Experience only ever goes up."
       actions={
-        <Button size="sm" variant="ghost" asChild>
-          <Link to="/hero/recovery">Coming back</Link>
-        </Button>
+        comingBack.data && comingBack.data.kind !== 'none' ? (
+          <Button size="sm" variant="ghost" asChild>
+            <Link to="/hero/recovery">Coming back</Link>
+          </Button>
+        ) : null
       }
     >
-      {deck.isPending || !deck.data ? (
-        <>
-          <Skeleton.Card />
-          <Skeleton.List rows={4} />
-        </>
-      ) : null}
+      <DataState
+        query={deck}
+        skeleton={
+          <>
+            <Skeleton.Card />
+            <Skeleton.List rows={4} />
+          </>
+        }
+      >
+        {data => (
+          <>
+            <Crest deck={data} />
 
-      {deck.data ? (
-        <>
-          <Crest deck={deck.data} />
+            <div className={styles.stats}>
+              {data.lifetime.map(stat => (
+                <Card key={stat.stat} padding="md">
+                  <Card.Body>
+                    <div className={styles.statName}>{stat.label}</div>
+                    <div className={styles.statValue}>{stat.value.toLocaleString()}</div>
+                    <Progress value={stat.percentOfBest} max={100} label={`${stat.label} against your strongest stat`} />
+                    <p className={styles.statNote}>{stat.note}</p>
+                  </Card.Body>
+                </Card>
+              ))}
+            </div>
 
-          <div className={styles.stats}>
-            {deck.data.lifetime.map(stat => (
-              <Card key={stat.stat} padding="md">
-                <Card.Body>
-                  <div className={styles.statName}>{stat.label}</div>
-                  <div className={styles.statValue}>{stat.value.toLocaleString()}</div>
-                  <Progress value={stat.percentOfBest} max={100} label={`${stat.label} against your strongest stat`} />
-                  <p className={styles.statNote}>{stat.note}</p>
-                </Card.Body>
-              </Card>
-            ))}
-          </div>
+            <div className={styles.tabs} role="tablist" aria-label="Hero sections">
+              {TABS.map(item => (
+                <Button key={item.id} size="sm" variant={tab === item.id ? 'secondary' : 'ghost'} role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)}>
+                  {item.label}
+                </Button>
+              ))}
+            </div>
 
-          <div className={styles.tabs} role="tablist" aria-label="Hero sections">
-            {TABS.map(item => (
-              <Button key={item.id} size="sm" variant={tab === item.id ? 'secondary' : 'ghost'} role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)}>
-                {item.label}
-              </Button>
-            ))}
-          </div>
-
-          {tab === 'overview' ? <Overview deck={deck.data} /> : null}
-          {tab === 'achievements' ? <AchievementsPanel achievements={deck.data.achievements} /> : null}
-          {tab === 'titles' ? <TitlesPanel deck={deck.data} /> : null}
-          {tab === 'cosmetics' ? <CosmeticsPanel deck={deck.data} /> : null}
-        </>
-      ) : null}
+            {tab === 'overview' ? <Overview deck={data} /> : null}
+            {tab === 'achievements' ? <AchievementsPanel achievements={data.achievements} /> : null}
+            {tab === 'titles' ? <TitlesPanel deck={data} /> : null}
+            {tab === 'cosmetics' ? <CosmeticsPanel deck={data} /> : null}
+          </>
+        )}
+      </DataState>
     </Screen>
   );
 }
 
+function LevelProgress({ level, xpIntoLevel, xpForNextLevel }: { level: number; xpIntoLevel: number; xpForNextLevel: number }): ReactElement {
+  if (xpForNextLevel === 0) {
+    return (
+      <div className={styles.xp}>
+        <Progress value={1} max={1} size="md" aria-label="Highest level reached" />
+        <div className={styles.xpFoot}>
+          <span>Highest level reached · experience is never taken away</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.xp}>
+      <Progress value={xpIntoLevel} max={xpForNextLevel} size="md" label={`Experience towards level ${level + 1}`} />
+      <div className={styles.xpFoot}>
+        <span className={screenStyles.mono}>
+          {xpIntoLevel.toLocaleString()} / {xpForNextLevel.toLocaleString()} XP
+        </span>
+        <span>
+          {Math.max(0, xpForNextLevel - xpIntoLevel).toLocaleString()} to level {level + 1} · experience is never taken away
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function Crest({ deck }: { deck: HeroDeck }): ReactElement {
-  const toNext = Math.max(0, deck.hero.xpForNextLevel - deck.hero.xpIntoLevel);
   return (
     <Card padding="lg">
       <Card.Body>
@@ -88,17 +121,7 @@ function Crest({ deck }: { deck: HeroDeck }): ReactElement {
           <div className={styles.identity}>
             <div className={styles.name}>{deck.hero.title}</div>
             <p className={styles.subtitle}>{deck.subtitle}</p>
-            <div className={styles.xp}>
-              <Progress value={deck.hero.xpIntoLevel} max={deck.hero.xpForNextLevel} size="md" label={`Experience towards level ${deck.hero.level + 1}`} />
-              <div className={styles.xpFoot}>
-                <span className={screenStyles.mono}>
-                  {deck.hero.xpIntoLevel.toLocaleString()} / {deck.hero.xpForNextLevel.toLocaleString()} XP
-                </span>
-                <span>
-                  {toNext.toLocaleString()} to level {deck.hero.level + 1} · experience is never taken away
-                </span>
-              </div>
-            </div>
+            {deck.hero.xpForNextLevel === null ? null : <LevelProgress level={deck.hero.level} xpIntoLevel={deck.hero.xpIntoLevel} xpForNextLevel={deck.hero.xpForNextLevel} />}
           </div>
           <div className={styles.tallies}>
             <div>
@@ -160,7 +183,7 @@ function Overview({ deck }: { deck: HeroDeck }): ReactElement {
         <Card padding="md">
           <Card.Body>
             <h2 className={screenStyles.cardTitle}>Crown · {deck.hero.crown.label}</h2>
-            <Progress value={deck.hero.crown.keptPercent} max={100} size="md" label="Crown period progress" />
+            <Progress value={deck.hero.crown.keptPercent} max={100} size="md" aria-label={`Crown ${deck.hero.crown.label}: ${deck.hero.crown.keptPercent}% kept`} />
             <p className={screenStyles.cardBody}>{deck.crownNote}</p>
             {deck.crownHistory.length > 0 ? (
               <div className={styles.crowns}>
@@ -170,7 +193,7 @@ function Overview({ deck }: { deck: HeroDeck }): ReactElement {
                     className={styles.crown}
                     data-banked={record.banked}
                     title={record.label}
-                    aria-label={`${record.label}: ${record.banked ? 'banked' : 'in progress'}`}
+                    aria-label={`${record.label}: ${record.banked ? 'banked' : 'not banked'}`}
                   >
                     ♛
                   </span>
@@ -183,7 +206,7 @@ function Overview({ deck }: { deck: HeroDeck }): ReactElement {
         <Card padding="md">
           <Card.Body>
             <h2 className={screenStyles.cardTitle}>Momentum</h2>
-            <p className={styles.statValue}>{deck.momentumLabel}</p>
+            <p className={styles.name}>{deck.momentumLabel}</p>
             <p className={screenStyles.cardBody}>{deck.momentumNote}</p>
           </Card.Body>
         </Card>

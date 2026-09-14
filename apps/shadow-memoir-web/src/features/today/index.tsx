@@ -4,7 +4,8 @@ import { Alert, Button, Card, EmptyState, Skeleton } from '@shadow-library/ui';
 
 import { QuestRow } from '@/features/quests/quest-row';
 import { useQuestActions } from '@/features/quests/quest-actions';
-import { formatDayName, useDay, useMemoirData, useQuickLogTiles } from '@/lib/data';
+import { formatDayName, useComingBack, useDay, useMemoirData, useQuickLogTiles } from '@/lib/data';
+import { useSyncReadiness } from '@/lib/sync';
 
 import { DayRail } from './day-rail';
 import { HeroCard } from './hero-card';
@@ -15,6 +16,8 @@ export function TodayScreen(): ReactElement {
   const navigate = useNavigate();
   const day = useDay();
   const tiles = useQuickLogTiles();
+  const comingBack = useComingBack();
+  const sync = useSyncReadiness();
   const actions = useQuestActions();
 
   return (
@@ -31,19 +34,20 @@ export function TodayScreen(): ReactElement {
       {day.data ? (
         <div className={styles.grid}>
           <div className={styles.column}>
-            <HeroCard hero={day.data.hero} mode={day.data.mode} />
+            {sync.kind === 'loading' ? <Skeleton.Card /> : null}
+            {sync.kind === 'ready' ? <HeroCard hero={day.data.hero} mode={day.data.mode} /> : null}
 
-            {day.data.recovery ? (
+            {day.data.recovery && comingBack.data?.kind === 'offered' ? (
               <>
                 <Alert intent="info" title={day.data.recovery.title}>
                   {day.data.recovery.body}
                 </Alert>
                 <div className={styles.actionRow}>
                   <Button size="sm" variant="secondary" asChild>
-                    <Link to="/hero">See recovery choices</Link>
+                    <Link to="/hero/recovery">See recovery choices</Link>
                   </Button>
                   <Button size="sm" variant="ghost" asChild>
-                    <Link to="/plan">Lift the reduced load</Link>
+                    <Link to="/plan">See the week</Link>
                   </Button>
                 </div>
               </>

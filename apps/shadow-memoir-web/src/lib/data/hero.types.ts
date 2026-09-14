@@ -1,5 +1,5 @@
 import { type StatAffinity } from './quest.types';
-import { type CrownPeriod, type HeroState } from './view.types';
+import { type HeroState } from './view.types';
 
 export type HeroIntensityMode = 'gentle' | 'standard' | 'demanding';
 
@@ -59,6 +59,11 @@ interface CrownRecord {
   banked: boolean;
 }
 
+/** `returner`: the Returner ritual fired today. `recovery`: a recovery quest is waiting today. `comeback`: a comeback bonus is armed or was claimed today. */
+export type ComingBackReason = 'returner' | 'recovery' | 'comeback';
+
+export type ComingBack = { kind: 'none' } | { kind: 'offered'; reason: ComingBackReason } | { kind: 'dismissed'; reason: ComingBackReason };
+
 export interface HeroDeck {
   hero: HeroState;
   subtitle: string;
@@ -100,6 +105,7 @@ interface MissedWhileAway {
 }
 
 export interface RecoveryView {
+  comingBack: ComingBack;
   headline: string;
   body: string;
   stats: { label: string; value: number; unit?: string }[];
@@ -107,11 +113,9 @@ export interface RecoveryView {
   intensity: HeroIntensityMode;
   intensityOptions: IntensityOption[];
   missed: MissedWhileAway[];
-  progressPercent: number;
-  progressNote: string;
+  progress: { percent: number; note: string } | null;
   overload: { title: string; body: string } | null;
   shieldNote: string;
-  crown: CrownPeriod;
 }
 
 export type HeroCommand =

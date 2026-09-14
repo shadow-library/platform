@@ -1,11 +1,14 @@
 import { type DispatchOptions, type SettledCommandResult } from './command.types';
 import { type Persona } from './fixtures';
-import { type Achievement, type Cosmetic, type HeroCommand, type HeroDeck, type HeroIntensityMode, type HeroTitle, type RecoveryView } from './hero.types';
+import { type Achievement, type ComingBack, type Cosmetic, type HeroCommand, type HeroDeck, type HeroIntensityMode, type HeroTitle, type RecoveryView } from './hero.types';
 import { type HeroState } from './view.types';
 
 export interface HeroProvider {
   getDeck(): Promise<HeroDeck>;
   getRecovery(): Promise<RecoveryView>;
+  getComingBack(): Promise<ComingBack>;
+  /** "Not now" on Coming back, until the account's day turns over. */
+  dismissComingBack(): Promise<void>;
   dispatchCommand(command: HeroCommand, options?: DispatchOptions): Promise<SettledCommandResult>;
 }
 
@@ -251,10 +254,37 @@ const CROWN_HISTORY: HeroDeck['crownHistory'] = [
   { label: 'August', banked: false },
 ];
 
-const INTENSITY_OPTIONS: RecoveryView['intensityOptions'] = [
-  { mode: 'gentle', name: 'Gentle', description: 'Three quests a day at most, no HP anywhere, shields spend on their own. A good place to come back to.' },
-  { mode: 'standard', name: 'Standard', description: 'Your normal rules: strictness per quest, HP on strict misses, shields on request.' },
-  { mode: 'demanding', name: 'Demanding', description: 'Strictness raised one level across the board. Available, and rarely the reason people keep going.' },
+const RECOVERY_CHOICES: RecoveryView['choices'] = [
+  {
+    id: 'recovery_quest',
+    title: 'Add a recovery quest to today',
+    body: 'A lighter version of a quest you used to keep — twenty minutes instead of forty-five, judged on the day rather than the hour.',
+    effect: 'Grants XP as normal. Starts a new streak at one and leaves the closed streak in History.',
+    actionLabel: 'Add a morning walk',
+    to: '/quests/new',
+  },
+  {
+    id: 'spend_shield',
+    title: 'Spend a shield on Thursday',
+    body: 'Thursday was a scheduled strength session you missed while away. A shield covers it for up to seven days afterwards.',
+    effect: 'Keeps the strength streak at eleven. Uses one of your two shields. No HP change.',
+    actionLabel: 'Open that day',
+    to: '/history',
+  },
+  {
+    id: 'keep_reduced',
+    title: 'Keep the reduced load until Sunday',
+    body: 'Comeback caps your day at three quests. The others are paused, not deleted.',
+    effect: 'Nothing is lost. On Sunday the cap lifts by itself.',
+    actionLabel: 'See the week',
+    to: '/plan',
+  },
+];
+
+export const INTENSITY_OPTIONS: RecoveryView['intensityOptions'] = [
+  { mode: 'gentle', name: 'Gentle', description: 'A miss never costs HP, HP refills faster overnight, and the crown is counted over the whole week.' },
+  { mode: 'standard', name: 'Standard', description: 'A missed anchor or routine quest costs one HP, and the crown is counted day by day.' },
+  { mode: 'demanding', name: 'Demanding', description: 'Fewer HP that refill more slowly, a higher cost when a long streak ends, and the crown counted day by day.' },
 ];
 
 const MOMENTUM_COPY: Record<Persona, { label: string; note: string }> = {
@@ -270,6 +300,7 @@ interface HeroFixtureState {
   owned: Set<string>;
   equipped: Record<Cosmetic['kind'], string | null>;
   intensity: HeroIntensityMode;
+  comingBackDismissed: boolean;
 }
 
 export interface HeroFixtureOptions {
@@ -314,6 +345,12 @@ export function createHeroProvider({ persona = 'active', hero }: HeroFixtureOpti
     owned: new Set(OWNED_BY_PERSONA[persona]),
     equipped: { badge: 'badge_bronze', hero_accent: null, theme_accent: null },
     intensity: persona === 'recovery' ? 'gentle' : 'standard',
+    comingBackDismissed: false,
+  };
+
+  const comingBack = (): ComingBack => {
+    if (state.persona !== 'recovery') return { kind: 'none' };
+    return { kind: state.comingBackDismissed ? 'dismissed' : 'offered', reason: 'recovery' };
   };
 
   const deck = (): HeroDeck => {
@@ -346,6 +383,7 @@ export function createHeroProvider({ persona = 'active', hero }: HeroFixtureOpti
   };
 
   const recovery = (): RecoveryView => ({
+    comingBack: comingBack(),
     headline: 'What happened, and what you can do',
     body: 'You were away eight days and came back on Wednesday. Two streaks closed while you were gone, and their records are intact in History. No XP was removed, no level was lost, and your HP was not spent for days you were not here.',
     stats: [
@@ -354,32 +392,7 @@ export function createHeroProvider({ persona = 'active', hero }: HeroFixtureOpti
       { label: 'Shields held', value: 2 },
       { label: 'HP', value: state.hero.hp, unit: `of ${state.hero.hpMax}` },
     ],
-    choices: [
-      {
-        id: 'recovery_quest',
-        title: 'Add a recovery quest to today',
-        body: 'A lighter version of a quest you used to keep — twenty minutes instead of forty-five, judged on the day rather than the hour.',
-        effect: 'Grants XP as normal. Starts a new streak at one and leaves the closed streak in History.',
-        actionLabel: 'Add a morning walk',
-        to: '/quests/new',
-      },
-      {
-        id: 'spend_shield',
-        title: 'Spend a shield on Thursday',
-        body: 'Thursday was a scheduled strength session you missed while away. A shield covers it for up to seven days afterwards.',
-        effect: 'Keeps the strength streak at eleven. Uses one of your two shields. No HP change.',
-        actionLabel: 'Open that day',
-        to: '/history',
-      },
-      {
-        id: 'keep_reduced',
-        title: 'Keep the reduced load until Sunday',
-        body: 'Comeback caps your day at three quests. The others are paused, not deleted.',
-        effect: 'Nothing is lost. On Sunday the cap lifts by itself.',
-        actionLabel: 'See the week',
-        to: '/plan',
-      },
-    ],
+    choices: comingBack().kind === 'offered' ? RECOVERY_CHOICES : [],
     intensity: state.intensity,
     intensityOptions: INTENSITY_OPTIONS,
     missed: [
@@ -388,20 +401,26 @@ export function createHeroProvider({ persona = 'active', hero }: HeroFixtureOpti
       { id: 'm3', title: 'Strength session', meta: 'Thursday 21 August', state: 'Shieldable' },
       { id: 'm4', title: 'Evening stretch', meta: 'Friday 22 August · streak closed at 9', state: 'Recoverable' },
     ],
-    progressPercent: 62,
-    progressNote: 'Three of five comeback days done. On Sunday the reduced load lifts by itself and HP returns to five — you do not have to do anything.',
+    progress: {
+      percent: 62,
+      note: 'Three of five comeback days done. On Sunday the reduced load lifts by itself and HP returns to five — you do not have to do anything.',
+    },
     overload: {
       title: 'Next week reads heavy',
       body: 'Reactivating everything at once would put 41 occurrences and about 14 hours into next week, above the 26 you have kept in your best week. Comeback keeps it at 21 until Sunday.',
     },
     shieldNote:
       'A shield covers one unavoidable miss on one quest: the streak survives, no HP is spent, and the day is marked shielded in History. You earn one per kept week, up to three.',
-    crown: state.hero.crown,
   });
 
   return {
     getDeck: () => Promise.resolve(deck()),
     getRecovery: () => Promise.resolve(recovery()),
+    getComingBack: () => Promise.resolve(comingBack()),
+    dismissComingBack: () => {
+      state.comingBackDismissed = true;
+      return Promise.resolve();
+    },
     dispatchCommand: command => {
       if (command.type === 'title.display') {
         const title = titlesFor(state.persona).find(item => item.id === command.titleId);

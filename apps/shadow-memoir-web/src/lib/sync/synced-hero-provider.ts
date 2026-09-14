@@ -1,24 +1,138 @@
+import { toISODate } from '@shadow-library/ui';
+
 import {
   type AccountProvider,
   type Achievement,
   ACHIEVEMENTS,
+  COMING_BACK_NOTICES,
+  type ComingBack,
+  type ComingBackReason,
   type Cosmetic,
   COSMETICS,
-  createHeroProvider,
+  type CrownPeriod,
   type DispatchOptions,
   type HeroCommand,
   type HeroDeck,
   type HeroProvider,
   type HeroTitle,
+  INTENSITY_OPTIONS,
+  type Momentum,
   type RecoveryView,
   type SettledCommandResult,
+  STAT_LABELS,
+  type StatAffinity,
   TITLES,
 } from '@/lib/data';
+import { formatCount, formatLocalDate, formatRelativeDay } from '@/lib/format';
 
 import { isHeroCommand } from './command-wire';
 import { ignoreAccountBoundary } from './memoir-store';
-import { type HeroGrants, projectHeroGrants } from './projection';
+import {
+  type ClosedCrown,
+  type HeroEventRecord,
+  type HeroEventType,
+  type HeroGrants,
+  type HeroStanding,
+  projectCrownHistory,
+  projectHeroEvents,
+  projectHeroGrants,
+  projectHeroStanding,
+  projectRecentMisses,
+  type RecentMiss,
+} from './projection';
 import { type SyncEngine } from './sync-engine';
+import { SYNC_META_KEYS } from './sync.types';
+
+const EVENT_LIMIT = 8;
+const CROWN_HISTORY_LENGTH = 7;
+
+const MOMENTUM_LABELS: Record<Momentum, string> = { cold: 'Settling', steady: 'Steady', warm: 'Warm' };
+
+const STAT_ORDER: StatAffinity[] = ['body', 'mind', 'wealth', 'discipline'];
+
+const STAT_NOTES: Record<StatAffinity, string> = {
+  body: 'Movement, sleep, food, strength',
+  mind: 'Reading, writing, study, focus',
+  wealth: 'Spending, saving, admin',
+  discipline: 'Anchors, tidiness, follow-through',
+};
+
+const HIDDEN_EVENT_TYPES: HeroEventType[] = ['crown_init'];
+
+const EVENT_TITLES: Record<HeroEventType, (event: HeroEventRecord) => string> = {
+  quest_complete: event => `${event.questName ?? 'A quest'} kept`,
+  quest_partial: event => `${event.questName ?? 'A quest'} partly kept`,
+  quest_late: event => `${event.questName ?? 'A quest'} kept late`,
+  recovery: event => `${event.questName ?? 'A recovery quest'} kept`,
+  level_up: event => (event.levelAfter === null ? 'New level reached' : `Level ${event.levelAfter} reached`),
+  achievement_unlock: event => `${ACHIEVEMENTS.find(achievement => achievement.id === event.achievementId)?.name ?? 'An achievement'} earned`,
+  coin_grant: () => 'Coins granted',
+  crown_banked: () => 'Crown banked',
+  side_quest: () => 'Side quest logged',
+  journal: () => 'Journal entry written',
+  meal: () => 'Meal logged',
+  weight: () => 'Weight logged',
+  coin_spend: () => 'Cosmetic unlocked',
+  recovery_spawned: event => (event.questName ? `Recovery quest offered for ${event.questName}` : 'Recovery quest offered'),
+  recovery_completed: () => 'Recovery quest kept',
+  recovery_expired: () => 'Recovery quest closed unkept',
+  crown_init: () => 'Crown period opened',
+  crown_forfeit: event => `Crown share lost on ${event.questName ?? 'a quest'}`,
+  returner_fired: () => 'Welcome back',
+};
+
+interface ComingBackCopy {
+  headline: string;
+  body: string;
+  choices: RecoveryView['choices'];
+}
+
+const TODAY_CHOICE: RecoveryView['choices'][number] = {
+  id: 'today',
+  title: 'Keep one quest today',
+  body: 'Pick whichever quest on today’s list feels manageable. There is nothing to catch up on.',
+  effect: 'Grants experience as usual.',
+  actionLabel: 'Go to today',
+  to: '/',
+};
+
+const WEEK_CHOICE: RecoveryView['choices'][number] = {
+  id: 'week',
+  title: 'Look over the week',
+  body: 'Moving or pausing a quest can make the coming days lighter.',
+  effect: 'Nothing changes until you move or pause something.',
+  actionLabel: 'See the week',
+  to: '/plan',
+};
+
+const COMING_BACK_COPY: Record<ComingBackReason | 'none', ComingBackCopy> = {
+  returner: {
+    headline: COMING_BACK_NOTICES.returner.title,
+    body: COMING_BACK_NOTICES.returner.body,
+    choices: [TODAY_CHOICE, WEEK_CHOICE],
+  },
+  recovery: {
+    headline: COMING_BACK_NOTICES.recovery.title,
+    body: COMING_BACK_NOTICES.recovery.body,
+    choices: [{ ...TODAY_CHOICE, title: 'Keep the recovery quest', body: 'It is on today’s list and judged on the day rather than the hour.' }, WEEK_CHOICE],
+  },
+  comeback: {
+    headline: 'A comeback bonus is ready',
+    body: 'After recent misses, the next anchor or routine quest you keep today earns extra experience and a coin.',
+    choices: [{ ...TODAY_CHOICE, title: 'Keep an anchor or routine quest', effect: 'Grants experience with the comeback bonus added.' }, WEEK_CHOICE],
+  },
+  none: {
+    headline: 'Nothing to come back from',
+    body: 'Nothing is waiting for you here today. After a missed day or a break, this page shows what changed and the choices open to you.',
+    choices: [],
+  },
+};
+
+const COMEBACK_CLAIMED_COPY: ComingBackCopy = {
+  headline: 'Comeback bonus claimed',
+  body: 'You kept a quest after recent misses today, and the comeback bonus was added to it. There is nothing else to do.',
+  choices: [WEEK_CHOICE],
+};
 
 function applied(message: string): SettledCommandResult {
   return { status: 'applied', message, xpAwarded: 0, coinsAwarded: 0 };
@@ -34,23 +148,105 @@ function cosmeticsFor(grants: HeroGrants, coins: number): Cosmetic[] {
   });
 }
 
+/** The server settles persona and comeback on the account's own day, which is the configured zone's date rather than the browser's. */
+function accountDay(timeZone: string | null): string {
+  if (!timeZone) return toISODate(new Date());
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const part = (type: Intl.DateTimeFormatPartTypes): string => parts.find(entry => entry.type === type)?.value ?? '';
+    return `${part('year')}-${part('month')}-${part('day')}`;
+  } catch {
+    return toISODate(new Date());
+  }
+}
+
+function comingBackReason(standing: HeroStanding): ComingBackReason | null {
+  if (standing.persona !== 'active') return standing.persona;
+  return standing.comeback ? 'comeback' : null;
+}
+
+function comingBackCopy(comingBack: ComingBack, standing: HeroStanding): ComingBackCopy {
+  if (comingBack.kind === 'none') return COMING_BACK_COPY.none;
+  if (comingBack.reason === 'comeback' && standing.comeback?.armed === false) return COMEBACK_CLAIMED_COPY;
+  return COMING_BACK_COPY[comingBack.reason];
+}
+
+function crownNote(crown: CrownPeriod): string {
+  if (crown.cadence === 'daily') return `Closes at the end of today · ${crown.keptPercent}% kept.`;
+  return `Day ${crown.dayIndex} of ${crown.dayCount} · closes ${formatLocalDate(crown.closesOn, { year: false })} · ${crown.keptPercent}% kept.`;
+}
+
+function closedCrownLabel(crown: ClosedCrown): string {
+  const closed = formatLocalDate(crown.closedOn, { year: false });
+  return crown.periodStart === crown.closedOn ? closed : `${formatLocalDate(crown.periodStart, { year: false })} – ${closed}`;
+}
+
+function lifetimeStats(stats: Record<StatAffinity, number>): HeroDeck['lifetime'] {
+  const best = Math.max(...STAT_ORDER.map(stat => stats[stat]));
+  return STAT_ORDER.map(stat => ({
+    stat,
+    label: STAT_LABELS[stat],
+    value: stats[stat],
+    percentOfBest: best === 0 ? 0 : Math.round((stats[stat] / best) * 100),
+    note: STAT_NOTES[stat],
+  }));
+}
+
+function eventValue(event: HeroEventRecord): string {
+  const xp = event.xpDelta > 0 ? `+${event.xpDelta} XP` : null;
+  const coins = event.coinsDelta === 0 ? null : `${event.coinsDelta > 0 ? '+' : '−'}${Math.abs(event.coinsDelta)} ◈`;
+  return [xp, coins].filter(Boolean).join(' · ');
+}
+
+function toProgressionEvent(event: HeroEventRecord, today: string): HeroDeck['events'][number] {
+  return {
+    id: event.id,
+    when: formatRelativeDay(event.date, today),
+    title: EVENT_TITLES[event.type](event),
+    meta: event.statAffinity && event.statDelta > 0 ? `${STAT_LABELS[event.statAffinity]} +${event.statDelta}` : '',
+    value: eventValue(event),
+    rewarded: event.xpDelta > 0 || event.coinsDelta > 0,
+  };
+}
+
+function missedRecently(misses: RecentMiss[]): RecoveryView['missed'] {
+  return misses
+    .map(quest => ({ quest, last: quest.misses[quest.misses.length - 1]?.date ?? '' }))
+    .sort((left, right) => right.last.localeCompare(left.last))
+    .map(({ quest, last }) => {
+      const shielded = quest.misses.filter(miss => miss.shielded).length;
+      const when =
+        quest.misses.length === 1
+          ? formatLocalDate(last, { year: false })
+          : `${formatCount(quest.misses.length, 'miss', 'misses')} · last ${formatLocalDate(last, { year: false })}`;
+      return {
+        id: quest.questId,
+        title: quest.questName,
+        meta: shielded > 0 && quest.misses.length > 1 ? `${when} · ${shielded} shielded` : when,
+        state: shielded === quest.misses.length ? 'Shielded' : 'Missed',
+      };
+    });
+}
+
+function shieldNote(standing: HeroStanding): string {
+  if (standing.shieldCap === 0) return 'None of your quests can hold a shield yet. Quests on a streak earn them as you keep them.';
+  return `You hold ${standing.shieldsAvailable} of ${standing.shieldCap} shields across your quests. A shield keeps a quest’s streak alive through a missed occurrence, and the day is marked shielded in History.`;
+}
+
 /**
- * The hero deck read from the account row and the three progression snapshot domains, with purchases,
- * equips and title display written through the outbox. `intensity.set` is an account setting rather than a
- * hero command, so it goes out as the same deferred `PATCH /account` the settings screen uses; the recovery
- * narrative around it stays on the fixture provider, which the server has no module for.
+ * The hero deck read from the account row and the progression domains, with purchases, equips and title display
+ * written through the outbox. `intensity.set` is an account setting rather than a hero command, so it goes out as the
+ * same deferred `PATCH /account` the settings screen uses.
  */
 export class SyncedHeroProvider implements HeroProvider {
   private grants: HeroGrants;
   private pending: Promise<void> = Promise.resolve();
-  private readonly narrative: HeroProvider;
 
   constructor(
     private readonly sync: SyncEngine,
     private readonly account: AccountProvider,
   ) {
     this.grants = projectHeroGrants(sync.domains());
-    this.narrative = createHeroProvider({ persona: 'active', hero: sync.world().hero });
     sync.subscribeProjection(() => (this.pending = this.pending.then(() => this.reproject())));
   }
 
@@ -93,24 +289,46 @@ export class SyncedHeroProvider implements HeroProvider {
     return applied('');
   }
 
+  private async comingBackFor(standing: HeroStanding, day: string): Promise<ComingBack> {
+    const reason = comingBackReason(standing);
+    if (!reason) return { kind: 'none' };
+    const dismissedOn = await this.sync.store.readMeta<string>(SYNC_META_KEYS.comingBackDismissedOn);
+    return { kind: dismissedOn === day ? 'dismissed' : 'offered', reason };
+  }
+
   async getDeck(): Promise<HeroDeck> {
     const hero = this.sync.world().hero;
+    const rows = this.sync.domains();
+    const standing = projectHeroStanding(rows);
+    const day = accountDay(standing.timezone);
     const titles: HeroTitle[] = TITLES.map(seed => ({ ...seed, earnedOn: this.grants.titles[seed.id] ?? null }));
     const achievements: Achievement[] = ACHIEVEMENTS.map(seed => ({ ...seed, earnedOn: this.grants.achievements[seed.id] ?? null }));
     const displayed = titles.find(title => title.id === this.grants.displayedTitleId);
+    const earned = achievements.filter(item => item.earnedOn !== null).length;
 
     return {
       hero: { ...hero, title: displayed?.name ?? 'Unnamed hero' },
-      subtitle: `Level ${hero.level} · ${achievements.filter(item => item.earnedOn !== null).length} achievements`,
-      shields: 0,
-      shieldCap: 3,
+      subtitle: [
+        `Level ${hero.level}`,
+        standing.activeDays === null ? null : formatCount(standing.activeDays, 'active day', 'active days'),
+        formatCount(earned, 'achievement', 'achievements'),
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      shields: standing.shieldsAvailable,
+      shieldCap: standing.shieldCap,
       hpNote: hero.hp === hero.hpMax ? 'full' : 'restores one a week on its own',
-      momentumLabel: hero.momentum,
+      momentumLabel: standing.persona === 'active' ? MOMENTUM_LABELS[hero.momentum] : 'Returning',
       momentumNote: 'Momentum describes the last two weeks. It is not a currency and it cannot go negative.',
-      crownNote: `Day ${hero.crown.dayIndex} of ${hero.crown.dayCount} · ${hero.crown.keptPercent}% kept.`,
-      crownHistory: [],
-      lifetime: [],
-      events: [],
+      crownNote: crownNote(hero.crown),
+      crownHistory: projectCrownHistory(rows)
+        .slice(-CROWN_HISTORY_LENGTH)
+        .map(crown => ({ label: closedCrownLabel(crown), banked: crown.banked })),
+      lifetime: lifetimeStats(standing.stats),
+      events: projectHeroEvents(rows)
+        .filter(event => !HIDDEN_EVENT_TYPES.includes(event.type))
+        .slice(0, EVENT_LIMIT)
+        .map(event => toProgressionEvent(event, day)),
       achievements,
       titles,
       displayedTitleId: this.grants.displayedTitleId,
@@ -119,8 +337,39 @@ export class SyncedHeroProvider implements HeroProvider {
   }
 
   async getRecovery(): Promise<RecoveryView> {
-    const [recovery, day] = await Promise.all([this.narrative.getRecovery(), this.account.getDay()]);
-    return { ...recovery, intensity: day.pendingIntensity ?? day.intensity };
+    const hero = this.sync.world().hero;
+    const rows = this.sync.domains();
+    const standing = projectHeroStanding(rows);
+    const day = accountDay(standing.timezone);
+    const [comingBack, preferences] = await Promise.all([this.comingBackFor(standing, day), this.account.getDay()]);
+    const copy = comingBackCopy(comingBack, standing);
+
+    return {
+      comingBack,
+      headline: copy.headline,
+      body: copy.body,
+      stats: [
+        { label: 'HP', value: hero.hp, unit: `of ${hero.hpMax}` },
+        { label: 'Shields held', value: standing.shieldsAvailable, unit: `of ${standing.shieldCap}` },
+        { label: 'Crown kept', value: hero.crown.keptPercent, unit: '%' },
+      ],
+      choices: comingBack.kind === 'offered' ? copy.choices : [],
+      intensity: preferences.pendingIntensity ?? preferences.intensity,
+      intensityOptions: INTENSITY_OPTIONS,
+      missed: missedRecently(projectRecentMisses(rows, day)),
+      progress: null,
+      overload: null,
+      shieldNote: shieldNote(standing),
+    };
+  }
+
+  getComingBack(): Promise<ComingBack> {
+    const standing = projectHeroStanding(this.sync.domains());
+    return this.comingBackFor(standing, accountDay(standing.timezone));
+  }
+
+  async dismissComingBack(): Promise<void> {
+    await this.sync.store.writeMeta(SYNC_META_KEYS.comingBackDismissedOn, accountDay(projectHeroStanding(this.sync.domains()).timezone));
   }
 
   async dispatchCommand(command: HeroCommand, options?: DispatchOptions): Promise<SettledCommandResult> {

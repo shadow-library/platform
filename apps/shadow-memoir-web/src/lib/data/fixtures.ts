@@ -1,6 +1,6 @@
 import { type OccurrenceState, type Quest, type QuestProgress, type Recurrence, type StatAffinity, type Strictness, type Weekday } from './quest.types';
-import { shiftDate, WEEKDAYS } from './labels';
-import { type ActivityEntry, type HeroState } from './view.types';
+import { shiftDate, startOfWeek, weekdayOf, WEEKDAYS } from './labels';
+import { type ActivityEntry, type CrownPeriod, type HeroState } from './view.types';
 
 export type Persona = 'new' | 'active' | 'recovery';
 
@@ -274,7 +274,7 @@ export interface SeedResult {
   metrics: Record<string, number>;
 }
 
-const HERO_BY_PERSONA: Record<Persona, HeroState> = {
+const HERO_BY_PERSONA: Record<Persona, Omit<HeroState, 'crown'> & { crownKeptPercent: number }> = {
   new: {
     level: 1,
     title: 'Unnamed hero',
@@ -285,7 +285,7 @@ const HERO_BY_PERSONA: Record<Persona, HeroState> = {
     hp: 5,
     hpMax: 5,
     momentum: 'steady',
-    crown: { label: 'this month', dayIndex: 1, dayCount: 30, keptPercent: 0 },
+    crownKeptPercent: 100,
   },
   active: {
     level: 14,
@@ -297,7 +297,7 @@ const HERO_BY_PERSONA: Record<Persona, HeroState> = {
     hp: 4,
     hpMax: 5,
     momentum: 'warm',
-    crown: { label: 'this month', dayIndex: 23, dayCount: 31, keptPercent: 74 },
+    crownKeptPercent: 74,
   },
   recovery: {
     level: 14,
@@ -309,7 +309,7 @@ const HERO_BY_PERSONA: Record<Persona, HeroState> = {
     hp: 2,
     hpMax: 5,
     momentum: 'cold',
-    crown: { label: 'this month', dayIndex: 23, dayCount: 31, keptPercent: 41 },
+    crownKeptPercent: 41,
   },
 };
 
@@ -329,6 +329,16 @@ const ACTIVITY_BY_PERSONA: Record<Persona, ActivityEntry[]> = {
   ],
 };
 
+function heroFor(today: string, persona: Persona): HeroState {
+  const { crownKeptPercent, ...hero } = HERO_BY_PERSONA[persona];
+  return { ...hero, crown: weeklyCrown(today, crownKeptPercent) };
+}
+
+function weeklyCrown(today: string, keptPercent: number): CrownPeriod {
+  const periodStart = startOfWeek(today);
+  return { label: 'this week', cadence: 'weekly', periodStart, closesOn: shiftDate(periodStart, 6), dayIndex: WEEKDAYS.indexOf(weekdayOf(today)) + 1, dayCount: 7, keptPercent };
+}
+
 export function seed(today: string, persona: Persona): SeedResult {
   const seeds = persona === 'new' ? [] : persona === 'recovery' ? RECOVERY_SEEDS : [...ACTIVE_SEEDS, ...INACTIVE_SEEDS];
   const quests = seeds.map(item => toQuest(item, today));
@@ -338,7 +348,7 @@ export function seed(today: string, persona: Persona): SeedResult {
   return {
     quests,
     progress: questProgress,
-    hero: { ...HERO_BY_PERSONA[persona], crown: { ...HERO_BY_PERSONA[persona].crown } },
+    hero: heroFor(today, persona),
     activity: [...ACTIVITY_BY_PERSONA[persona]],
     metrics: { steps: 6240, water: 1400, sleep: 7.5, calories: 480 },
   };

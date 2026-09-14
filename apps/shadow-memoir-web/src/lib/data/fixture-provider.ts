@@ -7,7 +7,21 @@ import { isCurrencyCode } from './finance.rules';
 import { getQuickLogProvider } from './quick-logs.provider';
 import { lbToKg, toStoredMetricValue } from './quick-logs.rules';
 import { type Persona, seed } from './fixtures';
-import { formatDuration, formatMonth, formatRange, formatTime, shiftDate, startOfWeek, STATE_LABELS, STRICTNESS_LABELS, WEEKDAY_LABELS, weekdayOf, WEEKDAYS } from './labels';
+import {
+  COMING_BACK_NOTICES,
+  formatDuration,
+  formatMonth,
+  formatRange,
+  formatShortDate,
+  formatTime,
+  shiftDate,
+  startOfWeek,
+  STATE_LABELS,
+  STRICTNESS_LABELS,
+  WEEKDAY_LABELS,
+  weekdayOf,
+  WEEKDAYS,
+} from './labels';
 import {
   type OccurrenceState,
   type Quest,
@@ -25,6 +39,7 @@ import {
 import {
   type ActivityEntry,
   type CaptureTarget,
+  type DayMode,
   type DayView,
   type HeroState,
   type PlanDay,
@@ -41,6 +56,7 @@ const HP_COST: Record<Strictness, number> = { anchor: 1, routine: 1, goal: 0, re
 const XP_CEILING = 25;
 const SOFT_CAPACITY_MINUTES = 150;
 const PREVIEW_WINDOW_DAYS = 7;
+const RESCHEDULE_CAP = 2;
 
 export interface LogRecord {
   state: OccurrenceState;
@@ -61,7 +77,7 @@ export interface LogRecord {
  */
 export interface MemoirWorldState {
   today: string;
-  persona: Persona;
+  persona: DayMode;
   quests: Quest[];
   progress: Record<string, QuestProgress>;
   logs: Map<string, LogRecord>;
@@ -262,14 +278,8 @@ export class MemoirEngine implements DataProvider {
       mode: this.state.persona,
       hero: { ...this.state.hero, crown: { ...this.state.hero.crown } },
       occurrences,
-      recovery:
-        this.state.persona === 'recovery'
-          ? {
-              title: 'Comeback week — three days back after eight away',
-              body: 'Your streaks from before the break are kept as history, and your XP was never touched. The load is reduced to three quests a day until Sunday, and two shields are active. You can lift the reduction whenever you want.',
-            }
-          : null,
-      wakeWindowNote: this.state.persona === 'recovery' ? 'no HP at stake today' : this.wakeWindowNote(date),
+      recovery: this.state.persona === 'recovery' || this.state.persona === 'returner' ? COMING_BACK_NOTICES[this.state.persona] : null,
+      wakeWindowNote: this.wakeWindowNote(date),
       streaks: this.streakBoard(date),
       upcoming: this.upcoming(date),
       activity: this.state.activity,
@@ -320,7 +330,7 @@ export class MemoirEngine implements DataProvider {
         .slice(0, 2)
         .map(item => ({ id: item.id, when: formatTime(item.startTimeMinutes) ?? 'Today', title: item.questName, meta: item.locked ? 'Today · locked plan' : 'Today' })),
       ...tomorrow.map(item => ({ id: `${item.id}-next`, when: relativeDayLabel(item.date, date), title: item.questName, meta: formatTime(item.startTimeMinutes) ?? 'all day' })),
-      { id: 'crown', when: `day ${crown.dayCount}`, title: 'Crown period closes', meta: `${crown.keptPercent}% kept so far` },
+      { id: 'crown', when: relativeDayLabel(crown.closesOn, date), title: 'Crown closes', meta: `${crown.keptPercent}% kept so far` },
     ].slice(0, 4);
   }
 
@@ -329,13 +339,15 @@ export class MemoirEngine implements DataProvider {
     const days = Array.from({ length: 7 }, (_, index) => this.planDay(shiftDate(startOfWeek(range.anchor), index)));
     const carryMiss = this.scheduledOn(shiftDate(this.state.today, -1)).find(item => item.state === 'missed');
     const anchorDate = parseISODate(range.anchor) ?? new Date(range.anchor);
+    const month = this.planMonth(anchorDate);
+    const periodDays = range.scope === 'week' ? days : month.flatMap(cell => (cell.date ? [this.planDay(cell.date)] : []));
 
     return {
       label: range.scope === 'week' ? formatRange(from, shiftDate(from, 6)) : formatMonth(range.anchor),
       from,
       to: range.scope === 'week' ? shiftDate(from, 6) : range.anchor,
       days,
-      month: this.planMonth(anchorDate),
+      month,
       carryOver: carryMiss
         ? {
             title: 'Yesterday left one commitment open',
@@ -343,14 +355,30 @@ export class MemoirEngine implements DataProvider {
           }
         : null,
       crown: { ...this.state.hero.crown },
-      rescheduleBudget: { used: this.state.progress['read-pages']?.reschedulesUsed ?? 0, cap: 2, resetsOn: shiftDate(startOfWeek(this.state.today), 7) },
-      glance: [
-        `${days.reduce((total, day) => total + day.items.length, 0)} occurrences scheduled · ${days.reduce((total, day) => total + day.items.filter(item => item.state === 'completed').length, 0)} kept so far`,
-        `HP ${this.state.hero.hp} of ${this.state.hero.hpMax}`,
-        `${Object.values(this.state.progress).reduce((total, item) => total + item.shields, 0)} shields held`,
-        `Heaviest day ${days.reduce((heaviest, day) => (day.loadPercent > heaviest.loadPercent ? day : heaviest), days[0] as PlanDay).date}`,
-      ],
+      rescheduleBudget: this.rescheduleBudget(),
+      glance: this.glance(periodDays),
     };
+  }
+
+  private rescheduleBudget(): PlanView['rescheduleBudget'] {
+    const busiest = this.state.quests
+      .filter(quest => quest.active)
+      .map(quest => ({ name: quest.name, progress: this.state.progress[quest.id] as QuestProgress }))
+      .reduce<{ name: string; progress: QuestProgress } | null>((best, entry) => (entry.progress.reschedulesUsed > (best?.progress.reschedulesUsed ?? 0) ? entry : best), null);
+    return { used: busiest?.progress.reschedulesUsed ?? 0, cap: busiest?.progress.rescheduleCap ?? RESCHEDULE_CAP, questName: busiest?.name ?? null };
+  }
+
+  private glance(days: PlanDay[]): string[] {
+    const scheduled = days.reduce((total, day) => total + day.items.length, 0);
+    const kept = days.reduce((total, day) => total + day.items.filter(item => item.state === 'completed').length, 0);
+    const heaviest = days.reduce<PlanDay | null>((best, day) => (day.loadPercent > (best?.loadPercent ?? 0) ? day : best), null);
+    const shields = Object.values(this.state.progress).reduce((total, item) => total + item.shields, 0);
+    return [
+      `${scheduled} occurrences scheduled · ${kept} kept so far`,
+      ...(heaviest ? [`Heaviest day ${formatShortDate(heaviest.date)}`] : []),
+      `HP ${this.state.hero.hp} of ${this.state.hero.hpMax} now`,
+      `${shields} shields held now`,
+    ];
   }
 
   private planDay(date: string): PlanDay {
@@ -373,8 +401,14 @@ export class MemoirEngine implements DataProvider {
       loadPercent,
       loadSummary: `${occurrences.length} quests · about ${formatDuration(minutes)}`,
       items,
-      note: this.state.locks.has(date) ? 'Plan locked until Monday. Moves past the cap are recorded as skips with a reason.' : null,
+      note: this.lockNote(date),
     };
+  }
+
+  private lockNote(date: string): string | null {
+    if (!this.state.locks.has(date)) return null;
+    if (date < this.state.today) return 'This day was locked.';
+    return 'Locked. Moves past the reschedule cap are recorded as postpones with a reason.';
   }
 
   private planMonth(anchor: Date): PlanMonthCell[] {
@@ -606,7 +640,7 @@ export class MemoirEngine implements DataProvider {
       adherence30d: null,
       xpEarned: 0,
       reschedulesUsed: 0,
-      rescheduleCap: 2,
+      rescheduleCap: RESCHEDULE_CAP,
       recentOutcomes: [],
     };
     this.syncQuestLock(id, draft.preCommit);
