@@ -1,3 +1,4 @@
+import { type Router } from '@tanstack/react-router';
 import { createAppRouter } from '@shadow-library/web/router';
 
 import NotFound from '@/components/NotFound';
@@ -5,14 +6,12 @@ import RouteError from '@/components/RouteError';
 
 import { routeTree } from '../generated/routeTree.gen';
 
-const buildRouter = () => createAppRouter(routeTree, { router: { defaultErrorComponent: RouteError, defaultNotFoundComponent: NotFound } });
-
-export function getRouter(): ReturnType<typeof buildRouter> {
-  return buildRouter();
+export function getRouter(): Router<typeof routeTree, 'never', true> {
+  return createAppRouter(routeTree, { router: { defaultErrorComponent: RouteError, defaultNotFoundComponent: NotFound } });
 }
 
 declare module '@tanstack/react-router' {
   interface Register {
-    router: ReturnType<typeof getRouter>;
+    router: Router<typeof routeTree, 'never', true>;
   }
 }

@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { type ErrorComponentProps, useRouter } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { AccessDenied, Button, toast } from '@shadow-library/ui';
@@ -29,13 +30,14 @@ export default function RouteError({ error }: ErrorComponentProps): ReactElement
  */
 function LoadFailed(): ReactElement {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [retrying, setRetrying] = useState(false);
 
   const retry = async (): Promise<void> => {
     if (retrying) return;
     setRetrying(true);
     try {
-      await router.options.context.queryClient.resetQueries({ predicate: query => query.state.status === 'error' && query.state.data === undefined });
+      await queryClient.resetQueries({ predicate: query => query.state.status === 'error' && query.state.data === undefined });
       await router.invalidate();
     } finally {
       setRetrying(false);
