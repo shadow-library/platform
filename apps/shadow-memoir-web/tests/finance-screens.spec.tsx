@@ -4,10 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { toast } from '@shadow-library/ui';
+import { ApiError } from '@shadow-library/web';
 
 import { CategoriesScreen, ExpenseDetailScreen, ExpenseEntryPanel, ExpensesScreen, SubscriptionsScreen } from '@/features/finance';
-import { receiptApi } from '@/lib/apis';
+import financeStyles from '@/features/finance/finance.module.css';
+import { receiptApi, type ReceiptDownloadResponseDto } from '@/lib/apis';
 import { type ExpenseCategory, type ExpenseDetail, type FinanceSettings, todayISODate, UNCATEGORISED } from '@/lib/data';
+import { formatLocalDate } from '@/lib/format';
 import { type DeltaPage, type SyncedMemoirData, SyncEngineProvider } from '@/lib/sync';
 
 import { createMemoirTestData, renderScreen, renderWithQuery } from './harness';
@@ -33,6 +36,12 @@ function foreignExpense(): ExpenseDetail {
     syncState: 'synced',
     audit: [],
   };
+}
+
+function addDaysISO(date: string, days: number): string {
+  const next = new Date(`${date}T12:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next.toISOString().slice(0, 10);
 }
 
 function typeAmount(value: string): void {
@@ -438,6 +447,47 @@ describe('subscriptions screen', () => {
     vi.restoreAllMocks();
   });
 
+  it('should keep the header text inside the page so a long total can truncate', async () => {
+    renderWithQuery(<SubscriptionsScreen />);
+
+    const heading = await screen.findByRole('heading', { name: 'Subscriptions', level: 1 });
+    expect(heading.parentElement?.classList.contains(financeStyles.headerText ?? '')).toBe(true);
+  });
+
+  it('should keep the renewal date visible beside a long name in the next 30 days', async () => {
+    const longName = `Subscription with an unreasonably long description ${'that keeps going '.repeat(8)}`.trim();
+    const dueDate = addDaysISO(todayISODate(), 2);
+    const { engine } = createTestEngine({
+      today: todayISODate(),
+      pages: [page({ subscriptions: [subscriptionRow({ name: longName, nextDueDate: dueDate, lastConfirmedDate: null })] })],
+    });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <SubscriptionsScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    const rail = (await screen.findByRole('heading', { name: 'Next 30 days' })).parentElement as HTMLElement;
+    const name = await within(rail).findByTitle(longName);
+    const date = within(rail).getByText(formatLocalDate(dueDate));
+    expect(name.classList.contains(financeStyles.railRowName ?? '')).toBe(true);
+    expect(name.contains(date)).toBe(false);
+  });
+
+  it('should scroll the new subscription panel clear of the bottom chrome when it opens', async () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+    renderWithQuery(<SubscriptionsScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Add subscription' }));
+
+    const panel = (await screen.findByRole('heading', { name: 'Add subscription' })).closest(`.${financeStyles.entryPanel}`);
+    expect(panel).not.toBeNull();
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+    expect(document.activeElement).toBe(screen.getByLabelText('Name'));
+    vi.restoreAllMocks();
+  });
+
   it('should create a subscription', async () => {
     const posted: PostedCommand[] = [];
     const success = vi.spyOn(toast, 'success');
@@ -476,6 +526,33 @@ describe('categories screen', () => {
     expect(await screen.findByRole('button', { name: 'Actions for Food' })).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Actions for Uncategorised' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Actions for Subscriptions' })).toBeNull();
+  });
+
+  it('should keep the header text inside the page so a long meta line can truncate', async () => {
+    renderScreen(<CategoriesScreen />);
+
+    const heading = await screen.findByRole('heading', { name: 'Categories', level: 1 });
+    expect(heading.parentElement?.classList.contains(financeStyles.headerText ?? '')).toBe(true);
+  });
+
+  it('should count a single uncategorised expense in the singular', async () => {
+    const { engine } = createTestEngine({ today: todayISODate(), pages: [page({ expenses: [expenseRow({ categoryId: 'uncat', note: 'Card payment' })] })] });
+    const data = createSyncedTestData(engine);
+    renderScreen(
+      <SyncEngineProvider data={data}>
+        <CategoriesScreen />
+      </SyncEngineProvider>,
+      { value: data },
+    );
+
+    expect(await screen.findByText(/^1 expense, €5\.20 this month\. Categorising it takes/)).toBeDefined();
+  });
+
+  it('should not promise a rename the page does not offer', async () => {
+    renderScreen(<CategoriesScreen />);
+
+    expect(await screen.findByRole('heading', { name: 'Archive safely' })).toBeDefined();
+    expect(screen.queryByText(/Renaming/)).toBeNull();
   });
 
   it('should keep an archived category after resync', async () => {
@@ -588,6 +665,45 @@ describe('expenses screen', () => {
     expect(await screen.findByText('Limit reached')).toBeDefined();
     expect(screen.getByText('6 / 5')).toBeDefined();
     expect(screen.getByText(/^Today’s scans are used up/)).toBeDefined();
+  });
+
+  it('should call an overdue subscription overdue in the subscriptions card', async () => {
+    await withTimeZone('Europe/Oslo', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-09-14T06:00:00.000Z'));
+      try {
+        renderMoney({
+          subscriptions: [
+            subscriptionRow({ id: 'sub-spotify', name: 'Spotify Premium', nextDueDate: '2026-09-15', lastConfirmedDate: '2026-08-15' }),
+            subscriptionRow({ id: 'sub-kindle', name: 'Kindle Unlimited', nextDueDate: '2026-09-12', lastConfirmedDate: '2026-08-12' }),
+          ],
+        });
+
+        expect(await screen.findByText('2 active · Kindle Unlimited was due 12 Sep')).toBeDefined();
+        expect(screen.queryByText(/next Kindle Unlimited/)).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  it('should count several overdue subscriptions instead of naming one', async () => {
+    await withTimeZone('Europe/Oslo', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-09-14T06:00:00.000Z'));
+      try {
+        renderMoney({
+          subscriptions: [
+            subscriptionRow({ id: 'sub-kindle', name: 'Kindle Unlimited', nextDueDate: '2026-09-12', lastConfirmedDate: '2026-08-12' }),
+            subscriptionRow({ id: 'sub-gym', name: 'SATS gym', nextDueDate: '2026-09-10', lastConfirmedDate: '2026-08-10' }),
+          ],
+        });
+
+        expect(await screen.findByText('2 active · 2 charges waiting to be confirmed')).toBeDefined();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   it('should show a queued badge for unsynced rows', async () => {
@@ -818,6 +934,176 @@ describe('expense detail screen', () => {
     expect(posted[0]?.payload['merchant']).toBe('Apotek 1');
     expect(await screen.findByText(/· Apotek 1$/)).toBeDefined();
     expect(screen.getByText('Receipt scanned')).toBeDefined();
+  });
+
+  describe('receipt photo', () => {
+    const ref = 'r/1/0192f1a2-7b3c-7d4e-8f50-1a2b3c4d5e6f.jpg';
+    const receiptExpense = (): Record<string, unknown> => expenseRow({ source: 'manual', receiptRef: ref });
+    const minutesFromNow = (minutes: number): string => new Date(Date.now() + minutes * 60_000).toISOString();
+
+    afterEach(() => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    async function openReceipt(): Promise<HTMLElement> {
+      fireEvent.click(await screen.findByRole('button', { name: 'View receipt' }));
+      return screen.findByRole('dialog');
+    }
+
+    function closeReceipt(dialog: HTMLElement): void {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    }
+
+    it('should preview the receipt photo from a fresh download link', async () => {
+      const download = vi.spyOn(receiptApi, 'download').mockResolvedValue({ url: 'https://storage.test/receipt.jpg', expiresAt: minutesFromNow(15) });
+      const row = receiptExpense();
+      renderDetail(String(row['id']), [page({ expenses: [row] })]);
+
+      const dialog = await openReceipt();
+
+      const photo = (await within(dialog).findByRole('img', { name: /^Receipt for Apotek 1/ })) as HTMLImageElement;
+      expect(photo.src).toBe('https://storage.test/receipt.jpg');
+      expect(within(dialog).getByRole('link', { name: 'Open photo' }).getAttribute('href')).toBe('https://storage.test/receipt.jpg');
+      expect(download).toHaveBeenCalledWith(ref);
+    });
+
+    it('should fetch a new link once the previous one has expired', async () => {
+      const download = vi
+        .spyOn(receiptApi, 'download')
+        .mockImplementation(async () => ({ url: `https://storage.test/receipt-${download.mock.calls.length}.jpg`, expiresAt: minutesFromNow(15) }));
+      const row = receiptExpense();
+      renderDetail(String(row['id']), [page({ expenses: [row] })]);
+
+      closeReceipt(await openReceipt());
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      await within(await openReceipt()).findByRole('img');
+      expect(download).toHaveBeenCalledTimes(1);
+
+      closeReceipt(screen.getByRole('dialog'));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.now() + 16 * 60_000);
+
+      const dialog = await openReceipt();
+      await waitFor(() => expect(download).toHaveBeenCalledTimes(2));
+      expect(((await within(dialog).findByRole('img')) as HTMLImageElement).src).toBe('https://storage.test/receipt-2.jpg');
+    });
+
+    it('should drop the link when it expires while the photo is open', async () => {
+      vi.spyOn(receiptApi, 'download').mockResolvedValue({ url: 'https://storage.test/receipt.jpg', expiresAt: new Date(Date.now() + 150).toISOString() });
+      const row = receiptExpense();
+      renderDetail(String(row['id']), [page({ expenses: [row] })]);
+
+      const dialog = await openReceipt();
+
+      expect(await within(dialog).findByText('This view has expired')).toBeDefined();
+      expect(within(dialog).queryByRole('link', { name: 'Open photo' })).toBeNull();
+      expect(within(dialog).getByRole('button', { name: 'Load again' })).toBeDefined();
+    });
+
+    it('should show a fresh receipt link even when the device clock runs ahead', async () => {
+      vi.spyOn(receiptApi, 'download').mockResolvedValue({ url: 'https://storage.test/receipt.jpg', expiresAt: minutesFromNow(-5) });
+      const row = receiptExpense();
+      renderDetail(String(row['id']), [page({ expenses: [row] })]);
+
+      const dialog = await openReceipt();
+
+      expect(((await within(dialog).findByRole('img')) as HTMLImageElement).src).toBe('https://storage.test/receipt.jpg');
+      expect(within(dialog).queryByText('This view has expired')).toBeNull();
+      expect(within(dialog).getByRole('link', { name: 'Open photo' })).toBeDefined();
+    });
+
+    it('should not reuse a link about to expire', async () => {
+      const download = vi.spyOn(receiptApi, 'download').mockImplementation(async () => ({ url: 'https://storage.test/receipt.jpg', expiresAt: minutesFromNow(1.5) }));
+      const row = receiptExpense();
+      renderDetail(String(row['id']), [page({ expenses: [row] })]);
+
+      const dialog = await openReceipt();
+      await within(dialog).findByRole('img');
+      closeReceipt(dialog);
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.now() + 45_000);
+
+      await within(await openReceipt()).findByRole('img');
+      await waitFor(() => expect(download).toHaveBeenCalledTimes(2));
+    });
+
+    it('should offer to load the photo again when it fails to display', async () => {
+      const download = vi.spyOn(receiptApi, 'download').mockImplementation(async () => ({ url: 'https://storage.test/receipt.heic', expiresAt: minutesFromNow(15) }));
+      const row = receiptExpense();
+      renderDetail(String(row['id']), [page({ expenses: [row] })]);
+
+      const dialog = await openReceipt();
+      fireEvent.error(await within(dialog).findByRole('img'));
+
+      expect(await within(dialog).findByText(/The connection may have dropped, or this browser can’t display the file type/)).toBeDefined();
+      expect(within(dialog).getByRole('link', { name: 'Open photo' })).toBeDefined();
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Load again' }));
+
+      expect(await within(dialog).findByRole('img')).toBeDefined();
+      expect(download).toHaveBeenCalledTimes(2);
+    });
+
+    it('should explain when the receipt photo is no longer available', async () => {
+      vi.spyOn(receiptApi, 'download').mockRejectedValue(new ApiError(404, { code: 'RCP_001', type: 'NotFound', message: 'Receipt not found' }));
+      const row = receiptExpense();
+      renderDetail(String(row['id']), [page({ expenses: [row] })]);
+
+      const dialog = await openReceipt();
+
+      expect(await within(dialog).findByText(/This receipt photo isn’t available any more/)).toBeDefined();
+      expect(within(dialog).queryByText(/Receipt not found$/)).toBeNull();
+      expect(within(dialog).queryByRole('button', { name: 'Try again' })).toBeNull();
+      expect(within(dialog).queryByRole('img')).toBeNull();
+    });
+
+    it('should not ask for a link while offline', async () => {
+      const download = vi.spyOn(receiptApi, 'download');
+      const row = receiptExpense();
+      renderDetail(String(row['id']), [page({ expenses: [row] })]);
+      await screen.findByRole('button', { name: 'View receipt' });
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+
+      const dialog = await openReceipt();
+
+      expect(await within(dialog).findByText(/You’re offline, so the receipt photo can’t be loaded/)).toBeDefined();
+      expect(within(dialog).getByRole('button', { name: 'Try again' })).toBeDefined();
+      expect(download).not.toHaveBeenCalled();
+    });
+
+    it('should read a dropped connection as offline', async () => {
+      vi.spyOn(receiptApi, 'download').mockRejectedValue(new ApiError(-1, { code: 'API_REQUEST_NETWORK_ERROR', type: 'NetworkError', message: 'Network error' }));
+      const row = receiptExpense();
+      renderDetail(String(row['id']), [page({ expenses: [row] })]);
+
+      const dialog = await openReceipt();
+
+      expect(await within(dialog).findByText(/You’re offline, so the receipt photo can’t be loaded/)).toBeDefined();
+    });
+
+    it('should show a loading state until the link arrives', async () => {
+      let resolveLink: (link: ReceiptDownloadResponseDto) => void = () => undefined;
+      vi.spyOn(receiptApi, 'download').mockImplementation(() => new Promise(resolve => (resolveLink = resolve)));
+      const row = receiptExpense();
+      renderDetail(String(row['id']), [page({ expenses: [row] })]);
+
+      const dialog = await openReceipt();
+
+      expect(within(dialog).getByRole('status', { name: 'Loading the receipt photo' })).toBeDefined();
+      act(() => resolveLink({ url: 'https://storage.test/receipt.jpg', expiresAt: minutesFromNow(15) }));
+      expect(await within(dialog).findByRole('img')).toBeDefined();
+    });
+
+    it('should not offer a receipt photo for an expense without one', async () => {
+      const row = expenseRow({ source: 'manual' });
+      renderDetail(String(row['id']), [page({ expenses: [row] })]);
+
+      expect(await screen.findByRole('button', { name: 'Edit' })).toBeDefined();
+      expect(screen.queryByRole('button', { name: 'View receipt' })).toBeNull();
+    });
   });
 
   it('should confirm before deleting an expense', async () => {

@@ -8,6 +8,7 @@ import {
   compareExpensesByDate,
   convertToHomeMinor,
   daysBetween,
+  deriveDueState,
   expenseChanges,
   financePeriod,
   latestRates,
@@ -38,12 +39,14 @@ import {
   type FinanceSummary,
   type FxRateSnapshot,
   type RangeSpend,
+  type ReceiptLink,
   type ReceiptScanQuota,
   type ReceiptUploadProgress,
   type Subscription,
   SUBSCRIPTION_CATEGORIES,
   type SubscriptionCollision,
   type SubscriptionDraft,
+  type SubscriptionHighlight,
   type SubscriptionsView,
   type UnconvertedSubscriptions,
   type UpcomingCharge,
@@ -60,6 +63,8 @@ export interface FinanceProvider {
   uploadReceipt(file: File, progress: ReceiptUploadProgress): Promise<string>;
   /** Marks an uploaded receipt as kept; called only once the owner saves the expense that carries it. */
   confirmReceipt(ref: string): Promise<void>;
+  /** A presigned link to a stored receipt photo; it stops working at `expiresAt`. */
+  receiptLink(ref: string): Promise<ReceiptLink>;
   dispatchCommand(command: FinanceCommand, options?: DispatchOptions): Promise<FinanceCommandResult>;
 }
 
@@ -467,10 +472,21 @@ function subscriptionTotals(subscriptions: Subscription[], homeCurrency: Currenc
   };
 }
 
+function byDueDate(a: Subscription, b: Subscription): number {
+  return a.nextDueDate < b.nextDueDate ? -1 : 1;
+}
+
+function subscriptionHighlight(active: Subscription[], today: string): SubscriptionHighlight | null {
+  const overdue = active.filter(item => deriveDueState(item, today) === 'overdue').sort(byDueDate);
+  const [oldest] = overdue;
+  if (oldest) return { kind: 'overdue', name: oldest.name, dueDate: oldest.nextDueDate, count: overdue.length };
+  const next = active.filter(item => item.nextDueDate >= today && !(item.lastConfirmedDate && item.lastConfirmedDate >= item.nextDueDate)).sort(byDueDate)[0];
+  return next ? { kind: 'next', name: next.name, dueDate: next.nextDueDate } : null;
+}
+
 export function financeSummary(state: FinanceState): FinanceSummary {
   const home = state.settings.homeCurrency;
   const activeSubscriptions = state.subscriptions.filter(item => item.active);
-  const nextDue = [...activeSubscriptions].sort((a, b) => (a.nextDueDate < b.nextDueDate ? -1 : 1))[0];
   const rates = latestRates(state.expenses, home);
   const totals = subscriptionTotals(activeSubscriptions, home, rates);
 
@@ -482,7 +498,7 @@ export function financeSummary(state: FinanceState): FinanceSummary {
     subscriptionsMonthlyMinor: totals.homeMinor,
     unconvertedSubscriptions: totals.unconverted,
     activeSubscriptions: activeSubscriptions.length,
-    nextSubscription: nextDue ? { name: nextDue.name, dueDate: nextDue.nextDueDate } : null,
+    subscriptionHighlight: subscriptionHighlight(activeSubscriptions, state.today),
     totalExpenses: state.monthlyExpenseCount,
     latestRates: rates,
     queuedExpense: state.expenses.find(expense => expense.syncState === 'queued') ?? null,
@@ -742,6 +758,10 @@ export class FixtureFinanceProvider implements FinanceProvider {
 
   confirmReceipt(): Promise<void> {
     return Promise.resolve();
+  }
+
+  async receiptLink(): Promise<ReceiptLink> {
+    return { url: '/icons/icon.svg', expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() };
   }
 
   async dispatchCommand(command: FinanceCommand): Promise<FinanceCommandResult> {

@@ -4,6 +4,7 @@ import { Badge, Button, Card, cn, DropdownMenu, IconButton, Skeleton } from '@sh
 
 import { DataState } from '@/components/DataState';
 import { type ExpenseCategoryId, formatMinor, notifyOutcome, useExpenseCategories, useFinanceCommand } from '@/lib/data';
+import { formatCount } from '@/lib/format';
 import { useDataReadiness } from '@/lib/sync';
 
 import styles from './finance.module.css';
@@ -30,7 +31,7 @@ export function CategoriesScreen(): ReactElement {
   return (
     <section className={styles.screen} aria-labelledby="categories-title">
       <header className={styles.header}>
-        <div>
+        <div className={styles.headerText}>
           <h1 className={styles.title} id="categories-title">
             Categories
           </h1>
@@ -95,10 +96,8 @@ export function CategoriesScreen(): ReactElement {
           <div className={styles.column}>
             <Card padding="md">
               <Card.Body>
-                <h2 className={styles.railTitle}>Rename and archive safely</h2>
-                <p className={styles.railProse}>
-                  Renaming a category updates every past expense — the amounts never change. Archiving hides it from new entries and keeps its history in Insights.
-                </p>
+                <h2 className={styles.railTitle}>Archive safely</h2>
+                <p className={styles.railProse}>Archiving hides a category from new entries. Its past expenses keep it, and Insights keeps its history.</p>
               </Card.Body>
             </Card>
 
@@ -107,8 +106,8 @@ export function CategoriesScreen(): ReactElement {
                 <Card.Body>
                   <h2 className={styles.railTitle}>Uncategorised</h2>
                   <p className={styles.railProse}>
-                    {uncategorisedCount} expenses, {formatMinor(view?.uncategorised.totalMinor ?? 0, home)} this month. Categorising them takes about twenty seconds and improves
-                    the next guess.
+                    {formatCount(uncategorisedCount, 'expense', 'expenses')}, {formatMinor(view?.uncategorised.totalMinor ?? 0, home)} this month. Categorising{' '}
+                    {uncategorisedCount === 1 ? 'it' : 'them'} takes about twenty seconds and improves the next guess.
                   </p>
                   <Button size="sm" variant="secondary" className={styles.railAction} asChild>
                     <Link to="/finance" search={{ category: 'uncat' }}>

@@ -94,9 +94,13 @@ function spendComparison(spend: RangeSpend): string {
 function subscriptionsKpiNote(summary: FinanceSummary): string {
   const unconverted = unconvertedSubscriptionsNote(summary.unconvertedSubscriptions);
   if (unconverted) return `${summary.activeSubscriptions} active · ${unconverted}`;
-  if (summary.nextSubscription)
-    return `${summary.activeSubscriptions} active · next ${summary.nextSubscription.name} on ${formatLocalDate(summary.nextSubscription.dueDate, { year: false })}`;
-  return `${summary.activeSubscriptions} active`;
+  const active = `${summary.activeSubscriptions} active`;
+  const highlight = summary.subscriptionHighlight;
+  if (!highlight) return active;
+  const day = formatLocalDate(highlight.dueDate, { year: false });
+  if (highlight.kind === 'next') return `${active} · next ${highlight.name} on ${day}`;
+  if (highlight.count > 1) return `${active} · ${highlight.count} charges waiting to be confirmed`;
+  return `${active} · ${highlight.name} was due ${day}`;
 }
 
 interface KpiProps {

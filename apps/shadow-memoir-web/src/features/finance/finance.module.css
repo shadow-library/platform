@@ -355,8 +355,14 @@
   font-size: var(--sh-text-body-sm);
 }
 
-.railRowName {
+.railRowText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
+}
+
+.railRowName {
   color: var(--sh-text-secondary);
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -370,6 +376,7 @@
 }
 
 .railRowWhen {
+  white-space: nowrap;
   color: var(--sh-text-tertiary);
   font-size: var(--sh-text-caption);
 }
@@ -426,6 +433,10 @@
   color: var(--sh-success-text);
 }
 
+.entryPanel {
+  scroll-margin-block: 16px calc(var(--sh-shell-bottom-inset, 0px) + 16px);
+}
+
 .formActions {
   display: flex;
   gap: 10px;
@@ -444,6 +455,16 @@
 .well {
   padding: 14px;
   border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-well);
+}
+
+.receiptImage {
+  display: block;
+  max-width: 100%;
+  max-height: min(60vh, 560px);
+  margin-inline: auto;
+  object-fit: contain;
+  border-radius: var(--sh-radius-md);
   background: var(--sh-surface-well);
 }
 
@@ -466,6 +487,10 @@
   align-items: flex-start;
   gap: 14px;
   flex-wrap: wrap;
+}
+
+.detailHead .rowMain {
+  flex-basis: 220px;
 }
 
 .detailTags {
@@ -595,6 +620,12 @@
   .subscriptionRow .rowTrail {
     flex-wrap: wrap;
     justify-content: space-between;
+  }
+}
+
+@media (max-width: 767px) {
+  .entryPanel {
+    scroll-margin-top: calc(var(--sh-topbar-height) + var(--sh-safe-top) + 12px);
   }
 }
 

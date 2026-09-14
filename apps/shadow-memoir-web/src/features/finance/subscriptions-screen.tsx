@@ -84,7 +84,7 @@ export function SubscriptionsScreen(): ReactElement {
   return (
     <section className={styles.screen} aria-labelledby="subs-title">
       <header className={styles.header}>
-        <div>
+        <div className={styles.headerText}>
           <h1 className={styles.title} id="subs-title">
             Subscriptions
           </h1>
@@ -201,8 +201,11 @@ export function SubscriptionsScreen(): ReactElement {
                 <ul className={styles.railList}>
                   {view?.upcoming.map(charge => (
                     <li key={`${charge.subscriptionId}-${charge.dueDate}`} className={styles.railRow}>
-                      <span className={styles.railRowName} title={charge.name}>
-                        {charge.name} <span className={styles.railRowWhen}>· {formatLocalDate(charge.dueDate)}</span>
+                      <span className={styles.railRowText}>
+                        <span className={styles.railRowName} title={charge.name}>
+                          {charge.name}
+                        </span>
+                        <span className={styles.railRowWhen}>{formatLocalDate(charge.dueDate)}</span>
                       </span>
                       <span className={styles.mono}>{formatMinor(charge.amountMinor, charge.currency)}</span>
                     </li>

@@ -62,6 +62,7 @@ if (typeof window !== 'undefined') {
   window.ResizeObserver ??= ObserverStub as unknown as typeof ResizeObserver;
   window.IntersectionObserver ??= ObserverStub as unknown as typeof IntersectionObserver;
   window.scrollTo = () => undefined;
+  Element.prototype.scrollIntoView = () => undefined;
 
   /** Radix's overlay primitives (Select, DropdownMenu, …) rely on pointer capture, which jsdom does not implement. */
   Element.prototype.hasPointerCapture ??= () => false;

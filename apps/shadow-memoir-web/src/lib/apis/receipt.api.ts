@@ -1,4 +1,4 @@
-import { type OcrQuotaResponseDto, type ReceiptConfirmResponseDto, type ReceiptCreateDto, type ReceiptCreateResponseDto } from './api-types.gen';
+import { type OcrQuotaResponseDto, type ReceiptConfirmResponseDto, type ReceiptCreateDto, type ReceiptCreateResponseDto, type ReceiptDownloadResponseDto } from './api-types.gen';
 import { APIRequest } from './transport';
 
 export interface ObjectUploadProgress {
@@ -47,6 +47,7 @@ function putObject(uploadUrl: string, file: Blob, contentType: string, progress:
 export const receiptApi = {
   create: (body: ReceiptCreateDto): Promise<ReceiptCreateResponseDto> => APIRequest.post('/v1/receipts').body(body).execute<ReceiptCreateResponseDto>(),
   confirm: (ref: string): Promise<ReceiptConfirmResponseDto> => APIRequest.post(`/v1/receipts/${encodeURIComponent(ref)}/confirm`).execute<ReceiptConfirmResponseDto>(),
+  download: (ref: string): Promise<ReceiptDownloadResponseDto> => APIRequest.get(`/v1/receipts/${encodeURIComponent(ref)}/download`).execute<ReceiptDownloadResponseDto>(),
   putObject,
   scanQuota: (): Promise<OcrQuotaResponseDto> => APIRequest.get('/v1/ocr/quota').execute<OcrQuotaResponseDto>(),
 };

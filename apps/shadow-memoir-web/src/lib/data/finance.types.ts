@@ -253,6 +253,8 @@ export interface UnconvertedSubscriptions {
   currencies: CurrencyCode[];
 }
 
+export type SubscriptionHighlight = { kind: 'next'; name: string; dueDate: string } | { kind: 'overdue'; name: string; dueDate: string; count: number };
+
 export interface FinanceSummary {
   settings: FinanceSettings;
   categories: ExpenseCategory[];
@@ -262,7 +264,7 @@ export interface FinanceSummary {
   subscriptionsMonthlyMinor: number;
   unconvertedSubscriptions: UnconvertedSubscriptions;
   activeSubscriptions: number;
-  nextSubscription: { name: string; dueDate: string } | null;
+  subscriptionHighlight: SubscriptionHighlight | null;
   totalExpenses: number;
   /** The newest locked rate per foreign currency, for the entry form's conversion estimate. */
   latestRates: FxRateSnapshot[];
@@ -281,6 +283,11 @@ export interface ReceiptScanQuota {
   cap: number;
   used: number;
   resetAt: string;
+}
+
+export interface ReceiptLink {
+  url: string;
+  expiresAt: string;
 }
 
 export interface ReceiptUploadProgress {

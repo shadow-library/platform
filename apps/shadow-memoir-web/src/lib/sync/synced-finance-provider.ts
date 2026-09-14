@@ -1,4 +1,4 @@
-import { RECEIPT_MAX_BYTES, receiptApi, receiptContentType, ReceiptUploadError, toReceiptUploadError } from '@/lib/apis';
+import { RECEIPT_MAX_BYTES, receiptApi, receiptContentType, ReceiptUploadError, toReceiptDownloadError, toReceiptUploadError } from '@/lib/apis';
 import {
   applyFinanceCommand,
   capAdvisoryForTier,
@@ -17,6 +17,7 @@ import {
   financeSubscriptionsView,
   financeSummary,
   type FinanceSummary,
+  type ReceiptLink,
   type ReceiptScanQuota,
   type ReceiptUploadProgress,
   type SubscriptionsView,
@@ -121,6 +122,15 @@ export class SyncedFinanceProvider implements FinanceProvider {
       await receiptApi.confirm(ref);
     } catch (error) {
       throw toReceiptUploadError(error);
+    }
+  }
+
+  async receiptLink(ref: string): Promise<ReceiptLink> {
+    try {
+      const link = await receiptApi.download(ref);
+      return { url: link.url, expiresAt: link.expiresAt };
+    } catch (error) {
+      throw toReceiptDownloadError(error);
     }
   }
 

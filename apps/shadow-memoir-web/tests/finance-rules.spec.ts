@@ -219,6 +219,43 @@ describe('financeSummary', () => {
     expect(summary.budget).toMatchObject({ kind: 'set', leftMinor: 48_800 });
     expect(formatMinor(summary.budget.kind === 'set' ? summary.budget.leftMinor : 0, summary.settings.homeCurrency)).toBe('¥48,800');
   });
+
+  it('should name an overdue charge as overdue rather than as the next renewal', () => {
+    const state: FinanceState = {
+      ...financeState('2026-09-14', []),
+      subscriptions: [
+        subscription({ id: 'sub-spotify', name: 'Spotify Premium', nextDueDate: '2026-09-15', lastConfirmedDate: '2026-08-15' }),
+        subscription({ id: 'sub-kindle', name: 'Kindle Unlimited', nextDueDate: '2026-09-12', lastConfirmedDate: '2026-08-12' }),
+      ],
+    };
+
+    expect(financeSummary(state).subscriptionHighlight).toEqual({ kind: 'overdue', name: 'Kindle Unlimited', dueDate: '2026-09-12', count: 1 });
+  });
+
+  it('should name the next upcoming renewal once nothing is overdue', () => {
+    const state: FinanceState = {
+      ...financeState('2026-09-14', []),
+      subscriptions: [
+        subscription({ id: 'sub-spotify', name: 'Spotify Premium', nextDueDate: '2026-09-15', lastConfirmedDate: '2026-08-15' }),
+        subscription({ id: 'sub-kindle', name: 'Kindle Unlimited', nextDueDate: '2026-09-12', lastConfirmedDate: '2026-09-12' }),
+        subscription({ id: 'sub-paused', name: 'Netflix', nextDueDate: '2026-09-10', active: false }),
+      ],
+    };
+
+    expect(financeSummary(state).subscriptionHighlight).toEqual({ kind: 'next', name: 'Spotify Premium', dueDate: '2026-09-15' });
+  });
+
+  it('should skip a cycle confirmed today when naming the next renewal', () => {
+    const state: FinanceState = {
+      ...financeState('2026-09-14', []),
+      subscriptions: [
+        subscription({ id: 'sub-spotify', name: 'Spotify Premium', nextDueDate: '2026-09-14', lastConfirmedDate: '2026-09-14' }),
+        subscription({ id: 'sub-netflix', name: 'Netflix', nextDueDate: '2026-09-20', lastConfirmedDate: '2026-08-20' }),
+      ],
+    };
+
+    expect(financeSummary(state).subscriptionHighlight).toEqual({ kind: 'next', name: 'Netflix', dueDate: '2026-09-20' });
+  });
 });
 
 describe('financeExpensePage', () => {

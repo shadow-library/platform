@@ -22,6 +22,7 @@ import { useDataReadiness, uuidv7 } from '@/lib/sync';
 
 import { ExpenseEntryPanel } from './expense-entry-panel';
 import styles from './finance.module.css';
+import { ReceiptViewer } from './receipt-viewer';
 
 export interface ExpenseDetailScreenProps {
   expenseId: string;
@@ -163,6 +164,7 @@ function ExpenseDetailContent({ view, expenseId }: ExpenseDetailContentProps): R
                   </div>
                 </div>
                 <div className={styles.detailActions}>
+                  {detail.receiptRef && <ReceiptViewer receiptRef={detail.receiptRef} subject={`${title} · ${formatLocalDate(detail.occurredOnDate)}`} />}
                   <Button ref={editButton} size="sm" variant="secondary" aria-expanded={editing} onClick={() => setEditing(current => !current)}>
                     {editing ? 'Stop editing' : 'Edit'}
                   </Button>

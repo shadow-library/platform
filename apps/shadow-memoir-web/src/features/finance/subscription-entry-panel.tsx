@@ -47,11 +47,13 @@ export function SubscriptionEntryPanel({ today, settings, onClose }: Subscriptio
   const command = useFinanceCommand();
   const [draft, setDraft] = useState<FormDraft>(() => initialDraft(today, settings.homeCurrency));
   const [confirming, setConfirming] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const submitting = useRef(false);
 
   useEffect(() => {
-    nameRef.current?.focus();
+    panelRef.current?.scrollIntoView({ block: 'nearest' });
+    nameRef.current?.focus({ preventScroll: true });
   }, []);
 
   const patch = (values: Partial<FormDraft>): void => setDraft(current => ({ ...current, ...values }));
@@ -88,7 +90,7 @@ export function SubscriptionEntryPanel({ today, settings, onClose }: Subscriptio
   };
 
   return (
-    <Card padding="lg" aria-labelledby="subscription-entry-title">
+    <Card ref={panelRef} padding="lg" className={styles.entryPanel} aria-labelledby="subscription-entry-title">
       <Card.Body>
         <form onSubmit={event => void submit(event)}>
           <div className={styles.cardHead}>
