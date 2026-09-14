@@ -78,6 +78,7 @@ import {
   useUpdateBotMutation,
 } from '@/lib/apis';
 import { botErrorMessage, botFieldError } from '@/lib/bot-errors';
+import { isValidRateLimit, MAX_RATE_LIMIT, MIN_RATE_LIMIT, rateLimitError } from '@/lib/bot-rate-limit';
 import { validateCidr } from '@/lib/cidr';
 import { daysUntil, formatDate, relativeTime } from '@/lib/format';
 
@@ -130,7 +131,6 @@ const STATUS_META: Record<BotItem['status'], { label: string; intent: 'success' 
   DELETED: { label: 'Deleted', intent: 'neutral' },
 };
 
-const MAX_RATE_LIMIT = 600;
 const MAX_IP_ENTRIES = 20;
 const MAX_ACTIVE_KEYS = 2;
 const EXPIRY_WARNING_DAYS = 7;
@@ -980,7 +980,7 @@ function SettingsTab({ orgId, organisationName, bot, require, onSuspendToggle, s
   const [nameError, setNameError] = useState<string | undefined>();
 
   const hasInvalidIp = ipAllowlist.some(token => !token.valid);
-  const rateLimitInvalid = rateLimitPerMinute === null;
+  const rateLimitMessage = rateLimitError(rateLimitPerMinute);
   const manageable = isManageable(bot.status);
 
   const saveGeneral = (): void => {
@@ -999,7 +999,7 @@ function SettingsTab({ orgId, organisationName, bot, require, onSuspendToggle, s
   };
 
   const saveNetwork = (): void => {
-    if (hasInvalidIp || rateLimitInvalid) return;
+    if (hasInvalidIp || !isValidRateLimit(rateLimitPerMinute)) return;
     const validIps = ipAllowlist.filter(token => token.valid).map(token => token.value);
     require(() =>
       update.mutate(
@@ -1039,15 +1039,18 @@ function SettingsTab({ orgId, organisationName, bot, require, onSuspendToggle, s
           >
             <TokenInput value={ipAllowlist} onValueChange={setIpAllowlist} validate={validateCidr} maxTokens={MAX_IP_ENTRIES} placeholder="Add a CIDR range" />
           </FormField>
-          <FormField
-            label="Rate limit"
-            error={rateLimitInvalid ? 'Enter a rate limit.' : undefined}
-            helper={rateLimitInvalid ? undefined : 'Requests over the limit get a 429 response.'}
-          >
-            <NumberStepper value={rateLimitPerMinute} onValueChange={setRateLimitPerMinute} min={1} max={MAX_RATE_LIMIT} unit="requests / minute per app" />
+          <FormField label="Rate limit" error={rateLimitMessage} helper={rateLimitMessage ? undefined : 'Requests over the limit get a 429 response.'}>
+            <NumberStepper
+              value={rateLimitPerMinute}
+              onValueChange={setRateLimitPerMinute}
+              min={MIN_RATE_LIMIT}
+              max={MAX_RATE_LIMIT}
+              clampOnBlur={false}
+              unit="requests / minute per app"
+            />
           </FormField>
           <div className={styles.formActions}>
-            <Button variant="primary" size="sm" loading={update.isPending} disabled={hasInvalidIp || rateLimitInvalid} onClick={saveNetwork}>
+            <Button variant="primary" size="sm" loading={update.isPending} disabled={hasInvalidIp || !isValidRateLimit(rateLimitPerMinute)} onClick={saveNetwork}>
               Save changes
             </Button>
           </div>

@@ -4,7 +4,7 @@ import { Button, Spinner } from '@shadow-library/ui';
 import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 
 import { ArrowLeftIcon, BrandGlyph, GridIcon, KeyRoundIcon, LayersIcon, LinkIcon, ShieldCheckIcon, UserIcon, UsersIcon, WebhookIcon } from '@/components/icons';
-import { ThemeToggle } from '@/components/si';
+import { CrumbTrail, ThemeToggle } from '@/components/si';
 import { useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
@@ -65,7 +65,7 @@ export function ConsoleShell({ children }: { children: ReactNode }): React.JSX.E
         items: [{ id: 'account', label: 'Back to your account', icon: <UserIcon size={16} />, onSelect: () => navigate({ to: '/account' }) }],
         onSignOut: () => signout.mutate(undefined, { onSuccess: () => navigate({ to: '/login' }) }),
       }}
-      breadcrumb={leaf != null ? `Operator console / ${leaf}` : 'Operator console'}
+      breadcrumb={leaf != null ? <CrumbTrail root="Operator console" leaf={leaf} /> : 'Operator console'}
       status={
         <span className={styles.privileged}>
           <LayersIcon size={12} />

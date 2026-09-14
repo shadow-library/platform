@@ -81,7 +81,11 @@ const TopNavigationRoot = forwardRef<HTMLElement, TopNavigationProps>(function T
             />
           </span>
         ) : null}
-        {brand != null ? <div className={styles.brand}>{brand}</div> : null}
+        {brand != null ? (
+          <div className={styles.brand} data-shrink={items.length === 0 || undefined}>
+            {brand}
+          </div>
+        ) : null}
         {/* A bar carrying only a brand and a utility cluster shouldn't publish an empty nav landmark. */}
         {items.length > 0 ? (
           <nav className={styles.links} aria-label={ariaLabel}>

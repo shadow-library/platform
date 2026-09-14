@@ -147,6 +147,30 @@ describe('TopNavigation', () => {
     expect(centredRule).toContain('min-width: auto;');
   });
 
+  it('should let the brand shrink when the bar carries no destinations', () => {
+    render(<TopNavigation brand={<span>Operator console / Users</span>} utility={<button type="button">Account</button>} />);
+    expect(screen.getByText('Operator console / Users').parentElement).toHaveAttribute('data-shrink');
+
+    const shrinkRule = css.slice(css.indexOf('.brand[data-shrink] {'), css.indexOf('}', css.indexOf('.brand[data-shrink] {')));
+    expect(shrinkRule).toContain('flex-shrink: 1;');
+    expect(shrinkRule).toContain('min-width: 0;');
+  });
+
+  it('should let the brand shrink in the centred layout', () => {
+    render(<TopNavigation brand={<span>Forge</span>} search={<button type="button">Search</button>} />);
+    expect(screen.getByRole('banner')).toHaveAttribute('data-layout', 'centred');
+    expect(screen.getByText('Forge').parentElement).toHaveAttribute('data-shrink');
+  });
+
+  it('should keep the brand at its full width beside destinations', () => {
+    render(
+      <TopNavigation brand={<span>Shadow</span>}>
+        <TopNavigation.Item href="/overview">Overview</TopNavigation.Item>
+      </TopNavigation>,
+    );
+    expect(screen.getByText('Shadow').parentElement).not.toHaveAttribute('data-shrink');
+  });
+
   it('marks the More trigger active when an overflowed link is active', () => {
     render(
       <TopNavigation maxVisible={1}>

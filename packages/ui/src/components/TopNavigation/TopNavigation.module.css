@@ -52,10 +52,6 @@
 .bar[data-layout='centred'] .utility {
   min-width: auto;
 }
-.bar[data-layout='centred'] .brand {
-  flex-shrink: 1;
-  min-width: 0;
-}
 
 .brand {
   display: flex;
@@ -64,6 +60,12 @@
   font-size: var(--sh-text-body-sm);
   font-weight: 600;
   color: var(--sh-text-primary);
+}
+
+/* Without destinations the brand (an AppShell breadcrumb) is the only thing that can give way to the utility cluster. */
+.brand[data-shrink] {
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .links {

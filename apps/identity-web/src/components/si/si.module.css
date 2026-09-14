@@ -94,6 +94,31 @@
   padding: 48px;
 }
 
+/* The root wraps onto the clipped second line when it can't fit whole; an ellipsized root degrades to a stray letter. */
+.crumbTrail {
+  display: flex;
+  flex-direction: row-reverse;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  column-gap: 0.3em;
+  min-width: 0;
+  line-height: var(--sh-text-body-sm--line-height);
+  height: var(--sh-text-body-sm--line-height);
+  overflow: hidden;
+}
+
+.crumbRoot,
+.crumbLeaf {
+  white-space: nowrap;
+}
+
+.crumbLeaf {
+  order: -1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .mono {
   font-family: var(--sh-font-mono);
   font-size: 0.92em;

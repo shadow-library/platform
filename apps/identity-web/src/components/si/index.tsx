@@ -124,6 +124,19 @@ export function ThemeToggle(): ReactElement {
   );
 }
 
+interface CrumbTrailProps {
+  root: string;
+  leaf: string;
+}
+
+export function CrumbTrail({ root, leaf }: CrumbTrailProps): ReactElement {
+  return (
+    <span className={styles.crumbTrail} title={`${root} / ${leaf}`}>
+      <span className={styles.crumbRoot}>{root} /</span> <span className={styles.crumbLeaf}>{leaf}</span>
+    </span>
+  );
+}
+
 export function Mono({ children }: { children: ReactNode }): ReactElement {
   return <span className={styles.mono}>{children}</span>;
 }

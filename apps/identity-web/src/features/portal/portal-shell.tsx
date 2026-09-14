@@ -4,7 +4,7 @@ import { IconButton, Spinner } from '@shadow-library/ui';
 import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 
 import { BellIcon, BrandGlyph, BuildingIcon, GridIcon, MailIcon, MonitorIcon, PlugIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
-import { ThemeToggle } from '@/components/si';
+import { CrumbTrail, ThemeToggle } from '@/components/si';
 import { useAdminContextQuery, useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
@@ -75,7 +75,7 @@ export function PortalShell({ children }: { children: ReactNode }): React.JSX.El
         email: user.email ?? undefined,
         onSignOut: () => signout.mutate(undefined, { onSuccess: () => navigate({ to: '/login' }) }),
       }}
-      breadcrumb={`Account / ${activeLabel(nav, pathname)}`}
+      breadcrumb={<CrumbTrail root="Account" leaf={activeLabel(nav, pathname)} />}
       status={
         <span className={styles.aalBadge} data-elevated={elevated || undefined}>
           <ShieldCheckIcon size={12} />

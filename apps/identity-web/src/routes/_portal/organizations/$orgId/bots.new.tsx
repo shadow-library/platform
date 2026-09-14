@@ -8,6 +8,7 @@ import { type DesiredGrantMap, desiredGrantsList, PermissionsMatrix, summarizePe
 import { useStepUpGate } from '@/features/portal';
 import { botPermissionCatalogQueryOptions, myOrganisationsQueryOptions, orgAccessOf, useBotPermissionCatalogQuery, useCreateBotMutation, useOrgAccess } from '@/lib/apis';
 import { botErrorMessage, botFieldError } from '@/lib/bot-errors';
+import { isValidRateLimit, MAX_RATE_LIMIT, MIN_RATE_LIMIT, rateLimitError } from '@/lib/bot-rate-limit';
 import { validateCidr } from '@/lib/cidr';
 
 import styles from './bots.module.css';
@@ -21,7 +22,6 @@ export const Route = createFileRoute('/_portal/organizations/$orgId/bots/new')({
 });
 
 const HANDLE_PATTERN = /^[a-z0-9](-?[a-z0-9])*$/;
-const MAX_RATE_LIMIT = 600;
 const MAX_IP_ENTRIES = 20;
 
 function NewBotPage(): React.JSX.Element {
@@ -50,7 +50,7 @@ function NewBotPage(): React.JSX.Element {
 
   const validIps = ipAllowlist.filter(token => token.valid).map(token => token.value);
   const hasInvalidIp = ipAllowlist.some(token => !token.valid);
-  const rateLimitInvalid = rateLimitPerMinute === null;
+  const rateLimitMessage = rateLimitError(rateLimitPerMinute);
 
   const submit = (): void => {
     setNameError(undefined);
@@ -66,7 +66,7 @@ function NewBotPage(): React.JSX.Element {
       setHandleError('Lowercase letters, numbers and hyphens, starting and ending with a letter or number.');
       return;
     }
-    if (hasInvalidIp || rateLimitInvalid) return;
+    if (hasInvalidIp || !isValidRateLimit(rateLimitPerMinute)) return;
 
     const grants = desiredGrantsList(desired);
     require(() =>
@@ -137,12 +137,15 @@ function NewBotPage(): React.JSX.Element {
               >
                 <TokenInput value={ipAllowlist} onValueChange={setIpAllowlist} validate={validateCidr} maxTokens={MAX_IP_ENTRIES} placeholder="Add a CIDR range" />
               </FormField>
-              <FormField
-                label="Rate limit"
-                error={rateLimitInvalid ? 'Enter a rate limit.' : undefined}
-                helper={rateLimitInvalid ? undefined : 'Requests over the limit get a 429 response.'}
-              >
-                <NumberStepper value={rateLimitPerMinute} onValueChange={setRateLimitPerMinute} min={1} max={MAX_RATE_LIMIT} unit="requests / minute per app" />
+              <FormField label="Rate limit" error={rateLimitMessage} helper={rateLimitMessage ? undefined : 'Requests over the limit get a 429 response.'}>
+                <NumberStepper
+                  value={rateLimitPerMinute}
+                  onValueChange={setRateLimitPerMinute}
+                  min={MIN_RATE_LIMIT}
+                  max={MAX_RATE_LIMIT}
+                  clampOnBlur={false}
+                  unit="requests / minute per app"
+                />
               </FormField>
             </div>
           </SectionCard>
@@ -151,7 +154,7 @@ function NewBotPage(): React.JSX.Element {
             <Button variant="ghost" onClick={backToList}>
               Cancel
             </Button>
-            <Button variant="primary" loading={create.isPending} disabled={hasInvalidIp || rateLimitInvalid} onClick={submit}>
+            <Button variant="primary" loading={create.isPending} disabled={hasInvalidIp || !isValidRateLimit(rateLimitPerMinute)} onClick={submit}>
               Create bot
             </Button>
           </div>
@@ -181,7 +184,7 @@ function NewBotPage(): React.JSX.Element {
             <DescriptionList.Item term="Network">
               {validIps.length > 0 ? `${validIps.length} IP range${validIps.length === 1 ? '' : 's'}` : 'All addresses allowed'}
             </DescriptionList.Item>
-            <DescriptionList.Item term="Rate limit">{rateLimitPerMinute ?? '—'} / min</DescriptionList.Item>
+            <DescriptionList.Item term="Rate limit">{isValidRateLimit(rateLimitPerMinute) ? rateLimitPerMinute : '—'} / min</DescriptionList.Item>
           </DescriptionList>
           <div className={styles.summaryNote}>Creating a bot asks you to confirm it’s you.</div>
         </aside>
