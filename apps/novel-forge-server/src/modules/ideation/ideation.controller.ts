@@ -1,15 +1,20 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
+
+import { GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { CreateSeedBody, GraduateSeedBody, GraduationResponse, ListSeedsQuery, ListSeedsResponse, SeedProjectParams, SeedResponse, SeedStressResponse } from './ideation.dto';
 import { GraduationService } from './graduation.service';
 import { IdeationService } from './ideation.service';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/seeds')
 export class SeedController {
   constructor(private readonly ideationService: IdeationService) {}
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post()
   @RespondFor(201, SeedResponse)
   createSeed(@Body() body: CreateSeedBody): Promise<SeedResponse> {
@@ -23,6 +28,7 @@ export class SeedController {
   }
 }
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId')
 export class IdeationController {
@@ -37,6 +43,8 @@ export class IdeationController {
     return this.ideationService.getSeed(params.projectId);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/seed/stress')
   @RespondFor(200, SeedStressResponse)
   stressSeed(@Params() params: SeedProjectParams): Promise<SeedStressResponse> {
@@ -44,6 +52,7 @@ export class IdeationController {
   }
 
   /** "Start the novel anyway" — the exit the studio keeps visible from turn one. */
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/seed/graduate')
   @RespondFor(200, GraduationResponse)
   graduateSeed(@Params() params: SeedProjectParams, @Body() body: GraduateSeedBody): Promise<GraduationResponse> {

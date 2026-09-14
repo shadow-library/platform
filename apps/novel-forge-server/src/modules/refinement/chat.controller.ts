@@ -1,5 +1,7 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
+
+import { GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import {
   ChatProjectParams,
@@ -20,6 +22,7 @@ import { ChatService } from './chat.service';
 import { type ChatTurnHandler, ChatTurnRegistry } from './chat-turn.registry';
 import { serialiseMessage, serialiseProposal } from './serialise';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/chat/sessions')
 export class ChatController {
@@ -28,6 +31,7 @@ export class ChatController {
     private readonly turnRegistry: ChatTurnRegistry,
   ) {}
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post()
   @RespondFor(201, ChatSessionResponse)
   createSession(@Params() params: ChatProjectParams, @Body() body: CreateChatSessionBody): Promise<ChatSessionResponse> {
@@ -68,6 +72,8 @@ export class ChatController {
    * turn, everything else runs the chat turn. The session is read here only to choose between them —
    * both pipelines re-read and re-guard it, and ownership was settled by the project middleware.
    */
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/:sessionId/messages')
   @RespondFor(201, ChatTurnResponse)
   async createTurn(@Params() params: ChatSessionParams, @Body() body: ChatTurnBody): Promise<ChatTurnResponse> {
@@ -87,30 +93,35 @@ export class ChatController {
     };
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Patch('/:sessionId')
   @RespondFor(200, ChatSessionResponse)
   updateSession(@Params() params: ChatSessionParams, @Body() body: UpdateChatSessionBody): Promise<ChatSessionResponse> {
     return this.chatService.updateSession(params.projectId, params.sessionId, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Patch('/:sessionId/model')
   @RespondFor(200, ChatSessionResponse)
   updateSessionModel(@Params() params: ChatSessionParams, @Body() body: UpdateSessionModelBody): Promise<ChatSessionResponse> {
     return this.chatService.updateSessionModel(params.projectId, params.sessionId, body.provider ?? null, body.model ?? null);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Delete('/:sessionId')
   @RespondFor(200, ChatSessionResponse)
   deleteSession(@Params() params: ChatSessionParams): Promise<ChatSessionResponse> {
     return this.chatService.deleteSession(params.projectId, params.sessionId);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/:sessionId/archive')
   @RespondFor(200, ChatSessionResponse)
   archiveSession(@Params() params: ChatSessionParams): Promise<ChatSessionResponse> {
     return this.chatService.setSessionStatus(params.projectId, params.sessionId, 'archived');
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/:sessionId/unarchive')
   @RespondFor(200, ChatSessionResponse)
   unarchiveSession(@Params() params: ChatSessionParams): Promise<ChatSessionResponse> {

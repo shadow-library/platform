@@ -1,5 +1,7 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, HttpStatus, Params, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
+
+import { GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
@@ -33,6 +35,7 @@ import {
 } from './reforge.dto';
 import { ReforgeService } from './reforge.service';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/reforge')
 export class ReforgeController {
@@ -45,12 +48,15 @@ export class ReforgeController {
     private readonly jobExecutor: JobExecutor,
   ) {}
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Put('/config')
   @RespondFor(200, ReforgeResponse)
   updateConfig(@Params() params: ReforgeParams, @Body() body: ReforgeConfigBody): Promise<ReforgeResponse> {
     return this.reforgeService.updateConfig(params.projectId, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post()
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
@@ -85,6 +91,8 @@ export class ReforgeController {
     return this.reforgeService.getReforge(params.projectId, params.chapter);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/chapters/:chapter')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
@@ -99,6 +107,8 @@ export class ReforgeController {
     return { jobId, kind: 'reforge', status: 'pending', target };
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/analyze')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
@@ -132,6 +142,8 @@ export class ReforgeController {
     return this.analysisService.listFindings(params.projectId, query as never);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/plan')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
@@ -150,18 +162,22 @@ export class ReforgeController {
     return this.planService.get(params.projectId) as Promise<ReforgePlanDetailResponse>;
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Put('/plan/spans')
   @RespondFor(200, ReforgePlanDetailResponse)
   replacePlanSpans(@Params() params: ReforgeParams, @Body() body: ReforgePlanSpansBody): Promise<ReforgePlanDetailResponse> {
     return this.planService.replaceSpans(params.projectId, body.spans, body.baseRevision) as Promise<ReforgePlanDetailResponse>;
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/plan/approve')
   @RespondFor(200, ReforgePlanDetailResponse)
   approvePlan(@Params() params: ReforgeParams, @Body() body: ReforgePlanApproveBody): Promise<ReforgePlanDetailResponse> {
     return this.planService.approve(params.projectId, body.baseRevision) as Promise<ReforgePlanDetailResponse>;
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/transform')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
@@ -189,6 +205,8 @@ export class ReforgeController {
     return this.reforgeService.getOutput(params.projectId, params.outputChapter) as Promise<ReforgeOutputResponse>;
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/outputs/:outputChapter')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
@@ -202,6 +220,7 @@ export class ReforgeController {
     return { jobId, kind: 'reforge', status: 'pending', target };
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/promote')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)

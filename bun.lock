@@ -125,6 +125,7 @@
         "@types/bun": "catalog:",
         "drizzle-kit": "catalog:",
         "fastify": "catalog:",
+        "light-my-request": "catalog:",
         "type-fest": "catalog:",
         "typescript": "catalog:",
       },

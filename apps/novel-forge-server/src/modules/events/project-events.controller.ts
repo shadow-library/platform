@@ -1,9 +1,12 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { EventStream, Get, HttpController, type HttpResponse, Params, Res } from '@shadow-library/fastify';
+
+import { PROJECTS_READ_PERMISSION } from '@server/constants';
 
 import { ProjectEventService } from './project-event.service';
 import { ProjectEventsParams } from './project-events.dto';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId')
 export class ProjectEventsController {

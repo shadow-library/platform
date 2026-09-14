@@ -1,5 +1,7 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, type HttpResponse, HttpStatus, Params, Patch, Post, Put, Query, Res, RespondFor } from '@shadow-library/fastify';
+
+import { GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
@@ -31,6 +33,7 @@ import {
 } from './translation.dto';
 import { TranslationService } from './translation.service';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/translation')
 export class TranslationController {
@@ -47,12 +50,14 @@ export class TranslationController {
     return { ...status, job: jobs.find(job => job.kind === 'translate') ?? null };
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Put('/config')
   @RespondFor(200, TranslationResponse)
   updateConfig(@Params() params: TranslationParams, @Body() body: TranslationConfigBody): Promise<TranslationResponse> {
     return this.translationService.updateConfig(params.projectId, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Put('/originals/:chapter')
   @HttpStatus(201)
   async upsertOriginal(@Params() params: TranslationChapterParams, @Body() body: OriginalChapterBody, @Res() res: HttpResponse): Promise<void> {
@@ -67,12 +72,15 @@ export class TranslationController {
     return this.translationService.getOriginal(params.projectId, params.chapter);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Delete('/originals/:chapter')
   @HttpStatus(204)
   deleteOriginal(@Params() params: TranslationChapterParams): Promise<void> {
     return this.translationService.deleteOriginal(params.projectId, params.chapter);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post()
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
@@ -98,6 +106,7 @@ export class TranslationController {
     return this.translationService.getChapter(params.projectId, params.chapter);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Put('/chapters/:chapter')
   @RespondFor(200, TranslationChapterDetailResponse)
   async editChapter(@Params() params: TranslationChapterParams, @Body() body: EditTranslationBody): Promise<TranslationChapterDetailResponse> {
@@ -105,6 +114,8 @@ export class TranslationController {
     return this.translationService.getChapter(params.projectId, params.chapter);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/chapters/:chapter')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
@@ -119,12 +130,14 @@ export class TranslationController {
     return { jobId, kind: 'translate', status: 'pending', target };
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/chapters/:chapter/finalize')
   @RespondFor(200, FinalizeChapterResponse)
   finalizeChapter(@Params() params: TranslationChapterParams): Promise<FinalizeChapterResponse> {
     return this.translationService.finalize(params.projectId, params.chapter);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/chapters/:chapter/reopen')
   @RespondFor(200, TranslationChapterDetailResponse)
   async reopenChapter(@Params() params: TranslationChapterParams): Promise<TranslationChapterDetailResponse> {
@@ -138,6 +151,7 @@ export class TranslationController {
     return this.translationService.listGlossary(params.projectId, query);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/glossary')
   @HttpStatus(201)
   @RespondFor(201, TranslationTermResponse)
@@ -145,24 +159,28 @@ export class TranslationController {
     return this.translationService.createTerm(params.projectId, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Patch('/glossary/:id')
   @RespondFor(200, TranslationTermResponse)
   updateTerm(@Params() params: TranslationTermParams, @Body() body: UpdateTranslationTermBody): Promise<TranslationTermResponse> {
     return this.translationService.updateTerm(params.projectId, params.id, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/glossary/:id/approve')
   @RespondFor(200, TranslationTermResponse)
   approveTerm(@Params() params: TranslationTermParams, @Body() body: ApproveTranslationTermBody): Promise<TranslationTermResponse> {
     return this.translationService.approveTerm(params.projectId, params.id, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/glossary/:id/reject')
   @RespondFor(200, TranslationTermResponse)
   rejectTerm(@Params() params: TranslationTermParams): Promise<TranslationTermResponse> {
     return this.translationService.rejectTerm(params.projectId, params.id);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/glossary/decisions')
   @RespondFor(200, TranslationTermDecisionsResponse)
   decideTerms(@Params() params: TranslationParams, @Body() body: TranslationTermDecisionsBody): Promise<TranslationTermDecisionsResponse> {

@@ -1,5 +1,7 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
+
+import { GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { ProposalResponse } from '../refinement/refinement.dto';
 import { serialiseProposal } from '../refinement/serialise';
@@ -53,35 +55,45 @@ import {
 } from './generation.dto';
 import { GenerationService } from './generation.service';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId')
 export class GenerationController {
   constructor(private readonly generationService: GenerationService) {}
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/seed-from-brief')
   @RespondFor(200, WorkflowRunResponse)
   seedFromBrief(@Params() params: ProjectParams, @Body() body: SeedFromBriefBody): Promise<WorkflowRunResponse> {
     return this.generationService.seedFromBrief(params.projectId, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/plan')
   @RespondFor(200, PlanResponse)
   planVolumes(@Params() params: ProjectParams, @Body() body: PlanBody): Promise<PlanResponse> {
     return this.generationService.plan(params.projectId, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/approve')
   @RespondFor(200, ApprovePlanResponse)
   approvePlan(@Params() params: ProjectParams): Promise<ApprovePlanResponse> {
     return this.generationService.approvePlan(params.projectId);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/outline')
   @RespondFor(200, OutlineResponse)
   outlineChapters(@Params() params: ProjectParams, @Body() body: OutlineBody): Promise<OutlineResponse> {
     return this.generationService.outline(params.projectId, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/arcs/:arcKey/outline')
   @RespondFor(200, OutlineResponse)
   outlineArc(@Params() params: ArcOutlineParams, @Body() body: OutlineArcBody): Promise<OutlineResponse> {
@@ -101,12 +113,15 @@ export class GenerationController {
     return this.generationService.getBrief(params.projectId, params.n);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Put('/briefs/:n')
   @RespondFor(200, BriefResponse)
   updateBrief(@Params() params: ChapterParams, @Body() body: UpdateBriefBody): Promise<BriefResponse> {
     return this.generationService.updateBrief(params.projectId, params.n, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/generate')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
@@ -134,30 +149,37 @@ export class GenerationController {
     return this.generationService.getDraft(params.projectId, params.n);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Put('/drafts/:n')
   @RespondFor(200, DraftResponse)
   updateDraft(@Params() params: ChapterParams, @Body() body: UpdateDraftBody): Promise<DraftResponse> {
     return this.generationService.updateDraft(params.projectId, params.n, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Delete('/drafts/:n')
   @HttpStatus(204)
   deleteDraft(@Params() params: ChapterParams): Promise<void> {
     return this.generationService.deleteDraft(params.projectId, params.n);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/drafts/:n/revise')
   @RespondFor(200, DraftResponse)
   reviseDraft(@Params() params: ChapterParams, @Body() body: ReviseDraftBody): Promise<DraftResponse> {
     return this.generationService.reviseDraft(params.projectId, params.n, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/drafts/:n/judge')
   @RespondFor(200, JudgeResponse)
   judgeDraft(@Params() params: ChapterParams): Promise<JudgeResponse> {
     return this.generationService.judgeDraft(params.projectId, params.n);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/drafts/:n/feedback')
   @RespondFor(201, UserFeedbackResponse)
   @HttpStatus(201)
@@ -165,6 +187,7 @@ export class GenerationController {
     return this.generationService.feedbackDraft(params.projectId, params.n, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/drafts/:n/approve')
   @RespondFor(200, DraftResponse)
   approveDraft(@Params() params: ChapterParams, @Body() body: ApproveDraftBody): Promise<DraftResponse> {
@@ -190,36 +213,46 @@ export class GenerationController {
     return this.generationService.getDraftPrompt(params.projectId, params.n);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/drafts/:n/import')
   @RespondFor(200, DraftResponse)
   importDraft(@Params() params: ChapterParams, @Body() body: ImportDraftBody): Promise<DraftResponse> {
     return this.generationService.importDraft(params.projectId, params.n, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/finalize')
   @RespondFor(200, WorkflowRunResponse)
   finalizeChapters(@Params() params: ProjectParams, @Body() body: FinalizeBody): Promise<WorkflowRunResponse> {
     return this.generationService.finalize(params.projectId, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/chapters/:n/generate-unrestricted')
   @RespondFor(200, DraftResponse)
   generateUnrestricted(@Params() params: ChapterParams, @Body() body: GenerateUnrestrictedBody): Promise<DraftResponse> {
     return this.generationService.generateUnrestricted(params.projectId, params.n, body);
   }
 
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/chapters/:n/summarize')
   @RespondFor(200, ChapterSummarizeResponse)
   summarizeChapter(@Params() params: ChapterParams): Promise<ChapterSummarizeResponse> {
     return this.generationService.summarizeChapter(params.projectId, params.n);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/chapters/:n/propose-continuity')
   @RespondFor(200, ContinuityProposalResponse)
   proposeContinuity(@Params() params: ChapterParams): Promise<ContinuityProposalResponse> {
     return this.generationService.proposeContinuity(params.projectId, params.n);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/chapters/:n/extract-to-bible')
   @RespondFor(200, ProposalResponse)
   extractToBible(@Params() params: ChapterParams): Promise<ProposalResponse> {
@@ -232,30 +265,37 @@ export class GenerationController {
     return this.generationService.getContinuityProposal(params.projectId, params.n);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Patch('/chapters/:n/continuity-proposal')
   @RespondFor(200, ContinuityProposalResponse)
   updateContinuityProposal(@Params() params: ChapterParams, @Body() body: UpdateContinuityBody): Promise<ContinuityProposalResponse> {
     return this.generationService.updateContinuityProposal(params.projectId, params.n, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/chapters/:n/continuity-proposal/apply')
   @RespondFor(200, ContinuityProposalResponse)
   applyContinuityProposal(@Params() params: ChapterParams): Promise<ContinuityProposalResponse> {
     return this.generationService.applyContinuityProposal(params.projectId, params.n);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/chapters/:n/continuity-proposal/discard')
   @RespondFor(200, ContinuityProposalResponse)
   discardContinuityProposal(@Params() params: ChapterParams): Promise<ContinuityProposalResponse> {
     return this.generationService.discardContinuityProposal(params.projectId, params.n);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/validate')
   @RespondFor(200, WorkflowRunResponse)
   validateContinuity(@Params() params: ProjectParams): Promise<WorkflowRunResponse> {
     return this.generationService.validate(params.projectId);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/chapters/:n/review')
   @RespondFor(200, ChapterReviewResponse)
   reviewChapter(@Params() params: ChapterParams): Promise<ChapterReviewResponse> {
@@ -299,6 +339,7 @@ export class GenerationController {
     return this.generationService.getAiUsage(params.projectId);
   }
 
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Get('/search')
   @RespondFor(200, SearchResponse)
   searchProse(@Params() params: ProjectParams, @Query() query: SearchQuery): Promise<SearchResponse> {
@@ -311,6 +352,8 @@ export class GenerationController {
     return this.generationService.getManuscript(params.projectId);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/backfill')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)

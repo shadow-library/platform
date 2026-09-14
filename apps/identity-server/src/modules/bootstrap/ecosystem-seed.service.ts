@@ -33,18 +33,27 @@ export class EcosystemSeedService {
   async seed(operator: EcosystemOperator): Promise<void> {
     const newApplications = ECOSYSTEM_SEED.applications.filter(application => !this.applicationService.getApplication(application.name));
     const existingApplications = ECOSYSTEM_SEED.applications.filter(application => this.applicationService.getApplication(application.name));
-    const serviceClients: SeedServiceClient[] = [];
+    const newServiceClients: SeedServiceClient[] = [];
     for (const client of ECOSYSTEM_SEED.serviceClients) {
-      if (!(await this.oauthClientService.getClient(client.id))) serviceClients.push(client);
+      if (!(await this.oauthClientService.getClient(client.id))) newServiceClients.push(client);
     }
 
     const scopes = await this.loadScopeCatalogue();
     for (const application of newApplications) await this.createApplication(application, operator, scopes);
-    for (const client of serviceClients) await this.createServiceClient(client);
+    for (const client of newServiceClients) await this.createServiceClient(client);
 
     for (const application of newApplications) await this.bindApplication(application, scopes);
     for (const application of existingApplications) await this.reconcileApplication(application, scopes);
-    for (const client of serviceClients) await this.grantScopes(client.id, client.grants, scopes);
+
+    /**
+     * Every service client, not only the ones just created: a grant added to the seed after a deployment
+     * exists would otherwise never reach it, and the caller would be denied forever with nothing to show
+     * for it. `grantScope` inserts on conflict do nothing, so re-running costs a no-op per grant, and a
+     * seeded grant an operator revokes comes back on the next restart, as a seeded application grant
+     * already does. This runs last because `reconcileApplication` is what adds a newly declared scope to
+     * `scopes`.
+     */
+    for (const client of ECOSYSTEM_SEED.serviceClients) await this.grantScopes(client.id, client.grants, scopes);
   }
 
   private async loadScopeCatalogue(): Promise<Map<string, string>> {

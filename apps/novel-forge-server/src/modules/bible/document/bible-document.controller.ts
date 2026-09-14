@@ -1,11 +1,13 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Put, RespondFor } from '@shadow-library/fastify';
 
 import { AppErrorCode } from '@server/classes';
+import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { BibleDocParams, BibleDocProjectParams, BibleDocResponse, ListBibleDocResponse, UpsertBibleDocBody } from './bible-document.dto';
 import { BibleDocumentService } from './bible-document.service';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/bible')
 export class BibleDocumentController {
@@ -26,6 +28,7 @@ export class BibleDocumentController {
     return doc;
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Put('/:section/:slug')
   @RespondFor(200, BibleDocResponse)
   upsertBibleDoc(@Params() params: BibleDocParams, @Body() body: UpsertBibleDocBody): Promise<BibleDocResponse> {

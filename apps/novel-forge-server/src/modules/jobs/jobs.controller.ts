@@ -1,14 +1,15 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Get, HttpController, Params, RespondFor } from '@shadow-library/fastify';
 
-import { AppErrorCode } from '@server/classes';
-
 import { ActorService } from '@modules/actor';
+import { AppErrorCode } from '@server/classes';
+import { PROJECTS_READ_PERMISSION } from '@server/constants';
 
 import { redactJobForResponse } from './job-response';
 import { JobService } from './job.service';
 import { JobIdParams, JobResponse } from './jobs.dto';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/jobs')
 export class JobsController {

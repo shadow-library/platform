@@ -1,10 +1,13 @@
 import { type FastifyReply } from 'fastify';
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Get, HttpController, Params, Res } from '@shadow-library/fastify';
+
+import { PROJECTS_READ_PERMISSION } from '@server/constants';
 
 import { ExportParams } from './export.dto';
 import { NovelPackageService } from './novel-package.service';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/export')
 export class ExportController {

@@ -1,5 +1,7 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, HttpController, HttpMethod, HttpRoute, HttpStatus, RespondFor, type RouteOptions } from '@shadow-library/fastify';
+
+import { GENERATION_RUN_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { JobExecutor } from '../jobs/job.executor';
 import { ImportNovelBody, ImportNovelResponse } from './novel-import.dto';
@@ -30,6 +32,8 @@ export class NovelImportController {
     private readonly jobExecutor: JobExecutor,
   ) {}
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @HttpRoute(IMPORT_ROUTE_OPTIONS)
   @HttpStatus(202)
   @RespondFor(202, ImportNovelResponse)

@@ -1,7 +1,8 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 import { AppErrorCode } from '@server/classes';
+import { ILLUSTRATIONS_WRITE_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import {
   AddEntityImageBody,
@@ -17,11 +18,13 @@ import {
 } from './entity.dto';
 import { EntityService } from './entity.service';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/entities')
 export class EntityController {
   constructor(private readonly entityService: EntityService) {}
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post()
   @RespondFor(201, EntityResponse)
   createEntity(@Params() params: EntityProjectParams, @Body() body: CreateEntityBody): Promise<EntityResponse> {
@@ -42,30 +45,35 @@ export class EntityController {
     return entity;
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Patch('/:entityKey')
   @RespondFor(200, EntityResponse)
   updateEntity(@Params() params: EntityKeyParams, @Body() body: UpdateEntityBody): Promise<EntityResponse> {
     return this.entityService.update(params.projectId, params.entityKey, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Delete('/:entityKey')
   @HttpStatus(204)
   deleteEntity(@Params() params: EntityKeyParams): Promise<void> {
     return this.entityService.delete(params.projectId, params.entityKey);
   }
 
+  @BotPermission(ILLUSTRATIONS_WRITE_PERMISSION)
   @Post('/:entityKey/image')
   @RespondFor(200, EntityResponse)
   uploadImage(@Params() params: EntityKeyParams, @Body() body: UploadImageBody): Promise<EntityResponse> {
     return this.entityService.setImage(params.projectId, params.entityKey, body.image, body.mime);
   }
 
+  @BotPermission(ILLUSTRATIONS_WRITE_PERMISSION)
   @Delete('/:entityKey/image')
   @RespondFor(200, EntityResponse)
   deleteImage(@Params() params: EntityKeyParams): Promise<EntityResponse> {
     return this.entityService.clearImage(params.projectId, params.entityKey);
   }
 
+  @BotPermission(ILLUSTRATIONS_WRITE_PERMISSION)
   @Post('/:entityKey/images')
   @RespondFor(201, EntityResponse)
   @HttpStatus(201)
@@ -73,6 +81,7 @@ export class EntityController {
     return this.entityService.addImage(params.projectId, params.entityKey, body.image, body.mime, body.caption);
   }
 
+  @BotPermission(ILLUSTRATIONS_WRITE_PERMISSION)
   @Delete('/:entityKey/images/:imageId')
   @RespondFor(200, EntityResponse)
   removeImage(@Params() params: EntityImageParams): Promise<EntityResponse> {

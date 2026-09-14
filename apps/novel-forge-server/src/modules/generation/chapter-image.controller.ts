@@ -1,9 +1,12 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, RespondFor } from '@shadow-library/fastify';
+
+import { ILLUSTRATIONS_WRITE_PERMISSION, PROJECTS_READ_PERMISSION } from '@server/constants';
 
 import { ChapterImageService } from './chapter-image.service';
 import { AddChapterImageBody, ChapterImageParams, ChapterImageResponse, ChapterParams, ListChapterImageResponse } from './generation.dto';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/chapters/:n/images')
 export class ChapterImageController {
@@ -16,6 +19,7 @@ export class ChapterImageController {
     return { items };
   }
 
+  @BotPermission(ILLUSTRATIONS_WRITE_PERMISSION)
   @Post()
   @RespondFor(201, ChapterImageResponse)
   @HttpStatus(201)
@@ -23,6 +27,7 @@ export class ChapterImageController {
     return this.chapterImageService.add(params.projectId, params.n, body.image, body.mime, body.caption);
   }
 
+  @BotPermission(ILLUSTRATIONS_WRITE_PERMISSION)
   @Delete('/:imageId')
   @HttpStatus(204)
   removeChapterImage(@Params() params: ChapterImageParams): Promise<void> {

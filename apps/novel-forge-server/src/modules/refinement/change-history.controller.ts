@@ -1,10 +1,13 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
+
+import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { ProposalApplyService, type RollbackResult } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
 import { ListChangesQuery, ListChangesResponse, ProposalProjectParams, RollbackBody, RollbackResponse } from './refinement.dto';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/changes')
 export class ChangeHistoryController {
@@ -19,6 +22,7 @@ export class ChangeHistoryController {
     return this.proposalService.listChanges(params.projectId, query);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/rollback')
   @RespondFor(200, RollbackResponse)
   rollbackChanges(@Params() params: ProposalProjectParams, @Body() body: RollbackBody): Promise<RollbackResponse> {

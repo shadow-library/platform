@@ -25,6 +25,9 @@ export const TEST_USER = { userId: '42' };
 /** Every token the suite mints acts in this organisation, so permission-guarded routes have one to evaluate in */
 export const TEST_ORG = 'org-test';
 
+/** A bot's organisation reaches `ActorService` as the owning id of everything it creates, so it must be numeric */
+export const TEST_BOT_ORG = '9001';
+
 export const testIdP = await createTestIdP({
   clientId: APP_ID,
   clientSecret: CLIENT_SECRET,
@@ -33,7 +36,7 @@ export const testIdP = await createTestIdP({
     name: 'Novel Forge',
     audience: AUTH_AUDIENCE,
     redirectUris: [CALLBACK_URI],
-    scopes: ['authz:check', 'app-session:manage'],
+    scopes: ['authz:check', 'authz:roles:sync', 'app-session:manage'],
   },
 });
 
@@ -49,4 +52,14 @@ Config['cache'].set('publishing.auto-push', false);
 /** Mints a bearer token accepted by the app's AuthGuard for the shared test user */
 export function issueTestToken(overrides: { sub?: string; scopes?: string[]; ttlSeconds?: number } = {}): Promise<string> {
   return testIdP.issueToken({ sub: overrides.sub ?? TEST_USER.userId, audience: AUTH_AUDIENCE, org: TEST_ORG, scopes: overrides.scopes, ttlSeconds: overrides.ttlSeconds });
+}
+
+/**
+ * Registers a bot key holding exactly `permissions` and returns the `sl_bot_…` key to present as a bearer.
+ * A bot enters only through the exchange, so this is the only way to drive one end to end.
+ */
+export function issueTestBotKey(botId: string, permissions: string[], org = TEST_BOT_ORG): string {
+  const botKey = testIdP.issueBotKey({ botId, org });
+  for (const action of permissions) testIdP.grantPermission({ kind: 'bot', sub: `bot_${botId}` }, org, action);
+  return botKey;
 }

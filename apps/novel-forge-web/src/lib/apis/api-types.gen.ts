@@ -294,6 +294,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/internal/bots/{botId}/ownership': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Ownership */
+    get: operations['get_internal_bots_botId_ownership'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/internal/bots/{botId}/transfer': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Transfer Ownership */
+    post: operations['post_internal_bots_botId_transfer'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/ingest/novels/{sourceRef}': {
     parameters: {
       query?: never;
@@ -3235,6 +3269,20 @@ export interface components {
       lastUsedAt?: null | string;
       /** Format: date-time */
       revokedAt?: null | string;
+    };
+    BotOwnershipResponse: {
+      projects: number;
+      illustrations: number;
+    };
+    TransferOwnershipBody: {
+      /** @description Identity user id the bot-owned rows are reassigned to. */
+      toUserId: string;
+    };
+    TransferOwnershipResponse: {
+      /** @description Projects this call reassigned; a retry of an applied transfer reports zero. */
+      projects: number;
+      /** @description Illustrations this call reassigned; a retry of an applied transfer reports zero. */
+      illustrations: number;
     };
     IngestNovelBody: {
       title: string;
@@ -7000,6 +7048,90 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_internal_bots_botId_ownership: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotOwnershipResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_internal_bots_botId_transfer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TransferOwnershipBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TransferOwnershipResponse'];
+        };
+      };
       /** @description Default Response */
       '4XX': {
         headers: {
@@ -15514,6 +15646,9 @@ export type CreateApiKeyBody = components['schemas']['CreateApiKeyBody'];
 export type CreateApiKeyResponse = components['schemas']['CreateApiKeyResponse'];
 export type ListApiKeysResponse = components['schemas']['ListApiKeysResponse'];
 export type ApiKeyResponse = components['schemas']['ApiKeyResponse'];
+export type BotOwnershipResponse = components['schemas']['BotOwnershipResponse'];
+export type TransferOwnershipBody = components['schemas']['TransferOwnershipBody'];
+export type TransferOwnershipResponse = components['schemas']['TransferOwnershipResponse'];
 export type IngestNovelBody = components['schemas']['IngestNovelBody'];
 export type NovelGenre = components['schemas']['NovelGenre'];
 export type NovelTag = components['schemas']['NovelTag'];
@@ -15900,6 +16035,7 @@ export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['pa
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
 export type StreamEventsPathParams = Exclude<paths['/api/v1/projects/{projectId}/events']['get']['parameters']['path'], undefined>;
 export type ListProjectPluginsPathParams = Exclude<paths['/api/v1/projects/{projectId}/plugins']['get']['parameters']['path'], undefined>;
+export type GetOwnershipPathParams = Exclude<paths['/internal/bots/{botId}/ownership']['get']['parameters']['path'], undefined>;
 export type GetManifestPathParams = Exclude<paths['/api/v1/ingest/novels/{sourceRef}/manifest']['get']['parameters']['path'], undefined>;
 export type GetOriginalsManifestPathParams = Exclude<paths['/api/v1/ingest/projects/{projectId}/originals']['get']['parameters']['path'], undefined>;
 export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;

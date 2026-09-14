@@ -174,8 +174,15 @@ describe('BootstrapService', () => {
       expect(client?.grantTypes).toEqual(expect.arrayContaining(['authorization_code', 'client_credentials', 'urn:ietf:params:oauth:grant-type:token-exchange']));
       const scopes = await clientService.getGrantedScopeNames(app);
       expect(scopes).toEqual(expect.arrayContaining(['authz:check', 'app-session:manage']));
-      expect(scopes).not.toContain('authz:roles:sync');
     }
+  });
+
+  it('should grant the role-sync scope only to the applications that push a catalog in code', async () => {
+    const clientService = env.getService(OAuthClientService);
+    expect(await clientService.getGrantedScopeNames('novel-forge')).toContain('authz:roles:sync');
+    expect(await clientService.getGrantedScopeNames('pulse')).toContain('authz:roles:sync');
+    expect(await clientService.getGrantedScopeNames('web-novel')).not.toContain('authz:roles:sync');
+    expect(await clientService.getGrantedScopeNames('memoir')).not.toContain('authz:roles:sync');
   });
 
   it('should grant novel-forge the cross-application web-novel:publish scope as its delegation ceiling', async () => {
@@ -235,6 +242,42 @@ describe('BootstrapService', () => {
     const rules = await env.getService(ServiceAccessService).listForApplication(webNovel.id);
     const internalRule = rules.find(rule => rule.callerClientId === 'novel-forge' && rule.pathPattern === '/internal/*');
     expect(internalRule?.method).toBe('*');
+  });
+
+  it('should let identity reach novel-forge bot-ownership routes with a scope granted to it alone', async () => {
+    const novelForge = env.getService(ApplicationService).getApplicationOrThrow('novel-forge');
+    const rules = await env.getService(ServiceAccessService).listForApplication(novelForge.id);
+    const botRule = rules.find(rule => rule.callerClientId === 'identity-server' && rule.pathPattern === '/internal/bots/*');
+    expect(botRule?.method).toBe('*');
+
+    const identityScopes = (await env.getService(OAuthClientService).getClientDetail('identity-server'))?.scopes ?? [];
+    expect(identityScopes).toContain('novel-forge:bots:manage');
+  });
+
+  /** A grant added to the seed after a deployment exists reaches it only if every service client is reconciled, not only new ones. */
+  it('should give an already-seeded service client a grant the seed gained later', async () => {
+    const db = env.getPostgresClient();
+    const clientService = env.getService(OAuthClientService);
+    const scope = await db.query.scopes.findFirst({ where: eq(schema.scopes.name, 'novel-forge:bots:manage'), columns: { id: true } });
+    expect(scope).not.toBeUndefined();
+
+    await db
+      .delete(schema.oauthClientScopeGrants)
+      .where(and(eq(schema.oauthClientScopeGrants.clientId, 'identity-server'), eq(schema.oauthClientScopeGrants.scopeId, scope?.id as string)));
+    expect(await clientService.getGrantedScopeNames('identity-server')).not.toContain('novel-forge:bots:manage');
+
+    const bootstrap = new BootstrapService(
+      env.getService(ApplicationService),
+      env.getService(ApplicationRoleService),
+      env.getService(UserService),
+      clientService,
+      env.getService(PolicyDecisionService),
+      env.getService(OrganisationService),
+      env.getService(EcosystemSeedService),
+    );
+    await bootstrap.onModuleInit();
+
+    expect(await clientService.getGrantedScopeNames('identity-server')).toContain('novel-forge:bots:manage');
   });
 
   it('should derive each app relying party redirect URI from the issuer host', async () => {

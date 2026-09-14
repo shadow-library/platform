@@ -139,6 +139,13 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       description: 'Long-form fiction authoring platform for the Shadow ecosystem',
       resourceName: 'Novel Forge API',
       publicHost: 'novelforge',
+      scopes: [
+        {
+          name: 'novel-forge:bots:manage',
+          description: 'Read and reassign what an organisation bot owns in novel forge',
+          principalType: 'SERVICE',
+        },
+      ],
       permissions: [{ name: 'novel-forge:curate', description: 'Publish third-party novels under their original author and manage curated-ingest API keys' }],
       roles: [
         {
@@ -148,7 +155,8 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
           grantToBootstrapAdmin: true,
         },
       ],
-      grants: [AUTHZ_CHECK, APP_SESSION, USERS_RESOLVE, { resource: 'api://web-novel', scope: 'web-novel:publish' }],
+      grants: [AUTHZ_CHECK, AUTHZ_ROLES_SYNC, APP_SESSION, USERS_RESOLVE, { resource: 'api://web-novel', scope: 'web-novel:publish' }],
+      serviceAccess: [{ callerClientId: 'identity-server', method: '*', pathPattern: '/internal/bots/*' }],
     },
     {
       name: 'web-novel',
@@ -186,7 +194,10 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       id: 'identity-server',
       label: 'identity outbound',
       application: PLATFORM_APPLICATION,
-      grants: [{ resource: 'api://pulse', scope: 'notifications:send' }],
+      grants: [
+        { resource: 'api://pulse', scope: 'notifications:send' },
+        { resource: 'api://novel-forge', scope: 'novel-forge:bots:manage' },
+      ],
     },
   ],
 };

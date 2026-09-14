@@ -1,9 +1,12 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Post, Put, RespondFor } from '@shadow-library/fastify';
+
+import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { ApproveArcsResponse, ArcKeyParams, ArcResponse, ListArcResponse, UpsertArcBody, VolumeArcsParams } from './arc.dto';
 import { ArcService } from './arc.service';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId')
 export class ArcController {
@@ -16,6 +19,7 @@ export class ArcController {
     return { arcs };
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/volumes/:volumeKey/arcs/approve')
   @RespondFor(200, ApproveArcsResponse)
   approveArcs(@Params() params: VolumeArcsParams): Promise<ApproveArcsResponse> {
@@ -28,6 +32,7 @@ export class ArcController {
     return this.arcService.get(params.projectId, params.arcKey);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Put('/arcs/:arcKey')
   @RespondFor(200, ArcResponse)
   upsertArc(@Params() params: ArcKeyParams, @Body() body: UpsertArcBody): Promise<ArcResponse> {

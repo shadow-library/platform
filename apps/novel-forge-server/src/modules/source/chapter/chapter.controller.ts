@@ -1,11 +1,13 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Query, RespondFor } from '@shadow-library/fastify';
 
 import { AppErrorCode } from '@server/classes';
+import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { ChapterParams, ChapterProjectParams, ChapterResponse, ListChapterResponse, ListChaptersQuery, UpdateChapterBody } from './chapter.dto';
 import { ChapterService } from './chapter.service';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/source/chapters')
 export class ChapterController {
@@ -25,12 +27,14 @@ export class ChapterController {
     return chapter;
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Patch('/:n')
   @RespondFor(200, ChapterResponse)
   updateChapter(@Params() params: ChapterParams, @Body() body: UpdateChapterBody): Promise<ChapterResponse> {
     return this.chapterService.update(params.projectId, params.n, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Delete('/:n')
   @HttpStatus(204)
   deleteChapter(@Params() params: ChapterParams): Promise<void> {

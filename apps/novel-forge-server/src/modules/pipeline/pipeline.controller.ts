@@ -1,5 +1,7 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, HttpStatus, Params, Post, RespondFor } from '@shadow-library/fastify';
+
+import { GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { ConsolidateService } from '../extraction/consolidate.service';
 import { DEFAULT_EXTRACT_LIMIT, ExtractionService } from '../extraction/extraction.service';
@@ -10,6 +12,7 @@ import { AssetService } from '../source/asset.service';
 import { RecombineService } from '../source/recombine.service';
 import { AssetsResponse, ConsolidateResponse, ExtractBody, JobEnqueueResponse, PipelineProjectParams, RecombineBody, RecombineResponse, SkeletonResponse } from './pipeline.dto';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId')
 export class PipelineController {
@@ -26,6 +29,8 @@ export class PipelineController {
   // Backfill tool: (re)runs continuity extraction over already-finalized chapters that have never been
   // extracted, for imported/legacy novels whose chapters were never processed. Routine extraction on
   // finalize is a separate, not-yet-built path — this endpoint stays manual/on-demand.
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/extract')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
@@ -40,12 +45,15 @@ export class PipelineController {
     return { jobId, kind: 'extract', status: 'pending', target };
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/recombine')
   @RespondFor(200, RecombineResponse)
   recombineChapters(@Params() params: PipelineProjectParams, @Body() body: RecombineBody): Promise<RecombineResponse> {
     return this.recombineService.recombine(params.projectId, { dryRun: body.dryRun, useAi: body.useAi });
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/consolidate')
   @RespondFor(200, ConsolidateResponse)
   consolidateSource(@Params() params: PipelineProjectParams): Promise<ConsolidateResponse> {
@@ -59,6 +67,8 @@ export class PipelineController {
     return { markdown };
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/skeleton')
   @RespondFor(200, SkeletonResponse)
   generateSkeleton(@Params() params: PipelineProjectParams): Promise<SkeletonResponse> {

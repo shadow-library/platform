@@ -1,5 +1,7 @@
-import { Authenticated } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, HttpStatus, Params, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
+
+import { GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
@@ -19,6 +21,7 @@ import {
 } from './rebrand.dto';
 import { RebrandService } from './rebrand.service';
 
+@BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/rebrand')
 export class RebrandController {
@@ -28,12 +31,15 @@ export class RebrandController {
     private readonly jobExecutor: JobExecutor,
   ) {}
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Put('/config')
   @RespondFor(200, RebrandResponse)
   updateConfig(@Params() params: RebrandParams, @Body() body: RebrandConfigBody): Promise<RebrandResponse> {
     return this.rebrandService.updateConfig(params.projectId, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post()
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
@@ -75,6 +81,8 @@ export class RebrandController {
     return this.rebrandService.getConversion(params.projectId, params.chapter);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/chapters/:chapter')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)

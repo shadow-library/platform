@@ -96,7 +96,9 @@ export class ProjectOwnershipGuard {
    * The sharing branch: a project its owner opened to the organisation is reachable by a member of that same
    * organisation who holds `novel-forge:curate` there. Only a user qualifies — a bot is granted permissions
    * for its own work, never for reading another principal's records — and a null organisation on either side
-   * never matches, which today keeps user-owned projects out because nothing ever writes their organisation column.
+   * never matches. A user-owned project carries an organisation only when `/internal/bots/:botId/transfer`
+   * handed it over from a bot, which deliberately preserves both columns so the organisation keeps the access
+   * it had while the bot still existed.
    *
    * `highRisk` because this guard is the only authorization on the destructive project routes, which scope by id
    * alone: at the default TTL a revoked curator would keep delete rights on someone else's project for 15 minutes.
