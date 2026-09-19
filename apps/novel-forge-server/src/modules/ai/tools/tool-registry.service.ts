@@ -2,15 +2,32 @@ import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { Injectable } from '@shadow-library/app';
 
+import { getArcTool } from './tools/get-arc.tool';
+import { getBibleDocumentTool } from './tools/get-bible-document.tool';
+import { getBriefTool } from './tools/get-brief.tool';
 import { getChapterSummariesTool } from './tools/get-chapter-summaries.tool';
+import { getDraftTool } from './tools/get-draft.tool';
 import { getEntityTool } from './tools/get-entity.tool';
 import { getPlotThreadsTool } from './tools/get-plot-threads.tool';
+import { getVolumeTool } from './tools/get-volume.tool';
 import { getWorldFactsTool } from './tools/get-world-facts.tool';
 import { searchLoreTool } from './tools/search-lore.tool';
 import { searchProseTool } from './tools/search-prose.tool';
 import { type RegisteredTool, type ToolContext } from './types';
 
-const ALL_TOOLS: RegisteredTool[] = [searchLoreTool, getEntityTool, getChapterSummariesTool, searchProseTool, getWorldFactsTool, getPlotThreadsTool];
+const ALL_TOOLS: RegisteredTool[] = [
+  searchLoreTool,
+  getEntityTool,
+  getChapterSummariesTool,
+  searchProseTool,
+  getWorldFactsTool,
+  getPlotThreadsTool,
+  getBibleDocumentTool,
+  getVolumeTool,
+  getArcTool,
+  getBriefTool,
+  getDraftTool,
+];
 
 @Injectable()
 export class ToolRegistryService {
