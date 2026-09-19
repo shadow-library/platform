@@ -159,9 +159,6 @@ export class ContextPreviewQuery {
   @Field({ optional: true, enum: chatScope.enumValues, description: 'chat scope type' })
   scopeType?: string;
 
-  @Field({ optional: true, description: 'chat scope ref (volume:v1, arc:a1, chapter:3, doc:section/slug)' })
-  scopeRef?: string;
-
   @Field({ optional: true, description: 'volume for arc_plan previews' })
   volumeKey?: string;
 }

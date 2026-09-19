@@ -1547,6 +1547,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/chats/{sessionId}/turn/stream': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start Turn */
+    post: operations['post_api_v1_projects_projectId_chats_sessionId_turn_stream'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/turns/{runId}/stream': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Stream Turn */
+    get: operations['get_api_v1_projects_projectId_turns_runId_stream'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/premise/enhance': {
     parameters: {
       query?: never;
@@ -4292,9 +4326,6 @@ export interface components {
       artifacts: components['schemas']['AppliedArtifactItem'][];
     };
     CreateChatSessionBody: {
-      scopeType: components['schemas']['ChatScope'];
-      scopeRef?: string;
-      title?: string;
       mode?: components['schemas']['ChatMode'];
     };
     /** @enum {string} */
@@ -4570,6 +4601,11 @@ export interface components {
       provider?: string | null;
       /** @description Model name override; clear both override fields to use the project or profile default. */
       model?: string | null;
+    };
+    /** @description A turn accepted and now running. Open the run’s event stream to watch it; the turn completes and persists whether or not anyone does. */
+    ChatTurnStreamResponse: {
+      /** @description Workflow run driving the turn — the key of GET /api/v1/projects/:projectId/turns/:runId/stream. */
+      runId: string;
     };
     EnhancePremiseBody: {
       /** @description rough overview to enhance; falls back to the project brief/premise when omitted */
@@ -10702,6 +10738,85 @@ export interface operations {
       };
     };
   };
+  post_api_v1_projects_projectId_chats_sessionId_turn_stream: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChatTurnBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatTurnStreamResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_turns_runId_stream: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Workflow run UUID, as returned by the turn-stream POST. */
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_premise_enhance: {
     parameters: {
       query?: never;
@@ -10839,8 +10954,6 @@ export interface operations {
         chapter?: number | string;
         /** @description chat scope type */
         scopeType?: 'project' | 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief' | 'ideation';
-        /** @description chat scope ref (volume:v1, arc:a1, chapter:3, doc:section/slug) */
-        scopeRef?: string;
         /** @description volume for arc_plan previews */
         volumeKey?: string;
       };
@@ -15573,6 +15686,7 @@ export type SeedConstraintResponse = components['schemas']['SeedConstraintRespon
 export type TasteAnchorsResponse = components['schemas']['TasteAnchorsResponse'];
 export type UpdateChatSessionBody = components['schemas']['UpdateChatSessionBody'];
 export type UpdateSessionModelBody = components['schemas']['UpdateSessionModelBody'];
+export type ChatTurnStreamResponse = components['schemas']['ChatTurnStreamResponse'];
 export type EnhancePremiseBody = components['schemas']['EnhancePremiseBody'];
 export type EnhancePremiseResponse = components['schemas']['EnhancePremiseResponse'];
 export type PremiseRationaleResponse = components['schemas']['PremiseRationaleResponse'];
@@ -15846,6 +15960,7 @@ export type GetSessionPathParams = Exclude<paths['/api/v1/projects/{projectId}/c
 export type ListMessagesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages']['get']['parameters']['query'], undefined>;
 export type ListMessagesPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages']['get']['parameters']['path'], undefined>;
 export type TurnStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/turn']['get']['parameters']['path'], undefined>;
+export type StreamTurnPathParams = Exclude<paths['/api/v1/projects/{projectId}/turns/{runId}/stream']['get']['parameters']['path'], undefined>;
 export type PreviewContextQueryParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['query'], undefined>;
 export type PreviewContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['path'], undefined>;
 export type ListEntitiesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['query'], undefined>;

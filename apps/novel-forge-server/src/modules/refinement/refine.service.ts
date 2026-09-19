@@ -42,7 +42,6 @@ export interface ContextPreviewInput {
   purpose: string;
   chapter?: number;
   scopeType?: string;
-  scopeRef?: string;
   volumeKey?: string;
 }
 

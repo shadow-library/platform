@@ -135,7 +135,7 @@ function NewChatDialog({ novelId, open, onOpenChange, onCreated }: NewChatDialog
   const submit = (): void => {
     if (!canCreate) return;
     createSession.mutate(
-      { scopeType: scope, scopeRef, title: title.trim() || defaultTitle || undefined, mode },
+      { mode },
       {
         onSuccess: session => {
           onOpenChange(false);
