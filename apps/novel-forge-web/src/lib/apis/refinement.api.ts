@@ -387,6 +387,9 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
     return () => {
       mountedRef.current = false;
       // Retires the in-flight turn's token too, so a POST that resolves after unmount opens no stream.
+      // tokenRef is a generation counter, not a DOM ref: the cleanup must invalidate whichever run is
+      // current at teardown, not one captured at effect setup, so reading `.current` here is correct.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       tokenRef.current++;
       sourceRef.current?.close();
       sourceRef.current = undefined;
