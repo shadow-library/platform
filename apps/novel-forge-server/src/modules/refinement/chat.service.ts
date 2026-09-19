@@ -334,7 +334,6 @@ export class ChatService {
     this.logger.info('chat turn', { projectId, sessionId, scopeType: session.scopeType, mode: session.mode });
     this.logger.debug('chat turn user message', { projectId, sessionId, content });
 
-    const isHub = session.scopeType === 'project';
     await this.compaction.compactIfNeeded(projectId, session, CHAT_HISTORY_BUDGET);
 
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'chat' });
@@ -345,7 +344,7 @@ export class ChatService {
     ]);
 
     const prompt = buildChatRefinePrompt(session.scopeType);
-    const scopeInstructions = isHub ? `${renderScopeInstructions(session.scopeType)}\n\n${this.renderLookupVocabulary()}` : renderScopeInstructions(session.scopeType);
+    const scopeInstructions = `${renderScopeInstructions(session.scopeType)}\n\n${this.renderLookupVocabulary()}`;
 
     // Resolve which model this turn runs on, then inject it as the `config.models.chat` override the
     // router already reads — the turn keeps the `chat` role for prompts/telemetry either way.
