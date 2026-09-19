@@ -557,7 +557,7 @@ function IllustrationsScreen(): React.JSX.Element {
             </Tooltip>
           </div>
           <p className={styles.railHint}>Forge composes each prompt from the canon, renders two candidates, and only writes the one you pick back onto the story.</p>
-          <SegmentedControl value={filter} onValueChange={v => pickFilter(v as SubjectFilter)}>
+          <SegmentedControl className={styles.subjectFilter} value={filter} onValueChange={v => pickFilter(v as SubjectFilter)}>
             <SegmentedControl.Item value="all">All</SegmentedControl.Item>
             <SegmentedControl.Item value="entity">Entities</SegmentedControl.Item>
             <SegmentedControl.Item value="chapter">Chapters</SegmentedControl.Item>

@@ -716,12 +716,16 @@
 
 .sheetHead {
   flex-shrink: 0;
-  height: 52px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  padding: 0 16px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.sheetHead > :last-child {
+  flex: 1 1 100%;
 }
 
 .sheetTitle {
@@ -751,6 +755,7 @@
 .sectionHead {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px;
 }
@@ -762,6 +767,7 @@
 .fieldHead {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
 }
 

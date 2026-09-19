@@ -138,6 +138,7 @@
   font-weight: 600;
   color: var(--sh-text-primary);
   text-align: left;
+  overflow-wrap: break-word;
 }
 
 [data-active='true'] .rowTitle {

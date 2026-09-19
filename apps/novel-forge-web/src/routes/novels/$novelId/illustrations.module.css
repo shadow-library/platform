@@ -32,6 +32,12 @@
   color: var(--sh-text-tertiary);
 }
 
+.subjectFilter[data-orientation] {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  height: auto;
+}
+
 .keyFilter {
   align-self: flex-start;
   border: none;
@@ -49,14 +55,20 @@
 }
 
 .itemRow {
-  gap: 11px;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 8px;
+}
+
+.itemRow :global(.nf-chip) {
+  padding: 2px 6px;
+  gap: 4px;
+  font-size: 10px;
 }
 
 .itemThumb,
 .itemThumbFallback {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
   border-radius: var(--sh-radius-md);
   object-fit: cover;
