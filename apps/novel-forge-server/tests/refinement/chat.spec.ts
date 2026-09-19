@@ -46,7 +46,7 @@ describe.if(pgAvailable)('ChatService', () => {
   let db: PrimaryDatabase;
   let chat: ChatService;
   let projectId: bigint;
-  const structuredMock = mock<() => Promise<unknown>>(async () => ({ reply: 'stub' }));
+  const structuredMock = mock<(...args: unknown[]) => Promise<unknown>>(async () => ({ reply: 'stub' }));
   const events = new ProjectEventService();
 
   beforeAll(async () => {
@@ -58,7 +58,11 @@ describe.if(pgAvailable)('ChatService', () => {
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
     const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop, events);
     const modelRouter = {
-      structured: structuredMock,
+      // The unawaited chat-title call (fired alongside every first turn whose opener qualifies) is
+      // dispatched here, before it ever reaches structuredMock — otherwise it would race the turn's own
+      // calls for entries queued via mockImplementationOnce.
+      structured: (promptModule: { key: string }, ...rest: unknown[]) =>
+        promptModule.key === 'chat-title' ? Promise.resolve({ title: 'Auto title' }) : structuredMock(promptModule, ...rest),
       resolveModel: () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }),
       resolveFor: async () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }),
     } as never;
@@ -178,7 +182,10 @@ describe.if(pgAvailable)('ChatService', () => {
 
     expect(await chat.hasPendingTurn(projectId, session.id)).toBe(false);
     expect(await chat.failedTurn(projectId, session.id)).toMatchObject({ graph: 'chat-turn', code: 'AI_007' });
-    expect(published.map(event => (event.type === 'run' ? `run:${event.status}` : event.type))).toEqual(['run:running', 'chat', 'run:failed']);
+    // Ignores the background chat-title run's own events (this opener also qualifies for naming) — this
+    // assertion is about the chat-turn run's lifecycle, not everything the project channel saw.
+    const turnEvents = published.filter(event => event.type !== 'run' || event.graph === 'chat-turn');
+    expect(turnEvents.map(event => (event.type === 'run' ? `run:${event.status}` : event.type))).toEqual(['run:running', 'chat', 'run:failed']);
   });
 
   it('should still report a failed turn whose message the database stamped later than the app stamped the failure', async () => {

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { AIMessage, HumanMessage } from '@langchain/core/messages';
-import { and, asc, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
@@ -16,9 +16,9 @@ import { countTokens } from '../ai/context/token-budget';
 import { type AiRole, isRegisteredModel, isUnrestrictedAllowed, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { buildChatRefinePrompt, renderScopeInstructions, scopeAllowedOps } from '../ai/prompts';
+import { buildChatRefinePrompt, PROMPT_REGISTRY, renderScopeInstructions, scopeAllowedOps } from '../ai/prompts';
 import { RetrievalService } from '../ai/retrieval';
-import { type ChatRefineOutput } from '../ai/schemas';
+import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
 import { ProjectEventService } from '../events/project-event.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
@@ -73,6 +73,10 @@ interface SessionListFilter {
 // execute before the model is told to answer with what it has.
 const MAX_LOOKUP_ROUNDS = 3;
 const CHAT_HUB_NODE = 'chat-hub';
+
+// D4: an opener this short ("fix this") never earns an auto-title — it would name nothing worth keeping.
+const CHAT_TITLE_MIN_CONTENT_LENGTH = 15;
+const CHAT_TITLE_GRAPH = 'chat-title';
 
 // A chat-turn run older than this is treated as orphaned, never "in progress", so a crashed process
 // can't leave a session's thinking indicator stuck on forever.
@@ -357,6 +361,9 @@ export class ChatService {
       // as-yet-unanswered message is what lets a refresh or a second tab recover the in-flight turn
       // (design recovery). The reply lands in persistAssistantTurn once the model returns.
       const userMessage = await this.persistUserMessage(projectId, session, content, runId);
+      // Not awaited (D4): must overlap the turn, not delay it. Its own workflow run, not this one — this
+      // run may already be marked complete by the time it resolves.
+      if (userMessage.ordinal === 1) this.nameSession(projectId, session, content, project as ProjectConfig | undefined);
       const ctx = { projectId, runId, node: 'chat-turn', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat' };
       const turnHistory = [...history];
       const invoke = (): Promise<ChatRefineOutput> => {
@@ -406,6 +413,33 @@ export class ChatService {
       this.logger.warn(`auto-apply of proposal ${proposal.id} failed: ${note}`);
       return { proposal: fresh, applyNote: note };
     }
+  }
+
+  /** Names a session from its opening message alone (design D4). */
+  private nameSession(projectId: bigint, session: Refinement.ChatSession, content: string, project: ProjectConfig | undefined): void {
+    if (session.title !== null) return;
+    const message = content.trim();
+    if (message.length < CHAT_TITLE_MIN_CONTENT_LENGTH) return;
+    this.runNameSession(projectId, session.id, message, project).catch(err => this.logger.warn('chat session naming failed', { projectId, sessionId: session.id, err }));
+  }
+
+  private async runNameSession(projectId: bigint, sessionId: string, message: string, project: ProjectConfig | undefined): Promise<void> {
+    const prompt = PROMPT_REGISTRY['chat-title'];
+    const { result: named } = await this.workflowRunService.runChain(projectId, CHAT_TITLE_GRAPH, `session:${sessionId}`, { message }, async runId => {
+      const ctx = { projectId, runId, node: CHAT_TITLE_GRAPH, promptKey: prompt.key, promptVersion: prompt.version, role: 'title' };
+      const output = (await this.modelRouter.structured(prompt, { message }, ctx, project)) as ChatTitleOutput;
+      const title = output.title.trim();
+      if (!title) return false;
+
+      // Guarded in the query, not read-then-write: a rename the author makes mid-turn must never be clobbered.
+      const [written] = await this.db
+        .update(schema.chatSessions)
+        .set({ title, updatedAt: new Date() })
+        .where(and(eq(schema.chatSessions.id, sessionId), isNull(schema.chatSessions.title)))
+        .returning({ id: schema.chatSessions.id });
+      return Boolean(written);
+    });
+    if (named) this.events.publish(projectId, { type: 'chat', sessionId });
   }
 
   /** The lookup half of the hub playbook: names, argument shapes, and purposes of the read-only tools. */
