@@ -25,13 +25,6 @@
   font-weight: 700;
 }
 
-.railHint {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--sh-text-tertiary);
-}
-
 .subjectFilter[data-orientation] {
   flex-wrap: wrap;
   row-gap: 2px;

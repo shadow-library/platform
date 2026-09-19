@@ -556,7 +556,6 @@ function IllustrationsScreen(): React.JSX.Element {
               </Button>
             </Tooltip>
           </div>
-          <p className={styles.railHint}>Forge composes each prompt from the canon, renders two candidates, and only writes the one you pick back onto the story.</p>
           <SegmentedControl className={styles.subjectFilter} value={filter} onValueChange={v => pickFilter(v as SubjectFilter)}>
             <SegmentedControl.Item value="all">All</SegmentedControl.Item>
             <SegmentedControl.Item value="entity">Entities</SegmentedControl.Item>
@@ -617,7 +616,10 @@ function IllustrationsScreen(): React.JSX.Element {
             onDismissWarnings={() => setRoundWarnings(undefined)}
           />
         ) : (
-          <div className="nf-pane-empty">Nothing rendered yet — start an illustration for an entity, a chapter scene, or the cover.</div>
+          <div className="nf-pane-empty">
+            Forge composes each prompt from the canon, renders two candidates, and only writes the one you pick back onto the story. Start an illustration for an entity, a chapter
+            scene, or the cover.
+          </div>
         )}
       </div>
 

@@ -401,7 +401,6 @@ function CanonFactsScreen(): React.JSX.Element {
               </Button>
             </Tooltip>
           </div>
-          <p className={styles.railHint}>The spoiler ledger — truths only the judge sees until a character earns them on-page.</p>
         </div>
         <div className={`nf-scroll ${styles.railList}`}>
           {factsQuery.isLoading && <PaneLoader />}
@@ -439,7 +438,7 @@ function CanonFactsScreen(): React.JSX.Element {
         {selectedKey ? (
           <FactDetail key={selectedKey} novelId={novelId} factKey={selectedKey} onEdit={fact => setDialog({ mode: 'edit', initial: formFromFact(fact) })} />
         ) : (
-          <div className="nf-pane-empty">Select a fact to see its detail, or create one.</div>
+          <div className="nf-pane-empty">The spoiler ledger — truths only the judge sees until a character earns them on-page. Select a fact to see its detail, or create one.</div>
         )}
       </div>
 
