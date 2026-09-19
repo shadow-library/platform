@@ -2,12 +2,6 @@
   flex: 1;
 }
 
-.dialogForm {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
 .thread {
   flex: 1;
   min-width: 0;
@@ -255,18 +249,45 @@
   color: var(--sh-text-tertiary);
 }
 
-.threadEmpty {
-  flex: 1;
+.hero {
+  min-height: 100%;
+  max-width: 720px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 12px;
+  text-align: center;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: var(--sh-text-h1);
+  line-height: var(--sh-text-h1--line-height);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sh-text-primary);
+}
+
+.heroSub {
+  margin: 0;
+  max-width: 56ch;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.6;
   color: var(--sh-text-tertiary);
 }
 
-.emptyText {
-  margin: 0;
+.suggestions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.suggestion {
+  border-radius: 99px;
 }
 
 .turnCard {

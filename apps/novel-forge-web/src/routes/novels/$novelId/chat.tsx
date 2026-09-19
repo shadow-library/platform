@@ -1,35 +1,32 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
-import { Button, Checkbox, Dialog, FormField, Input, SegmentedControl, Select, Spinner, Textarea, toast } from '@shadow-library/ui';
+import { Button, Checkbox, Dialog, SegmentedControl, Spinner, Textarea, toast } from '@shadow-library/ui';
 
-import { ArchiveIcon, ProposalsIcon, SendIcon, TrashIcon } from '@/components/icons';
+import { ArchiveIcon, EditIcon, ListIcon, ProposalsIcon, SearchIcon, SendIcon, SparkIcon, TrashIcon, WarningIcon } from '@/components/icons';
 import { type ChipIntent, Markdown, PaneError, PaneLoader, RowAction, StatusChip, TurnStatus } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import {
   type ChangeItemResponse,
-  type ChatScope,
+  type ChatMode,
   type ChatSessionResponse,
   isTurnFailureRecorded,
   turnState,
   useApplyProposalMutation,
   useChatMessagesQuery,
   useChatTurnMutation,
-  useCreateChatSessionMutation,
   useDeleteChatSessionMutation,
   useDiscardProposalMutation,
-  useListArcsQuery,
-  useListBibleDocsQuery,
   useListChangesQuery,
   useListChatSessionsQuery,
-  useListVolumesQuery,
+  useProjectQuery,
   useProposalQuery,
   useRevertProposalMutation,
   useRollbackMutation,
   useSetSessionStatusMutation,
   useUpdateChatSessionMutation,
 } from '@/lib/apis';
-import { messageTime, relativeTime } from '@/lib/format';
+import { messageTime, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './chat.module.css';
 import { ChangeOpBody, defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE, opLabel, PluginSourceChip } from './proposals';
@@ -37,6 +34,10 @@ import { ChangeOpBody, defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE, opLabel, P
 interface ChatSearch {
   session?: string;
 }
+
+// `?session=new` is the chat that does not exist yet: the row is written on the first message, so until
+// then there is nothing to name. Session ids are server-generated UUIDs, which can never spell `new`.
+const DRAFT_SESSION = 'new';
 
 // The open chat lives in the URL so a refresh or shared link reopens the same conversation.
 // No loader by design (category D): the refinement chat is a live, streaming conversation whose data is
@@ -49,207 +50,12 @@ export const Route = createFileRoute('/novels/$novelId/chat')({
   component: ChatScreen,
 });
 
-interface ScopeOption {
-  value: ChatScope;
-  label: string;
-  hint: string;
-}
-
-const SCOPE_OPTIONS: ScopeOption[] = [
-  { value: 'project', label: 'Control hub', hint: 'everything — canon, prose, and the pipeline itself' },
-  { value: 'novel', label: 'Whole novel', hint: 'premise, volume plan, and the full catalog' },
-  { value: 'volume_plan', label: 'Volume plan', hint: 'the full multi-volume structure' },
-  { value: 'volume', label: 'A volume', hint: 'one volume and its arcs' },
-  { value: 'arc_plan', label: 'Arc plan of a volume', hint: 'how a volume splits into arcs' },
-  { value: 'arc', label: 'An arc', hint: 'one arc and its chapter briefs' },
-  { value: 'brief', label: 'A chapter', hint: 'one chapter brief and its current draft' },
-  { value: 'bible_document', label: 'A bible document', hint: 'one Story Bible document' },
-];
-
 const OP_RESULT_INTENT: Record<string, ChipIntent> = {
   applied: 'success',
   declined: 'neutral',
   failed: 'danger',
   pending: 'warning',
 };
-
-interface NewChatDialogProps {
-  novelId: string;
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  onCreated: (s: ChatSessionResponse) => void;
-}
-
-function NewChatDialog({ novelId, open, onOpenChange, onCreated }: NewChatDialogProps): React.JSX.Element {
-  const createSession = useCreateChatSessionMutation(novelId);
-  const [scope, setScope] = useState<ChatScope>('project');
-  const [mode, setMode] = useState<'manual' | 'auto'>('manual');
-  const [volumeKey, setVolumeKey] = useState('');
-  const [arcKey, setArcKey] = useState('');
-  const [chapter, setChapter] = useState('');
-  const [doc, setDoc] = useState('');
-  const [title, setTitle] = useState('');
-
-  const needsVolume = scope === 'volume' || scope === 'arc_plan' || scope === 'arc';
-  const volumesQuery = useListVolumesQuery(novelId, { limit: 50 }, open && (needsVolume || scope === 'brief'));
-  const arcsQuery = useListArcsQuery(novelId, volumeKey || undefined, open && scope === 'arc');
-  const docsQuery = useListBibleDocsQuery(novelId, open && scope === 'bible_document');
-
-  const volumes = volumesQuery.data?.items ?? [];
-  const arcs = arcsQuery.data?.arcs ?? [];
-  const docs = docsQuery.data?.docs ?? [];
-  const chapters = volumes.flatMap(v =>
-    v.startChapter != null && v.endChapter != null ? Array.from({ length: v.endChapter - v.startChapter + 1 }, (_, i) => (v.startChapter as number) + i) : [],
-  );
-
-  const reset = (): void => {
-    setScope('project');
-    setMode('manual');
-    setVolumeKey('');
-    setArcKey('');
-    setChapter('');
-    setDoc('');
-    setTitle('');
-  };
-
-  const scopeRef = ((): string | undefined => {
-    if (scope === 'volume' || scope === 'arc_plan') return volumeKey ? `volume:${volumeKey}` : undefined;
-    if (scope === 'arc') return arcKey ? `arc:${arcKey}` : undefined;
-    if (scope === 'brief') return chapter ? `chapter:${chapter}` : undefined;
-    if (scope === 'bible_document') return doc ? `doc:${doc}` : undefined;
-    return undefined;
-  })();
-  const refRequired = scope !== 'project' && scope !== 'novel' && scope !== 'volume_plan';
-  const canCreate = !refRequired || Boolean(scopeRef);
-
-  const defaultTitle = ((): string => {
-    if (scope === 'volume' || scope === 'arc_plan') return volumes.find(v => v.volumeKey === volumeKey)?.title ?? volumeKey;
-    if (scope === 'arc') return arcs.find(a => a.arcKey === arcKey)?.title ?? arcKey;
-    if (scope === 'brief') return chapter ? `Chapter ${chapter}` : '';
-    if (scope === 'bible_document') return doc;
-    if (scope === 'volume_plan') return 'Volume plan';
-    if (scope === 'novel') return 'Novel chat';
-    return 'Control hub';
-  })();
-
-  const submit = (): void => {
-    if (!canCreate) return;
-    createSession.mutate(
-      { mode },
-      {
-        onSuccess: session => {
-          onOpenChange(false);
-          reset();
-          onCreated(session);
-        },
-        onError: err => toast.danger(err.message),
-      },
-    );
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={next => {
-        onOpenChange(next);
-        if (!next) reset();
-      }}
-    >
-      <Dialog.Content size="md">
-        <Dialog.Header title="New chat" description="Pick what the chat should reason over — that scope becomes its context." />
-        <Dialog.Body>
-          <div className={styles.dialogForm}>
-            <FormField label="Scope" helper={SCOPE_OPTIONS.find(o => o.value === scope)?.hint}>
-              <Select
-                value={scope}
-                onValueChange={v => {
-                  setScope(v as ChatScope);
-                  setVolumeKey('');
-                  setArcKey('');
-                  setChapter('');
-                  setDoc('');
-                }}
-              >
-                {SCOPE_OPTIONS.map(o => (
-                  <Select.Item key={o.value} value={o.value}>
-                    {o.label}
-                  </Select.Item>
-                ))}
-              </Select>
-            </FormField>
-            <FormField label="Mode" helper={mode === 'auto' ? 'Changes apply immediately — everything stays revertible from History' : 'Every change waits for your per-op review'}>
-              <SegmentedControl value={mode} onValueChange={v => setMode(v as 'manual' | 'auto')} size="sm">
-                <SegmentedControl.Item value="manual">Manual review</SegmentedControl.Item>
-                <SegmentedControl.Item value="auto">Auto apply</SegmentedControl.Item>
-              </SegmentedControl>
-            </FormField>
-            {needsVolume && (
-              <FormField label="Volume" required>
-                <Select value={volumeKey} onValueChange={setVolumeKey} placeholder="Pick a volume" loading={volumesQuery.isLoading}>
-                  {volumes.map(v => (
-                    <Select.Item key={v.volumeKey} value={v.volumeKey}>
-                      Vol {v.ordinal} · {v.title ?? v.volumeKey}
-                    </Select.Item>
-                  ))}
-                </Select>
-              </FormField>
-            )}
-            {scope === 'arc' && (
-              <FormField label="Arc" required>
-                <Select
-                  value={arcKey}
-                  onValueChange={setArcKey}
-                  placeholder={volumeKey ? 'Pick an arc' : 'Pick a volume first'}
-                  disabled={!volumeKey}
-                  loading={arcsQuery.isLoading}
-                >
-                  {arcs.map(a => (
-                    <Select.Item key={a.arcKey} value={a.arcKey}>
-                      {a.title ?? a.arcKey} (chs {a.chapterStart}–{a.chapterEnd})
-                    </Select.Item>
-                  ))}
-                </Select>
-              </FormField>
-            )}
-            {scope === 'brief' && (
-              <FormField label="Chapter" required>
-                <Select value={chapter} onValueChange={setChapter} placeholder="Pick a chapter" loading={volumesQuery.isLoading}>
-                  {chapters.map(n => (
-                    <Select.Item key={n} value={String(n)}>
-                      Chapter {n}
-                    </Select.Item>
-                  ))}
-                </Select>
-              </FormField>
-            )}
-            {scope === 'bible_document' && (
-              <FormField label="Document" required>
-                <Select value={doc} onValueChange={setDoc} placeholder="Pick a document" loading={docsQuery.isLoading}>
-                  {docs.map(d => (
-                    <Select.Item key={`${d.section}/${d.slug}`} value={`${d.section}/${d.slug}`}>
-                      {d.section}/{d.slug}
-                    </Select.Item>
-                  ))}
-                </Select>
-              </FormField>
-            )}
-            <FormField label="Title" helper="Optional — defaults to the scope">
-              <Input placeholder={defaultTitle || 'Untitled chat'} value={title} onValueChange={setTitle} />
-            </FormField>
-          </div>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Dialog.Close asChild>
-            <Button variant="ghost">Cancel</Button>
-          </Dialog.Close>
-          <Button variant="primary" loading={createSession.isPending} disabled={!canCreate} onClick={submit}>
-            Start chat
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog>
-  );
-}
 
 interface TurnProposalCardProps {
   novelId: string;
@@ -652,6 +458,120 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
   );
 }
 
+interface DraftSuggestion {
+  label: string;
+  prompt: string;
+  icon: React.JSX.Element;
+}
+
+const DRAFT_SUGGESTIONS: DraftSuggestion[] = [
+  {
+    label: 'Check what canon says',
+    prompt: 'What does canon currently say about my protagonist — traits, relationships, and everything that has changed about them across the volumes so far?',
+    icon: <SearchIcon size={14} />,
+  },
+  {
+    label: 'Plan the next arc',
+    prompt: 'Look at where the story stands and propose the next arc: the chapters it spans, the beats it has to hit, and what it sets up for later.',
+    icon: <ListIcon size={14} />,
+  },
+  {
+    label: 'Write a chapter brief',
+    prompt: 'Write the brief for the next chapter that has none — POV, scene beats, and the ending contract it has to land.',
+    icon: <EditIcon size={14} />,
+  },
+  {
+    label: 'Draft the next chapter',
+    prompt: 'Generate a draft of the next unwritten chapter from its brief, then tell me where you departed from the plan and why.',
+    icon: <SparkIcon size={14} />,
+  },
+  {
+    label: 'Audit for contradictions',
+    prompt: 'Audit the story bible against the drafts so far for contradictions — names, timeline, and facts that no longer line up — and list what needs fixing.',
+    icon: <WarningIcon size={14} />,
+  },
+];
+
+interface DraftChatProps {
+  novelId: string;
+  onStart?: (content: string, mode: ChatMode) => void;
+}
+
+function DraftChat({ novelId, onStart }: DraftChatProps): React.JSX.Element {
+  const projectQuery = useProjectQuery(novelId);
+  const [input, setInput] = useState('');
+  const [mode, setMode] = useState<ChatMode>('manual');
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const isAuto = mode === 'auto';
+  const name = projectQuery.data ? projectTitle(projectQuery.data) : 'this novel';
+  const canStart = Boolean(onStart) && input.trim().length > 0;
+
+  const fill = (prompt: string): void => {
+    setInput(prompt);
+    inputRef.current?.focus();
+  };
+
+  const start = (): void => {
+    if (!canStart) return;
+    onStart?.(input.trim(), mode);
+  };
+
+  return (
+    <div className={styles.thread}>
+      <div className={`nf-scroll ${styles.scroll}`}>
+        <div className={styles.hero}>
+          <h2 className={styles.heroTitle}>What are we working on?</h2>
+          <p className={styles.heroSub}>
+            Forge reads every part of “{name}” — canon, plans, and prose — and{' '}
+            {isAuto ? 'applies changes as it goes, every one revertible from History' : 'checks with you before it changes anything'}.
+          </p>
+          <div className={styles.suggestions}>
+            {DRAFT_SUGGESTIONS.map(suggestion => (
+              <Button key={suggestion.label} variant="secondary" size="sm" className={styles.suggestion} prefix={suggestion.icon} onClick={() => fill(suggestion.prompt)}>
+                {suggestion.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.composer}>
+        <div className={styles.composerInner}>
+          <Textarea
+            ref={inputRef}
+            value={input}
+            onValueChange={setInput}
+            placeholder="Ask for anything — edits, prose, pipeline runs…"
+            minRows={1}
+            maxRows={6}
+            autoGrow
+            className={styles.input}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                start();
+              }
+            }}
+          />
+          <div className={styles.composerBar}>
+            <ChatModelMenu novelId={novelId} scopeType="project" />
+            <SegmentedControl value={mode} onValueChange={v => setMode(v as ChatMode)} size="sm">
+              <SegmentedControl.Item value="manual">Manual</SegmentedControl.Item>
+              <SegmentedControl.Item value="auto">Auto</SegmentedControl.Item>
+            </SegmentedControl>
+            <span className={styles.hint}>{isAuto ? 'Auto — changes apply instantly, revertible from History' : 'Manual — you accept or decline each change'}</span>
+            <div className={styles.spacer} />
+            <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} disabled={!canStart} onClick={start}>
+              Send
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ChatScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const { session: sessionParam } = Route.useSearch();
@@ -664,14 +584,19 @@ function ChatScreen(): React.JSX.Element {
   // Ideation sessions belong to the studio, not the hub: renaming, archiving, deleting or flipping the mode
   // of one is refused with IDE_005, and its turns need the studio's own router and payload renderers.
   const sessions = (sessionsQuery.data?.items ?? []).filter(session => session.scopeType !== 'ideation');
-  const [newChatOpen, setNewChatOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChatSessionResponse | undefined>();
 
   // The URL param wins when it names a session still in the list; otherwise fall back to the first
   // without rewriting the URL, so an implicit selection stays clean and refresh is deterministic.
+  // The draft sentinel outranks both — it means the author asked for a chat none of these rows can be.
   const selectSession = (id?: string): Promise<void> => navigate({ search: { session: id } });
-  const selected = sessions.find(s => s.id === sessionParam) ?? sessions[0];
+  const selected = sessionParam === DRAFT_SESSION ? undefined : (sessions.find(s => s.id === sessionParam) ?? sessions[0]);
+
+  const newChat = (): void => {
+    setStatusFilter('active');
+    void selectSession(DRAFT_SESSION);
+  };
 
   const archive = (session: ChatSessionResponse): void => {
     setStatus.mutate({ sessionId: session.id, status: session.status === 'active' ? 'archived' : 'active' }, { onError: err => toast.danger(err.message) });
@@ -700,7 +625,7 @@ function ChatScreen(): React.JSX.Element {
             <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)}>
               History
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setNewChatOpen(true)}>
+            <Button variant="secondary" size="sm" onClick={newChat}>
               New
             </Button>
           </div>
@@ -751,27 +676,8 @@ function ChatScreen(): React.JSX.Element {
 
       {/* thread */}
       <div className="nf-detail">
-        {selected ? (
-          <ChatThread key={selected.id} novelId={novelId} session={selected} onOpenHistory={() => setHistoryOpen(true)} />
-        ) : (
-          <div className={styles.threadEmpty}>
-            <p className={styles.emptyText}>Start a chat to control and refine your novel — the Control hub can touch everything.</p>
-            <Button variant="primary" onClick={() => setNewChatOpen(true)}>
-              New chat
-            </Button>
-          </div>
-        )}
+        {selected ? <ChatThread key={selected.id} novelId={novelId} session={selected} onOpenHistory={() => setHistoryOpen(true)} /> : <DraftChat novelId={novelId} />}
       </div>
-
-      <NewChatDialog
-        novelId={novelId}
-        open={newChatOpen}
-        onOpenChange={setNewChatOpen}
-        onCreated={session => {
-          setStatusFilter('active');
-          selectSession(session.id);
-        }}
-      />
 
       <HistoryDialog novelId={novelId} open={historyOpen} onOpenChange={setHistoryOpen} />
 
