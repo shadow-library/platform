@@ -23,9 +23,39 @@
   background: var(--sh-surface-card);
 }
 
+.threadTitleButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+  color: inherit;
+}
+
+.threadTitleButton:hover {
+  background: var(--sh-bg-hover);
+}
+
 .threadTitle {
+  min-width: 0;
   font-size: var(--sh-text-body-sm);
   font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.threadTitleEdit {
+  flex-shrink: 0;
+  color: var(--sh-text-tertiary);
+}
+
+.threadTitleInput {
+  width: 260px;
 }
 
 .scroll {
@@ -233,6 +263,10 @@
 
 [data-active='true'] .sessionTitle {
   color: var(--sh-accent);
+}
+
+.sessionTitleInput {
+  width: 100%;
 }
 
 .sessionSummary {

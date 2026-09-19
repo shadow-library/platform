@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
-import { Button, Checkbox, Dialog, SegmentedControl, Spinner, Textarea, toast } from '@shadow-library/ui';
+import { Button, Checkbox, Dialog, Input, SegmentedControl, Spinner, Textarea, toast } from '@shadow-library/ui';
 
 import { ArchiveIcon, EditIcon, ListIcon, ProposalsIcon, SearchIcon, SendIcon, SparkIcon, TrashIcon, WarningIcon } from '@/components/icons';
 import { type ChipIntent, Markdown, PaneError, PaneLoader, RowAction, StatusChip, TurnStatus } from '@/components/nf';
@@ -57,6 +57,57 @@ const OP_RESULT_INTENT: Record<string, ChipIntent> = {
   failed: 'danger',
   pending: 'warning',
 };
+
+interface RenameInputProps {
+  label: string;
+  value: string;
+  loading: boolean;
+  onCommit: (title: string) => void;
+  onCancel: () => void;
+  className?: string;
+}
+
+// Shared by the rail row and the thread header: pre-filled and selected so typing replaces the title,
+// Enter/blur commit, Escape cancels. `settledRef` guards against an Escape's cancel and the blur that
+// follows it (removing the input from the DOM) both firing — only the first one is allowed to act.
+function RenameInput({ label, value, loading, onCommit, onCancel, className }: RenameInputProps): React.JSX.Element {
+  const [draft, setDraft] = useState(value);
+  const settledRef = useRef(false);
+
+  const commit = (): void => {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    const title = draft.trim();
+    if (title && title !== value) onCommit(title);
+    else onCancel();
+  };
+
+  const cancel = (): void => {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    onCancel();
+  };
+
+  return (
+    <Input
+      autoFocus
+      size="sm"
+      aria-label={label}
+      className={className}
+      value={draft}
+      disabled={loading}
+      onValueChange={setDraft}
+      onFocus={e => e.target.select()}
+      onClick={e => e.stopPropagation()}
+      onKeyDown={e => {
+        e.stopPropagation();
+        if (e.key === 'Enter') commit();
+        else if (e.key === 'Escape') cancel();
+      }}
+      onBlur={commit}
+    />
+  );
+}
 
 interface TurnProposalCardProps {
   novelId: string;
@@ -301,6 +352,7 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
   const turn = useChatTurnMutation(novelId, session.id);
   const updateSession = useUpdateChatSessionMutation(novelId);
   const [input, setInput] = useState('');
+  const [renamingHeader, setRenamingHeader] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const messages = messagesQuery.data?.messages ?? [];
@@ -372,6 +424,19 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
     updateSession.mutate({ sessionId: session.id, mode }, { onError: err => toast.danger(err.message) });
   };
 
+  const renameSession = (title: string): void => {
+    updateSession.mutate(
+      { sessionId: session.id, title },
+      {
+        onSuccess: () => setRenamingHeader(false),
+        onError: err => {
+          setRenamingHeader(false);
+          toast.danger(err.message);
+        },
+      },
+    );
+  };
+
   // Fires once per freshly created session: the draft screen hands off its content and unmounts, so this
   // is the only place it can be sent. Clearing the parent's queue up front — before the request settles —
   // means a remount (StrictMode, or the author bouncing back to this session) never re-sends it.
@@ -393,7 +458,21 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
       <div className={styles.threadHead}>
         <StatusChip intent="info">{isHub ? 'control hub' : `scope: ${session.scopeType}`}</StatusChip>
         {session.scopeRef && <StatusChip intent="neutral">{session.scopeRef}</StatusChip>}
-        <span className={styles.threadTitle}>{session.title ?? 'Untitled chat'}</span>
+        {renamingHeader ? (
+          <RenameInput
+            label={`Rename “${session.title ?? 'Untitled chat'}”`}
+            value={session.title ?? ''}
+            loading={updateSession.isPending}
+            onCommit={renameSession}
+            onCancel={() => setRenamingHeader(false)}
+            className={styles.threadTitleInput}
+          />
+        ) : (
+          <button type="button" className={styles.threadTitleButton} onClick={() => setRenamingHeader(true)}>
+            <span className={styles.threadTitle}>{session.title ?? 'Untitled chat'}</span>
+            <EditIcon size={13} className={styles.threadTitleEdit} />
+          </button>
+        )}
         <StatusChip intent={session.status === 'active' ? 'success' : 'neutral'} dot>
           {session.status}
         </StatusChip>
@@ -606,6 +685,9 @@ function ChatScreen(): React.JSX.Element {
   const setStatus = useSetSessionStatusMutation(novelId);
   const deleteSession = useDeleteChatSessionMutation(novelId);
   const createSession = useCreateChatSessionMutation(novelId);
+  const renameSession = useUpdateChatSessionMutation(novelId);
+  // The one row (if any) whose title is an editable input right now — never more than one at a time.
+  const [renamingSessionId, setRenamingSessionId] = useState<string>();
   // Bridges the gap between a create succeeding and the sessions list re-fetching to include the new row:
   // without it, `selected` would fall back to `sessions[0]` — a different chat — for one render.
   const [draftSession, setDraftSession] = useState<ChatSessionResponse>();
@@ -682,6 +764,19 @@ function ChatScreen(): React.JSX.Element {
     setStatus.mutate({ sessionId: session.id, status: session.status === 'active' ? 'archived' : 'active' }, { onError: err => toast.danger(err.message) });
   };
 
+  const rename = (sessionId: string, title: string): void => {
+    renameSession.mutate(
+      { sessionId, title },
+      {
+        onSuccess: () => setRenamingSessionId(undefined),
+        onError: err => {
+          setRenamingSessionId(undefined);
+          toast.danger(err.message);
+        },
+      },
+    );
+  };
+
   const doDelete = (): void => {
     if (!deleteTarget) return;
     deleteSession.mutate(deleteTarget.id, {
@@ -739,6 +834,9 @@ function ChatScreen(): React.JSX.Element {
                 <div className={styles.spacer} />
                 <span className={styles.sessionTime}>{relativeTime(session.lastTurnAt ?? session.updatedAt)}</span>
                 <div className="nf-rowactions">
+                  <RowAction label="Rename chat" onClick={() => setRenamingSessionId(session.id)}>
+                    <EditIcon size={13} />
+                  </RowAction>
                   <RowAction label={session.status === 'active' ? 'Archive chat' : 'Unarchive chat'} onClick={() => archive(session)}>
                     <ArchiveIcon size={13} />
                   </RowAction>
@@ -747,7 +845,18 @@ function ChatScreen(): React.JSX.Element {
                   </RowAction>
                 </div>
               </div>
-              <div className={styles.sessionTitle}>{session.title ?? 'Untitled chat'}</div>
+              {renamingSessionId === session.id ? (
+                <RenameInput
+                  label={`Rename “${session.title ?? 'Untitled chat'}”`}
+                  value={session.title ?? ''}
+                  loading={renameSession.isPending}
+                  onCommit={title => rename(session.id, title)}
+                  onCancel={() => setRenamingSessionId(undefined)}
+                  className={styles.sessionTitleInput}
+                />
+              ) : (
+                <div className={styles.sessionTitle}>{session.title ?? 'Untitled chat'}</div>
+              )}
               {session.summary && <div className={styles.sessionSummary}>{session.summary}</div>}
             </div>
           ))}
