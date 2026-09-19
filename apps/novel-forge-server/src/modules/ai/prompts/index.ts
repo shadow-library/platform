@@ -11,6 +11,7 @@ import { chapterExpandPrompt } from './chapter-expand.prompt';
 import { chapterExtractPrompt } from './chapter-extract.prompt';
 import { chapterSummarizePrompt } from './chapter-summarize.prompt';
 import { chatCompactPrompt } from './chat-compact.prompt';
+import { chatTitlePrompt } from './chat-title.prompt';
 import { chatRefinePrompt } from './chat-refine.prompt';
 import { continuityPrompt } from './continuity.prompt';
 import { epitomePrompt } from './epitome.prompt';
@@ -82,6 +83,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   /** Shape-only — the no-contradiction rule lives in `buildIdeationStressPrompt`; the studio calls the builder. */
   'ideation-stress': ideationStressPrompt as PromptModule<unknown>,
   'idea-name': ideaNamePrompt as PromptModule<unknown>,
+  'chat-title': chatTitlePrompt as PromptModule<unknown>,
   'arc-plan': arcPlanPrompt as PromptModule<unknown>,
   'chapter-extract': chapterExtractPrompt as PromptModule<unknown>,
   'rebrand-glossary': rebrandGlossaryPrompt as PromptModule<unknown>,

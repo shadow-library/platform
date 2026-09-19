@@ -35,6 +35,7 @@ export type PromptKey =
   | 'ideation-concepts'
   | 'ideation-stress'
   | 'idea-name'
+  | 'chat-title'
   | 'arc-plan'
   | 'chapter-extract'
   | 'rebrand-glossary'
